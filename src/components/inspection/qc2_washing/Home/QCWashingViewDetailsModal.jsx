@@ -721,7 +721,7 @@ const RecordsListModal = () => (
                               <p className={`text-sm ${
                                 point.decision === 'ok' ? 'text-green-600 dark:text-green-400' : 
                                 point.decision === 'no' ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                              }`}>{point.decision}</p>
+                              }`}>{point.decision?.toUpperCase()}</p>
                             </div>
                           </div>
                         ))}

@@ -555,7 +555,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                     {safeString(point.pointName)}
                   </Text>
                   <Text style={[styles.tableCol, { width: "12%" }]}>
-                    {safeString(point.decision)}
+                    {safeString(point.decision).toUpperCase()}
                   </Text>
                   <Text style={[
                     styles.tableCol, 

@@ -132,7 +132,7 @@ export const server = https.createServer(options, app);
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: "https://192.167.12.162:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
+    origin: "https://192.167.12.85:3001",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -298,7 +298,6 @@ app.use((req, res, next) => {
   SQL Query routs
 ------------------------------ */
 app.use(sqlQuery);
-
 /* ------------------------------
    New Endpoints for CutPanelOrders
 ------------------------------ */
@@ -531,19 +530,6 @@ app.get("/api/inline-orders-details", async (req, res) => {
   }
 });
 
-/* ------------------------------
-   Graceful Shutdown
------------------------------- */
-process.on("SIGINT", async () => {
-  try {
-     await closeSQLPools();
-    console.log("SQL connection pools closed.");
-  } catch (err) {
-    console.error("Error closing SQL connection pools:", err);
-  } finally {
-    process.exit(0);
-  }
-});
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -24581,7 +24567,13 @@ app.get(
 /* ------------------------------
    End Points - Measurement Data In qcWashing
 ------------------------------ */
-const qcWashingDir = path.join(process.cwd(),"backend","public", "storage", "qc_washing_images");
+const qcWashingDir = path.join(
+  process.cwd(),
+  "backend",
+  "public",
+  "storage",
+  "qc_washing_images"
+);
 // if (!fs.existsSync(qcWashingDir)) {
 //   fs.mkdirSync(qcWashingDir, { recursive: true });
 // }
@@ -24592,7 +24584,7 @@ function saveBase64Image(base64String, prefix = "image") {
   const ext = matches[1].split("/")[1];
   const buffer = Buffer.from(matches[2], "base64");
   // Generate a hash of the image content
-  const hash = crypto.createHash('md5').update(buffer).digest('hex');
+  const hash = crypto.createHash("md5").update(buffer).digest("hex");
   const filename = `${prefix}-${hash}.${ext}`;
   const filePath = path.join(qcWashingDir, filename);
 
@@ -24619,14 +24611,18 @@ export const uploadQcWashingFiles = multer({
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Invalid file type. Only JPEG, PNG, GIF, and WEBP are allowed."), false);
+      cb(
+        new Error(
+          "Invalid file type. Only JPEG, PNG, GIF, and WEBP are allowed."
+        ),
+        false
+      );
     }
   }
 });
 
-
 // Get order details by style number
-app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
+app.get("/api/qc-washing/order-details-by-style/:orderNo", async (req, res) => {
   const { orderNo } = req.params;
   const collection = ymProdConnection.db.collection("dt_orders");
 
@@ -24634,14 +24630,16 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
 
     if (!orders || orders.length === 0) {
-      return res.status(404).json({ success: false, message: `Style '${orderNo}' not found.` });
+      return res
+        .status(404)
+        .json({ success: false, message: `Style '${orderNo}' not found.` });
     }
 
     // Extract all available colors from OrderColors array
     const colorSet = new Set();
-    orders.forEach(order => {
+    orders.forEach((order) => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
-        order.OrderColors.forEach(colorObj => {
+        order.OrderColors.forEach((colorObj) => {
           if (colorObj && colorObj.Color) {
             colorSet.add(colorObj.Color);
           }
@@ -24649,43 +24647,49 @@ app.get('/api/qc-washing/order-details-by-style/:orderNo', async (req, res) => {
       }
     });
     const availableColors = Array.from(colorSet);
-    
-    const orderQty = orders.reduce((sum, order) => sum + (order.TotalQty || 0), 0);
+
+    const orderQty = orders.reduce(
+      (sum, order) => sum + (order.TotalQty || 0),
+      0
+    );
     const buyerName = getBuyerFromMoNumber(orderNo);
-    
 
     res.json({
       success: true,
       colors: availableColors,
       orderQty,
-      buyer: buyerName,
+      buyer: buyerName
     });
-
   } catch (error) {
     console.error(`Error fetching order details for style ${orderNo}:`, error);
-    res.status(500).json({ success: false, message: 'Server error while fetching order details.' });
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching order details."
+    });
   }
 });
 
 // GET - Get total order qty for a specific orderNo and color
-app.get('/api/qc-washing/order-color-qty/:orderNo/:color', async (req, res) => {
+app.get("/api/qc-washing/order-color-qty/:orderNo/:color", async (req, res) => {
   const { orderNo, color } = req.params;
   const collection = ymProdConnection.db.collection("dt_orders");
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
     if (!orders || orders.length === 0) {
-      return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
+      return res
+        .status(404)
+        .json({ success: false, message: `Order '${orderNo}' not found.` });
     }
     let totalQty = 0;
-    orders.forEach(order => {
+    orders.forEach((order) => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
-        const colorObj = order.OrderColors.find(c => 
-          c.Color.toLowerCase() === color.toLowerCase()
+        const colorObj = order.OrderColors.find(
+          (c) => c.Color.toLowerCase() === color.toLowerCase()
         );
         if (colorObj && Array.isArray(colorObj.OrderQty)) {
-          colorObj.OrderQty.forEach(sizeObj => {
+          colorObj.OrderQty.forEach((sizeObj) => {
             // Each sizeObj is like { "XS": 32 }
-            Object.values(sizeObj).forEach(qty => {
+            Object.values(sizeObj).forEach((qty) => {
               if (typeof qty === "number" && qty > 0) totalQty += qty;
             });
           });
@@ -24694,14 +24698,19 @@ app.get('/api/qc-washing/order-color-qty/:orderNo/:color', async (req, res) => {
     });
     res.json({ success: true, orderNo, color, colorOrderQty: totalQty });
   } catch (error) {
-    console.error(`Error fetching color order qty for ${orderNo} / ${color}:`, error);
-    res.status(500).json({ success: false, message: 'Server error while fetching color order qty.' });
+    console.error(
+      `Error fetching color order qty for ${orderNo} / ${color}:`,
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching color order qty."
+    });
   }
 });
 
-
 // Get sizes for a specific order and color
-app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
+app.get("/api/qc-washing/order-sizes/:orderNo/:color", async (req, res) => {
   const { orderNo, color } = req.params;
   const collection = ymProdConnection.db.collection("dt_orders");
 
@@ -24709,18 +24718,20 @@ app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
 
     if (!orders || orders.length === 0) {
-      return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
+      return res
+        .status(404)
+        .json({ success: false, message: `Order '${orderNo}' not found.` });
     }
 
     const sizes = new Set();
-    orders.forEach(order => {
+    orders.forEach((order) => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
-        const matchingColor = order.OrderColors.find(c => 
-          c.Color.toLowerCase() === color.toLowerCase()
+        const matchingColor = order.OrderColors.find(
+          (c) => c.Color.toLowerCase() === color.toLowerCase()
         );
-        
+
         if (matchingColor && matchingColor.OrderQty) {
-          matchingColor.OrderQty.forEach(entry => {
+          matchingColor.OrderQty.forEach((entry) => {
             const sizeName = Object.keys(entry)[0];
             const quantity = entry[sizeName];
             if (quantity > 0) {
@@ -24734,131 +24745,183 @@ app.get('/api/qc-washing/order-sizes/:orderNo/:color', async (req, res) => {
 
     const sizesArray = Array.from(sizes);
     res.json({ success: true, sizes: sizesArray });
-
   } catch (error) {
-    console.error(`Error fetching sizes for order ${orderNo} and color ${color}:`, error);
-    res.status(500).json({ success: false, message: 'Server error while fetching sizes.' });
+    console.error(
+      `Error fetching sizes for order ${orderNo} and color ${color}:`,
+      error
+    );
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while fetching sizes." });
   }
 });
 
 // Get measurement specifications for a specific order and color
-app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) => {
-  const { orderNo, color } = req.params;
-  const collection = ymProdConnection.db.collection("dt_orders");
-  
-  try {
-    const orders = await collection.find({ Order_No: orderNo }).toArray();
-    
-    if (!orders || orders.length === 0) {
-      return res.status(404).json({ success: false, message: `Order '${orderNo}' not found.` });
-    }
+app.get(
+  "/api/qc-washing/measurement-specs/:orderNo/:color",
+  async (req, res) => {
+    const { orderNo, color } = req.params;
+    const collection = ymProdConnection.db.collection("dt_orders");
 
-    const order = orders[0];
-    
-    // Extract measurement specifications from different possible locations
-    let measurementSpecs = [];
-    
-    // Check various possible locations for measurement data
-    if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
-      measurementSpecs = order.MeasurementSpecs;
-    } else if (order.Specs && Array.isArray(order.Specs)) {
-      measurementSpecs = order.Specs;
-    } else if (order.OrderColors) {
-      // Check if measurement specs are in color-specific data
-      const colorObj = order.OrderColors.find(c => 
-        c.Color.toLowerCase() === color.toLowerCase()
-      );
-      if (colorObj && colorObj.MeasurementSpecs) {
-        measurementSpecs = colorObj.MeasurementSpecs;
-      } else if (colorObj && colorObj.Specs) {
-        measurementSpecs = colorObj.Specs;
+    try {
+      const orders = await collection.find({ Order_No: orderNo }).toArray();
+
+      if (!orders || orders.length === 0) {
+        return res
+          .status(404)
+          .json({ success: false, message: `Order '${orderNo}' not found.` });
       }
-    }
-    
-    
-    const beforeWashSpecs = [];
-    const afterWashSpecs = [];
-    
-    // Group specs by kValue
-    const beforeWashByK = {};
-    const afterWashByK = {};
-    
-    // Check for BeforeWashSpecs and AfterWashSpecs arrays
-    if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
-      order.BeforeWashSpecs.forEach(spec => {
-        if (spec.MeasurementPointEngName && spec.Specs && Array.isArray(spec.Specs)) {
-          const kValue = spec.kValue || 'NA';
-          const pointName = spec.MeasurementPointEngName;
-          
-          if (!beforeWashByK[kValue]) {
-            beforeWashByK[kValue] = new Map();
-          }
-          
-          if (!beforeWashByK[kValue].has(pointName)) {
-            const sizeSpec = spec.Specs.find(s => s.size === color) || spec.Specs[0];
-            beforeWashByK[kValue].set(pointName, {
-              MeasurementPointEngName: pointName,
-              Specs: {
-                fraction: (sizeSpec?.fraction || sizeSpec?.decimal?.toString() || '0').toString().trim()
-              },
-              ToleranceMinus: (spec.TolMinus?.fraction || spec.TolMinus?.decimal?.toString() || '0').toString().trim(),
-              TolerancePlus: (spec.TolPlus?.fraction || spec.TolPlus?.decimal?.toString() || '0').toString().trim(),
-              kValue: kValue
-            });
-          }
-        }
-      });
-    }
-    
-    if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
-      order.AfterWashSpecs.forEach(spec => {
-        if (spec.MeasurementPointEngName && spec.Specs && Array.isArray(spec.Specs)) {
-          const kValue = spec.kValue || 'NA';
-          const pointName = spec.MeasurementPointEngName;
-          
-          if (!afterWashByK[kValue]) {
-            afterWashByK[kValue] = new Map();
-          }
-          
-          if (!afterWashByK[kValue].has(pointName)) {
-            const sizeSpec = spec.Specs.find(s => s.size === color) || spec.Specs[0];
-            afterWashByK[kValue].set(pointName, {
-              MeasurementPointEngName: pointName,
-              Specs: {
-                fraction: (sizeSpec?.fraction || sizeSpec?.decimal?.toString() || '0').toString().trim()
-              },
-              ToleranceMinus: (spec.TolMinus?.fraction || spec.TolMinus?.decimal?.toString() || '0').toString().trim(),
-              TolerancePlus: (spec.TolPlus?.fraction || spec.TolPlus?.decimal?.toString() || '0').toString().trim(),
-              kValue: kValue
-            });
-          }
-        }
-      });
-    }
-    
-    // Convert to grouped arrays
-    const beforeWashGrouped = {};
-    const afterWashGrouped = {};
-    
-    Object.keys(beforeWashByK).forEach(kValue => {
-      beforeWashGrouped[kValue] = Array.from(beforeWashByK[kValue].values());
-    });
-    
-    Object.keys(afterWashByK).forEach(kValue => {
-      afterWashGrouped[kValue] = Array.from(afterWashByK[kValue].values());
-    });
-    
-    // For backward compatibility, also provide flat arrays
-    Object.values(beforeWashGrouped).forEach(group => {
-      beforeWashSpecs.push(...group);
-    });
-    Object.values(afterWashGrouped).forEach(group => {
-      afterWashSpecs.push(...group);
-    });
-    
 
-    // If no measurement data found, provide default specifications
-    if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
+      const order = orders[0];
+
+      // Extract measurement specifications from different possible locations
+      let measurementSpecs = [];
+
+      // Check various possible locations for measurement data
+      if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
+        measurementSpecs = order.MeasurementSpecs;
+      } else if (order.Specs && Array.isArray(order.Specs)) {
+        measurementSpecs = order.Specs;
+      } else if (order.OrderColors) {
+        // Check if measurement specs are in color-specific data
+        const colorObj = order.OrderColors.find(
+          (c) => c.Color.toLowerCase() === color.toLowerCase()
+        );
+        if (colorObj && colorObj.MeasurementSpecs) {
+          measurementSpecs = colorObj.MeasurementSpecs;
+        } else if (colorObj && colorObj.Specs) {
+          measurementSpecs = colorObj.Specs;
+        }
+      }
+
+      const beforeWashSpecs = [];
+      const afterWashSpecs = [];
+
+      // Group specs by kValue
+      const beforeWashByK = {};
+      const afterWashByK = {};
+
+      // Check for BeforeWashSpecs and AfterWashSpecs arrays
+      if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
+        order.BeforeWashSpecs.forEach((spec) => {
+          if (
+            spec.MeasurementPointEngName &&
+            spec.Specs &&
+            Array.isArray(spec.Specs)
+          ) {
+            const kValue = spec.kValue || "NA";
+            const pointName = spec.MeasurementPointEngName;
+
+            if (!beforeWashByK[kValue]) {
+              beforeWashByK[kValue] = new Map();
+            }
+
+            if (!beforeWashByK[kValue].has(pointName)) {
+              const sizeSpec =
+                spec.Specs.find((s) => s.size === color) || spec.Specs[0];
+              beforeWashByK[kValue].set(pointName, {
+                MeasurementPointEngName: pointName,
+                Specs: {
+                  fraction: (
+                    sizeSpec?.fraction ||
+                    sizeSpec?.decimal?.toString() ||
+                    "0"
+                  )
+                    .toString()
+                    .trim()
+                },
+                ToleranceMinus: (
+                  spec.TolMinus?.fraction ||
+                  spec.TolMinus?.decimal?.toString() ||
+                  "0"
+                )
+                  .toString()
+                  .trim(),
+                TolerancePlus: (
+                  spec.TolPlus?.fraction ||
+                  spec.TolPlus?.decimal?.toString() ||
+                  "0"
+                )
+                  .toString()
+                  .trim(),
+                kValue: kValue
+              });
+            }
+          }
+        });
+      }
+
+      if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
+        order.AfterWashSpecs.forEach((spec) => {
+          if (
+            spec.MeasurementPointEngName &&
+            spec.Specs &&
+            Array.isArray(spec.Specs)
+          ) {
+            const kValue = spec.kValue || "NA";
+            const pointName = spec.MeasurementPointEngName;
+
+            if (!afterWashByK[kValue]) {
+              afterWashByK[kValue] = new Map();
+            }
+
+            if (!afterWashByK[kValue].has(pointName)) {
+              const sizeSpec =
+                spec.Specs.find((s) => s.size === color) || spec.Specs[0];
+              afterWashByK[kValue].set(pointName, {
+                MeasurementPointEngName: pointName,
+                Specs: {
+                  fraction: (
+                    sizeSpec?.fraction ||
+                    sizeSpec?.decimal?.toString() ||
+                    "0"
+                  )
+                    .toString()
+                    .trim()
+                },
+                ToleranceMinus: (
+                  spec.TolMinus?.fraction ||
+                  spec.TolMinus?.decimal?.toString() ||
+                  "0"
+                )
+                  .toString()
+                  .trim(),
+                TolerancePlus: (
+                  spec.TolPlus?.fraction ||
+                  spec.TolPlus?.decimal?.toString() ||
+                  "0"
+                )
+                  .toString()
+                  .trim(),
+                kValue: kValue
+              });
+            }
+          }
+        });
+      }
+
+      // Convert to grouped arrays
+      const beforeWashGrouped = {};
+      const afterWashGrouped = {};
+
+      Object.keys(beforeWashByK).forEach((kValue) => {
+        beforeWashGrouped[kValue] = Array.from(beforeWashByK[kValue].values());
+      });
+
+      Object.keys(afterWashByK).forEach((kValue) => {
+        afterWashGrouped[kValue] = Array.from(afterWashByK[kValue].values());
+      });
+
+      // For backward compatibility, also provide flat arrays
+      Object.values(beforeWashGrouped).forEach((group) => {
+        beforeWashSpecs.push(...group);
+      });
+      Object.values(afterWashGrouped).forEach((group) => {
+        afterWashSpecs.push(...group);
+      });
+
+      // If no measurement data found, provide default specifications
+      if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
         return res.json({
           success: true,
           beforeWashSpecs: [],
@@ -24869,28 +24932,34 @@ app.get('/api/qc-washing/measurement-specs/:orderNo/:color', async (req, res) =>
           message: "No measurement points available for this Mono."
         });
       } else {
-        return res.json({ 
-          success: true, 
+        return res.json({
+          success: true,
           beforeWashSpecs: beforeWashSpecs,
           afterWashSpecs: afterWashSpecs,
           beforeWashGrouped: beforeWashGrouped,
           afterWashGrouped: afterWashGrouped,
-          isDefault: false 
+          isDefault: false
         });
       }
-
-  } catch (error) {
-    console.error(`Error fetching measurement specs for Mono ${orderNo} :`, error);
-    res.status(500).json({ success: false, message: 'Server error while fetching measurement specs.' });
+    } catch (error) {
+      console.error(
+        `Error fetching measurement specs for Mono ${orderNo} :`,
+        error
+      );
+      res.status(500).json({
+        success: false,
+        message: "Server error while fetching measurement specs."
+      });
+    }
   }
-});
+);
 
 // Get order details by order number
-app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
+app.get("/api/qc-washing/order-details-by-order/:orderNo", async (req, res) => {
   try {
     const { orderNo } = req.params;
     const orderData = await QCWashing.findOne({ orderNo: orderNo });
-    
+
     if (orderData) {
       res.json({
         success: true,
@@ -24900,51 +24969,57 @@ app.get('/api/qc-washing/order-details-by-order/:orderNo', async (req, res) => {
         buyer: orderData.color.orderDetails.buyer
       });
     } else {
-      res.json({ success: false, message: 'Order not found' });
+      res.json({ success: false, message: "Order not found" });
     }
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch order details' });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch order details" });
   }
 });
 
-
 // Save size data
-app.post('/api/qc-washing/save-size', async (req, res) => {
+app.post("/api/qc-washing/save-size", async (req, res) => {
   try {
     const { orderNo, color, sizeData, userId } = req.body;
-    
+
     // Find existing QC record or create new one
-    let qcRecord = await QCWashing.findOne({ orderNo: orderNo, isAutoSave: true, userId: userId });
-    
+    let qcRecord = await QCWashing.findOne({
+      orderNo: orderNo,
+      isAutoSave: true,
+      userId: userId
+    });
+
     if (!qcRecord) {
       qcRecord = new QCWashing({
         orderNo: orderNo,
         isAutoSave: true,
         userId: userId,
-        status: 'auto-saved',
+        status: "auto-saved",
         color: {
           orderDetails: { color: color },
           measurementDetails: new Map()
         }
       });
     }
-    
+
     // Validate measurements against tolerance
     const validateMeasurement = (measurement, specs, tolMinus, tolPlus) => {
-      if (!measurement || !specs) return 'pass';
-      
+      if (!measurement || !specs) return "pass";
+
       const measValue = parseFloat(measurement);
       const specValue = parseFloat(specs);
       const minTol = parseFloat(tolMinus) || 0;
       const maxTol = parseFloat(tolPlus) || 0;
-      
+
       const minAllowed = specValue + minTol;
       const maxAllowed = specValue + maxTol;
-      
-      return (measValue >= minAllowed && measValue <= maxAllowed) ? 'pass' : 'fail';
+
+      return measValue >= minAllowed && measValue <= maxAllowed
+        ? "pass"
+        : "fail";
     };
-    
-  
+
     const sizeKey = `size_${sizeData.size}`;
     const measurementData = {
       size: sizeData.size,
@@ -24955,41 +25030,43 @@ app.post('/api/qc-washing/save-size', async (req, res) => {
       results: {},
       savedAt: new Date()
     };
-    
+
     // Add validation results
-    Object.keys(sizeData.measurements || {}).forEach(cellKey => {
+    Object.keys(sizeData.measurements || {}).forEach((cellKey) => {
       const measurement = sizeData.measurements[cellKey];
       measurementData.results[cellKey] = {
         value: measurement.decimal,
         fraction: measurement.fraction,
-        result: 'pass'
+        result: "pass"
       };
     });
-    
+
     qcRecord.color.measurementDetails.set(sizeKey, measurementData);
     await qcRecord.save();
-    
-    res.json({ success: true, message: 'Size data saved successfully' });
+
+    res.json({ success: true, message: "Size data saved successfully" });
   } catch (error) {
-    console.error('Save size error:', error);
-    res.status(500).json({ success: false, message: 'Failed to save size data' });
+    console.error("Save size error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to save size data" });
   }
 });
 
 // Get saved sizes
-app.get('/api/qc-washing/saved-sizes/:orderNo/:color', async (req, res) => {
+app.get("/api/qc-washing/saved-sizes/:orderNo/:color", async (req, res) => {
   try {
     const { orderNo, color } = req.params;
-    const qcRecord = await QCWashing.findOne({ 
-      orderNo: orderNo, 
+    const qcRecord = await QCWashing.findOne({
+      orderNo: orderNo,
       colorName: color,
-      isAutoSave: true 
+      isAutoSave: true
     });
-    
+
     if (qcRecord && qcRecord.color && qcRecord.color.measurementDetails) {
       const savedSizes = [];
       qcRecord.color.measurementDetails.forEach((value, key) => {
-        if (key.startsWith('size_')) {
+        if (key.startsWith("size_")) {
           savedSizes.push(value.size);
         }
       });
@@ -24998,16 +25075,20 @@ app.get('/api/qc-washing/saved-sizes/:orderNo/:color', async (req, res) => {
       res.json({ success: true, savedSizes: [] });
     }
   } catch (error) {
-    console.error('Get saved sizes error:', error);
-    res.status(500).json({ success: false, message: 'Failed to get saved sizes' });
+    console.error("Get saved sizes error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get saved sizes" });
   }
 });
 
-app.post('/api/qc-washing/submit', async (req, res) => {
+app.post("/api/qc-washing/submit", async (req, res) => {
   try {
     const { orderNo } = req.body;
     if (!orderNo) {
-      return res.status(400).json({ success: false, message: 'orderNo is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: "orderNo is required" });
     }
     const latestAutoSave = await QCWashing.findOne({
       orderNo,
@@ -25015,80 +25096,101 @@ app.post('/api/qc-washing/submit', async (req, res) => {
     }).sort({ updatedAt: -1 });
 
     if (!latestAutoSave) {
-      return res.status(404).json({ success: false, message: 'No auto-save record found to submit.' });
+      return res.status(404).json({
+        success: false,
+        message: "No auto-save record found to submit."
+      });
     }
 
     latestAutoSave.isAutoSave = false;
-    latestAutoSave.status = 'submitted';
+    latestAutoSave.status = "submitted";
     latestAutoSave.submittedAt = new Date();
     latestAutoSave.savedAt = new Date();
     await latestAutoSave.save();
 
-    res.json({ success: true, submissionId: latestAutoSave._id, message: 'QC Washing data submitted successfully' });
+    res.json({
+      success: true,
+      submissionId: latestAutoSave._id,
+      message: "QC Washing data submitted successfully"
+    });
   } catch (error) {
-    console.error('Submit error:', error);
-    res.status(500).json({ success: false, message: 'Failed to submit data', error: error.message, stack: error.stack });
+    console.error("Submit error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to submit data",
+      error: error.message,
+      stack: error.stack
+    });
   }
 });
 
 // Load color-specific data
-app.get('/api/qc-washing/load-color-data/:orderNo/:color', async (req, res) => {
+app.get("/api/qc-washing/load-color-data/:orderNo/:color", async (req, res) => {
   try {
     const { orderNo, color } = req.params;
     const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
-    
+
     if (qcRecord && qcRecord.colors) {
-      const colorData = qcRecord.colors.find(c => c.colorName === color);
-      
+      const colorData = qcRecord.colors.find((c) => c.colorName === color);
+
       if (colorData) {
         // res.json({ success: true, colorData: colorData });
-        res.json({ success: true, colorData: {
-          ...colorData,
-          before_after_wash: qcRecord.before_after_wash,
-          washQty: qcRecord.washQty,
-          checkedQty: qcRecord.checkedQty,
-          totalCheckedPoint: qcRecord.totalCheckedPoint,
-          totalPass: qcRecord.totalPass,
-          totalFail: qcRecord.totalFail,
-          passRate: qcRecord.passRate
-        }});
+        res.json({
+          success: true,
+          colorData: {
+            ...colorData,
+            before_after_wash: qcRecord.before_after_wash,
+            washQty: qcRecord.washQty,
+            checkedQty: qcRecord.checkedQty,
+            totalCheckedPoint: qcRecord.totalCheckedPoint,
+            totalPass: qcRecord.totalPass,
+            totalFail: qcRecord.totalFail,
+            passRate: qcRecord.passRate
+          }
+        });
       } else {
-        res.json({ success: false, message: 'Color data not found' });
+        res.json({ success: false, message: "Color data not found" });
       }
     } else {
-      res.json({ success: false, message: 'No saved data found' });
+      res.json({ success: false, message: "No saved data found" });
     }
   } catch (error) {
-    console.error('Load color data error:', error);
-    res.status(500).json({ success: false, message: 'Failed to load color data' });
+    console.error("Load color data error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load color data" });
   }
 });
 
 // Get all saved colors for an order
-app.get('/api/qc-washing/saved-colors/:orderNo', async (req, res) => {
+app.get("/api/qc-washing/saved-colors/:orderNo", async (req, res) => {
   try {
     const { orderNo } = req.params;
     const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
-    
+
     if (qcRecord && qcRecord.colors) {
-      const savedColors = qcRecord.colors.map(c => c.colorName);
+      const savedColors = qcRecord.colors.map((c) => c.colorName);
       res.json({ success: true, savedColors: savedColors });
     } else {
       res.json({ success: true, savedColors: [] });
     }
   } catch (error) {
-    console.error('Get saved colors error:', error);
-    res.status(500).json({ success: false, message: 'Failed to get saved colors' });
+    console.error("Get saved colors error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get saved colors" });
   }
 });
 
 // Get order numbers
-app.get('/api/qc-washing/order-numbers', async (req, res) => {
+app.get("/api/qc-washing/order-numbers", async (req, res) => {
   try {
-    const orders = await QCWashing.distinct('orderNo');
+    const orders = await QCWashing.distinct("orderNo");
     res.json({ success: true, orderNumbers: orders });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to fetch order numbers' });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch order numbers" });
   }
 });
 
@@ -25097,25 +25199,27 @@ app.get('/api/qc-washing/order-numbers', async (req, res) => {
 ------------------------------ */
 
 // Check if existing record exists for QC Washing
-app.get('/api/qc-washing/check-existing/:orderNo', async (req, res) => {
+app.get("/api/qc-washing/check-existing/:orderNo", async (req, res) => {
   try {
     const { orderNo } = req.params;
-    const existingRecord = await QCWashing.findOne({ 
-      orderNo: orderNo, 
-      isAutoSave: true 
+    const existingRecord = await QCWashing.findOne({
+      orderNo: orderNo,
+      isAutoSave: true
     }).sort({ savedAt: -1 });
 
     if (existingRecord) {
-      res.json({ 
-        exists: true, 
+      res.json({
+        exists: true,
         recordId: existingRecord._id,
         existingData: {
           formData: existingRecord.color?.orderDetails || {},
-          inspectionData: existingRecord.color?.inspectionDetails?.checkedPoints || [],
-          processData: existingRecord.color?.inspectionDetails?.parameters || [],
+          inspectionData:
+            existingRecord.color?.inspectionDetails?.checkedPoints || [],
+          processData:
+            existingRecord.color?.inspectionDetails?.parameters || [],
           defectData: existingRecord.color?.defectDetails || {},
           addedDefects: existingRecord.color?.defectDetails?.defects || [],
-          comment: existingRecord.color?.defectDetails?.comment || '',
+          comment: existingRecord.color?.defectDetails?.comment || "",
           signatures: existingRecord.signatures || {},
           measurementData: existingRecord.measurementData || []
         }
@@ -25124,42 +25228,52 @@ app.get('/api/qc-washing/check-existing/:orderNo', async (req, res) => {
       res.json({ exists: false });
     }
   } catch (error) {
-    console.error('Error checking existing record:', error);
-    res.status(500).json({ success: false, message: 'Failed to check existing record' });
+    console.error("Error checking existing record:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to check existing record" });
   }
 });
 
 // Update existing QC Washing record
-app.put('/api/qc-washing/update/:recordId', async (req, res) => {
+app.put("/api/qc-washing/update/:recordId", async (req, res) => {
   try {
     const { recordId } = req.params;
     const updateData = req.body;
-    
+
     const updatedRecord = await QCWashing.findByIdAndUpdate(
-      recordId, 
-      updateData, 
+      recordId,
+      updateData,
       { new: true }
     );
-    
+
     if (updatedRecord) {
-      res.json({ success: true, id: updatedRecord._id, message: 'Record updated successfully' });
+      res.json({
+        success: true,
+        id: updatedRecord._id,
+        message: "Record updated successfully"
+      });
     } else {
-      res.status(404).json({ success: false, message: 'Record not found' });
+      res.status(404).json({ success: false, message: "Record not found" });
     }
   } catch (error) {
-    console.error('Error updating record:', error);
-    res.status(500).json({ success: false, message: 'Failed to update record' });
+    console.error("Error updating record:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update record" });
   }
 });
 
 // GET - Get overall summary for a given orderNo and color
-app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
+app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
   try {
     const { recordId } = req.params;
     const qcRecord = await QCWashing.findById(recordId);
 
     if (!qcRecord) {
-      return res.status(404).json({ success: false, message: 'No data found for this record.' });
+      return res
+        .status(404)
+        .json({ success: false, message: "No data found for this record." });
     }
 
     // Use saved summary fields if available, fallback to 0 or "N/A"
@@ -25176,7 +25290,8 @@ app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
         totalDefectCount: qcRecord.totalDefectCount ?? 0,
         defectRate: qcRecord.defectRate ?? 0,
         defectRatio: qcRecord.defectRatio ?? 0,
-        overallResult: qcRecord.overallFinalResult ?? qcRecord.overallResult ?? "N/A",
+        overallResult:
+          qcRecord.overallFinalResult ?? qcRecord.overallResult ?? "N/A",
         // Optionally include these if you want to show them in the UI:
         passRate: qcRecord.passRate ?? "",
         measurementPoints: qcRecord.measurementPoints ?? "",
@@ -25184,28 +25299,37 @@ app.get('/api/qc-washing/overall-summary-by-id/:recordId', async (req, res) => {
         totalFail: qcRecord.totalFail ?? "",
         measurementOverallResult: qcRecord.measurementOverallResult ?? "",
         defectOverallResult: qcRecord.defectDetails?.result ?? "N/A",
-        defectDetails: qcRecord.defectDetails ?? {},
+        defectDetails: qcRecord.defectDetails ?? {}
       }
     });
   } catch (error) {
-    console.error('Error fetching overall summary by id:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching overall summary.' });
+    console.error("Error fetching overall summary by id:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching overall summary."
+    });
   }
 });
 
-app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
+app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
   try {
     const { recordId } = req.params;
     const summary = req.body.summary || {};
 
     const qcRecord = await QCWashing.findById(recordId);
-    if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
+    if (!qcRecord)
+      return res
+        .status(404)
+        .json({ success: false, message: "Record not found." });
 
     // Calculate totalCheckedPcs correctly from measurement data
     let totalCheckedPcs = 0;
-    if (qcRecord.measurementDetails && qcRecord.measurementDetails.measurement) {
+    if (
+      qcRecord.measurementDetails &&
+      qcRecord.measurementDetails.measurement
+    ) {
       // Sum up the qty from each size measurement
-      qcRecord.measurementDetails.measurement.forEach(measurement => {
+      qcRecord.measurementDetails.measurement.forEach((measurement) => {
         if (typeof measurement.qty === "number" && measurement.qty > 0) {
           totalCheckedPcs += measurement.qty;
         }
@@ -25221,15 +25345,20 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     let rejectedDefectPcs = 0;
     let totalDefectCount = 0;
     const defectDetails = qcRecord.defectDetails || {};
-    
+
     if (Array.isArray(defectDetails.defectsByPc)) {
       rejectedDefectPcs = defectDetails.defectsByPc.length;
       totalDefectCount = defectDetails.defectsByPc.reduce(
-        (sum, pc) => sum + (
-          Array.isArray(pc.pcDefects)
-            ? pc.pcDefects.reduce((defSum, defect) => defSum + (parseInt(defect.defectQty, 10) || 0), 0)
-            : 0
-        ), 0
+        (sum, pc) =>
+          sum +
+          (Array.isArray(pc.pcDefects)
+            ? pc.pcDefects.reduce(
+                (defSum, defect) =>
+                  defSum + (parseInt(defect.defectQty, 10) || 0),
+                0
+              )
+            : 0),
+        0
       );
     }
 
@@ -25237,44 +25366,59 @@ app.post('/api/qc-washing/save-summary/:recordId', async (req, res) => {
     qcRecord.totalCheckedPcs = totalCheckedPcs;
     qcRecord.rejectedDefectPcs = rejectedDefectPcs;
     qcRecord.totalDefectCount = totalDefectCount;
-    qcRecord.defectRate = totalCheckedPcs > 0 ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1)) : 0;
-    qcRecord.defectRatio = totalCheckedPcs > 0 ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1)) : 0;
+    qcRecord.defectRate =
+      totalCheckedPcs > 0
+        ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1))
+        : 0;
+    qcRecord.defectRatio =
+      totalCheckedPcs > 0
+        ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
+        : 0;
     qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
-
 
     await qcRecord.save();
     res.json({ success: true });
   } catch (error) {
-    console.error('Save summary error:', error);
-    res.status(500).json({ success: false, message: 'Failed to save summary.' });
+    console.error("Save summary error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to save summary." });
   }
 });
-
-
 
 const getAqlLevelForBuyer = (buyer) => {
   if (!buyer) return 1.0;
   const buyerUpper = buyer.toUpperCase();
-  
-  if (buyerUpper.includes('MWW')) return 2.5;
-  if (buyerUpper.includes('REITMANS')) return 4.0;
-  if (buyerUpper.includes('ARITZIA')) return 1.5;
-  if (buyerUpper.includes('A & F') || buyerUpper.includes('A&F') || buyerUpper.includes('ANF')) return 1.5;
-  if (buyerUpper.includes('COSCO')) return 1.0;
-  
+
+  if (buyerUpper.includes("MWW")) return 2.5;
+  if (buyerUpper.includes("REITMANS")) return 4.0;
+  if (buyerUpper.includes("ARITZIA")) return 1.5;
+  if (
+    buyerUpper.includes("A & F") ||
+    buyerUpper.includes("A&F") ||
+    buyerUpper.includes("ANF")
+  )
+    return 1.5;
+  if (buyerUpper.includes("COSCO")) return 1.0;
+
   return 1.0;
 };
 
-app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
+app.post("/api/qc-washing/aql-chart/find-by-sample-size", async (req, res) => {
   try {
     const { orderNo } = req.body;
     // const sampleSizeNum = parseInt(sampleSize, 10);
-    
-    const firstOutputRecord = await QCWashingFirstOutput.findOne().sort({ createdAt: -1 }).lean();
+
+    const firstOutputRecord = await QCWashingFirstOutput.findOne()
+      .sort({ createdAt: -1 })
+      .lean();
     const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
 
     if (isNaN(sampleSizeNum) || sampleSizeNum <= 0) {
-      return res.status(400).json({ success: false, message: "A valid sample size must be provided." });
+      return res.status(400).json({
+        success: false,
+        message: "A valid sample size must be provided."
+      });
     }
 
     const buyer = await getBuyerFromMoNumber(orderNo);
@@ -25284,21 +25428,25 @@ app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
       Type: "General",
       Level: "II",
       SampleSize: { $gte: sampleSizeNum }
-    }).sort({ SampleSize: 1 }).lean();
+    })
+      .sort({ SampleSize: 1 })
+      .lean();
 
     if (!aqlChart) {
-      return res
-        .status(404)
-        .json({ success: false, message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.` });
+      return res.status(404).json({
+        success: false,
+        message: `No AQL chart found for a sample size of ${sampleSizeNum} or greater.`
+      });
     }
 
     // Find the specific AQL entry for level 1.0 within the document.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
+    const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
 
     if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({ success: false, message: "AQL level  ${aqlLevel} not found for the matching chart." });
+      return res.status(404).json({
+        success: false,
+        message: "AQL level  ${aqlLevel} not found for the matching chart."
+      });
     }
 
     // Respond with the data in the format expected by the frontend.
@@ -25311,21 +25459,24 @@ app.post('/api/qc-washing/aql-chart/find-by-sample-size', async (req, res) => {
         levelUsed: aqlLevel
       }
     });
-
   } catch (error) {
-    console.error('AQL lookup by sample size error:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching AQL details by sample size.' });
+    console.error("AQL lookup by sample size error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching AQL details by sample size."
+    });
   }
 });
 // AQL data endpoint
-app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
+app.post("/api/qc-washing/aql-chart/find", async (req, res) => {
   try {
     const { lotSize, orderNo } = req.body;
 
     if (!lotSize || isNaN(lotSize)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Lot size (wash Qty) is required and must be a number." });
+      return res.status(400).json({
+        success: false,
+        message: "Lot size (wash Qty) is required and must be a number."
+      });
     }
     const lotSizeNum = parseInt(lotSize, 10);
 
@@ -25334,84 +25485,102 @@ app.post('/api/qc-washing/aql-chart/find', async (req, res) => {
 
     // Find the AQL chart document where the lot size falls within the defined range.
     const aqlChart = await AQLChart.findOne({
-      Type: "General", 
-      Level: "II",   
+      Type: "General",
+      Level: "II",
       "LotSize.min": { $lte: lotSizeNum },
-      $or: [
-        { "LotSize.max": { $gte: lotSizeNum } },
-        { "LotSize.max": null }
-      ]
+      $or: [{ "LotSize.max": { $gte: lotSizeNum } }, { "LotSize.max": null }]
     }).lean();
 
     if (!aqlChart) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No AQL chart found for the given lot size." });
+      return res.status(404).json({
+        success: false,
+        message: "No AQL chart found for the given lot size."
+      });
     }
 
     // Find the specific AQL entry for level  within the document.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
+    const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
 
     if (!aqlEntry) {
-      return res
-        .status(404)
-        .json({ success: false, message: "AQL level  ${aqlLevel} not found for the matching chart." });
+      return res.status(404).json({
+        success: false,
+        message: "AQL level  ${aqlLevel} not found for the matching chart."
+      });
     }
 
-    
     res.json({
       success: true,
       aqlData: {
         sampleSize: aqlChart.SampleSize,
         acceptedDefect: aqlEntry.AcceptDefect,
         rejectedDefect: aqlEntry.RejectDefect,
-        levelUsed: aqlLevel 
+        levelUsed: aqlLevel
       }
     });
   } catch (error) {
-    console.error('AQL calculation error:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching AQL details.' });
+    console.error("AQL calculation error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching AQL details."
+    });
   }
 });
 
-app.post('/api/qc-washing/first-output-details', async (req, res) => {
+app.post("/api/qc-washing/first-output-details", async (req, res) => {
   try {
     const { orderNo } = req.body;
 
     if (!orderNo) {
-      return res.status(400).json({ success: false, message: "Order No is required to fetch first output details." });
+      return res.status(400).json({
+        success: false,
+        message: "Order No is required to fetch first output details."
+      });
     }
 
     // 1. Find the latest 'First Output' record to get the quantity.
     // We sort by createdAt descending and take the first one.
-    const firstOutputRecord = await QCWashingFirstOutput.findOne().sort({ createdAt: -1 }).lean();
+    const firstOutputRecord = await QCWashingFirstOutput.findOne()
+      .sort({ createdAt: -1 })
+      .lean();
 
     if (!firstOutputRecord) {
-      return res.status(404).json({ success: false, message: "No 'First Output' quantity has been set in the admin settings." });
+      return res.status(404).json({
+        success: false,
+        message:
+          "No 'First Output' quantity has been set in the admin settings."
+      });
     }
 
-       const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
+    const sampleSizeNum = parseInt(firstOutputRecord.quantity, 10);
 
     // 2. Get the buyer and AQL level based on the provided orderNo.
     const buyer = await getBuyerFromMoNumber(orderNo);
     const aqlLevel = getAqlLevelForBuyer(buyer);
 
     // 3. Find the AQL chart document based on the lot size (quantity).
-   const aqlChart = await AQLChart.findOne({
+    const aqlChart = await AQLChart.findOne({
       Type: "General",
       Level: "II",
       SampleSize: { $gte: sampleSizeNum }
-    }).sort({ SampleSize: 1 }).lean();
+    })
+      .sort({ SampleSize: 1 })
+      .lean();
 
     if (!aqlChart) {
-      return res.status(404).json({ success: false, message: "No AQL chart found for the given lot size." });
+      return res.status(404).json({
+        success: false,
+        message: "No AQL chart found for the given lot size."
+      });
     }
 
     // 4. Find the specific AQL entry for the buyer's AQL level.
-    const aqlEntry = aqlChart.AQL.find(aql => aql.level === aqlLevel);
+    const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
 
     if (!aqlEntry) {
-      return res.status(404).json({ success: false, message: `AQL level ${aqlLevel} not found for the matching chart.` });
+      return res.status(404).json({
+        success: false,
+        message: `AQL level ${aqlLevel} not found for the matching chart.`
+      });
     }
 
     // 5. Respond with the data in the format expected by the frontend.
@@ -25425,10 +25594,12 @@ app.post('/api/qc-washing/first-output-details', async (req, res) => {
         levelUsed: aqlLevel
       }
     });
-
   } catch (error) {
-    console.error('Error fetching first output details:', error);
-    res.status(500).json({ success: false, message: 'Server error while fetching first output details.' });
+    console.error("Error fetching first output details:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching first output details."
+    });
   }
 });
 
@@ -25485,44 +25656,48 @@ app.post('/api/qc-washing/first-output-details', async (req, res) => {
 // });
 
 // Load submitted data
-app.get('/api/qc-washing/load-submitted/:orderNo', async (req, res) => {
+app.get("/api/qc-washing/load-submitted/:orderNo", async (req, res) => {
   try {
     const { orderNo } = req.params;
-    const submittedData = await QCWashing.findOne({ 
-      orderNo: orderNo, 
+    const submittedData = await QCWashing.findOne({
+      orderNo: orderNo,
       isAutoSave: false,
-      status: 'submitted'
+      status: "submitted"
     }).sort({ submittedAt: -1 });
 
     if (submittedData) {
       res.json({ success: true, data: submittedData });
     } else {
-      res.json({ success: false, message: 'No submitted data found' });
+      res.json({ success: false, message: "No submitted data found" });
     }
   } catch (error) {
-    console.error('Load submitted data error:', error);
-    res.status(500).json({ success: false, message: 'Failed to load submitted data' });
+    console.error("Load submitted data error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load submitted data" });
   }
 });
 
 // Check if submitted data exists
-app.get('/api/qc-washing/check-submitted/:orderNo', async (req, res) => {
+app.get("/api/qc-washing/check-submitted/:orderNo", async (req, res) => {
   try {
     const { orderNo } = req.params;
-    const submittedData = await QCWashing.findOne({ 
-      orderNo: orderNo, 
+    const submittedData = await QCWashing.findOne({
+      orderNo: orderNo,
       isAutoSave: false,
-      status: 'submitted'
+      status: "submitted"
     });
 
-    res.json({ 
+    res.json({
       exists: !!submittedData,
       isSubmitted: !!submittedData,
       recordId: submittedData?._id
     });
   } catch (error) {
-    console.error('Check submitted data error:', error);
-    res.status(500).json({ success: false, message: 'Failed to check submitted data' });
+    console.error("Check submitted data error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to check submitted data" });
   }
 });
 
@@ -25531,101 +25706,131 @@ app.get('/api/qc-washing/check-submitted/:orderNo', async (req, res) => {
 ------------------------------ */
 
 // GET - Fetch all check list items
-app.get('/api/qc-washing-checklist', async (req, res) => {
+app.get("/api/qc-washing-checklist", async (req, res) => {
   try {
-    const checkList = await QCWashingCheckList.find({}).sort({ code: 1 }).lean();
+    const checkList = await QCWashingCheckList.find({})
+      .sort({ code: 1 })
+      .lean();
     res.json(checkList);
   } catch (error) {
-    console.error('Error fetching QC Washing check list:', error);
-    res.status(500).json({ message: 'Server error fetching check list' });
+    console.error("Error fetching QC Washing check list:", error);
+    res.status(500).json({ message: "Server error fetching check list" });
   }
 });
 
 // POST - Add new check list item
-app.post('/api/qc-washing-checklist', async (req, res) => {
+app.post("/api/qc-washing-checklist", async (req, res) => {
   try {
     const { name } = req.body;
     if (!name) {
-      return res.status(400).json({ message: 'Name is required.' });
+      return res.status(400).json({ message: "Name is required." });
     }
 
     const existingByName = await QCWashingCheckList.findOne({ name });
     if (existingByName) {
-      return res.status(409).json({ message: `Check list name '${name}' already exists.` });
+      return res
+        .status(409)
+        .json({ message: `Check list name '${name}' already exists.` });
     }
-    
+
     const newCheckList = new QCWashingCheckList(req.body);
     await newCheckList.save();
-    res.status(201).json({ message: 'Check list item added successfully', checkList: newCheckList });
+    res.status(201).json({
+      message: "Check list item added successfully",
+      checkList: newCheckList
+    });
   } catch (error) {
-    console.error('Error adding check list item:', error);
+    console.error("Error adding check list item:", error);
     if (error.code === 11000) {
-      return res.status(409).json({ message: 'Duplicate entry. Check list code might exist.' });
+      return res
+        .status(409)
+        .json({ message: "Duplicate entry. Check list code might exist." });
     }
-    res.status(500).json({ message: 'Failed to add check list item', error: error.message });
+    res
+      .status(500)
+      .json({ message: "Failed to add check list item", error: error.message });
   }
 });
 
 // GET - Get next available code
-app.get('/api/qc-washing-checklist/next-code', async (req, res) => {
+app.get("/api/qc-washing-checklist/next-code", async (req, res) => {
   try {
-    const lastItem = await QCWashingCheckList.findOne().sort({ code: -1 }).lean();
+    const lastItem = await QCWashingCheckList.findOne()
+      .sort({ code: -1 })
+      .lean();
     let nextCode = 1;
     if (lastItem && lastItem.code) {
       nextCode = parseInt(lastItem.code, 10) + 1;
     }
     res.json({ success: true, nextCode });
   } catch (error) {
-    console.error('Error fetching next check list code:', error);
-    res.status(500).json({ success: false, message: 'Failed to fetch next code' });
+    console.error("Error fetching next check list code:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch next code" });
   }
 });
 
 // PUT - Update check list item
-app.put('/api/qc-washing-checklist/:id', async (req, res) => {
+app.put("/api/qc-washing-checklist/:id", async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid check list ID format.' });
+      return res.status(400).json({ message: "Invalid check list ID format." });
     }
-    
-    const updatedItem = await QCWashingCheckList.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true
-    });
-    
+
+    const updatedItem = await QCWashingCheckList.findByIdAndUpdate(
+      id,
+      req.body,
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
     if (!updatedItem) {
-      return res.status(404).json({ message: 'Check list item not found.' });
+      return res.status(404).json({ message: "Check list item not found." });
     }
-    
-    res.status(200).json({ message: 'Check list item updated successfully', checkList: updatedItem });
+
+    res.status(200).json({
+      message: "Check list item updated successfully",
+      checkList: updatedItem
+    });
   } catch (error) {
-    console.error('Error updating check list item:', error);
+    console.error("Error updating check list item:", error);
     if (error.code === 11000) {
-      return res.status(409).json({ message: 'Update failed due to duplicate code.' });
+      return res
+        .status(409)
+        .json({ message: "Update failed due to duplicate code." });
     }
-    res.status(500).json({ message: 'Failed to update check list item', error: error.message });
+    res.status(500).json({
+      message: "Failed to update check list item",
+      error: error.message
+    });
   }
 });
 
 // DELETE - Delete check list item
-app.delete('/api/qc-washing-checklist/:id', async (req, res) => {
+app.delete("/api/qc-washing-checklist/:id", async (req, res) => {
   try {
     const { id } = req.params;
     if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ message: 'Invalid check list ID format.' });
+      return res.status(400).json({ message: "Invalid check list ID format." });
     }
-    
+
     const deletedItem = await QCWashingCheckList.findByIdAndDelete(id);
     if (!deletedItem) {
-      return res.status(404).json({ message: 'Check list item not found.' });
+      return res.status(404).json({ message: "Check list item not found." });
     }
-    
-    res.status(200).json({ message: 'Check list item deleted successfully' });
+
+    res.status(200).json({ message: "Check list item deleted successfully" });
   } catch (error) {
-    console.error('Error deleting check list item:', error);
-    res.status(500).json({ message: 'Failed to delete check list item', error: error.message });
-    }
+    console.error("Error deleting check list item:", error);
+    res.status(500).json({
+      message: "Failed to delete check list item",
+      error: error.message
+    });
+  }
 });
 
 // =================================================================
@@ -25648,7 +25853,6 @@ const uploadQC2_washing_image = multer({
     }
   }
 });
-
 
 /* ------------------------------
    End Points - QC Washing Defects
@@ -25682,26 +25886,30 @@ app.post("/api/qc-washing-defects", async (req, res) => {
     }
     const newDefect = new QCWashingDefects(req.body);
     await newDefect.save();
-    res
-      .status(201)
-      .json({ message: "QC Washing defect added successfully", defect: newDefect });
+    res.status(201).json({
+      message: "QC Washing defect added successfully",
+      defect: newDefect
+    });
   } catch (error) {
     console.error("Error adding QC Washing defect:", error);
     if (error.code === 11000)
       return res
         .status(409)
         .json({ message: "Duplicate entry. Defect code or name might exist." });
-    res
-      .status(500)
-      .json({ message: "Failed to add QC Washing defect", error: error.message });
+    res.status(500).json({
+      message: "Failed to add QC Washing defect",
+      error: error.message
+    });
   }
 });
 
-app.get('/api/qc-washing-defects/next-code', async (req, res) => {
+app.get("/api/qc-washing-defects/next-code", async (req, res) => {
   try {
     // Find the defect with the highest 'code' value.
     // The .lean() method is for performance, as we only need to read the data.
-    const lastDefect = await QCWashingDefects.findOne().sort({ code: -1 }).lean();
+    const lastDefect = await QCWashingDefects.findOne()
+      .sort({ code: -1 })
+      .lean();
 
     let nextCode = 1; // Default to 1 if no defects exist
     if (lastDefect && lastDefect.code) {
@@ -25712,7 +25920,9 @@ app.get('/api/qc-washing-defects/next-code', async (req, res) => {
     res.json({ success: true, nextCode });
   } catch (error) {
     console.error("Error fetching next defect code:", error);
-    res.status(500).json({ success: false, message: 'Failed to fetch next defect code' });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to fetch next defect code" });
   }
 });
 
@@ -25723,10 +25933,14 @@ app.put("/api/qc-washing-defects/:id", async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid defect ID format." });
     }
-    const updatedDefect = await QCWashingDefects.findByIdAndUpdate(id, req.body, {
-      new: true,
-      runValidators: true
-    });
+    const updatedDefect = await QCWashingDefects.findByIdAndUpdate(
+      id,
+      req.body,
+      {
+        new: true,
+        runValidators: true
+      }
+    );
     if (!updatedDefect) {
       return res.status(404).json({ message: "QC Washing Defect not found." });
     }
@@ -25740,9 +25954,10 @@ app.put("/api/qc-washing-defects/:id", async (req, res) => {
       return res
         .status(409)
         .json({ message: "Update failed due to duplicate code or name." });
-    res
-      .status(500)
-      .json({ message: "Failed to update QC Washing defect", error: error.message });
+    res.status(500).json({
+      message: "Failed to update QC Washing defect",
+      error: error.message
+    });
   }
 });
 
@@ -25772,14 +25987,18 @@ app.delete("/api/qc-washing-defects/:id", async (req, res) => {
     });
   } catch (error) {
     console.error("Error deleting QC Washing defect:", error);
-    res
-      .status(500)
-      .json({ message: "Failed to delete QC Washing defect", error: error.message });
+    res.status(500).json({
+      message: "Failed to delete QC Washing defect",
+      error: error.message
+    });
   }
 });
 
 // PUT - Replace image for an existing QC Washing defect
-app.put("/api/qc-washing-defects/:id/image",uploadQC2_washing_image.single("defectImage"), async (req, res) => {
+app.put(
+  "/api/qc-washing-defects/:id/image",
+  uploadQC2_washing_image.single("defectImage"),
+  async (req, res) => {
     try {
       const { id } = req.params;
       if (!req.file) {
@@ -25928,10 +26147,13 @@ app.delete("/api/qc-washing-first-outputs/:id", async (req, res) => {
 });
 
 // POST /api/qc-washing/standards
-app.post('/api/qc-washing/standards', async (req, res) => {
+app.post("/api/qc-washing/standards", async (req, res) => {
   try {
     const { washType, washingMachine, tumbleDry } = req.body;
-    if (!washType) return res.status(400).json({ success: false, message: "washType is required" });
+    if (!washType)
+      return res
+        .status(400)
+        .json({ success: false, message: "washType is required" });
 
     let record = await QCWashingMachineStandard.findOne({ washType });
     if (record) {
@@ -25939,7 +26161,11 @@ app.post('/api/qc-washing/standards', async (req, res) => {
       record.tumbleDry = tumbleDry;
       await record.save();
     } else {
-      record = await QCWashingMachineStandard.create({ washType, washingMachine, tumbleDry });
+      record = await QCWashingMachineStandard.create({
+        washType,
+        washingMachine,
+        tumbleDry
+      });
     }
     res.json({ success: true, data: record });
   } catch (err) {
@@ -25948,7 +26174,7 @@ app.post('/api/qc-washing/standards', async (req, res) => {
 });
 
 // GET /api/qc-washing/standards
-app.get('/api/qc-washing/standards', async (req, res) => {
+app.get("/api/qc-washing/standards", async (req, res) => {
   try {
     const records = await QCWashingMachineStandard.find({});
     res.json({ success: true, data: records });
@@ -25963,11 +26189,17 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
     const { formData, userId, savedAt } = req.body;
 
     if (!formData || !formData.orderNo) {
-      return res.status(400).json({ success: false, message: "Order No is required." });
+      return res
+        .status(400)
+        .json({ success: false, message: "Order No is required." });
     }
 
     const dateValue = formData.date
-      ? new Date(formData.date.length === 10 ? formData.date + "T00:00:00.000Z" : formData.date)
+      ? new Date(
+          formData.date.length === 10
+            ? formData.date + "T00:00:00.000Z"
+            : formData.date
+        )
       : undefined;
 
     // Build the query for uniqueness - same as find-existing
@@ -25983,7 +26215,8 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
     };
 
     Object.keys(query).forEach(
-      (key) => (query[key] === undefined || query[key] === "") && delete query[key]
+      (key) =>
+        (query[key] === undefined || query[key] === "") && delete query[key]
     );
 
     // Find existing record for THIS specific inspector
@@ -26015,91 +26248,9 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
     res.json({ success: true, id: record._id });
   } catch (err) {
     console.error("OrderData-save error:", err);
-    res.status(500).json({ success: false, message: "Server error while saving order data." });
-  }
-});
-
-
-app.get('/api/qc-washing/check-measurement-details/:orderNo', async (req, res) => {
-  try {
-    const { orderNo } = req.params;
-    
-    if (!orderNo) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Order number is required',
-        hasMeasurement: false 
-      });
-    }
-
-    const collection = ymProdConnection.db.collection("dt_orders");
-
-    // Find the order first
-    const order = await collection.findOne({
-      $or: [
-        { Order_No: orderNo },
-        { Style: orderNo }
-      ]
-    });
-
-    if (!order) {
-      return res.json({
-        success: true,
-        hasMeasurement: false,
-        message: 'Order not found',
-        debug: {
-          orderNo: orderNo,
-          foundRecord: false
-        }
-      });
-    }
-
-    // Check if measurement specs exist and have valid data
-    const hasBeforeWashSpecs = Array.isArray(order.BeforeWashSpecs) && 
-        order.BeforeWashSpecs.length > 0 &&
-        order.BeforeWashSpecs.some(spec => 
-          spec.MeasurementPointEngName && 
-          spec.MeasurementPointEngName.trim() !== ""
-        );
-
-    const hasAfterWashSpecs = Array.isArray(order.AfterWashSpecs) && 
-          order.AfterWashSpecs.length > 0 &&
-          order.AfterWashSpecs.some(spec => 
-            spec.MeasurementPointEngName && 
-            spec.MeasurementPointEngName.trim() !== ""
-          );
-
-    const hasMeasurement = hasBeforeWashSpecs || hasAfterWashSpecs;
-
-    res.json({
-      success: true,
-      hasMeasurement: hasMeasurement,
-      message: hasMeasurement 
-        ? 'Measurement details found' 
-        : 'No measurement details found for this order',
-      debug: {
-        orderNo: orderNo,
-        foundRecord: true,
-        measurementStructure: {
-          hasBeforeWashSpecs: hasBeforeWashSpecs,
-          hasAfterWashSpecs: hasAfterWashSpecs,
-          beforeWashSpecsCount: order.BeforeWashSpecs?.length || 0,
-          afterWashSpecsCount: order.AfterWashSpecs?.length || 0,
-          orderData: {
-            Order_No: order.Order_No,
-            Style: order.Style
-          }
-        }
-      }
-    });
-
-  } catch (error) {
-    console.error('Error checking measurement details:', error);
     res.status(500).json({
       success: false,
-      message: 'Server error while checking measurement details',
-      hasMeasurement: false,
-      error: error.message
+      message: "Server error while saving order data."
     });
   }
 });
@@ -26191,7 +26342,6 @@ app.get(
   }
 );
 
-// Simpler version using only userId
 app.post("/api/qc-washing/find-existing", async (req, res) => {
   try {
     const {
@@ -26218,24 +26368,23 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
       before_after_wash,
       factoryName,
       reportType,
-      "inspector.empId": inspectorId  // This should match the specific inspector
+      "inspector.empId": inspectorId // This should match the specific inspector
     };
 
     // Remove undefined or empty string fields from query
     Object.keys(query).forEach(
-      (key) => (query[key] === undefined || query[key] === "") && delete query[key]
+      (key) =>
+        (query[key] === undefined || query[key] === "") && delete query[key]
     );
-
 
     const record = await QCWashing.findOne(query);
 
     if (record) {
       res.json({ success: true, exists: true, record });
     } else {
-      console.log("No existing record found"); 
+      console.log("No existing record found");
       res.json({ success: true, exists: false });
     }
-
   } catch (err) {
     console.error("Find-existing error:", err);
     res.status(500).json({ success: false, message: "Server error." });
@@ -26243,7 +26392,7 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
 });
 
 // In your Express backend
-app.get('/api/qc-washing/load-saved-by-id/:id', async (req, res) => {
+app.get("/api/qc-washing/load-saved-by-id/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const savedData = await QCWashing.findById(id);
@@ -26251,13 +26400,14 @@ app.get('/api/qc-washing/load-saved-by-id/:id', async (req, res) => {
       // ...transform as needed, similar to your existing logic...
       res.json({ success: true, savedData });
     } else {
-      res.json({ success: false, message: 'No saved data found' });
+      res.json({ success: false, message: "No saved data found" });
     }
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to load saved data' });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load saved data" });
   }
 });
-
 
 const inspectionMemoryStorage = multer.memoryStorage();
 
@@ -26274,314 +26424,391 @@ const uploadInspectionImage = multer({
   }
 });
 
-// function normalizeInspectionImagePath(img) {
-//   if (!img) return "";
+function normalizeInspectionImagePath(img) {
+  if (!img) return "";
 
-//   // If new upload, img.file will be handled by fileMap logic in your code
-//   if (img.preview && typeof img.preview === "string") {
-//     if (img.preview.startsWith("./public/")) {
-//       return img.preview; // Keep the ./public format for consistency with defect images
-//     }
-//     if (img.preview.startsWith("/public/")) {
-//       return "." + img.preview; // Convert /public to ./public
-//     }
-//     if (img.preview.startsWith("/storage/")) {
-//       return "./public" + img.preview; // Convert /storage to ./public/storage
-//     }
-//     if (img.preview.startsWith("http")) {
-//       try {
-//         const url = new URL(img.preview);
-//         return "./public" + url.pathname; // Convert full URL to ./public path
-//       } catch (e) {
-//         return img.preview;
-//       }
-//     }
+  // If new upload, img.file will be handled by fileMap logic in your code
 
-//     // If it's just a filename (no slashes)
-//     if (!img.preview.includes("/")) {
-//       return `./public/storage/qc_washing_images/inspection/${img.preview}`;
-//     }
+  if (img.preview && typeof img.preview === "string") {
+    // If it's already a full URL, return as-is
+    if (img.preview.startsWith("http")) {
+      return img.preview;
+    }
 
-//     // If it contains a slash but not at the start, treat as relative path
-//     if (img.preview[0] !== "/") {
-//       return `./public/storage/qc_washing_images/inspection/${img.preview}`;
-//     }
+    // Convert relative paths to full URLs
+    if (img.preview.startsWith("./public/storage/")) {
+      const relativePath = img.preview.replace("./public/storage/", "");
+      return `${
+        process.env.BASE_URL || "http://localhost:3000"
+      }/storage/${relativePath}`;
+    }
 
-//     // Fallback
-//     return img.preview;
-//   }
+    if (img.preview.startsWith("/storage/")) {
+      return `${process.env.BASE_URL || "http://localhost:3000"}${img.preview}`;
+    }
 
-//   // Fallback: if img.name exists, reconstruct path
-//   if (img.name && !img.name.includes("/")) {
-//     return `./public/storage/qc_washing_images/inspection/${img.name}`;
-//   }
+    if (img.preview.startsWith("./public/")) {
+      return img.preview; // Keep the ./public format for consistency with defect images
+    }
+    if (img.preview.startsWith("/public/")) {
+      return "." + img.preview; // Convert /public to ./public
+    }
+    if (img.preview.startsWith("/storage/")) {
+      return "./public" + img.preview; // Convert /storage to ./public/storage
+    }
+    if (img.preview.startsWith("http")) {
+      try {
+        const url = new URL(img.preview);
+        return "./public" + url.pathname; // Convert full URL to ./public path
+      } catch (e) {
+        return img.preview;
+      }
+    }
 
-//   return "";
-// }
-// Updated inspection save endpoint
-// Updated inspection save endpoint - with full URL like defect images
+    // If it's just a filename (no slashes)
+    if (!img.preview.includes("/")) {
+      return `./public/storage/qc_washing_images/inspection/${img.preview}`;
+    }
+
+    // If it contains a slash but not at the start, treat as relative path
+    if (img.preview[0] !== "/") {
+      return `./public/storage/qc_washing_images/inspection/${img.preview}`;
+    }
+
+    // Fallback
+    return img.preview;
+  }
+
+  // Fallback: if img.name exists, reconstruct path
+  if (img.name && !img.name.includes("/")) {
+    return `./public/storage/qc_washing_images/inspection/${img.name}`;
+  }
+
+  return "";
+}
+
 // Add this helper function at the top of your file to get the server base URL
 function getServerBaseUrl(req) {
-  const protocol = req.protocol || 'http';
-  const host = req.get('host') || 'localhost:3000';
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost:3000";
   return `${protocol}://${host}`;
 }
 
-// Updated inspection save endpoint
-app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (req, res) => {
-  const standardValues = JSON.parse(req.body.standardValues || '{}');
-  const actualValues = JSON.parse(req.body.actualValues || '{}');
-  const machineStatus = JSON.parse(req.body.machineStatus || '{}');
+app.post(
+  "/api/qc-washing/inspection-save",
+  uploadInspectionImage.any(),
+  async (req, res) => {
+    const standardValues = JSON.parse(req.body.standardValues || "{}");
+    const actualValues = JSON.parse(req.body.actualValues || "{}");
+    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
 
-  try {
-    const { recordId } = req.body;
-    const inspectionData = JSON.parse(req.body.inspectionData || '[]');
-    const processData = JSON.parse(req.body.processData || '{}');
-    const defectData = JSON.parse(req.body.defectData || '[]');
+    try {
+      const { recordId } = req.body;
+      const inspectionData = JSON.parse(req.body.inspectionData || "[]");
+      const processData = JSON.parse(req.body.processData || "{}");
+      const defectData = JSON.parse(req.body.defectData || "[]");
 
-    if (!recordId) {
-      return res.status(400).json({ success: false, message: "recordId is required" });
-    }
-
-    // Get server base URL
-    const serverBaseUrl = getServerBaseUrl(req);
-
-    // Handle file uploads with FULL SERVER URL
-    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
-    const fileMap = {};
-
-    for (const file of (req.files || [])) {
-      let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) {
-        fileExtension = '.jpg';
+      if (!recordId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "recordId is required" });
       }
-      const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
-      const fullFilePath = path.join(uploadDir, newFilename);
-      await fs.promises.writeFile(fullFilePath, file.buffer);
-      
-      // *** FIXED: Save complete server URL instead of relative path ***
-      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
-    }
 
-    // Find or create the record
-    let record = await QCWashing.findById(recordId);
-    if (!record) {
-      record = new QCWashing({ _id: recordId });
-    }
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
 
-    // Build machine processes
-    const machineProcesses = [];
-    const machineTypes = {
-      "Washing Machine": ["temperature", "time", "silicon", "softener"],
-      "Tumble Dry": ["temperature", "time"]
-    };
+      // Handle file uploads
+      const uploadDir = path.join(
+        __dirname,
+        "./public/storage/qc_washing_images/inspection"
+      );
 
-    Object.entries(machineTypes).forEach(([machineType, parameters]) => {
-      const machineProcess = { machineType };
-      
-      parameters.forEach(param => {
-        const actualVal = actualValues[machineType]?.[param];
-        const standardVal = standardValues[machineType]?.[param];
-        
-        machineProcess[param] = {
-          actualValue: actualVal === null || actualVal === undefined ? "" : actualVal,
-          standardValue: standardVal === null || standardVal === undefined ? "" : standardVal,
-          status: {
-            ok: machineStatus[machineType]?.[param]?.ok || false,
-            no: machineStatus[machineType]?.[param]?.no || false
-          }
-        };
-      });
-      
-      machineProcesses.push(machineProcess);
-    });
+      const fileMap = {};
+      for (const file of req.files || []) {
+        const fileExtension = path.extname(file.originalname);
+        const newFilename = `inspection-${Date.now()}-${Math.round(
+          Math.random() * 1e9
+        )}${fileExtension}`;
+        const fullFilePath = path.join(uploadDir, newFilename);
+        await fs.promises.writeFile(fullFilePath, file.buffer);
 
-    // Handle inspection images with full server URLs
-    if (inspectionData) {
-      inspectionData.forEach((item, idx) => {
-        if (item.comparisonImages) {
-          item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-            // Return new uploaded image URL or existing URL
-            const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
-            if (newImageUrl) {
-              return newImageUrl;
-            }
-            
-            // If it's an existing image, check if it's already a full URL
-            if (typeof img === "string" && (img.startsWith('http://') || img.startsWith('https://'))) {
-              return img; // Already a full URL
-            }
-            
-            // If it's a relative path, convert to full URL
-            if (typeof img === "string" && img.startsWith('./')) {
-              return `${serverBaseUrl}${img.replace('./', '/')}`;
-            }
-            
-            // Handle object format
-            if (typeof img === "object" && img !== null && img.name) {
-              if (img.name.startsWith('http://') || img.name.startsWith('https://')) {
-                return img.name; // Already a full URL
-              }
-              if (img.name.startsWith('./')) {
-                return `${serverBaseUrl}${img.name.replace('./', '/')}`;
-              }
-              return img.name;
-            }
-            
-            return img || "";
-          });
-        }
-      });
-    }
-
-    // Build the inspection details
-    record.inspectionDetails = {
-      ...record.inspectionDetails,
-      checkedPoints: (inspectionData || []).map((item, idx) => ({
-        pointName: item.checkedList,
-        decision: item.decision,
-        comparison: item.comparisonImages || [],
-        remark: item.remark,
-      })),
-      
-      machineProcesses: machineProcesses,
-      parameters: (defectData || []).map(item => ({
-        parameterName: item.parameter,
-        checkedQty: item.checkedQty,
-        defectQty: item.failedQty,
-        passRate: item.passRate,
-        result: item.result,
-        remark: item.remark,
-      })),
-    };
-
-    record.savedAt = new Date();
-    record.status = 'processing';
-    await record.save();
-
-    res.json({ success: true, message: "Inspection data saved", data: record });
-  } catch (err) {
-    console.error('Inspection save error:', err);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-});
-
-// Updated inspection update endpoint
-app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async (req, res) => {
-  const standardValues = JSON.parse(req.body.standardValues || '{}');
-  const actualValues = JSON.parse(req.body.actualValues || '{}');
-  const machineStatus = JSON.parse(req.body.machineStatus || '{}');
-
-  try {
-    const { recordId } = req.body;
-    const inspectionData = JSON.parse(req.body.inspectionData || '[]');
-    const processData = JSON.parse(req.body.processData || '{}');
-    const defectData = JSON.parse(req.body.defectData || '[]');
-
-    if (!recordId) {
-      return res.status(400).json({ success: false, message: "recordId is required" });
-    }
-
-    // Get server base URL
-    const serverBaseUrl = getServerBaseUrl(req);
-
-    // Handle file uploads with FULL SERVER URL
-    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
-    const fileMap = {};
-
-    for (const file of (req.files || [])) {
-      let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) {
-        fileExtension = '.jpg';
+        // Use the same format as defect images - with ./public prefix
+        fileMap[
+          file.fieldname
+        ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
       }
-      const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
-      const fullFilePath = path.join(uploadDir, newFilename);
-      await fs.promises.writeFile(fullFilePath, file.buffer);
-      
-      // *** FIXED: Save complete server URL instead of relative path ***
-      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
-    }
 
-    // Find the record
-    let record = await QCWashing.findById(recordId);
-    if (!record) {
-      return res.status(404).json({ success: false, message: "Record not found for update" });
-    }
+      // Find or create the record
+      let record = await QCWashing.findById(recordId);
+      if (!record) {
+        record = new QCWashing({ _id: recordId });
+      }
 
-    // Build machine processes (same as save)
-    const machineProcesses = [];
-    const machineTypes = {
-      "Washing Machine": ["temperature", "time", "silicon", "softener"],
-      "Tumble Dry": ["temperature", "time"]
-    };
+      // Build machine processes with the new structure
+      const machineProcesses = [];
 
-    Object.entries(machineTypes).forEach(([machineType, parameters]) => {
-      const machineProcess = { machineType };
-      
-      parameters.forEach(param => {
-        const actualVal = actualValues[machineType]?.[param];
-        const standardVal = standardValues[machineType]?.[param];
-        
-        machineProcess[param] = {
-          actualValue: actualVal === null || actualVal === undefined ? "" : actualVal,
-          standardValue: standardVal === null || standardVal === undefined ? "" : standardVal,
-          status: {
-            ok: machineStatus[machineType]?.[param]?.ok || false,
-            no: machineStatus[machineType]?.[param]?.no || false
-          }
-        };
-      });
-      
-      machineProcesses.push(machineProcess);
-    });
+      // Define the machine types and their parameters
+      const machineTypes = {
+        "Washing Machine": ["temperature", "time", "silicon", "softener"],
+        "Tumble Dry": ["temperature", "time"]
+      };
 
-    // Handle inspection images with full server URLs (same logic as save)
-    if (inspectionData) {
-      inspectionData.forEach((item, idx) => {
-        if (item.comparisonImages) {
-          item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-            const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
-            if (newImageUrl) {
-              return newImageUrl;
+      Object.entries(machineTypes).forEach(([machineType, parameters]) => {
+        const machineProcess = { machineType };
+
+        parameters.forEach((param) => {
+          const actualVal = actualValues[machineType]?.[param];
+          const standardVal = standardValues[machineType]?.[param];
+
+          machineProcess[param] = {
+            actualValue:
+              actualVal === null || actualVal === undefined ? "" : actualVal,
+            standardValue:
+              standardVal === null || standardVal === undefined
+                ? ""
+                : standardVal,
+            status: {
+              ok: machineStatus[machineType]?.[param]?.ok || false,
+              no: machineStatus[machineType]?.[param]?.no || false
             }
-            
-            // Keep existing images as they are (should already be full URLs from previous saves)
-            return img;
-          });
-        }
+          };
+        });
+
+        machineProcesses.push(machineProcess);
       });
+
+      // Handle inspection images with full server URLs
+      if (inspectionData) {
+        inspectionData.forEach((item, idx) => {
+          if (item.comparisonImages) {
+            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+              // Return new uploaded image URL or existing URL
+              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+
+              // If it's an existing image, check if it's already a full URL
+              if (
+                typeof img === "string" &&
+                (img.startsWith("http://") || img.startsWith("https://"))
+              ) {
+                return img; // Already a full URL
+              }
+
+              // If it's a relative path, convert to full URL
+              if (typeof img === "string" && img.startsWith("./")) {
+                return `${serverBaseUrl}${img.replace("./", "/")}`;
+              }
+
+              // Handle object format
+              if (typeof img === "object" && img !== null && img.name) {
+                if (
+                  img.name.startsWith("http://") ||
+                  img.name.startsWith("https://")
+                ) {
+                  return img.name; // Already a full URL
+                }
+                if (img.name.startsWith("./")) {
+                  return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+                }
+                return img.name;
+              }
+
+              return img || "";
+            });
+          }
+        });
+      }
+
+      // Build the inspection details
+      record.inspectionDetails = {
+        ...record.inspectionDetails,
+        checkedPoints: (inspectionData || []).map((item, idx) => ({
+          pointName: item.checkedList,
+          decision: item.decision,
+          comparison: (item.comparisonImages || []).map((img, imgIdx) => {
+            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
+              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
+            }
+            return normalizeInspectionImagePath(img);
+          }),
+          remark: item.remark
+        })),
+
+        machineProcesses: machineProcesses,
+        parameters: (defectData || []).map((item) => ({
+          parameterName: item.parameter,
+          checkedQty: item.checkedQty,
+          defectQty: item.failedQty,
+          passRate: item.passRate,
+          result: item.result,
+          remark: item.remark
+        }))
+      };
+
+      record.savedAt = new Date();
+      record.status = "processing";
+      await record.save();
+
+      res.json({
+        success: true,
+        message: "Inspection data saved",
+        data: record
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: "Server error" });
     }
-
-    // Build the inspection details
-    record.inspectionDetails = {
-      ...record.inspectionDetails,
-      checkedPoints: (inspectionData || []).map((item, idx) => ({
-        pointName: item.checkedList,
-        decision: item.decision,
-        comparison: item.comparisonImages || [],
-        remark: item.remark,
-      })),
-      
-      machineProcesses: machineProcesses,
-      parameters: (defectData || []).map(item => ({
-        parameterName: item.parameter,
-        checkedQty: item.checkedQty,
-        defectQty: item.failedQty,
-        passRate: item.passRate,
-        result: item.result,
-        remark: item.remark,
-      })),
-    };
-
-    record.savedAt = new Date();
-    await record.save();
-
-    res.json({ success: true, message: "Inspection data updated", data: record });
-  } catch (err) {
-    console.error('Inspection update error:', err);
-    res.status(500).json({ success: false, message: "Server error" });
   }
-});
+);
+
+app.post(
+  "/api/qc-washing/inspection-update",
+  uploadInspectionImage.any(),
+  async (req, res) => {
+    const standardValues = JSON.parse(req.body.standardValues || "{}");
+    const actualValues = JSON.parse(req.body.actualValues || "{}");
+    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
+
+    try {
+      const { recordId } = req.body;
+      const inspectionData = JSON.parse(req.body.inspectionData || "[]");
+      const processData = JSON.parse(req.body.processData || "{}");
+      const defectData = JSON.parse(req.body.defectData || "[]");
+
+      if (!recordId) {
+        return res
+          .status(400)
+          .json({ success: false, message: "recordId is required" });
+      }
+
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
+
+      // Handle file uploads
+      const uploadDir = path.join(
+        __dirname,
+        "./public/storage/qc_washing_images/inspection"
+      );
+
+      const fileMap = {};
+      for (const file of req.files || []) {
+        const fileExtension = path.extname(file.originalname);
+        const newFilename = `inspection-${Date.now()}-${Math.round(
+          Math.random() * 1e9
+        )}${fileExtension}`;
+        const fullFilePath = path.join(uploadDir, newFilename);
+        await fs.promises.writeFile(fullFilePath, file.buffer);
+
+        // Save complete server URL instead of relative path
+        fileMap[
+          file.fieldname
+        ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
+      }
+
+      // Find the record
+      let record = await QCWashing.findById(recordId);
+      if (!record) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Record not found for update" });
+      }
+
+      // Build machine processes with the new structure
+      const machineProcesses = [];
+
+      // Define the machine types and their parameters
+      const machineTypes = {
+        "Washing Machine": ["temperature", "time", "silicon", "softener"],
+        "Tumble Dry": ["temperature", "time"]
+      };
+
+      Object.entries(machineTypes).forEach(([machineType, parameters]) => {
+        const machineProcess = { machineType };
+
+        parameters.forEach((param) => {
+          const actualVal = actualValues[machineType]?.[param];
+          const standardVal = standardValues[machineType]?.[param];
+
+          machineProcess[param] = {
+            actualValue:
+              actualVal === null || actualVal === undefined ? "" : actualVal,
+            standardValue:
+              standardVal === null || standardVal === undefined
+                ? ""
+                : standardVal,
+            status: {
+              ok: machineStatus[machineType]?.[param]?.ok || false,
+              no: machineStatus[machineType]?.[param]?.no || false
+            }
+          };
+        });
+
+        machineProcesses.push(machineProcess);
+      });
+
+      // Handle inspection images with full server URLs (same logic as save)
+      if (inspectionData) {
+        inspectionData.forEach((item, idx) => {
+          if (item.comparisonImages) {
+            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+
+              // Keep existing images as they are (should already be full URLs from previous saves)
+              return img;
+            });
+          }
+        });
+      }
+
+      // Build the inspection details
+      record.inspectionDetails = {
+        ...record.inspectionDetails,
+        checkedPoints: (inspectionData || []).map((item, idx) => {
+          const images = (item.comparisonImages || []).map((img, imgIdx) => {
+            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
+              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
+            }
+            return normalizeInspectionImagePath(img);
+          });
+
+          return {
+            pointName: item.checkedList,
+            decision: item.decision,
+            comparison: images,
+            remark: item.remark
+          };
+        }),
+
+        machineProcesses: machineProcesses,
+        parameters: (defectData || []).map((item) => ({
+          parameterName: item.parameter,
+          checkedQty: item.checkedQty,
+          defectQty: item.failedQty,
+          passRate: item.passRate,
+          result: item.result,
+          remark: item.remark
+        }))
+      };
+
+      record.savedAt = new Date();
+      await record.save();
+
+      res.json({
+        success: true,
+        message: "Inspection data updated",
+        data: record
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: "Server error" });
+    }
+  }
+);
 
 const defectMemoryStorage = multer.memoryStorage();
 const uploadDefectImage = multer({
@@ -26597,186 +26824,226 @@ const uploadDefectImage = multer({
   }
 });
 // Save defect details with images
-app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (req, res) => {
-  try {
-    const { recordId } = req.body;
-    const defectDetails = JSON.parse(req.body.defectDetails || '{}');
+app.post(
+  "/api/qc-washing/defect-details-save",
+  uploadDefectImage.any(),
+  async (req, res) => {
+    try {
+      const { recordId } = req.body;
+      const defectDetails = JSON.parse(req.body.defectDetails || "{}");
 
-    if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
+      if (!recordId)
+        return res
+          .status(400)
+          .json({ success: false, message: "Missing recordId" });
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
 
-    // Get server base URL
-    const serverBaseUrl = getServerBaseUrl(req);
+      // Ensure upload directory exists
+      const uploadDir = path.join(
+        __dirname,
+        "./public/storage/qc_washing_images/defect"
+      );
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
-
-    // Map uploaded files by fieldname and write them to disk
-    const fileMap = {};
-    for (const file of (req.files || [])) {
-      let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) {
-        fileExtension = '.jpg';
+      // Map uploaded files by fieldname and write them to disk
+      const fileMap = {};
+      for (const file of req.files || []) {
+        let fileExtension = path.extname(file.originalname);
+        if (!fileExtension) {
+          fileExtension = ".jpg";
+        }
+        const newFilename = `defect-${Date.now()}-${Math.round(
+          Math.random() * 1e9
+        )}${fileExtension}`;
+        const fullFilePath = path.join(uploadDir, newFilename);
+        await fs.promises.writeFile(fullFilePath, file.buffer);
+        fileMap[
+          file.fieldname
+        ] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
       }
-      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
-      const fullFilePath = path.join(uploadDir, newFilename);
-      await fs.promises.writeFile(fullFilePath, file.buffer);
-      
-      // *** FIXED: Save complete server URL instead of relative path ***
-      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
-    }
 
-    // Attach image URLs to defectDetails.defectsByPc and additionalImages
-    if (defectDetails.defectsByPc) {
-      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
-        (pc.pcDefects || []).forEach((defect, defectIdx) => {
-          if (defect.defectImages) {
-            defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              // Return new uploaded image URL
-              const newImageUrl = fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
-              }
-              
-              // Handle existing images
-              if (typeof img === "string" && (img.startsWith('http://') || img.startsWith('https://'))) {
-                return img; // Already a full URL
-              }
-              
-              if (typeof img === "string" && img.startsWith('./')) {
-                return `${serverBaseUrl}${img.replace('./', '/')}`;
-              }
-              
-              if (typeof img === "object" && img !== null && img.name) {
-                if (img.name.startsWith('http://') || img.name.startsWith('https://')) {
+      // Attach image URLs to defectDetails.defectsByPc and additionalImages
+      if (defectDetails.defectsByPc) {
+        defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+          (pc.pcDefects || []).forEach((defect, defectIdx) => {
+            if (defect.defectImages) {
+              defect.defectImages = defect.defectImages.map((img, imgIdx) => {
+                // Return new uploaded image URL
+                const newImageUrl =
+                  fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`];
+                if (newImageUrl) {
+                  return newImageUrl;
+                }
+
+                // Handle existing images
+                if (
+                  typeof img === "string" &&
+                  (img.startsWith("http://") || img.startsWith("https://"))
+                ) {
+                  return img; // Already a full URL
+                }
+
+                if (typeof img === "string" && img.startsWith("./")) {
+                  return `${serverBaseUrl}${img.replace("./", "/")}`;
+                }
+
+                if (typeof img === "object" && img !== null && img.name) {
+                  if (
+                    img.name.startsWith("http://") ||
+                    img.name.startsWith("https://")
+                  ) {
+                    return img.name;
+                  }
+                  if (img.name.startsWith("./")) {
+                    return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+                  }
                   return img.name;
                 }
-                if (img.name.startsWith('./')) {
-                  return `${serverBaseUrl}${img.name.replace('./', '/')}`;
-                }
+
+                return img || "";
+              });
+            }
+          });
+        });
+      }
+
+      if (defectDetails.additionalImages) {
+        defectDetails.additionalImages = defectDetails.additionalImages.map(
+          (img, imgIdx) => {
+            // Return new uploaded image URL
+            const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
+            if (newImageUrl) {
+              return newImageUrl;
+            }
+
+            // Handle existing images
+            if (
+              typeof img === "string" &&
+              (img.startsWith("http://") || img.startsWith("https://"))
+            ) {
+              return img; // Already a full URL
+            }
+
+            if (typeof img === "string" && img.startsWith("./")) {
+              return `${serverBaseUrl}${img.replace("./", "/")}`;
+            }
+
+            if (typeof img === "object" && img !== null && img.name) {
+              if (
+                img.name.startsWith("http://") ||
+                img.name.startsWith("https://")
+              ) {
                 return img.name;
               }
-              
-              return img || "";
-            });
+              if (img.name.startsWith("./")) {
+                return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+              }
+              return img.name;
+            }
+
+            return img || "";
           }
-        });
-      });
-    }
-
-    if (defectDetails.additionalImages) {
-      defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
-        // Return new uploaded image URL
-        const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
-        if (newImageUrl) {
-          return newImageUrl;
-        }
-        
-        // Handle existing images
-        if (typeof img === "string" && (img.startsWith('http://') || img.startsWith('https://'))) {
-          return img; // Already a full URL
-        }
-        
-        if (typeof img === "string" && img.startsWith('./')) {
-          return `${serverBaseUrl}${img.replace('./', '/')}`;
-        }
-        
-        if (typeof img === "object" && img !== null && img.name) {
-          if (img.name.startsWith('http://') || img.name.startsWith('https://')) {
-            return img.name;
-          }
-          if (img.name.startsWith('./')) {
-            return `${serverBaseUrl}${img.name.replace('./', '/')}`;
-          }
-          return img.name;
-        }
-        
-        return img || "";
-      });
-    }
-
-    // Save to DB
-    const doc = await QCWashing.findByIdAndUpdate(
-      recordId,
-      { 'defectDetails': defectDetails, updatedAt: new Date() },
-      { new: true }
-    );
-
-    if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
-
-    res.json({ success: true, data: doc.defectDetails });
-
-  } catch (err) {
-    console.error('Defect details save error:', err);
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// Updated defect details update endpoint
-app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async (req, res) => {
-  try {
-    const { recordId } = req.body;
-    const defectDetails = JSON.parse(req.body.defectDetails || '{}');
-
-    if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
-
-    // Get server base URL
-    const serverBaseUrl = getServerBaseUrl(req);
-
-    // Ensure upload directory exists
-    const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
-
-    // Map uploaded files by fieldname and write them to disk
-    const fileMap = {};
-    for (const file of (req.files || [])) {
-      let fileExtension = path.extname(file.originalname);
-      if (!fileExtension) {
-        fileExtension = '.jpg';
+        );
       }
-      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
-      const fullFilePath = path.join(uploadDir, newFilename);
-      await fs.promises.writeFile(fullFilePath, file.buffer);
-      
-      // *** FIXED: Save complete server URL instead of relative path ***
-      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
+
+      // Save to DB
+      const doc = await QCWashing.findByIdAndUpdate(
+        recordId,
+        { defectDetails: defectDetails, updatedAt: new Date() },
+        { new: true }
+      );
+
+      if (!doc)
+        return res
+          .status(404)
+          .json({ success: false, message: "Record not found" });
+
+      res.json({ success: true, data: doc.defectDetails });
+    } catch (err) {
+      console.error("Defect details save error:", err);
+      res.status(500).json({ success: false, message: err.message });
     }
-
-    // Attach image URLs to defectDetails.defectsByPc and additionalImages
-    if (defectDetails.defectsByPc) {
-      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
-        (pc.pcDefects || []).forEach((defect, defectIdx) => {
-          if (defect.defectImages) {
-            defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              // Return new uploaded image URL or keep existing
-              return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img;
-            });
-          }
-        });
-      });
-    }
-
-    if (defectDetails.additionalImages) {
-      defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
-        // Return new uploaded image URL or keep existing
-        return fileMap[`additionalImages_${imgIdx}`] || img;
-      });
-    }
-
-    // Save to DB
-    const doc = await QCWashing.findByIdAndUpdate(
-      recordId,
-      { 'defectDetails': defectDetails, updatedAt: new Date() },
-      { new: true }
-    );
-
-    if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
-
-    res.json({ success: true, data: doc.defectDetails });
-
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
   }
-});
+);
 
+// Update defect details with images
+app.post(
+  "/api/qc-washing/defect-details-update",
+  uploadDefectImage.any(),
+  async (req, res) => {
+    try {
+      const { recordId } = req.body;
+      const defectDetails = JSON.parse(req.body.defectDetails || "{}");
+      if (!recordId)
+        return res
+          .status(400)
+          .json({ success: false, message: "Missing recordId" });
+
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
+
+      // Ensure upload directory exists
+      const uploadDir = path.join(
+        __dirname,
+        "./public/storage/qc_washing_images/defect"
+      );
+
+      // Map uploaded files by fieldname and write them to disk
+      const fileMap = {};
+      for (const file of req.files || []) {
+        let fileExtension = path.extname(file.originalname);
+        if (!fileExtension) {
+          // fallback to .jpg if no extension is found
+          fileExtension = ".jpg";
+        }
+        const newFilename = `defect-${Date.now()}-${Math.round(
+          Math.random() * 1e9
+        )}${fileExtension}`;
+        const fullFilePath = path.join(uploadDir, newFilename);
+        await fs.promises.writeFile(fullFilePath, file.buffer);
+        fileMap[
+          file.fieldname
+        ] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
+      }
+
+      // Attach image URLs to defectDetails.defectsByPc and additionalImages
+      if (defectDetails.defectsByPc) {
+        defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+          (pc.pcDefects || []).forEach((defect, defectIdx) => {
+            if (defect.defectImages) {
+              defect.defectImages = defect.defectImages.map((img, imgIdx) => {
+                return (
+                  fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img
+                );
+              });
+            }
+          });
+        });
+      }
+      if (defectDetails.additionalImages) {
+        defectDetails.additionalImages = defectDetails.additionalImages.map(
+          (img, imgIdx) => {
+            return fileMap[`additionalImages_${imgIdx}`] || img;
+          }
+        );
+      }
+
+      // Save to DB
+      const doc = await QCWashing.findByIdAndUpdate(
+        recordId,
+        { defectDetails: defectDetails, updatedAt: new Date() },
+        { new: true }
+      );
+      if (!doc)
+        return res
+          .status(404)
+          .json({ success: false, message: "Record not found" });
+      res.json({ success: true, data: doc.defectDetails });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  }
+);
 
 function calculateMeasurementSizeSummary(measurementDetail) {
   if (!measurementDetail || !Array.isArray(measurementDetail.pcs)) {
@@ -26789,25 +27056,29 @@ function calculateMeasurementSizeSummary(measurementDetail) {
   let plusToleranceFailCount = 0;
   let minusToleranceFailCount = 0;
 
-  measurementDetail.pcs.forEach(pc => {
-    (pc.measurementPoints || []).forEach(point => {
+  measurementDetail.pcs.forEach((pc) => {
+    (pc.measurementPoints || []).forEach((point) => {
       checkedPoints++;
-      if (point.result === 'pass') totalPass++;
-      if (point.result === 'fail') {
+      if (point.result === "pass") totalPass++;
+      if (point.result === "fail") {
         totalFail++;
         // Only count fail points for plus/minus tolerance
-        const value = typeof point.measured_value_decimal === 'number'
-          ? point.measured_value_decimal
-          : parseFloat(point.measured_value_decimal);
-        const specs = typeof point.specs === 'number'
-          ? point.specs
-          : parseFloat(point.specs);
-        const tolMinus = typeof point.toleranceMinus === 'number'
-          ? point.toleranceMinus
-          : parseFloat(point.toleranceMinus);
-        const tolPlus = typeof point.tolerancePlus === 'number'
-          ? point.tolerancePlus
-          : parseFloat(point.tolerancePlus);
+        const value =
+          typeof point.measured_value_decimal === "number"
+            ? point.measured_value_decimal
+            : parseFloat(point.measured_value_decimal);
+        const specs =
+          typeof point.specs === "number"
+            ? point.specs
+            : parseFloat(point.specs);
+        const tolMinus =
+          typeof point.toleranceMinus === "number"
+            ? point.toleranceMinus
+            : parseFloat(point.toleranceMinus);
+        const tolPlus =
+          typeof point.tolerancePlus === "number"
+            ? point.tolerancePlus
+            : parseFloat(point.tolerancePlus);
 
         if (!isNaN(value) && !isNaN(specs)) {
           if (!isNaN(tolPlus) && value > tolPlus) plusToleranceFailCount++;
@@ -26824,35 +27095,57 @@ function calculateMeasurementSizeSummary(measurementDetail) {
     totalPass,
     totalFail,
     plusToleranceFailCount,
-    minusToleranceFailCount,
+    minusToleranceFailCount
   };
 }
 
-
 // Save or update measurement details for a record
-app.post('/api/qc-washing/measurement-save', async (req, res) => {
+app.post("/api/qc-washing/measurement-save", async (req, res) => {
   try {
     const { recordId, measurementDetail } = req.body;
     if (!recordId || !measurementDetail) {
-      return res.status(400).json({ success: false, message: "Missing recordId or measurementDetail" });
+      return res.status(400).json({
+        success: false,
+        message: "Missing recordId or measurementDetail"
+      });
     }
     if (!measurementDetail.before_after_wash) {
-      return res.status(400).json({ success: false, message: "before_after_wash is required in measurementDetail" });
+      return res.status(400).json({
+        success: false,
+        message: "before_after_wash is required in measurementDetail"
+      });
     }
     const record = await QCWashing.findById(recordId);
     if (!record) {
-      return res.status(404).json({ success: false, message: "Record not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Record not found" });
     }
     // Ensure measurementDetails is an object with two arrays
     if (!record.measurementDetails) {
-      record.measurementDetails = { measurement: [], measurementSizeSummary: [] };
+      record.measurementDetails = {
+        measurement: [],
+        measurementSizeSummary: []
+      };
     }
     // Remove existing
-    record.measurementDetails.measurement = (record.measurementDetails.measurement || []).filter(
-      m => !(m.size === measurementDetail.size && m.before_after_wash === measurementDetail.before_after_wash)
+    record.measurementDetails.measurement = (
+      record.measurementDetails.measurement || []
+    ).filter(
+      (m) =>
+        !(
+          m.size === measurementDetail.size &&
+          m.before_after_wash === measurementDetail.before_after_wash
+        )
     );
-    record.measurementDetails.measurementSizeSummary = (record.measurementDetails.measurementSizeSummary || []).filter(
-      s => !(s.size === measurementDetail.size && s.before_after_wash === measurementDetail.before_after_wash)
+    record.measurementDetails.measurementSizeSummary = (
+      record.measurementDetails.measurementSizeSummary || []
+    ).filter(
+      (s) =>
+        !(
+          s.size === measurementDetail.size &&
+          s.before_after_wash === measurementDetail.before_after_wash
+        )
     );
     // Calculate summary
     const summary = calculateMeasurementSizeSummary(measurementDetail);
@@ -26861,43 +27154,60 @@ app.post('/api/qc-washing/measurement-save', async (req, res) => {
     record.measurementDetails.measurementSizeSummary.push(summary);
     record.savedAt = new Date();
     await record.save();
-    res.json({ success: true, message: "Measurement detail saved", measurementDetails: record.measurementDetails });
+    res.json({
+      success: true,
+      message: "Measurement detail saved",
+      measurementDetails: record.measurementDetails
+    });
   } catch (err) {
-    console.error('Measurement save error:', err);
-    res.status(500).json({ success: false, message: "Failed to save measurement detail" });
+    console.error("Measurement save error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to save measurement detail" });
   }
 });
 
+app.post(
+  "/api/qc-washing/measurement-summary-autosave/:recordId",
+  async (req, res) => {
+    try {
+      const { recordId } = req.params;
+      const summary = req.body.summary || {};
+      const qcRecord = await QCWashing.findById(recordId);
+      if (!qcRecord)
+        return res
+          .status(404)
+          .json({ success: false, message: "Record not found." });
 
+      // Accept both totalCheckedPoints and totalCheckedPcs for compatibility
+      qcRecord.totalCheckedPoint =
+        summary.totalCheckedPoints ?? summary.totalCheckedPcs ?? 0;
+      qcRecord.totalCheckedPcs =
+        summary.totalCheckedPcs ?? summary.totalCheckedPoints ?? 0;
+      qcRecord.totalPass = summary.totalPass ?? 0;
+      qcRecord.totalFail = summary.totalFail ?? 0;
+      qcRecord.passRate = summary.passRate ?? 0;
+      qcRecord.measurementOverallResult =
+        summary.overallResult || summary.overallFinalResult || "PENDING";
+      qcRecord.savedAt = new Date();
 
-app.post('/api/qc-washing/measurement-summary-autosave/:recordId', async (req, res) => {
-  try {
-    const { recordId } = req.params;
-    const summary = req.body.summary || {};
-    const qcRecord = await QCWashing.findById(recordId);
-    if (!qcRecord) return res.status(404).json({ success: false, message: 'Record not found.' });
-
-    // Accept both totalCheckedPoints and totalCheckedPcs for compatibility
-    qcRecord.totalCheckedPoint = summary.totalCheckedPoints ?? summary.totalCheckedPcs ?? 0;
-    qcRecord.totalCheckedPcs = summary.totalCheckedPcs ?? summary.totalCheckedPoints ?? 0; 
-    qcRecord.totalPass = summary.totalPass ?? 0;
-    qcRecord.totalFail = summary.totalFail ?? 0;
-    qcRecord.passRate = summary.passRate ?? 0;
-    qcRecord.measurementOverallResult = summary.overallResult || summary.overallFinalResult || "PENDING";
-    qcRecord.savedAt = new Date();
-
-    await qcRecord.save();
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Measurement summary autosave error:', error);
-    res.status(500).json({ success: false, message: 'Failed to autosave measurement summary.' });
+      await qcRecord.save();
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Measurement summary autosave error:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to autosave measurement summary."
+      });
+    }
   }
-});
-
+);
 // Get all submitted QC washing data
 app.get("/api/qc-washing/all-submitted", async (req, res) => {
   try {
-    const submittedData = await QCWashing.find({ status: ['submitted' , 'processing']})
+    const submittedData = await QCWashing.find({
+      status: ["submitted", "processing"]
+    })
       .sort({ updatedAt: -1 })
       .lean();
 
@@ -26909,10 +27219,10 @@ app.get("/api/qc-washing/all-submitted", async (req, res) => {
     });
   } catch (error) {
     console.error("Error fetching submitted QC washing data:", error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      error: "Failed to fetch submitted QC washing data", 
-      message: error.message 
+      error: "Failed to fetch submitted QC washing data",
+      message: error.message
     });
   }
 });
@@ -26921,7 +27231,7 @@ app.get("/api/qc-washing/all-submitted", async (req, res) => {
 app.get("/api/qc-washing/submitted/:id", async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Validate the ID format (assuming MongoDB ObjectId)
     if (!id || id.length !== 24) {
       return res.status(400).json({
@@ -26931,7 +27241,7 @@ app.get("/api/qc-washing/submitted/:id", async (req, res) => {
     }
 
     const reportData = await QCWashing.findById(id).lean();
-    
+
     if (!reportData) {
       return res.status(404).json({
         success: false,
@@ -26954,7 +27264,6 @@ app.get("/api/qc-washing/submitted/:id", async (req, res) => {
       success: true,
       data: transformedData
     });
-
   } catch (error) {
     console.error("Error fetching QC washing report:", error);
     res.status(500).json({
@@ -26965,33 +27274,34 @@ app.get("/api/qc-washing/submitted/:id", async (req, res) => {
   }
 });
 
-app.get('/api/qc-washing/comparison', async (req, res) => {
-  const { orderNo, color, washType, reportType, factory, before_after_wash } = req.query;
-  
+app.get("/api/qc-washing/comparison", async (req, res) => {
+  const { orderNo, color, washType, reportType, factory, before_after_wash } =
+    req.query;
+
   const filter = {
     orderNo,
     color,
     washType,
     reportType,
     factoryName: factory,
-    before_after_wash: before_after_wash || 'Before Wash' 
+    before_after_wash: before_after_wash || "Before Wash"
   };
-  
+
   const comparisonRecord = await QCWashing.findOne(filter);
   res.json(comparisonRecord);
 });
 
-app.get('/api/qc-washing/results', async (req, res) => {
+app.get("/api/qc-washing/results", async (req, res) => {
   try {
     const { orderNo, color, washType, reportType, factory } = req.query;
-    
+
     const query = {};
     if (orderNo) query.orderNo = orderNo;
     if (color) query.color = color;
     if (washType) query.washType = washType;
     if (reportType) query.reportType = reportType;
     if (factory) query.factoryName = factory;
-    
+
     const results = await QCWashing.find(query);
     res.json(results);
   } catch (error) {
@@ -26999,399 +27309,14 @@ app.get('/api/qc-washing/results', async (req, res) => {
   }
 });
 
-// Enhanced image serving endpoint
-// app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
-//   try {
-//     const { type, filename } = req.params;
-//     console.log(`🖼️ Image request: ${type}/${filename}`);
-    
-//     // Try multiple possible paths
-//     const possiblePaths = [
-//       path.join(__dirname, 'public/storage/qc_washing_images', type, filename),
-//       path.join(__dirname, 'storage/qc_washing_images', type, filename),
-//       path.join(__dirname, 'public', 'qc_washing_images', type, filename),
-//       path.join(__dirname, 'uploads/qc_washing_images', type, filename),
-//       path.join(__dirname, 'files/qc_washing_images', type, filename)
-//     ];
-    
-//     let foundPath = null;
-//     for (const testPath of possiblePaths) {
-//       console.log(`🔍 Testing path: ${testPath}`);
-//       if (fs.existsSync(testPath)) {
-//         foundPath = testPath;
-//         console.log(`✅ Found file at: ${foundPath}`);
-//         break;
-//       }
-//     }
-    
-//     if (!foundPath) {
-//       console.warn(`❌ File not found: ${filename}`);
-//       console.warn('Searched paths:', possiblePaths);
-//       return res.status(404).json({
-//         success: false,
-//         message: 'Image not found',
-//         filename,
-//         searchedPaths: possiblePaths
-//       });
-//     }
-    
-//     // Get file stats and set appropriate headers
-//     const stats = fs.statSync(foundPath);
-//     const ext = path.extname(filename).toLowerCase();
-    
-//     const mimeTypes = {
-//       '.jpg': 'image/jpeg',
-//       '.jpeg': 'image/jpeg',
-//       '.png': 'image/png',
-//       '.gif': 'image/gif',
-//       '.webp': 'image/webp',
-//       '.bmp': 'image/bmp'
-//     };
-    
-//     const mimeType = mimeTypes[ext] || 'image/jpeg';
-    
-//     // Set headers
-//     res.setHeader('Content-Type', mimeType);
-//     res.setHeader('Content-Length', stats.size);
-//     res.setHeader('Access-Control-Allow-Origin', '*');
-//     res.setHeader('Access-Control-Allow-Methods', 'GET');
-//     res.setHeader('Cache-Control', 'public, max-age=31536000');
-//     res.setHeader('Last-Modified', stats.mtime.toUTCString());
-    
-//     // Stream the file
-//     const readStream = fs.createReadStream(foundPath);
-//     readStream.pipe(res);
-    
-//     console.log(`✅ Successfully served: ${filename}`);
-    
-//   } catch (error) {
-//     console.error(`❌ Error serving image:`, error);
-//     res.status(500).json({
-//       success: false,
-//       message: 'Internal server error',
-//       error: error.message
-//     });
-//   }
-// });
-
-// Enhanced image serving with CORS
-// // Enhanced image serving with proper 304 handling
-// app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
-//   try {
-//     const { type, filename } = req.params;
-//     console.log(`🖼️ Image request: ${type}/${filename}`);
-    
-//     // ALWAYS set CORS headers first - even for 304 responses
-//     res.header('Access-Control-Allow-Origin', '*');
-//     res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-//     res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cache-Control');
-//     res.header('Access-Control-Expose-Headers', 'Content-Length, Content-Type, Last-Modified, ETag');
-    
-//     // Handle OPTIONS request
-//     if (req.method === 'OPTIONS') {
-//       return res.status(200).end();
-//     }
-    
-//     // Try multiple possible paths
-//     const possiblePaths = [
-//       path.join(__dirname, 'public/storage/qc_washing_images', type, filename),
-//       path.join(__dirname, 'storage/qc_washing_images', type, filename),
-//       path.join(__dirname, 'public', 'qc_washing_images', type, filename),
-//       path.join(__dirname, 'uploads/qc_washing_images', type, filename),
-//       path.join(__dirname, 'files/qc_washing_images', type, filename)
-//     ];
-    
-//     let foundPath = null;
-//     for (const testPath of possiblePaths) {
-//       console.log(`🔍 Testing path: ${testPath}`);
-//       if (fs.existsSync(testPath)) {
-//         foundPath = testPath;
-//         console.log(`✅ Found file at: ${foundPath}`);
-//         break;
-//       }
-//     }
-    
-//     if (!foundPath) {
-//       console.warn(`❌ File not found: ${filename}`);
-      
-//       // Return a 1x1 transparent pixel instead of 404
-//       const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-//       res.setHeader('Content-Type', 'image/png');
-//       res.setHeader('Content-Length', transparentPixel.length);
-//       res.setHeader('Cache-Control', 'no-cache'); // Don't cache 404 fallbacks
-//       return res.send(transparentPixel);
-//     }
-    
-//     // Get file stats
-//     const stats = fs.statSync(foundPath);
-//     const ext = path.extname(filename).toLowerCase();
-    
-//     const mimeTypes = {
-//       '.jpg': 'image/jpeg',
-//       '.jpeg': 'image/jpeg',
-//       '.png': 'image/png',
-//       '.gif': 'image/gif',
-//       '.webp': 'image/webp',
-//       '.bmp': 'image/bmp'
-//     };
-    
-//     const mimeType = mimeTypes[ext] || 'image/jpeg';
-//     const etag = `"${stats.mtime.getTime()}-${stats.size}"`;
-//     const lastModified = stats.mtime.toUTCString();
-    
-//     // Set content headers
-//     res.setHeader('Content-Type', mimeType);
-//     res.setHeader('Content-Length', stats.size);
-//     res.setHeader('Last-Modified', lastModified);
-//     res.setHeader('ETag', etag);
-    
-//     // Set cache headers but ensure CORS works
-//     res.setHeader('Cache-Control', 'public, max-age=3600'); // Shorter cache time
-    
-//     // Handle conditional requests (If-Modified-Since, If-None-Match)
-//     const ifModifiedSince = req.headers['if-modified-since'];
-//     const ifNoneMatch = req.headers['if-none-match'];
-    
-//     // Check if client has current version
-//     if ((ifModifiedSince && ifModifiedSince === lastModified) || 
-//         (ifNoneMatch && ifNoneMatch === etag)) {
-      
-//       console.log(`📦 Sending 304 Not Modified for: ${filename}`);
-      
-//       // IMPORTANT: Set CORS headers even for 304 responses
-//       res.header('Access-Control-Allow-Origin', '*');
-//       res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-//       res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-      
-//       return res.status(304).end();
-//     }
-    
-//     // Stream the file
-//     const readStream = fs.createReadStream(foundPath);
-//     readStream.pipe(res);
-    
-//     console.log(`✅ Successfully served: ${filename}`);
-    
-//   } catch (error) {
-//     console.error(`❌ Error serving image:`, error);
-    
-//     // Return transparent pixel on error
-//     const transparentPixel = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
-//     res.setHeader('Content-Type', 'image/png');
-//     res.setHeader('Access-Control-Allow-Origin', '*');
-//     res.setHeader('Cache-Control', 'no-cache');
-//     res.send(transparentPixel);
-//   }
-// });
-
-// Image proxy endpoint to convert images to base64
-// // Add this endpoint to your backend
-// app.get('/api/image-base64/:imagePath(*)', async (req, res) => {
-//   try {
-//     const imagePath = req.params.imagePath;
-//     const fullPath = path.join(__dirname, './public/storage', imagePath);
-
-    
-//     // Check if file exists
-//     if (!fs.existsSync(fullPath)) {
-//       return res.status(404).json({ 
-//         success: false, 
-//         message: 'Image not found',
-//         path: imagePath 
-//       });
-//     }
-    
-//     // Read file and convert to base64
-//     const imageBuffer = fs.readFileSync(fullPath);
-//     const mimeType = path.extname(imagePath).toLowerCase() === '.png' ? 'image/png' : 'image/jpeg';
-//     const base64Image = `data:${mimeType};base64,${imageBuffer.toString('base64')}`;
-    
-    
-//     res.json({
-//       success: true,
-//       dataUrl: base64Image,
-//       originalPath: imagePath
-//     });
-    
-//   } catch (error) {
-//     console.error('❌ Error converting image to base64:', error);
-//     res.status(500).json({ 
-//       success: false, 
-//       message: 'Failed to convert image',
-//       error: error.message 
-//     });
-//   }
-// });
-// Base64 image conversion endpoint for PDF generation
-// app.get('/api/pdf-image-base64/:type/:filename', async (req, res) => {
-//   const { type, filename } = req.params;
-//   console.log(`🔄 Base64 conversion request: ${type}/${filename}`);
-  
-//   // Set CORS headers
-//   res.header('Access-Control-Allow-Origin', '*');
-//   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-//   res.header('Cache-Control', 'no-cache');
-  
-//   if (req.method === 'OPTIONS') {
-//     return res.status(200).end();
-//   }
-  
-//   try {
-//     // First, try to find the file locally
-//     const possiblePaths = [
-//       path.join(process.cwd(), 'public/storage/qc_washing_images', type, filename),
-//       path.join(process.cwd(), 'storage/qc_washing_images', type, filename),
-//       path.join(process.cwd(), 'public', 'qc_washing_images', type, filename),
-//       path.join(process.cwd(), 'uploads/qc_washing_images', type, filename),
-//       path.join(process.cwd(), 'files/qc_washing_images', type, filename)
-//     ];
-    
-//     let foundPath = null;
-//     let imageBuffer = null;
-    
-//     // Check local files first
-//     for (const testPath of possiblePaths) {
-//       if (fs.existsSync(testPath)) {
-//         foundPath = testPath;
-//         imageBuffer = fs.readFileSync(foundPath);
-//         console.log(`✅ Found local file: ${foundPath} (${imageBuffer.length} bytes)`);
-//         break;
-//       }
-//     }
-    
-//     // If not found locally, try to fetch from yqms.yaikh.com
-//     if (!imageBuffer) {
-//       console.log(`🔄 File not found locally, fetching from yqms.yaikh.com`);
-      
-//       const proxyUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
-//       console.log(`📡 Fetching from: ${proxyUrl}`);
-      
-//       try {
-//         // Use axios if available, otherwise use https
-//         if (typeof axios !== 'undefined') {
-//           const response = await axios.get(proxyUrl, {
-//             responseType: 'arraybuffer',
-//             timeout: 10000,
-//             headers: {
-//               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-//             }
-//           });
-//           imageBuffer = Buffer.from(response.data);
-//         } else {
-//           // Fallback to https module
-//           const https = await import('https');
-//           const { URL } = await import('url');
-          
-//           imageBuffer = await new Promise((resolve, reject) => {
-//             const urlObj = new URL(proxyUrl);
-//             const options = {
-//               hostname: urlObj.hostname,
-//               port: urlObj.port || 443,
-//               path: urlObj.pathname,
-//               method: 'GET',
-//               headers: {
-//                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-//               }
-//             };
-            
-//             const req = https.request(options, (response) => {
-//               if (response.statusCode !== 200) {
-//                 reject(new Error(`HTTP ${response.statusCode}`));
-//                 return;
-//               }
-              
-//               const chunks = [];
-//               response.on('data', chunk => chunks.push(chunk));
-//               response.on('end', () => resolve(Buffer.concat(chunks)));
-//             });
-            
-//             req.on('error', reject);
-//             req.setTimeout(10000, () => {
-//               req.destroy();
-//               reject(new Error('Request timeout'));
-//             });
-//             req.end();
-//           });
-//         }
-        
-//         console.log(`✅ Successfully fetched from remote: ${imageBuffer.length} bytes`);
-//       } catch (fetchError) {
-//         console.warn(`❌ Failed to fetch from remote: ${fetchError.message}`);
-//         throw new Error(`Image not found locally or remotely`);
-//       }
-//     }
-    
-//     if (!imageBuffer || imageBuffer.length === 0) {
-//       throw new Error('Empty image buffer');
-//     }
-    
-//     // Determine MIME type from filename
-//     const ext = path.extname(filename).toLowerCase();
-//     const mimeTypes = {
-//       '.jpg': 'image/jpeg',
-//       '.jpeg': 'image/jpeg',
-//       '.png': 'image/png',
-//       '.gif': 'image/gif',
-//       '.webp': 'image/webp',
-//       '.bmp': 'image/bmp'
-//     };
-//     const mimeType = mimeTypes[ext] || 'image/jpeg';
-    
-//     // Convert to base64
-//     const base64 = imageBuffer.toString('base64');
-//     const dataUrl = `data:${mimeType};base64,${base64}`;
-    
-//     console.log(`✅ Successfully converted to base64: ${filename} (${base64.length} chars)`);
-    
-//     res.json({
-//       success: true,
-//       dataUrl,
-//       originalPath: `${type}/${filename}`,
-//       size: imageBuffer.length,
-//       mimeType
-//     });
-    
-//   } catch (error) {
-//     console.error(`❌ Error converting image to base64: ${type}/${filename}`, error.message);
-    
-//     // Return a colored placeholder as base64
-//     const createPlaceholderBase64 = (color, text) => {
-//       const svg = `<svg width="100" height="60" xmlns="http://www.w3.org/2000/svg">
-//         <rect width="100%" height="100%" fill="${color}"/>
-//         <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="#666">
-//           ${text}
-//         </text>
-//       </svg>`;
-//       const base64 = Buffer.from(svg).toString('base64');
-//       return `data:image/svg+xml;base64,${base64}`;
-//     };
-    
-//     let placeholderColor = '#f3f4f6';
-//     let placeholderText = 'Image Error';
-    
-//     if (type === 'defect') {
-//       placeholderColor = '#fee2e2';
-//       placeholderText = 'Defect Image';
-//     } else if (type === 'inspection') {
-//       placeholderColor = '#dbeafe';
-//       placeholderText = 'Inspection Image';
-//     }
-    
-//     const placeholderDataUrl = createPlaceholderBase64(placeholderColor, placeholderText);
-    
-//     res.json({
-//       success: false,
-//       dataUrl: placeholderDataUrl,
-//       originalPath: `${type}/${filename}`,
-//       error: error.message,
-//       isPlaceholder: true
-//     });
-//   }
-// });
-
-app.get('/api/pdf-image-base64/:type/:filename', async (req, res) => {
+app.get("/api/pdf-image-base64/:type/:filename", async (req, res) => {
   const { type, filename } = req.params;
-  const localPath = path.join(__dirname, 'public/storage/qc_washing_images', type, filename);
+  const localPath = path.join(
+    __dirname,
+    "public/storage/qc_washing_images",
+    type,
+    filename
+  );
 
   try {
     let imageData;
@@ -27400,152 +27325,152 @@ app.get('/api/pdf-image-base64/:type/:filename', async (req, res) => {
       imageData = fs.readFileSync(localPath);
     } else {
       const remoteUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
-      const response = await axios.get(remoteUrl, { responseType: 'arraybuffer' });
+      const response = await axios.get(remoteUrl, {
+        responseType: "arraybuffer"
+      });
       imageData = response.data;
     }
 
-    const base64 = Buffer.from(imageData, 'binary').toString('base64');
+    const base64 = Buffer.from(imageData, "binary").toString("base64");
     res.json({ base64: `data:image/jpeg;base64,${base64}` });
   } catch (error) {
-    console.error('Error converting image:', error.message);
-    res.status(500).json({ error: 'Failed to convert image to base64' });
+    console.error("Error converting image:", error.message);
+    res.status(500).json({ error: "Failed to convert image to base64" });
   }
 });
-
-
 
 // Helper function for MIME types
 const getMimeType = (filePath) => {
   const ext = path.extname(filePath).toLowerCase();
   const mimeTypes = {
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png': 'image/png',
-    '.gif': 'image/gif',
-    '.webp': 'image/webp',
-    '.bmp': 'image/bmp',
-    '.svg': 'image/svg+xml'
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".svg": "image/svg+xml"
   };
-  return mimeTypes[ext] || 'image/jpeg';
+  return mimeTypes[ext] || "image/jpeg";
 };
 
-
 // Additional middleware for image serving
-app.use('/storage', (req, res, next) => {
+app.use("/storage", (req, res, next) => {
   // Set CORS headers specifically for image requests
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Cache-Control');
-  res.header('Access-Control-Max-Age', '86400'); // 24 hours
-  
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Cache-Control"
+  );
+  res.header("Access-Control-Max-Age", "86400"); // 24 hours
+
   // Handle preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     res.status(200).end();
     return;
   }
-  
+
   next();
 });
 
 // Replace your current image serving endpoint with this ES module version
-app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
+app.get("/storage/qc_washing_images/:type/:filename", async (req, res) => {
   const { type, filename } = req.params;
-  console.log(`🖼️ Image request: ${type}/${filename}`);
-  
+
   // Set CORS headers
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  res.header('Cache-Control', 'public, max-age=3600');
-  
-  if (req.method === 'OPTIONS') {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept"
+  );
+  res.header("Cache-Control", "public, max-age=3600");
+
+  if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
-  
+
   try {
     // First, try to find the file locally
     const possiblePaths = [
-      path.join(process.cwd(), 'public/storage/qc_washing_images', type, filename),
-      path.join(process.cwd(), 'storage/qc_washing_images', type, filename),
-      path.join(process.cwd(), 'public', 'qc_washing_images', type, filename),
-      path.join(process.cwd(), 'uploads/qc_washing_images', type, filename),
-      path.join(process.cwd(), 'files/qc_washing_images', type, filename)
+      path.join(
+        process.cwd(),
+        "public/storage/qc_washing_images",
+        type,
+        filename
+      ),
+      path.join(process.cwd(), "storage/qc_washing_images", type, filename),
+      path.join(process.cwd(), "public", "qc_washing_images", type, filename),
+      path.join(process.cwd(), "uploads/qc_washing_images", type, filename),
+      path.join(process.cwd(), "files/qc_washing_images", type, filename)
     ];
-    
+
     let foundPath = null;
     for (const testPath of possiblePaths) {
       if (fs.existsSync(testPath)) {
         foundPath = testPath;
-        console.log(`✅ Found local file at: ${foundPath}`);
         break;
       }
     }
-    
+
     if (foundPath) {
       // Serve local file
       const ext = path.extname(filename).toLowerCase();
       const mimeTypes = {
-        '.jpg': 'image/jpeg',
-        '.jpeg': 'image/jpeg',
-        '.png': 'image/png',
-        '.gif': 'image/gif',
-        '.webp': 'image/webp'
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp"
       };
-      
-      res.setHeader('Content-Type', mimeTypes[ext] || 'image/jpeg');
+
+      res.setHeader("Content-Type", mimeTypes[ext] || "image/jpeg");
       res.sendFile(foundPath);
-      console.log(`✅ Successfully served local file: ${type}/${filename}`);
       return;
     }
-    
-    // If not found locally, try to proxy from yqms.yaikh.com
-    console.log(`🔄 File not found locally, trying to proxy from yqms.yaikh.com`);
-    
+
     const proxyUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
-    console.log(`📡 Proxying from: ${proxyUrl}`);
-    
+
     const urlObj = new URL(proxyUrl);
-    // const options = {
-    //   hostname: urlObj.hostname,
-    //   port: urlObj.port || 443,
-    //   path: urlObj.pathname,
-    //   method: 'GET',
-    //   headers: {
-    //     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    //   }
-    // };
-    
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname,
+      method: "GET",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      }
+    };
+
     // const proxyReq = https.request(options, (proxyRes) => {
     //   if (proxyRes.statusCode !== 200) {
-    //     console.warn(`❌ Proxy request failed with status: ${proxyRes.statusCode}`);
+
     //     throw new Error(`HTTP error! status: ${proxyRes.statusCode}`);
     //   }
-      
+
     //   // Set content type
-    //   const contentType = proxyRes.headers['content-type'] || 'image/jpeg';
-    //   res.setHeader('Content-Type', contentType);
-    //   res.setHeader('Content-Length', proxyRes.headers['content-length']);
-      
+    //   const contentType = proxyRes.headers["content-type"] || "image/jpeg";
+    //   res.setHeader("Content-Type", contentType);
+    //   res.setHeader("Content-Length", proxyRes.headers["content-length"]);
+
     //   // Pipe the response
     //   proxyRes.pipe(res);
-    //   console.log(`✅ Successfully proxied: ${type}/${filename}`);
+
     // });
-    
-    // proxyReq.on('error', (error) => {
-    //   console.error(`❌ Proxy request error:`, error);
-    //   throw error;
-    // });
-    
-    // proxyReq.setTimeout(10000, () => {
-    //   proxyReq.destroy();
-    //   throw new Error('Request timeout');
-    // });
-    
-    // proxyReq.end();
-    
+
+    proxyReq.on("error", (error) => {
+      throw error;
+    });
+
+    proxyReq.setTimeout(10000, () => {
+      proxyReq.destroy();
+      throw new Error("Request timeout");
+    });
+
+    proxyReq.end();
   } catch (error) {
-    console.error(`❌ Error serving/proxying image: ${type}/${filename}`, error);
-    
     // Return a colored placeholder SVG
     const createPlaceholder = (color, text) => {
       const svg = `<svg width="100" height="60" xmlns="http://www.w3.org/2000/svg">
@@ -27556,28 +27481,27 @@ app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
       </svg>`;
       return Buffer.from(svg);
     };
-    
-    let placeholderColor = '#f3f4f6';
-    let placeholderText = 'Image Error';
-    
-    if (type === 'defect') {
-      placeholderColor = '#fee2e2';
-      placeholderText = 'Defect Image';
-    } else if (type === 'inspection') {
-      placeholderColor = '#dbeafe';
-      placeholderText = 'Inspection Image';
+
+    let placeholderColor = "#f3f4f6";
+    let placeholderText = "Image Error";
+
+    if (type === "defect") {
+      placeholderColor = "#fee2e2";
+      placeholderText = "Defect Image";
+    } else if (type === "inspection") {
+      placeholderColor = "#dbeafe";
+      placeholderText = "Inspection Image";
     }
-    
+
     const placeholder = createPlaceholder(placeholderColor, placeholderText);
-    res.setHeader('Content-Type', 'image/svg+xml');
-    res.setHeader('Content-Length', placeholder.length);
+    res.setHeader("Content-Type", "image/svg+xml");
+    res.setHeader("Content-Length", placeholder.length);
     res.send(placeholder);
   }
 });
 
-
 // GET /api/users endpoint
-app.get('/api/users', async (req, res) => {
+app.get("/api/users", async (req, res) => {
   try {
     const userList = await UserMain.find(
       { working_status: "Working" }, // Optional: only get active users
@@ -27593,11 +27517,11 @@ app.get('/api/users', async (req, res) => {
     ).sort({ eng_name: 1 });
 
     // Transform the data to match what your frontend expects
-    const transformedUsers = userList.map(user => ({
-      userId: user.emp_id,        // Map emp_id to userId
+    const transformedUsers = userList.map((user) => ({
+      userId: user.emp_id, // Map emp_id to userId
       _id: user._id,
-      name: user.eng_name,        // Use eng_name as the display name
-      username: user.name,        // Keep original name as username
+      name: user.eng_name, // Use eng_name as the display name
+      username: user.name, // Keep original name as username
       emp_id: user.emp_id,
       eng_name: user.eng_name,
       dept_name: user.dept_name,
@@ -27609,17 +27533,15 @@ app.get('/api/users', async (req, res) => {
       success: true,
       users: transformedUsers
     });
-
   } catch (error) {
-    console.error('Error fetching users:', error);
+    console.error("Error fetching users:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch users',
+      message: "Failed to fetch users",
       error: error.message
     });
   }
 });
-
 
 /* -------------------------------------------
    End Points - Supplier Issues Configuration

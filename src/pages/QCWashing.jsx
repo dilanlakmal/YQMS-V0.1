@@ -13,41 +13,47 @@ import { useTranslation } from "react-i18next";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
-  
+
   // If it's already a data URL, return as is
   if (typeof src === "string" && src.startsWith("data:")) return src;
-  
+
   // If it's a blob URL, return as is
   if (typeof src === "string" && src.startsWith("blob:")) return src;
-  
+
   // Handle paths starting with ./public (backend format) - convert to /public
   if (typeof src === "string" && src.startsWith("./public/")) {
     return `${API_BASE_URL}${src.replace("./public", "")}`;
   }
-  
+
   // Handle paths starting with /public - this is what we have in the database
   if (typeof src === "string" && src.startsWith("/public/")) {
     return `${API_BASE_URL}${src}`;
   }
-  
+
   // Handle paths starting with /storage, add /public prefix
   if (typeof src === "string" && src.startsWith("/storage/")) {
     return `${API_BASE_URL}/public${src}`;
   }
-  
+
   // If it's already a full URL, return as is
-  if (typeof src === "string" && (src.startsWith("http://") || src.startsWith("https://"))) {
+  if (
+    typeof src === "string" &&
+    (src.startsWith("http://") || src.startsWith("https://"))
+  ) {
     return src;
   }
-  
+
   // If it's a base64 string without data: prefix
-  if (typeof src === "string" && /^[A-Za-z0-9+/=]+$/.test(src) && src.length > 100) {
+  if (
+    typeof src === "string" &&
+    /^[A-Za-z0-9+/=]+$/.test(src) &&
+    src.length > 100
+  ) {
     return `data:image/jpeg;base64,${src}`;
   }
-  
+
   return src;
 };
-
 
 function transformDefectsByPc(savedDefectsByPc) {
   if (Array.isArray(savedDefectsByPc)) {
@@ -60,28 +66,28 @@ function transformDefectsByPc(savedDefectsByPc) {
           defectName: defect.defectName || "", // Add this line
           defectQty: defect.defectQty || "",
           isBodyVisible: true,
-          defectImages: (defect.defectImages || []).map(imgStr => ({
+          defectImages: (defect.defectImages || []).map((imgStr) => ({
             file: null,
             preview: normalizeImageSrc(imgStr),
             name: "image.jpg"
           }))
-          
         }));
       }
       return acc;
     }, {});
   }
-  
+
   if (typeof savedDefectsByPc === "object" && savedDefectsByPc !== null) {
     const result = {};
-    Object.keys(savedDefectsByPc).forEach(pc => {
+    Object.keys(savedDefectsByPc).forEach((pc) => {
       result[pc] = (savedDefectsByPc[pc] || []).map((defect, index) => ({
         id: defect.id || index + 1,
         selectedDefect: defect.defectId || defect.selectedDefect || "",
         defectName: defect.defectName || "", // Add this line
         defectQty: defect.defectQty || "",
-        isBodyVisible: defect.isBodyVisible !== undefined ? defect.isBodyVisible : true,
-        defectImages: (defect.defectImages || []).map(imgStr => ({
+        isBodyVisible:
+          defect.isBodyVisible !== undefined ? defect.isBodyVisible : true,
+        defectImages: (defect.defectImages || []).map((imgStr) => ({
           file: null,
           preview: normalizeImageSrc(imgStr),
           name: "image.jpg"
@@ -97,7 +103,9 @@ function normalizeImagePreview(img) {
   if (!img) return "";
   if (typeof img === "string") return img;
   if (typeof img === "object" && img.preview) {
-    return typeof img.preview === "string" ? img.preview : (img.preview.preview || "");
+    return typeof img.preview === "string"
+      ? img.preview
+      : img.preview.preview || "";
   }
   return "";
 }
@@ -105,9 +113,12 @@ function normalizeImagePreview(img) {
 function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
   const currentMeasurementDetails = currentFormData.measurementDetails;
-  
+
   let measurementArray = [];
-  if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
+  if (
+    currentMeasurementDetails &&
+    typeof currentMeasurementDetails === "object"
+  ) {
     measurementArray = currentMeasurementDetails.measurement || [];
   } else if (Array.isArray(currentMeasurementDetails)) {
     measurementArray = currentMeasurementDetails;
@@ -115,7 +126,7 @@ function calculateSummaryData(currentFormData) {
 
   // 1. Calculate totalCheckedPcs from measurement data qty (FIXED)
   let totalCheckedPcs = 0;
-  measurementArray.forEach(data => {
+  measurementArray.forEach((data) => {
     // Use qty field which represents the number of pieces checked for each size
     if (typeof data.qty === "number" && data.qty > 0) {
       totalCheckedPcs += data.qty;
@@ -130,15 +141,15 @@ function calculateSummaryData(currentFormData) {
   // 2. Calculate measurement points and passes (for measurement statistics only)
   let measurementPoints = 0;
   let measurementPass = 0;
-  
-  measurementArray.forEach(data => {
+
+  measurementArray.forEach((data) => {
     if (Array.isArray(data.pcs)) {
-      data.pcs.forEach(pc => {
+      data.pcs.forEach((pc) => {
         if (Array.isArray(pc.measurementPoints)) {
-          pc.measurementPoints.forEach(point => {
-            if (point.result === 'pass' || point.result === 'fail') {
+          pc.measurementPoints.forEach((point) => {
+            if (point.result === "pass" || point.result === "fail") {
               measurementPoints++;
-              if (point.result === 'pass') measurementPass++;
+              if (point.result === "pass") measurementPass++;
             }
           });
         }
@@ -193,8 +204,7 @@ function calculateSummaryData(currentFormData) {
   } else {
     overallResult = "N/A";
   }
-  
-  
+
   return {
     totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
@@ -205,14 +215,13 @@ function calculateSummaryData(currentFormData) {
     overallResult,
     // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
-    measurementPass: measurementPass || 0,
+    measurementPass: measurementPass || 0
   };
 }
 
-
 function machineProcessesToObject(machineProcesses) {
   const obj = {};
-  (machineProcesses || []).forEach(proc => {
+  (machineProcesses || []).forEach((proc) => {
     obj[proc.machineType] = {
       temperature: proc.temperature || "",
       time: proc.time || "",
@@ -229,11 +238,16 @@ function fractionToDecimal(fraction) {
   // Remove + or - for parsing, but keep sign
   let sign = 1;
   let str = fraction.trim();
-  if (str.startsWith('-')) { sign = -1; str = str.slice(1); }
-  if (str.startsWith('+')) { str = str.slice(1); }
+  if (str.startsWith("-")) {
+    sign = -1;
+    str = str.slice(1);
+  }
+  if (str.startsWith("+")) {
+    str = str.slice(1);
+  }
   if (str === "" || str === "-") return 0;
-  if (str.includes('/')) {
-    const [num, den] = str.split('/').map(Number);
+  if (str.includes("/")) {
+    const [num, den] = str.split("/").map(Number);
     if (!isNaN(num) && !isNaN(den) && den !== 0) {
       return sign * (num / den);
     }
@@ -265,13 +279,15 @@ const QCWashingPage = () => {
     factoryName: "YM",
     before_after_wash: "Before Wash",
     result: "",
-    aql:[{
-      sampleSize: "",
-      acceptedDefect: "",
-      rejectedDefect: "",
-      levelUsed: "",
-    }],
-    
+    aql: [
+      {
+        sampleSize: "",
+        acceptedDefect: "",
+        rejectedDefect: "",
+        levelUsed: ""
+      }
+    ],
+
     inspectionDetails: {},
     defectDetails: {
       checkedQty: "",
@@ -279,116 +295,139 @@ const QCWashingPage = () => {
       result: "",
       defectsByPc: [],
       additionalImages: [],
-      comment: "",
+      comment: ""
     },
     measurementDetails: [],
-     
+
     totalCheckedPcs: 0,
     rejectedDefectPcs: 0,
     totalDefectCount: 0,
     defectRate: 0,
     defectRatio: 0,
-    overallFinalResult: "N/A",
+    overallFinalResult: "N/A"
   });
 
   // State: Data Lists
   const [subFactories, setSubFactories] = useState([]);
   const [colorOptions, setColorOptions] = useState([]);
-  const [orderNoSuggestions, setOrderNoSuggestions] = useState([]); 
-  const [showOrderNoSuggestions, setShowOrderNoSuggestions] = useState(false); 
+  const [orderNoSuggestions, setOrderNoSuggestions] = useState([]);
+  const [showOrderNoSuggestions, setShowOrderNoSuggestions] = useState(false);
   const [orderNumbers, setOrderNumbers] = useState([]);
   const [styleSuggestions, setStyleSuggestions] = useState([]);
   const [filteredOrderNumbers, setFilteredOrderNumbers] = useState([]);
   const [masterChecklist, setMasterChecklist] = useState([]);
   const [defectOptions, setDefectOptions] = useState([]);
-  const [activeTab, setActiveTab] = useState('newInspection');
+  const [activeTab, setActiveTab] = useState("newInspection");
   const [overallSummary, setOverallSummary] = useState(null);
   const [colorOrderQty, setColorOrderQty] = useState(null);
-//   const [sectionVisibility, setSectionVisibility] = useState({
-//   orderDetails: true,
-//   inspectionData: false,
-//   defectDetails: false,
-//   measurementDetails: false,
-// });
-const [orderSectionSaved, setOrderSectionSaved] = useState(false);
-const [recordId, setRecordId] = useState(null);
+  //   const [sectionVisibility, setSectionVisibility] = useState({
+  //   orderDetails: true,
+  //   inspectionData: false,
+  //   defectDetails: false,
+  //   measurementDetails: false,
+  // });
+  const [orderSectionSaved, setOrderSectionSaved] = useState(false);
+  const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
 
+  // Function to activate the next section
+  // const activateNextSection = (currentSection) => {
+  //   setSectionVisibility((prev) => {
+  //     const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
+  //     const idx = order.indexOf(currentSection);
+  //     if (idx !== -1 && idx < order.length - 1) {
+  //       return { ...prev, [order[idx + 1]]: true };
+  //     }
+  //     return prev;
+  //   });
+  // };
 
-// Function to activate the next section
-// const activateNextSection = (currentSection) => {
-//   setSectionVisibility((prev) => {
-//     const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
-//     const idx = order.indexOf(currentSection);
-//     if (idx !== -1 && idx < order.length - 1) {
-//       return { ...prev, [order[idx + 1]]: true };
-//     }
-//     return prev;
-//   });
-// };
-
-  
-const fetchOverallSummary = async (recordId) => {
-  if (!recordId) return;
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`);
-    const data = await response.json();
-    if (data.success) {
-      setOverallSummary(data.summary);
-    } else {
+  const fetchOverallSummary = async (recordId) => {
+    if (!recordId) return;
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/overall-summary-by-id/${recordId}`
+      );
+      const data = await response.json();
+      if (data.success) {
+        setOverallSummary(data.summary);
+      } else {
+        setOverallSummary(null);
+      }
+    } catch (error) {
       setOverallSummary(null);
+      console.error("Error fetching overall summary:", error);
     }
-  } catch (error) {
-    setOverallSummary(null);
-    console.error('Error fetching overall summary:', error);
-  }
-};
+  };
 
   // State: Inspection, Defect, Measurement
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
-  "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-  "Tumble Dry": { temperature: "", time: "" }
-});
+    "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+    "Tumble Dry": { temperature: "", time: "" }
+  });
   const defaultDefectData = [
-    { parameter: "Color Shade 01", ok: true, no: false,  checkedQty: 0, failedQty: 0, result: "Pass", remark: "" },
-    { parameter: "Appearance", ok: true, no: false, checkedQty: 0, failedQty: 0,result: "Pass", remark: ""},
+    {
+      parameter: "Color Shade 01",
+      ok: true,
+      no: false,
+      checkedQty: 0,
+      failedQty: 0,
+      result: "Pass",
+      remark: ""
+    },
+    {
+      parameter: "Appearance",
+      ok: true,
+      no: false,
+      checkedQty: 0,
+      failedQty: 0,
+      result: "Pass",
+      remark: ""
+    }
   ];
-  const [defectData, setDefectData] = useState(normalizeDefectData(defaultDefectData));
+  const [defectData, setDefectData] = useState(
+    normalizeDefectData(defaultDefectData)
+  );
   function normalizeDefectData(data) {
-  return (data || []).map(param => ({
-    ...param,
-    parameter: param.parameter || param.parameterName || "",
-    ok: param.ok !== undefined ? param.ok : true,
-    no: param.no !== undefined ? param.no : false,
-    checkedQty: param.checkedQty || 0,
-    failedQty: param.failedQty || 0,
-    remark: param.remark || "",
-    acceptedDefect: param.aqlAcceptedDefect || "",
-    checkboxes: param.checkboxes || {},
-  }));
-}
+    return (data || []).map((param) => ({
+      ...param,
+      parameter: param.parameter || param.parameterName || "",
+      ok: param.ok !== undefined ? param.ok : true,
+      no: param.no !== undefined ? param.no : false,
+      checkedQty: param.checkedQty || 0,
+      failedQty: param.failedQty || 0,
+      remark: param.remark || "",
+      acceptedDefect: param.aqlAcceptedDefect || "",
+      checkboxes: param.checkboxes || {}
+    }));
+  }
   const [addedDefects, setAddedDefects] = useState([]);
   const [uploadedImages, setUploadedImages] = useState([]);
   const [comment, setComment] = useState("");
   const [savedSizes, setSavedSizes] = useState([]);
-  const [measurementData, setMeasurementData] = useState({ beforeWash: [], afterWash: [] });
+  const [measurementData, setMeasurementData] = useState({
+    beforeWash: [],
+    afterWash: []
+  });
   const [showMeasurementTable, setShowMeasurementTable] = useState(true);
-  const [machineType, setMachineType] = useState('Washing Machine');
+  const [machineType, setMachineType] = useState("Washing Machine");
   const [isDataLoading, setIsDataLoading] = useState(false);
 
   // State: Auto-save
   const [autoSaveId, setAutoSaveId] = useState(null);
   const [lastSaved, setLastSaved] = useState(null);
   const autoSaveTimeoutRef = useRef(null);
-  const [defectsByPc, setDefectsByPc] =  useState({});
+  const [defectsByPc, setDefectsByPc] = useState({});
 
   // State: Cache for color-specific data to prevent data loss on switching
   const [colorDataCache, setColorDataCache] = useState({});
   const [orderSectionVisible, setOrderSectionVisible] = useState(true);
   const [defectSectionVisible, setDefectSectionVisible] = useState(false);
-  const [inspectionSectionVisible, setInspectionSectionVisible] = useState(false);
-  const [measurementSectionVisible, setMeasurementSectionVisible] = useState(false);
+  const [inspectionSectionVisible, setInspectionSectionVisible] =
+    useState(false);
+  const [measurementSectionVisible, setMeasurementSectionVisible] =
+    useState(false);
   const activateAllSections = () => {
     setDefectSectionVisible(true);
     setInspectionSectionVisible(true);
@@ -397,14 +436,19 @@ const fetchOverallSummary = async (recordId) => {
     setDefectContentVisible(false);
     setMeasurementContentVisible(false);
   };
-  const [inspectionContentVisible, setInspectionContentVisible] = useState(false);
+  const [inspectionContentVisible, setInspectionContentVisible] =
+    useState(false);
   const [defectContentVisible, setDefectContentVisible] = useState(false);
-  const [measurementContentVisible, setMeasurementContentVisible] = useState(false);
+  const [measurementContentVisible, setMeasurementContentVisible] =
+    useState(false);
 
   const toggleOrderSection = () => setOrderSectionVisible(!orderSectionVisible);
-  const toggleInspectionSection = () => setInspectionContentVisible(!inspectionContentVisible);
-  const toggleDefectSection = () => setDefectContentVisible(!defectContentVisible);
-  const toggleMeasurementSection = () => setMeasurementContentVisible(!measurementContentVisible);
+  const toggleInspectionSection = () =>
+    setInspectionContentVisible(!inspectionContentVisible);
+  const toggleDefectSection = () =>
+    setDefectContentVisible(!defectContentVisible);
+  const toggleMeasurementSection = () =>
+    setMeasurementContentVisible(!measurementContentVisible);
 
   const [standardValues, setStandardValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
@@ -430,41 +474,40 @@ const fetchOverallSummary = async (recordId) => {
   });
 
   // Helper function to get English fiber remarks
-const getFiberRemarkInEnglish = (decision) => {
-  const englishRemarks = {
-    "1": "Cleaning must be done by fabric mill.", 
-    "2": "YM doing the cleaning, front & back side.", 
-    "3": "Randomly 2-3 pcs back side hairly can acceptable."  
-  };
-  
-  return englishRemarks[decision] || "";
-};
+  const getFiberRemarkInEnglish = (decision) => {
+    const englishRemarks = {
+      1: "Cleaning must be done by fabric mill.",
+      2: "YM doing the cleaning, front & back side.",
+      3: "Randomly 2-3 pcs back side hairly can acceptable."
+    };
 
-// Helper function to convert English fiber remarks to current language
-const convertEnglishToCurrentLanguage = (englishRemark, t) => {
-  const englishToDecisionMap = {
-    "Cleaning must be done by fabric mill.": "1",
-    "YM doing the cleaning, front & back side.": "2", 
-    "Randomly 2-3 pcs back side hairly can acceptable.": "3"
+    return englishRemarks[decision] || "";
   };
-  
-  const decision = englishToDecisionMap[englishRemark];
-  if (decision) {
-    switch (decision) {
-      case "1":
-        return t("qcWashing.fiber 01");
-      case "2":
-        return t("qcWashing.fiber 02");
-      case "3":
-        return t("qcWashing.fiber 03");
-      default:
-        return englishRemark;
+
+  // Helper function to convert English fiber remarks to current language
+  const convertEnglishToCurrentLanguage = (englishRemark, t) => {
+    const englishToDecisionMap = {
+      "Cleaning must be done by fabric mill.": "1",
+      "YM doing the cleaning, front & back side.": "2",
+      "Randomly 2-3 pcs back side hairly can acceptable.": "3"
+    };
+
+    const decision = englishToDecisionMap[englishRemark];
+    if (decision) {
+      switch (decision) {
+        case "1":
+          return t("qcWashing.fiber 01");
+        case "2":
+          return t("qcWashing.fiber 02");
+        case "3":
+          return t("qcWashing.fiber 03");
+        default:
+          return englishRemark;
+      }
     }
-  }
-  
-  return englishRemark; // Return original if not a fiber remark
-};
 
+    return englishRemark; // Return original if not a fiber remark
+  };
 
   // Section Toggle
   // const toggleSection = (section) => {
@@ -479,22 +522,20 @@ const convertEnglishToCurrentLanguage = (englishRemark, t) => {
     if (imageObject.file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
-     
-          if (!(imageObject.file instanceof Blob)) {
-            reject(new Error("Invalid file object provided."));
-            return;
-          }
+
+        if (!(imageObject.file instanceof Blob)) {
+          reject(new Error("Invalid file object provided."));
+          return;
+        }
         reader.readAsDataURL(imageObject.file);
         reader.onload = () => resolve(reader.result);
         reader.onerror = (error) => reject(error);
       });
     } else if (imageObject.preview) {
-  
       return Promise.resolve(imageObject.preview);
     }
     return Promise.resolve(null);
   };
-
 
   // --- useEffect: Initial Data Fetch ---
   useEffect(() => {
@@ -503,86 +544,97 @@ const convertEnglishToCurrentLanguage = (englishRemark, t) => {
     fetchOrderNumbers();
     fetchChecklist();
   }, []);
-  useEffect(() => {
-}, [uploadedImages]);
-
+  useEffect(() => {}, [uploadedImages]);
 
   // --- useEffect: Calculate Checked Qty ---
- useEffect(() => {
-  const aql = formData.aql && formData.aql[0];
-  if (
-    (formData.inline === "Inline" || formData.reportType === "Inline") &&
-    aql?.sampleSize &&
-    formData.washQty
-  ) {
-    const newCheckedQty = Math.min(
-      parseInt(formData.washQty, 10),
-      parseInt(aql.sampleSize, 10)
-    ).toString();
-    if (formData.checkedQty !== newCheckedQty) {
-      setFormData(prev => ({
-        ...prev,
-        checkedQty: newCheckedQty
-      }));
-    }
-  }
-}, [formData.aql, formData.washQty, formData.inline, formData.reportType]);
-
-
-useEffect(() => {
-  if (recordId) {
-    fetchOverallSummary(recordId);
-  }
-}, [recordId, lastSaved]);
-
-
-   // --- useEffect: Calculate AQL Status ---
   useEffect(() => {
-  const aql = formData.aql && formData.aql[0];
-  if (
-    (formData.inline === 'Inline' || formData.reportType === 'Inline' || formData.firstOutput === "First Output" || formData.reportType === 'First Output')
-    && aql?.acceptedDefect
-  ) {
-    const totalDefects = Object.values(defectsByPc)
-      .flat()
-      .reduce((sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0), 0);
-
-    const acceptedDefectCount = parseInt(aql.acceptedDefect, 10);
-    if (!isNaN(acceptedDefectCount)) {
-      const newStatus = totalDefects <= acceptedDefectCount ? 'Pass' : 'Fail';
-      if (newStatus !== formData.result) {
-        setFormData(prev => ({ ...prev, result: newStatus }));
+    const aql = formData.aql && formData.aql[0];
+    if (
+      (formData.inline === "Inline" || formData.reportType === "Inline") &&
+      aql?.sampleSize &&
+      formData.washQty
+    ) {
+      const newCheckedQty = Math.min(
+        parseInt(formData.washQty, 10),
+        parseInt(aql.sampleSize, 10)
+      ).toString();
+      if (formData.checkedQty !== newCheckedQty) {
+        setFormData((prev) => ({
+          ...prev,
+          checkedQty: newCheckedQty
+        }));
       }
     }
-  } else {
-    if (formData.result) {
-      setFormData(prev => ({ ...prev, result: '' }));
-    }
-  }
-}, [defectsByPc, formData.aql, formData.inline, formData.reportType, formData.firstOutput, formData.result]);
-
+  }, [formData.aql, formData.washQty, formData.inline, formData.reportType]);
 
   useEffect(() => {
-  const fetchColorOrderQty = async () => {
-    if (!formData.orderNo || !formData.color) {
-      setColorOrderQty(null);
-      return;
+    if (recordId) {
+      fetchOverallSummary(recordId);
     }
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodeURIComponent(formData.color)}`);
-      const data = await response.json();
-      if (data.success) {
-        setColorOrderQty(data.colorOrderQty);
-      } else {
+  }, [recordId, lastSaved]);
+
+  // --- useEffect: Calculate AQL Status ---
+  useEffect(() => {
+    const aql = formData.aql && formData.aql[0];
+    if (
+      (formData.inline === "Inline" ||
+        formData.reportType === "Inline" ||
+        formData.firstOutput === "First Output" ||
+        formData.reportType === "First Output") &&
+      aql?.acceptedDefect
+    ) {
+      const totalDefects = Object.values(defectsByPc)
+        .flat()
+        .reduce(
+          (sum, defect) => sum + (parseInt(defect.defectQty, 10) || 0),
+          0
+        );
+
+      const acceptedDefectCount = parseInt(aql.acceptedDefect, 10);
+      if (!isNaN(acceptedDefectCount)) {
+        const newStatus = totalDefects <= acceptedDefectCount ? "Pass" : "Fail";
+        if (newStatus !== formData.result) {
+          setFormData((prev) => ({ ...prev, result: newStatus }));
+        }
+      }
+    } else {
+      if (formData.result) {
+        setFormData((prev) => ({ ...prev, result: "" }));
+      }
+    }
+  }, [
+    defectsByPc,
+    formData.aql,
+    formData.inline,
+    formData.reportType,
+    formData.firstOutput,
+    formData.result
+  ]);
+
+  useEffect(() => {
+    const fetchColorOrderQty = async () => {
+      if (!formData.orderNo || !formData.color) {
+        setColorOrderQty(null);
+        return;
+      }
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
+            formData.orderNo
+          }/${encodeURIComponent(formData.color)}`
+        );
+        const data = await response.json();
+        if (data.success) {
+          setColorOrderQty(data.colorOrderQty);
+        } else {
+          setColorOrderQty(null);
+        }
+      } catch (error) {
         setColorOrderQty(null);
       }
-    } catch (error) {
-      setColorOrderQty(null);
-    }
-  };
-  fetchColorOrderQty();
-}, [formData.orderNo, formData.color]);
-
+    };
+    fetchColorOrderQty();
+  }, [formData.orderNo, formData.color]);
 
   useEffect(() => {
     const fetchColorOrderQty = async () => {
@@ -635,56 +687,63 @@ useEffect(() => {
   }, [formData.orderNo, formData.color]);
 
   // Add useEffect to handle language changes for fiber remarks
-useEffect(() => {
-  // Update existing fiber remarks when language changes OR when inspection data is loaded
-  setInspectionData(prev =>
-    prev.map(item => {
-      if (item.checkedList === "Fiber" && item.remark) {
-        // First, try to convert English remarks to current language
-        const translatedRemark = convertEnglishToCurrentLanguage(item.remark, t);
-        
-        // If it was translated (different from original), use the translation
-        if (translatedRemark !== item.remark) {
-          return { ...item, remark: translatedRemark };
-        }
-        
-        // If it's a decision-based remark, update based on decision
-        if (item.decision && item.decision !== "ok") {
-          let newRemark = "";
-          switch (item.decision) {
-            case "1":
-              newRemark = t("qcWashing.fiber 01");
-              break;
-            case "2":
-              newRemark = t("qcWashing.fiber 02");
-              break;
-            case "3":
-              newRemark = t("qcWashing.fiber 03");
-              break;
-            default:
-              newRemark = item.remark; // Keep existing remark for other cases
+  useEffect(() => {
+    // Update existing fiber remarks when language changes OR when inspection data is loaded
+    setInspectionData((prev) =>
+      prev.map((item) => {
+        if (item.checkedList === "Fiber" && item.remark) {
+          // First, try to convert English remarks to current language
+          const translatedRemark = convertEnglishToCurrentLanguage(
+            item.remark,
+            t
+          );
+
+          // If it was translated (different from original), use the translation
+          if (translatedRemark !== item.remark) {
+            return { ...item, remark: translatedRemark };
           }
-          return { ...item, remark: newRemark };
+
+          // If it's a decision-based remark, update based on decision
+          if (item.decision && item.decision !== "ok") {
+            let newRemark = "";
+            switch (item.decision) {
+              case "1":
+                newRemark = t("qcWashing.fiber 01");
+                break;
+              case "2":
+                newRemark = t("qcWashing.fiber 02");
+                break;
+              case "3":
+                newRemark = t("qcWashing.fiber 03");
+                break;
+              default:
+                newRemark = item.remark; // Keep existing remark for other cases
+            }
+            return { ...item, remark: newRemark };
+          }
         }
-      }
-      return item;
-    })
-  );
-}, [t, inspectionData.length]); // Add inspectionData.length as dependency
+        return item;
+      })
+    );
+  }, [t, inspectionData.length]); // Add inspectionData.length as dependency
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
-  if (Array.isArray(loadedMeasurements)) {
-    const measurements = loadedMeasurements
-      .map(m => m.measurement)
-      .filter(Boolean);
+    if (Array.isArray(loadedMeasurements)) {
+      const measurements = loadedMeasurements
+        .map((m) => m.measurement)
+        .filter(Boolean);
 
-    const beforeWash = measurements.filter(m => m.before_after_wash === "beforeWash");
-    const afterWash = measurements.filter(m => m.before_after_wash === "afterWash");
-    return { beforeWash, afterWash };
-  }
-  return { beforeWash: [], afterWash: [] };
-};
+      const beforeWash = measurements.filter(
+        (m) => m.before_after_wash === "beforeWash"
+      );
+      const afterWash = measurements.filter(
+        (m) => m.before_after_wash === "afterWash"
+      );
+      return { beforeWash, afterWash };
+    }
+    return { beforeWash: [], afterWash: [] };
+  };
 
   const initializeInspectionData = (checklist = []) => {
     if (!Array.isArray(checklist)) return [];
@@ -692,7 +751,7 @@ useEffect(() => {
       checkedList: item.name,
       approvedDate: "",
       na: false,
-      remark: "",
+      remark: ""
     }));
   };
 
@@ -700,7 +759,7 @@ useEffect(() => {
     setActiveTab(tabName);
   };
 
-    // --- Data Fetch Functions ---
+  // --- Data Fetch Functions ---
   const fetchChecklist = async () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
@@ -713,27 +772,28 @@ useEffect(() => {
   };
 
   const fetchSubFactories = async () => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/supplier-issues/defects/Washing`);
-    const data = await response.json();
-    if (data && Array.isArray(data.factoryList)) {
-      setSubFactories(data.factoryList);
-      setFormData(prev => ({
-        ...prev,
-        factoryName: data.factoryList.includes("YM")
-          ? "YM"
-          : (data.factoryList[0] || "")
-      }));
-    } else {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/supplier-issues/defects/Washing`
+      );
+      const data = await response.json();
+      if (data && Array.isArray(data.factoryList)) {
+        setSubFactories(data.factoryList);
+        setFormData((prev) => ({
+          ...prev,
+          factoryName: data.factoryList.includes("YM")
+            ? "YM"
+            : data.factoryList[0] || ""
+        }));
+      } else {
+        setSubFactories([]);
+        setFormData((prev) => ({ ...prev, factoryName: "" }));
+      }
+    } catch (error) {
       setSubFactories([]);
-      setFormData(prev => ({ ...prev, factoryName: "" }));
+      setFormData((prev) => ({ ...prev, factoryName: "" }));
     }
-  } catch (error) {
-    setSubFactories([]);
-    setFormData(prev => ({ ...prev, factoryName: "" }));
-  }
-};
-
+  };
 
   const fetchWashingDefects = async () => {
     try {
@@ -747,7 +807,7 @@ useEffect(() => {
 
   // Renamed and updated to use /api/search-mono for order number suggestions
   const fetchOrderNoSuggestions = async (searchTerm) => {
-    if (!searchTerm || searchTerm.length < 2) { 
+    if (!searchTerm || searchTerm.length < 2) {
       setOrderNoSuggestions([]);
       return;
     }
@@ -815,7 +875,6 @@ useEffect(() => {
       setStyleSuggestions([]);
     }
   };
-  
 
   const fetchOrderDetailsByStyle = async (orderNo) => {
     if (!orderNo) {
@@ -824,7 +883,7 @@ useEffect(() => {
         ...prev,
         color: "",
         orderQty: "",
-        buyer: "",
+        buyer: ""
       }));
       setStyleSuggestions([]);
       return;
@@ -847,10 +906,10 @@ useEffect(() => {
       //       "info"
       //     );
       //     setFormData((prev) => ({ ...prev, orderNo: "", style: "" }));
-      //     return; 
+      //     return;
       //   }
       // }
-      
+
       // 3. If not submitted, fetch order details from dt_orders
       let response = await fetch(
         `${API_BASE_URL}/api/qc-washing/order-details-by-style/${orderNo}`
@@ -874,7 +933,7 @@ useEffect(() => {
             prev.color ||
             (orderData.colors && orderData.colors.length > 0
               ? orderData.colors[0]
-              : ""),
+              : "")
         }));
       } else {
         throw new Error(
@@ -896,250 +955,309 @@ useEffect(() => {
   };
 
   const loadSavedDataById = async (id) => {
-  if (!id) return;
-  setIsDataLoading(true);
-  try {
-    const response = await fetch(`${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`);
-    const data = await response.json();
-    
-    if (!data.success || !data.savedData) {
-      Swal.fire("No saved data found", "", "info");
-      setIsDataLoading(false);
-      return;
-    }
+    if (!id) return;
+    setIsDataLoading(true);
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`
+      );
+      const data = await response.json();
 
-    const saved = data.savedData;
+      if (!data.success || !data.savedData) {
+        Swal.fire("No saved data found", "", "info");
+        setIsDataLoading(false);
+        return;
+      }
 
-    // Set form data
-    setFormData(prev => ({
-      ...prev,
-      ...saved.formData,
-      date: saved.formData?.date ? saved.formData.date.split("T")[0] : prev.date,
-      before_after_wash: saved.before_after_wash || prev.before_after_wash,
-      orderQty: saved.formData?.orderQty || prev.orderQty,
-      buyer: saved.formData?.buyer || prev.buyer,
-      aql: [{
-        sampleSize: saved.formData?.aqlSampleSize || prev.aql?.[0]?.sampleSize || "",
-        acceptedDefect: saved.formData?.aqlAcceptedDefect || prev.aql?.[0]?.acceptedDefect || "",
-        rejectedDefect: saved.formData?.aqlRejectedDefect || prev.aql?.[0]?.rejectedDefect || "",
-        levelUsed: saved.aql?.[0]?.levelUsed || saved.formData?.aqlLevelUsed || "",
-      }],
-    }));
+      const saved = data.savedData;
 
-    // Handle inspection data - initialize with defaults if no saved data
-    if (saved.inspectionDetails?.checkedPoints && saved.inspectionDetails.checkedPoints.length > 0) {
-      const loadedInspectionData = saved.inspectionDetails.checkedPoints.map(item => ({
-        checkedList: item.pointName || "",
-        decision: item.decision === true ? "ok" : item.decision === false ? "no" : item.decision || "",
-        comparisonImages: (item.comparison || []).filter(Boolean).map(img => ({
-          file: null,
-          preview: normalizeImageSrc(img),
-          name: typeof img === "string" ? img.split('/').pop() : "image.jpg"
-        })),
-        remark: item.remark || "",
-        approvedDate: item.approvedDate || "",
-        na: item.condition === "N/A" || false,
+      // Set form data
+      setFormData((prev) => ({
+        ...prev,
+        ...saved.formData,
+        date: saved.formData?.date
+          ? saved.formData.date.split("T")[0]
+          : prev.date,
+        before_after_wash: saved.before_after_wash || prev.before_after_wash,
+        orderQty: saved.formData?.orderQty || prev.orderQty,
+        buyer: saved.formData?.buyer || prev.buyer,
+        aql: [
+          {
+            sampleSize:
+              saved.formData?.aqlSampleSize || prev.aql?.[0]?.sampleSize || "",
+            acceptedDefect:
+              saved.formData?.aqlAcceptedDefect ||
+              prev.aql?.[0]?.acceptedDefect ||
+              "",
+            rejectedDefect:
+              saved.formData?.aqlRejectedDefect ||
+              prev.aql?.[0]?.rejectedDefect ||
+              "",
+            levelUsed:
+              saved.aql?.[0]?.levelUsed || saved.formData?.aqlLevelUsed || ""
+          }
+        ]
       }));
 
-      const translatedInspectionData = loadedInspectionData.map(item => {
-        if (item.checkedList === "Fiber" && item.remark) {
-          const translatedRemark = convertEnglishToCurrentLanguage(item.remark, t);
-          if (translatedRemark !== item.remark) {
-            return { ...item, remark: translatedRemark };
-          }
-          
-          if (item.decision && item.decision !== "ok") {
-            let newRemark = "";
-            switch (item.decision) {
-              case "1":
-                newRemark = t("qcWashing.fiber 01");
-                break;
-              case "2":
-                newRemark = t("qcWashing.fiber 02");
-                break;
-              case "3":
-                newRemark = t("qcWashing.fiber 03");
-                break;
-              default:
-                newRemark = item.remark;
-            }
-            return { ...item, remark: newRemark };
-          }
-        }
-        return item;
-      });
-      
-      setInspectionData(translatedInspectionData);
-    } else {
-      // Initialize with default values from masterChecklist if no saved inspection data
-      setInspectionData(initializeInspectionData(masterChecklist));
-    }
+      // Handle inspection data - initialize with defaults if no saved data
+      if (
+        saved.inspectionDetails?.checkedPoints &&
+        saved.inspectionDetails.checkedPoints.length > 0
+      ) {
+        const loadedInspectionData = saved.inspectionDetails.checkedPoints.map(
+          (item) => ({
+            checkedList: item.pointName || "",
+            decision:
+              item.decision === true
+                ? "ok"
+                : item.decision === false
+                ? "no"
+                : item.decision || "",
+            comparisonImages: (item.comparison || [])
+              .filter(Boolean)
+              .map((img) => ({
+                file: null,
+                preview: normalizeImageSrc(img),
+                name:
+                  typeof img === "string" ? img.split("/").pop() : "image.jpg"
+              })),
+            remark: item.remark || "",
+            approvedDate: item.approvedDate || "",
+            na: item.condition === "N/A" || false
+          })
+        );
 
-    // Handle machine processes - initialize with defaults if no saved data
-    if (saved.inspectionDetails?.machineProcesses && saved.inspectionDetails.machineProcesses.length > 0) {
-      // Process saved machine data as before
-      saved.inspectionDetails.machineProcesses.forEach(machine => {
-        const machineType = machine.machineType;
-        const parameters = machineType === "Washing Machine" 
-          ? ["temperature", "time", "silicon", "softener"]
-          : ["temperature", "time"];
-        
-        parameters.forEach(param => {
-          if (machine[param]) {
-            const standardValue = machine[param].standardValue;
-            const standardStr = standardValue === null || standardValue === undefined ? "" : String(standardValue);
-            
-            const actualValue = machine[param].actualValue;
-            const actualStr = actualValue === null || actualValue === undefined ? "" : String(actualValue);
-            
-            setStandardValues(prev => ({
-              ...prev,
-              [machineType]: {
-                ...prev[machineType],
-                [param]: standardStr
+        const translatedInspectionData = loadedInspectionData.map((item) => {
+          if (item.checkedList === "Fiber" && item.remark) {
+            const translatedRemark = convertEnglishToCurrentLanguage(
+              item.remark,
+              t
+            );
+            if (translatedRemark !== item.remark) {
+              return { ...item, remark: translatedRemark };
+            }
+
+            if (item.decision && item.decision !== "ok") {
+              let newRemark = "";
+              switch (item.decision) {
+                case "1":
+                  newRemark = t("qcWashing.fiber 01");
+                  break;
+                case "2":
+                  newRemark = t("qcWashing.fiber 02");
+                  break;
+                case "3":
+                  newRemark = t("qcWashing.fiber 03");
+                  break;
+                default:
+                  newRemark = item.remark;
               }
-            }));
-            
-            setActualValues(prev => ({
-              ...prev,
-              [machineType]: {
-                ...prev[machineType],
-                [param]: actualStr
-              }
-            }));
-            
-            setMachineStatus(prev => ({
-              ...prev,
-              [machineType]: {
-                ...prev[machineType],
-                [param]: {
-                  ok: machine[param].status?.ok || false,
-                  no: machine[param].status?.no || false
+              return { ...item, remark: newRemark };
+            }
+          }
+          return item;
+        });
+
+        setInspectionData(translatedInspectionData);
+      } else {
+        // Initialize with default values from masterChecklist if no saved inspection data
+        setInspectionData(initializeInspectionData(masterChecklist));
+      }
+
+      // Handle machine processes - initialize with defaults if no saved data
+      if (
+        saved.inspectionDetails?.machineProcesses &&
+        saved.inspectionDetails.machineProcesses.length > 0
+      ) {
+        // Process saved machine data as before
+        saved.inspectionDetails.machineProcesses.forEach((machine) => {
+          const machineType = machine.machineType;
+          const parameters =
+            machineType === "Washing Machine"
+              ? ["temperature", "time", "silicon", "softener"]
+              : ["temperature", "time"];
+
+          parameters.forEach((param) => {
+            if (machine[param]) {
+              const standardValue = machine[param].standardValue;
+              const standardStr =
+                standardValue === null || standardValue === undefined
+                  ? ""
+                  : String(standardValue);
+
+              const actualValue = machine[param].actualValue;
+              const actualStr =
+                actualValue === null || actualValue === undefined
+                  ? ""
+                  : String(actualValue);
+
+              setStandardValues((prev) => ({
+                ...prev,
+                [machineType]: {
+                  ...prev[machineType],
+                  [param]: standardStr
                 }
-              }
-            }));
+              }));
+
+              setActualValues((prev) => ({
+                ...prev,
+                [machineType]: {
+                  ...prev[machineType],
+                  [param]: actualStr
+                }
+              }));
+
+              setMachineStatus((prev) => ({
+                ...prev,
+                [machineType]: {
+                  ...prev[machineType],
+                  [param]: {
+                    ok: machine[param].status?.ok || false,
+                    no: machine[param].status?.no || false
+                  }
+                }
+              }));
+            }
+          });
+        });
+      } else {
+        // Initialize with default machine values if no saved machine data
+        setStandardValues({
+          "Washing Machine": {
+            temperature: "",
+            time: "",
+            silicon: "",
+            softener: ""
+          },
+          "Tumble Dry": { temperature: "", time: "" }
+        });
+        setActualValues({
+          "Washing Machine": {
+            temperature: "",
+            time: "",
+            silicon: "",
+            softener: ""
+          },
+          "Tumble Dry": { temperature: "", time: "" }
+        });
+        setMachineStatus({
+          "Washing Machine": {
+            temperature: { ok: true, no: false },
+            time: { ok: true, no: false },
+            silicon: { ok: true, no: false },
+            softener: { ok: true, no: false }
+          },
+          "Tumble Dry": {
+            temperature: { ok: true, no: false },
+            time: { ok: true, no: false }
           }
         });
-      });
-    } else {
-      // Initialize with default machine values if no saved machine data
-      setStandardValues({
-        "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-        "Tumble Dry": { temperature: "", time: "" }
-      });
-      setActualValues({
-        "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-        "Tumble Dry": { temperature: "", time: "" }
-      });
-      setMachineStatus({
-        "Washing Machine": {
-          temperature: { ok: true, no: false },
-          time: { ok: true, no: false },
-          silicon: { ok: true, no: false },
-          softener: { ok: true, no: false }
-        },
-        "Tumble Dry": {
-          temperature: { ok: true, no: false },
-          time: { ok: true, no: false }
-        }
-      });
-    }
-
-    // Handle defect data - initialize with defaults if no saved data
-    if (saved.inspectionDetails?.parameters && saved.inspectionDetails.parameters.length > 0) {
-      setDefectData(
-        saved.inspectionDetails.parameters.map(param => ({
-          parameter: param.parameterName || param.parameter || "",
-          checkedQty: param.checkedQty || 0,
-          failedQty: param.defectQty || param.failedQty || 0,
-          passRate: param.passRate || "",
-          result: param.result || "",
-          remark: param.remark || "",
-          ok: param.ok !== undefined ? param.ok : true,
-          no: param.no !== undefined ? param.no : false,
-          acceptedDefect: param.aqlAcceptedDefect || "",
-          checkboxes: param.checkboxes || {},
-        }))
-      );
-    } else {
-      // Initialize with default defect data if no saved defect data
-      setDefectData(normalizeDefectData(defaultDefectData));
-    }
-
-    // Continue with other data loading...
-    setAddedDefects(saved.addedDefects || []);
-    setDefectsByPc(transformDefectsByPc(saved.defectDetails?.defectsByPc || {}));
-    setUploadedImages(
-      (saved.defectDetails?.additionalImages || [])
-        .filter(Boolean)
-        .map(img => {
-          if (typeof img === "object" && img !== null) {
-            return { 
-              file: null,
-              preview: normalizeImageSrc(img.preview || img), 
-              name: img.name || "image.jpg" 
-            };
-          }
-          if (typeof img === "string") {
-            return { 
-              file: null,
-              preview: normalizeImageSrc(img), 
-              name: img.split('/').pop() || "image.jpg" 
-            };
-          }
-          return { 
-            file: null,
-            preview: "", 
-            name: "image.jpg" 
-          };
-        })
-    );
-    setComment(saved.defectDetails?.comment || "");
-    setMeasurementData({
-      beforeWash: (saved.measurementDetails?.measurement || []).filter(m => m.before_after_wash === "beforeWash"),
-      afterWash: (saved.measurementDetails?.measurement || []).filter(m => m.before_after_wash === "afterWash"),
-    });
-
-    let sizes = [];
-    if (saved.measurementDetails) {
-      if (Array.isArray(saved.measurementDetails)) {
-        sizes = saved.measurementDetails.map(m => m.size);
-      } else if (typeof saved.measurementDetails === "object" && Array.isArray(saved.measurementDetails.measurement)) {
-        sizes = saved.measurementDetails.measurement.map(m => m.size);
       }
+
+      // Handle defect data - initialize with defaults if no saved data
+      if (
+        saved.inspectionDetails?.parameters &&
+        saved.inspectionDetails.parameters.length > 0
+      ) {
+        setDefectData(
+          saved.inspectionDetails.parameters.map((param) => ({
+            parameter: param.parameterName || param.parameter || "",
+            checkedQty: param.checkedQty || 0,
+            failedQty: param.defectQty || param.failedQty || 0,
+            passRate: param.passRate || "",
+            result: param.result || "",
+            remark: param.remark || "",
+            ok: param.ok !== undefined ? param.ok : true,
+            no: param.no !== undefined ? param.no : false,
+            acceptedDefect: param.aqlAcceptedDefect || "",
+            checkboxes: param.checkboxes || {}
+          }))
+        );
+      } else {
+        // Initialize with default defect data if no saved defect data
+        setDefectData(normalizeDefectData(defaultDefectData));
+      }
+
+      // Continue with other data loading...
+      setAddedDefects(saved.addedDefects || []);
+      setDefectsByPc(
+        transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
+      );
+      setUploadedImages(
+        (saved.defectDetails?.additionalImages || [])
+          .filter(Boolean)
+          .map((img) => {
+            if (typeof img === "object" && img !== null) {
+              return {
+                file: null,
+                preview: normalizeImageSrc(img.preview || img),
+                name: img.name || "image.jpg"
+              };
+            }
+            if (typeof img === "string") {
+              return {
+                file: null,
+                preview: normalizeImageSrc(img),
+                name: img.split("/").pop() || "image.jpg"
+              };
+            }
+            return {
+              file: null,
+              preview: "",
+              name: "image.jpg"
+            };
+          })
+      );
+      setComment(saved.defectDetails?.comment || "");
+      setMeasurementData({
+        beforeWash: (saved.measurementDetails?.measurement || []).filter(
+          (m) => m.before_after_wash === "beforeWash"
+        ),
+        afterWash: (saved.measurementDetails?.measurement || []).filter(
+          (m) => m.before_after_wash === "afterWash"
+        )
+      });
+
+      let sizes = [];
+      if (saved.measurementDetails) {
+        if (Array.isArray(saved.measurementDetails)) {
+          sizes = saved.measurementDetails.map((m) => m.size);
+        } else if (
+          typeof saved.measurementDetails === "object" &&
+          Array.isArray(saved.measurementDetails.measurement)
+        ) {
+          sizes = saved.measurementDetails.measurement.map((m) => m.size);
+        }
+      }
+      setSavedSizes(sizes);
+      setRecordId(saved._id);
+      if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
+
+      Swal.fire({
+        icon: "success",
+        title: "Saved data loaded!",
+        timer: 1200,
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false
+      });
+    } catch (error) {
+      Swal.fire("Error loading saved data", error.message, "error");
+      console.error("Error loading saved data:", error);
+    } finally {
+      setIsDataLoading(false);
     }
-    setSavedSizes(sizes);
-    setRecordId(saved._id);
-    if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
+  };
 
-    Swal.fire({
-      icon: "success",
-      title: "Saved data loaded!",
-      timer: 1200,
-      toast: true,
-      position: "top-end",
-      showConfirmButton: false
-    });
-
-  } catch (error) {
-    Swal.fire("Error loading saved data", error.message, "error");
-    console.error("Error loading saved data:", error);
-  } finally {
-    setIsDataLoading(false);
-  }
-};
-
-
-
-    // --- Form Handlers ---
+  // --- Form Handlers ---
   const handleInputChange = (field, value) => {
     if (field === "orderNo") {
       fetchOrderNoSuggestions(value);
       setShowOrderNoSuggestions(true);
     }
-    
+
     // --- Cache state before changing color ---
-    if (field === 'color' && value !== formData.color && formData.color) {
+    if (field === "color" && value !== formData.color && formData.color) {
       const outgoingColor = formData.color;
       const currentStateForColor = {
         inspectionData,
@@ -1150,50 +1268,53 @@ useEffect(() => {
         measurementData,
         uploadedImages,
         savedSizes,
-        defectsByPc, 
+        defectsByPc,
         formData: {
           washQty: formData.washQty,
           checkedQty: formData.checkedQty,
-          before_after_wash: formData.before_after_wash,
+          before_after_wash: formData.before_after_wash
         }
       };
-      setColorDataCache(prevCache => ({ ...prevCache, [outgoingColor]: currentStateForColor }));
+      setColorDataCache((prevCache) => ({
+        ...prevCache,
+        [outgoingColor]: currentStateForColor
+      }));
     }
 
     setFormData((prev) => {
       const newState = { ...prev, [field]: value };
       if (field === "firstOutput") {
         newState.inline = "";
-        newState.reportType = value; 
-        newState.washQty = "";       
-        newState.checkedQty = ""; 
+        newState.reportType = value;
+        newState.washQty = "";
+        newState.checkedQty = "";
         if (value === "First Output") {
           fetchFirstOutputDetails();
         }
       } else if (field === "inline") {
         newState.firstOutput = "";
         newState.reportType = value;
-        newState.washQty = "";       
+        newState.washQty = "";
         newState.checkedQty = "";
       } else if (field === "reportType") {
         if (value === "First Output") {
           newState.firstOutput = "First Output";
           newState.inline = "";
-          newState.washQty = "";       
-        newState.checkedQty = "";
+          newState.washQty = "";
+          newState.checkedQty = "";
           fetchFirstOutputDetails();
         } else if (value === "Inline") {
           newState.inline = "Inline";
           newState.firstOutput = "";
-          newState.washQty = "";       
-        newState.checkedQty = "";
+          newState.washQty = "";
+          newState.checkedQty = "";
         }
       }
 
       if (field === "reportType" && value === "Inline" && formData.washQty) {
-          fetchAQLData(formData.washQty);
-          calculateCheckedQty(formData.washQty);
-        }
+        fetchAQLData(formData.washQty);
+        calculateCheckedQty(formData.washQty);
+      }
 
       if (field === "color" && value !== prev.color) {
         if (value && (prev.orderNo || prev.style)) {
@@ -1228,62 +1349,79 @@ useEffect(() => {
   const fetchFirstOutputDetails = async () => {
     const orderNo = formData.orderNo || formData.style;
     if (!orderNo) {
-      Swal.fire('Missing Order No', 'Please enter an Order No before selecting First Output.', 'warning');
-      setFormData(prev => ({ ...prev, firstOutput: '', reportType: '' }));
+      Swal.fire(
+        "Missing Order No",
+        "Please enter an Order No before selecting First Output.",
+        "warning"
+      );
+      setFormData((prev) => ({ ...prev, firstOutput: "", reportType: "" }));
       return;
     }
     try {
       setIsDataLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/first-output-details`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderNo: orderNo })
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/first-output-details`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderNo: orderNo })
+        }
+      );
       const data = await response.json();
 
       if (response.ok && data.success) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           checkedQty: data.checkedQty,
-          aql:[{sampleSize: data.aqlData.sampleSize,
-          acceptedDefect: data.aqlData.acceptedDefect,
-          rejectedDefect: data.aqlData.rejectedDefect,
-          levelUsed: data.aqlData.levelUsed}],
-          washQty: data.checkedQty,
+          aql: [
+            {
+              sampleSize: data.aqlData.sampleSize,
+              acceptedDefect: data.aqlData.acceptedDefect,
+              rejectedDefect: data.aqlData.rejectedDefect,
+              levelUsed: data.aqlData.levelUsed
+            }
+          ],
+          washQty: data.checkedQty
         }));
       } else {
         Swal.fire({
-          icon: 'error',
-          title: 'Could not fetch First Output data',
-          text: data.message || 'An unknown error occurred.',
+          icon: "error",
+          title: "Could not fetch First Output data",
+          text: data.message || "An unknown error occurred."
         });
         // Clear relevant fields on failure
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           checkedQty: "",
           washQty: "",
-          aql: [{
-            sampleSize: "",
-            acceptedDefect: "",
-            rejectedDefect: "",
-            levelUsed: "",
-          }]
+          aql: [
+            {
+              sampleSize: "",
+              acceptedDefect: "",
+              rejectedDefect: "",
+              levelUsed: ""
+            }
+          ]
         }));
       }
     } catch (error) {
       console.error("Error fetching First Output details:", error);
-      Swal.fire('Error', 'A network error occurred while fetching First Output details.', 'error');
+      Swal.fire(
+        "Error",
+        "A network error occurred while fetching First Output details.",
+        "error"
+      );
     } finally {
       setIsDataLoading(false);
     }
   };
 
-   // --- AQL & Checked Qty ---
+  // --- AQL & Checked Qty ---
   // Fetch AQL data for inline reportType field
   const fetchAQLData = async (washQty) => {
-   if (!washQty) return;
+    if (!washQty) return;
     const orderNo = formData.orderNo || formData.style;
-    
+
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
@@ -1292,24 +1430,25 @@ useEffect(() => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             lotSize: parseInt(washQty) || 0,
-            orderNo: orderNo,
-          }),
+            orderNo: orderNo
+          })
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({
-          message: `Request failed with status ${response.status}`,
+          message: `Request failed with status ${response.status}`
         }));
-        console.error("AQL API Error:", errorData.message || "Unknown error");
         setFormData((prev) => ({
           ...prev,
-          aql: [{
-            sampleSize: "",
-            acceptedDefect: "",
-            rejectedDefect: "",
-            levelUsed: "",
-          }]
+          aql: [
+            {
+              sampleSize: "",
+              acceptedDefect: "",
+              rejectedDefect: "",
+              levelUsed: ""
+            }
+          ]
         }));
         return;
       }
@@ -1318,22 +1457,26 @@ useEffect(() => {
       if (data.success && data.aqlData) {
         setFormData((prev) => ({
           ...prev,
-          aql: [{
-            sampleSize: data.aqlData.sampleSize,
-            acceptedDefect: data.aqlData.acceptedDefect,
-            rejectedDefect: data.aqlData.rejectedDefect,
-            levelUsed: data.aqlData.levelUsed,
-          }]
+          aql: [
+            {
+              sampleSize: data.aqlData.sampleSize,
+              acceptedDefect: data.aqlData.acceptedDefect,
+              rejectedDefect: data.aqlData.rejectedDefect,
+              levelUsed: data.aqlData.levelUsed
+            }
+          ]
         }));
       } else {
-         setFormData((prev) => ({
+        setFormData((prev) => ({
           ...prev,
-          aql: [{
-            sampleSize: "",
-            acceptedDefect: "",
-            rejectedDefect: "",
-            levelUsed: "",
-          }]
+          aql: [
+            {
+              sampleSize: "",
+              acceptedDefect: "",
+              rejectedDefect: "",
+              levelUsed: ""
+            }
+          ]
         }));
       }
     } catch (error) {
@@ -1342,21 +1485,21 @@ useEffect(() => {
   };
 
   // Calculate checked qty based on wash qty and AQL data
- const calculateCheckedQty = (washQty) => {
-  setTimeout(() => {
-    setFormData((prev) => {
-      const aql = prev.aql && prev.aql[0];
-      if (aql?.sampleSize && washQty) {
-        const checkedQty = Math.min(
-          parseInt(washQty),
-          parseInt(aql.sampleSize)
-        );
-        return { ...prev, checkedQty: checkedQty };
-      }
-      return prev;
-    });
-  }, 100);
-};
+  const calculateCheckedQty = (washQty) => {
+    setTimeout(() => {
+      setFormData((prev) => {
+        const aql = prev.aql && prev.aql[0];
+        if (aql?.sampleSize && washQty) {
+          const checkedQty = Math.min(
+            parseInt(washQty),
+            parseInt(aql.sampleSize)
+          );
+          return { ...prev, checkedQty: checkedQty };
+        }
+        return prev;
+      });
+    }, 100);
+  };
 
   // --- Measurement ---
   // Calculate totals from Measurement Data to match the Summary Card
@@ -1367,7 +1510,7 @@ useEffect(() => {
     if (measurementData && typeof measurementData === "object") {
       const allMeasurements = [
         ...(measurementData.beforeWash || []),
-        ...(measurementData.afterWash || []),
+        ...(measurementData.afterWash || [])
       ];
 
       allMeasurements.forEach((data) => {
@@ -1389,15 +1532,25 @@ useEffect(() => {
     }
 
     const totalFail = totalCheckedPoints - totalPass;
-    const passRate = totalCheckedPoints > 0 ? Math.round((totalPass / totalCheckedPoints) * 100) : 0;
-    return { totalCheckedPoint: totalCheckedPoints, totalPass, totalFail, passRate };
+    const passRate =
+      totalCheckedPoints > 0
+        ? Math.round((totalPass / totalCheckedPoints) * 100)
+        : 0;
+    return {
+      totalCheckedPoint: totalCheckedPoints,
+      totalPass,
+      totalFail,
+      passRate
+    };
   };
 
   // Handle measurement size save with nested structure
   const handleSizeSubmit = async (transformedSizeData) => {
     try {
       const before_after_wash =
-        formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+        formData.before_after_wash === "Before Wash"
+          ? "beforeWash"
+          : "afterWash";
 
       // 1. Update local measurement data and saved sizes
       setMeasurementData((prev) => {
@@ -1412,7 +1565,7 @@ useEffect(() => {
         } else {
           return {
             ...prev,
-            [before_after_wash]: [...currentArray, transformedSizeData],
+            [before_after_wash]: [...currentArray, transformedSizeData]
           };
         }
       });
@@ -1448,8 +1601,8 @@ useEffect(() => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             recordId,
-            measurementDetail,
-          }),
+            measurementDetail
+          })
         }
       );
 
@@ -1470,17 +1623,20 @@ useEffect(() => {
     }
   };
 
-
   // Handle measurement data edit
   const handleMeasurementEdit = (size = null) => {
     setShowMeasurementTable(true);
     if (size) {
       setSavedSizes((prev) => prev.filter((s) => s !== size));
       const before_after_wash =
-        formData.before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+        formData.before_after_wash === "Before Wash"
+          ? "beforeWash"
+          : "afterWash";
       setMeasurementData((prev) => ({
         ...prev,
-        [before_after_wash]: prev[before_after_wash].filter((item) => item.size !== size),
+        [before_after_wash]: prev[before_after_wash].filter(
+          (item) => item.size !== size
+        )
       }));
     }
   };
@@ -1492,7 +1648,7 @@ useEffect(() => {
     }
   };
 
- // --- Image Upload ---
+  // --- Image Upload ---
   const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
     if (uploadedImages.length + files.length > 5) {
@@ -1507,7 +1663,7 @@ useEffect(() => {
     const options = {
       maxSizeMB: 0.5,
       maxWidthOrHeight: 1024,
-      useWebWorker: true,
+      useWebWorker: true
     };
 
     Swal.fire({
@@ -1516,7 +1672,7 @@ useEffect(() => {
       allowOutsideClick: false,
       didOpen: () => {
         Swal.showLoading();
-      },
+      }
     });
 
     for (const file of files) {
@@ -1525,7 +1681,7 @@ useEffect(() => {
         const preview = URL.createObjectURL(compressedFile);
         setUploadedImages((prev) => [
           ...prev,
-          { file: compressedFile, preview, name: compressedFile.name },
+          { file: compressedFile, preview, name: compressedFile.name }
         ]);
       } catch (error) {
         console.error("Image compression failed:", error);
@@ -1536,38 +1692,40 @@ useEffect(() => {
   };
 
   const autoSaveSummary = async (summary, recordId) => {
-  if (!recordId || !summary) return;
-  try {
-    await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ summary }),
-    });
-  } catch (error) {
-    console.error("Failed to auto-save summary:", error);
-  }
-};
+    if (!recordId || !summary) return;
+    try {
+      await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary })
+      });
+    } catch (error) {
+      console.error("Failed to auto-save summary:", error);
+    }
+  };
 
-const autoSaveOverallSummary = async (summary, recordId) => {
-  if (!recordId || !summary) return;
-  try {
-    await fetch(`${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ summary }),
-    });
-  } catch (error) {
-    console.error("Failed to auto-save overall summary:", error);
-  }
-};
+  const autoSaveOverallSummary = async (summary, recordId) => {
+    if (!recordId || !summary) return;
+    try {
+      await fetch(
+        `${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ summary })
+        }
+      );
+    } catch (error) {
+      console.error("Failed to auto-save overall summary:", error);
+    }
+  };
 
-
-     // Function to calculate and update summary data (NEW/MODIFIED)
+  // Function to calculate and update summary data (NEW/MODIFIED)
   const updateSummaryData = (currentFormData) => {
-  const summary = calculateSummaryData(currentFormData);
+    const summary = calculateSummaryData(currentFormData);
     setFormData((prevData) => ({
       ...prevData,
-      ...summary,
+      ...summary
     }));
     if (recordId) {
       autoSaveSummary(summary, recordId);
@@ -1589,16 +1747,18 @@ const autoSaveOverallSummary = async (summary, recordId) => {
       inline: "",
       reportType: "",
       buyer: "",
-      factoryName: subFactories.includes("YM") ? "YM" : (subFactories[0] || ""),
+      factoryName: subFactories.includes("YM") ? "YM" : subFactories[0] || "",
       before_after_wash: "Before Wash",
       result: "",
-      aql:[{
-        sampleSize: "",
-        acceptedDefect: "",
-        rejectedDefect: "",
-        levelUsed: "",
-      }],
-      
+      aql: [
+        {
+          sampleSize: "",
+          acceptedDefect: "",
+          rejectedDefect: "",
+          levelUsed: ""
+        }
+      ],
+
       inspectionDetails: {},
       defectDetails: {
         checkedQty: "",
@@ -1606,32 +1766,37 @@ const autoSaveOverallSummary = async (summary, recordId) => {
         result: "",
         defectsByPc: [],
         additionalImages: [],
-        comment: "",
+        comment: ""
       },
       measurementDetails: [],
-      
+
       totalCheckedPcs: 0,
       rejectedDefectPcs: 0,
       totalDefectCount: 0,
       defectRate: 0,
       defectRatio: 0,
-      overallFinalResult: "N/A",
+      overallFinalResult: "N/A"
     });
 
     // Reset all other states
     setOrderNoSuggestions([]);
     setShowOrderNoSuggestions(false);
     setStyleSuggestions([]);
-    
+
     // Re-initialize inspection data with master checklist
     if (masterChecklist && masterChecklist.length > 0) {
       setInspectionData(initializeInspectionData(masterChecklist));
     } else {
       setInspectionData([]);
     }
-    
+
     setProcessData({
-      "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+      "Washing Machine": {
+        temperature: "",
+        time: "",
+        silicon: "",
+        softener: ""
+      },
       "Tumble Dry": { temperature: "", time: "" }
     });
     setDefectData(normalizeDefectData(defaultDefectData));
@@ -1660,11 +1825,21 @@ const autoSaveOverallSummary = async (summary, recordId) => {
 
     // Reset machine values
     setStandardValues({
-      "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+      "Washing Machine": {
+        temperature: "",
+        time: "",
+        silicon: "",
+        softener: ""
+      },
       "Tumble Dry": { temperature: "", time: "" }
     });
     setActualValues({
-      "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+      "Washing Machine": {
+        temperature: "",
+        time: "",
+        silicon: "",
+        softener: ""
+      },
       "Tumble Dry": { temperature: "", time: "" }
     });
     setMachineStatus({
@@ -1682,68 +1857,71 @@ const autoSaveOverallSummary = async (summary, recordId) => {
 
     // Reset loading state
     setIsDataLoading(false);
-    
+
     // Clear colorOptions after a small delay to ensure form is ready
     setTimeout(() => {
       setColorOptions([]);
     }, 100);
   };
 
-    useEffect(() => {
-  // Debounce the calculation to prevent multiple rapid calls
-  const timeoutId = setTimeout(() => {
-    const defectDetails = {
-      ...formData.defectDetails,
-      checkedQty: formData.checkedQty,
-      washQty: formData.washQty,
-      result: formData.result,
-      defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
-        pcNumber,
-        pcDefects,
-      })),
-    };
+  useEffect(() => {
+    // Debounce the calculation to prevent multiple rapid calls
+    const timeoutId = setTimeout(() => {
+      const defectDetails = {
+        ...formData.defectDetails,
+        checkedQty: formData.checkedQty,
+        washQty: formData.washQty,
+        result: formData.result,
+        defectsByPc: Object.entries(defectsByPc).map(
+          ([pcNumber, pcDefects]) => ({
+            pcNumber,
+            pcDefects
+          })
+        )
+      };
 
-    const measurementDetails = {
-      measurement: [
-        ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-        ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-      ],
-    };
+      const measurementDetails = {
+        measurement: [
+          ...measurementData.beforeWash.map((item) => ({
+            ...item,
+            before_after_wash: "beforeWash"
+          })),
+          ...measurementData.afterWash.map((item) => ({
+            ...item,
+            before_after_wash: "afterWash"
+          }))
+        ]
+      };
 
-    // Calculate summary from the latest data
-    const summary = calculateSummaryData({
-      ...formData,
-      defectDetails,
-      measurementDetails, 
-    });
+      // Calculate summary from the latest data
+      const summary = calculateSummaryData({
+        ...formData,
+        defectDetails,
+        measurementDetails
+      });
 
+      setFormData((prev) => ({
+        ...prev,
+        defectDetails,
+        measurementDetails,
+        ...summary
+      }));
 
-    setFormData((prev) => ({
-      ...prev,
-      defectDetails,
-      measurementDetails,
-      ...summary,
-    }));
+      if (recordId) {
+        autoSaveSummary(summary, recordId);
+      }
+    }, 100); // 100ms debounce
 
-    // Re-initialize inspection data with master checklist
-    if (masterChecklist && masterChecklist.length > 0) {
-      setInspectionData(initializeInspectionData(masterChecklist));
-    } else {
-      setInspectionData([]);
-    }
-  }, 100); // 100ms debounce
-
-  return () => clearTimeout(timeoutId);
-}, [
-  defectsByPc,
-  measurementData.beforeWash,
-  measurementData.afterWash,
-  formData.checkedQty,
-  formData.washQty,
-  formData.result,
-  recordId,
-]);
-
+    return () => clearTimeout(timeoutId);
+  }, [
+    defectsByPc,
+    measurementData.beforeWash,
+    measurementData.afterWash,
+    formData.checkedQty,
+    formData.washQty,
+    formData.result,
+    recordId
+  ]);
 
   // Load color-specific data
   const loadColorSpecificData = async (orderNo, color) => {
@@ -1758,12 +1936,12 @@ const autoSaveOverallSummary = async (summary, recordId) => {
       setMeasurementData(cachedData.measurementData);
       setUploadedImages(cachedData.uploadedImages);
       setSavedSizes(cachedData.savedSizes);
-      setDefectsByPc(cachedData.defectsByPc || {}); 
-      setFormData(prev => ({
+      setDefectsByPc(cachedData.defectsByPc || {});
+      setFormData((prev) => ({
         ...prev,
-        ...(cachedData.formData || {}) 
+        ...(cachedData.formData || {})
       }));
-      return; 
+      return;
     }
 
     // 2. If not in cache, fetch from the server
@@ -1780,113 +1958,145 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           const colorData = data.colorData;
 
           if (colorData.orderDetails) {
-            setFormData(prev => {
+            setFormData((prev) => {
               const newColor = colorData.orderDetails.color || color;
-              const updatedColor = prev.color === newColor ? prev.color : newColor;
+              const updatedColor =
+                prev.color === newColor ? prev.color : newColor;
 
               return {
                 ...prev,
                 ...colorData.orderDetails,
                 color: updatedColor,
-                before_after_wash: colorData.orderDetails.before_after_wash || prev.before_after_wash,
+                before_after_wash:
+                  colorData.orderDetails.before_after_wash ||
+                  prev.before_after_wash,
                 washQty: colorData.defectDetails?.washQty || prev.washQty,
-                checkedQty: colorData.defectDetails?.checkedQty || prev.checkedQty,
-                aql: [{
-                  sampleSize: colorData.orderDetails.aqlSampleSize
-                  || colorData.inspectionDetails?.aqlSampleSize
-                  || prev.aqlSampleSize,
-                  acceptedDefect: colorData.orderDetails.aqlAcceptedDefect
-                  || colorData.inspectionDetails?.aqlAcceptedDefect
-                  || prev.aqlAcceptedDefect,
-                  rejectedDefect: colorData.orderDetails.aqlRejectedDefect
-                  || colorData.inspectionDetails?.aqlRejectedDefect
-                  || prev.aqlRejectedDefect,
-                levelUsed: colorData.orderDetails.aqlLevelUsed
-                  || colorData.inspectionDetails?.aqlLevelUsed
-                  || prev.aqlLevelUsed, 
-                }]
+                checkedQty:
+                  colorData.defectDetails?.checkedQty || prev.checkedQty,
+                aql: [
+                  {
+                    sampleSize:
+                      colorData.orderDetails.aqlSampleSize ||
+                      colorData.inspectionDetails?.aqlSampleSize ||
+                      prev.aqlSampleSize,
+                    acceptedDefect:
+                      colorData.orderDetails.aqlAcceptedDefect ||
+                      colorData.inspectionDetails?.aqlAcceptedDefect ||
+                      prev.aqlAcceptedDefect,
+                    rejectedDefect:
+                      colorData.orderDetails.aqlRejectedDefect ||
+                      colorData.inspectionDetails?.aqlRejectedDefect ||
+                      prev.aqlRejectedDefect,
+                    levelUsed:
+                      colorData.orderDetails.aqlLevelUsed ||
+                      colorData.inspectionDetails?.aqlLevelUsed ||
+                      prev.aqlLevelUsed
+                  }
+                ]
               };
             });
           }
           // In loadColorSpecificData function, replace the setInspectionData call with:
-            const loadedInspectionData = colorData.inspectionDetails?.checkedPoints?.map((point) => ({ 
-                checkedList: point.pointName,
-                decision: point.decision === true ? "ok" : point.decision === false ? "no" : point.decision || "",
-                comparisonImages: (point.comparison || []).filter(Boolean).map(img => ({
+          const loadedInspectionData =
+            colorData.inspectionDetails?.checkedPoints?.map((point) => ({
+              checkedList: point.pointName,
+              decision:
+                point.decision === true
+                  ? "ok"
+                  : point.decision === false
+                  ? "no"
+                  : point.decision || "",
+              comparisonImages: (point.comparison || [])
+                .filter(Boolean)
+                .map((img) => ({
                   file: null,
                   preview: normalizeImageSrc(img),
-                  name: typeof img === "string" ? img.split('/').pop() : "image.jpg"
+                  name:
+                    typeof img === "string" ? img.split("/").pop() : "image.jpg"
                 })),
-                approvedDate: point.approvedDate || "",
-                na: point.condition === "N/A",
-                remark: point.remark || "",
-              })) || initializeInspectionData(masterChecklist);
+              approvedDate: point.approvedDate || "",
+              na: point.condition === "N/A",
+              remark: point.remark || ""
+            })) || initializeInspectionData(masterChecklist);
 
-            // Convert English fiber remarks to current language immediately after loading
-            const translatedInspectionData = loadedInspectionData.map(item => {
-              if (item.checkedList === "Fiber" && item.remark) {
-                const translatedRemark = convertEnglishToCurrentLanguage(item.remark, t);
-                if (translatedRemark !== item.remark) {
-                  return { ...item, remark: translatedRemark };
-                }
-                
-                // Handle decision-based remarks
-                if (item.decision && item.decision !== "ok") {
-                  let newRemark = "";
-                  switch (item.decision) {
-                    case "1":
-                      newRemark = t("qcWashing.fiber 01");
-                      break;
-                    case "2":
-                      newRemark = t("qcWashing.fiber 02");
-                      break;
-                    case "3":
-                      newRemark = t("qcWashing.fiber 03");
-                      break;
-                    default:
-                      newRemark = item.remark;
-                  }
-                  return { ...item, remark: newRemark };
-                }
+          // Convert English fiber remarks to current language immediately after loading
+          const translatedInspectionData = loadedInspectionData.map((item) => {
+            if (item.checkedList === "Fiber" && item.remark) {
+              const translatedRemark = convertEnglishToCurrentLanguage(
+                item.remark,
+                t
+              );
+              if (translatedRemark !== item.remark) {
+                return { ...item, remark: translatedRemark };
               }
-              return item;
-            });
 
-            setInspectionData(translatedInspectionData);
-          
-             const colorOrderQty =
-              colorData.orderDetails?.colorOrderQty ||
-              null;
-            setColorOrderQty(colorOrderQty);
+              // Handle decision-based remarks
+              if (item.decision && item.decision !== "ok") {
+                let newRemark = "";
+                switch (item.decision) {
+                  case "1":
+                    newRemark = t("qcWashing.fiber 01");
+                    break;
+                  case "2":
+                    newRemark = t("qcWashing.fiber 02");
+                    break;
+                  case "3":
+                    newRemark = t("qcWashing.fiber 03");
+                    break;
+                  default:
+                    newRemark = item.remark;
+                }
+                return { ...item, remark: newRemark };
+              }
+            }
+            return item;
+          });
 
-         setProcessData(machineProcessesToObject(colorData.inspectionDetails?.machineProcesses));
+          setInspectionData(translatedInspectionData);
 
-         if (colorData.inspectionDetails?.parameters && colorData.inspectionDetails.parameters.length > 0)  {
-            setDefectData(normalizeDefectData(colorData.inspectionDetails.parameters));
+          const colorOrderQty = colorData.orderDetails?.colorOrderQty || null;
+          setColorOrderQty(colorOrderQty);
+
+          setProcessData(
+            machineProcessesToObject(
+              colorData.inspectionDetails?.machineProcesses
+            )
+          );
+
+          if (
+            colorData.inspectionDetails?.parameters &&
+            colorData.inspectionDetails.parameters.length > 0
+          ) {
+            setDefectData(
+              normalizeDefectData(colorData.inspectionDetails.parameters)
+            );
           } else {
             setDefectData(normalizeDefectData(defaultDefectData));
           }
 
-          setAddedDefects(colorData.defectDetails?.defects?.map(d => ({ 
-            defectId: d.defectId,
-            defectName: d.defectName,
-            qty: d.defectQty
-          })) || []);
+          setAddedDefects(
+            colorData.defectDetails?.defects?.map((d) => ({
+              defectId: d.defectId,
+              defectName: d.defectName,
+              qty: d.defectQty
+            })) || []
+          );
 
-          
-        if (colorData.defectDetails?.defectsByPc) {
-          setDefectsByPc(transformDefectsByPc(colorData.defectDetails.defectsByPc));
-        } else {
-          setDefectsByPc({});
-        }
-         if (colorData.defectDetails?.additionalImages) {
+          if (colorData.defectDetails?.defectsByPc) {
+            setDefectsByPc(
+              transformDefectsByPc(colorData.defectDetails.defectsByPc)
+            );
+          } else {
+            setDefectsByPc({});
+          }
+          if (colorData.defectDetails?.additionalImages) {
             setUploadedImages(
-              (colorData.defectDetails.additionalImages || []).map(img => {
+              (colorData.defectDetails.additionalImages || []).map((img) => {
                 if (typeof img === "string") {
                   return {
                     file: null,
                     preview: normalizeImageSrc(img),
-                    name: img.split('/').pop() || "image.jpg"
+                    name: img.split("/").pop() || "image.jpg"
                   };
                 } else if (typeof img === "object" && img !== null) {
                   return {
@@ -1905,23 +2115,44 @@ const autoSaveOverallSummary = async (summary, recordId) => {
           }
 
           setComment(colorData.defectDetails?.comment || "");
-          setMeasurementData(processMeasurementData(colorData.measurementDetails || []));
-          setSavedSizes(colorData.measurementDetails ? [...new Set([...(colorData.measurementDetails.beforeWash || []).map(m => m.size), ...(colorData.measurementDetails.afterWash || []).map(m => m.size)])] : []);
+          setMeasurementData(
+            processMeasurementData(colorData.measurementDetails || [])
+          );
+          setSavedSizes(
+            colorData.measurementDetails
+              ? [
+                  ...new Set([
+                    ...(colorData.measurementDetails.beforeWash || []).map(
+                      (m) => m.size
+                    ),
+                    ...(colorData.measurementDetails.afterWash || []).map(
+                      (m) => m.size
+                    )
+                  ])
+                ]
+              : []
+          );
           setShowMeasurementTable(true);
 
-
-          if (!colorData.inspectionDetails || colorData.inspectionDetails.checkedPoints.length === 0) {
+          if (
+            !colorData.inspectionDetails ||
+            colorData.inspectionDetails.checkedPoints.length === 0
+          ) {
             setInspectionData(initializeInspectionData(masterChecklist));
           }
-
         } else {
           setInspectionData(initializeInspectionData(masterChecklist));
-          setProcessData({ machineType: "", temperature: "", time: "", chemical: "" });
+          setProcessData({
+            machineType: "",
+            temperature: "",
+            time: "",
+            chemical: ""
+          });
           setDefectData(normalizeDefectData(defaultDefectData));
 
           setAddedDefects([]);
-          setDefectsByPc({}); 
-          setUploadedImages([]); 
+          setDefectsByPc({});
+          setUploadedImages([]);
           setComment("");
           setMeasurementData({ beforeWash: [], afterWash: [] });
           setSavedSizes([]);
@@ -1933,7 +2164,7 @@ const autoSaveOverallSummary = async (summary, recordId) => {
       Swal.fire({
         icon: "error",
         title: "Load Failed",
-        text: `Could not load data for color "${color}". Please try again.`,
+        text: `Could not load data for color "${color}". Please try again.`
       });
     } finally {
       setIsDataLoading(false);
@@ -1962,23 +2193,24 @@ const autoSaveOverallSummary = async (summary, recordId) => {
     }
   };
 
-   useEffect(() => {
-    if (formData.orderNo && formData.color) loadSavedSizes(formData.orderNo, formData.color);
+  useEffect(() => {
+    if (formData.orderNo && formData.color)
+      loadSavedSizes(formData.orderNo, formData.color);
   }, [formData.orderNo, formData.color]);
 
   useEffect(() => {
-  if (recordId && masterChecklist.length > 0) {
-    // Ensure inspection data is properly initialized if it's empty
-    if (!inspectionData || inspectionData.length === 0) {
-      setInspectionData(initializeInspectionData(masterChecklist));
+    if (recordId && masterChecklist.length > 0) {
+      // Ensure inspection data is properly initialized if it's empty
+      if (!inspectionData || inspectionData.length === 0) {
+        setInspectionData(initializeInspectionData(masterChecklist));
+      }
+
+      // Ensure defect data is properly initialized if it's empty
+      if (!defectData || defectData.length === 0) {
+        setDefectData(normalizeDefectData(defaultDefectData));
+      }
     }
-    
-    // Ensure defect data is properly initialized if it's empty
-    if (!defectData || defectData.length === 0) {
-      setDefectData(normalizeDefectData(defaultDefectData));
-    }
-  }
-}, [recordId, masterChecklist.length]);
+  }, [recordId, masterChecklist.length]);
 
   const PageTitle = () => (
     <div className="text-center">
@@ -1994,355 +2226,396 @@ const autoSaveOverallSummary = async (summary, recordId) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
-      
-        <PageTitle />
-        <div className=" border-b border-gray-300 dark:border-gray-700 mb-6 mt-4">
-          <nav className="-mb-px flex justify-center space-x-8" aria-label="Tabs">
-            <button
-              onClick={() => handleTabChange('newInspection')}
-              className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === 'newInspection'
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-            >
-              New Inspection
-            </button>
-            <button
-              onClick={() => handleTabChange('submittedData')}
-              className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === 'submittedData'
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-            >
-              Daily View
-            </button>
-          </nav>
-        </div>
-       
-      <main className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-          activeTab === 'submittedData' 
-            ? 'max-w-none px-2 sm:px-4 lg:px-6' 
-            : 'max-w-7xl px-4 sm:px-6 lg:px-8'
-        }`}>
-         {activeTab === 'newInspection' && (
-        <>
-        <OverAllSummaryCard
-         
-           summary={{
-              ...formData,
-              checkedQty: Number(formData.checkedQty) || 0,
-              washQty: Number(formData.washQty) || 0,
-            }}
-          measurementData={formData.measurementDetails} 
-          defectDetails={formData.defectDetails} 
-          before_after_wash={formData.before_after_wash}
-          showMeasurementTable={showMeasurementTable}
-        />
-        <OrderDetailsSection
-          onLoadSavedDataById={loadSavedDataById}
-          setSavedSizes={setSavedSizes}
-          formData={formData}
-          setFormData={setFormData}
-          handleInputChange={handleInputChange}
-          fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
-          colorOptions={colorOptions}
-          subFactories={subFactories}
-          user={user}
-          isVisible={orderSectionVisible}
-          onToggle={toggleOrderSection}
-          activateNextSection={activateAllSections}
-          styleSuggestions={styleSuggestions}
-          fetchMatchingStyles={fetchMatchingStyles}
-          setStyleSuggestions={setStyleSuggestions}
-          orderNumbers={filteredOrderNumbers}
-          filterOrderNumbers={filterOrderNumbers}
-          orderNoSuggestions={orderNoSuggestions}
-          showOrderNoSuggestions={showOrderNoSuggestions}
-          setShowOrderNoSuggestions={setShowOrderNoSuggestions}
-          colorOrderQty={colorOrderQty}
-          inspectionData={inspectionData}
-          processData={processData}
-          defectData={defectData}
-          addedDefects={addedDefects}
-          comment={comment}
-          measurementData={measurementData}
-          uploadedImages={uploadedImages}
-          setRecordId={setRecordId}
-          isSaved={orderSectionSaved}
-          setIsSaved={setOrderSectionSaved}
-        />
-
-        {inspectionSectionVisible && (
-          <InspectionDataSection
-            onLoadSavedDataById={loadSavedDataById}
-            inspectionData={inspectionData}
-            setInspectionData={setInspectionData} 
-            processData={processData}
-            setProcessData={setProcessData}
-            defectData={defectData}
-            isVisible={inspectionContentVisible} // Use content visibility state
-            onToggle={toggleInspectionSection}
-            machineType={machineType}
-            setMachineType={setMachineType}
-            washQty={formData.washQty}
-            setDefectData={setDefectData} 
-            recordId={recordId}
-            washType={formData.washType}
-            standardValues={standardValues}
-            setStandardValues={setStandardValues}
-            actualValues={actualValues}
-            setActualValues={setActualValues}
-            machineStatus={machineStatus}
-            setMachineStatus={setMachineStatus}
-            normalizeImageSrc={normalizeImageSrc}
-          />
-        )}
-
-        {/* Only render when defectSectionVisible is true */}
-        {defectSectionVisible && (
-          <DefectDetailsSection
-            onLoadSavedDataById={loadSavedDataById}
-            formData={formData}
-            handleInputChange={handleInputChange}
-            defectOptions={defectOptions}
-            addedDefects={addedDefects}
-            setAddedDefects={setAddedDefects}
-            uploadedImages={uploadedImages}
-            setUploadedImages={setUploadedImages}
-            isVisible={defectContentVisible} // Use content visibility state
-            onToggle={toggleDefectSection}
-            defectStatus={formData.result} 
-            recordId={recordId}
-            defectsByPc={defectsByPc}
-            setDefectsByPc={setDefectsByPc}
-            comment={comment}
-            setComment={setComment}
-            normalizeImageSrc={normalizeImageSrc} 
-          />
-        )}
-
-        {/* Only render when measurementSectionVisible is true */}
-        {measurementSectionVisible && (
-          <MeasurementDetailsSection
-            onLoadSavedDataById={loadSavedDataById}
-            orderNo={formData.orderNo || formData.style}
-            color={formData.color}
-            before_after_wash={formData.before_after_wash}
-            isVisible={measurementContentVisible} // Use content visibility state
-            onToggle={toggleMeasurementSection}
-            savedSizes={savedSizes}
-            setSavedSizes={setSavedSizes}
-            onSizeSubmit={handleSizeSubmit}
-            measurementData={measurementData}
-            showMeasurementTable={showMeasurementTable}
-            onMeasurementEdit={handleMeasurementEdit}
-            onMeasurementChange={handleMeasurementChange}
-            recordId={recordId}
-          />
-        )}
-
-        <div className="flex justify-end space-x-4">
+      <PageTitle />
+      <div className=" border-b border-gray-300 dark:border-gray-700 mb-6 mt-4">
+        <nav className="-mb-px flex justify-center space-x-8" aria-label="Tabs">
           <button
-            className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-            onClick={async () => {
-              // Show confirmation dialog first
-              const result = await Swal.fire({
-                title: 'Are you sure?',
-                text: 'Do you want to submit this QC Washing data?',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Yes, Submit!',
-                cancelButtonText: 'No, Cancel',
-                reverseButtons: true
-              });
+            onClick={() => handleTabChange("newInspection")}
+            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
+                          ${
+                            activeTab === "newInspection"
+                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
+                          }`}
+          >
+            New Inspection
+          </button>
+          <button
+            onClick={() => handleTabChange("submittedData")}
+            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
+                          ${
+                            activeTab === "submittedData"
+                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
+                          }`}
+          >
+            Daily View
+          </button>
+        </nav>
+      </div>
 
-              // If user clicked "No" or closed the dialog, return early
-              if (!result.isConfirmed) {
-                return;
-              }
+      <main
+        className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
+          activeTab === "submittedData"
+            ? "max-w-none px-2 sm:px-4 lg:px-6"
+            : "max-w-7xl px-4 sm:px-6 lg:px-8"
+        }`}
+      >
+        {activeTab === "newInspection" && (
+          <>
+            <OverAllSummaryCard
+              summary={{
+                ...formData,
+                checkedQty: Number(formData.checkedQty) || 0,
+                washQty: Number(formData.washQty) || 0
+              }}
+              measurementData={formData.measurementDetails}
+              defectDetails={formData.defectDetails}
+              before_after_wash={formData.before_after_wash}
+              showMeasurementTable={showMeasurementTable}
+            />
+            <OrderDetailsSection
+              onLoadSavedDataById={loadSavedDataById}
+              setSavedSizes={setSavedSizes}
+              formData={formData}
+              setFormData={setFormData}
+              handleInputChange={handleInputChange}
+              fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
+              colorOptions={colorOptions}
+              subFactories={subFactories}
+              user={user}
+              isVisible={orderSectionVisible}
+              onToggle={toggleOrderSection}
+              activateNextSection={activateAllSections}
+              styleSuggestions={styleSuggestions}
+              fetchMatchingStyles={fetchMatchingStyles}
+              setStyleSuggestions={setStyleSuggestions}
+              orderNumbers={filteredOrderNumbers}
+              filterOrderNumbers={filterOrderNumbers}
+              orderNoSuggestions={orderNoSuggestions}
+              showOrderNoSuggestions={showOrderNoSuggestions}
+              setShowOrderNoSuggestions={setShowOrderNoSuggestions}
+              colorOrderQty={colorOrderQty}
+              inspectionData={inspectionData}
+              processData={processData}
+              defectData={defectData}
+              addedDefects={addedDefects}
+              comment={comment}
+              measurementData={measurementData}
+              uploadedImages={uploadedImages}
+              setRecordId={setRecordId}
+              isSaved={orderSectionSaved}
+              setIsSaved={setOrderSectionSaved}
+            />
 
-              try {
-                // --- 1. Recalculate summary with the latest state ---
-                const defectDetails = {
-                  ...formData.defectDetails,
-                  checkedQty: formData.checkedQty,
-                  washQty: formData.washQty,
-                  result: formData.result,
-                  defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({
-                    pcNumber,
-                    pcDefects,
-                  })),
-                };
+            {inspectionSectionVisible && (
+              <InspectionDataSection
+                onLoadSavedDataById={loadSavedDataById}
+                inspectionData={inspectionData}
+                setInspectionData={setInspectionData}
+                processData={processData}
+                setProcessData={setProcessData}
+                defectData={defectData}
+                isVisible={inspectionContentVisible} // Use content visibility state
+                onToggle={toggleInspectionSection}
+                machineType={machineType}
+                setMachineType={setMachineType}
+                washQty={formData.washQty}
+                setDefectData={setDefectData}
+                recordId={recordId}
+                washType={formData.washType}
+                standardValues={standardValues}
+                setStandardValues={setStandardValues}
+                actualValues={actualValues}
+                setActualValues={setActualValues}
+                machineStatus={machineStatus}
+                setMachineStatus={setMachineStatus}
+                normalizeImageSrc={normalizeImageSrc}
+              />
+            )}
 
-                const measurementDetails = {
-                  measurement: [
-                    ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-                    ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-                  ]
-                };
+            {/* Only render when defectSectionVisible is true */}
+            {defectSectionVisible && (
+              <DefectDetailsSection
+                onLoadSavedDataById={loadSavedDataById}
+                formData={formData}
+                handleInputChange={handleInputChange}
+                defectOptions={defectOptions}
+                addedDefects={addedDefects}
+                setAddedDefects={setAddedDefects}
+                uploadedImages={uploadedImages}
+                setUploadedImages={setUploadedImages}
+                isVisible={defectContentVisible} // Use content visibility state
+                onToggle={toggleDefectSection}
+                defectStatus={formData.result}
+                recordId={recordId}
+                defectsByPc={defectsByPc}
+                setDefectsByPc={setDefectsByPc}
+                comment={comment}
+                setComment={setComment}
+                normalizeImageSrc={normalizeImageSrc}
+              />
+            )}
 
-                const summary = calculateSummaryData({
-                  ...formData,
-                  defectDetails,
-                  measurementDetails,
-                });
+            {/* Only render when measurementSectionVisible is true */}
+            {measurementSectionVisible && (
+              <MeasurementDetailsSection
+                onLoadSavedDataById={loadSavedDataById}
+                orderNo={formData.orderNo || formData.style}
+                color={formData.color}
+                before_after_wash={formData.before_after_wash}
+                isVisible={measurementContentVisible} // Use content visibility state
+                onToggle={toggleMeasurementSection}
+                savedSizes={savedSizes}
+                setSavedSizes={setSavedSizes}
+                onSizeSubmit={handleSizeSubmit}
+                measurementData={measurementData}
+                showMeasurementTable={showMeasurementTable}
+                onMeasurementEdit={handleMeasurementEdit}
+                onMeasurementChange={handleMeasurementChange}
+                recordId={recordId}
+              />
+            )}
 
-                // --- 2. Build the submitData payload ---
-                const { totalCheckedPoint, totalPass, totalFail, passRate } = getMeasurementStats();
-                const aql = formData.aql && formData.aql[0];
+            <div className="flex justify-end space-x-4">
+              <button
+                className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                onClick={async () => {
+                  // Show confirmation dialog first
+                  const result = await Swal.fire({
+                    title: "Are you sure?",
+                    text: "Do you want to submit this QC Washing data?",
+                    icon: "question",
+                    showCancelButton: true,
+                    confirmButtonColor: "#3085d6",
+                    cancelButtonColor: "#d33",
+                    confirmButtonText: "Yes, Submit!",
+                    cancelButtonText: "No, Cancel",
+                    reverseButtons: true
+                  });
 
-                const submitAql = [{
-                  sampleSize: Number(aql?.sampleSize) || 0,
-                  acceptedDefect: Number(aql?.acceptedDefect) || 0,
-                  rejectedDefect: Number(aql?.rejectedDefect) || 0,
-                  levelUsed: Number(aql?.levelUsed) || 0
-                }];
+                  // If user clicked "No" or closed the dialog, return early
+                  if (!result.isConfirmed) {
+                    return;
+                  }
 
-                const submitData = {
-                  orderNo: formData.orderNo || formData.style,
-                  date: formData.date,
-                  colorName: formData.color,
-                  before_after_wash: formData.before_after_wash,
-                  washQty: formData.washQty,
-                  checkedQty: formData.checkedQty,
-                  totalCheckedPoint,
-                  totalPass,
-                  totalFail,
-                  passRate,
-                  submitAql,
-                  totalCheckedPcs: summary.totalCheckedPcs,
-                  rejectedDefectPcs: summary.rejectedDefectPcs,
-                  totalDefectCount: summary.totalDefectCount,
-                  defectRate: summary.defectRate,
-                  defectRatio: summary.defectRatio,
-                  overallFinalResult: summary.overallFinalResult,
-                  submittedAt: new Date().toISOString(),
-                  userId: user?.emp_id,
-                  
-                  color: {
-                    orderDetails: {
+                  try {
+                    // --- 1. Recalculate summary with the latest state ---
+                    const defectDetails = {
+                      ...formData.defectDetails,
+                      checkedQty: formData.checkedQty,
+                      washQty: formData.washQty,
+                      result: formData.result,
+                      defectsByPc: Object.entries(defectsByPc).map(
+                        ([pcNumber, pcDefects]) => ({
+                          pcNumber,
+                          pcDefects
+                        })
+                      )
+                    };
+
+                    const measurementDetails = {
+                      measurement: [
+                        ...measurementData.beforeWash.map((item) => ({
+                          ...item,
+                          before_after_wash: "beforeWash"
+                        })),
+                        ...measurementData.afterWash.map((item) => ({
+                          ...item,
+                          before_after_wash: "afterWash"
+                        }))
+                      ]
+                    };
+
+                    const summary = calculateSummaryData({
                       ...formData,
-                      inspector: {
-                        empId: user?.emp_id,
-                        name: user?.username,
-                      },
-                    },
-                    inspectionDetails: {
-                      temp: processData.temperature,
-                      time: processData.time,
-                      chemical: processData.chemical,
-                      checkedPoints: inspectionData.map(item => ({
-                        pointName: item.checkedList,
-                        approvedDate: item.approvedDate,
-                        condition: item.na ? "N/A" : "Active",
-                        remark: item.remark,
-                      })),
-                      parameters: defectData.map(item => {
-                        const checkedQty = Number(item.checkedQty) || 0;
-                        const failedQty = Number(item.failedQty) || 0;
-                        const passRate = checkedQty > 0 ? (((checkedQty - failedQty) / checkedQty) * 100).toFixed(2) : '0.00';
-                        const result = (item.aqlAcceptedDefect !== undefined && checkedQty > 0)
-                          ? (failedQty <= item.aqlAcceptedDefect ? "Pass" : "Fail")
-                          : "";
-                        return {
-                          parameterName: item.parameter,
-                          checkedQty: item.checkedQty || 0,
-                          failedQty: item.failedQty || 0,
-                          passRate,
-                          result,
-                          remark: item.remark,
-                          ok: item.ok,
-                          no: item.no,
-                          checkboxes: item.checkboxes || {},
-                        };
-                      }),
-                    },
-                    defectDetails: {
+                      defectDetails,
+                      measurementDetails
+                    });
+
+                    // --- 2. Build the submitData payload ---
+                    const {
+                      totalCheckedPoint,
+                      totalPass,
+                      totalFail,
+                      passRate
+                    } = getMeasurementStats();
+                    const aql = formData.aql && formData.aql[0];
+
+                    const submitAql = [
+                      {
+                        sampleSize: Number(aql?.sampleSize) || 0,
+                        acceptedDefect: Number(aql?.acceptedDefect) || 0,
+                        rejectedDefect: Number(aql?.rejectedDefect) || 0,
+                        levelUsed: Number(aql?.levelUsed) || 0
+                      }
+                    ];
+
+                    const submitData = {
+                      orderNo: formData.orderNo || formData.style,
+                      date: formData.date,
+                      colorName: formData.color,
+                      before_after_wash: formData.before_after_wash,
                       washQty: formData.washQty,
                       checkedQty: formData.checkedQty,
-                      result: formData.result,
-                      defectsByPc: await Promise.all(Object.entries(defectsByPc).map(
-                        async ([pcKey, pcDefects]) => ({
-                          pcNumber: pcKey,
-                          pcDefects: await Promise.all((Array.isArray(pcDefects) ? pcDefects : []).map(async (defect) => ({
-                            defectName: defect.selectedDefect,
-                            defectQty: defect.defectQty,
-                            defectImages: await Promise.all((defect.defectImages || []).map(img => imageToBase64(img)))
-                          })))
-                        })
-                      )),
-                      comment: comment,
-                      additionalImages: await Promise.all(uploadedImages.map(img => imageToBase64(img))),
-                    },
-                    measurementDetails: {
-                      measurement: [
-                        ...measurementData.beforeWash.map((item) => ({ ...item, before_after_wash: "beforeWash" })),
-                        ...measurementData.afterWash.map((item) => ({ ...item, before_after_wash: "afterWash" })),
-                      ]
-                    },
-                  },
-                };
+                      totalCheckedPoint,
+                      totalPass,
+                      totalFail,
+                      passRate,
+                      submitAql,
+                      totalCheckedPcs: summary.totalCheckedPcs,
+                      rejectedDefectPcs: summary.rejectedDefectPcs,
+                      totalDefectCount: summary.totalDefectCount,
+                      defectRate: summary.defectRate,
+                      defectRatio: summary.defectRatio,
+                      overallFinalResult: summary.overallFinalResult,
+                      submittedAt: new Date().toISOString(),
+                      userId: user?.emp_id,
 
-                // --- 3. Submit to the server ---
-                const response = await fetch(
-                  `${API_BASE_URL}/api/qc-washing/submit`,
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(submitData),
+                      color: {
+                        orderDetails: {
+                          ...formData,
+                          inspector: {
+                            empId: user?.emp_id,
+                            name: user?.username
+                          }
+                        },
+                        inspectionDetails: {
+                          temp: processData.temperature,
+                          time: processData.time,
+                          chemical: processData.chemical,
+                          checkedPoints: inspectionData.map((item) => ({
+                            pointName: item.checkedList,
+                            approvedDate: item.approvedDate,
+                            condition: item.na ? "N/A" : "Active",
+                            remark: item.remark
+                          })),
+                          parameters: defectData.map((item) => {
+                            const checkedQty = Number(item.checkedQty) || 0;
+                            const failedQty = Number(item.failedQty) || 0;
+                            const passRate =
+                              checkedQty > 0
+                                ? (
+                                    ((checkedQty - failedQty) / checkedQty) *
+                                    100
+                                  ).toFixed(2)
+                                : "0.00";
+                            const result =
+                              item.aqlAcceptedDefect !== undefined &&
+                              checkedQty > 0
+                                ? failedQty <= item.aqlAcceptedDefect
+                                  ? "Pass"
+                                  : "Fail"
+                                : "";
+                            return {
+                              parameterName: item.parameter,
+                              checkedQty: item.checkedQty || 0,
+                              failedQty: item.failedQty || 0,
+                              passRate,
+                              result,
+                              remark: item.remark,
+                              ok: item.ok,
+                              no: item.no,
+                              checkboxes: item.checkboxes || {}
+                            };
+                          })
+                        },
+                        defectDetails: {
+                          washQty: formData.washQty,
+                          checkedQty: formData.checkedQty,
+                          result: formData.result,
+                          defectsByPc: await Promise.all(
+                            Object.entries(defectsByPc).map(
+                              async ([pcKey, pcDefects]) => ({
+                                pcNumber: pcKey,
+                                pcDefects: await Promise.all(
+                                  (Array.isArray(pcDefects)
+                                    ? pcDefects
+                                    : []
+                                  ).map(async (defect) => ({
+                                    defectName: defect.selectedDefect,
+                                    defectQty: defect.defectQty,
+                                    defectImages: await Promise.all(
+                                      (defect.defectImages || []).map((img) =>
+                                        imageToBase64(img)
+                                      )
+                                    )
+                                  }))
+                                )
+                              })
+                            )
+                          ),
+                          comment: comment,
+                          additionalImages: await Promise.all(
+                            uploadedImages.map((img) => imageToBase64(img))
+                          )
+                        },
+                        measurementDetails: {
+                          measurement: [
+                            ...measurementData.beforeWash.map((item) => ({
+                              ...item,
+                              before_after_wash: "beforeWash"
+                            })),
+                            ...measurementData.afterWash.map((item) => ({
+                              ...item,
+                              before_after_wash: "afterWash"
+                            }))
+                          ]
+                        }
+                      }
+                    };
+
+                    // --- 3. Submit to the server ---
+                    const response = await fetch(
+                      `${API_BASE_URL}/api/qc-washing/submit`,
+                      {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(submitData)
+                      }
+                    );
+
+                    const submitResult = await response.json();
+                    if (submitResult.success) {
+                      // Show success message
+                      await Swal.fire({
+                        icon: "success",
+                        title: "Success!",
+                        text: "QC Washing data submitted successfully!",
+                        confirmButtonText: "OK"
+                      });
+
+                      // Clear form data and reset states
+                      clearFormData();
+
+                      // Optional: Reload the page after a short delay
+                      // setTimeout(() => {
+                      //   window.location.reload();
+                      // }, 500);
+                    } else {
+                      Swal.fire({
+                        icon: "error",
+                        title: "Submission Failed",
+                        text: submitResult.message || "Failed to submit data"
+                      });
+                    }
+                  } catch (error) {
+                    console.error("Submit error:", error);
+                    Swal.fire({
+                      icon: "error",
+                      title: "Error",
+                      text: "Failed to submit data. Please try again."
+                    });
                   }
-                );
-
-                const submitResult = await response.json();
-                if (submitResult.success) {
-                  // Show success message
-                  await Swal.fire({
-                    icon: "success",
-                    title: "Success!",
-                    text: "QC Washing data submitted successfully!",
-                    confirmButtonText: "OK"
-                  });
-
-                  // Clear form data and reset states
-                  clearFormData();
-                  
-                  
-                  // Optional: Reload the page after a short delay
-                  // setTimeout(() => {
-                  //   window.location.reload();
-                  // }, 500);
-                } else {
-                  Swal.fire({
-                    icon: "error",
-                    title: "Submission Failed",
-                    text: submitResult.message || "Failed to submit data",
-                  });
-                }
-              } catch (error) {
-                console.error("Submit error:", error);
-                Swal.fire({
-                  icon: "error",
-                  title: "Error",
-                  text: "Failed to submit data. Please try again.",
-                });
-              }
-            }}
-          >
-            Submit
-          </button>
-        </div>
-        </>
+                }}
+              >
+                Submit
+              </button>
+            </div>
+          </>
         )}
 
-        {activeTab === 'submittedData' && (
-          <SubmittedWashingDataPage />
-        )}
+        {activeTab === "submittedData" && <SubmittedWashingDataPage />}
       </main>
     </div>
   );
