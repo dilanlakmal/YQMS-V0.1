@@ -201,51 +201,19 @@ const handleCloseFullReport = () => {
   });
 };
 
-// Enhanced convert image to base64 using backend endpoint with retry mechanism
+// Skip image conversion due to CORS issues - use placeholders
 const convertImageToBase64 = async (imagePath, API_BASE_URL) => {
-  if (!imagePath || !API_BASE_URL) {
-    console.log(`❌ convertImageToBase64: Missing parameters`);
-    return null;
-  }
+  if (!imagePath) return null;
   
   // If it's already base64, return it
   if (imagePath.startsWith('data:image/')) {
     return imagePath;
   }
   
-try {
-  if (!imagePath.startsWith('https://yqms.yaikh.com/storage/qc_washing_images/')) {
-    console.warn('❌ Unsupported image path format:', imagePath);
-    return imagePath; // fallback to original URL
-  }
-
-  const [type, filename] = imagePath
-    .replace('https://yqms.yaikh.com/storage/qc_washing_images/', '')
-    .split('/');
-
-  const apiUrl = `${API_BASE_URL}/api/pdf-image-base64/${type}/${filename}`;
-  console.log(`🔄 Converting to base64: ${apiUrl}`);
-
-  const response = await fetch(apiUrl, {
-    method: 'GET',
-    headers: { Accept: 'application/json' }
-  });
-
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-  const data = await response.json();
-
-  if (data.base64) {
-    console.log(`✅ Successfully converted: ${imagePath}`);
-    return data.base64;
-  } else {
-    console.warn(`❌ Conversion failed, using original URL: ${imagePath}`);
-    return imagePath;
-  }
-} catch (error) {
-  console.error(`❌ Error converting image to base64: ${error.message}`);
-  return imagePath; // fallback to original URL
-  }
+  // For now, return null to show placeholders due to CORS issues
+  // This avoids the fetch errors and provides a clean PDF with placeholders
+  console.log(`🖼️ Skipping image conversion due to CORS, will show placeholder: ${imagePath.substring(0, 50)}...`);
+  return null;
 };
 
 
@@ -274,25 +242,16 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
               
               const processedImages = [];
               for (const imagePath of defect.defectImages) {
-                try {
-                  // Skip if already base64
-                  if (imagePath && imagePath.startsWith('data:image/')) {
-                    processedImages.push(imagePath);
-                    console.log('✅ Image already in base64 format');
-                    continue;
-                  }
-                  
-                  const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-                  if (base64Image && base64Image.startsWith('data:image/')) {
-                    processedImages.push(base64Image);
-                    console.log('✅ Successfully converted defect image');
-                  } else {
-                    console.warn(`❌ Failed to convert defect image: ${imagePath}`);
-                    // Don't push null, skip invalid images
-                  }
-                } catch (error) {
-                  console.warn(`❌ Error processing defect image: ${imagePath}`, error.message);
+                // Skip if already base64
+                if (imagePath && imagePath.startsWith('data:image/')) {
+                  processedImages.push(imagePath);
+                  console.log('✅ Image already in base64 format');
+                  continue;
                 }
+                
+                // For CORS-blocked images, add placeholder info
+                console.log(`🖼️ Adding defect image placeholder for: ${imagePath}`);
+                processedImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'defect' });
               }
               
               // IMPORTANT: Assign the processed images back to the correct location
@@ -308,24 +267,16 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
     if (processedRecord.defectDetails?.additionalImages && Array.isArray(processedRecord.defectDetails.additionalImages)) {
       const processedAdditionalImages = [];
       for (const imagePath of processedRecord.defectDetails.additionalImages) {
-        try {
-          // Skip if already base64
-          if (imagePath && imagePath.startsWith('data:image/')) {
-            processedAdditionalImages.push(imagePath);
-            console.log('✅ Additional image already in base64 format');
-            continue;
-          }
-          
-          const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-          if (base64Image && base64Image.startsWith('data:image/')) {
-            processedAdditionalImages.push(base64Image);
-            console.log('✅ Successfully converted additional image');
-          } else {
-            console.warn(`❌ Failed to convert additional image: ${imagePath}`);
-          }
-        } catch (error) {
-          console.warn(`❌ Error processing additional image: ${imagePath}`, error.message);
+        // Skip if already base64
+        if (imagePath && imagePath.startsWith('data:image/')) {
+          processedAdditionalImages.push(imagePath);
+          console.log('✅ Additional image already in base64 format');
+          continue;
         }
+        
+        // For CORS-blocked images, add placeholder info
+        console.log(`🖼️ Adding additional image placeholder for: ${imagePath}`);
+        processedAdditionalImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'additional' });
       }
       
       // IMPORTANT: Assign the processed images back
@@ -358,8 +309,8 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
             if (imagePath.startsWith('data:image/')) {
               processedComparisonImages.push(imagePath);
             } else {
-              const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-              if (base64Image) processedComparisonImages.push(base64Image);
+              console.log(`🖼️ Adding comparison image placeholder for: ${imagePath}`);
+              processedComparisonImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'comparison' });
             }
           }
           processedRecord.inspectionDetails.checkedPoints[pointIndex].comparison = processedComparisonImages;
@@ -385,6 +336,14 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
       }
     }
 
+    // Log final summary
+    console.log('📈 Image processing complete:', {
+      defectsByPc: processedRecord.defectDetails?.defectsByPc?.length || 0,
+      additionalImages: processedRecord.defectDetails?.additionalImages?.length || 0,
+      checkedPoints: processedRecord.inspectionDetails?.checkedPoints?.length || 0,
+      machineProcesses: processedRecord.inspectionDetails?.machineProcesses?.length || 0
+    });
+    
     return processedRecord;
   } catch (error) {
     console.error('❌ Error processing images in record:', error);
@@ -474,80 +433,9 @@ const processImageToBase64 = async (imagePath) => {
     
     console.log('📝 Generating PDF with base64 images for record:', record._id);
     
-    // Process images to base64
-    const processedRecord = JSON.parse(JSON.stringify(record)); // Deep clone
-    
-    // Convert defect images
-    if (processedRecord.defectDetails?.defectsByPc) {
-      for (let pcIndex = 0; pcIndex < processedRecord.defectDetails.defectsByPc.length; pcIndex++) {
-        const pcDefect = processedRecord.defectDetails.defectsByPc[pcIndex];
-        
-        if (pcDefect.pcDefects) {
-          for (let defectIndex = 0; defectIndex < pcDefect.pcDefects.length; defectIndex++) {
-            const defect = pcDefect.pcDefects[defectIndex];
-            
-            if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              const convertedImages = [];
-              for (const imagePath of defect.defectImages) {
-                const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-                if (base64Image) {
-                  convertedImages.push(base64Image);
-                }
-              }
-              processedRecord.defectDetails.defectsByPc[pcIndex].pcDefects[defectIndex].defectImages = convertedImages;
-            }
-          }
-        }
-      }
-    }
-    
-    // Convert additional images
-    if (processedRecord.defectDetails?.additionalImages) {
-      const convertedAdditionalImages = [];
-      for (const imagePath of processedRecord.defectDetails.additionalImages) {
-        const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-        if (base64Image) {
-          convertedAdditionalImages.push(base64Image);
-        }
-      }
-      processedRecord.defectDetails.additionalImages = convertedAdditionalImages;
-    }
-    
-    // Convert inspection images
-    if (processedRecord.inspectionDetails?.checkedPoints) {
-      for (let pointIndex = 0; pointIndex < processedRecord.inspectionDetails.checkedPoints.length; pointIndex++) {
-        const point = processedRecord.inspectionDetails.checkedPoints[pointIndex];
-        
-        // Convert point image
-        if (point.image) {
-          const base64Image = await convertImageToBase64(point.image, API_BASE_URL);
-          processedRecord.inspectionDetails.checkedPoints[pointIndex].image = base64Image;
-        }
-        
-        // Convert comparison images
-        if (point.comparison && Array.isArray(point.comparison)) {
-          const convertedComparisons = [];
-          for (const imagePath of point.comparison) {
-            const base64Image = await convertImageToBase64(imagePath, API_BASE_URL);
-            if (base64Image) {
-              convertedComparisons.push(base64Image);
-            }
-          }
-          processedRecord.inspectionDetails.checkedPoints[pointIndex].comparison = convertedComparisons;
-        }
-      }
-    }
-    
-    // Convert machine images
-    if (processedRecord.inspectionDetails?.machineProcesses) {
-      for (let machineIndex = 0; machineIndex < processedRecord.inspectionDetails.machineProcesses.length; machineIndex++) {
-        const machine = processedRecord.inspectionDetails.machineProcesses[machineIndex];
-        if (machine.image) {
-          const base64Image = await convertImageToBase64(machine.image, API_BASE_URL);
-          processedRecord.inspectionDetails.machineProcesses[machineIndex].image = base64Image;
-        }
-      }
-    }
+    // Process images to base64 using the centralized function
+    const processedRecord = await processImagesInRecord(record, API_BASE_URL);
+    console.log('✅ Image processing completed, generating PDF...');
     
     // Fetch comparison data
     let comparisonData = null;

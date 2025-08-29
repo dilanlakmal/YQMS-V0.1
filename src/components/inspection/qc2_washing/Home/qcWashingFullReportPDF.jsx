@@ -165,53 +165,104 @@ const safeString = (value) => {
   return String(value);
 };
 
-// Update your getImageSrc function to ensure proper file extensions
+// Enhanced getImageSrc function for PDF rendering
 const getImageSrc = (imagePath, API_BASE_URL) => {
   if (!imagePath) return null;
 
-  // Allow both base64 and direct URLs
-  if (imagePath.startsWith('data:image/') || imagePath.startsWith('http')) {
+  // Handle placeholder objects - return null to show placeholder
+  if (typeof imagePath === 'object' && imagePath.isPlaceholder) {
+    console.log('🖼️ Using placeholder instead of CORS-blocked image:', imagePath.originalUrl?.substring(0, 50));
+    return null; // Return null to show placeholder instead of attempting fetch
+  }
+
+  // If it's already base64, return it directly
+  if (imagePath.startsWith('data:image/')) {
+    console.log('📷 Using base64 image for PDF');
     return imagePath;
   }
 
-  return null; // fallback
-};
-
-const SafeImage = ({ src, style, alt }) => {
-  if (!src) {
-    return (
-      <View style={[style, { backgroundColor: '#f3f4f6', justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: 6, color: '#6b7280' }}>No Image</Text>
-      </View>
-    );
+  // For external URLs that would cause CORS, return null to show placeholder
+  if (imagePath.startsWith('http')) {
+    console.log('🖼️ Skipping HTTP URL to avoid CORS:', imagePath.substring(0, 50) + '...');
+    return null;
   }
 
-  console.log('🖼️ Rendering image:', src?.substring(0, 100) + '...');
+  // Handle relative paths by constructing full URL
+  if (API_BASE_URL && imagePath.startsWith('/')) {
+    const fullUrl = `${API_BASE_URL}${imagePath}`;
+    console.log('🔗 Constructed full URL for PDF:', fullUrl.substring(0, 50) + '...');
+    return fullUrl;
+  }
 
-  try {
-    return <Image src={src} style={style} />;
-  } catch (error) {
-    console.warn('Failed to render image:', src, error.message);
-    
-    // Return colored placeholder based on image type
+  console.log('⚠️ No valid image source found:', imagePath);
+  return null;
+};
+
+const SafeImage = ({ src, style, alt, placeholderInfo }) => {
+  // Handle null/undefined src
+  if (!src) {
     let bgColor = '#f3f4f6';
     let textColor = '#6b7280';
-    let text = 'Image Error';
+    let text = 'No Image';
     
-    if (src?.includes('defect')) {
+    if (alt?.toLowerCase().includes('defect')) {
       bgColor = '#fee2e2';
       textColor = '#991b1b';
       text = 'Defect Image';
-    } else if (src?.includes('inspection')) {
+    } else if (alt?.toLowerCase().includes('inspection') || alt?.toLowerCase().includes('comparison')) {
       bgColor = '#dbeafe';
       textColor = '#1e40af';
       text = 'Inspection Image';
+    } else if (alt?.toLowerCase().includes('machine')) {
+      bgColor = '#f0fdf4';
+      textColor = '#166534';
+      text = 'Machine Image';
+    } else if (alt?.toLowerCase().includes('additional')) {
+      bgColor = '#fef3c7';
+      textColor = '#d97706';
+      text = 'Additional Image';
     }
     
     return (
       <View style={[style, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={{ fontSize: 6, color: textColor, textAlign: 'center' }}>{text}</Text>
-        {alt && <Text style={{ fontSize: 4, color: '#9ca3af', textAlign: 'center' }}>{alt}</Text>}
+        <Text style={{ fontSize: 4, color: '#9ca3af', textAlign: 'center' }}>Not Available</Text>
+      </View>
+    );
+  }
+
+  try {
+    return <Image src={src} style={style} />;
+  } catch (error) {
+    console.warn('Failed to render image:', src?.substring(0, 50), error.message);
+    
+    // Return colored placeholder based on image type or alt text
+    let bgColor = '#f3f4f6';
+    let textColor = '#6b7280';
+    let text = 'Image Error';
+    
+    if (src?.includes('defect') || alt?.toLowerCase().includes('defect')) {
+      bgColor = '#fee2e2';
+      textColor = '#991b1b';
+      text = 'Defect Image';
+    } else if (src?.includes('inspection') || alt?.toLowerCase().includes('inspection') || alt?.toLowerCase().includes('comparison')) {
+      bgColor = '#dbeafe';
+      textColor = '#1e40af';
+      text = 'Inspection Image';
+    } else if (alt?.toLowerCase().includes('machine')) {
+      bgColor = '#f0fdf4';
+      textColor = '#166534';
+      text = 'Machine Image';
+    } else if (alt?.toLowerCase().includes('additional')) {
+      bgColor = '#fef3c7';
+      textColor = '#d97706';
+      text = 'Additional Image';
+    }
+    
+    return (
+      <View style={[style, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: 6, color: textColor, textAlign: 'center' }}>{text}</Text>
+        <Text style={{ fontSize: 4, color: '#9ca3af', textAlign: 'center' }}>Load Failed</Text>
       </View>
     );
   }
@@ -359,6 +410,8 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
                             key={imgIndex}
                             src={getImageSrc(img, API_BASE_URL)}
                             style={styles.defectImage}
+                            alt={`Defect Image ${imgIndex + 1}`}
+                            placeholderInfo={typeof img === 'object' ? img : null}
                           />
                         );
                       })
@@ -390,6 +443,8 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
                   <SafeImage
                     src={getImageSrc(img, API_BASE_URL)}
                     style={[styles.defectImage, { width: 80, height: 60 }]}
+                    alt={`Additional Image ${imgIndex + 1}`}
+                    placeholderInfo={typeof img === 'object' ? img : null}
                   />
                   <Text style={{ fontSize: 4, color: "#999" }}>
                     Add {imgIndex + 1}
@@ -546,7 +601,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
               console.log(`🖼️ Processing inspection point ${index + 1}:`, {
                 pointName: point.pointName,
                 comparisonImages: point.comparison?.length || 0,
-                firstImage: point.comparison?.[0]?.substring(0, 50)
+                firstImage: typeof point.comparison?.[0] === 'string' ? point.comparison[0].substring(0, 50) : 'placeholder'
               });
 
               return (
@@ -585,13 +640,16 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                     {/* Comparison Images */}
                     {point.comparison && point.comparison.length > 0 ? (
                       point.comparison.map((img, imgIndex) => {
-                        console.log(`🖼️ Processing comparison image ${imgIndex + 1}:`, {
-                          type: typeof img,
-                          startsWithHttp: img?.startsWith('http'),
-                          startsWithData: img?.startsWith('data:image/'),
-                          length: img?.length,
-                          preview: img?.substring(0, 50)
-                        });
+                        // Skip logging for placeholder objects to avoid errors
+                        if (typeof img === 'string') {
+                          console.log(`🖼️ Processing comparison image ${imgIndex + 1}:`, {
+                            type: typeof img,
+                            startsWithHttp: img?.startsWith('http'),
+                            startsWithData: img?.startsWith('data:image/'),
+                            length: img?.length,
+                            preview: img?.substring(0, 50)
+                          });
+                        }
 
                         return (
                           <View key={imgIndex} style={{ margin: 2 }}>
