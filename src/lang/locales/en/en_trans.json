@@ -662,7 +662,7 @@
     "panelNameKhmer": "Part Name (Khmer)",
     "spreadTable": "Spread Table",
     "spreadTableNo": "Spread Table No",
-    "mackerNo": "Macker No",
+    "mackerNo": "Marker No",
     "mackerLength": "Marker Length",
     "fabricType": "Fabric Type",
     "material": "Material",
@@ -831,7 +831,7 @@
     "noPointsFoundTitle": "No Measurement Points Found",
     "noPointsFoundMsg": "No measurement points found for this Garment Type. Please add points to proceed.",
     "remarks": "Remarks",
-    "mackerRatio": "Macker Ratio",
+    "mackerRatio": "Marker Ratio",
     "garmentType": "Garment Type",
     "lotNos": "Lot Nos",
     "layerDetails": "Layer Details",
@@ -900,8 +900,8 @@
       "planLayers": "Plan Layers",
       "actualLayers": "Actual Layers",
       "totalPcs": "Total Pcs (Calculated)",
-      "mackerNo": "Macker No.",
-      "mackerLength": "Macker Length",
+      "mackerNo": "Marker No.",
+      "mackerLength": "Marker Length",
       "markerIndex": "No.",
       "markerSize": "Marker Size",
       "ratio": "Ratio"
@@ -934,7 +934,7 @@
     "generalInfoUpdatedSuccess": "General inspection information updated successfully.",
     "failedToUpdateGeneralInfo": "Failed to update general information.",
     "noRecordSelectedForModify": "No record selected or loaded for modification.",
-    "otherSectionsPlaceholder": "Further modifications for Macker Ratio, Size-specific data, and Defects will be implemented here.",
+    "otherSectionsPlaceholder": "Further modifications for Marker Ratio, Size-specific data, and Defects will be implemented here.",
     "autoCalculated": "Auto",
     "validation": {
       "totalBundleQtyTooHigh": "The entered 'Total Bundle Qty' results in calculations exceeding limits. Please adjust."

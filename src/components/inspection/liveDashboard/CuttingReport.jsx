@@ -189,6 +189,22 @@ const CuttingReport = () => {
   const actionMenuRef = useRef(null);
   // --- END: NEW STATE FOR ACTIONS ---
 
+  // --- START: COLUMN VISIBILITY STATE ---
+  const [columnVisibility, setColumnVisibility] = useState({
+    markerRatio: false,
+    layerDetails: false,
+    bundleDetails: false,
+    inspectionDetails: false
+  });
+
+  const handleColumnVisibilityChange = (column) => {
+    setColumnVisibility(prev => ({
+      ...prev,
+      [column]: !prev[column]
+    }));
+  };
+  // --- END: COLUMN VISIBILITY STATE ---
+
   const fetchFilterOptions = useCallback(async (currentFilters) => {
     try {
       const params = {
@@ -570,8 +586,47 @@ const CuttingReport = () => {
             {t("cutting.noReportsFound")}
           </p>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 border border-gray-300 text-xs sm:text-sm">
+          <div>
+            <div className="mb-2 flex flex-wrap gap-4 text-sm items-end justify-end">
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={columnVisibility.markerRatio}
+                  onChange={() => handleColumnVisibilityChange('markerRatio')}
+                  className="rounded border-gray-300"
+                />
+                <span>{t("cutting.mackerRatio")}</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={columnVisibility.layerDetails}
+                  onChange={() => handleColumnVisibilityChange('layerDetails')}
+                  className="rounded border-gray-300"
+                />
+                <span>{t("cutting.layerDetails")}</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={columnVisibility.bundleDetails}
+                  onChange={() => handleColumnVisibilityChange('bundleDetails')}
+                  className="rounded border-gray-300"
+                />
+                <span>{t("cutting.bundleDetails")}</span>
+              </label>
+              <label className="flex items-center gap-1 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={columnVisibility.inspectionDetails}
+                  onChange={() => handleColumnVisibilityChange('inspectionDetails')}
+                  className="rounded border-gray-300"
+                />
+                <span>{t("cutting.inspectionDetails")}</span>
+              </label>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200 border border-gray-300 text-xs sm:text-sm">
               <thead className="bg-gray-100">
                 <tr className="text-left font-semibold text-gray-600">
                   <th
@@ -646,30 +701,38 @@ const CuttingReport = () => {
                   >
                     {t("cutting.mackerNo")}
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.mackerRatio")}
-                  </th>
-                  <th
-                    colSpan="3"
-                    className="px-3 py-2 text-center border-r border-b"
-                  >
-                    {t("cutting.layerDetails")}
-                  </th>
-                  <th
-                    colSpan="4"
-                    className="px-3 py-2 text-center border-r border-b"
-                  >
-                    {t("cutting.bundleDetails")}
-                  </th>
-                  <th
-                    colSpan="5"
-                    className="px-3 py-2 text-center border-r border-b"
-                  >
-                    {t("cutting.inspectionDetails")}
-                  </th>
+                  {columnVisibility.markerRatio && (
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.mackerRatio")}
+                    </th>
+                  )}
+                  {columnVisibility.layerDetails && (
+                    <th
+                      colSpan="3"
+                      className="px-3 py-2 text-center border-r border-b"
+                    >
+                      {t("cutting.layerDetails")}
+                    </th>
+                  )}
+                  {columnVisibility.bundleDetails && (
+                    <th
+                      colSpan="4"
+                      className="px-3 py-2 text-center border-r border-b"
+                    >
+                      {t("cutting.bundleDetails")}
+                    </th>
+                  )}
+                  {columnVisibility.inspectionDetails && (
+                    <th
+                      colSpan="5"
+                      className="px-3 py-2 text-center border-r border-b"
+                    >
+                      {t("cutting.inspectionDetails")}
+                    </th>
+                  )}
                   <th
                     rowSpan="2"
                     className="px-3 py-2 text-right border-r border-b align-middle"
@@ -696,70 +759,82 @@ const CuttingReport = () => {
                   </th>
                 </tr>
                 <tr className="text-right font-semibold text-gray-600">
-                  <th className="px-3 py-2 border-r border-b">
-                    {t("cutting.plan")}
-                  </th>
-                  <th className="px-3 py-2 border-r border-b">
-                    {t("cutting.actual")}
-                  </th>
-                  <th className="px-3 py-2 border-r border-b">
-                    {t("cutting.totalPcs")}
-                  </th>
-                  {/* Bundle Details (with icons) */}
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.totalQty")}
-                  >
-                    <Archive size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.qtyChecked")}
-                  >
-                    <ClipboardCheck size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.inspectedQty")}
-                  >
-                    <FileSearch size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.inspectedSizes")}
-                  >
-                    <Scaling size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.totalCompleted")}
-                  >
-                    <PackageCheck size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.pass")}
-                  >
-                    <ThumbsUp size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.reject")}
-                  >
-                    <ThumbsDown size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.rejectMeasurements")}
-                  >
-                    <AlertTriangle size={16} className="mx-auto" />
-                  </th>
-                  <th
-                    className="px-3 py-2 border-r border-b"
-                    title={t("cutting.rejectDefects")}
-                  >
-                    <Bug size={16} className="mx-auto" />
-                  </th>
+                  {columnVisibility.layerDetails && (
+                    <>
+                      <th className="px-3 py-2 border-r border-b">
+                        {t("cutting.plan")}
+                      </th>
+                      <th className="px-3 py-2 border-r border-b">
+                        {t("cutting.actual")}
+                      </th>
+                      <th className="px-3 py-2 border-r border-b">
+                        {t("cutting.totalPcs")}
+                      </th>
+                    </>
+                  )}
+                  {columnVisibility.bundleDetails && (
+                    <>
+                      {/* Bundle Details (with icons) */}
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.totalQty")}
+                      >
+                        <Archive size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.qtyChecked")}
+                      >
+                        <ClipboardCheck size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.inspectedQty")}
+                      >
+                        <FileSearch size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.inspectedSizes")}
+                      >
+                        <Scaling size={16} className="mx-auto" />
+                      </th>
+                    </>
+                  )}
+                  {columnVisibility.inspectionDetails && (
+                    <>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.totalCompleted")}
+                      >
+                        <PackageCheck size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.pass")}
+                      >
+                        <ThumbsUp size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.reject")}
+                      >
+                        <ThumbsDown size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.rejectMeasurements")}
+                      >
+                        <AlertTriangle size={16} className="mx-auto" />
+                      </th>
+                      <th
+                        className="px-3 py-2 border-r border-b"
+                        title={t("cutting.rejectDefects")}
+                      >
+                        <Bug size={16} className="mx-auto" />
+                      </th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -817,73 +892,87 @@ const CuttingReport = () => {
                       <td className="px-3 py-2 text-center border-r">
                         {report.cuttingTableDetails?.mackerNo}
                       </td>
-                      <td className="px-3 py-2 border-r min-w-[150px]">
-                        {report.mackerRatio &&
-                          report.mackerRatio.length > 0 && (
-                            <table className="text-xs w-full">
-                              <tbody>
-                                <tr>
-                                  {report.mackerRatio.map((mr) => (
-                                    <td
-                                      key={`${mr.index}-size`}
-                                      className="px-1 text-center font-bold"
-                                    >
-                                      {mr.markerSize}
-                                    </td>
-                                  ))}
-                                </tr>
-                                <tr>
-                                  {report.mackerRatio.map((mr) => (
-                                    <td
-                                      key={`${mr.index}-ratio`}
-                                      className="px-1 pt-1 text-center"
-                                    >
-                                      <span className="bg-amber-600 text-white font-semibold rounded px-1.5 py-0.5">
-                                        {mr.ratio}
-                                      </span>
-                                    </td>
-                                  ))}
-                                </tr>
-                              </tbody>
-                            </table>
-                          )}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
-                        {report.cuttingTableDetails?.planLayers}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
-                        {report.cuttingTableDetails?.actualLayers}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
-                        {report.cuttingTableDetails?.totalPcs}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
-                        {report.totalBundleQty}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-orange-200 font-bold">
-                        {report.bundleQtyCheck}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100">
-                        {report.totalInspectionQty}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
-                        {report.numberOfInspectedSizes}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100 font-bold">
-                        {report.sumTotalPcs}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-green-100 font-bold">
-                        {report.sumTotalPass}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-300 font-bold">
-                        {report.sumTotalReject}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
-                        {report.sumTotalRejectMeasurement}
-                      </td>
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
-                        {report.sumTotalRejectDefects}
-                      </td>
+                      {columnVisibility.markerRatio && (
+                        <td className="px-3 py-2 border-r min-w-[150px]">
+                          {report.mackerRatio &&
+                            report.mackerRatio.length > 0 && (
+                              <table className="text-xs w-full">
+                                <tbody>
+                                  <tr>
+                                    {report.mackerRatio.map((mr) => (
+                                      <td
+                                        key={`${mr.index}-size`}
+                                        className="px-1 text-center font-bold"
+                                      >
+                                        {mr.markerSize}
+                                      </td>
+                                    ))}
+                                  </tr>
+                                  <tr>
+                                    {report.mackerRatio.map((mr) => (
+                                      <td
+                                        key={`${mr.index}-ratio`}
+                                        className="px-1 pt-1 text-center"
+                                      >
+                                        <span className="bg-amber-600 text-white font-semibold rounded px-1.5 py-0.5">
+                                          {mr.ratio}
+                                        </span>
+                                      </td>
+                                    ))}
+                                  </tr>
+                                </tbody>
+                              </table>
+                            )}
+                        </td>
+                      )}
+                      {columnVisibility.layerDetails && (
+                        <>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
+                            {report.cuttingTableDetails?.planLayers}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                            {report.cuttingTableDetails?.actualLayers}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                            {report.cuttingTableDetails?.totalPcs}
+                          </td>
+                        </>
+                      )}
+                      {columnVisibility.bundleDetails && (
+                        <>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
+                            {report.totalBundleQty}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-orange-200 font-bold">
+                            {report.bundleQtyCheck}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100">
+                            {report.totalInspectionQty}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                            {report.numberOfInspectedSizes}
+                          </td>
+                        </>
+                      )}
+                      {columnVisibility.inspectionDetails && (
+                        <>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100 font-bold">
+                            {report.sumTotalPcs}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-green-100 font-bold">
+                            {report.sumTotalPass}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-300 font-bold">
+                            {report.sumTotalReject}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
+                            {report.sumTotalRejectMeasurement}
+                          </td>
+                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
+                            {report.sumTotalRejectDefects}
+                          </td>
+                        </>
+                      )}
                       <td className="px-3 py-2 text-right border-r whitespace-nowrap font-bold">
                         {report.overallPassRate?.toFixed(2)}
                       </td>
@@ -964,7 +1053,8 @@ const CuttingReport = () => {
                   );
                 })}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
         )}
 
