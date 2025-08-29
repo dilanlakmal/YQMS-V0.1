@@ -104,8 +104,8 @@ import { API_BASE_URL } from "./config.js";
 import { URL } from "url";
 import { Buffer } from "buffer";
 
-// import sqlQuery from "./route/sqlQueryRoutes.js";
-// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+import sqlQuery from "./route/sqlQueryRoutes.js";
+import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Connection String
@@ -297,7 +297,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs
 ------------------------------ */
-// app.use(sqlQuery);
+app.use(sqlQuery);
 
 /* ------------------------------
    New Endpoints for CutPanelOrders
@@ -26320,6 +26320,14 @@ const uploadInspectionImage = multer({
 // }
 // Updated inspection save endpoint
 // Updated inspection save endpoint - with full URL like defect images
+// Add this helper function at the top of your file to get the server base URL
+function getServerBaseUrl(req) {
+  const protocol = req.protocol || 'http';
+  const host = req.get('host') || 'localhost:3000';
+  return `${protocol}://${host}`;
+}
+
+// Updated inspection save endpoint
 app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (req, res) => {
   const standardValues = JSON.parse(req.body.standardValues || '{}');
   const actualValues = JSON.parse(req.body.actualValues || '{}');
@@ -26335,7 +26343,10 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       return res.status(400).json({ success: false, message: "recordId is required" });
     }
 
-    // Handle file uploads - SAME AS DEFECT IMAGES
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
+
+    // Handle file uploads with FULL SERVER URL
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
     const fileMap = {};
 
@@ -26348,8 +26359,8 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
       
-      // *** FIXED: Use full URL like defect images ***
-      fileMap[file.fieldname] = `./public/storage/qc_washing_images/inspection/${newFilename}`;
+      // *** FIXED: Save complete server URL instead of relative path ***
+      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
     // Find or create the record
@@ -26385,14 +26396,39 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
       machineProcesses.push(machineProcess);
     });
 
-    // *** FIXED: Handle inspection images like defect images ***
+    // Handle inspection images with full server URLs
     if (inspectionData) {
       inspectionData.forEach((item, idx) => {
         if (item.comparisonImages) {
           item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-            return fileMap[`comparisonImages_${idx}_${imgIdx}`] || 
-                   (typeof img === "object" && img !== null && img.name ? img.name : img) || 
-                   "";
+            // Return new uploaded image URL or existing URL
+            const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
+            if (newImageUrl) {
+              return newImageUrl;
+            }
+            
+            // If it's an existing image, check if it's already a full URL
+            if (typeof img === "string" && (img.startsWith('http://') || img.startsWith('https://'))) {
+              return img; // Already a full URL
+            }
+            
+            // If it's a relative path, convert to full URL
+            if (typeof img === "string" && img.startsWith('./')) {
+              return `${serverBaseUrl}${img.replace('./', '/')}`;
+            }
+            
+            // Handle object format
+            if (typeof img === "object" && img !== null && img.name) {
+              if (img.name.startsWith('http://') || img.name.startsWith('https://')) {
+                return img.name; // Already a full URL
+              }
+              if (img.name.startsWith('./')) {
+                return `${serverBaseUrl}${img.name.replace('./', '/')}`;
+              }
+              return img.name;
+            }
+            
+            return img || "";
           });
         }
       });
@@ -26430,7 +26466,7 @@ app.post('/api/qc-washing/inspection-save', uploadInspectionImage.any(), async (
   }
 });
 
-// Updated inspection update endpoint - with full URL like defect images
+// Updated inspection update endpoint
 app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async (req, res) => {
   const standardValues = JSON.parse(req.body.standardValues || '{}');
   const actualValues = JSON.parse(req.body.actualValues || '{}');
@@ -26446,7 +26482,10 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       return res.status(400).json({ success: false, message: "recordId is required" });
     }
 
-    // Handle file uploads - SAME AS DEFECT IMAGES
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
+
+    // Handle file uploads with FULL SERVER URL
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/inspection');
     const fileMap = {};
 
@@ -26459,8 +26498,8 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
       
-      // *** FIXED: Use full URL like defect images ***
-      fileMap[file.fieldname] = `./storage/qc_washing_images/inspection/${newFilename}`;
+      // *** FIXED: Save complete server URL instead of relative path ***
+      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
     }
 
     // Find the record
@@ -26469,7 +26508,7 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       return res.status(404).json({ success: false, message: "Record not found for update" });
     }
 
-    // Build machine processes
+    // Build machine processes (same as save)
     const machineProcesses = [];
     const machineTypes = {
       "Washing Machine": ["temperature", "time", "silicon", "softener"],
@@ -26496,12 +26535,18 @@ app.post('/api/qc-washing/inspection-update', uploadInspectionImage.any(), async
       machineProcesses.push(machineProcess);
     });
 
-    // *** FIXED: Handle inspection images like defect images ***
+    // Handle inspection images with full server URLs (same logic as save)
     if (inspectionData) {
       inspectionData.forEach((item, idx) => {
         if (item.comparisonImages) {
           item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-            return fileMap[`comparisonImages_${idx}_${imgIdx}`] || img;
+            const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
+            if (newImageUrl) {
+              return newImageUrl;
+            }
+            
+            // Keep existing images as they are (should already be full URLs from previous saves)
+            return img;
           });
         }
       });
@@ -26559,11 +26604,11 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
 
     if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
 
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
+
     // Ensure upload directory exists
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
-    // if (!fs.existsSync(uploadDir)) {
-    //   fs.mkdirSync(uploadDir, { recursive: true });
-    // }
 
     // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
@@ -26575,19 +26620,43 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
       const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[file.fieldname] = `./public/storage/qc_washing_images/defect/${newFilename}`;
+      
+      // *** FIXED: Save complete server URL instead of relative path ***
+      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
     }
 
     // Attach image URLs to defectDetails.defectsByPc and additionalImages
     if (defectDetails.defectsByPc) {
       defectDetails.defectsByPc.forEach((pc, pcIdx) => {
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
-          
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-              return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`]
-              || (typeof img === "object" && img !== null && img.name ? img.name : img)
-              || "";
+              // Return new uploaded image URL
+              const newImageUrl = fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+              
+              // Handle existing images
+              if (typeof img === "string" && (img.startsWith('http://') || img.startsWith('https://'))) {
+                return img; // Already a full URL
+              }
+              
+              if (typeof img === "string" && img.startsWith('./')) {
+                return `${serverBaseUrl}${img.replace('./', '/')}`;
+              }
+              
+              if (typeof img === "object" && img !== null && img.name) {
+                if (img.name.startsWith('http://') || img.name.startsWith('https://')) {
+                  return img.name;
+                }
+                if (img.name.startsWith('./')) {
+                  return `${serverBaseUrl}${img.name.replace('./', '/')}`;
+                }
+                return img.name;
+              }
+              
+              return img || "";
             });
           }
         });
@@ -26596,7 +26665,32 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
 
     if (defectDetails.additionalImages) {
       defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
-        return fileMap[`additionalImages_${imgIdx}`] || (typeof img === "object" && img !== null && img.name ? img.name : img) || "";
+        // Return new uploaded image URL
+        const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
+        if (newImageUrl) {
+          return newImageUrl;
+        }
+        
+        // Handle existing images
+        if (typeof img === "string" && (img.startsWith('http://') || img.startsWith('https://'))) {
+          return img; // Already a full URL
+        }
+        
+        if (typeof img === "string" && img.startsWith('./')) {
+          return `${serverBaseUrl}${img.replace('./', '/')}`;
+        }
+        
+        if (typeof img === "object" && img !== null && img.name) {
+          if (img.name.startsWith('http://') || img.name.startsWith('https://')) {
+            return img.name;
+          }
+          if (img.name.startsWith('./')) {
+            return `${serverBaseUrl}${img.name.replace('./', '/')}`;
+          }
+          return img.name;
+        }
+        
+        return img || "";
       });
     }
 
@@ -26617,31 +26711,33 @@ app.post('/api/qc-washing/defect-details-save', uploadDefectImage.any(), async (
   }
 });
 
-// Update defect details with images
+// Updated defect details update endpoint
 app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async (req, res) => {
   try {
     const { recordId } = req.body;
     const defectDetails = JSON.parse(req.body.defectDetails || '{}');
+
     if (!recordId) return res.status(400).json({ success: false, message: "Missing recordId" });
+
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
 
     // Ensure upload directory exists
     const uploadDir = path.join(__dirname, './public/storage/qc_washing_images/defect');
-    // if (!fs.existsSync(uploadDir)) {
-    //   fs.mkdirSync(uploadDir, { recursive: true });
-    // }
 
     // Map uploaded files by fieldname and write them to disk
     const fileMap = {};
     for (const file of (req.files || [])) {
-     let fileExtension = path.extname(file.originalname);
-  if (!fileExtension) {
-    // fallback to .jpg if no extension is found
-    fileExtension = '.jpg';
-  }
+      let fileExtension = path.extname(file.originalname);
+      if (!fileExtension) {
+        fileExtension = '.jpg';
+      }
       const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
       const fullFilePath = path.join(uploadDir, newFilename);
       await fs.promises.writeFile(fullFilePath, file.buffer);
-      fileMap[file.fieldname] = `./public/storage/qc_washing_images/defect/${newFilename}`;
+      
+      // *** FIXED: Save complete server URL instead of relative path ***
+      fileMap[file.fieldname] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
     }
 
     // Attach image URLs to defectDetails.defectsByPc and additionalImages
@@ -26650,14 +26746,17 @@ app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async
         (pc.pcDefects || []).forEach((defect, defectIdx) => {
           if (defect.defectImages) {
             defect.defectImages = defect.defectImages.map((img, imgIdx) => {
+              // Return new uploaded image URL or keep existing
               return fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img;
             });
           }
         });
       });
     }
+
     if (defectDetails.additionalImages) {
       defectDetails.additionalImages = defectDetails.additionalImages.map((img, imgIdx) => {
+        // Return new uploaded image URL or keep existing
         return fileMap[`additionalImages_${imgIdx}`] || img;
       });
     }
@@ -26668,12 +26767,16 @@ app.post('/api/qc-washing/defect-details-update', uploadDefectImage.any(), async
       { 'defectDetails': defectDetails, updatedAt: new Date() },
       { new: true }
     );
+
     if (!doc) return res.status(404).json({ success: false, message: "Record not found" });
+
     res.json({ success: true, data: doc.defectDetails });
+
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
+
 
 function calculateMeasurementSizeSummary(measurementDetail) {
   if (!measurementDetail || !Array.isArray(measurementDetail.pcs)) {
@@ -27402,43 +27505,43 @@ app.get('/storage/qc_washing_images/:type/:filename', async (req, res) => {
     console.log(`📡 Proxying from: ${proxyUrl}`);
     
     const urlObj = new URL(proxyUrl);
-    const options = {
-      hostname: urlObj.hostname,
-      port: urlObj.port || 443,
-      path: urlObj.pathname,
-      method: 'GET',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    };
+    // const options = {
+    //   hostname: urlObj.hostname,
+    //   port: urlObj.port || 443,
+    //   path: urlObj.pathname,
+    //   method: 'GET',
+    //   headers: {
+    //     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    //   }
+    // };
     
-    const proxyReq = https.request(options, (proxyRes) => {
-      if (proxyRes.statusCode !== 200) {
-        console.warn(`❌ Proxy request failed with status: ${proxyRes.statusCode}`);
-        throw new Error(`HTTP error! status: ${proxyRes.statusCode}`);
-      }
+    // const proxyReq = https.request(options, (proxyRes) => {
+    //   if (proxyRes.statusCode !== 200) {
+    //     console.warn(`❌ Proxy request failed with status: ${proxyRes.statusCode}`);
+    //     throw new Error(`HTTP error! status: ${proxyRes.statusCode}`);
+    //   }
       
-      // Set content type
-      const contentType = proxyRes.headers['content-type'] || 'image/jpeg';
-      res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Length', proxyRes.headers['content-length']);
+    //   // Set content type
+    //   const contentType = proxyRes.headers['content-type'] || 'image/jpeg';
+    //   res.setHeader('Content-Type', contentType);
+    //   res.setHeader('Content-Length', proxyRes.headers['content-length']);
       
-      // Pipe the response
-      proxyRes.pipe(res);
-      console.log(`✅ Successfully proxied: ${type}/${filename}`);
-    });
+    //   // Pipe the response
+    //   proxyRes.pipe(res);
+    //   console.log(`✅ Successfully proxied: ${type}/${filename}`);
+    // });
     
-    proxyReq.on('error', (error) => {
-      console.error(`❌ Proxy request error:`, error);
-      throw error;
-    });
+    // proxyReq.on('error', (error) => {
+    //   console.error(`❌ Proxy request error:`, error);
+    //   throw error;
+    // });
     
-    proxyReq.setTimeout(10000, () => {
-      proxyReq.destroy();
-      throw new Error('Request timeout');
-    });
+    // proxyReq.setTimeout(10000, () => {
+    //   proxyReq.destroy();
+    //   throw new Error('Request timeout');
+    // });
     
-    proxyReq.end();
+    // proxyReq.end();
     
   } catch (error) {
     console.error(`❌ Error serving/proxying image: ${type}/${filename}`, error);

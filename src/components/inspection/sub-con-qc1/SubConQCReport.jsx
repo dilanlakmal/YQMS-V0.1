@@ -233,21 +233,39 @@ const SubConQCReport = () => {
       <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
         <div className="flex flex-wrap items-end gap-4">
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium">Start Date</label>
+            <label htmlFor="startDate" className="text-sm font-medium">
+              Start Date
+            </label>
             <DatePicker
+              id="startDate"
               selected={filters.startDate}
               onChange={(date) => handleFilterChange("startDate", date)}
               maxDate={filters.endDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              dateFormat="yyyy-MM-dd"
+              placeholderText="YYYY-MM-DD"
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              popperClassName="z-50"
             />
           </div>
           <div className="flex-shrink-0">
-            <label className="text-sm font-medium">End Date</label>
+            <label htmlFor="endDate" className="text-sm font-medium">
+              End Date
+            </label>
             <DatePicker
+              id="endDate"
               selected={filters.endDate}
               onChange={(date) => handleFilterChange("endDate", date)}
               minDate={filters.startDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              dateFormat="yyyy-MM-dd"
+              placeholderText="YYYY-MM-DD"
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              popperClassName="z-50"
             />
           </div>
           <div className="flex-1 min-w-[150px]">

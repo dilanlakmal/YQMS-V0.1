@@ -55,7 +55,6 @@ const InspectionDataSection = ({
   setActualValues,
   machineStatus,
   setMachineStatus,
-  normalizeImageSrc,
 }) => {
 
   const uploadRefs = useRef([]);
@@ -415,7 +414,7 @@ const handleActualValueChange = (machineType, param, value) => {
 
   // Add this helper function at the top of your component, after the existing helper functions
   const convertImagePathToUrl = (imagePath) => {
-    if (!imagePath) return null;
+    if (!imagePath || imagePath.startsWith("blob:")) return imagePath;
 
     // If it's already a full URL, return as-is
     if (imagePath.startsWith("http")) {
@@ -527,7 +526,7 @@ const handleActualValueChange = (machineType, param, value) => {
             if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
               const updatedImages = savedPoint.comparison.map(imgPath => ({
                 file: null,
-                preview: normalizeImageSrc ? normalizeImageSrc(imgPath) : imgPath,
+                preview: convertImagePathToUrl(imgPath),
                 name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
               }));
               return { ...item, comparisonImages: updatedImages };
@@ -656,7 +655,7 @@ const handleUpdateInspection = async () => {
             if (savedPoint && savedPoint.comparison && savedPoint.comparison.length > 0) {
               const updatedImages = savedPoint.comparison.map(imgPath => ({
                 file: null,
-                preview: normalizeImageSrc ? normalizeImageSrc(imgPath) : imgPath,
+                preview: convertImagePathToUrl(imgPath),
                 name: typeof imgPath === "string" ? imgPath.split('/').pop() : "image.jpg"
               }));
               return { ...item, comparisonImages: updatedImages };
@@ -826,32 +825,30 @@ useEffect(() => {
   // Add this useEffect to handle loaded data conversion
   useEffect(() => {
     // Convert any existing comparison image paths to proper URLs when data is loaded
-    setInspectionData((prev) =>
-      prev.map((item) => {
-        if (item.comparisonImages && item.comparisonImages.length > 0) {
-          const updatedImages = item.comparisonImages.map((img) => {
-            if (typeof img === "string") {
-              // If it's just a string path, convert it
-              return {
-                file: null,
-                preview: convertImagePathToUrl(img),
-                name: img.split("/").pop() || "image.jpg"
-              };
-            } else if (img && typeof img === "object" && img.preview) {
-              // If it's already an object but preview might need conversion
-              return {
-                ...img,
-                preview: convertImagePathToUrl(img.preview)
-              };
-            }
-            return img;
-          });
-          return { ...item, comparisonImages: updatedImages };
-        }
-        return item;
-      })
-    );
-  }, [inspectionData.length]); // Only run when inspectionData length changes to avoid infinite loops
+    if (recordId) { // Only run if there is a record
+      setInspectionData((prev) =>
+        prev.map((item) => {
+          if (item.comparisonImages && item.comparisonImages.length > 0) {
+            const updatedImages = item.comparisonImages.map((img) => {
+              const preview = typeof img === 'string' ? img : (img && img.preview);
+              // Only convert if it's not already a full URL or a blob URL
+              if (preview && !preview.startsWith('http') && !preview.startsWith('blob:')) {
+                const newPreview = convertImagePathToUrl(preview);
+                if (typeof img === 'string') {
+                  return { file: null, preview: newPreview, name: preview.split('/').pop() || 'image.jpg' };
+                }
+                return { ...img, preview: newPreview };
+              }
+              return img;
+            });
+            return { ...item, comparisonImages: updatedImages };
+          }
+          return item;
+        })
+      );
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordId]); // Rerun when a new record is loaded to process the image paths.
 
   // Remove image
   const handleRemoveImage = (index, imgIdx) => {
@@ -1429,7 +1426,6 @@ InspectionDataSection.propTypes = {
   setActualValues: PropTypes.func.isRequired,
   machineStatus: PropTypes.object.isRequired,
   setMachineStatus: PropTypes.func.isRequired,
-  normalizeImageSrc: PropTypes.func,
 };
 
 export default InspectionDataSection;

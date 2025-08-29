@@ -511,14 +511,24 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
           <div className="space-y-1">
-            <label className="text-sm font-medium flex items-center gap-2">
+            <label
+              htmlFor="inspectionDate"
+              className="text-sm font-medium flex items-center gap-2"
+            >
               <Calendar size={16} />
               Inspection Date
             </label>
             <DatePicker
+              id="inspectionDate"
               selected={inspectionState.inspectionDate}
               onChange={(date) => handleStateChange("inspectionDate", date)}
               className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              dateFormat="yyyy-MM-dd"
+              maxDate={new Date()}
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              placeholderText="YYYY-MM-DD"
             />
           </div>
           <div className="space-y-1">

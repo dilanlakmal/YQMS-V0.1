@@ -80,7 +80,7 @@ const sqlConfigYMWHSYS2 = {
   },
   requestTimeout: 18000000,
   connectionTimeout: 18000000,
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+  pool: { max: 10, min: 2, idleTimeoutMillis: 60000 }
 };
 
 /* ------------------------------
@@ -96,9 +96,9 @@ const sqlConfigDTrade = {
     encrypt: false,
     trustServerCertificate: true
   },
-  requestTimeout: 18000000,
-  connectionTimeout: 18000000,
-  pool: { max: 10, min: 0, idleTimeoutMillis: 30000 }
+  requestTimeout: 21000000,
+  connectionTimeout: 21000000,
+  pool: { max: 10, min: 1, idleTimeoutMillis: 60000 }
 };
 
 // Create connection pools
@@ -118,6 +118,16 @@ const sqlConnectionStatus = {
 // Function to connect to a pool, now it updates the status tracker
 async function connectPool(pool, poolName) {
   try {
+
+    // Close existing connection if any
+    if (pool.connected || pool.connecting) {
+      try {
+        await pool.close();
+      } catch (closeErr) {
+        console.warn(`Warning closing existing ${poolName} connection:`, closeErr.message);
+      }
+    }
+
     await pool.connect();
     console.log(
       `✅ Successfully connected to ${poolName} pool at ${pool.config.server}`
@@ -138,30 +148,41 @@ async function connectPool(pool, poolName) {
 }
 
 // MODIFICATION: This function is now more critical for on-demand reconnections.
-async function ensurePoolConnected(pool, poolName) {
-  // If we know the connection is down, or the pool reports it's not connected
-  if (!sqlConnectionStatus[poolName] || !pool.connected) {
-    console.log(
-      `Pool ${poolName} is not connected. Attempting to reconnect...`
-    );
+async function ensurePoolConnected(pool, poolName, maxRetries = 3) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      // Attempt to close the pool if it's in a broken state before reconnecting
-      if (pool.connected || pool.connecting) {
-        await pool.close();
+      // Check if pool is connected and status is true
+      if (pool.connected && sqlConnectionStatus[poolName]) {
+        return; // Connection is good
       }
-      await connectPool(pool, poolName); // This will re-attempt connection and update the status
+
+      console.log(`Attempt ${attempt}/${maxRetries}: Reconnecting to ${poolName}...`);
+      
+      // Close existing connection if in bad state
+      if (pool.connected || pool.connecting) {
+        try {
+          await pool.close();
+        } catch (closeErr) {
+          console.warn(`Warning during close for ${poolName}:`, closeErr.message);
+        }
+      }
+
+      // Wait a bit before retry (except first attempt)
+      if (attempt > 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000 * attempt));
+      }
+
+      await connectPool(pool, poolName);
+      return; // Success
+
     } catch (reconnectErr) {
-      console.error(
-        `Failed to reconnect to ${poolName}:`,
-        reconnectErr.message
-      );
-      sqlConnectionStatus[poolName] = false; // Ensure status is false
-      throw reconnectErr; // Throw error to be caught by the calling function
+      console.error(`Attempt ${attempt}/${maxRetries} failed for ${poolName}:`, reconnectErr.message);
+      
+      if (attempt === maxRetries) {
+        sqlConnectionStatus[poolName] = false;
+        throw new Error(`Failed to reconnect to ${poolName} after ${maxRetries} attempts: ${reconnectErr.message}`);
+      }
     }
-  }
-  // If we reach here, the pool should be connected.
-  if (!sqlConnectionStatus[poolName]) {
-    throw new Error(`Database ${poolName} is unavailable.`);
   }
 }
 
@@ -1076,18 +1097,42 @@ async function syncCutPanelOrders() {
   }
 
   // *** 3. THE TRY...FINALLY BLOCK TO ENSURE THE LOCK IS RELEASED ***
-  try {
-    isCutPanelSyncRunning = true; // Set the lock
-    console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
+  let retryCount = 0;
+  const maxRetries = 3;
+  
+  while (retryCount < maxRetries) {
+    try {
+      isCutPanelSyncRunning = true; // Set the lock
+      console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
 
-    if (!sqlConnectionStatus.YMWHSYS2) {
-      console.warn(
-        "[CutPanelOrders] Skipping sync: YMWHSYS2 database is not connected."
-      );
-      return; // The 'finally' block will still run to release the lock
+      if (!sqlConnectionStatus.YMWHSYS2) {
+        console.warn(
+          "[CutPanelOrders] Skipping sync: YMWHSYS2 database is not connected."
+        );
+        return; // The 'finally' block will still run to release the lock
+      }
+
+      try {
+        await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+      } catch (connErr) {
+        console.error("[CutPanelOrders] Failed to connect to FC_SYSTEM:", connErr.message);
+        return;
+      }
+
+      break; // Exit retry loop if successful
+    } catch (err) {
+      if (err.number === 1205 && retryCount < maxRetries - 1) {
+        retryCount++;
+        const delay = Math.random() * 1000 + 1000; // Random delay 1-2 seconds
+        console.log(`[CutPanelOrders] Deadlock detected. Retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      throw err; // Re-throw if not a deadlock or max retries reached
     }
+  }
 
-    await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
+  try {
 
     // This is your query for a rolling 3-day update. This is perfect for the cron job.
     const query = `
@@ -1491,10 +1536,15 @@ async function syncDTOrdersData() {
     console.log("🔄 Starting DT Orders data migration...");
     
     // Ensure DTrade connection
-    await ensurePoolConnected(poolDTrade, "DTrade_CONN");
-    
-    // Ensure FC_SYSTEM connection
-    await ensurePoolConnected(poolYMWHSYS2, "FC_SYSTEM");
+     try {
+      await Promise.all([
+        ensurePoolConnected(poolDTrade, "DTrade_CONN"),
+        ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2")
+      ]);
+    } catch (connErr) {
+      console.error("❌ Failed to establish required connections:", connErr.message);
+      throw connErr;
+    }
     const request = poolDTrade.request();
     const requestFC = poolYMWHSYS2.request();
 
@@ -2231,7 +2281,7 @@ export const syncDtOrders = async (req, res) => {
 //   });
 
 // Schedule to run every day at 2:00 AM
-  cron.schedule("0 */2 * * *", async () => {
+  cron.schedule("0 */1 * * *", async () => {
    await syncDTOrdersData()
     .then((result) => {
       console.log("✅ DT Orders Data Sync completed ", result);
