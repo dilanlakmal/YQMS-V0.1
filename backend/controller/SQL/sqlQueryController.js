@@ -258,6 +258,7 @@ async function initializeServer() {
   await syncCutPanelOrders();
   await syncQC1SunriseData();
   await syncDTOrdersData();
+  await syncQC1WorkerData();
 
   console.log("--- Server Initialization Complete ---");
 }
@@ -1538,21 +1539,21 @@ async function syncQC1WorkerData(
 /*--------------------------------------------------------------------------------*/
 
 // 1. On server start, fetch all data from 2025-07-10 to today
-syncQC1WorkerData("2025-07-01", new Date())
-  .then(() => {
-    console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
-  })
-  .catch((err) => {
-    console.error("❌ Initial QC1 Worker Data Sync failed:", err);
-  });
+// syncQC1WorkerData("2025-07-01", new Date())
+//   .then(() => {
+//     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
+//   })
+//   .catch((err) => {
+//     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
+//   });
 
 // Schedule to run every day at 11:00 PM
-cron.schedule("0 23 * * *", () => {
+cron.schedule("0 23 * * *", async () => {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
 
-  syncQC1WorkerData(startDate, endDate)
+  await syncQC1WorkerData(startDate, endDate)
     .then(() => {
       console.log(
         "✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm)."
