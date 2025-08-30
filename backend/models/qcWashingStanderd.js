@@ -4,7 +4,13 @@ const MachineStandardSchema = new mongoose.Schema(
   {
     washType: {
       type: String,
-      enum: ["Normal Wash", "Acid Wash", "Garment Dye", , "Soft Wash"],
+      enum: [
+        "Normal Wash",
+        "Acid Wash",
+        "Garment Dye",
+        "Soft Wash",
+        "Acid Wash + Garment Dye"
+      ],
       required: true
     },
     washingMachine: {

@@ -26,7 +26,12 @@ const subconSewingQc1ReportSchema = new mongoose.Schema(
     },
     checkedQty: { type: Number, required: true },
     totalDefectQty: { type: Number, required: true },
-    defectList: [defectListItemSchema] // Array of defects
+    defectList: [defectListItemSchema], // Array of defects
+    comments: {
+      type: String,
+      maxLength: [500, "Comments cannot exceed 500 characters."], // Server-side validation
+      default: "" // Ensures field exists even if empty
+    }
   },
   {
     collection: "subcon_sewing_qc1_reports",
