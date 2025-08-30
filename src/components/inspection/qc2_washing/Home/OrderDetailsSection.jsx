@@ -99,18 +99,102 @@ const OrderDetailsSection = ({
     setIsSaved(false);
   };
   
-  const handleSave = async () => {
+const handleSave = async () => {
   try {
-    if (!formData.orderNo) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'Missing Order Number',
-        text: 'Please enter an Order Number before saving.',
-        confirmButtonText: 'OK'
-      });
-      return;
+    // Check for required fields
+    const requiredFields = [
+      { field: 'orderNo', label: 'Order Number' },
+      { field: 'color', label: 'Color' },
+      { field: 'reportType', label: 'Report Type' }
+    ];
+
+    // Check basic required fields first
+    for (const { field, label } of requiredFields) {
+      if (!formData[field]) {
+        Swal.fire({
+          icon: 'warning',
+          title: `Missing ${label}`,
+          text: `Please enter ${label} before saving.`,
+          confirmButtonText: 'OK'
+        });
+        return;
+      }
     }
 
+    // Special handling for washQty - check existing record if missing
+    if (!formData.washQty) {
+      // First check if there's an existing record for this user
+      const uniqueKey = {
+        orderNo: formData.orderNo,
+        date: formData.date,
+        color: formData.color,
+        washType: formData.washType,
+        before_after_wash: formData.before_after_wash,
+        factoryName: formData.factoryName,
+        reportType: formData.reportType,
+        inspectorId: user?.emp_id 
+      };
+
+      const checkRes = await fetch(`${API_BASE_URL}/api/qc-washing/find-existing`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(uniqueKey)
+      });
+      const checkData = await checkRes.json();
+
+      if (checkData.success && checkData.exists) {
+        // Load existing record
+        const result = await Swal.fire({
+          icon: 'info',
+          title: 'Existing record found',
+          text: 'Found an existing record. Do you want to load it for editing?',
+          showCancelButton: true,
+          confirmButtonText: 'Yes, load record',
+          cancelButtonText: 'Cancel'
+        });
+
+        if (result.isConfirmed) {
+          const record = checkData.record;
+          setFormData({
+            ...formData,
+            ...record,
+          });
+          setRecordId(record._id);
+          setIsSaved(true);
+
+          // Load the existing record data
+          if (onLoadSavedDataById) {
+            await onLoadSavedDataById(record._id);
+          }
+
+          // Activate all sections when order details are saved/loaded
+          if (activateNextSection) activateNextSection();
+
+          Swal.fire({
+            icon: 'success',
+            title: 'Existing record loaded for editing.',
+            showConfirmButton: false,
+            timer: 1500,
+            position: 'top-end',
+            toast: true
+          });
+          return;
+        } else {
+          return; // User cancelled
+        }
+      } else {
+        // No existing record found and washQty is missing
+        Swal.fire({
+          icon: 'warning',
+          title: 'Missing Wash Quantity',
+          text: 'Please enter Estimate Wash Qty before saving.',
+          confirmButtonText: 'OK'
+        });
+        return;
+      }
+    }
+
+    // Check measurement details
     const measurementCheck = await checkMeasurementDetails(formData.orderNo);
    
     if (!measurementCheck.success || !measurementCheck.hasMeasurement) {
@@ -127,7 +211,7 @@ const OrderDetailsSection = ({
       return;
     }
 
-    // FIX: Include inspectorId in the request body
+    // Check for existing record (this is now redundant if washQty was missing, but kept for other cases)
     const uniqueKey = {
       orderNo: formData.orderNo,
       date: formData.date,
@@ -144,7 +228,6 @@ const OrderDetailsSection = ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(uniqueKey)
     });
-
     const checkData = await checkRes.json();
    
     if (checkData.success && checkData.exists) {
@@ -215,7 +298,6 @@ const OrderDetailsSection = ({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(saveData)
     });
-
     const result = await response.json();
    
     if (result.success) {
@@ -259,6 +341,7 @@ const OrderDetailsSection = ({
     console.error("Save error:", error);
   }
 };
+
 
   const handleOrderNoChange = (e) => {
     handleInputChange("orderNo", e.target.value);
