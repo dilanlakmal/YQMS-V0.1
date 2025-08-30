@@ -246,6 +246,7 @@ async function initializeServer() {
   await syncCutPanelOrders();
   await syncQC1SunriseData();
   await syncDTOrdersData();
+  await syncQC1WorkerData();
 
   console.log("--- Server Initialization Complete ---");
 }
@@ -1280,7 +1281,20 @@ export const cutpanelOrdersSync = async (req, res) => {
 };
 
 async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date()) {
-  await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+     console.log("🔄 Starting QC1 Worker Data sync...");
+    
+    // 1. Check connection status first
+    if (!sqlConnectionStatus.YMDataStore) {
+      console.warn("⚠️ YMDataStore is not connected. Attempting to reconnect...");
+    }
+    
+    // 2. Ensure connection is available
+    await ensurePoolConnected(poolYMDataStore, "YMDataStore");
+    
+    // 3. Verify connection is actually working
+    if (!poolYMDataStore.connected) {
+      throw new Error("YMDataStore pool is not connected after reconnection attempt");
+    }
   const request = poolYMDataStore.request();
 
   // Output Data
@@ -1506,21 +1520,21 @@ async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date())
 
 
 // 1. On server start, fetch all data from 2025-07-10 to today
-syncQC1WorkerData("2025-07-01", new Date())
-  .then(() => {
-    console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
-  })
-  .catch((err) => {
-    console.error("❌ Initial QC1 Worker Data Sync failed:", err);
-  });
+// syncQC1WorkerData("2025-07-01", new Date())
+//   .then(() => {
+//     console.log("✅ Initial QC1 Worker Data Sync completed (all data).");
+//   })
+//   .catch((err) => {
+//     console.error("❌ Initial QC1 Worker Data Sync failed:", err);
+//   });
 
 // Schedule to run every day at 11:00 PM
-cron.schedule("0 23 * * *", () => {
+cron.schedule("0 23 * * *", async () => {
   const endDate = new Date();
   const startDate = new Date();
   startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
 
-  syncQC1WorkerData(startDate, endDate)
+  await syncQC1WorkerData(startDate, endDate)
     .then(() => {
       console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
     })
