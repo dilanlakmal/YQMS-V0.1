@@ -110,6 +110,15 @@ import crypto from "crypto";
 // Import the API_BASE_URL from our config file
 import { API_BASE_URL } from "./config.js";
 
+import { URL } from "url";
+import { Buffer } from "buffer";
+
+/* ------------------------------
+   SQL Query Import
+------------------------------ */
+// import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+
 /* ------------------------------
    Connection String
 ------------------------------ */
@@ -167,10 +176,37 @@ app.use(bodyParser.json());
 
 app.use(
   cors({
-    origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
+    origin: [
+      "https://192.167.12.162:3001",
+      "https://yqms.yaikh.com",
+      " https://192.167.12.85:3001"
+    ], //["http://localhost:3001", "https://localhost:3001"],
+    // methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    // allowedHeaders: ["Content-Type", "Authorization"],
+    // credentials: true
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "Cache-Control",
+      "Origin",
+      "X-Requested-With",
+      "Accept",
+      "Pragma",
+      "Expires",
+      "Last-Modified",
+      "If-Modified-Since",
+      "If-None-Match",
+      "ETag"
+    ],
+    exposedHeaders: [
+      "Content-Length",
+      "Content-Type",
+      "Cache-Control",
+      "Last-Modified",
+      "ETag"
+    ],
+    credentials: true,
+    optionsSuccessStatus: 200
   })
 );
 
@@ -223,7 +259,8 @@ const QC2BGrade = createQC2BGradeModel(ymProdConnection);
 const QC2Task = createQC2TaskModel(ymProdConnection);
 const IEWorkerTask = createIEWorkerTaskModel(ymProdConnection);
 
-const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
+// export const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
+const InlineOrders = createInlineOrdersModel(ymProdConnection);
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
@@ -234,12 +271,14 @@ const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
 const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
 const CuttingMeasurementPoint =
   createCuttingMeasurementPointModel(ymProdConnection); // New model instance
-const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
+// export const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
+const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection);
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
 
-const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
+// export const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
+const QC1Sunrise = createQC1SunriseModel(ymProdConnection);
 
 const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
 const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
@@ -287,7 +326,9 @@ const QCWashingMachineStandard =
   createQCWashingMachineStandard(ymProdConnection);
 const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
+// export const QCWorkers = createQCWorkersModel(ymProdConnection);
 const QCWorkers = createQCWorkersModel(ymProdConnection);
+// export const DtOrder = createDTOrdersSchema(ymProdConnection);
 const DtOrder = createDTOrdersSchema(ymProdConnection);
 
 // Set UTF-8 encoding for responses
@@ -295,6 +336,15 @@ app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   next();
 });
+
+/* ------------------------------
+  SQL Query routs start
+------------------------------ */
+// app.use(sqlQuery);
+
+/* ------------------------------
+  SQL Query routs start
+------------------------------ */
 
 /* ------------------------------
    YM DataSore SQL
@@ -2862,9 +2912,7 @@ app.get("/api/inline-orders-details", async (req, res) => {
 
 process.on("SIGINT", async () => {
   try {
-    await poolYMDataStore.close();
-    await poolYMCE.close();
-    await poolYMWHSYS2.close();
+    await closeSQLPools();
     console.log("SQL connection pools closed.");
   } catch (err) {
     console.error("Error closing SQL connection pools:", err);
@@ -6521,7 +6569,7 @@ app.get("/api/download-data", async (req, res) => {
       matchQuery.task_no = parseInt(taskNo);
     }
 
-    console.log("Match Query:", matchQuery); // For debugging
+    // console.log("Match Query:", matchQuery); // For debugging
 
     // Get total count
     const total = await collection.countDocuments(matchQuery);
@@ -6534,7 +6582,7 @@ app.get("/api/download-data", async (req, res) => {
       .limit(limit)
       .lean();
 
-    console.log("Found records:", data.length); // For debugging
+    // console.log("Found records:", data.length); // For debugging
 
     // Transform data for consistent response
     const transformedData = data.map((item) => ({
@@ -7201,7 +7249,7 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
     const data = result[0].data || [];
     const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
 
-    console.log("Search result:", { data, total });
+    // console.log("Search result:", { data, total });
     res.json({ data, total });
   } catch (error) {
     console.error("Error searching data cards:", error);
@@ -7254,8 +7302,8 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   const updateData = req.body;
 
   try {
-    console.log(`Received request to update record with ID: ${id}`);
-    console.log(`Update Data: ${JSON.stringify(updateData)}`);
+    // console.log(`Received request to update record with ID: ${id}`);
+    // console.log(`Update Data: ${JSON.stringify(updateData)}`);
     const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
       id,
       updateData,
@@ -15117,7 +15165,7 @@ app.post("/users", async (req, res) => {
       password
     } = req.body;
 
-    console.log("Request body:", req.body);
+    // console.log("Request body:", req.body);
 
     // >>> NEW: Check if a user with the same name already exists (case-insensitive)
     const existingUserByName = await UserMain.findOne({
@@ -15222,7 +15270,7 @@ app.post("/api/get-user-data", async (req, res) => {
       sub_roles: user.sub_roles
     });
   } catch (error) {
-    console.error("Error fetching user data:", error);
+    // console.error("Error fetching user data:", error);
     res
       .status(500)
       .json({ message: "Failed to fetch user data", error: error.message });
@@ -15272,7 +15320,7 @@ app.post("/api/login", async (req, res) => {
     if (!user) {
       return res.status(401).json({ message: "Invalid username or password" });
     }
-    console.log("User Details", user);
+    // console.log("User Details", user);
 
     const isPasswordValid = await bcrypt.compare(
       password.trim(),
@@ -15301,8 +15349,8 @@ app.post("/api/login", async (req, res) => {
       { expiresIn: "30d" }
     );
 
-    console.log("Access Token:", accessToken);
-    console.log("Refresh Token:", refreshToken);
+    // console.log("Access Token:", accessToken);
+    // console.log("Refresh Token:", refreshToken);
 
     res.status(200).json({
       message: "Login successful",
@@ -15324,7 +15372,7 @@ app.post("/api/login", async (req, res) => {
       }
     });
   } catch (error) {
-    // console.error("Login error:", error);
+    console.error("Login error:", error);
     res.status(500).json({ message: "Failed to log in", error: error.message });
   }
 });
@@ -28573,6 +28621,13 @@ function normalizeInspectionImagePath(img) {
   return "";
 }
 
+// Add this helper function at the top of your file to get the server base URL
+function getServerBaseUrl(req) {
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost:3000";
+  return `${protocol}://${host}`;
+}
+
 app.post(
   "/api/qc-washing/inspection-save",
   uploadInspectionImage.any(),
@@ -28593,6 +28648,9 @@ app.post(
           .json({ success: false, message: "recordId is required" });
       }
 
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
+
       // Handle file uploads
       const uploadDir = path.join(
         __dirname,
@@ -28611,7 +28669,7 @@ app.post(
         // Use the same format as defect images - with ./public prefix
         fileMap[
           file.fieldname
-        ] = `./public/storage/qc_washing_images/inspection/${newFilename}`;
+        ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
       }
 
       // Find or create the record
@@ -28652,6 +28710,50 @@ app.post(
 
         machineProcesses.push(machineProcess);
       });
+
+      // Handle inspection images with full server URLs
+      if (inspectionData) {
+        inspectionData.forEach((item, idx) => {
+          if (item.comparisonImages) {
+            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+              // Return new uploaded image URL or existing URL
+              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+
+              // If it's an existing image, check if it's already a full URL
+              if (
+                typeof img === "string" &&
+                (img.startsWith("http://") || img.startsWith("https://"))
+              ) {
+                return img; // Already a full URL
+              }
+
+              // If it's a relative path, convert to full URL
+              if (typeof img === "string" && img.startsWith("./")) {
+                return `${serverBaseUrl}${img.replace("./", "/")}`;
+              }
+
+              // Handle object format
+              if (typeof img === "object" && img !== null && img.name) {
+                if (
+                  img.name.startsWith("http://") ||
+                  img.name.startsWith("https://")
+                ) {
+                  return img.name; // Already a full URL
+                }
+                if (img.name.startsWith("./")) {
+                  return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+                }
+                return img.name;
+              }
+
+              return img || "";
+            });
+          }
+        });
+      }
 
       // Build the inspection details
       record.inspectionDetails = {
@@ -28715,6 +28817,9 @@ app.post(
           .json({ success: false, message: "recordId is required" });
       }
 
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
+
       // Handle file uploads
       const uploadDir = path.join(
         __dirname,
@@ -28730,10 +28835,10 @@ app.post(
         const fullFilePath = path.join(uploadDir, newFilename);
         await fs.promises.writeFile(fullFilePath, file.buffer);
 
-        // Use the same format as defect images - with ./public prefix
+        // Save complete server URL instead of relative path
         fileMap[
           file.fieldname
-        ] = `./public/storage/qc_washing_images/inspection/${newFilename}`;
+        ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
       }
 
       // Find the record
@@ -28776,6 +28881,23 @@ app.post(
 
         machineProcesses.push(machineProcess);
       });
+
+      // Handle inspection images with full server URLs (same logic as save)
+      if (inspectionData) {
+        inspectionData.forEach((item, idx) => {
+          if (item.comparisonImages) {
+            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+
+              // Keep existing images as they are (should already be full URLs from previous saves)
+              return img;
+            });
+          }
+        });
+      }
 
       // Build the inspection details
       record.inspectionDetails = {
@@ -28848,15 +28970,14 @@ app.post(
         return res
           .status(400)
           .json({ success: false, message: "Missing recordId" });
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
 
       // Ensure upload directory exists
       const uploadDir = path.join(
         __dirname,
         "./public/storage/qc_washing_images/defect"
       );
-      // if (!fs.existsSync(uploadDir)) {
-      //   fs.mkdirSync(uploadDir, { recursive: true });
-      // }
 
       // Map uploaded files by fieldname and write them to disk
       const fileMap = {};
@@ -28872,7 +28993,7 @@ app.post(
         await fs.promises.writeFile(fullFilePath, file.buffer);
         fileMap[
           file.fieldname
-        ] = `./public/storage/qc_washing_images/defect/${newFilename}`;
+        ] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
       }
 
       // Attach image URLs to defectDetails.defectsByPc and additionalImages
@@ -28881,13 +29002,39 @@ app.post(
           (pc.pcDefects || []).forEach((defect, defectIdx) => {
             if (defect.defectImages) {
               defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-                return (
-                  fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] ||
-                  (typeof img === "object" && img !== null && img.name
-                    ? img.name
-                    : img) ||
-                  ""
-                );
+                // Return new uploaded image URL
+                const newImageUrl =
+                  fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`];
+                if (newImageUrl) {
+                  return newImageUrl;
+                }
+
+                // Handle existing images
+                if (
+                  typeof img === "string" &&
+                  (img.startsWith("http://") || img.startsWith("https://"))
+                ) {
+                  return img; // Already a full URL
+                }
+
+                if (typeof img === "string" && img.startsWith("./")) {
+                  return `${serverBaseUrl}${img.replace("./", "/")}`;
+                }
+
+                if (typeof img === "object" && img !== null && img.name) {
+                  if (
+                    img.name.startsWith("http://") ||
+                    img.name.startsWith("https://")
+                  ) {
+                    return img.name;
+                  }
+                  if (img.name.startsWith("./")) {
+                    return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+                  }
+                  return img.name;
+                }
+
+                return img || "";
               });
             }
           });
@@ -28897,13 +29044,38 @@ app.post(
       if (defectDetails.additionalImages) {
         defectDetails.additionalImages = defectDetails.additionalImages.map(
           (img, imgIdx) => {
-            return (
-              fileMap[`additionalImages_${imgIdx}`] ||
-              (typeof img === "object" && img !== null && img.name
-                ? img.name
-                : img) ||
-              ""
-            );
+            // Return new uploaded image URL
+            const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
+            if (newImageUrl) {
+              return newImageUrl;
+            }
+
+            // Handle existing images
+            if (
+              typeof img === "string" &&
+              (img.startsWith("http://") || img.startsWith("https://"))
+            ) {
+              return img; // Already a full URL
+            }
+
+            if (typeof img === "string" && img.startsWith("./")) {
+              return `${serverBaseUrl}${img.replace("./", "/")}`;
+            }
+
+            if (typeof img === "object" && img !== null && img.name) {
+              if (
+                img.name.startsWith("http://") ||
+                img.name.startsWith("https://")
+              ) {
+                return img.name;
+              }
+              if (img.name.startsWith("./")) {
+                return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+              }
+              return img.name;
+            }
+
+            return img || "";
           }
         );
       }
@@ -28941,14 +29113,14 @@ app.post(
           .status(400)
           .json({ success: false, message: "Missing recordId" });
 
+      // Get server base URL
+      const serverBaseUrl = getServerBaseUrl(req);
+
       // Ensure upload directory exists
       const uploadDir = path.join(
         __dirname,
         "./public/storage/qc_washing_images/defect"
       );
-      // if (!fs.existsSync(uploadDir)) {
-      //   fs.mkdirSync(uploadDir, { recursive: true });
-      // }
 
       // Map uploaded files by fieldname and write them to disk
       const fileMap = {};
@@ -28965,7 +29137,7 @@ app.post(
         await fs.promises.writeFile(fullFilePath, file.buffer);
         fileMap[
           file.fieldname
-        ] = `./public/storage/qc_washing_images/defect/${newFilename}`;
+        ] = `${serverBaseUrl}/storage/qc_washing_images/defect/${newFilename}`;
       }
 
       // Attach image URLs to defectDetails.defectsByPc and additionalImages
@@ -29164,6 +29336,346 @@ app.post(
     }
   }
 );
+// Get all submitted QC washing data
+app.get("/api/qc-washing/all-submitted", async (req, res) => {
+  try {
+    const submittedData = await QCWashing.find({
+      status: ["submitted", "processing"]
+    })
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    // Return in the format expected by frontend
+    res.json({
+      success: true,
+      data: submittedData,
+      count: submittedData.length
+    });
+  } catch (error) {
+    console.error("Error fetching submitted QC washing data:", error);
+    res.status(500).json({
+      success: false,
+      error: "Failed to fetch submitted QC washing data",
+      message: error.message
+    });
+  }
+});
+
+// Get specific submitted QC washing data by ID
+app.get("/api/qc-washing/submitted/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Validate the ID format (assuming MongoDB ObjectId)
+    if (!id || id.length !== 24) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid ID format"
+      });
+    }
+
+    const reportData = await QCWashing.findById(id).lean();
+
+    if (!reportData) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found"
+      });
+    }
+
+    // Transform the data to match the expected format for the modal
+    const transformedData = {
+      ...reportData,
+      colorName: reportData.color, // Map color to colorName for consistency
+      formData: {
+        result: reportData.overallFinalResult,
+        remarks: reportData.defectDetails?.comment || "",
+        measurements: reportData.measurementDetails?.measurement || []
+      }
+    };
+
+    res.json({
+      success: true,
+      data: transformedData
+    });
+  } catch (error) {
+    console.error("Error fetching QC washing report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch report data",
+      error: error.message
+    });
+  }
+});
+
+app.get("/api/qc-washing/comparison", async (req, res) => {
+  const { orderNo, color, washType, reportType, factory, before_after_wash } =
+    req.query;
+
+  const filter = {
+    orderNo,
+    color,
+    washType,
+    reportType,
+    factoryName: factory,
+    before_after_wash: before_after_wash || "Before Wash"
+  };
+
+  const comparisonRecord = await QCWashing.findOne(filter);
+  res.json(comparisonRecord);
+});
+
+app.get("/api/qc-washing/results", async (req, res) => {
+  try {
+    const { orderNo, color, washType, reportType, factory } = req.query;
+
+    const query = {};
+    if (orderNo) query.orderNo = orderNo;
+    if (color) query.color = color;
+    if (washType) query.washType = washType;
+    if (reportType) query.reportType = reportType;
+    if (factory) query.factoryName = factory;
+
+    const results = await QCWashing.find(query);
+    res.json(results);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/api/pdf-image-base64/:type/:filename", async (req, res) => {
+  const { type, filename } = req.params;
+  const localPath = path.join(
+    __dirname,
+    "public/storage/qc_washing_images",
+    type,
+    filename
+  );
+
+  try {
+    let imageData;
+
+    if (fs.existsSync(localPath)) {
+      imageData = fs.readFileSync(localPath);
+    } else {
+      const remoteUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
+      const response = await axios.get(remoteUrl, {
+        responseType: "arraybuffer"
+      });
+      imageData = response.data;
+    }
+
+    const base64 = Buffer.from(imageData, "binary").toString("base64");
+    res.json({ base64: `data:image/jpeg;base64,${base64}` });
+  } catch (error) {
+    console.error("Error converting image:", error.message);
+    res.status(500).json({ error: "Failed to convert image to base64" });
+  }
+});
+
+// Helper function for MIME types
+const getMimeType = (filePath) => {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeTypes = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".bmp": "image/bmp",
+    ".svg": "image/svg+xml"
+  };
+  return mimeTypes[ext] || "image/jpeg";
+};
+
+// Additional middleware for image serving
+app.use("/storage", (req, res, next) => {
+  // Set CORS headers specifically for image requests
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept, Cache-Control"
+  );
+  res.header("Access-Control-Max-Age", "86400"); // 24 hours
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    res.status(200).end();
+    return;
+  }
+
+  next();
+});
+
+// Replace your current image serving endpoint with this ES module version
+app.get("/storage/qc_washing_images/:type/:filename", async (req, res) => {
+  const { type, filename } = req.params;
+
+  // Set CORS headers
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header(
+    "Access-Control-Allow-Headers",
+    "Origin, X-Requested-With, Content-Type, Accept"
+  );
+  res.header("Cache-Control", "public, max-age=3600");
+
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  try {
+    // First, try to find the file locally
+    const possiblePaths = [
+      path.join(
+        process.cwd(),
+        "public/storage/qc_washing_images",
+        type,
+        filename
+      ),
+      path.join(process.cwd(), "storage/qc_washing_images", type, filename),
+      path.join(process.cwd(), "public", "qc_washing_images", type, filename),
+      path.join(process.cwd(), "uploads/qc_washing_images", type, filename),
+      path.join(process.cwd(), "files/qc_washing_images", type, filename)
+    ];
+
+    let foundPath = null;
+    for (const testPath of possiblePaths) {
+      if (fs.existsSync(testPath)) {
+        foundPath = testPath;
+        break;
+      }
+    }
+
+    if (foundPath) {
+      // Serve local file
+      const ext = path.extname(filename).toLowerCase();
+      const mimeTypes = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".webp": "image/webp"
+      };
+
+      res.setHeader("Content-Type", mimeTypes[ext] || "image/jpeg");
+      res.sendFile(foundPath);
+      return;
+    }
+
+    const proxyUrl = `https://yqms.yaikh.com/storage/qc_washing_images/${type}/${filename}`;
+
+    const urlObj = new URL(proxyUrl);
+    const options = {
+      hostname: urlObj.hostname,
+      port: urlObj.port || 443,
+      path: urlObj.pathname,
+      method: "GET",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+      }
+    };
+
+    // const proxyReq = https.request(options, (proxyRes) => {
+    //   if (proxyRes.statusCode !== 200) {
+
+    //     throw new Error(`HTTP error! status: ${proxyRes.statusCode}`);
+    //   }
+
+    //   // Set content type
+    //   const contentType = proxyRes.headers["content-type"] || "image/jpeg";
+    //   res.setHeader("Content-Type", contentType);
+    //   res.setHeader("Content-Length", proxyRes.headers["content-length"]);
+
+    //   // Pipe the response
+    //   proxyRes.pipe(res);
+
+    // });
+
+    proxyReq.on("error", (error) => {
+      throw error;
+    });
+
+    proxyReq.setTimeout(10000, () => {
+      proxyReq.destroy();
+      throw new Error("Request timeout");
+    });
+
+    proxyReq.end();
+  } catch (error) {
+    // Return a colored placeholder SVG
+    const createPlaceholder = (color, text) => {
+      const svg = `<svg width="100" height="60" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100%" height="100%" fill="${color}"/>
+        <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="#666">
+          ${text}
+        </text>
+      </svg>`;
+      return Buffer.from(svg);
+    };
+
+    let placeholderColor = "#f3f4f6";
+    let placeholderText = "Image Error";
+
+    if (type === "defect") {
+      placeholderColor = "#fee2e2";
+      placeholderText = "Defect Image";
+    } else if (type === "inspection") {
+      placeholderColor = "#dbeafe";
+      placeholderText = "Inspection Image";
+    }
+
+    const placeholder = createPlaceholder(placeholderColor, placeholderText);
+    res.setHeader("Content-Type", "image/svg+xml");
+    res.setHeader("Content-Length", placeholder.length);
+    res.send(placeholder);
+  }
+});
+
+// GET /api/users endpoint
+app.get("/api/users", async (req, res) => {
+  try {
+    const userList = await UserMain.find(
+      { working_status: "Working" }, // Optional: only get active users
+      {
+        _id: 1,
+        emp_id: 1,
+        eng_name: 1,
+        name: 1,
+        dept_name: 1,
+        sect_name: 1,
+        job_title: 1
+      }
+    ).sort({ eng_name: 1 });
+
+    // Transform the data to match what your frontend expects
+    const transformedUsers = userList.map((user) => ({
+      userId: user.emp_id, // Map emp_id to userId
+      _id: user._id,
+      name: user.eng_name, // Use eng_name as the display name
+      username: user.name, // Keep original name as username
+      emp_id: user.emp_id,
+      eng_name: user.eng_name,
+      dept_name: user.dept_name,
+      sect_name: user.sect_name,
+      job_title: user.job_title
+    }));
+
+    res.json({
+      success: true,
+      users: transformedUsers
+    });
+  } catch (error) {
+    console.error("Error fetching users:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch users",
+      error: error.message
+    });
+  }
+});
 
 /* -------------------------------------------
    End Points - Supplier Issues Configuration
@@ -30034,6 +30546,47 @@ app.get("/api/subcon-defects", async (req, res) => {
   }
 });
 
+// ENDPOINT: Find a specific report to check for existence/edit
+
+app.get("/api/subcon-sewing-qc1-report/find", async (req, res) => {
+  try {
+    const { inspectionDate, factory, lineNo, moNo, color } = req.query;
+
+    // Basic validation to ensure all required parameters are present
+    if (!inspectionDate || !factory || !lineNo || !moNo || !color) {
+      return res
+        .status(400)
+        .json({ error: "Missing required search parameters." });
+    }
+
+    // Since the date comes as a string, we need to find any record on that specific day.
+    // We create a date range for the entire day from start (00:00:00) to end (23:59:59).
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const report = await SubconSewingQc1Report.findOne({
+      factory,
+      lineNo,
+      moNo,
+      color,
+      inspectionDate: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    });
+
+    // If a report is found, send it. If not, `report` will be null.
+    // The frontend will handle the null case as "not found".
+    res.json(report);
+  } catch (error) {
+    console.error("Error finding Sub-Con QC report:", error);
+    res.status(500).json({ error: "Failed to find report" });
+  }
+});
+
 // Helper function to generate a unique Report ID
 const generateSubconReportID = async () => {
   const date = new Date();
@@ -30088,6 +30641,42 @@ app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
         .json({ error: "Validation failed", details: error.message });
     }
     res.status(500).json({ error: "Failed to save report" });
+  }
+});
+
+// ENDPOINT: Update an existing report by its ID
+
+app.put("/api/subcon-sewing-qc1-reports/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reportData = req.body;
+
+    // We don't need to generate a new reportID, as we're updating.
+    // We also re-calculate the buyer in case the MO number was somehow changed.
+    const buyer = getBuyerFromMoNumber(reportData.moNo);
+
+    const updatedReport = await SubconSewingQc1Report.findByIdAndUpdate(
+      id,
+      { ...reportData, buyer: buyer },
+      { new: true, runValidators: true } // {new: true} returns the updated document
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({ error: "Report not found." });
+    }
+
+    res.json({
+      message: "Report updated successfully!",
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error("Error updating Sub-Con QC report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to update report" });
   }
 });
 
@@ -30247,6 +30836,193 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
   } catch (error) {
     console.error("Error fetching Sub-Con QC report data:", error);
     res.status(500).json({ error: "Failed to fetch report data" });
+  }
+});
+
+/* ------------------------------------------------------------------
+   End Points - Sub-Con QC Management (Admin Panel)
+------------------------------------------------------------------ */
+
+// --- FACTORY MANAGEMENT ---
+
+// GET all factories (can also be used for filtering by name)
+app.get("/api/subcon-sewing-factories-manage", async (req, res) => {
+  try {
+    let query = {};
+    if (req.query.factory) {
+      // Using regex for partial matching, case-insensitive
+      query.factory = { $regex: req.query.factory, $options: "i" };
+    }
+    const factories = await SubconSewingFactory.find(query).sort({ no: 1 });
+    res.json(factories);
+  } catch (error) {
+    console.error("Error fetching sub-con factories:", error);
+    res.status(500).json({ error: "Failed to fetch factories" });
+  }
+});
+
+// POST a new factory
+app.post("/api/subcon-sewing-factories-manage", async (req, res) => {
+  try {
+    // Auto-increment 'no' field
+    const lastFactory = await SubconSewingFactory.findOne().sort({ no: -1 });
+    const newNo = lastFactory ? lastFactory.no + 1 : 1;
+
+    const newFactory = new SubconSewingFactory({
+      ...req.body,
+      no: newNo
+    });
+    await newFactory.save();
+    res.status(201).json(newFactory);
+  } catch (error) {
+    // Handle potential duplicate factory name error
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A factory with this name already exists." });
+    }
+    // General error handling
+    console.error("Error creating sub-con factory:", error);
+    res.status(500).json({ error: "Failed to create factory" });
+  } //
+});
+
+// PUT (update) an existing factory by its ID
+app.put("/api/subcon-sewing-factories-manage/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedFactory = await SubconSewingFactory.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!updatedFactory) {
+      return res.status(404).json({ error: "Factory not found." });
+    }
+    res.json(updatedFactory);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A factory with this name already exists." });
+    }
+    console.error("Error updating sub-con factory:", error);
+    res.status(500).json({ error: "Failed to update factory" });
+  }
+});
+
+// DELETE an existing factory by its ID
+app.delete("/api/subcon-sewing-factories-manage/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedFactory = await SubconSewingFactory.findByIdAndDelete(id);
+
+    if (!deletedFactory) {
+      return res.status(404).json({ error: "Factory not found." });
+    }
+
+    res.json({ message: "Factory deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting sub-con factory:", error);
+    res.status(500).json({ error: "Failed to delete factory" });
+  }
+});
+
+// --- DEFECT MANAGEMENT ---
+
+// GET all defects with filtering
+app.get("/api/subcon-defects-manage", async (req, res) => {
+  try {
+    let query = {};
+    if (req.query.DefectCode) {
+      query.DefectCode = req.query.DefectCode;
+    }
+    if (req.query.DisplayCode) {
+      query.DisplayCode = req.query.DisplayCode;
+    }
+    if (req.query.DefectNameEng) {
+      query.DefectNameEng = { $regex: req.query.DefectNameEng, $options: "i" };
+    }
+    const defects = await SubConDefect.find(query).sort({ DisplayCode: 1 });
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching sub-con defects for management:", error);
+    res.status(500).json({ error: "Failed to fetch defects" });
+  }
+});
+
+// POST a new defect
+app.post("/api/subcon-defects", async (req, res) => {
+  try {
+    // Auto-increment 'no' and 'DisplayCode'
+    const lastDefect = await SubConDefect.findOne().sort({ no: -1 });
+    const newNo = lastDefect ? lastDefect.no + 1 : 1;
+
+    const lastDisplayCodeDefect = await SubConDefect.findOne().sort({
+      DisplayCode: -1
+    });
+    const newDisplayCode = lastDisplayCodeDefect
+      ? lastDisplayCodeDefect.DisplayCode + 1
+      : 1;
+
+    const newDefect = new SubConDefect({
+      ...req.body,
+      no: newNo,
+      DisplayCode: newDisplayCode
+    });
+    await newDefect.save();
+    res.status(201).json(newDefect);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A defect with this Defect Code already exists." });
+    }
+    console.error("Error creating sub-con defect:", error);
+    res.status(500).json({ error: "Failed to create defect" });
+  }
+});
+
+// PUT (update) an existing defect by ID
+app.put("/api/subcon-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Do not allow 'no' or 'DisplayCode' to be updated
+    const { no, DisplayCode, ...updateData } = req.body;
+
+    const updatedDefect = await SubConDefect.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true
+    });
+    if (!updatedDefect) {
+      return res.status(404).json({ error: "Defect not found." });
+    }
+    res.json(updatedDefect);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A defect with this Defect Code already exists." });
+    }
+    console.error("Error updating sub-con defect:", error);
+    res.status(500).json({ error: "Failed to update defect" });
+  }
+});
+
+// DELETE an existing defect by its ID
+app.delete("/api/subcon-defects-manage/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedDefect = await SubConDefect.findByIdAndDelete(id);
+
+    if (!deletedDefect) {
+      return res.status(404).json({ error: "Defect not found." });
+    }
+
+    res.json({ message: "Defect deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting sub-con defect:", error);
+    res.status(500).json({ error: "Failed to delete defect" });
   }
 });
 

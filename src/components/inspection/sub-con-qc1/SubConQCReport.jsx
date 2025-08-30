@@ -14,6 +14,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Select from "react-select";
 import { API_BASE_URL } from "../../../../config";
+import { useAuth } from "../../authentication/AuthContext";
 
 // --- Reusable Components ---
 const SummaryCard = ({ icon, title, value, bgColorClass }) => (
@@ -74,6 +75,7 @@ const ToggleButton = ({ label, value, activeValue, onClick }) => (
 );
 
 const SubConQCReport = () => {
+  const { user } = useAuth();
   const [filters, setFilters] = useState({
     startDate: new Date(),
     endDate: new Date(),
@@ -99,6 +101,25 @@ const SubConQCReport = () => {
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState("qty"); // 'qty' or 'rate'
 
+  // === NEW LOGIC: Determine the user's factory based on their name ===
+
+  const userFactory = useMemo(() => {
+    // Check if we have a user, a name, and a list of factories from the API
+    if (user && user.name && data.filterOptions.factories?.length > 0) {
+      // Find a factory name that matches the user's name (case-insensitive)
+      const matchedFactoryName = data.filterOptions.factories.find(
+        (f) => f.toLowerCase() === user.name.toLowerCase()
+      );
+
+      // If a match is found, return it in the format react-select expects
+      if (matchedFactoryName) {
+        return { value: matchedFactoryName, label: matchedFactoryName };
+      }
+    }
+    // If no match is found, or data is not ready, return null
+    return null;
+  }, [user, data.filterOptions.factories]);
+
   // Fetch the master list of all defects once on component mount
   useEffect(() => {
     const fetchAllDefects = async () => {
@@ -112,6 +133,16 @@ const SubConQCReport = () => {
     };
     fetchAllDefects();
   }, []);
+
+  // === NEW LOGIC: Automatically set the factory filter for a factory user ===
+
+  useEffect(() => {
+    // If we've identified the user's factory and the filter isn't already set,
+    // update the filters state to select their factory by default.
+    if (userFactory && !filters.factory) {
+      handleFilterChange("factory", userFactory);
+    }
+  }, [userFactory, filters.factory]);
 
   // Fetch all report data based on filters
   useEffect(() => {
@@ -176,15 +207,38 @@ const SubConQCReport = () => {
     });
   };
 
-  const clearFilters = () =>
-    setFilters({
+  // --- MODIFIED clearFilters function ---
+  const clearFilters = () => {
+    const defaultFilters = {
       startDate: new Date(),
       endDate: new Date(),
       factory: null,
       lineNo: null,
       moNo: null,
       color: null
-    });
+    };
+    // If the user is restricted to one factory, re-apply that filter after clearing others
+    if (userFactory) {
+      defaultFilters.factory = userFactory;
+    }
+    setFilters(defaultFilters);
+  };
+
+  // === NEW LOGIC: Create a conditional options list for the factory filter ===
+
+  const factoryFilterOptions = useMemo(() => {
+    // If the user is a factory user, the dropdown should only contain their factory
+    if (userFactory) {
+      return [userFactory];
+    }
+    // For all other users, map the full list of factories from the API response
+    return (
+      data.filterOptions?.factories?.map((f) => ({
+        value: f,
+        label: f
+      })) || []
+    );
+  }, [userFactory, data.filterOptions.factories]);
 
   const reactSelectStyles = {
     control: (base) => ({
@@ -253,14 +307,12 @@ const SubConQCReport = () => {
           <div className="flex-1 min-w-[150px]">
             <label className="text-sm font-medium">Factory</label>
             <Select
-              options={data.filterOptions?.factories?.map((f) => ({
-                value: f,
-                label: f
-              }))}
+              options={factoryFilterOptions}
               value={filters.factory}
               onChange={(val) => handleFilterChange("factory", val)}
               styles={reactSelectStyles}
-              isClearable
+              isClearable={!userFactory} // A normal user can clear, a factory user cannot
+              isDisabled={!!userFactory} // The dropdown is disabled for a factory user
               placeholder="All Factories"
             />
           </div>
