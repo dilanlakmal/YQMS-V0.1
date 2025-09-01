@@ -104,8 +104,8 @@ import { API_BASE_URL } from "./config.js";
 import { URL } from "url";
 import { Buffer } from "buffer";
 
-import sqlQuery from "./route/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./route/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Connection String
@@ -149,33 +149,32 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 app.use(bodyParser.json());
 app.use(express.json());
 
-const allowedOrigins = ["https://192.167.12.85:3001", "http://localhost:3001", "https://localhost:3001", "https://yqms.yaikh.com","https://192.167.12.162:3001"];
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) === -1) {
-        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-        return callback(new Error(msg), false);
-      }
-      return callback(null, true);
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cache-Control","Origin", "X-Requested-With","Accept", "Pragma","Expires", "Last-Modified", "If-Modified-Since","If-None-Match","ETag"],
-    exposedHeaders: [
-      "Content-Length",
-      "Content-Type",
-      "Cache-Control",
-      "Last-Modified",
-      "ETag"
-    ],
-    credentials: true,
-    optionsSuccessStatus: 200
-  })
-);
+const allowedOrigins = [
+  "https://192.167.12.85:3001",
+  "http://localhost:3001",
+  "https://localhost:3001",
+  "https://yqms.yaikh.com",
+  "https://192.167.12.162:3001"
+];
 
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests) or from whitelisted domains.
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+  allowedHeaders: "Content-Type,Authorization,Cache-Control,Origin,X-Requested-With,Accept,Pragma,Expires,Last-Modified,If-Modified-Since,If-None-Match,ETag",
+  exposedHeaders: "Content-Length,Content-Type,Cache-Control,Last-Modified,ETag",
+  credentials: true,
+  optionsSuccessStatus: 204 // Use 204 No Content for preflight success, which is a common practice.
+};
 
-app.options("*", cors());
+// Enable CORS with the defined options. This handles pre-flight requests automatically.
+app.use(cors(corsOptions));
 
 const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
@@ -297,7 +296,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 /* ------------------------------
    New Endpoints for CutPanelOrders
 ------------------------------ */
@@ -27049,6 +27048,7 @@ function calculateMeasurementSizeSummary(measurementDetail) {
   if (!measurementDetail || !Array.isArray(measurementDetail.pcs)) {
     return {};
   }
+
   let checkedPcs = measurementDetail.pcs.length;
   let checkedPoints = 0;
   let totalPass = 0;
@@ -27088,8 +27088,15 @@ function calculateMeasurementSizeSummary(measurementDetail) {
     });
   });
 
+  // Determine the correct wash type format
+  const washType = measurementDetail.before_after_wash === 'Before Wash' ? 'beforeWash' : 
+                   measurementDetail.before_after_wash === 'After Wash' ? 'afterWash' :
+                   measurementDetail.before_after_wash;
+
   return {
     size: measurementDetail.size,
+    before_after_wash: washType,
+    kvalue: measurementDetail.kvalue,
     checkedPcs,
     checkedPoints,
     totalPass,
@@ -27103,24 +27110,29 @@ function calculateMeasurementSizeSummary(measurementDetail) {
 app.post("/api/qc-washing/measurement-save", async (req, res) => {
   try {
     const { recordId, measurementDetail } = req.body;
+    
     if (!recordId || !measurementDetail) {
       return res.status(400).json({
         success: false,
         message: "Missing recordId or measurementDetail"
       });
     }
-    if (!measurementDetail.before_after_wash) {
+    
+    if (!measurementDetail.before_after_wash || !measurementDetail.kvalue) {
       return res.status(400).json({
         success: false,
-        message: "before_after_wash is required in measurementDetail"
+        message: "before_after_wash and kvalue are required in measurementDetail"
       });
     }
+
     const record = await QCWashing.findById(recordId);
     if (!record) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Record not found" });
+      return res.status(404).json({ 
+        success: false, 
+        message: "Record not found" 
+      });
     }
+
     // Ensure measurementDetails is an object with two arrays
     if (!record.measurementDetails) {
       record.measurementDetails = {
@@ -27128,44 +27140,110 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
         measurementSizeSummary: []
       };
     }
-    // Remove existing
-    record.measurementDetails.measurement = (
-      record.measurementDetails.measurement || []
-    ).filter(
-      (m) =>
-        !(
-          m.size === measurementDetail.size &&
-          m.before_after_wash === measurementDetail.before_after_wash
-        )
+
+    // Determine the wash type for filtering
+    const washType = measurementDetail.before_after_wash;
+    
+    // Check if this is an edit operation
+    const isEdit = measurementDetail.isEdit === true;
+    
+    console.log('Processing measurement save:', {
+      size: measurementDetail.size,
+      kvalue: measurementDetail.kvalue,
+      washType: washType,
+      isEdit: isEdit
+    });
+    
+    // Find existing measurement record
+    const measurementIndex = record.measurementDetails.measurement.findIndex(
+      (m) => 
+        m.size === measurementDetail.size &&
+        m.kvalue === measurementDetail.kvalue &&
+        m.before_after_wash === washType
     );
-    record.measurementDetails.measurementSizeSummary = (
-      record.measurementDetails.measurementSizeSummary || []
-    ).filter(
-      (s) =>
-        !(
+    
+    // For measurementSizeSummary, search more flexibly since existing records might not have before_after_wash field
+    let summaryIndex = -1;
+    
+    // First, try to find by size, kvalue, and before_after_wash
+    summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
+      (s) => 
+        s.size === measurementDetail.size &&
+        s.kvalue === measurementDetail.kvalue &&
+        s.before_after_wash === washType
+    );
+    
+    // If not found, try to find by size and kvalue only (for existing records without before_after_wash)
+    if (summaryIndex === -1) {
+      summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
+        (s) => 
           s.size === measurementDetail.size &&
-          s.before_after_wash === measurementDetail.before_after_wash
-        )
-    );
-    // Calculate summary
+          s.kvalue === measurementDetail.kvalue
+      );
+      
+      console.log('Found summary by size+kvalue only at index:', summaryIndex);
+    }
+    
+    console.log('Search results:', {
+      measurementIndex,
+      summaryIndex,
+      totalMeasurements: record.measurementDetails.measurement.length,
+      totalSummaries: record.measurementDetails.measurementSizeSummary.length,
+      existingSummaries: record.measurementDetails.measurementSizeSummary.map(s => ({
+        size: s.size,
+        kvalue: s.kvalue,
+        before_after_wash: s.before_after_wash || 'MISSING'
+      }))
+    });
+    
+    // Calculate new summary
     const summary = calculateMeasurementSizeSummary(measurementDetail);
-    // Add new
-    record.measurementDetails.measurement.push(measurementDetail);
-    record.measurementDetails.measurementSizeSummary.push(summary);
+    
+    // Always update existing records if found, regardless of isEdit flag
+    if (measurementIndex !== -1) {
+      // Update existing measurement
+      record.measurementDetails.measurement[measurementIndex] = measurementDetail;
+      console.log('Updated measurement at index:', measurementIndex);
+    } else {
+      // Add new measurement if not found
+      record.measurementDetails.measurement.push(measurementDetail);
+      console.log('Added new measurement');
+    }
+    
+    if (summaryIndex !== -1) {
+      // Update existing summary
+      record.measurementDetails.measurementSizeSummary[summaryIndex] = summary;
+      console.log('Updated summary at index:', summaryIndex);
+    } else {
+      // Only add new summary if we really couldn't find an existing one
+      // This should be rare if the search logic above is working correctly
+      record.measurementDetails.measurementSizeSummary.push(summary);
+      console.log('Added new summary - this might indicate a search issue');
+    }
+
     record.savedAt = new Date();
     await record.save();
+
+    console.log('Final counts:', {
+      measurements: record.measurementDetails.measurement.length,
+      summaries: record.measurementDetails.measurementSizeSummary.length
+    });
+
     res.json({
       success: true,
-      message: "Measurement detail saved",
+      message: isEdit ? "Measurement detail updated" : "Measurement detail saved",
       measurementDetails: record.measurementDetails
     });
+
   } catch (err) {
     console.error("Measurement save error:", err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to save measurement detail" });
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to save measurement detail" 
+    });
   }
 });
+
 
 app.post(
   "/api/qc-washing/measurement-summary-autosave/:recordId",

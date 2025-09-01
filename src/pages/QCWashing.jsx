@@ -1552,17 +1552,25 @@ const QCWashingPage = () => {
           ? "beforeWash"
           : "afterWash";
 
+      // Check if this size+kvalue combination already exists
+      const currentArray = measurementData[before_after_wash] || [];
+      const existingRecord = currentArray.find(
+        (item) => item.size === transformedSizeData.size && item.kvalue === transformedSizeData.kvalue
+      );
+
       // 1. Update local measurement data and saved sizes
       setMeasurementData((prev) => {
         const currentArray = prev[before_after_wash];
         const existingIndex = currentArray.findIndex(
-          (item) => item.size === transformedSizeData.size
+          (item) => item.size === transformedSizeData.size && item.kvalue === transformedSizeData.kvalue
         );
         if (existingIndex >= 0) {
+          // Update existing record
           const updated = [...currentArray];
           updated[existingIndex] = transformedSizeData;
           return { ...prev, [before_after_wash]: updated };
         } else {
+          // Add new record
           return {
             ...prev,
             [before_after_wash]: [...currentArray, transformedSizeData]
@@ -1592,7 +1600,11 @@ const QCWashingPage = () => {
         return;
       }
 
-      const measurementDetail = { ...transformedSizeData, before_after_wash };
+      const measurementDetail = { 
+        ...transformedSizeData, 
+        before_after_wash,
+        isUpdate: !!existingRecord // Flag to indicate if this is an update
+      };
 
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/measurement-save`,
@@ -1609,7 +1621,8 @@ const QCWashingPage = () => {
       const result = await response.json();
 
       if (result.success) {
-        Swal.fire("Success", `Size data saved to database!`, "success");
+        const action = existingRecord ? "updated" : "saved";
+        Swal.fire("Success", `Size data ${action} to database!`, "success");
       } else {
         Swal.fire(
           "Error",
@@ -1624,20 +1637,40 @@ const QCWashingPage = () => {
   };
 
   // Handle measurement data edit
-  const handleMeasurementEdit = (size = null) => {
+  const handleMeasurementEdit = (size = null, kvalue = null) => {
     setShowMeasurementTable(true);
     if (size) {
-      setSavedSizes((prev) => prev.filter((s) => s !== size));
       const before_after_wash =
         formData.before_after_wash === "Before Wash"
           ? "beforeWash"
           : "afterWash";
-      setMeasurementData((prev) => ({
-        ...prev,
-        [before_after_wash]: prev[before_after_wash].filter(
-          (item) => item.size !== size
-        )
-      }));
+      
+      if (kvalue) {
+        // Remove specific size+kvalue combination
+        setMeasurementData((prev) => ({
+          ...prev,
+          [before_after_wash]: prev[before_after_wash].filter(
+            (item) => !(item.size === size && item.kvalue === kvalue)
+          )
+        }));
+        
+        // Only remove from savedSizes if no other k-values exist for this size
+        const remainingRecords = measurementData[before_after_wash].filter(
+          (item) => item.size === size && item.kvalue !== kvalue
+        );
+        if (remainingRecords.length === 0) {
+          setSavedSizes((prev) => prev.filter((s) => s !== size));
+        }
+      } else {
+        // Remove all records for this size (legacy behavior)
+        setSavedSizes((prev) => prev.filter((s) => s !== size));
+        setMeasurementData((prev) => ({
+          ...prev,
+          [before_after_wash]: prev[before_after_wash].filter(
+            (item) => item.size !== size
+          )
+        }));
+      }
     }
   };
 

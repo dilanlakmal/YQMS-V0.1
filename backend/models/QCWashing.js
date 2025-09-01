@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 
 const MeasurementSizeSummarySchema = new mongoose.Schema({
   size: String,
+  kvalue: String,
   checkedPcs: Number,
   checkedPoints: Number,
   totalPass: Number,
