@@ -339,7 +339,7 @@ const getImageUrl = (imagePath) => {
                         <TrendingUp className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-amber-600 dark:text-amber-300 uppercase tracking-wide mb-1">Pass Rate</p>
+                        <p className="text-xs font-medium text-amber-600 dark:text-amber-300 uppercase tracking-wide mb-1">Pass Rate(Measurment)</p>
                         <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{reportData.passRate}%</p>
                       </div>
                     </div>
@@ -347,29 +347,37 @@ const getImageUrl = (imagePath) => {
                   <div className={`rounded-xl p-4 border hover:shadow-md transition-shadow ${
                     reportData.overallFinalResult === 'Pass'
                       ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-800'
-                      : 'bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 border-rose-200 dark:border-rose-800'
+                      : reportData.overallFinalResult === 'Fail'
+                      ? 'bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 border-rose-200 dark:border-rose-800'
+                      : 'bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className={`p-3 rounded-xl ${
-                        reportData.overallFinalResult === 'Pass' ? 'bg-emerald-500' : 'bg-rose-500'
+                        reportData.overallFinalResult === 'Pass' ? 'bg-emerald-500' : reportData.overallFinalResult === 'Fail' ? 'bg-rose-500' : 'bg-amber-500'
                       }`}>
                         {reportData.overallFinalResult === 'Pass' ? (
                           <Award className="w-6 h-6 text-white" />
-                        ) : (
+                        ) : reportData.overallFinalResult === 'Fail' ? (
                           <XCircle className="w-6 h-6 text-white" />
+                        ) : (
+                          <Clock className="w-6 h-6 text-white" />
                         )}
                       </div>
                       <div className="text-right">
                         <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${
                           reportData.overallFinalResult === 'Pass'
                             ? 'text-emerald-600 dark:text-emerald-300'
-                            : 'text-rose-600 dark:text-rose-300'
+                            : reportData.overallFinalResult === 'Fail'
+                            ? 'text-rose-600 dark:text-rose-300'
+                            : 'text-amber-600 dark:text-amber-300'
                         }`}>Final Result</p>
                         <p className={`text-2xl font-bold ${
                           reportData.overallFinalResult === 'Pass'
                             ? 'text-emerald-900 dark:text-emerald-100'
-                            : 'text-rose-900 dark:text-rose-100'
-                        }`}>{reportData.overallFinalResult}</p>
+                            : reportData.overallFinalResult === 'Fail'
+                            ? 'text-rose-900 dark:text-rose-100'
+                            : 'text-amber-900 dark:text-amber-100'
+                        }`}>{reportData.overallFinalResult || 'Pending'}</p>
                       </div>
                     </div>
                   </div>

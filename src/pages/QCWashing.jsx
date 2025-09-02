@@ -189,10 +189,14 @@ function calculateSummaryData(currentFormData) {
       : 0;
 
   // 5. Result logic
-  let overallResult = "Pass";
+  let overallResult = "Pending";
   const measurementOverallResult =
-    measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
-  const defectOverallResult = currentDefectDetails?.result || "N/A";
+    measurementPoints === 0
+      ? "Pending"
+      : measurementPoints - measurementPass > 0
+      ? "Fail"
+      : "Pass";
+  const defectOverallResult = currentDefectDetails?.result || "Pending";
 
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
     overallResult = "Fail";
@@ -202,7 +206,7 @@ function calculateSummaryData(currentFormData) {
   ) {
     overallResult = "Pass";
   } else {
-    overallResult = "N/A";
+    overallResult = "Pending";
   }
 
   return {
@@ -211,7 +215,7 @@ function calculateSummaryData(currentFormData) {
     totalDefectCount: defectCount || 0,
     defectRate,
     defectRatio,
-    overallFinalResult: overallResult || "N/A",
+    overallFinalResult: overallResult || "Pending",
     overallResult,
     // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
@@ -304,7 +308,7 @@ const QCWashingPage = () => {
     totalDefectCount: 0,
     defectRate: 0,
     defectRatio: 0,
-    overallFinalResult: "N/A"
+    overallFinalResult: "Pending"
   });
 
   // State: Data Lists
@@ -583,6 +587,14 @@ const QCWashingPage = () => {
         formData.reportType === "First Output") &&
       aql?.acceptedDefect
     ) {
+      const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
+      if (defectCheckedQty === 0) {
+        if (formData.result !== "") {
+          setFormData((prev) => ({ ...prev, result: "" }));
+        }
+        return;
+      }
+
       const totalDefects = Object.values(defectsByPc)
         .flat()
         .reduce(
@@ -608,7 +620,8 @@ const QCWashingPage = () => {
     formData.inline,
     formData.reportType,
     formData.firstOutput,
-    formData.result
+    formData.result,
+    formData.checkedQty
   ]);
 
   useEffect(() => {
@@ -1808,7 +1821,7 @@ const QCWashingPage = () => {
       totalDefectCount: 0,
       defectRate: 0,
       defectRatio: 0,
-      overallFinalResult: "N/A"
+      overallFinalResult: "Pending"
     });
 
     // Reset all other states

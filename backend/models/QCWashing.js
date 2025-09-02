@@ -22,7 +22,7 @@ const MeasurementPointSchema = new mongoose.Schema({
   rowNo: Number,
   measured_value_decimal: Number,
   measured_value_fraction: String,
-  result: { type: String, enum: ['pass', 'fail'], default: 'pass' }
+  result: { type: String, enum: ['pass', 'fail','pending'], default: 'pending' }
 }, { _id: false });
 
 const PcsSchema = new mongoose.Schema({

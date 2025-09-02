@@ -781,7 +781,7 @@ const processImageToBase64 = async (imagePath) => {
                     Status
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Defect Rate (%)
+                    Pass Rate (Measur.) (%)
                   </th>
                   {showDefectColumn && (
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
@@ -888,7 +888,7 @@ const processImageToBase64 = async (imagePath) => {
                             ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
                             : record.overallFinalResult === 'Fail'
                             ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
                         }`}>
                           {record.overallFinalResult || 'N/A'}
                         </span>
@@ -1001,7 +1001,7 @@ const processImageToBase64 = async (imagePath) => {
               <button
                 onClick={handlePrevPage}
                 disabled={currentPage === 1}
-                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Previous
               </button>
@@ -1026,7 +1026,7 @@ const processImageToBase64 = async (imagePath) => {
                       className={`px-3 py-1 text-sm border rounded-md ${
                         currentPage === pageNum
                           ? 'bg-indigo-600 text-white border-indigo-600'
-                          : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          : 'text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
                       }`}
                     >
                       {pageNum}
@@ -1038,7 +1038,7 @@ const processImageToBase64 = async (imagePath) => {
               <button
                 onClick={handleNextPage}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Next
               </button>
