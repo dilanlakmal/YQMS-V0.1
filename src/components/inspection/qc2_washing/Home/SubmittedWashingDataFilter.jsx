@@ -255,7 +255,7 @@ const SubmittedWashingDataFilter = ({
       {/* Filter Content */}
       {isVisible && (
         <div className="p-6 bg-gray-50 dark:bg-gray-900">
-          <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-10 gap-6">
             
             {/* Date Range Filters */}
             <div className="relative">
@@ -438,7 +438,7 @@ const SubmittedWashingDataFilter = ({
             </div>
 
             {/* Continue with other regular dropdowns... */}
-            <div className="relative">
+            {/* <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <User className="w-4 h-4 mr-1" />
                 Buyer
@@ -461,7 +461,7 @@ const SubmittedWashingDataFilter = ({
                   </svg>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

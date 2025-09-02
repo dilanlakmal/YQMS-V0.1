@@ -29,7 +29,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
     color: itemData.color,
     washType: itemData.washType,
     reportType: itemData.reportType,
-    factoryName: itemData.factoryName,
+    // factoryName: itemData.factoryName,
     before_after_wash: itemData.before_after_wash,
     washQty: itemData.washQty,
     colorOrderQty: itemData.colorOrderQty
@@ -57,8 +57,8 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
       record.before_after_wash === itemData.before_after_wash &&
       record.color === itemData.color &&
       record.washType === itemData.washType &&
-      record.reportType === itemData.reportType &&
-      record.factoryName === itemData.factoryName;
+      record.reportType === itemData.reportType;
+      // record.factoryName === itemData.factoryName;
     
     if (matches) {
       console.log('Matching record found:', {
@@ -230,8 +230,8 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
       record.before_after_wash === itemData.before_after_wash &&
       record.color === itemData.color &&
       record.washType === itemData.washType &&
-      record.reportType === itemData.reportType &&
-      record.factoryName === itemData.factoryName;
+      record.reportType === itemData.reportType;
+      // record.factoryName === itemData.factoryName;
   });
 
   // Sort by date or creation time to get chronological order
@@ -245,8 +245,6 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
   setShowRecordsList(true);
 };
 
-
-// Modal or list component
 // Modal or list component
 const RecordsListModal = () => (
   showRecordsList && (
@@ -271,6 +269,9 @@ const RecordsListModal = () => (
                 <tr>
                   <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
                     #
+                  </th>
+                  <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                    Factory Name
                   </th>
                   <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
                     Date
@@ -307,6 +308,9 @@ const RecordsListModal = () => (
                             Current
                           </span>
                         )}
+                      </td>
+                      <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
+                        {record.factoryName || 'N/A'}
                       </td>
                       <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
                         {new Date(record.date || record.createdAt).toLocaleDateString()}
@@ -529,6 +533,22 @@ const RecordsListModal = () => (
                     </div>
                   </div>
                 </div>
+
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
+                <div className="flex items-center">
+                  <Target className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                  <div className="ml-3">
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Wash Stage</p>
+                    <p className={`text-lg font-semibold capitalize ${
+                      itemData.before_after_wash === 'before wash' 
+                        ? 'text-amber-900 dark:text-amber-100' 
+                        : 'text-emerald-900 dark:text-emerald-100'
+                    }`}>
+                      {itemData.before_after_wash || 'N/A'}
+                    </p>
+                  </div>
+                </div>
+              </div>
 
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">

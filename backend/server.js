@@ -26234,7 +26234,7 @@ app.post("/api/qc-washing/orderData-save", async (req, res) => {
       });
     } else {
       // Update existing record for this inspector
-      console.log("Updating existing record:", record._id); // Add this for debugging
+      // console.log("Updating existing record:", record._id); // Add this for debugging
       Object.assign(record, formData);
       record.inspector.empId = userId;
       record.userId = userId;
@@ -26330,7 +26330,7 @@ app.get(
         }
       });
     } catch (error) {
-      console.error("Error checking measurement details:", error);
+      // console.error("Error checking measurement details:", error);
       res.status(500).json({
         success: false,
         message: "Server error while checking measurement details",
@@ -26381,7 +26381,7 @@ app.post("/api/qc-washing/find-existing", async (req, res) => {
     if (record) {
       res.json({ success: true, exists: true, record });
     } else {
-      console.log("No existing record found");
+      // console.log("No existing record found");
       res.json({ success: true, exists: false });
     }
   } catch (err) {
@@ -27133,7 +27133,6 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
       });
     }
 
-    // Ensure measurementDetails is an object with two arrays
     if (!record.measurementDetails) {
       record.measurementDetails = {
         measurement: [],
@@ -27141,20 +27140,9 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
       };
     }
 
-    // Determine the wash type for filtering
     const washType = measurementDetail.before_after_wash;
-    
-    // Check if this is an edit operation
     const isEdit = measurementDetail.isEdit === true;
-    
-    console.log('Processing measurement save:', {
-      size: measurementDetail.size,
-      kvalue: measurementDetail.kvalue,
-      washType: washType,
-      isEdit: isEdit
-    });
-    
-    // Find existing measurement record
+ 
     const measurementIndex = record.measurementDetails.measurement.findIndex(
       (m) => 
         m.size === measurementDetail.size &&
@@ -27162,10 +27150,8 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
         m.before_after_wash === washType
     );
     
-    // For measurementSizeSummary, search more flexibly since existing records might not have before_after_wash field
     let summaryIndex = -1;
-    
-    // First, try to find by size, kvalue, and before_after_wash
+
     summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
       (s) => 
         s.size === measurementDetail.size &&
@@ -27173,7 +27159,6 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
         s.before_after_wash === washType
     );
     
-    // If not found, try to find by size and kvalue only (for existing records without before_after_wash)
     if (summaryIndex === -1) {
       summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
         (s) => 
@@ -27181,53 +27166,25 @@ app.post("/api/qc-washing/measurement-save", async (req, res) => {
           s.kvalue === measurementDetail.kvalue
       );
       
-      console.log('Found summary by size+kvalue only at index:', summaryIndex);
     }
-    
-    console.log('Search results:', {
-      measurementIndex,
-      summaryIndex,
-      totalMeasurements: record.measurementDetails.measurement.length,
-      totalSummaries: record.measurementDetails.measurementSizeSummary.length,
-      existingSummaries: record.measurementDetails.measurementSizeSummary.map(s => ({
-        size: s.size,
-        kvalue: s.kvalue,
-        before_after_wash: s.before_after_wash || 'MISSING'
-      }))
-    });
     
     // Calculate new summary
     const summary = calculateMeasurementSizeSummary(measurementDetail);
     
-    // Always update existing records if found, regardless of isEdit flag
     if (measurementIndex !== -1) {
-      // Update existing measurement
       record.measurementDetails.measurement[measurementIndex] = measurementDetail;
-      console.log('Updated measurement at index:', measurementIndex);
     } else {
-      // Add new measurement if not found
       record.measurementDetails.measurement.push(measurementDetail);
-      console.log('Added new measurement');
     }
     
     if (summaryIndex !== -1) {
-      // Update existing summary
       record.measurementDetails.measurementSizeSummary[summaryIndex] = summary;
-      console.log('Updated summary at index:', summaryIndex);
     } else {
-      // Only add new summary if we really couldn't find an existing one
-      // This should be rare if the search logic above is working correctly
       record.measurementDetails.measurementSizeSummary.push(summary);
-      console.log('Added new summary - this might indicate a search issue');
     }
 
     record.savedAt = new Date();
     await record.save();
-
-    console.log('Final counts:', {
-      measurements: record.measurementDetails.measurement.length,
-      summaries: record.measurementDetails.measurementSizeSummary.length
-    });
 
     res.json({
       success: true,
@@ -27330,7 +27287,7 @@ app.get("/api/qc-washing/submitted/:id", async (req, res) => {
     // Transform the data to match the expected format for the modal
     const transformedData = {
       ...reportData,
-      colorName: reportData.color, // Map color to colorName for consistency
+      colorName: reportData.color, 
       formData: {
         result: reportData.overallFinalResult,
         remarks: reportData.defectDetails?.comment || "",
@@ -27538,16 +27495,16 @@ app.get("/storage/qc_washing_images/:type/:filename", async (req, res) => {
 
     // });
 
-    proxyReq.on("error", (error) => {
-      throw error;
-    });
+    // proxyReq.on("error", (error) => {
+    //   throw error;
+    // });
 
-    proxyReq.setTimeout(10000, () => {
-      proxyReq.destroy();
-      throw new Error("Request timeout");
-    });
+    // proxyReq.setTimeout(10000, () => {
+    //   proxyReq.destroy();
+    //   throw new Error("Request timeout");
+    // });
 
-    proxyReq.end();
+    // proxyReq.end();
   } catch (error) {
     // Return a colored placeholder SVG
     const createPlaceholder = (color, text) => {

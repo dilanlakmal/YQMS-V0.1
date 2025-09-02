@@ -12,6 +12,11 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [paginatedData, setPaginatedData] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
   const [showDefectColumn, setShowDefectColumn] = useState(false);
@@ -530,12 +535,12 @@ const processImageToBase64 = async (imagePath) => {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
-  // Filter function - moved to separate component but logic stays here
+  // Cross-filtering function with proper cumulative filtering
   const applyFilters = (filters) => {
     let filtered = [...submittedData];
 
     // Date range filter
-    if (filters.dateRange.startDate || filters.dateRange.endDate) {
+    if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
       filtered = filtered.filter(item => {
         const itemDate = new Date(item.date);
         const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null;
@@ -571,15 +576,10 @@ const processImageToBase64 = async (imagePath) => {
       );
     }
 
-    // Status filter
-    // if (filters.status) {
-    //   filtered = filtered.filter(item => item.overallFinalResult === filters.status);
-    // }
-
     // Buyer filter
-    if (filters.buyer) {
-      filtered = filtered.filter(item => item.buyer === filters.buyer);
-    }
+    // if (filters.buyer) {
+    //   filtered = filtered.filter(item => item.buyer === filters.buyer);
+    // }
 
     // Factory name filter
     if (filters.factoryName) {
@@ -596,11 +596,13 @@ const processImageToBase64 = async (imagePath) => {
       filtered = filtered.filter(item => item.washType === filters.washType);
     }
 
+    // Before/After wash filter
     if (filters.before_after_wash) {
       filtered = filtered.filter(item => item.before_after_wash === filters.before_after_wash);
     }
 
     setFilteredData(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
   };
 
   // Handle filter changes
@@ -617,6 +619,34 @@ const processImageToBase64 = async (imagePath) => {
   useEffect(() => {
     setFilteredData(submittedData);
   }, [submittedData]);
+
+  // Update paginated data when filtered data or current page changes
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedData(filteredData.slice(startIndex, endIndex));
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage + 1;
+  const endIndex = Math.min(currentPage * itemsPerPage, filteredData.length);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -650,7 +680,7 @@ const processImageToBase64 = async (imagePath) => {
     <div className="space-y-6">
       {/* Filter Component */}
       <SubmittedWashingDataFilter
-        data={submittedData}
+        data={filteredData.length > 0 ? filteredData : submittedData}
         onFilterChange={handleFilterChange}
         onReset={handleFilterReset}
         isVisible={filterVisible}
@@ -685,7 +715,7 @@ const processImageToBase64 = async (imagePath) => {
               </label>
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {filteredData.length} of {submittedData.length} records
+              Showing {startIndex}-{endIndex} of {filteredData.length} records
             </div>
           </div>
         </div>
@@ -714,11 +744,14 @@ const processImageToBase64 = async (imagePath) => {
                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                    Factory
                   </th>
-                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                    Buyer
-                  </th>
+                  </th> */}
                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                   Wash Type
+                  </th>
+                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                 Report Type
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     MO No
@@ -732,11 +765,14 @@ const processImageToBase64 = async (imagePath) => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Total Order Qty
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Color Order Qty
-                  </th>
+                  </th> */}
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                    Wash Qty
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   Checked Qty
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
                    Before/After Wash
@@ -745,7 +781,7 @@ const processImageToBase64 = async (imagePath) => {
                     Status
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Pass Rate (%)
+                    Defect Rate (%)
                   </th>
                   {showDefectColumn && (
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
@@ -764,6 +800,8 @@ const processImageToBase64 = async (imagePath) => {
                 {/* Sub-header row for complex columns */}
                 <tr className="bg-gray-100 dark:bg-gray-600">
                   <th className="px-3 py-2"></th>
+                  {/* <th className="px-3 py-2"></th> */}
+                  {/* <th className="px-3 py-2"></th> */}
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
@@ -799,7 +837,7 @@ const processImageToBase64 = async (imagePath) => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredData.map((record, index) => {
+                {paginatedData.map((record, index) => {
                   const defectDetails = getDefectDetails(record);
                   const measurementDetails = getMeasurementDetails(record);
                   
@@ -811,11 +849,14 @@ const processImageToBase64 = async (imagePath) => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.factoryName || 'N/A'}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
+                      {/* <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.buyer || 'N/A'}
+                      </td> */}
+                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {record.washType || 'N/A'}
                       </td>
                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {record.before_after_wash || 'N/A'}
+                        {record.reportType || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.orderNo || 'N/A'}
@@ -829,11 +870,14 @@ const processImageToBase64 = async (imagePath) => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.orderQty || 'N/A'}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                      {/* <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.colorOrderQty || 'N/A'}
-                      </td>
+                      </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.washQty || 'N/A'}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                        {record.checkedQty || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.before_after_wash || 'N/A'}
@@ -944,6 +988,61 @@ const processImageToBase64 = async (imagePath) => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+        
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+              Showing {startIndex} to {endIndex} of {filteredData.length} results
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-3 py-1 text-sm border rounded-md ${
+                        currentPage === pageNum
+                          ? 'bg-indigo-600 text-white border-indigo-600'
+                          : 'border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
