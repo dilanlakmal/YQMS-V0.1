@@ -1628,6 +1628,16 @@ const getImageUrl = (imagePath) => {
                                         return within;
                                       })();
                                       
+                                      const beforeOutOf = (() => {
+                                        let outOf = 0;
+                                        beforeSizeData?.pcs?.forEach(pc => {
+                                          pc.measurementPoints?.forEach(mp => {
+                                            if (mp.result === 'fail') outOf++;
+                                          });
+                                        });
+                                        return outOf;
+                                      })();
+                                      
                                       const afterWithin = (() => {
                                         let within = 0;
                                         afterSizeData?.pcs?.forEach(pc => {
@@ -1638,13 +1648,27 @@ const getImageUrl = (imagePath) => {
                                         return within;
                                       })();
                                       
-                                      const change = afterWithin - beforeWithin;
-                                      const changeColor = change > 0 ? 'text-green-600 dark:text-green-400' : change < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400';
-                                      const changeSymbol = change > 0 ? '+' : '';
+                                      const afterOutOf = (() => {
+                                        let outOf = 0;
+                                        afterSizeData?.pcs?.forEach(pc => {
+                                          pc.measurementPoints?.forEach(mp => {
+                                            if (mp.result === 'fail') outOf++;
+                                          });
+                                        });
+                                        return outOf;
+                                      })();
+                                      
+                                      const withinChange = afterWithin - beforeWithin;
+                                      const outOfChange = afterOutOf - beforeOutOf;
                                       
                                       return (
-                                        <div className={changeColor}>
-                                          {changeSymbol}{change} Points
+                                        <div className="flex justify-between">
+                                          <span className={withinChange > 0 ? 'text-green-600 dark:text-green-400' : withinChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}>
+                                            Within: {withinChange > 0 ? '+' : ''}{withinChange}
+                                          </span>
+                                          <span className={outOfChange < 0 ? 'text-green-600 dark:text-green-400' : outOfChange > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}>
+                                            Out of: {outOfChange > 0 ? '+' : ''}{outOfChange}
+                                          </span>
                                         </div>
                                       );
                                     })()}
