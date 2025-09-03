@@ -10,6 +10,7 @@ import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
+import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
@@ -189,10 +190,14 @@ function calculateSummaryData(currentFormData) {
       : 0;
 
   // 5. Result logic
-  let overallResult = "Pass";
+  let overallResult = "Pending";
   const measurementOverallResult =
-    measurementPoints - measurementPass > 0 ? "Fail" : "Pass";
-  const defectOverallResult = currentDefectDetails?.result || "N/A";
+    measurementPoints === 0
+      ? "Pending"
+      : measurementPoints - measurementPass > 0
+      ? "Fail"
+      : "Pass";
+  const defectOverallResult = currentDefectDetails?.result || "Pending";
 
   if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
     overallResult = "Fail";
@@ -202,7 +207,7 @@ function calculateSummaryData(currentFormData) {
   ) {
     overallResult = "Pass";
   } else {
-    overallResult = "N/A";
+    overallResult = "Pending";
   }
 
   return {
@@ -211,7 +216,7 @@ function calculateSummaryData(currentFormData) {
     totalDefectCount: defectCount || 0,
     defectRate,
     defectRatio,
-    overallFinalResult: overallResult || "N/A",
+    overallFinalResult: overallResult || "Pending",
     overallResult,
     // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
@@ -304,7 +309,7 @@ const QCWashingPage = () => {
     totalDefectCount: 0,
     defectRate: 0,
     defectRatio: 0,
-    overallFinalResult: "N/A"
+    overallFinalResult: "Pending"
   });
 
   // State: Data Lists
@@ -583,6 +588,14 @@ const QCWashingPage = () => {
         formData.reportType === "First Output") &&
       aql?.acceptedDefect
     ) {
+      const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
+      if (defectCheckedQty === 0) {
+        if (formData.result !== "") {
+          setFormData((prev) => ({ ...prev, result: "" }));
+        }
+        return;
+      }
+
       const totalDefects = Object.values(defectsByPc)
         .flat()
         .reduce(
@@ -608,7 +621,8 @@ const QCWashingPage = () => {
     formData.inline,
     formData.reportType,
     formData.firstOutput,
-    formData.result
+    formData.result,
+    formData.checkedQty
   ]);
 
   useEffect(() => {
@@ -1552,17 +1566,29 @@ const QCWashingPage = () => {
           ? "beforeWash"
           : "afterWash";
 
+      // Check if this size+kvalue combination already exists
+      const currentArray = measurementData[before_after_wash] || [];
+      const existingRecord = currentArray.find(
+        (item) =>
+          item.size === transformedSizeData.size &&
+          item.kvalue === transformedSizeData.kvalue
+      );
+
       // 1. Update local measurement data and saved sizes
       setMeasurementData((prev) => {
         const currentArray = prev[before_after_wash];
         const existingIndex = currentArray.findIndex(
-          (item) => item.size === transformedSizeData.size
+          (item) =>
+            item.size === transformedSizeData.size &&
+            item.kvalue === transformedSizeData.kvalue
         );
         if (existingIndex >= 0) {
+          // Update existing record
           const updated = [...currentArray];
           updated[existingIndex] = transformedSizeData;
           return { ...prev, [before_after_wash]: updated };
         } else {
+          // Add new record
           return {
             ...prev,
             [before_after_wash]: [...currentArray, transformedSizeData]
@@ -1592,7 +1618,11 @@ const QCWashingPage = () => {
         return;
       }
 
-      const measurementDetail = { ...transformedSizeData, before_after_wash };
+      const measurementDetail = {
+        ...transformedSizeData,
+        before_after_wash,
+        isUpdate: !!existingRecord // Flag to indicate if this is an update
+      };
 
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/measurement-save`,
@@ -1609,7 +1639,8 @@ const QCWashingPage = () => {
       const result = await response.json();
 
       if (result.success) {
-        Swal.fire("Success", `Size data saved to database!`, "success");
+        const action = existingRecord ? "updated" : "saved";
+        Swal.fire("Success", `Size data ${action} to database!`, "success");
       } else {
         Swal.fire(
           "Error",
@@ -1624,20 +1655,40 @@ const QCWashingPage = () => {
   };
 
   // Handle measurement data edit
-  const handleMeasurementEdit = (size = null) => {
+  const handleMeasurementEdit = (size = null, kvalue = null) => {
     setShowMeasurementTable(true);
     if (size) {
-      setSavedSizes((prev) => prev.filter((s) => s !== size));
       const before_after_wash =
         formData.before_after_wash === "Before Wash"
           ? "beforeWash"
           : "afterWash";
-      setMeasurementData((prev) => ({
-        ...prev,
-        [before_after_wash]: prev[before_after_wash].filter(
-          (item) => item.size !== size
-        )
-      }));
+
+      if (kvalue) {
+        // Remove specific size+kvalue combination
+        setMeasurementData((prev) => ({
+          ...prev,
+          [before_after_wash]: prev[before_after_wash].filter(
+            (item) => !(item.size === size && item.kvalue === kvalue)
+          )
+        }));
+
+        // Only remove from savedSizes if no other k-values exist for this size
+        const remainingRecords = measurementData[before_after_wash].filter(
+          (item) => item.size === size && item.kvalue !== kvalue
+        );
+        if (remainingRecords.length === 0) {
+          setSavedSizes((prev) => prev.filter((s) => s !== size));
+        }
+      } else {
+        // Remove all records for this size (legacy behavior)
+        setSavedSizes((prev) => prev.filter((s) => s !== size));
+        setMeasurementData((prev) => ({
+          ...prev,
+          [before_after_wash]: prev[before_after_wash].filter(
+            (item) => item.size !== size
+          )
+        }));
+      }
     }
   };
 
@@ -1775,7 +1826,7 @@ const QCWashingPage = () => {
       totalDefectCount: 0,
       defectRate: 0,
       defectRatio: 0,
-      overallFinalResult: "N/A"
+      overallFinalResult: "Pending"
     });
 
     // Reset all other states
@@ -2240,6 +2291,17 @@ const QCWashingPage = () => {
           >
             New Inspection
           </button>
+          {/* <button
+            onClick={() => handleTabChange("subConEditQty")}
+            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
+                          ${
+                            activeTab === "subConEditQty"
+                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
+                          }`}
+          >
+            Sub_Con Edit
+          </button> */}
           <button
             onClick={() => handleTabChange("submittedData")}
             className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
@@ -2256,7 +2318,7 @@ const QCWashingPage = () => {
 
       <main
         className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-          activeTab === "submittedData"
+          activeTab === "submittedData" || activeTab === "subConEditQty"
             ? "max-w-none px-2 sm:px-4 lg:px-6"
             : "max-w-7xl px-4 sm:px-6 lg:px-8"
         }`}
@@ -2616,6 +2678,7 @@ const QCWashingPage = () => {
         )}
 
         {activeTab === "submittedData" && <SubmittedWashingDataPage />}
+        {/* {activeTab === "subConEditQty" && <SubConEdit />} */}
       </main>
     </div>
   );
