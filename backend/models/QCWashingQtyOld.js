@@ -38,8 +38,6 @@ const qcWashingQtyOldSchema = new mongoose.Schema(
     timestamps: true
   }
 );
-
-// Updated index - removed QC_ID since it's now in the Workers array
 qcWashingQtyOldSchema.index(
   {
     Inspection_date: 1,
