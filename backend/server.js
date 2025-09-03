@@ -27278,27 +27278,42 @@ app.get("/api/qc-washing/submitted/:id", async (req, res) => {
 });
 
 app.get("/api/qc-washing/comparison", async (req, res) => {
-  const { orderNo, color, washType, reportType, factory, before_after_wash } =
-    req.query;
+   try {
+    const { orderNo, color, washType, reportType, factory, before_after_wash } =
+      req.query;
 
-  const filter = {
-    orderNo,
-    color,
-    washType,
-    reportType,
-    factoryName: factory,
-    before_after_wash: before_after_wash || "Before Wash"
-  };
+    const baseFilter = {
+      orderNo,
+      color,
+      washType,
+      factoryName: factory,
+      before_after_wash: before_after_wash || "Before Wash",
+    };
 
-  const comparisonRecord = await QCWashing.findOne(filter);
-  res.json(comparisonRecord);
+    let comparisonRecord = null;
+
+    // 1. Try to find a record with the same reportType first to get the most relevant match.
+    if (reportType) {
+      comparisonRecord = await QCWashing.findOne({ ...baseFilter, reportType }).sort({ createdAt: -1 });
+    }
+
+    // 2. If not found, try finding a record without matching the reportType.
+    // This handles cases where an 'After Wash' (e.g., First Output) needs to be compared with a 'Before Wash' (e.g., Inline).
+    if (!comparisonRecord) {
+      comparisonRecord = await QCWashing.findOne(baseFilter).sort({ createdAt: -1 });
+    }
+
+    res.json(comparisonRecord);
+  } catch (error) {
+    console.error("Error fetching comparison data for QC Washing:", error);
+    res.status(500).json({ error: "Failed to fetch comparison data", details: error.message });
+  }
 });
 
 
 app.get("/api/qc-washing/results", async (req, res) => {
   try {
     const { orderNo, color, washType, reportType, factory } = req.query;
-
     const query = {};
     if (orderNo) query.orderNo = orderNo;
     if (color) query.color = color;

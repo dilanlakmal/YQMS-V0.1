@@ -791,7 +791,7 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData, API_BASE_URL
       <Text style={styles.sectionTitle}>Before vs After Wash Comparison</Text>
       <View style={{ marginBottom: 10 }}>
         <Text style={{ fontSize: 8, color: "#6b7280" }}>
-          Before: {secondaryData.before_after_wash} | After: {primaryData.before_after_wash}
+          Before: {secondaryData.before_after_wash} ({secondaryData.reportType || 'N/A'}) | After: {primaryData.before_after_wash} ({primaryData.reportType || 'N/A'})
         </Text>
       </View>
       

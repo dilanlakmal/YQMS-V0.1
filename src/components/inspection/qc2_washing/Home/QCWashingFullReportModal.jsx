@@ -35,79 +35,87 @@ const getImageUrl = (imagePath) => {
 
 // Fetch comparison data (opposite wash type measurements)
   const fetchComparisonData = async (orderNo, color, washType, reportType, factory, currentWashType) => {
-    setIsLoadingComparison(true);
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/qc-washing/results`, {
-        params: {
-          orderNo,
-          color,
-          washType,
-          reportType,
-          factory
-        }
-      });
-      
-      // Find the opposite wash record based on current record type
-      const targetWashType = currentWashType === 'Before Wash' ? 'After Wash' : 'Before Wash';
-      const comparisonRecord = response.data.find(record => 
-        record.orderNo === orderNo &&
-        record.color === color &&
-        record.washType === washType &&
-        record.reportType === reportType &&
-        record.factoryName === factory &&
-        record.before_after_wash === targetWashType
-      );
-      
-      
-      setComparisonData(comparisonRecord);
-    } catch (error) {
-      console.error('Error fetching comparison data:', error);
-      setComparisonData(null);
-    } finally {
-      setIsLoadingComparison(false);
-    }
-  };
+  setIsLoadingComparison(true);
+  console.log('Fetching comparison data for:', { orderNo, color, washType, reportType, factory, currentWashType });
+  
+  try {
+    const response = await axios.get(`${API_BASE_URL}/api/qc-washing/results`, {
+      params: {
+        orderNo,
+        color,
+        washType,
+        reportType,
+        factory
+      }
+    });
+    
+    console.log('All records found:', response.data);
+    
+    // Find the opposite wash record based on current record type
+    const targetWashType = currentWashType === 'Before Wash' ? 'After Wash' : 'Before Wash';
+    const comparisonRecord = response.data.find(record => 
+      record.orderNo === orderNo &&
+      record.color === color &&
+      record.washType === washType &&
+      record.reportType === reportType &&
+      record.factoryName === factory &&
+      record.before_after_wash === targetWashType
+    );
+    
+    console.log('Target wash type:', targetWashType);
+    console.log('Comparison record found:', comparisonRecord);
+    
+    setComparisonData(comparisonRecord);
+  } catch (error) {
+    console.error('Error fetching comparison data:', error);
+    setComparisonData(null);
+  } finally {
+    setIsLoadingComparison(false);
+  }
+};
 
   useEffect(() => {
-    if (isOpen && recordData) {
-      // Transform the existing record data to match expected format
-      const transformedData = {
-        ...recordData,
-        colorName: recordData.color,
-        formData: {
-          result: recordData.overallFinalResult,
-          remarks: recordData.defectDetails?.comment || "",
-          measurements: recordData.measurementDetails?.measurement || []
-        }
-      };
-      setReportData(transformedData);
-      
-      // Extract available K-values and set default selection
-      if (recordData.measurementDetails?.measurement) {
-        const kValues = recordData.measurementDetails.measurement.map(size => size.kvalue).filter(Boolean);
-        const uniqueKValues = [...new Set(kValues)];
-        setAvailableKValues(uniqueKValues);
-        setSelectedKValue(uniqueKValues[0] || null);
+  if (isOpen && recordData) {
+    // Transform the existing record data to match expected format
+    const transformedData = {
+      ...recordData,
+      colorName: recordData.color,
+      formData: {
+        result: recordData.overallFinalResult,
+        remarks: recordData.defectDetails?.comment || "",
+        measurements: recordData.measurementDetails?.measurement || []
       }
-      
-      // Fetch comparison data if measurement data exists for both Before and After wash records
-      if (recordData.measurementDetails?.measurement && 
-          recordData.measurementDetails.measurement.length > 0 &&
-          (recordData.before_after_wash === 'After Wash' || recordData.before_after_wash === 'Before Wash')) {
-        fetchComparisonData(
-          recordData.orderNo,
-          recordData.color,
-          recordData.washType,
-          recordData.reportType,
-          recordData.factoryName,
-          recordData.before_after_wash // Pass current wash type
-        );
-      } else {
-        // Clear comparison data if no measurements
-        setComparisonData(null);
-      }
+    };
+    setReportData(transformedData);
+    
+    // Extract available K-values and set default selection
+    if (recordData.measurementDetails?.measurement) {
+      const kValues = recordData.measurementDetails.measurement.map(size => size.kvalue).filter(Boolean);
+      const uniqueKValues = [...new Set(kValues)];
+      setAvailableKValues(uniqueKValues);
+      setSelectedKValue(uniqueKValues[0] || null);
     }
-  }, [isOpen, recordData]);
+    
+    // Fetch comparison data if measurement data exists for both Before and After wash records
+    // UPDATED: Remove the reportType restriction - fetch for both "Inline" and "First Output"
+    if (recordData.measurementDetails?.measurement && 
+        recordData.measurementDetails.measurement.length > 0 &&
+        (recordData.before_after_wash === 'After Wash' || recordData.before_after_wash === 'Before Wash')) {
+      fetchComparisonData(
+        recordData.orderNo,
+        recordData.color,
+        recordData.washType,
+        recordData.reportType, // Keep the same report type for comparison
+        recordData.factoryName,
+        recordData.before_after_wash // Pass current wash type
+      );
+    } else {
+      // Clear comparison data if no measurements
+      setComparisonData(null);
+    }
+  }
+}, [isOpen, recordData]);
+
 
   if (!isOpen) return null;
 
@@ -1303,9 +1311,9 @@ const getImageUrl = (imagePath) => {
 
              {/* Before vs After Wash Comparison */}
               {((reportData.before_after_wash === 'After Wash' || reportData.before_after_wash === 'Before Wash') && 
-                comparisonData && 
-                comparisonData.measurementDetails?.measurement && 
-                comparisonData.measurementDetails.measurement.length > 0) && (
+                  comparisonData && 
+                  comparisonData.measurementDetails?.measurement && 
+                  comparisonData.measurementDetails.measurement.length > 0) && (
                   <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
