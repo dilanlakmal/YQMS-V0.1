@@ -251,7 +251,7 @@ const SubConQCReport = () => {
     menu: (base) => ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
-      zIndex: 50
+      zIndex: 9999
     }),
     option: (base, { isFocused, isSelected }) => ({
       ...base,
@@ -293,6 +293,7 @@ const SubConQCReport = () => {
               onChange={(date) => handleFilterChange("startDate", date)}
               maxDate={filters.endDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              popperClassName="z-[9999]"
             />
           </div>
           <div className="flex-shrink-0">
@@ -302,6 +303,7 @@ const SubConQCReport = () => {
               onChange={(date) => handleFilterChange("endDate", date)}
               minDate={filters.startDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              popperClassName="z-[9999]"
             />
           </div>
           <div className="flex-1 min-w-[150px]">
