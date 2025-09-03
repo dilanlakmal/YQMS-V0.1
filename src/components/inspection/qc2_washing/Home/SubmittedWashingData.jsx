@@ -76,97 +76,168 @@ const handleCloseFullReport = () => {
   });
 }
 
-  // Function to fetch wash qty from qc_washing_qty_old collection
-  const fetchWashQty = async (record) => {
+// Function to fetch wash qty from qc_washing_qty_old collection
+const fetchWashQty = async (record) => {
+  try {
+    console.log('Processing record:', {
+      reportType: record.reportType,
+      originalWashQty: record.washQty,
+      orderNo: record.orderNo,
+      color: record.color
+    });
+
+    // If report type is "First output", always use original wash qty and mark as green
+    if (record.reportType === 'First output') {
+      const washQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
+      console.log('First output - using original washQty:', washQty);
+      return {
+        washQty: washQty,
+        fromOldCollection: true, // This ensures it displays in green
+        isFirstOutput: true
+      };
+    }
+
+    // For other report types, try to fetch from qc_washing_qty_old collection
+    const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
+    
+    console.log('Fetching from API with params:', {
+      date: dateStr,
+      color: record.color,
+      orderNo: record.orderNo,
+      qcId: record.userId
+    });
+
+    const response = await fetch(
+      `${API_BASE_URL}/api/qc-washing/wash-qty?date=${dateStr}&color=${encodeURIComponent(record.color)}&orderNo=${encodeURIComponent(record.orderNo)}&qcId=${encodeURIComponent(record.userId)}`
+    );
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('API response:', data);
+      
+      // Only use the value from old collection if it's greater than 0
+      if (data.success && data.washQty !== undefined && data.washQty !== null && data.washQty > 0) {
+        console.log('Found valid wash qty in old collection:', data.washQty);
+        return {
+          washQty: data.washQty,
+          fromOldCollection: true,
+          isFirstOutput: false
+        };
+      } else {
+        console.log('Old collection returned 0 or invalid value, using original washQty');
+      }
+    }
+    
+    // If not found in old collection OR the value is 0, use the original washQty from qcWashing collection
+    const fallbackWashQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
+    console.log('Using fallback washQty from qcWashing collection:', fallbackWashQty);
+    
+    return {
+      washQty: fallbackWashQty,
+      fromOldCollection: false,
+      isFirstOutput: false
+    };
+  } catch (error) {
+    console.error('Error fetching wash qty:', error);
+    const errorFallbackWashQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
+    console.log('Error fallback washQty:', errorFallbackWashQty);
+    
+    return {
+      washQty: errorFallbackWashQty,
+      fromOldCollection: false,
+      isFirstOutput: false
+    };
+  }
+};
+
+// Update the data fetching logic
+useEffect(() => {
+  const fetchSubmittedData = async () => {
     try {
-      const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
+      setIsLoading(true);
+      setError(null);
       
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/wash-qty?date=${dateStr}&color=${encodeURIComponent(record.color)}&orderNo=${encodeURIComponent(record.orderNo)}&qcId=${encodeURIComponent(record.userId)}`
+        `${API_BASE_URL}/api/qc-washing/all-submitted`
       );
       
-      if (response.ok) {
-        const data = await response.json();
-        return {
-          washQty: data.success ? data.washQty : record.washQty || 0,
-          fromOldCollection: data.success
-        };
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError("Report feature is not yet implemented on the server.");
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return;
       }
-      return {
-        washQty: record.washQty || 0,
-        fromOldCollection: false
-      };
-    } catch (error) {
-      console.error('Error fetching wash qty:', error);
-      return {
-        washQty: record.washQty || 0,
-        fromOldCollection: false
-      };
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        const records = data.data || [];
+        console.log('Original records count:', records.length);
+        console.log('Original washQty values:', records.map(r => ({ 
+          orderNo: r.orderNo, 
+          washQty: r.washQty,
+          washQtyType: typeof r.washQty,
+          reportType: r.reportType
+        })));
+        
+        // Fetch wash qty for each record
+        const recordsWithWashQty = await Promise.all(
+          records.map(async (record, index) => {
+            console.log(`Processing record ${index + 1}:`, {
+              orderNo: record.orderNo,
+              color: record.color,
+              reportType: record.reportType,
+              originalWashQty: record.washQty
+            });
+            
+            // Store original wash qty before API call
+            const originalWashQty = record.washQty;
+            const washQtyData = await fetchWashQty(record);
+            
+            const processedRecord = { 
+              ...record, 
+              originalWashQty: originalWashQty, // Keep original for reference
+              washQty: washQtyData.washQty,
+              washQtyFromOldCollection: washQtyData.fromOldCollection,
+              isFirstOutput: washQtyData.isFirstOutput || record.reportType === 'First output'
+            };
+            
+            console.log(`Processed record ${index + 1}:`, {
+              orderNo: processedRecord.orderNo,
+              finalWashQty: processedRecord.washQty,
+              fromOldCollection: processedRecord.washQtyFromOldCollection,
+              isFirstOutput: processedRecord.isFirstOutput,
+              reportType: processedRecord.reportType
+            });
+            
+            return processedRecord;
+          })
+        );
+        
+        console.log('Final processed records:', recordsWithWashQty.length);
+        setSubmittedData(recordsWithWashQty); 
+      } else {
+        setError(data.message || "Failed to fetch submitted data.");
+      }
+    } catch (err) {
+      console.error('Fetch error:', err);
+      if (err.message.includes('404')) {
+        setError("Report feature is not yet implemented on the server.");
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError("Could not connect to server. Please check your connection.");
+      } else {
+        setError(`Error: ${err.message}`);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Fetch data on component mount
-  useEffect(() => {
-    const fetchSubmittedData = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/all-submitted`
-        );
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            setError("Report feature is not yet implemented on the server.");
-          } else {
-            throw new Error(`HTTP error! status: ${response.status}`);
-          }
-          return;
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-          const records = data.data || [];
-          
-          // Fetch wash qty for each record that meets the criteria
-          const recordsWithWashQty = await Promise.all(
-            records.map(async (record) => {
-              // Only fetch wash qty for inline reports from YM factory with normal wash type
-              if (record.reportType === 'Inline' && 
-                  record.factoryName === 'YM' && 
-                  record.washType === 'Normal Wash') {
-                const washQtyData = await fetchWashQty(record);
-                return { 
-                  ...record, 
-                  washQty: washQtyData.washQty,
-                  washQtyFromOldCollection: washQtyData.fromOldCollection
-                };
-              }
-              return record;
-            })
-          );
-          
-          setSubmittedData(recordsWithWashQty); 
-        } else {
-          setError(data.message || "Failed to fetch submitted data.");
-        }
-      } catch (err) {
-        if (err.message.includes('404')) {
-          setError("Report feature is not yet implemented on the server.");
-        } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-          setError("Could not connect to server. Please check your connection.");
-        } else {
-          setError(`Error: ${err.message}`);
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  fetchSubmittedData();
+}, []);
 
-    fetchSubmittedData();
-  }, []);
 
   // Helper function to extract defect details
   const getDefectDetails = (record) => {
@@ -924,11 +995,11 @@ const processImageToBase64 = async (imagePath) => {
                       </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         <span className={`${
-                          record.washQtyFromOldCollection || record.reportType === 'First Output'
+                          record.reportType === 'First Output' || record.washQtyFromOldCollection
                             ? 'text-green-600 font-medium' 
                             : 'text-gray-400'
                         }`}>
-                          {record.washQty || 'N/A'}
+                          {record.washQty !== undefined && record.washQty !== null ? record.washQty : 'N/A'}
                         </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
