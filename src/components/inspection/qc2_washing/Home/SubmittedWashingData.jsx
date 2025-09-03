@@ -76,6 +76,35 @@ const handleCloseFullReport = () => {
   });
 }
 
+  // Function to fetch wash qty from qc_washing_qty_old collection
+  const fetchWashQty = async (record) => {
+    try {
+      const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
+      
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/wash-qty?date=${dateStr}&color=${encodeURIComponent(record.color)}&orderNo=${encodeURIComponent(record.orderNo)}&qcId=${encodeURIComponent(record.userId)}`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          washQty: data.success ? data.washQty : record.washQty || 0,
+          fromOldCollection: data.success
+        };
+      }
+      return {
+        washQty: record.washQty || 0,
+        fromOldCollection: false
+      };
+    } catch (error) {
+      console.error('Error fetching wash qty:', error);
+      return {
+        washQty: record.washQty || 0,
+        fromOldCollection: false
+      };
+    }
+  };
+
   // Fetch data on component mount
   useEffect(() => {
     const fetchSubmittedData = async () => {
@@ -99,7 +128,27 @@ const handleCloseFullReport = () => {
         const data = await response.json();
         
         if (data.success) {
-          setSubmittedData(data.data || []); 
+          const records = data.data || [];
+          
+          // Fetch wash qty for each record that meets the criteria
+          const recordsWithWashQty = await Promise.all(
+            records.map(async (record) => {
+              // Only fetch wash qty for inline reports from YM factory with normal wash type
+              if (record.reportType === 'Inline' && 
+                  record.factoryName === 'YM' && 
+                  record.washType === 'Normal Wash') {
+                const washQtyData = await fetchWashQty(record);
+                return { 
+                  ...record, 
+                  washQty: washQtyData.washQty,
+                  washQtyFromOldCollection: washQtyData.fromOldCollection
+                };
+              }
+              return record;
+            })
+          );
+          
+          setSubmittedData(recordsWithWashQty); 
         } else {
           setError(data.message || "Failed to fetch submitted data.");
         }
@@ -874,7 +923,13 @@ const processImageToBase64 = async (imagePath) => {
                         {record.colorOrderQty || 'N/A'}
                       </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.washQty || 'N/A'}
+                        <span className={`${
+                          record.washQtyFromOldCollection || record.reportType === 'First Output'
+                            ? 'text-green-600 font-medium' 
+                            : 'text-gray-400'
+                        }`}>
+                          {record.washQty || 'N/A'}
+                        </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.checkedQty || 'N/A'}

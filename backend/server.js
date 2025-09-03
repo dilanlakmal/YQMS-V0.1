@@ -283,6 +283,340 @@ const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
 const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
+/* ------------------------------
+   End Points - QC Washing Qty Old
+------------------------------ */
+
+// Endpoint to fetch wash qty from qc_washing_qty_old collection
+app.get("/api/qc-washing/wash-qty", async (req, res) => {
+  try {
+    const { date, color, orderNo, qcId } = req.query;
+    
+    console.log('Wash qty request params:', { date, color, orderNo, qcId });
+    console.log('Normalized factoryName check: YM, washType check: Normal Wash, reportType check: Inline');
+    
+    if (!date || !color || !orderNo || !qcId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing required parameters: date, color, orderNo, qcId" 
+      });
+    }
+
+    // Parse the date to match the format in the database
+    const inspectionDate = new Date(date);
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    console.log('Date range:', { startOfDay, endOfDay });
+    console.log('Searching for color:', color);
+    console.log('Will try English extraction if exact match fails');
+    
+    // Find the record matching date, color, and orderNo (style_no)
+    // Try exact match first, then partial match for color
+    let washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
+      Style_No: orderNo,
+      Color: color
+    });
+    
+    // If no exact match, try English-only matching by fetching candidates and filtering
+    if (!washQtyRecord) {
+      const candidates = await QCWashingQtyOld.find({
+        Inspection_date: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        },
+        Style_No: orderNo
+      });
+      
+      // Extract English part from brackets and match
+      washQtyRecord = candidates.find(record => {
+        const dbColor = record.Color;
+        // Extract text between [ and ]
+        const match = dbColor.match(/\[([^\]]+)\]/);
+        const englishPart = match ? match[1] : dbColor;
+        return englishPart.toLowerCase() === color.toLowerCase();
+      });
+    }
+
+    console.log('Found wash qty record:', washQtyRecord ? 'Yes' : 'No');
+    if (washQtyRecord) {
+      console.log('Matched color in DB:', washQtyRecord.Color);
+      console.log('Available workers:', washQtyRecord.WorkerWashQty.map(w => w.QC_ID));
+    }
+
+    if (!washQtyRecord) {
+      return res.json({ 
+        success: false, 
+        washQty: 0, 
+        message: "No wash qty record found",
+        searchCriteria: { date: startOfDay, orderNo, color }
+      });
+    }
+
+    // Find the specific QC worker's wash qty
+    const workerWashQty = washQtyRecord.WorkerWashQty.find(
+      worker => worker.QC_ID === qcId
+    );
+
+    console.log('Worker wash qty found:', workerWashQty ? 'Yes' : 'No');
+    if (washQtyRecord) {
+      console.log('All available QC_IDs:', washQtyRecord.WorkerWashQty.map(w => w.QC_ID));
+      console.log('Looking for QC_ID:', qcId);
+    }
+
+    const washQty = workerWashQty ? workerWashQty.Wash_Qty : 0;
+
+    res.json({ 
+      success: true, 
+      washQty,
+      totalWashQty: washQtyRecord.Total_Wash_Qty,
+      workerFound: !!workerWashQty
+    });
+
+  } catch (error) {
+    console.error("Error fetching wash qty:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch wash qty", 
+      error: error.message 
+    });
+  }
+});
+
+// Test endpoint to check QCWashingQtyOld collection structure
+app.get("/api/qc-washing/test-wash-qty", async (req, res) => {
+  try {
+    const sampleRecord = await QCWashingQtyOld.findOne().limit(1);
+    const totalCount = await QCWashingQtyOld.countDocuments();
+    
+    // Get some recent records for testing
+    const recentRecords = await QCWashingQtyOld.find()
+      .sort({ Inspection_date: -1 })
+      .limit(5)
+      .select('Inspection_date Style_No Color Total_Wash_Qty WorkerWashQty');
+    
+    res.json({ 
+      success: true, 
+      totalRecords: totalCount,
+      sampleRecord: sampleRecord,
+      recentRecords: recentRecords,
+      message: "QCWashingQtyOld collection test successful"
+    });
+
+  } catch (error) {
+    console.error("Error testing QCWashingQtyOld collection:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to test collection", 
+      error: error.message 
+    });
+  }
+});
+
+// Test endpoint to verify specific record matching
+app.get("/api/qc-washing/test-specific-match", async (req, res) => {
+  try {
+    const testDate = '2025-08-23';
+    const testOrderNo = 'GPAF6018';
+    const testColor = '500 EGGPLANT';
+    const testQcId = 'YM6926';
+    
+    const inspectionDate = new Date(testDate);
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Try exact match first
+    let washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
+      Style_No: testOrderNo,
+      Color: testColor
+    });
+    
+    // If no exact match, try English extraction
+    if (!washQtyRecord) {
+      const candidates = await QCWashingQtyOld.find({
+        Inspection_date: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        },
+        Style_No: testOrderNo
+      });
+      
+      washQtyRecord = candidates.find(record => {
+        const dbColor = record.Color;
+        const match = dbColor.match(/\[([^\]]+)\]/);
+        const englishPart = match ? match[1] : dbColor;
+        return englishPart.toLowerCase() === testColor.toLowerCase();
+      });
+    }
+    
+    let result = {
+      testParams: { testDate, testOrderNo, testColor, testQcId },
+      dateRange: { startOfDay, endOfDay },
+      recordFound: !!washQtyRecord,
+      washQty: 0,
+      workerFound: false
+    };
+    
+    if (washQtyRecord) {
+      const workerWashQty = washQtyRecord.WorkerWashQty.find(
+        worker => worker.QC_ID === testQcId
+      );
+      
+      result.recordDetails = {
+        dbColor: washQtyRecord.Color,
+        dbStyleNo: washQtyRecord.Style_No,
+        dbDate: washQtyRecord.Inspection_date,
+        totalWashQty: washQtyRecord.Total_Wash_Qty,
+        availableWorkers: washQtyRecord.WorkerWashQty.map(w => ({ id: w.QC_ID, qty: w.Wash_Qty }))
+      };
+      
+      if (workerWashQty) {
+        result.washQty = workerWashQty.Wash_Qty;
+        result.workerFound = true;
+      }
+    }
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error("Error in test endpoint:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Test failed", 
+      error: error.message 
+    });
+  }
+});
+
+// Debug endpoint to search wash qty records with flexible criteria
+app.get("/api/qc-washing/search-wash-qty", async (req, res) => {
+  try {
+    const { orderNo, color, qcId, dateFrom, dateTo } = req.query;
+    
+    let query = {};
+    
+    if (orderNo) {
+      query.Style_No = { $regex: orderNo, $options: 'i' };
+    }
+    
+    if (color) {
+      query.Color = { $regex: color, $options: 'i' };
+    }
+    
+    if (dateFrom || dateTo) {
+      query.Inspection_date = {};
+      if (dateFrom) {
+        query.Inspection_date.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        query.Inspection_date.$lte = new Date(dateTo);
+      }
+    }
+    
+    const records = await QCWashingQtyOld.find(query)
+      .sort({ Inspection_date: -1 })
+      .limit(10);
+    
+    // If qcId is provided, filter worker data
+    let filteredRecords = records;
+    if (qcId) {
+      filteredRecords = records.map(record => {
+        const workerData = record.WorkerWashQty.find(w => w.QC_ID === qcId);
+        return {
+          ...record.toObject(),
+          matchingWorker: workerData || null,
+          hasMatchingWorker: !!workerData
+        };
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      records: filteredRecords,
+      count: filteredRecords.length,
+      searchCriteria: { orderNo, color, qcId, dateFrom, dateTo }
+    });
+
+  } catch (error) {
+    console.error("Error searching wash qty records:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to search wash qty records", 
+      error: error.message 
+    });
+  }
+});
+
+// Endpoint to update wash qty for a specific record
+app.put("/api/qc-washing/update-wash-qty/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { washQty } = req.body;
+
+    const updatedRecord = await QCWashing.findByIdAndUpdate(
+      id,
+      { washQty: parseInt(washQty) || 0 },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Record not found" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: updatedRecord,
+      message: "Wash qty updated successfully"
+    });
+
+  } catch (error) {
+    console.error("Error updating wash qty:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to update wash qty", 
+      error: error.message 
+    });
+  }
+});
+
+// Endpoint to fetch all submitted QC washing data
+app.get("/api/qc-washing/all-submitted", async (req, res) => {
+  try {
+    const submittedData = await QCWashing.find({ 
+      status: { $in: ['submitted', 'processing', 'auto-saved'] }
+    }).sort({ createdAt: -1 });
+
+    res.json({ 
+      success: true, 
+      data: submittedData,
+      count: submittedData.length
+    });
+
+  } catch (error) {
+    console.error("Error fetching submitted QC washing data:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch submitted data", 
+      error: error.message 
+    });
+  }
+});
 const SubConDefect = createSubConDefectsModel(ymProdConnection);
 const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
 const SubconSewingQc1Report =
@@ -27326,6 +27660,54 @@ app.get("/api/qc-washing/comparison", async (req, res) => {
   res.json(comparisonRecord);
 });
 
+// Endpoint to fetch wash qty from qc_washing_qty_old collection
+app.get("/api/qc-washing/wash-qty", async (req, res) => {
+  try {
+    const { date, color, orderNo, qcId } = req.query;
+    
+    if (!date || !color || !orderNo || !qcId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Date, color, orderNo, and qcId are required" 
+      });
+    }
+
+    // Parse the date to match the format in the database
+    const inspectionDate = new Date(date);
+    
+    const washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate()),
+        $lt: new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate() + 1)
+      },
+      Style_No: orderNo,
+      Color: color,
+      "WorkerWashQty.QC_ID": qcId
+    });
+
+    if (washQtyRecord) {
+      const workerData = washQtyRecord.WorkerWashQty.find(worker => worker.QC_ID === qcId);
+      return res.json({
+        success: true,
+        washQty: workerData ? workerData.Wash_Qty : 0
+      });
+    }
+
+    res.json({
+      success: false,
+      washQty: 0,
+      message: "No wash qty data found"
+    });
+  } catch (error) {
+    console.error("Error fetching wash qty:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch wash qty data",
+      error: error.message
+    });
+  }
+});
+
 app.get("/api/qc-washing/results", async (req, res) => {
   try {
     const { orderNo, color, washType, reportType, factory } = req.query;
@@ -27997,12 +28379,8 @@ app.post('/api/upload-qc2-data', async (req, res) => {
     
     // Define washing line identifiers
     const washingLineIdentifiers = [
-      'Washing',
-      'WASHING', 
-      'washing',
-      'Wash',
-      'WASH',
-      'wash',
+      'Washing', 'WASHING', 'washing',
+      'Wash', 'WASH', 'wash',
     ];
     
     // Function to check if a line is washing-related
@@ -28020,50 +28398,60 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       Chinese: (d.Chinese || '').trim().toLowerCase(),
     }));
 
-    // Standardize field names (existing code)
-    const outputRows = outputData.map(row => ({
-      ...row,
-      Inspection_date: row['日期'] || row['BillDate'] || '',
-      QC_ID: row['工号'] || row['EmpID'] || '',
-      WorkLine: row['打菲组别'] || row['Batch Group'] || row['组名'] || row['WorkLine'] || '',
-      MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
-      SeqNo: row['工序号'] || row['SeqNo'] || '',
-      ColorNo: row['颜色'] || row['ColorNo'] || '',
-      ColorName: row['颜色'] || row['ColorName'] || '',
-      SizeName: row['尺码'] || row['SizeName'] || '',
-      Qty: row['数量'] || row['Qty'] || 0,
-    }));
-
-    const defectRows = defectData.map(row => {
-      const defectNameRaw = (row['疵点名称'] || row['ReworkName'] || '').trim().toLowerCase();
-      let found = allDefectsArr.find(d =>
-        defectNameRaw === d.defectName ||
-        (d.English && defectNameRaw.includes(d.English)) ||
-        (d.Khmer && defectNameRaw.includes(d.Khmer)) ||
-        (d.Chinese && defectNameRaw.includes(d.Chinese)) ||
-        (d.English && d.English.includes(defectNameRaw)) ||
-        (d.Khmer && d.Khmer.includes(defectNameRaw)) ||
-        (d.Chinese && d.Chinese.includes(defectNameRaw))
-      );
-
-      let defectCode = found ? found.defectCode : '';
-
-      return {
+    // Standardize field names and filter out invalid records
+    const outputRows = outputData
+      .map(row => ({
         ...row,
-        Inspection_date: row['日期'] || row['dDate'] || '',
-        QC_ID: row['工号'] || row['EmpID_QC'] || '',
-        WorkLine: row['组名'] || row['WorkLine'] || 'N/A',
+        Inspection_date: row['日期'] || row['BillDate'] || '',
+        QC_ID: row['工号'] || row['EmpID'] || '',
+        WorkLine: row['打菲组别'] || row['Batch Group'] || row['组名'] || row['WorkLine'] || '',
         MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
+        SeqNo: row['工序号'] || row['SeqNo'] || '',
         ColorNo: row['颜色'] || row['ColorNo'] || '',
         ColorName: row['颜色'] || row['ColorName'] || '',
         SizeName: row['尺码'] || row['SizeName'] || '',
-        ReworkCode: defectCode, 
-        ReworkName: defectNameRaw,
-        Defect_Qty: row['数量'] || row['Defect_Qty'] || 0,
-      };
-    });
+        Qty: row['数量'] || row['Qty'] || 0,
+      }))
+      .filter(row => {
+        // Filter out records without required fields
+        return row.Inspection_date && row.QC_ID && row.MONo;
+      });
 
-    // Build outputMap and defectMap (existing code)
+    const defectRows = defectData
+      .map(row => {
+        const defectNameRaw = (row['疵点名称'] || row['ReworkName'] || '').trim().toLowerCase();
+        let found = allDefectsArr.find(d =>
+          defectNameRaw === d.defectName ||
+          (d.English && defectNameRaw.includes(d.English)) ||
+          (d.Khmer && defectNameRaw.includes(d.Khmer)) ||
+          (d.Chinese && defectNameRaw.includes(d.Chinese)) ||
+          (d.English && d.English.includes(defectNameRaw)) ||
+          (d.Khmer && d.Khmer.includes(defectNameRaw)) ||
+          (d.Chinese && d.Chinese.includes(defectNameRaw))
+        );
+
+        let defectCode = found ? found.defectCode : '';
+
+        return {
+          ...row,
+          Inspection_date: row['日期'] || row['dDate'] || '',
+          QC_ID: row['工号'] || row['EmpID_QC'] || '',
+          WorkLine: row['组名'] || row['WorkLine'] || 'N/A',
+          MONo: row['款号'] || row['ModelNo'] || row['MoNo'] || row['StyleNo'] || row['Style_No'] || row['型号'] || '',
+          ColorNo: row['颜色'] || row['ColorNo'] || '',
+          ColorName: row['颜色'] || row['ColorName'] || '',
+          SizeName: row['尺码'] || row['SizeName'] || '',
+          ReworkCode: defectCode, 
+          ReworkName: defectNameRaw,
+          Defect_Qty: row['数量'] || row['Defect_Qty'] || 0,
+        };
+      })
+      .filter(row => {
+        // Filter out records without required fields
+        return row.Inspection_date && row.QC_ID && row.MONo;
+      });
+
+    // Build outputMap and defectMap
     const outputMap = new Map();
     for (const row of outputRows) {
       const key = makeKey(row);
@@ -28080,19 +28468,23 @@ app.post('/api/upload-qc2-data', async (req, res) => {
 
     // Merge and Build Documents
     const docs = new Map();
-    const washingQtyData = new Map(); 
+    const washingQtyData = new Map();
 
     const allKeys = new Set([...outputMap.keys(), ...defectMap.keys()]);
 
     for (const key of allKeys) {
       const outputRows = outputMap.get(key) || [];
       const defectRows = defectMap.get(key) || [];
-
       const [Inspection_date_str, QC_ID_raw] = key.split("|");
       const QC_ID = QC_ID_raw === "6335" ? "YM6335" : QC_ID_raw;
       const Inspection_date = Inspection_date_str ? new Date(Inspection_date_str + "T00:00:00Z") : null;
 
-      // Output grouping (existing code)
+      // Skip if essential data is missing
+      if (!Inspection_date || !QC_ID) {
+        continue;
+      }
+
+      // Output grouping
       const outputGroup = {};
       for (const r of outputRows) {
         const oKey = [r.WorkLine, r.MONo, r.ColorName, r.SizeName].join("|");
@@ -28108,7 +28500,7 @@ app.post('/api/upload-qc2-data', async (req, res) => {
         Qty: rows.reduce((sum, r) => sum + Number(r.Qty || 0), 0)
       }));
 
-      // Output summary (existing code)
+      // Output summary
       const outputSummaryMap = new Map();
       for (const o of Output_data) {
         const key = `${o.Line_no}|${o.MONo}`;
@@ -28121,33 +28513,31 @@ app.post('/api/upload-qc2-data', async (req, res) => {
       const Output_data_summary = Array.from(outputSummaryMap.values());
       const TotalOutput = Output_data_summary.reduce((sum, o) => sum + o.Qty, 0);
 
-      // MODIFIED: Only create washing quantity data for washing lines
-      // But don't include Line_no in the washing data structure
-      const washingQtyMap = new Map();
+      // Washing quantity data structure
       for (const o of Output_data) {
-        // Only process if this is a washing line
-        if (isWashingLine(o.Line_no)) {
-          const washKey = `${Inspection_date_str}|${QC_ID}|${o.MONo}|${o.Color}`;
-          if (!washingQtyMap.has(washKey)) {
-            washingQtyMap.set(washKey, {
+        // Only process if this is a washing line and has required data
+        if (isWashingLine(o.Line_no) && o.MONo) {
+          const washKey = `${Inspection_date_str}|${o.MONo}|${o.Color}`;
+          
+          if (!washingQtyData.has(washKey)) {
+            washingQtyData.set(washKey, {
               Inspection_date: Inspection_date,
-              QC_ID: QC_ID,
               Style_No: o.MONo,
               Color: o.Color,
-              Wash_Qty: 0
-              // Note: Line_no is NOT included here
+              Total_Wash_Qty: 0,
+              WorkerWashQty: new Map()
             });
           }
-          washingQtyMap.get(washKey).Wash_Qty += o.Qty;
-        }
-      }
 
-      // Add to global washing quantity data map (only washing lines)
-      for (const [washKey, washData] of washingQtyMap) {
-        if (!washingQtyData.has(washKey)) {
-          washingQtyData.set(washKey, washData);
-        } else {
-          washingQtyData.get(washKey).Wash_Qty += washData.Wash_Qty;
+          const washData = washingQtyData.get(washKey);
+          washData.Total_Wash_Qty += o.Qty;
+          
+          // Add or update worker quantity
+          if (washData.WorkerWashQty.has(QC_ID)) {
+            washData.WorkerWashQty.set(QC_ID, washData.WorkerWashQty.get(QC_ID) + o.Qty);
+          } else {
+            washData.WorkerWashQty.set(QC_ID, o.Qty);
+          }
         }
       }
 
@@ -28234,7 +28624,23 @@ app.post('/api/upload-qc2-data', async (req, res) => {
     }
 
     const finalDocs = Array.from(docs.values());
-    const washingQtyDocs = Array.from(washingQtyData.values());
+    
+    // Convert washing quantity data to final format with validation
+    const washingQtyDocs = Array.from(washingQtyData.values())
+      .filter(washData => {
+        // Only include records with required fields
+        return washData.Inspection_date && washData.Style_No && washData.WorkerWashQty.size > 0;
+      })
+      .map(washData => ({
+        Inspection_date: washData.Inspection_date,
+        Style_No: washData.Style_No,
+        Color: washData.Color,
+        Total_Wash_Qty: washData.Total_Wash_Qty,
+        WorkerWashQty: Array.from(washData.WorkerWashQty.entries()).map(([qc_id, qty]) => ({
+          QC_ID: qc_id,
+          Wash_Qty: qty
+        }))
+      }));
 
     res.json({ finalDocs, washingQtyDocs });
 
@@ -28243,7 +28649,6 @@ app.post('/api/upload-qc2-data', async (req, res) => {
     res.status(500).json({ error: 'Failed to process and save QC2 data.' });
   }
 });
-
 
 // routes/qc2.js (add this to the same file)
 app.get('/api/fetch-qc2-data', async (req, res) => {
@@ -28259,12 +28664,24 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
   try {
     const { finalDocs, washingQtyData } = req.body;
 
-    if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
-      return res.status(400).json({ error: 'No QC data to save.' });
+    // Validate QC data
+    const validQCDocs = (finalDocs || []).filter(doc => {
+      return doc.Inspection_date && doc.QC_ID;
+    });
+
+    if (validQCDocs.length === 0) {
+      return res.status(400).json({ error: 'No valid QC data to save.' });
     }
 
+    // Validate washing quantity data
+    const validWashingDocs = (washingQtyData || []).filter(doc => {
+      return doc.Inspection_date && doc.Style_No && 
+             Array.isArray(doc.WorkerWashQty) && doc.WorkerWashQty.length > 0 &&
+             doc.WorkerWashQty.every(worker => worker.QC_ID);
+    });
+
     // QC data bulk operations
-    const bulkOps = finalDocs.map(doc => ({
+    const bulkOps = validQCDocs.map(doc => ({
       updateOne: {
         filter: {
           Inspection_date: doc.Inspection_date instanceof Date ? doc.Inspection_date : new Date(doc.Inspection_date),
@@ -28275,17 +28692,25 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       }
     }));
 
+    // Washing quantity data bulk operations
     let washingBulkOps = [];
-    if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
-      washingBulkOps = washingQtyData.map(doc => ({
+    if (validWashingDocs.length > 0) {
+      washingBulkOps = validWashingDocs.map(doc => ({
         updateOne: {
           filter: {
             Inspection_date: doc.Inspection_date instanceof Date ? doc.Inspection_date : new Date(doc.Inspection_date),
-            QC_ID: doc.QC_ID,
             Style_No: doc.Style_No,
             Color: doc.Color
           },
-          update: { $set: doc },
+          update: {
+            $set: {
+              Inspection_date: doc.Inspection_date instanceof Date ? doc.Inspection_date : new Date(doc.Inspection_date),
+              Style_No: doc.Style_No,
+              Color: doc.Color,
+              Total_Wash_Qty: doc.Total_Wash_Qty,
+              WorkerWashQty: doc.WorkerWashQty
+            }
+          },
           upsert: true
         }
       }));
@@ -28324,6 +28749,8 @@ app.post('/api/manual-save-qc2-data', async (req, res) => {
       success: true, 
       qcDataCount: bulkOps.length,
       washingQtyCount: washingBulkOps.length,
+      skippedQCRecords: (finalDocs || []).length - validQCDocs.length,
+      skippedWashingRecords: (washingQtyData || []).length - validWashingDocs.length,
       results: results
     });
 
@@ -28348,113 +28775,113 @@ app.get('/api/fetch-washing-qty-data', async (req, res) => {
 });
 
 // routes/qc2.js (add this to the same file)
-app.get("/api/fetch-qc2-data", async (req, res) => {
+app.get('/api/fetch-qc2-data', async (req, res) => {
   try {
     const results = await QCWorkers.find({}).lean();
     res.json(results);
   } catch (err) {
-    res.status(500).json({ error: "Failed to fetch QC2 data." });
+    res.status(500).json({ error: 'Failed to fetch QC2 data.' });
   }
 });
 
-app.post("/api/manual-save-qc2-data", async (req, res) => {
-  try {
-    const { finalDocs, washingQtyData } = req.body;
+// app.post("/api/manual-save-qc2-data", async (req, res) => {
+//   try {
+//     const { finalDocs, washingQtyData } = req.body;
 
-    if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
-      return res.status(400).json({ error: "No QC data to save." });
-    }
+//     if (!Array.isArray(finalDocs) || finalDocs.length === 0) {
+//       return res.status(400).json({ error: "No QC data to save." });
+//     }
 
-    // QC data bulk operations
-    const bulkOps = finalDocs.map((doc) => ({
-      updateOne: {
-        filter: {
-          Inspection_date:
-            doc.Inspection_date instanceof Date
-              ? doc.Inspection_date
-              : new Date(doc.Inspection_date),
-          QC_ID: doc.QC_ID
-        },
-        update: { $set: doc },
-        upsert: true
-      }
-    }));
+//     // QC data bulk operations
+//     const bulkOps = finalDocs.map((doc) => ({
+//       updateOne: {
+//         filter: {
+//           Inspection_date:
+//             doc.Inspection_date instanceof Date
+//               ? doc.Inspection_date
+//               : new Date(doc.Inspection_date),
+//           QC_ID: doc.QC_ID
+//         },
+//         update: { $set: doc },
+//         upsert: true
+//       }
+//     }));
 
-    // Washing quantity data bulk operations (only washing data, no Line_no field)
-    let washingBulkOps = [];
-    if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
-      washingBulkOps = washingQtyData.map((doc) => ({
-        updateOne: {
-          filter: {
-            Inspection_date:
-              doc.Inspection_date instanceof Date
-                ? doc.Inspection_date
-                : new Date(doc.Inspection_date),
-            QC_ID: doc.QC_ID,
-            Style_No: doc.Style_No,
-            Color: doc.Color
-            // Note: No Line_no in filter since it's not stored
-          },
-          update: { $set: doc },
-          upsert: true
-        }
-      }));
-    }
+//     // Washing quantity data bulk operations (only washing data, no Line_no field)
+//     let washingBulkOps = [];
+//     if (Array.isArray(washingQtyData) && washingQtyData.length > 0) {
+//       washingBulkOps = washingQtyData.map((doc) => ({
+//         updateOne: {
+//           filter: {
+//             Inspection_date:
+//               doc.Inspection_date instanceof Date
+//                 ? doc.Inspection_date
+//                 : new Date(doc.Inspection_date),
+//             QC_ID: doc.QC_ID,
+//             Style_No: doc.Style_No,
+//             Color: doc.Color
+//             // Note: No Line_no in filter since it's not stored
+//           },
+//           update: { $set: doc },
+//           upsert: true
+//         }
+//       }));
+//     }
 
-    // Execute both bulk operations
-    const results = [];
+//     // Execute both bulk operations
+//     const results = [];
 
-    if (bulkOps.length > 0) {
-      try {
-        const qcResult = await QCWorkers.bulkWrite(bulkOps);
-        results.push({ type: "QC", result: qcResult });
-      } catch (qcError) {
-        console.error("QC bulk write error:", qcError);
-        return res.status(500).json({
-          error: "Failed to save QC data",
-          details: qcError.message
-        });
-      }
-    }
+//     if (bulkOps.length > 0) {
+//       try {
+//         const qcResult = await QCWorkers.bulkWrite(bulkOps);
+//         results.push({ type: "QC", result: qcResult });
+//       } catch (qcError) {
+//         console.error("QC bulk write error:", qcError);
+//         return res.status(500).json({
+//           error: "Failed to save QC data",
+//           details: qcError.message
+//         });
+//       }
+//     }
 
-    if (washingBulkOps.length > 0) {
-      try {
-        const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
-        results.push({ type: "Washing", result: washingResult });
-      } catch (washingError) {
-        console.error("Washing bulk write error:", washingError);
-        return res.status(500).json({
-          error: "Failed to save washing data",
-          details: washingError.message
-        });
-      }
-    }
+//     if (washingBulkOps.length > 0) {
+//       try {
+//         const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
+//         results.push({ type: "Washing", result: washingResult });
+//       } catch (washingError) {
+//         console.error("Washing bulk write error:", washingError);
+//         return res.status(500).json({
+//           error: "Failed to save washing data",
+//           details: washingError.message
+//         });
+//       }
+//     }
 
-    res.json({
-      success: true,
-      qcDataCount: bulkOps.length,
-      washingQtyCount: washingBulkOps.length,
-      results: results
-    });
-  } catch (err) {
-    console.error("Manual save error:", err);
-    res.status(500).json({
-      error: "Failed to manually save QC2 data.",
-      details: err.message
-    });
-  }
-});
+//     res.json({
+//       success: true,
+//       qcDataCount: bulkOps.length,
+//       washingQtyCount: washingBulkOps.length,
+//       results: results
+//     });
+//   } catch (err) {
+//     console.error("Manual save error:", err);
+//     res.status(500).json({
+//       error: "Failed to manually save QC2 data.",
+//       details: err.message
+//     });
+//   }
+// });
 
-// New endpoint to fetch washing quantity data
-app.get("/api/fetch-washing-qty-data", async (req, res) => {
-  try {
-    const results = await QCWashingQtyOld.find({}).lean();
-    res.json(results);
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Failed to fetch washing quantity data." });
-  }
-});
+// // New endpoint to fetch washing quantity data
+// app.get("/api/fetch-washing-qty-data", async (req, res) => {
+//   try {
+//     const results = await QCWashingQtyOld.find({}).lean();
+//     res.json(results);
+//   } catch (err) {
+//     console.error(err);
+//     res.status(500).json({ error: "Failed to fetch washing quantity data." });
+//   }
+// });
 
 /* ------------------------------
    AI Chatbot Proxy Route

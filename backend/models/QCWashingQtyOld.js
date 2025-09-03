@@ -5,10 +5,6 @@ const qcWashingQtyOldSchema = new mongoose.Schema({
     type: Date,
     required: true
   },
-  QC_ID: {
-    type: String,
-    required: true
-  },
   Style_No: {
     type: String,
     required: true
@@ -17,21 +13,33 @@ const qcWashingQtyOldSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  Wash_Qty: {
+  Total_Wash_Qty: {
     type: Number,
     required: true,
     default: 0
-  }
+  },
+ WorkerWashQty: [{
+   _id: false, 
+    QC_ID: {
+      type: String,
+      required: true
+    },
+    Wash_Qty: {
+      type: Number,
+      required: true,
+      default: 0
+    }
+  }]
 }, {
   timestamps: true 
 });
 
+// Updated index - removed QC_ID since it's now in the Workers array
 qcWashingQtyOldSchema.index({ 
   Inspection_date: 1, 
-  QC_ID: 1, 
   Style_No: 1, 
   Color: 1 
 }, { unique: true });
+
 export default (connection) =>
   connection.model("qc_washing_qty_old", qcWashingQtyOldSchema, "qc_washing_qty_old");
-

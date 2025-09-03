@@ -10,6 +10,7 @@ import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
+import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
@@ -2286,6 +2287,17 @@ const QCWashingPage = () => {
           >
             New Inspection
           </button>
+          {/* <button
+            onClick={() => handleTabChange("subConEditQty")}
+            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
+                          ${
+                            activeTab === "subConEditQty"
+                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
+                          }`}
+          >
+            Sub_Con Edit
+          </button> */}
           <button
             onClick={() => handleTabChange("submittedData")}
             className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
@@ -2302,7 +2314,7 @@ const QCWashingPage = () => {
 
       <main
         className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-          activeTab === "submittedData"
+          activeTab === "submittedData" || activeTab === "subConEditQty"
             ? "max-w-none px-2 sm:px-4 lg:px-6"
             : "max-w-7xl px-4 sm:px-6 lg:px-8"
         }`}
@@ -2662,6 +2674,7 @@ const QCWashingPage = () => {
         )}
 
         {activeTab === "submittedData" && <SubmittedWashingDataPage />}
+        {/* {activeTab === "subConEditQty" && <SubConEdit />} */}
       </main>
     </div>
   );

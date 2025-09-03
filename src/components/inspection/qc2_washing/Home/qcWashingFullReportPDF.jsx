@@ -166,106 +166,37 @@ const safeString = (value) => {
 };
 
 // Enhanced getImageSrc function for PDF rendering
-const getImageSrc = (imagePath, API_BASE_URL) => {
-  if (!imagePath) return null;
+const ImagePlaceholder = ({ style, text, subtext }) => (
+  <View style={[style, { backgroundColor: '#e5e7eb', justifyContent: 'center', alignItems: 'center', padding: 4 }]}>
+    <Text style={{ fontSize: 6, color: '#6b7280', textAlign: 'center' }}>{text}</Text>
+    {subtext && <Text style={{ fontSize: 4, color: '#9ca3af', textAlign: 'center', marginTop: 2 }}>{subtext}</Text>}
+  </View>
+);
 
-  // Handle placeholder objects - return null to show placeholder
-  if (typeof imagePath === 'object' && imagePath.isPlaceholder) {
-    console.log('🖼️ Using placeholder instead of CORS-blocked image:', imagePath.originalUrl?.substring(0, 50));
-    return null; // Return null to show placeholder instead of attempting fetch
+const SafeImage = ({ src, style, alt }) => {
+  // If src is a placeholder object, extract the originalUrl. Otherwise, use src directly.
+  const imageUrl = (typeof src === 'object' && src !== null && src.isPlaceholder) ? src.originalUrl : src;
+
+  // If there's no valid imageUrl string, render the placeholder.
+  if (!imageUrl || typeof imageUrl !== 'string') {
+    const subtext = (typeof src === 'object' && src?.isPlaceholder) ? "URL Blocked" : "Not Available";
+    return <ImagePlaceholder style={style} text={alt || 'Image'} subtext={subtext} />;
   }
 
-  // If it's already base64, return it directly
-  if (imagePath.startsWith('data:image/')) {
-    console.log('📷 Using base64 image for PDF');
-    return imagePath;
-  }
+  // @react-pdf/renderer's Image component requires an object for network requests.
+  const imageSrc = {
+    uri: imageUrl,
+    method: 'GET',
+    headers: {} // Body is not allowed for GET requests
+  };
 
-  // For external URLs that would cause CORS, return null to show placeholder
-  if (imagePath.startsWith('http')) {
-    console.log('🖼️ Skipping HTTP URL to avoid CORS:', imagePath.substring(0, 50) + '...');
-    return null;
-  }
-
-  // Handle relative paths by constructing full URL
-  if (API_BASE_URL && imagePath.startsWith('/')) {
-    const fullUrl = `${API_BASE_URL}${imagePath}`;
-    console.log('🔗 Constructed full URL for PDF:', fullUrl.substring(0, 50) + '...');
-    return fullUrl;
-  }
-
-  console.log('⚠️ No valid image source found:', imagePath);
-  return null;
-};
-
-const SafeImage = ({ src, style, alt, placeholderInfo }) => {
-  // Handle null/undefined src
-  if (!src) {
-    let bgColor = '#f3f4f6';
-    let textColor = '#6b7280';
-    let text = 'No Image';
-    
-    if (alt?.toLowerCase().includes('defect')) {
-      bgColor = '#fee2e2';
-      textColor = '#991b1b';
-      text = 'Defect Image';
-    } else if (alt?.toLowerCase().includes('inspection') || alt?.toLowerCase().includes('comparison')) {
-      bgColor = '#dbeafe';
-      textColor = '#1e40af';
-      text = 'Inspection Image';
-    } else if (alt?.toLowerCase().includes('machine')) {
-      bgColor = '#f0fdf4';
-      textColor = '#166534';
-      text = 'Machine Image';
-    } else if (alt?.toLowerCase().includes('additional')) {
-      bgColor = '#fef3c7';
-      textColor = '#d97706';
-      text = 'Additional Image';
-    }
-    
-    return (
-      <View style={[style, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: 6, color: textColor, textAlign: 'center' }}>{text}</Text>
-        <Text style={{ fontSize: 4, color: '#9ca3af', textAlign: 'center' }}>Not Available</Text>
-      </View>
-    );
-  }
-
-  try {
-    return <Image src={src} style={style} />;
-  } catch (error) {
-    console.warn('Failed to render image:', src?.substring(0, 50), error.message);
-    
-    // Return colored placeholder based on image type or alt text
-    let bgColor = '#f3f4f6';
-    let textColor = '#6b7280';
-    let text = 'Image Error';
-    
-    if (src?.includes('defect') || alt?.toLowerCase().includes('defect')) {
-      bgColor = '#fee2e2';
-      textColor = '#991b1b';
-      text = 'Defect Image';
-    } else if (src?.includes('inspection') || alt?.toLowerCase().includes('inspection') || alt?.toLowerCase().includes('comparison')) {
-      bgColor = '#dbeafe';
-      textColor = '#1e40af';
-      text = 'Inspection Image';
-    } else if (alt?.toLowerCase().includes('machine')) {
-      bgColor = '#f0fdf4';
-      textColor = '#166534';
-      text = 'Machine Image';
-    } else if (alt?.toLowerCase().includes('additional')) {
-      bgColor = '#fef3c7';
-      textColor = '#d97706';
-      text = 'Additional Image';
-    }
-    
-    return (
-      <View style={[style, { backgroundColor: bgColor, justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: 6, color: textColor, textAlign: 'center' }}>{text}</Text>
-        <Text style={{ fontSize: 4, color: '#9ca3af', textAlign: 'center' }}>Load Failed</Text>
-      </View>
-    );
-  }
+  return (
+    <Image
+      src={imageSrc}
+      style={style}
+      onError={(e) => console.error(`PDF Image Load Error for ${alt}: ${e.message || 'Unknown error'}`)}
+    />
+  );
 };
 
 
@@ -408,10 +339,9 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
                         return (
                           <SafeImage
                             key={imgIndex}
-                            src={getImageSrc(img, API_BASE_URL)}
+                            src={img.originalUrl || img} // Pass the original URL
                             style={styles.defectImage}
                             alt={`Defect Image ${imgIndex + 1}`}
-                            placeholderInfo={typeof img === 'object' ? img : null}
                           />
                         );
                       })
@@ -441,10 +371,9 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
               return (
                 <View key={imgIndex} style={{ margin: 2 }}>
                   <SafeImage
-                    src={getImageSrc(img, API_BASE_URL)}
+                    src={img.originalUrl || img} // Pass the original URL
                     style={[styles.defectImage, { width: 80, height: 60 }]}
                     alt={`Additional Image ${imgIndex + 1}`}
-                    placeholderInfo={typeof img === 'object' ? img : null}
                   />
                   <Text style={{ fontSize: 4, color: "#999" }}>
                     Add {imgIndex + 1}
@@ -627,7 +556,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                     {point.image && (
                       <View style={{ margin: 2 }}>
                         <SafeImage
-                          src={getImageSrc(point.image, API_BASE_URL)}
+                          src={point.image}
                           style={styles.inspectionImage}
                           alt={`Point ${point.pointName} Image`}
                         />
@@ -654,7 +583,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                         return (
                           <View key={imgIndex} style={{ margin: 2 }}>
                             <SafeImage
-                              src={getImageSrc(img, API_BASE_URL)}
+                              src={img.originalUrl || img} // Pass the original URL
                               style={styles.inspectionImage}
                               alt={`Comparison ${imgIndex + 1}`}
                             />
@@ -835,7 +764,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                   <View style={styles.imageContainer}>
                     <Text style={{ fontSize: 7, color: "#6b7280", marginBottom: 3 }}>Machine Image:</Text>
                     <SafeImage
-                      src={getImageSrc(machine.image, API_BASE_URL)}
+                      src={machine.image}
                       style={styles.machineImage}
                       alt={`Machine ${machine.machineType} Image`}
                     />
@@ -1131,7 +1060,6 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
 const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL }) => {
-  const baseUrl = API_BASE_URL || 'http://localhost:8000';
   
   if (!recordData) {
     return (
@@ -1182,7 +1110,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
         <DefectAnalysisTable 
           defectsByPc={defectsByPc} 
           additionalImages={additionalImages}
-          API_BASE_URL={baseUrl}
+          API_BASE_URL={API_BASE_URL}
         />
         {measurementSizeSummary.length > 0 && <SizewiseSummaryTable measurementSizeSummary={measurementSizeSummary} />}
         {comparisonData && <ComparisonSection recordData={recordData} comparisonData={comparisonData} />}
@@ -1196,7 +1124,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
           <Text style={styles.pageHeader}>Inspection Details</Text>
           <InspectionDetailsSection 
             inspectionDetails={inspectionDetails} 
-            API_BASE_URL={baseUrl}
+            API_BASE_URL={API_BASE_URL}
           />
         </Page>
       )}
@@ -1220,7 +1148,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
             beforeAfterWash={recordData.before_after_wash || "Washing"}
           />
           <Text style={styles.pageHeader}>Before vs After Wash Comparison</Text>
-          <BeforeAfterComparisonSection recordData={recordData} comparisonData={comparisonData} API_BASE_URL={baseUrl} />
+          <BeforeAfterComparisonSection recordData={recordData} comparisonData={comparisonData} API_BASE_URL={API_BASE_URL} />
         </Page>
       )}
     </Document>
