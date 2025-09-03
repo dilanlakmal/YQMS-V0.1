@@ -1026,7 +1026,7 @@ const QCWashingPage = () => {
                 ? "ok"
                 : item.decision === false
                 ? "no"
-                : item.decision || "",
+                : item.decision || "ok", // Default to "ok" if no decision
             comparisonImages: (item.comparison || [])
               .filter(Boolean)
               .map((img) => ({
@@ -1075,7 +1075,13 @@ const QCWashingPage = () => {
         setInspectionData(translatedInspectionData);
       } else {
         // Initialize with default values from masterChecklist if no saved inspection data
-        setInspectionData(initializeInspectionData(masterChecklist));
+        const defaultInspectionData = initializeInspectionData(
+          masterChecklist
+        ).map((item) => ({
+          ...item,
+          decision: "ok" // Set default decision to "ok"
+        }));
+        setInspectionData(defaultInspectionData);
       }
 
       // Handle machine processes - initialize with defaults if no saved data

@@ -228,6 +228,54 @@ const InspectionDataSection = ({
     );
   }, [washQty, defectData.length]);
 
+  // Initialize inspection data with default "OK" values when recordId exists but no data
+  useEffect(() => {
+    if (recordId && inspectionData.length > 0) {
+      // Check if inspection data has default empty values (no decisions set)
+      const hasEmptyDecisions = inspectionData.every(
+        (item) => !item.decision || item.decision === ""
+      );
+
+      if (hasEmptyDecisions) {
+        // Set all decisions to "ok" by default
+        setInspectionData((prev) =>
+          prev.map((item) => ({
+            ...item,
+            decision: "ok"
+          }))
+        );
+      }
+    }
+  }, [recordId, inspectionData.length]);
+
+  // Initialize machine status with default "OK" values when recordId exists
+  useEffect(() => {
+    if (recordId) {
+      // Check if machine status is in default state (all OK)
+      const isDefaultState = Object.values(machineStatus).every((machine) =>
+        Object.values(machine).every(
+          (param) => param.ok === true && param.no === false
+        )
+      );
+
+      if (!isDefaultState) {
+        // Reset to default OK state
+        setMachineStatus({
+          "Washing Machine": {
+            temperature: { ok: true, no: false },
+            time: { ok: true, no: false },
+            silicon: { ok: true, no: false },
+            softener: { ok: true, no: false }
+          },
+          "Tumble Dry": {
+            temperature: { ok: true, no: false },
+            time: { ok: true, no: false }
+          }
+        });
+      }
+    }
+  }, [recordId]);
+
   const handleParamInputChange = (rowIdx, field, value) => {
     setDefectData((prev) => {
       const isColorShade =

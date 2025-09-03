@@ -329,7 +329,12 @@ const OrderDetailsSection = ({
         // Activate all sections when order details are saved
         if (activateNextSection) activateNextSection();
 
-        if (result.id && setRecordId) setRecordId(result.id);
+        if (result.id && setRecordId) {
+          setRecordId(result.id);
+
+          // Auto-save inspection data with defaults after order is saved
+          await autoSaveInspectionData(result.id);
+        }
       } else {
         Swal.fire({
           icon: "error",
@@ -352,6 +357,164 @@ const OrderDetailsSection = ({
         toast: true
       });
       console.error("Save error:", error);
+    }
+  };
+
+  // Auto-save inspection data with default values
+  const autoSaveInspectionData = async (recordId) => {
+    try {
+      // Create default inspection data with "OK" decisions
+      const defaultInspectionData = [
+        { checkedList: "Appearance", decision: "ok", remark: "" },
+        { checkedList: "Color Shade", decision: "ok", remark: "" },
+        { checkedList: "Fiber", decision: "ok", remark: "" },
+        { checkedList: "Measurement", decision: "ok", remark: "" },
+        { checkedList: "Pilling", decision: "ok", remark: "" },
+        { checkedList: "Shrinkage", decision: "ok", remark: "" }
+      ];
+
+      // Create default defect data with calculated pass rate
+      const washQtyNum = Number(formData.washQty) || 0;
+      const defaultDefectData = [
+        {
+          parameter: "Color Shade 01",
+          checkedQty: washQtyNum,
+          failedQty: 0,
+          passRate:
+            washQtyNum > 0
+              ? (((washQtyNum - 0) / washQtyNum) * 100).toFixed(2)
+              : "0.00",
+          result: "Pass",
+          remark: ""
+        },
+        {
+          parameter: "Appearance",
+          checkedQty: washQtyNum,
+          failedQty: 0,
+          passRate:
+            washQtyNum > 0
+              ? (((washQtyNum - 0) / washQtyNum) * 100).toFixed(2)
+              : "0.00",
+          result: "Pass",
+          remark: ""
+        }
+      ];
+
+      // Create default machine status with "OK" status
+      const defaultMachineStatus = {
+        "Washing Machine": {
+          temperature: { ok: true, no: false },
+          time: { ok: true, no: false },
+          silicon: { ok: true, no: false },
+          softener: { ok: true, no: false }
+        },
+        "Tumble Dry": {
+          temperature: { ok: true, no: false },
+          time: { ok: true, no: false }
+        }
+      };
+
+      // Get standard values for the wash type
+      let defaultStandardValues = {
+        "Washing Machine": {
+          temperature: "",
+          time: "",
+          silicon: "",
+          softener: ""
+        },
+        "Tumble Dry": { temperature: "", time: "" }
+      };
+
+      let defaultActualValues = {
+        "Washing Machine": {
+          temperature: "",
+          time: "",
+          silicon: "",
+          softener: ""
+        },
+        "Tumble Dry": { temperature: "", time: "" }
+      };
+
+      // Fetch standard values for the wash type
+      try {
+        const standardResponse = await fetch(
+          `${API_BASE_URL}/api/qc-washing/standards`
+        );
+        const standardData = await standardResponse.json();
+
+        if (standardData.success) {
+          const standardRecord = standardData.data.find(
+            (record) => record.washType === formData.washType
+          );
+
+          if (standardRecord) {
+            defaultStandardValues = {
+              "Washing Machine": {
+                temperature: String(
+                  standardRecord.washingMachine?.temperature || ""
+                ),
+                time: String(standardRecord.washingMachine?.time || ""),
+                silicon: String(standardRecord.washingMachine?.silicon || ""),
+                softener: String(standardRecord.washingMachine?.softener || "")
+              },
+              "Tumble Dry": {
+                temperature: String(
+                  standardRecord.tumbleDry?.temperature || ""
+                ),
+                time: String(standardRecord.tumbleDry?.time || "")
+              }
+            };
+
+            // Set actual values to standard values initially (current display values)
+            defaultActualValues = { ...defaultStandardValues };
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching standard values:", error);
+      }
+
+      // Build FormData for inspection save
+      const formDataForInspection = new FormData();
+      formDataForInspection.append("recordId", recordId);
+      formDataForInspection.append(
+        "inspectionData",
+        JSON.stringify(defaultInspectionData)
+      );
+      formDataForInspection.append("processData", JSON.stringify({}));
+      formDataForInspection.append(
+        "defectData",
+        JSON.stringify(defaultDefectData)
+      );
+      formDataForInspection.append(
+        "standardValues",
+        JSON.stringify(defaultStandardValues)
+      );
+      formDataForInspection.append(
+        "actualValues",
+        JSON.stringify(defaultActualValues)
+      );
+      formDataForInspection.append(
+        "machineStatus",
+        JSON.stringify(defaultMachineStatus)
+      );
+
+      // Send to backend
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/inspection-save`,
+        {
+          method: "POST",
+          body: formDataForInspection
+        }
+      );
+
+      const result = await response.json();
+      if (result.success) {
+        console.log("Inspection data auto-saved successfully");
+      } else {
+        console.error("Failed to auto-save inspection data:", result.message);
+      }
+    } catch (error) {
+      console.error("Error auto-saving inspection data:", error);
     }
   };
 
