@@ -284,348 +284,6 @@ const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection
 const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
 
-/* ------------------------------
-   End Points - QC Washing Qty Old
------------------------------- */
-
-// Endpoint to fetch wash qty from qc_washing_qty_old collection
-app.get("/api/qc-washing/wash-qty", async (req, res) => {
-  try {
-    const { date, color, orderNo, qcId } = req.query;
-    
-    console.log('Wash qty request params:', { date, color, orderNo, qcId });
-    console.log('Normalized factoryName check: YM, washType check: Normal Wash, reportType check: Inline');
-    
-    if (!date || !color || !orderNo || !qcId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Missing required parameters: date, color, orderNo, qcId" 
-      });
-    }
-
-    // Parse the date to match the format in the database
-    const inspectionDate = new Date(date);
-    const startOfDay = new Date(inspectionDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(inspectionDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    console.log('Date range:', { startOfDay, endOfDay });
-    console.log('Searching for color:', color);
-    console.log('Will try English extraction if exact match fails');
-    
-    // Find the record matching date, color, and orderNo (style_no)
-    // Try exact match first, then partial match for color
-    let washQtyRecord = await QCWashingQtyOld.findOne({
-      Inspection_date: {
-        $gte: startOfDay,
-        $lt: endOfDay
-      },
-      Style_No: orderNo,
-      Color: color
-    });
-    
-    // If no exact match, try English-only matching by fetching candidates and filtering
-    if (!washQtyRecord) {
-      const candidates = await QCWashingQtyOld.find({
-        Inspection_date: {
-          $gte: startOfDay,
-          $lt: endOfDay
-        },
-        Style_No: orderNo
-      });
-      
-      // Extract English part from brackets and match
-      washQtyRecord = candidates.find(record => {
-        const dbColor = record.Color;
-        // Extract text between [ and ]
-        const match = dbColor.match(/\[([^\]]+)\]/);
-        const englishPart = match ? match[1] : dbColor;
-        return englishPart.toLowerCase() === color.toLowerCase();
-      });
-    }
-
-    console.log('Found wash qty record:', washQtyRecord ? 'Yes' : 'No');
-    if (washQtyRecord) {
-      console.log('Matched color in DB:', washQtyRecord.Color);
-      console.log('Available workers:', washQtyRecord.WorkerWashQty.map(w => w.QC_ID));
-    }
-
-    if (!washQtyRecord) {
-      return res.json({ 
-        success: false, 
-        washQty: 0, 
-        message: "No wash qty record found",
-        searchCriteria: { date: startOfDay, orderNo, color }
-      });
-    }
-
-    // Find the specific QC worker's wash qty
-    const workerWashQty = washQtyRecord.WorkerWashQty.find(
-      worker => worker.QC_ID === qcId
-    );
-
-    console.log('Worker wash qty found:', workerWashQty ? 'Yes' : 'No');
-    if (washQtyRecord) {
-      console.log('All available QC_IDs:', washQtyRecord.WorkerWashQty.map(w => w.QC_ID));
-      console.log('Looking for QC_ID:', qcId);
-    }
-
-    const washQty = workerWashQty ? workerWashQty.Wash_Qty : 0;
-
-    res.json({ 
-      success: true, 
-      washQty,
-      totalWashQty: washQtyRecord.Total_Wash_Qty,
-      workerFound: !!workerWashQty
-    });
-
-  } catch (error) {
-    console.error("Error fetching wash qty:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to fetch wash qty", 
-      error: error.message 
-    });
-  }
-});
-
-// Test endpoint to check QCWashingQtyOld collection structure
-app.get("/api/qc-washing/test-wash-qty", async (req, res) => {
-  try {
-    const sampleRecord = await QCWashingQtyOld.findOne().limit(1);
-    const totalCount = await QCWashingQtyOld.countDocuments();
-    
-    // Get some recent records for testing
-    const recentRecords = await QCWashingQtyOld.find()
-      .sort({ Inspection_date: -1 })
-      .limit(5)
-      .select('Inspection_date Style_No Color Total_Wash_Qty WorkerWashQty');
-    
-    res.json({ 
-      success: true, 
-      totalRecords: totalCount,
-      sampleRecord: sampleRecord,
-      recentRecords: recentRecords,
-      message: "QCWashingQtyOld collection test successful"
-    });
-
-  } catch (error) {
-    console.error("Error testing QCWashingQtyOld collection:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to test collection", 
-      error: error.message 
-    });
-  }
-});
-
-// Test endpoint to verify specific record matching
-app.get("/api/qc-washing/test-specific-match", async (req, res) => {
-  try {
-    const testDate = '2025-08-23';
-    const testOrderNo = 'GPAF6018';
-    const testColor = '500 EGGPLANT';
-    const testQcId = 'YM6926';
-    
-    const inspectionDate = new Date(testDate);
-    const startOfDay = new Date(inspectionDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(inspectionDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    
-    // Try exact match first
-    let washQtyRecord = await QCWashingQtyOld.findOne({
-      Inspection_date: {
-        $gte: startOfDay,
-        $lt: endOfDay
-      },
-      Style_No: testOrderNo,
-      Color: testColor
-    });
-    
-    // If no exact match, try English extraction
-    if (!washQtyRecord) {
-      const candidates = await QCWashingQtyOld.find({
-        Inspection_date: {
-          $gte: startOfDay,
-          $lt: endOfDay
-        },
-        Style_No: testOrderNo
-      });
-      
-      washQtyRecord = candidates.find(record => {
-        const dbColor = record.Color;
-        const match = dbColor.match(/\[([^\]]+)\]/);
-        const englishPart = match ? match[1] : dbColor;
-        return englishPart.toLowerCase() === testColor.toLowerCase();
-      });
-    }
-    
-    let result = {
-      testParams: { testDate, testOrderNo, testColor, testQcId },
-      dateRange: { startOfDay, endOfDay },
-      recordFound: !!washQtyRecord,
-      washQty: 0,
-      workerFound: false
-    };
-    
-    if (washQtyRecord) {
-      const workerWashQty = washQtyRecord.WorkerWashQty.find(
-        worker => worker.QC_ID === testQcId
-      );
-      
-      result.recordDetails = {
-        dbColor: washQtyRecord.Color,
-        dbStyleNo: washQtyRecord.Style_No,
-        dbDate: washQtyRecord.Inspection_date,
-        totalWashQty: washQtyRecord.Total_Wash_Qty,
-        availableWorkers: washQtyRecord.WorkerWashQty.map(w => ({ id: w.QC_ID, qty: w.Wash_Qty }))
-      };
-      
-      if (workerWashQty) {
-        result.washQty = workerWashQty.Wash_Qty;
-        result.workerFound = true;
-      }
-    }
-    
-    res.json(result);
-    
-  } catch (error) {
-    console.error("Error in test endpoint:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Test failed", 
-      error: error.message 
-    });
-  }
-});
-
-// Debug endpoint to search wash qty records with flexible criteria
-app.get("/api/qc-washing/search-wash-qty", async (req, res) => {
-  try {
-    const { orderNo, color, qcId, dateFrom, dateTo } = req.query;
-    
-    let query = {};
-    
-    if (orderNo) {
-      query.Style_No = { $regex: orderNo, $options: 'i' };
-    }
-    
-    if (color) {
-      query.Color = { $regex: color, $options: 'i' };
-    }
-    
-    if (dateFrom || dateTo) {
-      query.Inspection_date = {};
-      if (dateFrom) {
-        query.Inspection_date.$gte = new Date(dateFrom);
-      }
-      if (dateTo) {
-        query.Inspection_date.$lte = new Date(dateTo);
-      }
-    }
-    
-    const records = await QCWashingQtyOld.find(query)
-      .sort({ Inspection_date: -1 })
-      .limit(10);
-    
-    // If qcId is provided, filter worker data
-    let filteredRecords = records;
-    if (qcId) {
-      filteredRecords = records.map(record => {
-        const workerData = record.WorkerWashQty.find(w => w.QC_ID === qcId);
-        return {
-          ...record.toObject(),
-          matchingWorker: workerData || null,
-          hasMatchingWorker: !!workerData
-        };
-      });
-    }
-    
-    res.json({ 
-      success: true, 
-      records: filteredRecords,
-      count: filteredRecords.length,
-      searchCriteria: { orderNo, color, qcId, dateFrom, dateTo }
-    });
-
-  } catch (error) {
-    console.error("Error searching wash qty records:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to search wash qty records", 
-      error: error.message 
-    });
-  }
-});
-
-// Endpoint to update wash qty for a specific record
-app.put("/api/qc-washing/update-wash-qty/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { washQty } = req.body;
-
-    const updatedRecord = await QCWashing.findByIdAndUpdate(
-      id,
-      { washQty: parseInt(washQty) || 0 },
-      { new: true }
-    );
-
-    if (!updatedRecord) {
-      return res.status(404).json({ 
-        success: false, 
-        message: "Record not found" 
-      });
-    }
-
-    res.json({ 
-      success: true, 
-      data: updatedRecord,
-      message: "Wash qty updated successfully"
-    });
-
-  } catch (error) {
-    console.error("Error updating wash qty:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to update wash qty", 
-      error: error.message 
-    });
-  }
-});
-
-// Endpoint to fetch all submitted QC washing data
-app.get("/api/qc-washing/all-submitted", async (req, res) => {
-  try {
-    const submittedData = await QCWashing.find({ 
-      status: { $in: ['submitted', 'processing', 'auto-saved'] }
-    }).sort({ createdAt: -1 });
-
-    res.json({ 
-      success: true, 
-      data: submittedData,
-      count: submittedData.length
-    });
-
-  } catch (error) {
-    console.error("Error fetching submitted QC washing data:", error);
-    res.status(500).json({ 
-      success: false, 
-      message: "Failed to fetch submitted data", 
-      error: error.message 
-    });
-  }
-});
-const SubConDefect = createSubConDefectsModel(ymProdConnection);
-const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
-const SubconSewingQc1Report =
-  createSubconSewingQc1ReportModel(ymProdConnection);
-// Set UTF-8 encoding for responses
-app.use((req, res, next) => {
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  next();
-});
 
 /* ------------------------------
   SQL Query routs
@@ -27571,30 +27229,6 @@ app.post(
     }
   }
 );
-// Get all submitted QC washing data
-app.get("/api/qc-washing/all-submitted", async (req, res) => {
-  try {
-    const submittedData = await QCWashing.find({
-      status: ["submitted", "processing"]
-    })
-      .sort({ updatedAt: -1 })
-      .lean();
-
-    // Return in the format expected by frontend
-    res.json({
-      success: true,
-      data: submittedData,
-      count: submittedData.length
-    });
-  } catch (error) {
-    console.error("Error fetching submitted QC washing data:", error);
-    res.status(500).json({
-      success: false,
-      error: "Failed to fetch submitted QC washing data",
-      message: error.message
-    });
-  }
-});
 
 // Get specific submitted QC washing data by ID
 app.get("/api/qc-washing/submitted/:id", async (req, res) => {
@@ -27660,53 +27294,6 @@ app.get("/api/qc-washing/comparison", async (req, res) => {
   res.json(comparisonRecord);
 });
 
-// Endpoint to fetch wash qty from qc_washing_qty_old collection
-app.get("/api/qc-washing/wash-qty", async (req, res) => {
-  try {
-    const { date, color, orderNo, qcId } = req.query;
-    
-    if (!date || !color || !orderNo || !qcId) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Date, color, orderNo, and qcId are required" 
-      });
-    }
-
-    // Parse the date to match the format in the database
-    const inspectionDate = new Date(date);
-    
-    const washQtyRecord = await QCWashingQtyOld.findOne({
-      Inspection_date: {
-        $gte: new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate()),
-        $lt: new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate() + 1)
-      },
-      Style_No: orderNo,
-      Color: color,
-      "WorkerWashQty.QC_ID": qcId
-    });
-
-    if (washQtyRecord) {
-      const workerData = washQtyRecord.WorkerWashQty.find(worker => worker.QC_ID === qcId);
-      return res.json({
-        success: true,
-        washQty: workerData ? workerData.Wash_Qty : 0
-      });
-    }
-
-    res.json({
-      success: false,
-      washQty: 0,
-      message: "No wash qty data found"
-    });
-  } catch (error) {
-    console.error("Error fetching wash qty:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch wash qty data",
-      error: error.message
-    });
-  }
-});
 
 app.get("/api/qc-washing/results", async (req, res) => {
   try {
@@ -27959,6 +27546,341 @@ app.get("/api/users", async (req, res) => {
     });
   }
 });
+
+/* ------------------------------
+   End Points - QC Washing Qty Old
+------------------------------ */
+
+// Endpoint to fetch wash qty from qc_washing_qty_old collection
+app.get("/api/qc-washing/wash-qty", async (req, res) => {
+  try {
+    const { date, color, orderNo, qcId } = req.query;
+  
+    if (!date || !color || !orderNo || !qcId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "Missing required parameters: date, color, orderNo, qcId" 
+      });
+    }
+
+    // Parse the date to match the format in the database
+    const inspectionDate = new Date(date);
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Find the record matching date, color, and orderNo (style_no)
+    // Try exact match first, then partial match for color
+    let washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
+      Style_No: orderNo,
+      Color: color
+    });
+    
+    // If no exact match, try English-only matching by fetching candidates and filtering
+    if (!washQtyRecord) {
+      const candidates = await QCWashingQtyOld.find({
+        Inspection_date: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        },
+        Style_No: orderNo
+      });
+      
+      // Extract English part from brackets and match
+      washQtyRecord = candidates.find(record => {
+        const dbColor = record.Color;
+        // Extract text between [ and ]
+        const match = dbColor.match(/\[([^\]]+)\]/);
+        const englishPart = match ? match[1] : dbColor;
+        return englishPart.toLowerCase() === color.toLowerCase();
+      });
+    }
+
+    if (washQtyRecord) {
+      console.log('Matched color in DB:', washQtyRecord.Color);
+      console.log('Available workers:', washQtyRecord.WorkerWashQty.map(w => w.QC_ID));
+    }
+
+    if (!washQtyRecord) {
+      return res.json({ 
+        success: false, 
+        washQty: 0, 
+        message: "No wash qty record found",
+        searchCriteria: { date: startOfDay, orderNo, color }
+      });
+    }
+
+    // Find the specific QC worker's wash qty
+    const workerWashQty = washQtyRecord.WorkerWashQty.find(
+      worker => worker.QC_ID === qcId
+    );
+
+    if (washQtyRecord) {
+      console.log('All available QC_IDs:', washQtyRecord.WorkerWashQty.map(w => w.QC_ID));
+      console.log('Looking for QC_ID:', qcId);
+    }
+
+    const washQty = workerWashQty ? workerWashQty.Wash_Qty : 0;
+
+    res.json({ 
+      success: true, 
+      washQty,
+      totalWashQty: washQtyRecord.Total_Wash_Qty,
+      workerFound: !!workerWashQty
+    });
+
+  } catch (error) {
+    console.error("Error fetching wash qty:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch wash qty", 
+      error: error.message 
+    });
+  }
+});
+
+// Test endpoint to check QCWashingQtyOld collection structure
+app.get("/api/qc-washing/test-wash-qty", async (req, res) => {
+  try {
+    const sampleRecord = await QCWashingQtyOld.findOne().limit(1);
+    const totalCount = await QCWashingQtyOld.countDocuments();
+    
+    // Get some recent records for testing
+    const recentRecords = await QCWashingQtyOld.find()
+      .sort({ Inspection_date: -1 })
+      .limit(5)
+      .select('Inspection_date Style_No Color Total_Wash_Qty WorkerWashQty');
+    
+    res.json({ 
+      success: true, 
+      totalRecords: totalCount,
+      sampleRecord: sampleRecord,
+      recentRecords: recentRecords,
+      message: "QCWashingQtyOld collection test successful"
+    });
+
+  } catch (error) {
+    console.error("Error testing QCWashingQtyOld collection:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to test collection", 
+      error: error.message 
+    });
+  }
+});
+
+// Test endpoint to verify specific record matching
+app.get("/api/qc-washing/test-specific-match", async (req, res) => {
+  try {
+    const testDate = '2025-08-23';
+    const testOrderNo = 'GPAF6018';
+    const testColor = '500 EGGPLANT';
+    const testQcId = 'YM6926';
+    
+    const inspectionDate = new Date(testDate);
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Try exact match first
+    let washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
+      Style_No: testOrderNo,
+      Color: testColor
+    });
+    
+    // If no exact match, try English extraction
+    if (!washQtyRecord) {
+      const candidates = await QCWashingQtyOld.find({
+        Inspection_date: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        },
+        Style_No: testOrderNo
+      });
+      
+      washQtyRecord = candidates.find(record => {
+        const dbColor = record.Color;
+        const match = dbColor.match(/\[([^\]]+)\]/);
+        const englishPart = match ? match[1] : dbColor;
+        return englishPart.toLowerCase() === testColor.toLowerCase();
+      });
+    }
+    
+    let result = {
+      testParams: { testDate, testOrderNo, testColor, testQcId },
+      dateRange: { startOfDay, endOfDay },
+      recordFound: !!washQtyRecord,
+      washQty: 0,
+      workerFound: false
+    };
+    
+    if (washQtyRecord) {
+      const workerWashQty = washQtyRecord.WorkerWashQty.find(
+        worker => worker.QC_ID === testQcId
+      );
+      
+      result.recordDetails = {
+        dbColor: washQtyRecord.Color,
+        dbStyleNo: washQtyRecord.Style_No,
+        dbDate: washQtyRecord.Inspection_date,
+        totalWashQty: washQtyRecord.Total_Wash_Qty,
+        availableWorkers: washQtyRecord.WorkerWashQty.map(w => ({ id: w.QC_ID, qty: w.Wash_Qty }))
+      };
+      
+      if (workerWashQty) {
+        result.washQty = workerWashQty.Wash_Qty;
+        result.workerFound = true;
+      }
+    }
+    
+    res.json(result);
+    
+  } catch (error) {
+    console.error("Error in test endpoint:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Test failed", 
+      error: error.message 
+    });
+  }
+});
+
+// Debug endpoint to search wash qty records with flexible criteria
+app.get("/api/qc-washing/search-wash-qty", async (req, res) => {
+  try {
+    const { orderNo, color, qcId, dateFrom, dateTo } = req.query;
+    
+    let query = {};
+    
+    if (orderNo) {
+      query.Style_No = { $regex: orderNo, $options: 'i' };
+    }
+    
+    if (color) {
+      query.Color = { $regex: color, $options: 'i' };
+    }
+    
+    if (dateFrom || dateTo) {
+      query.Inspection_date = {};
+      if (dateFrom) {
+        query.Inspection_date.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        query.Inspection_date.$lte = new Date(dateTo);
+      }
+    }
+    
+    const records = await QCWashingQtyOld.find(query)
+      .sort({ Inspection_date: -1 })
+      .limit(10);
+    
+    // If qcId is provided, filter worker data
+    let filteredRecords = records;
+    if (qcId) {
+      filteredRecords = records.map(record => {
+        const workerData = record.WorkerWashQty.find(w => w.QC_ID === qcId);
+        return {
+          ...record.toObject(),
+          matchingWorker: workerData || null,
+          hasMatchingWorker: !!workerData
+        };
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      records: filteredRecords,
+      count: filteredRecords.length,
+      searchCriteria: { orderNo, color, qcId, dateFrom, dateTo }
+    });
+
+  } catch (error) {
+    console.error("Error searching wash qty records:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to search wash qty records", 
+      error: error.message 
+    });
+  }
+});
+
+// Endpoint to update wash qty for a specific record
+app.put("/api/qc-washing/update-wash-qty/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { washQty } = req.body;
+
+    const updatedRecord = await QCWashing.findByIdAndUpdate(
+      id,
+      { washQty: parseInt(washQty) || 0 },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Record not found" 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: updatedRecord,
+      message: "Wash qty updated successfully"
+    });
+
+  } catch (error) {
+    console.error("Error updating wash qty:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to update wash qty", 
+      error: error.message 
+    });
+  }
+});
+
+// Endpoint to fetch all submitted QC washing data
+app.get("/api/qc-washing/all-submitted", async (req, res) => {
+  try {
+    const submittedData = await QCWashing.find({ 
+      status: { $in: ['submitted', 'processing', 'auto-saved'] }
+    }).sort({ createdAt: -1 });
+
+    res.json({ 
+      success: true, 
+      data: submittedData,
+      count: submittedData.length
+    });
+
+  } catch (error) {
+    console.error("Error fetching submitted QC washing data:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch submitted data", 
+      error: error.message 
+    });
+  }
+});
+const SubConDefect = createSubConDefectsModel(ymProdConnection);
+const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
+const SubconSewingQc1Report =
+  createSubconSewingQc1ReportModel(ymProdConnection);
+// Set UTF-8 encoding for responses
+app.use((req, res, next) => {
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  next();
+});
+
 
 /* -------------------------------------------
    End Points - Supplier Issues Configuration
