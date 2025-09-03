@@ -44,8 +44,23 @@ const QCWashingViewDetailsModal = ({
   const calculateWashQuantities = () => {
     if (!itemData) return;
 
+    console.log("=== Wash Quantity Calculation Debug ===");
+    console.log("itemData:", {
+      id: itemData._id,
+      orderNo: itemData.orderNo,
+      color: itemData.color,
+      washType: itemData.washType,
+      reportType: itemData.reportType,
+      // factoryName: itemData.factoryName,
+      before_after_wash: itemData.before_after_wash,
+      washQty: itemData.washQty,
+      colorOrderQty: itemData.colorOrderQty
+    });
+    console.log("allRecords length:", allRecords.length);
+
     // If no allRecords, treat current record as the only record
     if (!allRecords || allRecords.length === 0) {
+      console.log("No allRecords available, using current record only");
       const alreadyWashedQty = parseInt(itemData.washQty) || 0;
       const remainingQty = Math.max(
         0,
@@ -68,14 +83,24 @@ const QCWashingViewDetailsModal = ({
         record.before_after_wash === itemData.before_after_wash &&
         record.color === itemData.color &&
         record.washType === itemData.washType &&
-        record.reportType === itemData.reportType &&
-        record.factoryName === itemData.factoryName;
+        record.reportType === itemData.reportType;
+      // record.factoryName === itemData.factoryName;
 
+      if (matches) {
+        console.log("Matching record found:", {
+          id: record._id,
+          washQty: record.washQty,
+          createdAt: record.createdAt
+        });
+      }
       return matches;
     });
 
+    console.log("Matching records count:", matchingRecords.length);
+
     // If no matching records found, treat current record as the only record
     if (matchingRecords.length === 0) {
+      console.log("No matching records found, using current record only");
       const alreadyWashedQty = parseInt(itemData.washQty) || 0;
       const remainingQty = Math.max(
         0,
@@ -98,6 +123,16 @@ const QCWashingViewDetailsModal = ({
       return dateA - dateB;
     });
 
+    console.log(
+      "Sorted records:",
+      sortedRecords.map((r) => ({
+        id: r._id,
+        washQty: r.washQty,
+        createdAt: r.createdAt,
+        date: r.date
+      }))
+    );
+
     // Find current record position - try multiple matching strategies
     let currentRecordIndex = -1;
 
@@ -118,6 +153,8 @@ const QCWashingViewDetailsModal = ({
       return false;
     });
 
+    console.log("Direct ID match index:", currentRecordIndex);
+
     // Strategy 2: Match by washQty and approximate date if ID match fails
     if (currentRecordIndex === -1) {
       currentRecordIndex = sortedRecords.findIndex((record) => {
@@ -133,17 +170,20 @@ const QCWashingViewDetailsModal = ({
 
         return washQtyMatch && dateMatch;
       });
+      console.log("WashQty + Date match index:", currentRecordIndex);
     }
 
     // Strategy 3: If still not found, assume it's the latest record
     if (currentRecordIndex === -1) {
       currentRecordIndex = sortedRecords.length - 1;
+      console.log("Using latest record index:", currentRecordIndex);
     }
 
     // Calculate cumulative wash quantity up to current record (inclusive)
     const recordsUpToCurrent = sortedRecords.slice(0, currentRecordIndex + 1);
     const alreadyWashedQty = recordsUpToCurrent.reduce((sum, record) => {
       const washQty = parseInt(record.washQty) || 0;
+      console.log(`Adding washQty: ${washQty} from record:`, record._id);
       return sum + washQty;
     }, 0);
 
@@ -151,6 +191,15 @@ const QCWashingViewDetailsModal = ({
       0,
       (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty
     );
+
+    console.log("Final calculation:", {
+      recordsUpToCurrent: recordsUpToCurrent.length,
+      alreadyWashedQty,
+      remainingQty,
+      currentRecordIndex,
+      totalRecords: sortedRecords.length
+    });
+
     setWashQuantityData({
       alreadyWashedQty,
       remainingQty,
@@ -221,9 +270,9 @@ const QCWashingViewDetailsModal = ({
         record.before_after_wash === itemData.before_after_wash &&
         record.color === itemData.color &&
         record.washType === itemData.washType &&
-        record.reportType === itemData.reportType &&
-        record.factoryName === itemData.factoryName
+        record.reportType === itemData.reportType
       );
+      // record.factoryName === itemData.factoryName;
     });
 
     // Sort by date or creation time to get chronological order
@@ -237,7 +286,6 @@ const QCWashingViewDetailsModal = ({
     setShowRecordsList(true);
   };
 
-  // Modal or list component
   // Modal or list component
   const RecordsListModal = () =>
     showRecordsList && (
@@ -262,6 +310,9 @@ const QCWashingViewDetailsModal = ({
                   <tr>
                     <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
                       #
+                    </th>
+                    <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
+                      Factory Name
                     </th>
                     <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
                       Date
@@ -310,6 +361,9 @@ const QCWashingViewDetailsModal = ({
                               Current
                             </span>
                           )}
+                        </td>
+                        <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
+                          {record.factoryName || "N/A"}
                         </td>
                         <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
                           {new Date(
@@ -604,6 +658,26 @@ const QCWashingViewDetailsModal = ({
 
                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
                   <div className="flex items-center">
+                    <Target className="w-8 h-8 text-amber-600 dark:text-amber-400" />
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        Wash Stage
+                      </p>
+                      <p
+                        className={`text-lg font-semibold capitalize ${
+                          itemData.before_after_wash === "before wash"
+                            ? "text-amber-900 dark:text-amber-100"
+                            : "text-emerald-900 dark:text-emerald-100"
+                        }`}
+                      >
+                        {itemData.before_after_wash || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
+                  <div className="flex items-center">
                     <Building className="w-8 h-8 text-orange-600 dark:text-orange-400" />
                     <div className="ml-3">
                       <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
@@ -865,7 +939,7 @@ const QCWashingViewDetailsModal = ({
                                         : "text-gray-900 dark:text-gray-100"
                                     }`}
                                   >
-                                    {point.decision}
+                                    {point.decision?.toUpperCase()}
                                   </p>
                                 </div>
                               </div>

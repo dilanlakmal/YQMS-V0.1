@@ -277,7 +277,7 @@ const SubmittedWashingDataFilter = ({
       {/* Filter Content */}
       {isVisible && (
         <div className="p-6 bg-gray-50 dark:bg-gray-900">
-          <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+          <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-10 gap-6">
             {/* Date Range Filters */}
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -517,7 +517,7 @@ const SubmittedWashingDataFilter = ({
             </div>
 
             {/* Continue with other regular dropdowns... */}
-            <div className="relative">
+            {/* <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <User className="w-4 h-4 mr-1" />
                 Buyer
@@ -525,34 +525,22 @@ const SubmittedWashingDataFilter = ({
               <div className="relative">
                 <select
                   value={filters.buyer}
-                  onChange={(e) => handleFilterChange("buyer", e.target.value)}
+                  onChange={(e) => handleFilterChange('buyer', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Buyers</option>
-                  {getUniqueValues("buyer").map((buyer) => (
-                    <option key={buyer} value={buyer}>
-                      {buyer}
-                    </option>
+                  {getUniqueValues('buyer').map(buyer => (
+                    <option key={buyer} value={buyer}>{buyer}</option>
                   ))}
                 </select>
                 <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>
-            </div>
+            </div> */}
 
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

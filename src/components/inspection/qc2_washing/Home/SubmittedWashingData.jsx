@@ -12,6 +12,11 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
+  const [paginatedData, setPaginatedData] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [filterVisible, setFilterVisible] = useState(false);
   const [showDefectColumn, setShowDefectColumn] = useState(false);
@@ -70,6 +75,41 @@ const SubmittedWashingDataPage = () => {
     });
   };
 
+  // Function to fetch wash qty from qc_washing_qty_old collection
+  const fetchWashQty = async (record) => {
+    try {
+      const dateStr = record.date
+        ? new Date(record.date).toISOString().split("T")[0]
+        : "";
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/wash-qty?date=${dateStr}&color=${encodeURIComponent(
+          record.color
+        )}&orderNo=${encodeURIComponent(
+          record.orderNo
+        )}&qcId=${encodeURIComponent(record.userId)}`
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        return {
+          washQty: data.success ? data.washQty : record.washQty || 0,
+          fromOldCollection: data.success
+        };
+      }
+      return {
+        washQty: record.washQty || 0,
+        fromOldCollection: false
+      };
+    } catch (error) {
+      console.error("Error fetching wash qty:", error);
+      return {
+        washQty: record.washQty || 0,
+        fromOldCollection: false
+      };
+    }
+  };
+
   // Fetch data on component mount
   useEffect(() => {
     const fetchSubmittedData = async () => {
@@ -93,7 +133,29 @@ const SubmittedWashingDataPage = () => {
         const data = await response.json();
 
         if (data.success) {
-          setSubmittedData(data.data || []);
+          const records = data.data || [];
+
+          // Fetch wash qty for each record that meets the criteria
+          const recordsWithWashQty = await Promise.all(
+            records.map(async (record) => {
+              // Only fetch wash qty for inline reports from YM factory with normal wash type
+              if (
+                record.reportType === "Inline" &&
+                record.factoryName === "YM" &&
+                record.washType === "Normal Wash"
+              ) {
+                const washQtyData = await fetchWashQty(record);
+                return {
+                  ...record,
+                  washQty: washQtyData.washQty,
+                  washQtyFromOldCollection: washQtyData.fromOldCollection
+                };
+              }
+              return record;
+            })
+          );
+
+          setSubmittedData(recordsWithWashQty);
         } else {
           setError(data.message || "Failed to fetch submitted data.");
         }
@@ -212,55 +274,24 @@ const SubmittedWashingDataPage = () => {
     });
   };
 
-  // Enhanced convert image to base64 using backend endpoint with retry mechanism
+  // Skip image conversion due to CORS issues - use placeholders
   const convertImageToBase64 = async (imagePath, API_BASE_URL) => {
-    if (!imagePath || !API_BASE_URL) {
-      console.log(`❌ convertImageToBase64: Missing parameters`);
-      return null;
-    }
+    if (!imagePath) return null;
 
     // If it's already base64, return it
     if (imagePath.startsWith("data:image/")) {
       return imagePath;
     }
 
-    try {
-      if (
-        !imagePath.startsWith(
-          "https://yqms.yaikh.com/storage/qc_washing_images/"
-        )
-      ) {
-        console.warn("❌ Unsupported image path format:", imagePath);
-        return imagePath; // fallback to original URL
-      }
-
-      const [type, filename] = imagePath
-        .replace("https://yqms.yaikh.com/storage/qc_washing_images/", "")
-        .split("/");
-
-      const apiUrl = `${API_BASE_URL}/api/pdf-image-base64/${type}/${filename}`;
-      console.log(`🔄 Converting to base64: ${apiUrl}`);
-
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: { Accept: "application/json" }
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const data = await response.json();
-
-      if (data.base64) {
-        console.log(`✅ Successfully converted: ${imagePath}`);
-        return data.base64;
-      } else {
-        console.warn(`❌ Conversion failed, using original URL: ${imagePath}`);
-        return imagePath;
-      }
-    } catch (error) {
-      console.error(`❌ Error converting image to base64: ${error.message}`);
-      return imagePath; // fallback to original URL
-    }
+    // For now, return null to show placeholders due to CORS issues
+    // This avoids the fetch errors and provides a clean PDF with placeholders
+    console.log(
+      `🖼️ Skipping image conversion due to CORS, will show placeholder: ${imagePath.substring(
+        0,
+        50
+      )}...`
+    );
+    return null;
   };
 
   // Process images for PDF rendering
@@ -304,33 +335,22 @@ const SubmittedWashingDataPage = () => {
 
                 const processedImages = [];
                 for (const imagePath of defect.defectImages) {
-                  try {
-                    // Skip if already base64
-                    if (imagePath && imagePath.startsWith("data:image/")) {
-                      processedImages.push(imagePath);
-                      console.log("✅ Image already in base64 format");
-                      continue;
-                    }
-
-                    const base64Image = await convertImageToBase64(
-                      imagePath,
-                      API_BASE_URL
-                    );
-                    if (base64Image && base64Image.startsWith("data:image/")) {
-                      processedImages.push(base64Image);
-                      console.log("✅ Successfully converted defect image");
-                    } else {
-                      console.warn(
-                        `❌ Failed to convert defect image: ${imagePath}`
-                      );
-                      // Don't push null, skip invalid images
-                    }
-                  } catch (error) {
-                    console.warn(
-                      `❌ Error processing defect image: ${imagePath}`,
-                      error.message
-                    );
+                  // Skip if already base64
+                  if (imagePath && imagePath.startsWith("data:image/")) {
+                    processedImages.push(imagePath);
+                    console.log("✅ Image already in base64 format");
+                    continue;
                   }
+
+                  // For CORS-blocked images, add placeholder info
+                  console.log(
+                    `🖼️ Adding defect image placeholder for: ${imagePath}`
+                  );
+                  processedImages.push({
+                    isPlaceholder: true,
+                    originalUrl: imagePath,
+                    type: "defect"
+                  });
                 }
 
                 // IMPORTANT: Assign the processed images back to the correct location
@@ -354,32 +374,22 @@ const SubmittedWashingDataPage = () => {
         const processedAdditionalImages = [];
         for (const imagePath of processedRecord.defectDetails
           .additionalImages) {
-          try {
-            // Skip if already base64
-            if (imagePath && imagePath.startsWith("data:image/")) {
-              processedAdditionalImages.push(imagePath);
-              console.log("✅ Additional image already in base64 format");
-              continue;
-            }
-
-            const base64Image = await convertImageToBase64(
-              imagePath,
-              API_BASE_URL
-            );
-            if (base64Image && base64Image.startsWith("data:image/")) {
-              processedAdditionalImages.push(base64Image);
-              console.log("✅ Successfully converted additional image");
-            } else {
-              console.warn(
-                `❌ Failed to convert additional image: ${imagePath}`
-              );
-            }
-          } catch (error) {
-            console.warn(
-              `❌ Error processing additional image: ${imagePath}`,
-              error.message
-            );
+          // Skip if already base64
+          if (imagePath && imagePath.startsWith("data:image/")) {
+            processedAdditionalImages.push(imagePath);
+            console.log("✅ Additional image already in base64 format");
+            continue;
           }
+
+          // For CORS-blocked images, add placeholder info
+          console.log(
+            `🖼️ Adding additional image placeholder for: ${imagePath}`
+          );
+          processedAdditionalImages.push({
+            isPlaceholder: true,
+            originalUrl: imagePath,
+            type: "additional"
+          });
         }
 
         // IMPORTANT: Assign the processed images back
@@ -430,11 +440,14 @@ const SubmittedWashingDataPage = () => {
               if (imagePath.startsWith("data:image/")) {
                 processedComparisonImages.push(imagePath);
               } else {
-                const base64Image = await convertImageToBase64(
-                  imagePath,
-                  API_BASE_URL
+                console.log(
+                  `🖼️ Adding comparison image placeholder for: ${imagePath}`
                 );
-                if (base64Image) processedComparisonImages.push(base64Image);
+                processedComparisonImages.push({
+                  isPlaceholder: true,
+                  originalUrl: imagePath,
+                  type: "comparison"
+                });
               }
             }
             processedRecord.inspectionDetails.checkedPoints[
@@ -477,6 +490,17 @@ const SubmittedWashingDataPage = () => {
           }
         }
       }
+
+      // Log final summary
+      console.log("📈 Image processing complete:", {
+        defectsByPc: processedRecord.defectDetails?.defectsByPc?.length || 0,
+        additionalImages:
+          processedRecord.defectDetails?.additionalImages?.length || 0,
+        checkedPoints:
+          processedRecord.inspectionDetails?.checkedPoints?.length || 0,
+        machineProcesses:
+          processedRecord.inspectionDetails?.machineProcesses?.length || 0
+      });
 
       return processedRecord;
     } catch (error) {
@@ -570,123 +594,9 @@ const SubmittedWashingDataPage = () => {
         record._id
       );
 
-      // Process images to base64
-      const processedRecord = JSON.parse(JSON.stringify(record)); // Deep clone
-
-      // Convert defect images
-      if (processedRecord.defectDetails?.defectsByPc) {
-        for (
-          let pcIndex = 0;
-          pcIndex < processedRecord.defectDetails.defectsByPc.length;
-          pcIndex++
-        ) {
-          const pcDefect = processedRecord.defectDetails.defectsByPc[pcIndex];
-
-          if (pcDefect.pcDefects) {
-            for (
-              let defectIndex = 0;
-              defectIndex < pcDefect.pcDefects.length;
-              defectIndex++
-            ) {
-              const defect = pcDefect.pcDefects[defectIndex];
-
-              if (defect.defectImages && Array.isArray(defect.defectImages)) {
-                const convertedImages = [];
-                for (const imagePath of defect.defectImages) {
-                  const base64Image = await convertImageToBase64(
-                    imagePath,
-                    API_BASE_URL
-                  );
-                  if (base64Image) {
-                    convertedImages.push(base64Image);
-                  }
-                }
-                processedRecord.defectDetails.defectsByPc[pcIndex].pcDefects[
-                  defectIndex
-                ].defectImages = convertedImages;
-              }
-            }
-          }
-        }
-      }
-
-      // Convert additional images
-      if (processedRecord.defectDetails?.additionalImages) {
-        const convertedAdditionalImages = [];
-        for (const imagePath of processedRecord.defectDetails
-          .additionalImages) {
-          const base64Image = await convertImageToBase64(
-            imagePath,
-            API_BASE_URL
-          );
-          if (base64Image) {
-            convertedAdditionalImages.push(base64Image);
-          }
-        }
-        processedRecord.defectDetails.additionalImages =
-          convertedAdditionalImages;
-      }
-
-      // Convert inspection images
-      if (processedRecord.inspectionDetails?.checkedPoints) {
-        for (
-          let pointIndex = 0;
-          pointIndex < processedRecord.inspectionDetails.checkedPoints.length;
-          pointIndex++
-        ) {
-          const point =
-            processedRecord.inspectionDetails.checkedPoints[pointIndex];
-
-          // Convert point image
-          if (point.image) {
-            const base64Image = await convertImageToBase64(
-              point.image,
-              API_BASE_URL
-            );
-            processedRecord.inspectionDetails.checkedPoints[pointIndex].image =
-              base64Image;
-          }
-
-          // Convert comparison images
-          if (point.comparison && Array.isArray(point.comparison)) {
-            const convertedComparisons = [];
-            for (const imagePath of point.comparison) {
-              const base64Image = await convertImageToBase64(
-                imagePath,
-                API_BASE_URL
-              );
-              if (base64Image) {
-                convertedComparisons.push(base64Image);
-              }
-            }
-            processedRecord.inspectionDetails.checkedPoints[
-              pointIndex
-            ].comparison = convertedComparisons;
-          }
-        }
-      }
-
-      // Convert machine images
-      if (processedRecord.inspectionDetails?.machineProcesses) {
-        for (
-          let machineIndex = 0;
-          machineIndex <
-          processedRecord.inspectionDetails.machineProcesses.length;
-          machineIndex++
-        ) {
-          const machine =
-            processedRecord.inspectionDetails.machineProcesses[machineIndex];
-          if (machine.image) {
-            const base64Image = await convertImageToBase64(
-              machine.image,
-              API_BASE_URL
-            );
-            processedRecord.inspectionDetails.machineProcesses[
-              machineIndex
-            ].image = base64Image;
-          }
-        }
-      }
+      // Process images to base64 using the centralized function
+      const processedRecord = await processImagesInRecord(record, API_BASE_URL);
+      console.log("✅ Image processing completed, generating PDF...");
 
       // Fetch comparison data
       let comparisonData = null;
@@ -791,12 +701,15 @@ const SubmittedWashingDataPage = () => {
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
 
-  // Filter function - moved to separate component but logic stays here
+  // Cross-filtering function with proper cumulative filtering
   const applyFilters = (filters) => {
     let filtered = [...submittedData];
 
     // Date range filter
-    if (filters.dateRange.startDate || filters.dateRange.endDate) {
+    if (
+      filters.dateRange &&
+      (filters.dateRange.startDate || filters.dateRange.endDate)
+    ) {
       filtered = filtered.filter((item) => {
         const itemDate = new Date(item.date);
         const startDate = filters.dateRange.startDate
@@ -836,15 +749,10 @@ const SubmittedWashingDataPage = () => {
       );
     }
 
-    // Status filter
-    // if (filters.status) {
-    //   filtered = filtered.filter(item => item.overallFinalResult === filters.status);
-    // }
-
     // Buyer filter
-    if (filters.buyer) {
-      filtered = filtered.filter((item) => item.buyer === filters.buyer);
-    }
+    // if (filters.buyer) {
+    //   filtered = filtered.filter(item => item.buyer === filters.buyer);
+    // }
 
     // Factory name filter
     if (filters.factoryName) {
@@ -865,6 +773,7 @@ const SubmittedWashingDataPage = () => {
       filtered = filtered.filter((item) => item.washType === filters.washType);
     }
 
+    // Before/After wash filter
     if (filters.before_after_wash) {
       filtered = filtered.filter(
         (item) => item.before_after_wash === filters.before_after_wash
@@ -872,6 +781,7 @@ const SubmittedWashingDataPage = () => {
     }
 
     setFilteredData(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
   };
 
   // Handle filter changes
@@ -888,6 +798,34 @@ const SubmittedWashingDataPage = () => {
   useEffect(() => {
     setFilteredData(submittedData);
   }, [submittedData]);
+
+  // Update paginated data when filtered data or current page changes
+  useEffect(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    setPaginatedData(filteredData.slice(startIndex, endIndex));
+  }, [filteredData, currentPage, itemsPerPage]);
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage + 1;
+  const endIndex = Math.min(currentPage * itemsPerPage, filteredData.length);
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page);
+  };
+
+  const handlePrevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  const handleNextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -925,7 +863,7 @@ const SubmittedWashingDataPage = () => {
     <div className="space-y-6">
       {/* Filter Component */}
       <SubmittedWashingDataFilter
-        data={submittedData}
+        data={filteredData.length > 0 ? filteredData : submittedData}
         onFilterChange={handleFilterChange}
         onReset={handleFilterReset}
         isVisible={filterVisible}
@@ -960,7 +898,7 @@ const SubmittedWashingDataPage = () => {
               </label>
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
-              Showing {filteredData.length} of {submittedData.length} records
+              Showing {startIndex}-{endIndex} of {filteredData.length} records
             </div>
           </div>
         </div>
@@ -993,11 +931,14 @@ const SubmittedWashingDataPage = () => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Factory
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
-                    Buyer
-                  </th>
+                  {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   Buyer
+                  </th> */}
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Wash Type
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                    Report Type
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     MO No
@@ -1011,11 +952,14 @@ const SubmittedWashingDataPage = () => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Total Order Qty
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Color Order Qty
-                  </th>
+                  </th> */}
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Wash Qty
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                    Checked Qty
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
                     Before/After Wash
@@ -1024,7 +968,7 @@ const SubmittedWashingDataPage = () => {
                     Status
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Pass Rate (%)
+                    Pass Rate (Measur.) (%)
                   </th>
                   {showDefectColumn && (
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
@@ -1043,6 +987,8 @@ const SubmittedWashingDataPage = () => {
                 {/* Sub-header row for complex columns */}
                 <tr className="bg-gray-100 dark:bg-gray-600">
                   <th className="px-3 py-2"></th>
+                  {/* <th className="px-3 py-2"></th> */}
+                  {/* <th className="px-3 py-2"></th> */}
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
@@ -1078,7 +1024,7 @@ const SubmittedWashingDataPage = () => {
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                {filteredData.map((record, index) => {
+                {paginatedData.map((record, index) => {
                   const defectDetails = getDefectDetails(record);
                   const measurementDetails = getMeasurementDetails(record);
 
@@ -1095,11 +1041,14 @@ const SubmittedWashingDataPage = () => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.factoryName || "N/A"}
                       </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {record.buyer || "N/A"}
-                      </td>
+                      {/* <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {record.buyer || 'N/A'}
+                      </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.washType || "N/A"}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
+                        {record.reportType || "N/A"}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.orderNo || "N/A"}
@@ -1113,11 +1062,23 @@ const SubmittedWashingDataPage = () => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.orderQty || "N/A"}
                       </td>
+                      {/* <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                        {record.colorOrderQty || 'N/A'}
+                      </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.colorOrderQty || "N/A"}
+                        <span
+                          className={`${
+                            record.washQtyFromOldCollection ||
+                            record.reportType === "First Output"
+                              ? "text-green-600 font-medium"
+                              : "text-gray-400"
+                          }`}
+                        >
+                          {record.washQty || "N/A"}
+                        </span>
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.washQty || "N/A"}
+                        {record.checkedQty || "N/A"}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.before_after_wash || "N/A"}
@@ -1129,7 +1090,7 @@ const SubmittedWashingDataPage = () => {
                               ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200"
                               : record.overallFinalResult === "Fail"
                               ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200"
-                              : "bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200"
+                              : "bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200"
                           }`}
                         >
                           {record.overallFinalResult || "N/A"}
@@ -1224,7 +1185,7 @@ const SubmittedWashingDataPage = () => {
                                 <FileText size={16} className="mr-3" />
                                 Full Report
                               </button>
-                              {/* <button
+                              <button
                                 onClick={() => {
                                   handleDownloadPDF(record);
                                   setOpenDropdown(null);
@@ -1236,7 +1197,7 @@ const SubmittedWashingDataPage = () => {
                                 {isqcWashingPDF
                                   ? "Generating PDF..."
                                   : "Download PDF"}
-                              </button> */}
+                              </button>
                               <hr className="my-1 border-gray-200 dark:border-gray-600" />
                               {/* <button
                                 onClick={() => {
@@ -1257,6 +1218,62 @@ const SubmittedWashingDataPage = () => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-6 py-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400">
+              Showing {startIndex} to {endIndex} of {filteredData.length}{" "}
+              results
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handlePrevPage}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+
+              <div className="flex space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => handlePageChange(pageNum)}
+                      className={`px-3 py-1 text-sm border rounded-md ${
+                        currentPage === pageNum
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={handleNextPage}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>
