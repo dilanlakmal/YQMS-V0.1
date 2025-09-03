@@ -443,7 +443,6 @@ const RecordsListModal = () => (
                     </div>
                   </div>
                 </div>
-
               </div>
             </div>
 

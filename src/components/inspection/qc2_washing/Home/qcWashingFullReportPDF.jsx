@@ -388,7 +388,6 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], API_BASE
   );
 };
 
-
 const MeasurementDetailTable = ({ sizeData }) => {
   const measurementPoints = sizeData.pcs[0]?.measurementPoints || [];
   if (measurementPoints.length === 0) return null;
@@ -1032,7 +1031,6 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData, API_BASE_URL
     </View>
   );
 };
-
 
 const ComparisonSection = ({ recordData, comparisonData }) => (
   <View style={styles.section}>

@@ -1989,7 +1989,8 @@
     "qastandarddefects": "QA Standard Defects",
     "qcWashingTab": "Washing QC",
     "supplierIssuesTab": "Supplier Issues",
-    "contentComingSoon": "This section is under development. Content will be available soon."
+    "contentComingSoon": "This section is under development. Content will be available soon.",
+    "subConQC1Tab": "Sub-Con QC1"
   },
 
   "qcWashing":{

@@ -12,7 +12,7 @@ import {
   Save,
   Search,
   User,
-  XCircle
+  XCircle,
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
@@ -61,7 +61,7 @@ const VerticalSummaryCard = ({
   title,
   value,
   colorClass,
-  bgColorClass
+  bgColorClass,
 }) => (
   <div
     className={`p-3 rounded-lg shadow-sm flex flex-col h-full ${bgColorClass}`}
@@ -76,13 +76,38 @@ const VerticalSummaryCard = ({
   </div>
 );
 
+// --- A dedicated card for the Comments input ---
+
+const CommentsCard = ({ comments, onChange, maxLength = 500 }) => (
+  <div className="p-4 rounded-lg shadow-md flex flex-col bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+    <label
+      htmlFor="comments-box"
+      className="text-sm font-bold text-gray-800 dark:text-gray-300 uppercase tracking-wider mb-2"
+    >
+      Comments
+    </label>
+    <textarea
+      id="comments-box"
+      value={comments}
+      onChange={onChange}
+      maxLength={maxLength}
+      rows={4}
+      className="w-full bg-white dark:bg-gray-900/50 border-2 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 rounded-md p-2 text-gray-700 dark:text-gray-200 resize-none"
+      placeholder="Enter any comments here..."
+    />
+    <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-1">
+      {maxLength - (comments?.length || 0)} characters remaining
+    </div>
+  </div>
+);
+
 // --- Defect Card component ---
 const DefectCard = ({
   defect,
   checkedQty,
   onQtyChange,
   getDefectRateCellColor,
-  isLocked
+  isLocked,
 }) => {
   const defectRate =
     checkedQty > 0 ? (Number(defect.qty || 0) / checkedQty) * 100 : null;
@@ -149,6 +174,13 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
   const [isQtyLocked, setIsQtyLocked] = useState(false); // State for locking inputs
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  const [existingReportId, setExistingReportId] = useState(null);
+
+  // --- EVENT HANDLERS ---
+  const handleStateChange = (field, value) => {
+    setInspectionState((prevState) => ({ ...prevState, [field]: value }));
+  };
+
   // --- DEBOUNCE HELPER ---
   const debounce = useCallback((func, delay) => {
     let timeoutId;
@@ -169,7 +201,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       }
       try {
         const res = await axios.get(`${API_BASE_URL}/api/search-mono`, {
-          params: { term: searchTerm }
+          params: { term: searchTerm },
         });
         setMoNoOptions(res.data.map((mo) => ({ value: mo, label: mo })));
       } catch (error) {
@@ -205,6 +237,38 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     fetchFactories();
   }, []);
 
+  // =========================================================================
+  //    Auto-select factory based on logged-in user's name ===
+  // =========================================================================
+  useEffect(() => {
+    // Proceed only if we have a user, a user name, and a list of factories.
+    // Also, only run this if a factory has NOT been selected yet.
+    if (
+      user &&
+      user.name &&
+      allFactories.length > 0 &&
+      !inspectionState.factory
+    ) {
+      // Find a factory in the list where the `factory` field matches the `user.name`.
+      const matchedFactory = allFactories.find(
+        (f) => f.factory.toLowerCase() === user.name.toLowerCase()
+      );
+
+      // If a match is found, create the option object for react-select.
+      if (matchedFactory) {
+        const factoryOption = {
+          value: matchedFactory.factory,
+          label: matchedFactory.factory_second_name
+            ? `${matchedFactory.factory} (${matchedFactory.factory_second_name})`
+            : matchedFactory.factory,
+        };
+        // Update the state to auto-select this factory.
+        handleStateChange("factory", factoryOption);
+      }
+    }
+    // This effect depends on the user, the factory list, and the current inspection state.
+  }, [user, allFactories, inspectionState.factory, handleStateChange]);
+
   // Fetch defects from the backend
   useEffect(() => {
     const fetchDefects = async () => {
@@ -215,7 +279,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         if (inspectionState.defects.length === 0) {
           setInspectionState((prevState) => ({
             ...prevState,
-            defects: defectsWithQty
+            defects: defectsWithQty,
           }));
         }
       } catch (error) {
@@ -224,6 +288,95 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     };
     fetchDefects();
   }, [setInspectionState, inspectionState.defects.length]);
+
+  // =========================================================================
+  // === NEW useEffect: To check for an existing report when key fields change ===
+  // =========================================================================
+  useEffect(() => {
+    const { inspectionDate, factory, lineNo, moNo, color } = inspectionState;
+
+    // Check if all necessary fields are selected before making the API call
+    if (inspectionDate && factory && lineNo && moNo && color) {
+      const findExistingReport = async () => {
+        try {
+          const params = {
+            inspectionDate: inspectionDate.toISOString().split("T")[0], // Format to YYYY-MM-DD
+            factory: factory.value,
+            lineNo: lineNo.value,
+            moNo: moNo.value,
+            color: color.value,
+          };
+          const res = await axios.get(
+            `${API_BASE_URL}/api/subcon-sewing-qc1-report/find`,
+            { params }
+          );
+
+          if (res.data) {
+            // --- REPORT FOUND: POPULATE THE FORM ---
+            const existingReport = res.data;
+            setExistingReportId(existingReport._id); // Set the ID for update logic
+
+            // 1. Update Checked Qty and Comments
+            handleStateChange(
+              "checkedQty",
+              existingReport.checkedQty.toString()
+            );
+
+            handleStateChange("comments", existingReport.comments || "");
+
+            // 2. Update defect quantities
+            // Create a map for quick lookups of existing defect quantities
+            const defectQtyMap = new Map(
+              existingReport.defectList.map((d) => [d.defectCode, d.qty])
+            );
+
+            // Map over the full defect list and update quantities from the map
+            const updatedDefects = inspectionState.defects.map((defect) => ({
+              ...defect,
+              qty: (defectQtyMap.get(defect.DefectCode) || "").toString(),
+            }));
+
+            handleStateChange("defects", updatedDefects);
+
+            // Notify the user they are in edit mode
+            Swal.fire({
+              icon: "info",
+              title: "Previous Report Loaded",
+              text: "You are now editing an existing report. Your changes will overwrite the previous data.",
+              toast: true,
+              position: "top-end",
+              showConfirmButton: false,
+              timer: 3500,
+            });
+          } else {
+            // --- NO REPORT FOUND: RESET TO A NEW FORM STATE ---
+            setExistingReportId(null);
+            // Reset quantities to ensure no old data is carried over
+            handleStateChange("checkedQty", "");
+            const resetDefects = inspectionState.defects.map((d) => ({
+              ...d,
+              qty: "",
+            }));
+            handleStateChange("defects", resetDefects);
+            handleStateChange("comments", "");
+          }
+        } catch (error) {
+          console.error("Error checking for existing report:", error);
+          // In case of an error, assume it's a new report
+          setExistingReportId(null);
+        }
+      };
+
+      findExistingReport();
+    }
+  }, [
+    inspectionState.inspectionDate,
+    inspectionState.factory,
+    inspectionState.lineNo,
+    inspectionState.moNo,
+    inspectionState.color,
+    // Note: inspectionState.defects.length is added to ensure we have the base defect list before running this
+  ]);
 
   // Fetch colors when MO No changes
   useEffect(() => {
@@ -259,7 +412,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         setLineOptions(
           selectedFactoryData.lineList.map((line) => ({
             value: line,
-            label: line
+            label: line,
           }))
         );
       }
@@ -316,11 +469,6 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     return (totalDefectQty / checked) * 100;
   }, [totalDefectQty, inspectionState.checkedQty]);
 
-  // --- EVENT HANDLERS ---
-  const handleStateChange = (field, value) => {
-    setInspectionState((prevState) => ({ ...prevState, [field]: value }));
-  };
-
   const handleDefectQtyChange = (defectCode, value) => {
     if (
       value === "" ||
@@ -350,16 +498,16 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     if (totalDefectRate > 5)
       return {
         color: "text-red-600 dark:text-red-400",
-        bg: "bg-red-100 dark:bg-red-900/50"
+        bg: "bg-red-100 dark:bg-red-900/50",
       };
     if (totalDefectRate >= 3)
       return {
         color: "text-orange-500 dark:text-orange-400",
-        bg: "bg-orange-100 dark:bg-orange-900/50"
+        bg: "bg-orange-100 dark:bg-orange-900/50",
       };
     return {
       color: "text-green-600 dark:text-green-400",
-      bg: "bg-green-100 dark:bg-green-900/50"
+      bg: "bg-green-100 dark:bg-green-900/50",
     };
   };
 
@@ -374,14 +522,14 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     control: (base) => ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
-      borderColor: "var(--color-border)"
+      borderColor: "var(--color-border)",
     }),
     singleValue: (base) => ({ ...base, color: "var(--color-text-primary)" }),
     input: (base) => ({ ...base, color: "var(--color-text-primary)" }),
     menu: (base) => ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
-      zIndex: 50
+      zIndex: 50,
     }),
     option: (base, { isFocused, isSelected }) => ({
       ...base,
@@ -390,23 +538,48 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         : isFocused
         ? "var(--color-bg-tertiary)"
         : "var(--color-bg-secondary)",
-      color: isSelected ? "white" : "var(--color-text-primary)"
-    })
+      color: isSelected ? "white" : "var(--color-text-primary)",
+    }),
   };
 
-  // --- DEFENSIVE CHECK IN useMemo ---
+  // --- ENHANCED factoryOptions LOGIC ---
   const factoryOptions = useMemo(() => {
-    // If allFactories is not an array, return an empty array immediately.
-    if (!Array.isArray(allFactories)) {
+    // Always start with a defensive check.
+    if (!Array.isArray(allFactories) || allFactories.length === 0) {
       return [];
     }
+
+    // Check if a user is logged in and has a name.
+    if (user && user.name) {
+      // Try to find a factory that matches the user's name (case-insensitive).
+      const matchedFactory = allFactories.find(
+        (f) => f.factory.toLowerCase() === user.name.toLowerCase()
+      );
+
+      // --- NEW LOGIC ---
+      // If a match is found, create and return an options array
+      // containing ONLY that single factory.
+      if (matchedFactory) {
+        return [
+          {
+            value: matchedFactory.factory,
+            label: matchedFactory.factory_second_name
+              ? `${matchedFactory.factory} (${matchedFactory.factory_second_name})`
+              : matchedFactory.factory,
+          },
+        ];
+      }
+    }
+
+    // If no user is logged in, or if their name doesn't match any factory,
+    // return the full list of all factories.
     return allFactories.map((f) => ({
       value: f.factory,
       label: f.factory_second_name
         ? `${f.factory} (${f.factory_second_name})`
-        : f.factory
+        : f.factory,
     }));
-  }, [allFactories]);
+  }, [allFactories, user]); // <-- Add 'user' to the dependency array.
 
   // FORM VALIDATION LOGIC
   const isFormInvalid = useMemo(() => {
@@ -439,7 +612,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         defectCode: d.DefectCode,
         displayCode: d.DisplayCode,
         defectName: d.DefectNameEng, // English name only
-        qty: Number(d.qty)
+        qty: Number(d.qty),
       }));
 
     const factoryData = allFactories.find(
@@ -455,30 +628,48 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       color: inspectionState.color.value,
       preparedBy: {
         empId: user.emp_id,
-        engName: user.eng_name
+        engName: user.eng_name,
       },
       checkedQty: Number(inspectionState.checkedQty),
       totalDefectQty: totalDefectQty,
-      defectList: defectsToSave
+      defectList: defectsToSave,
+      comments: inspectionState.comments || "",
     };
 
     try {
-      const response = await axios.post(
-        `${API_BASE_URL}/api/subcon-sewing-qc1-reports`,
-        payload
-      );
-      Swal.fire({
-        icon: "success",
-        title: "Report Saved!",
-        text: `Your report has been saved with ID: ${response.data.reportID}`,
-        timer: 2000,
-        showConfirmButton: false
-      });
+      let response;
+      if (existingReportId) {
+        // --- UPDATE an existing report ---
+        response = await axios.put(
+          `${API_BASE_URL}/api/subcon-sewing-qc1-reports/${existingReportId}`,
+          payload
+        );
+        Swal.fire({
+          icon: "success",
+          title: "Report Updated!",
+          text: `The report has been successfully updated.`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      } else {
+        // --- CREATE a new report ---
+        response = await axios.post(
+          `${API_BASE_URL}/api/subcon-sewing-qc1-reports`,
+          payload
+        );
+        Swal.fire({
+          icon: "success",
+          title: "Report Saved!",
+          text: `Your new report has been saved with ID: ${response.data.reportID}`,
+          timer: 2000,
+          showConfirmButton: false,
+        });
+      }
 
       // --- FORM RESET LOGIC ---
       const resetDefects = inspectionState.defects.map((d) => ({
         ...d,
-        qty: ""
+        qty: "",
       }));
 
       setInspectionState((prevState) => ({
@@ -487,10 +678,12 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         moNo: null,
         color: null,
         checkedQty: "",
-        defects: resetDefects
+        defects: resetDefects,
+        comments: "",
       }));
 
-      // Clear local state
+      // Clear local state and reset edit mode
+      setExistingReportId(null);
       setMoNoSearchTerm("");
       setMoNoOptions([]);
       setColorOptions([]);
@@ -624,6 +817,10 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             colorClass="text-gray-500 dark:text-gray-300"
             bgColorClass="bg-gray-200 dark:bg-gray-700/50"
           />
+          <CommentsCard
+            comments={inspectionState.comments || ""}
+            onChange={(e) => handleStateChange("comments", e.target.value)}
+          />
           <div className="flex justify-end gap-2">
             <button
               onClick={() => setIsPreviewOpen(true)}
@@ -641,7 +838,11 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
               ) : (
                 <Save size={18} />
               )}
-              {isSubmitting ? "Saving..." : "Save Inspection"}
+              {isSubmitting
+                ? "Saving..."
+                : existingReportId
+                ? "Update Inspection"
+                : "Save Inspection"}
             </button>
           </div>
         </div>
@@ -719,7 +920,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           user,
           defects: inspectionState.defects,
           getTotalRateStyling,
-          getDefectRateCellColor
+          getDefectRateCellColor,
         }}
       />
     </div>

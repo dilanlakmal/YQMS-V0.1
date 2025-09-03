@@ -43,6 +43,7 @@ import createQCWashingModel from "./models/QCWashing.js";
 import createQCWashingDefectsModel from "./models/QCWashingDefectsModel.js";
 import createQCWashingCheckpointsModel from "./models/QCWashingCheckpointsModel.js";
 import createQCWashingFirstOutputModel from "./models/QCWashingFirstOutputModel.js";
+import createIEWorkerTaskModel from "./models/IEWorkerTask.js";
 
 import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
 import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
@@ -104,7 +105,10 @@ import { API_BASE_URL } from "./config.js";
 import { URL } from "url";
 import { Buffer } from "buffer";
 
-// import sqlQuery from "./route/sqlQueryRoutes.js";
+/* ------------------------------
+   SQL Query Import
+------------------------------ */
+// import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
 // import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
@@ -244,11 +248,7 @@ const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
 
 export const QC1Sunrise = createQC1SunriseModel(ymProdConnection); 
-
 const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
-const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
-const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
-const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
 const SCCDefect = createSCCDefectModel(ymProdConnection);
 const SCCScratchDefect = createSCCScratchDefectModel(ymProdConnection);
@@ -4195,7 +4195,7 @@ app.get("/api/download-data", async (req, res) => {
       matchQuery.task_no = parseInt(taskNo);
     }
 
-    console.log("Match Query:", matchQuery); // For debugging
+    // console.log("Match Query:", matchQuery); // For debugging
 
     // Get total count
     const total = await collection.countDocuments(matchQuery);
@@ -4208,7 +4208,7 @@ app.get("/api/download-data", async (req, res) => {
       .limit(limit)
       .lean();
 
-    console.log("Found records:", data.length); // For debugging
+    // console.log("Found records:", data.length); // For debugging
 
     // Transform data for consistent response
     const transformedData = data.map((item) => ({
@@ -4907,7 +4907,7 @@ app.get("/api/qc2-inspection-pass-bundle/search", async (req, res) => {
     const data = result[0].data || [];
     const total = result[0].total.length > 0 ? result[0].total[0].count : 0;
 
-    console.log("Search result:", { data, total });
+    // console.log("Search result:", { data, total });
     res.json({ data, total });
   } catch (error) {
     console.error("Error searching data cards:", error);
@@ -4961,8 +4961,8 @@ app.put("/api/qc2-inspection-pass-bundle/:id", async (req, res) => {
   const updateData = req.body;
 
   try {
-    console.log(`Received request to update record with ID: ${id}`);
-    console.log(`Update Data: ${JSON.stringify(updateData)}`);
+    // console.log(`Received request to update record with ID: ${id}`);
+    // console.log(`Update Data: ${JSON.stringify(updateData)}`);
     const updatedRecord = await QC2InspectionPassBundle.findByIdAndUpdate(
       id,
       updateData,
@@ -13125,7 +13125,7 @@ app.post("/api/get-user-data", async (req, res) => {
       sub_roles: user.sub_roles
     });
   } catch (error) {
-    console.error("Error fetching user data:", error);
+    // console.error("Error fetching user data:", error);
     res
       .status(500)
       .json({ message: "Failed to fetch user data", error: error.message });
@@ -13227,7 +13227,7 @@ app.post("/api/login", async (req, res) => {
       }
     });
   } catch (error) {
-    // console.error("Login error:", error);
+    console.error("Login error:", error);
     res.status(500).json({ message: "Failed to log in", error: error.message });
   }
 });
@@ -28821,6 +28821,318 @@ app.get('/api/fetch-qc2-data', async (req, res) => {
 // });
 
 /* ------------------------------
+   End Points - QC Washing Qty Old
+------------------------------ */
+
+// Endpoint to fetch wash qty from qc_washing_qty_old collection
+app.get("/api/qc-washing/wash-qty", async (req, res) => {
+  try {
+    const { date, color, orderNo, qcId } = req.query;
+
+    if (!date || !color || !orderNo || !qcId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required parameters: date, color, orderNo, qcId"
+      });
+    }
+
+    // Parse the date to match the format in the database
+    const inspectionDate = new Date(date);
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Find the record matching date, color, and orderNo (style_no)
+    // Try exact match first, then partial match for color
+    let washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
+      Style_No: orderNo,
+      Color: color
+    });
+
+    // If no exact match, try English-only matching by fetching candidates and filtering
+    if (!washQtyRecord) {
+      const candidates = await QCWashingQtyOld.find({
+        Inspection_date: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        },
+        Style_No: orderNo
+      });
+
+      // Extract English part from brackets and match
+      washQtyRecord = candidates.find((record) => {
+        const dbColor = record.Color;
+        // Extract text between [ and ]
+        const match = dbColor.match(/\[([^\]]+)\]/);
+        const englishPart = match ? match[1] : dbColor;
+        return englishPart.toLowerCase() === color.toLowerCase();
+      });
+    }
+
+    if (!washQtyRecord) {
+      return res.json({
+        success: false,
+        washQty: 0,
+        message: "No wash qty record found",
+        searchCriteria: { date: startOfDay, orderNo, color }
+      });
+    }
+
+    // Find the specific QC worker's wash qty
+    const workerWashQty = washQtyRecord.WorkerWashQty.find(
+      (worker) => worker.QC_ID === qcId
+    );
+
+    const washQty = workerWashQty ? workerWashQty.Wash_Qty : 0;
+
+    res.json({
+      success: true,
+      washQty,
+      totalWashQty: washQtyRecord.Total_Wash_Qty,
+      workerFound: !!workerWashQty
+    });
+  } catch (error) {
+    console.error("Error fetching wash qty:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch wash qty",
+      error: error.message
+    });
+  }
+});
+
+// Test endpoint to check QCWashingQtyOld collection structure
+app.get("/api/qc-washing/test-wash-qty", async (req, res) => {
+  try {
+    const sampleRecord = await QCWashingQtyOld.findOne().limit(1);
+    const totalCount = await QCWashingQtyOld.countDocuments();
+
+    // Get some recent records for testing
+    const recentRecords = await QCWashingQtyOld.find()
+      .sort({ Inspection_date: -1 })
+      .limit(5)
+      .select("Inspection_date Style_No Color Total_Wash_Qty WorkerWashQty");
+
+    res.json({
+      success: true,
+      totalRecords: totalCount,
+      sampleRecord: sampleRecord,
+      recentRecords: recentRecords,
+      message: "QCWashingQtyOld collection test successful"
+    });
+  } catch (error) {
+    console.error("Error testing QCWashingQtyOld collection:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to test collection",
+      error: error.message
+    });
+  }
+});
+
+// Test endpoint to verify specific record matching
+app.get("/api/qc-washing/test-specific-match", async (req, res) => {
+  try {
+    const testDate = "2025-08-23";
+    const testOrderNo = "GPAF6018";
+    const testColor = "500 EGGPLANT";
+    const testQcId = "YM6926";
+
+    const inspectionDate = new Date(testDate);
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    // Try exact match first
+    let washQtyRecord = await QCWashingQtyOld.findOne({
+      Inspection_date: {
+        $gte: startOfDay,
+        $lt: endOfDay
+      },
+      Style_No: testOrderNo,
+      Color: testColor
+    });
+
+    // If no exact match, try English extraction
+    if (!washQtyRecord) {
+      const candidates = await QCWashingQtyOld.find({
+        Inspection_date: {
+          $gte: startOfDay,
+          $lt: endOfDay
+        },
+        Style_No: testOrderNo
+      });
+
+      washQtyRecord = candidates.find((record) => {
+        const dbColor = record.Color;
+        const match = dbColor.match(/\[([^\]]+)\]/);
+        const englishPart = match ? match[1] : dbColor;
+        return englishPart.toLowerCase() === testColor.toLowerCase();
+      });
+    }
+
+    let result = {
+      testParams: { testDate, testOrderNo, testColor, testQcId },
+      dateRange: { startOfDay, endOfDay },
+      recordFound: !!washQtyRecord,
+      washQty: 0,
+      workerFound: false
+    };
+
+    if (washQtyRecord) {
+      const workerWashQty = washQtyRecord.WorkerWashQty.find(
+        (worker) => worker.QC_ID === testQcId
+      );
+
+      result.recordDetails = {
+        dbColor: washQtyRecord.Color,
+        dbStyleNo: washQtyRecord.Style_No,
+        dbDate: washQtyRecord.Inspection_date,
+        totalWashQty: washQtyRecord.Total_Wash_Qty,
+        availableWorkers: washQtyRecord.WorkerWashQty.map((w) => ({
+          id: w.QC_ID,
+          qty: w.Wash_Qty
+        }))
+      };
+
+      if (workerWashQty) {
+        result.washQty = workerWashQty.Wash_Qty;
+        result.workerFound = true;
+      }
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error in test endpoint:", error);
+    res.status(500).json({
+      success: false,
+      message: "Test failed",
+      error: error.message
+    });
+  }
+});
+
+// Debug endpoint to search wash qty records with flexible criteria
+app.get("/api/qc-washing/search-wash-qty", async (req, res) => {
+  try {
+    const { orderNo, color, qcId, dateFrom, dateTo } = req.query;
+
+    let query = {};
+
+    if (orderNo) {
+      query.Style_No = { $regex: orderNo, $options: "i" };
+    }
+
+    if (color) {
+      query.Color = { $regex: color, $options: "i" };
+    }
+
+    if (dateFrom || dateTo) {
+      query.Inspection_date = {};
+      if (dateFrom) {
+        query.Inspection_date.$gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        query.Inspection_date.$lte = new Date(dateTo);
+      }
+    }
+
+    const records = await QCWashingQtyOld.find(query)
+      .sort({ Inspection_date: -1 })
+      .limit(10);
+
+    // If qcId is provided, filter worker data
+    let filteredRecords = records;
+    if (qcId) {
+      filteredRecords = records.map((record) => {
+        const workerData = record.WorkerWashQty.find((w) => w.QC_ID === qcId);
+        return {
+          ...record.toObject(),
+          matchingWorker: workerData || null,
+          hasMatchingWorker: !!workerData
+        };
+      });
+    }
+
+    res.json({
+      success: true,
+      records: filteredRecords,
+      count: filteredRecords.length,
+      searchCriteria: { orderNo, color, qcId, dateFrom, dateTo }
+    });
+  } catch (error) {
+    console.error("Error searching wash qty records:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to search wash qty records",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to update wash qty for a specific record
+app.put("/api/qc-washing/update-wash-qty/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { washQty } = req.body;
+
+    const updatedRecord = await QCWashing.findByIdAndUpdate(
+      id,
+      { washQty: parseInt(washQty) || 0 },
+      { new: true }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({
+        success: false,
+        message: "Record not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: updatedRecord,
+      message: "Wash qty updated successfully"
+    });
+  } catch (error) {
+    console.error("Error updating wash qty:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update wash qty",
+      error: error.message
+    });
+  }
+});
+
+// Endpoint to fetch all submitted QC washing data
+app.get("/api/qc-washing/all-submitted", async (req, res) => {
+  try {
+    const submittedData = await QCWashing.find({
+      status: { $in: ["submitted", "processing", "auto-saved"] }
+    }).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: submittedData,
+      count: submittedData.length
+    });
+  } catch (error) {
+    console.error("Error fetching submitted QC washing data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch submitted data",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
    AI Chatbot Proxy Route
 ------------------------------ */
 
@@ -28880,6 +29192,47 @@ app.get("/api/subcon-defects", async (req, res) => {
   }
 });
 
+// ENDPOINT: Find a specific report to check for existence/edit
+
+app.get("/api/subcon-sewing-qc1-report/find", async (req, res) => {
+  try {
+    const { inspectionDate, factory, lineNo, moNo, color } = req.query;
+
+    // Basic validation to ensure all required parameters are present
+    if (!inspectionDate || !factory || !lineNo || !moNo || !color) {
+      return res
+        .status(400)
+        .json({ error: "Missing required search parameters." });
+    }
+
+    // Since the date comes as a string, we need to find any record on that specific day.
+    // We create a date range for the entire day from start (00:00:00) to end (23:59:59).
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const report = await SubconSewingQc1Report.findOne({
+      factory,
+      lineNo,
+      moNo,
+      color,
+      inspectionDate: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    });
+
+    // If a report is found, send it. If not, `report` will be null.
+    // The frontend will handle the null case as "not found".
+    res.json(report);
+  } catch (error) {
+    console.error("Error finding Sub-Con QC report:", error);
+    res.status(500).json({ error: "Failed to find report" });
+  }
+});
+
 // Helper function to generate a unique Report ID
 const generateSubconReportID = async () => {
   const date = new Date();
@@ -28934,6 +29287,42 @@ app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
         .json({ error: "Validation failed", details: error.message });
     }
     res.status(500).json({ error: "Failed to save report" });
+  }
+});
+
+// ENDPOINT: Update an existing report by its ID
+
+app.put("/api/subcon-sewing-qc1-reports/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reportData = req.body;
+
+    // We don't need to generate a new reportID, as we're updating.
+    // We also re-calculate the buyer in case the MO number was somehow changed.
+    const buyer = getBuyerFromMoNumber(reportData.moNo);
+
+    const updatedReport = await SubconSewingQc1Report.findByIdAndUpdate(
+      id,
+      { ...reportData, buyer: buyer },
+      { new: true, runValidators: true } // {new: true} returns the updated document
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({ error: "Report not found." });
+    }
+
+    res.json({
+      message: "Report updated successfully!",
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error("Error updating Sub-Con QC report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to update report" });
   }
 });
 
@@ -29093,6 +29482,193 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
   } catch (error) {
     console.error("Error fetching Sub-Con QC report data:", error);
     res.status(500).json({ error: "Failed to fetch report data" });
+  }
+});
+
+/* ------------------------------------------------------------------
+   End Points - Sub-Con QC Management (Admin Panel)
+------------------------------------------------------------------ */
+
+// --- FACTORY MANAGEMENT ---
+
+// GET all factories (can also be used for filtering by name)
+app.get("/api/subcon-sewing-factories-manage", async (req, res) => {
+  try {
+    let query = {};
+    if (req.query.factory) {
+      // Using regex for partial matching, case-insensitive
+      query.factory = { $regex: req.query.factory, $options: "i" };
+    }
+    const factories = await SubconSewingFactory.find(query).sort({ no: 1 });
+    res.json(factories);
+  } catch (error) {
+    console.error("Error fetching sub-con factories:", error);
+    res.status(500).json({ error: "Failed to fetch factories" });
+  }
+});
+
+// POST a new factory
+app.post("/api/subcon-sewing-factories-manage", async (req, res) => {
+  try {
+    // Auto-increment 'no' field
+    const lastFactory = await SubconSewingFactory.findOne().sort({ no: -1 });
+    const newNo = lastFactory ? lastFactory.no + 1 : 1;
+
+    const newFactory = new SubconSewingFactory({
+      ...req.body,
+      no: newNo
+    });
+    await newFactory.save();
+    res.status(201).json(newFactory);
+  } catch (error) {
+    // Handle potential duplicate factory name error
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A factory with this name already exists." });
+    }
+    // General error handling
+    console.error("Error creating sub-con factory:", error);
+    res.status(500).json({ error: "Failed to create factory" });
+  } //
+});
+
+// PUT (update) an existing factory by its ID
+app.put("/api/subcon-sewing-factories-manage/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updatedFactory = await SubconSewingFactory.findByIdAndUpdate(
+      id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!updatedFactory) {
+      return res.status(404).json({ error: "Factory not found." });
+    }
+    res.json(updatedFactory);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A factory with this name already exists." });
+    }
+    console.error("Error updating sub-con factory:", error);
+    res.status(500).json({ error: "Failed to update factory" });
+  }
+});
+
+// DELETE an existing factory by its ID
+app.delete("/api/subcon-sewing-factories-manage/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedFactory = await SubconSewingFactory.findByIdAndDelete(id);
+
+    if (!deletedFactory) {
+      return res.status(404).json({ error: "Factory not found." });
+    }
+
+    res.json({ message: "Factory deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting sub-con factory:", error);
+    res.status(500).json({ error: "Failed to delete factory" });
+  }
+});
+
+// --- DEFECT MANAGEMENT ---
+
+// GET all defects with filtering
+app.get("/api/subcon-defects-manage", async (req, res) => {
+  try {
+    let query = {};
+    if (req.query.DefectCode) {
+      query.DefectCode = req.query.DefectCode;
+    }
+    if (req.query.DisplayCode) {
+      query.DisplayCode = req.query.DisplayCode;
+    }
+    if (req.query.DefectNameEng) {
+      query.DefectNameEng = { $regex: req.query.DefectNameEng, $options: "i" };
+    }
+    const defects = await SubConDefect.find(query).sort({ DisplayCode: 1 });
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching sub-con defects for management:", error);
+    res.status(500).json({ error: "Failed to fetch defects" });
+  }
+});
+
+// POST a new defect
+app.post("/api/subcon-defects", async (req, res) => {
+  try {
+    // Auto-increment 'no' and 'DisplayCode'
+    const lastDefect = await SubConDefect.findOne().sort({ no: -1 });
+    const newNo = lastDefect ? lastDefect.no + 1 : 1;
+
+    const lastDisplayCodeDefect = await SubConDefect.findOne().sort({
+      DisplayCode: -1
+    });
+    const newDisplayCode = lastDisplayCodeDefect
+      ? lastDisplayCodeDefect.DisplayCode + 1
+      : 1;
+
+    const newDefect = new SubConDefect({
+      ...req.body,
+      no: newNo,
+      DisplayCode: newDisplayCode
+    });
+    await newDefect.save();
+    res.status(201).json(newDefect);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A defect with this Defect Code already exists." });
+    }
+    console.error("Error creating sub-con defect:", error);
+    res.status(500).json({ error: "Failed to create defect" });
+  }
+});
+
+// PUT (update) an existing defect by ID
+app.put("/api/subcon-defects/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Do not allow 'no' or 'DisplayCode' to be updated
+    const { no, DisplayCode, ...updateData } = req.body;
+
+    const updatedDefect = await SubConDefect.findByIdAndUpdate(id, updateData, {
+      new: true,
+      runValidators: true
+    });
+    if (!updatedDefect) {
+      return res.status(404).json({ error: "Defect not found." });
+    }
+    res.json(updatedDefect);
+  } catch (error) {
+    if (error.code === 11000) {
+      return res
+        .status(400)
+        .json({ error: "A defect with this Defect Code already exists." });
+    }
+    console.error("Error updating sub-con defect:", error);
+    res.status(500).json({ error: "Failed to update defect" });
+  }
+});
+
+// DELETE an existing defect by its ID
+app.delete("/api/subcon-defects-manage/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const deletedDefect = await SubConDefect.findByIdAndDelete(id);
+
+    if (!deletedDefect) {
+      return res.status(404).json({ error: "Defect not found." });
+    }
+
+    res.json({ message: "Defect deleted successfully." });
+  } catch (error) {
+    console.error("Error deleting sub-con defect:", error);
+    res.status(500).json({ error: "Failed to delete defect" });
   }
 });
 

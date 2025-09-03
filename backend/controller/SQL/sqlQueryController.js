@@ -118,7 +118,6 @@ const sqlConnectionStatus = {
 // Function to connect to a pool, now it updates the status tracker
 async function connectPool(pool, poolName) {
   try {
-
     // Close existing connection if any
     if (pool.connected || pool.connecting) {
       try {
@@ -1134,7 +1133,6 @@ async function syncCutPanelOrders() {
   }
 
   try {
-
     // This is your query for a rolling 3-day update. This is perfect for the cron job.
     const query = `
       DECLARE @StartDate DATE = CAST(DATEADD(DAY, -3, GETDATE()) AS DATE);
@@ -1517,7 +1515,6 @@ async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date())
   }
 }
 /*--------------------------------------------------------------------------------*/
-
 
 // 1. On server start, fetch all data from 2025-07-10 to today
 // syncQC1WorkerData("2025-07-01", new Date())
@@ -2258,7 +2255,6 @@ function extractSpecsDataAsArray(record, orderNo) {
       console.log("⚠️ No data to sync");
       return { success: true, message: "No data to sync" };
     }
-
   } catch (error) {
     console.error("❌ DT Orders sync failed:", error);
     throw error;

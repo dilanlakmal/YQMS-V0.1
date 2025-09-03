@@ -198,7 +198,7 @@ const CuttingReport = () => {
   });
 
   const handleColumnVisibilityChange = (column) => {
-    setColumnVisibility(prev => ({
+    setColumnVisibility((prev) => ({
       ...prev,
       [column]: !prev[column]
     }));
@@ -592,7 +592,7 @@ const CuttingReport = () => {
                 <input
                   type="checkbox"
                   checked={columnVisibility.markerRatio}
-                  onChange={() => handleColumnVisibilityChange('markerRatio')}
+                  onChange={() => handleColumnVisibilityChange("markerRatio")}
                   className="rounded border-gray-300"
                 />
                 <span>{t("cutting.mackerRatio")}</span>
@@ -601,7 +601,7 @@ const CuttingReport = () => {
                 <input
                   type="checkbox"
                   checked={columnVisibility.layerDetails}
-                  onChange={() => handleColumnVisibilityChange('layerDetails')}
+                  onChange={() => handleColumnVisibilityChange("layerDetails")}
                   className="rounded border-gray-300"
                 />
                 <span>{t("cutting.layerDetails")}</span>
@@ -610,7 +610,7 @@ const CuttingReport = () => {
                 <input
                   type="checkbox"
                   checked={columnVisibility.bundleDetails}
-                  onChange={() => handleColumnVisibilityChange('bundleDetails')}
+                  onChange={() => handleColumnVisibilityChange("bundleDetails")}
                   className="rounded border-gray-300"
                 />
                 <span>{t("cutting.bundleDetails")}</span>
@@ -619,7 +619,9 @@ const CuttingReport = () => {
                 <input
                   type="checkbox"
                   checked={columnVisibility.inspectionDetails}
-                  onChange={() => handleColumnVisibilityChange('inspectionDetails')}
+                  onChange={() =>
+                    handleColumnVisibilityChange("inspectionDetails")
+                  }
                   className="rounded border-gray-300"
                 />
                 <span>{t("cutting.inspectionDetails")}</span>
@@ -627,432 +629,432 @@ const CuttingReport = () => {
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200 border border-gray-300 text-xs sm:text-sm">
-              <thead className="bg-gray-100">
-                <tr className="text-left font-semibold text-gray-600">
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.inspectionDate")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.buyer")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.moNo")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.tableNo")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.custStyle")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.spreadTable")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.material")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.lotNos")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.qcId")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.color")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.garmentType")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 border-r border-b align-middle"
-                  >
-                    {t("cutting.mackerNo")}
-                  </th>
-                  {columnVisibility.markerRatio && (
+                <thead className="bg-gray-100">
+                  <tr className="text-left font-semibold text-gray-600">
                     <th
                       rowSpan="2"
                       className="px-3 py-2 border-r border-b align-middle"
                     >
-                      {t("cutting.mackerRatio")}
+                      {t("cutting.inspectionDate")}
                     </th>
-                  )}
-                  {columnVisibility.layerDetails && (
                     <th
-                      colSpan="3"
-                      className="px-3 py-2 text-center border-r border-b"
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
                     >
-                      {t("cutting.layerDetails")}
+                      {t("cutting.buyer")}
                     </th>
-                  )}
-                  {columnVisibility.bundleDetails && (
                     <th
-                      colSpan="4"
-                      className="px-3 py-2 text-center border-r border-b"
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
                     >
-                      {t("cutting.bundleDetails")}
+                      {t("cutting.moNo")}
                     </th>
-                  )}
-                  {columnVisibility.inspectionDetails && (
                     <th
-                      colSpan="5"
-                      className="px-3 py-2 text-center border-r border-b"
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
                     >
-                      {t("cutting.inspectionDetails")}
+                      {t("cutting.tableNo")}
                     </th>
-                  )}
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 text-right border-r border-b align-middle"
-                  >
-                    {t("cutting.passRate")} (%)
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 text-center border-r border-b align-middle"
-                  >
-                    {t("cutting.results")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 text-center border-r border-b align-middle"
-                  >
-                    {t("cutting.report")}
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-3 py-2 text-center border-b align-middle"
-                  >
-                    {t("common.action")}
-                  </th>
-                </tr>
-                <tr className="text-right font-semibold text-gray-600">
-                  {columnVisibility.layerDetails && (
-                    <>
-                      <th className="px-3 py-2 border-r border-b">
-                        {t("cutting.plan")}
-                      </th>
-                      <th className="px-3 py-2 border-r border-b">
-                        {t("cutting.actual")}
-                      </th>
-                      <th className="px-3 py-2 border-r border-b">
-                        {t("cutting.totalPcs")}
-                      </th>
-                    </>
-                  )}
-                  {columnVisibility.bundleDetails && (
-                    <>
-                      {/* Bundle Details (with icons) */}
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.custStyle")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.spreadTable")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.material")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.lotNos")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.qcId")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.color")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.garmentType")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 border-r border-b align-middle"
+                    >
+                      {t("cutting.mackerNo")}
+                    </th>
+                    {columnVisibility.markerRatio && (
                       <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.totalQty")}
+                        rowSpan="2"
+                        className="px-3 py-2 border-r border-b align-middle"
                       >
-                        <Archive size={16} className="mx-auto" />
+                        {t("cutting.mackerRatio")}
                       </th>
+                    )}
+                    {columnVisibility.layerDetails && (
                       <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.qtyChecked")}
+                        colSpan="3"
+                        className="px-3 py-2 text-center border-r border-b"
                       >
-                        <ClipboardCheck size={16} className="mx-auto" />
+                        {t("cutting.layerDetails")}
                       </th>
+                    )}
+                    {columnVisibility.bundleDetails && (
                       <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.inspectedQty")}
+                        colSpan="4"
+                        className="px-3 py-2 text-center border-r border-b"
                       >
-                        <FileSearch size={16} className="mx-auto" />
+                        {t("cutting.bundleDetails")}
                       </th>
+                    )}
+                    {columnVisibility.inspectionDetails && (
                       <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.inspectedSizes")}
+                        colSpan="5"
+                        className="px-3 py-2 text-center border-r border-b"
                       >
-                        <Scaling size={16} className="mx-auto" />
+                        {t("cutting.inspectionDetails")}
                       </th>
-                    </>
-                  )}
-                  {columnVisibility.inspectionDetails && (
-                    <>
-                      <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.totalCompleted")}
-                      >
-                        <PackageCheck size={16} className="mx-auto" />
-                      </th>
-                      <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.pass")}
-                      >
-                        <ThumbsUp size={16} className="mx-auto" />
-                      </th>
-                      <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.reject")}
-                      >
-                        <ThumbsDown size={16} className="mx-auto" />
-                      </th>
-                      <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.rejectMeasurements")}
-                      >
-                        <AlertTriangle size={16} className="mx-auto" />
-                      </th>
-                      <th
-                        className="px-3 py-2 border-r border-b"
-                        title={t("cutting.rejectDefects")}
-                      >
-                        <Bug size={16} className="mx-auto" />
-                      </th>
-                    </>
-                  )}
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {reports.map((report) => {
-                  const { status, color } = getResultStatus(
-                    report.totalInspectionQty,
-                    report.sumTotalReject,
-                    report.sumTotalPcs,
-                    t
-                  );
-                  return (
-                    <tr key={report._id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 whitespace-nowrap border-r">
-                        {report.inspectionDate}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-r">
-                        {report.buyer}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-r">
-                        {report.moNo}
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-r">
-                        {report.tableNo}
-                      </td>
-                      <td className="px-3 py-2 border-r break-words min-w-[150px]">
-                        {report.buyerStyle}
-                      </td>
-                      <td className="px-3 py-2 border-r break-words">
-                        {report.cuttingTableDetails?.spreadTable}
-                      </td>
-                      <td className="px-3 py-2 border-r break-words min-w-[150px]">
-                        {report.fabricDetails?.material}
-                      </td>
-                      <td className="px-3 py-2 border-r max-w-xs">
-                        <div className="flex flex-wrap gap-1">
-                          {report.lotNo?.map((lot, idx) => (
-                            <span
-                              key={idx}
-                              className="bg-gray-200 text-gray-800 text-xs font-medium px-2 py-0.5 rounded-full"
-                            >
-                              {lot}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-3 py-2 whitespace-nowrap border-r">
-                        {report.cutting_emp_id}
-                      </td>
-                      <td className="px-3 py-2 border-r break-words">
-                        {report.color}
-                      </td>
-                      <td className="px-3 py-2 border-r break-words">
-                        {report.garmentType}
-                      </td>
-                      <td className="px-3 py-2 text-center border-r">
-                        {report.cuttingTableDetails?.mackerNo}
-                      </td>
-                      {columnVisibility.markerRatio && (
-                        <td className="px-3 py-2 border-r min-w-[150px]">
-                          {report.mackerRatio &&
-                            report.mackerRatio.length > 0 && (
-                              <table className="text-xs w-full">
-                                <tbody>
-                                  <tr>
-                                    {report.mackerRatio.map((mr) => (
-                                      <td
-                                        key={`${mr.index}-size`}
-                                        className="px-1 text-center font-bold"
-                                      >
-                                        {mr.markerSize}
-                                      </td>
-                                    ))}
-                                  </tr>
-                                  <tr>
-                                    {report.mackerRatio.map((mr) => (
-                                      <td
-                                        key={`${mr.index}-ratio`}
-                                        className="px-1 pt-1 text-center"
-                                      >
-                                        <span className="bg-amber-600 text-white font-semibold rounded px-1.5 py-0.5">
-                                          {mr.ratio}
-                                        </span>
-                                      </td>
-                                    ))}
-                                  </tr>
-                                </tbody>
-                              </table>
-                            )}
+                    )}
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 text-right border-r border-b align-middle"
+                    >
+                      {t("cutting.passRate")} (%)
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 text-center border-r border-b align-middle"
+                    >
+                      {t("cutting.results")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 text-center border-r border-b align-middle"
+                    >
+                      {t("cutting.report")}
+                    </th>
+                    <th
+                      rowSpan="2"
+                      className="px-3 py-2 text-center border-b align-middle"
+                    >
+                      {t("common.action")}
+                    </th>
+                  </tr>
+                  <tr className="text-right font-semibold text-gray-600">
+                    {columnVisibility.layerDetails && (
+                      <>
+                        <th className="px-3 py-2 border-r border-b">
+                          {t("cutting.plan")}
+                        </th>
+                        <th className="px-3 py-2 border-r border-b">
+                          {t("cutting.actual")}
+                        </th>
+                        <th className="px-3 py-2 border-r border-b">
+                          {t("cutting.totalPcs")}
+                        </th>
+                      </>
+                    )}
+                    {columnVisibility.bundleDetails && (
+                      <>
+                        {/* Bundle Details (with icons) */}
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.totalQty")}
+                        >
+                          <Archive size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.qtyChecked")}
+                        >
+                          <ClipboardCheck size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.inspectedQty")}
+                        >
+                          <FileSearch size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.inspectedSizes")}
+                        >
+                          <Scaling size={16} className="mx-auto" />
+                        </th>
+                      </>
+                    )}
+                    {columnVisibility.inspectionDetails && (
+                      <>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.totalCompleted")}
+                        >
+                          <PackageCheck size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.pass")}
+                        >
+                          <ThumbsUp size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.reject")}
+                        >
+                          <ThumbsDown size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.rejectMeasurements")}
+                        >
+                          <AlertTriangle size={16} className="mx-auto" />
+                        </th>
+                        <th
+                          className="px-3 py-2 border-r border-b"
+                          title={t("cutting.rejectDefects")}
+                        >
+                          <Bug size={16} className="mx-auto" />
+                        </th>
+                      </>
+                    )}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {reports.map((report) => {
+                    const { status, color } = getResultStatus(
+                      report.totalInspectionQty,
+                      report.sumTotalReject,
+                      report.sumTotalPcs,
+                      t
+                    );
+                    return (
+                      <tr key={report._id} className="hover:bg-gray-50">
+                        <td className="px-3 py-2 whitespace-nowrap border-r">
+                          {report.inspectionDate}
                         </td>
-                      )}
-                      {columnVisibility.layerDetails && (
-                        <>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
-                            {report.cuttingTableDetails?.planLayers}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
-                            {report.cuttingTableDetails?.actualLayers}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
-                            {report.cuttingTableDetails?.totalPcs}
-                          </td>
-                        </>
-                      )}
-                      {columnVisibility.bundleDetails && (
-                        <>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
-                            {report.totalBundleQty}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-orange-200 font-bold">
-                            {report.bundleQtyCheck}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100">
-                            {report.totalInspectionQty}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
-                            {report.numberOfInspectedSizes}
-                          </td>
-                        </>
-                      )}
-                      {columnVisibility.inspectionDetails && (
-                        <>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100 font-bold">
-                            {report.sumTotalPcs}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-green-100 font-bold">
-                            {report.sumTotalPass}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-300 font-bold">
-                            {report.sumTotalReject}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
-                            {report.sumTotalRejectMeasurement}
-                          </td>
-                          <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
-                            {report.sumTotalRejectDefects}
-                          </td>
-                        </>
-                      )}
-                      <td className="px-3 py-2 text-right border-r whitespace-nowrap font-bold">
-                        {report.overallPassRate?.toFixed(2)}
-                      </td>
-                      <td
-                        className={`px-3 py-2 text-center border-r font-semibold ${color}`}
-                      >
-                        {status}
-                      </td>
-                      <td className="px-3 py-2 text-center border-r">
-                        <button
-                          onClick={() => handleViewReport(report._id)}
-                          className="text-blue-600 hover:text-blue-800"
-                          title={t("cutting.viewReport")}
-                        >
-                          <Eye size={18} />
-                        </button>
-                      </td>
-
-                      {/* --- MODIFIED ACTION COLUMN --- */}
-                      <td className="px-3 py-2 text-center relative">
-                        <button
-                          onClick={() => handleActionClick(report._id)}
-                          className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-200"
-                        >
-                          <MoreVertical size={18} />
-                        </button>
-
-                        {activeActionMenu === report._id && (
-                          <div
-                            ref={actionMenuRef}
-                            className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20"
-                          >
-                            <ul className="py-1 text-sm text-gray-700">
-                              <li>
-                                <a
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    handleOpenFollowUp(report);
-                                  }}
-                                  className="flex items-center px-4 py-2 hover:bg-gray-100"
-                                >
-                                  <ClipboardList size={16} className="mr-3" />
-                                  {t("common.followUp")}
-                                </a>
-                              </li>
-                              <li>
-                                <a
-                                  href="#"
-                                  onClick={(e) => e.preventDefault()}
-                                  className="flex items-center px-4 py-2 hover:bg-gray-100 text-gray-400 cursor-not-allowed"
-                                >
-                                  <Edit size={16} className="mr-3" />
-                                  {t("common.editFollowUp")}
-                                </a>
-                              </li>
-                              <li>
-                                <a
-                                  href="#"
-                                  onClick={(e) => e.preventDefault()}
-                                  className="flex items-center px-4 py-2 hover:bg-gray-100 text-gray-400 cursor-not-allowed"
-                                >
-                                  <MessageSquare size={16} className="mr-3" />
-                                  {t("common.comments")}
-                                </a>
-                              </li>
-                            </ul>
+                        <td className="px-3 py-2 whitespace-nowrap border-r">
+                          {report.buyer}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap border-r">
+                          {report.moNo}
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap border-r">
+                          {report.tableNo}
+                        </td>
+                        <td className="px-3 py-2 border-r break-words min-w-[150px]">
+                          {report.buyerStyle}
+                        </td>
+                        <td className="px-3 py-2 border-r break-words">
+                          {report.cuttingTableDetails?.spreadTable}
+                        </td>
+                        <td className="px-3 py-2 border-r break-words min-w-[150px]">
+                          {report.fabricDetails?.material}
+                        </td>
+                        <td className="px-3 py-2 border-r max-w-xs">
+                          <div className="flex flex-wrap gap-1">
+                            {report.lotNo?.map((lot, idx) => (
+                              <span
+                                key={idx}
+                                className="bg-gray-200 text-gray-800 text-xs font-medium px-2 py-0.5 rounded-full"
+                              >
+                                {lot}
+                              </span>
+                            ))}
                           </div>
+                        </td>
+                        <td className="px-3 py-2 whitespace-nowrap border-r">
+                          {report.cutting_emp_id}
+                        </td>
+                        <td className="px-3 py-2 border-r break-words">
+                          {report.color}
+                        </td>
+                        <td className="px-3 py-2 border-r break-words">
+                          {report.garmentType}
+                        </td>
+                        <td className="px-3 py-2 text-center border-r">
+                          {report.cuttingTableDetails?.mackerNo}
+                        </td>
+                        {columnVisibility.markerRatio && (
+                          <td className="px-3 py-2 border-r min-w-[150px]">
+                            {report.mackerRatio &&
+                              report.mackerRatio.length > 0 && (
+                                <table className="text-xs w-full">
+                                  <tbody>
+                                    <tr>
+                                      {report.mackerRatio.map((mr) => (
+                                        <td
+                                          key={`${mr.index}-size`}
+                                          className="px-1 text-center font-bold"
+                                        >
+                                          {mr.markerSize}
+                                        </td>
+                                      ))}
+                                    </tr>
+                                    <tr>
+                                      {report.mackerRatio.map((mr) => (
+                                        <td
+                                          key={`${mr.index}-ratio`}
+                                          className="px-1 pt-1 text-center"
+                                        >
+                                          <span className="bg-amber-600 text-white font-semibold rounded px-1.5 py-0.5">
+                                            {mr.ratio}
+                                          </span>
+                                        </td>
+                                      ))}
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              )}
+                          </td>
                         )}
-                      </td>
+                        {columnVisibility.layerDetails && (
+                          <>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
+                              {report.cuttingTableDetails?.planLayers}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                              {report.cuttingTableDetails?.actualLayers}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                              {report.cuttingTableDetails?.totalPcs}
+                            </td>
+                          </>
+                        )}
+                        {columnVisibility.bundleDetails && (
+                          <>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-yellow-100">
+                              {report.totalBundleQty}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-orange-200 font-bold">
+                              {report.bundleQtyCheck}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100">
+                              {report.totalInspectionQty}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-gray-100">
+                              {report.numberOfInspectedSizes}
+                            </td>
+                          </>
+                        )}
+                        {columnVisibility.inspectionDetails && (
+                          <>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-blue-100 font-bold">
+                              {report.sumTotalPcs}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-green-100 font-bold">
+                              {report.sumTotalPass}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-300 font-bold">
+                              {report.sumTotalReject}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
+                              {report.sumTotalRejectMeasurement}
+                            </td>
+                            <td className="px-3 py-2 text-right border-r whitespace-nowrap bg-red-100 font-bold">
+                              {report.sumTotalRejectDefects}
+                            </td>
+                          </>
+                        )}
+                        <td className="px-3 py-2 text-right border-r whitespace-nowrap font-bold">
+                          {report.overallPassRate?.toFixed(2)}
+                        </td>
+                        <td
+                          className={`px-3 py-2 text-center border-r font-semibold ${color}`}
+                        >
+                          {status}
+                        </td>
+                        <td className="px-3 py-2 text-center border-r">
+                          <button
+                            onClick={() => handleViewReport(report._id)}
+                            className="text-blue-600 hover:text-blue-800"
+                            title={t("cutting.viewReport")}
+                          >
+                            <Eye size={18} />
+                          </button>
+                        </td>
 
-                      {/* <td className="px-3 py-2 text-center">
+                        {/* --- MODIFIED ACTION COLUMN --- */}
+                        <td className="px-3 py-2 text-center relative">
+                          <button
+                            onClick={() => handleActionClick(report._id)}
+                            className="text-gray-500 hover:text-gray-700 p-1 rounded-full hover:bg-gray-200"
+                          >
+                            <MoreVertical size={18} />
+                          </button>
+
+                          {activeActionMenu === report._id && (
+                            <div
+                              ref={actionMenuRef}
+                              className="absolute right-0 mt-2 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-20"
+                            >
+                              <ul className="py-1 text-sm text-gray-700">
+                                <li>
+                                  <a
+                                    href="#"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      handleOpenFollowUp(report);
+                                    }}
+                                    className="flex items-center px-4 py-2 hover:bg-gray-100"
+                                  >
+                                    <ClipboardList size={16} className="mr-3" />
+                                    {t("common.followUp")}
+                                  </a>
+                                </li>
+                                <li>
+                                  <a
+                                    href="#"
+                                    onClick={(e) => e.preventDefault()}
+                                    className="flex items-center px-4 py-2 hover:bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  >
+                                    <Edit size={16} className="mr-3" />
+                                    {t("common.editFollowUp")}
+                                  </a>
+                                </li>
+                                <li>
+                                  <a
+                                    href="#"
+                                    onClick={(e) => e.preventDefault()}
+                                    className="flex items-center px-4 py-2 hover:bg-gray-100 text-gray-400 cursor-not-allowed"
+                                  >
+                                    <MessageSquare size={16} className="mr-3" />
+                                    {t("common.comments")}
+                                  </a>
+                                </li>
+                              </ul>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* <td className="px-3 py-2 text-center">
                         <button className="text-gray-500 hover:text-gray-700">
                           <MoreVertical size={18} />
                         </button>
                       </td> */}
-                    </tr>
-                  );
-                })}
-              </tbody>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
           </div>

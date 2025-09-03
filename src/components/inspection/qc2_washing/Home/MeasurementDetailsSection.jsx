@@ -716,6 +716,56 @@ const addSize = (size) => {
           });
         }
       }
+
+      // If no global pattern, try to apply pattern from saved data for this size
+      if (!patternApplied) {
+        const savedDataForThisSize = currentWashMeasurements.filter(
+          (m) => m.size === sizeStr
+        );
+
+        if (savedDataForThisSize.length > 0) {
+          // Use the pattern from the most recent saved K-value for this size
+          const mostRecentSaved =
+            savedDataForThisSize[savedDataForThisSize.length - 1];
+
+          // Apply pattern if the specs length matches
+          if (
+            mostRecentSaved.selectedRows &&
+            mostRecentSaved.selectedRows.length === specs.length
+          ) {
+            setSelectedRowsBySize((prev) => ({
+              ...prev,
+              [sizeStr]: [...mostRecentSaved.selectedRows]
+            }));
+            patternApplied = true;
+
+            // Initialize measurement values for selected rows with 0 values
+            setMeasurementValues((prevValues) => {
+              const newValues = { ...prevValues };
+
+              mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
+                if (isSelected) {
+                  for (let colIndex = 0; colIndex < 3; colIndex++) {
+                    const cellKey = `${sizeStr}-${tableType}-${rowIndex}-${colIndex}`;
+                    // Always initialize with 0, not previous values
+                    newValues[cellKey] = { decimal: 0, fraction: "0" };
+                  }
+                }
+              });
+
+              return newValues;
+            });
+          }
+        }
+      }
+
+      // If no pattern was applied, reset to default
+      if (!patternApplied) {
+        setSelectedRowsBySize((prev) => ({
+          ...prev,
+          [sizeStr]: Array(specs.length).fill(false)
+        }));
+      }
     }
     
     // If no pattern was applied, reset to default

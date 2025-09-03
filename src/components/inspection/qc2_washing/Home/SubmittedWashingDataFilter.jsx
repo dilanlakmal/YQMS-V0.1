@@ -537,7 +537,6 @@ const SubmittedWashingDataFilter = ({
                 </div>
               </div>
             </div>
-
           </div>
 
           {/* Action Buttons */}

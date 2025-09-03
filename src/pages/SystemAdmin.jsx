@@ -12,7 +12,8 @@ import {
   CheckSquare,
   ThermometerSnowflake,
   Combine,
-  Users, // << CHANGED from UsersCog to Users
+  Wrench,
+  Users, 
   SlidersHorizontal
 } from "lucide-react";
 
@@ -30,6 +31,7 @@ import QC2DefectsAddModify from "../components/inspection/qc2/QC2DefectsAddModif
 import QCWashing from "../components/inspection/qc2_washing/admin/qcWashingModify";
 import QADefectsManager from "../components/inspection/qc_accuracy/QADefectsManager";
 import QAStandardDefectsManager from "../components/inspection/qc_accuracy/QAStandardDefectsManager";
+import SubConQCManage from "../components/inspection/sub-con-qc1/SubConQCManage";
 import SupplierIssueAdmin from "../components/inspection/supplier_issue/SupplierIssueAdmin";
 
 // Placeholder components for other tabs
@@ -142,6 +144,12 @@ const SystemAdmin = () => {
         labelKey: "systemAdmin.supplierIssuesTab", // Add this to your translation files
         icon: <ShieldAlert size={18} />,
         component: <SupplierIssueAdmin />
+      },
+      {
+        id: "subConQC1",
+        labelKey: "systemAdmin.subConQC1Tab",
+        icon: <Wrench size={18} />,
+        component: <SubConQCManage />
       }
     ],
     [] // t is not needed here as labelKey strings are static. If they were dynamic like t('some.key'), then t would be a dependency.
