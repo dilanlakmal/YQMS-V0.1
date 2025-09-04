@@ -365,12 +365,10 @@ const OrderDetailsSection = ({
     try {
       // Create default inspection data with "OK" decisions
       const defaultInspectionData = [
-        { checkedList: "Appearance", decision: "ok", remark: "" },
-        { checkedList: "Color Shade", decision: "ok", remark: "" },
+        { checkedList: "Shade Band", decision: "ok", remark: "" },
+        { checkedList: "Hand Feel", decision: "ok", remark: "" },
         { checkedList: "Fiber", decision: "ok", remark: "" },
-        { checkedList: "Measurement", decision: "ok", remark: "" },
-        { checkedList: "Pilling", decision: "ok", remark: "" },
-        { checkedList: "Shrinkage", decision: "ok", remark: "" }
+        { checkedList: "Pilling", decision: "ok", remark: "" }
       ];
 
       // Create default defect data with calculated pass rate
