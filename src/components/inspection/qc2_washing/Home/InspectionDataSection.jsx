@@ -133,8 +133,6 @@ const InspectionDataSection = ({
               "Tumble Dry": tumbleDryValues
             });
 
-            // ONLY set actual values if they are currently empty/default
-            // Don't overwrite existing actual values with standard values
             setActualValues((prev) => {
               const newActualValues = { ...prev };
 
@@ -170,6 +168,23 @@ const InspectionDataSection = ({
 
               return newActualValues;
             });
+            const hasLoadedActualValues =
+              (actualValues["Washing Machine"] &&
+                Object.values(actualValues["Washing Machine"]).some(
+                  (val) => val !== "" && val !== null && val !== undefined
+                )) ||
+              (actualValues["Tumble Dry"] &&
+                Object.values(actualValues["Tumble Dry"]).some(
+                  (val) => val !== "" && val !== null && val !== undefined
+                ));
+
+            if (!hasLoadedActualValues) {
+              // Initialize actual values with standard values
+              setActualValues({
+                "Washing Machine": { ...washingMachineValues },
+                "Tumble Dry": { ...tumbleDryValues }
+              });
+            }
           }
         }
       } catch (error) {
@@ -177,18 +192,8 @@ const InspectionDataSection = ({
       }
     };
 
-    // Only fetch standards if we don't have actual values loaded yet
-    // This prevents overwriting loaded data
-    const hasLoadedActualValues =
-      actualValues["Washing Machine"] &&
-      Object.values(actualValues["Washing Machine"]).some(
-        (val) => val !== "" && val !== null && val !== undefined
-      );
-
-    if (!hasLoadedActualValues) {
-      fetchStandardValues();
-    }
-  }, [washType, setStandardValues, setActualValues]);
+    fetchStandardValues();
+  }, [washType]);
 
   useEffect(() => {
     const qty = Number(washQty);
@@ -251,15 +256,15 @@ const InspectionDataSection = ({
   // Initialize machine status with default "OK" values when recordId exists
   useEffect(() => {
     if (recordId) {
-      // Check if machine status is in default state (all OK)
-      const isDefaultState = Object.values(machineStatus).every((machine) =>
-        Object.values(machine).every(
-          (param) => param.ok === true && param.no === false
-        )
-      );
+      // Only initialize if machineStatus is completely empty or undefined
+      const hasAnyStatus =
+        Object.keys(machineStatus).length > 0 &&
+        Object.values(machineStatus).some(
+          (machine) => Object.keys(machine).length > 0
+        );
 
-      if (!isDefaultState) {
-        // Reset to default OK state
+      if (!hasAnyStatus) {
+        // Initialize with default OK state only if empty
         setMachineStatus({
           "Washing Machine": {
             temperature: { ok: true, no: false },
@@ -1395,11 +1400,10 @@ const InspectionDataSection = ({
                                 Standard
                               </label>
                               <div className="px-3 py-2 bg-gray-100 dark:bg-gray-700 rounded font-mono text-sm dark:text-white">
-                                {standardValue === "" ||
-                                standardValue === null ||
+                                {standardValue === null ||
                                 standardValue === undefined
                                   ? ""
-                                  : standardValue}
+                                  : String(standardValue)}
                               </div>
                             </div>
 
