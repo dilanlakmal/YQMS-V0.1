@@ -1148,8 +1148,9 @@ const InspectionDataSection = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {(Array.isArray(inspectionData) ? inspectionData : []).map(
-                    (item, idx) => (
+                  {(Array.isArray(inspectionData) ? inspectionData : [])
+                    .filter(item => item.fromDatabase !== false) // Only show database-related values
+                    .map((item, idx) => (
                       <tr key={idx}>
                         <td className="border px-4 py-2 dark:text-white">
                           {item.checkedList}
