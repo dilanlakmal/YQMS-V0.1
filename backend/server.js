@@ -259,7 +259,7 @@ const QC2BGrade = createQC2BGradeModel(ymProdConnection);
 const QC2Task = createQC2TaskModel(ymProdConnection);
 const IEWorkerTask = createIEWorkerTaskModel(ymProdConnection);
 
-export const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
+export const InlineOrders = createInlineOrdersModel(ymProdConnection); 
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
@@ -267,15 +267,15 @@ const PairingDefect = createPairingDefectModel(ymProdConnection);
 const AccessoryIssue = createAccessoryIssueModel(ymProdConnection);
 const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
 
-const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
+const CuttingInspection = createCuttingInspectionModel(ymProdConnection); 
 const CuttingMeasurementPoint =
-  createCuttingMeasurementPointModel(ymProdConnection); // New model instance
-export const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); // New model instance
+  createCuttingMeasurementPointModel(ymProdConnection); /
+export const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); 
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
 
-export const QC1Sunrise = createQC1SunriseModel(ymProdConnection); // Define the new model
+export const QC1Sunrise = createQC1SunriseModel(ymProdConnection); 
 
 const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
 const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
@@ -336,10 +336,6 @@ app.use((req, res, next) => {
   SQL Query routs start
 ------------------------------ */
 app.use(sqlQuery);
-
-/* ------------------------------
-  SQL Query routs start
------------------------------- */
 
 // /* ------------------------------
 //    YM DataSore SQL
