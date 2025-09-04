@@ -24753,10 +24753,8 @@ app.get(
   async (req, res) => {
     const { orderNo, color } = req.params;
     const collection = ymProdConnection.db.collection("dt_orders");
-
     try {
       const orders = await collection.find({ Order_No: orderNo }).toArray();
-
       if (!orders || orders.length === 0) {
         return res
           .status(404)
@@ -24767,8 +24765,8 @@ app.get(
 
       // Extract measurement specifications from different possible locations
       let measurementSpecs = [];
-
       // Check various possible locations for measurement data
+
       if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
         measurementSpecs = order.MeasurementSpecs;
       } else if (order.Specs && Array.isArray(order.Specs)) {
@@ -24802,39 +24800,16 @@ app.get(
           ) {
             const kValue = spec.kValue || "NA";
             const pointName = spec.MeasurementPointEngName;
-
             if (!beforeWashByK[kValue]) {
               beforeWashByK[kValue] = new Map();
             }
-
             if (!beforeWashByK[kValue].has(pointName)) {
-              const sizeSpec =
-                spec.Specs.find((s) => s.size === color) || spec.Specs[0];
+              // FIX: Pass all sizes instead of just color
               beforeWashByK[kValue].set(pointName, {
                 MeasurementPointEngName: pointName,
-                Specs: {
-                  fraction: (
-                    sizeSpec?.fraction ||
-                    sizeSpec?.decimal?.toString() ||
-                    "0"
-                  )
-                    .toString()
-                    .trim()
-                },
-                ToleranceMinus: (
-                  spec.TolMinus?.fraction ||
-                  spec.TolMinus?.decimal?.toString() ||
-                  "0"
-                )
-                  .toString()
-                  .trim(),
-                TolerancePlus: (
-                  spec.TolPlus?.fraction ||
-                  spec.TolPlus?.decimal?.toString() ||
-                  "0"
-                )
-                  .toString()
-                  .trim(),
+                Specs: spec.Specs, // Pass the entire array of size-specific specs
+                ToleranceMinus: spec.TolMinus, // Pass the entire array
+                TolerancePlus: spec.TolPlus, // Pass the entire array
                 kValue: kValue
               });
             }
@@ -24851,39 +24826,16 @@ app.get(
           ) {
             const kValue = spec.kValue || "NA";
             const pointName = spec.MeasurementPointEngName;
-
             if (!afterWashByK[kValue]) {
               afterWashByK[kValue] = new Map();
             }
-
             if (!afterWashByK[kValue].has(pointName)) {
-              const sizeSpec =
-                spec.Specs.find((s) => s.size === color) || spec.Specs[0];
+              // FIX: Pass all sizes instead of just color
               afterWashByK[kValue].set(pointName, {
                 MeasurementPointEngName: pointName,
-                Specs: {
-                  fraction: (
-                    sizeSpec?.fraction ||
-                    sizeSpec?.decimal?.toString() ||
-                    "0"
-                  )
-                    .toString()
-                    .trim()
-                },
-                ToleranceMinus: (
-                  spec.TolMinus?.fraction ||
-                  spec.TolMinus?.decimal?.toString() ||
-                  "0"
-                )
-                  .toString()
-                  .trim(),
-                TolerancePlus: (
-                  spec.TolPlus?.fraction ||
-                  spec.TolPlus?.decimal?.toString() ||
-                  "0"
-                )
-                  .toString()
-                  .trim(),
+                Specs: spec.Specs, // Pass the entire array of size-specific specs
+                ToleranceMinus: spec.TolMinus, // Pass the entire array
+                TolerancePlus: spec.TolPlus, // Pass the entire array
                 kValue: kValue
               });
             }
@@ -24907,6 +24859,7 @@ app.get(
       Object.values(beforeWashGrouped).forEach((group) => {
         beforeWashSpecs.push(...group);
       });
+
       Object.values(afterWashGrouped).forEach((group) => {
         afterWashSpecs.push(...group);
       });
@@ -27287,6 +27240,7 @@ app.get("/api/qc-washing/comparison", async (req, res) => {
       color,
       washType,
       factoryName: factory,
+      reportType,
       before_after_wash: before_after_wash || "Before Wash",
     };
 
@@ -27297,8 +27251,6 @@ app.get("/api/qc-washing/comparison", async (req, res) => {
       comparisonRecord = await QCWashing.findOne({ ...baseFilter, reportType }).sort({ createdAt: -1 });
     }
 
-    // 2. If not found, try finding a record without matching the reportType.
-    // This handles cases where an 'After Wash' (e.g., First Output) needs to be compared with a 'Before Wash' (e.g., Inline).
     if (!comparisonRecord) {
       comparisonRecord = await QCWashing.findOne(baseFilter).sort({ createdAt: -1 });
     }

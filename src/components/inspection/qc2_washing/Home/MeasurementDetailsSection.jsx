@@ -822,10 +822,11 @@ const removeSize = (size) => {
       updated[columnIndex] = !updated[columnIndex];
 
       if (updated[columnIndex]) {
-        const specs = before_after_wash === 'Before Wash'
-          ? (measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)
-          : (measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash);
         const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+        const currentKValue = getKValueForSize(size, tableType);
+        const specs = before_after_wash === 'Before Wash'
+          ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash)
+          : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash);
 
         setMeasurementValues(prevValues => {
           const newValues = { ...prevValues };
@@ -890,10 +891,11 @@ const removeSize = (size) => {
 };
 
   const toggleSelectAllRows = (size, checked, tableType) => {
+    const currentKValue = getKValueForSize(size, tableType);
     const specs =
       tableType === 'before'
-        ? measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash
-        : measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash;
+        ? measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash
+        : measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash;
     const newSelections = specs.map(() => checked);
 
     setSelectedRowsBySize(prev => ({
@@ -1030,11 +1032,19 @@ const removeSize = (size) => {
                   </tr>
                 </thead>
                 <tbody>
-                  {(measurementSpecs.beforeWashGrouped[activeBeforeTab] || measurementSpecs.beforeWash)?.map((spec, index) => {
+                  {(measurementSpecs.beforeWashGrouped[getKValueForSize(size, 'before')] || measurementSpecs.beforeWash)?.map((spec, index) => {
                     const area = spec.MeasurementPointEngName || `Point ${index + 1}`;
-                    const specs = (spec.Specs?.fraction || spec.Specs || '-').toString().trim();
-                    const tolMinus = (spec.ToleranceMinus || '-').toString().trim();
-                    const tolPlus = (spec.TolerancePlus || '-').toString().trim();
+                    
+                    // Get size-specific specs
+                    const sizeSpec = Array.isArray(spec.Specs) ? spec.Specs.find(s => s.size === size) : null;
+                    const specs = sizeSpec ? sizeSpec.fraction : (spec.Specs?.fraction || spec.Specs || '-');
+                    
+                    // Get size-specific tolerances
+                    const sizeSpecTolMinus = Array.isArray(spec.ToleranceMinus) ? spec.ToleranceMinus.find(t => t.size === size) : null;
+                    const sizeSpecTolPlus = Array.isArray(spec.TolerancePlus) ? spec.TolerancePlus.find(t => t.size === size) : null;
+                    
+                    const tolMinus = (sizeSpecTolMinus?.fraction || spec.TolMinus?.fraction || spec.ToleranceMinus?.fraction || spec.ToleranceMinus || '-').toString().trim();
+                    const tolPlus = (sizeSpecTolPlus?.fraction || spec.TolPlus?.fraction || spec.TolerancePlus?.fraction || spec.TolerancePlus || '-').toString().trim();
                     const isSelected = selectedRowsBySize[size]?.[index] === true;
                     const shouldHide = hideUnselectedRowsBySize[size] && !isSelected;
                     if (shouldHide) return null;
@@ -1206,13 +1216,21 @@ const removeSize = (size) => {
                     </tr>
                   </thead>
                   <tbody>
-                    {(measurementSpecs.afterWashGrouped[activeAfterTab] || measurementSpecs.afterWash)?.map((spec, index) => {
+                    {(measurementSpecs.afterWashGrouped[getKValueForSize(size, 'after')] || measurementSpecs.afterWash)?.map((spec, index) => {
                       const isSelected = selectedRowsBySize[size]?.[index] === true;
                       const shouldHide = hideUnselectedRowsBySize[size] && !isSelected;
                       const area = spec.MeasurementPointEngName || `Point ${index + 1}`;
-                      const specs = (spec.Specs?.fraction || spec.Specs || '-').toString().trim();
-                      const tolMinus = (spec.ToleranceMinus || '-').toString().trim();
-                      const tolPlus = (spec.TolerancePlus || '-').toString().trim();
+                      
+                      // Get size-specific specs
+                      const sizeSpec = Array.isArray(spec.Specs) ? spec.Specs.find(s => s.size === size) : null;
+                      const specs = sizeSpec ? sizeSpec.fraction : (spec.Specs?.fraction || spec.Specs || '-');
+                      
+                      // Get size-specific tolerances
+                      const sizeSpecTolMinus = Array.isArray(spec.ToleranceMinus) ? spec.ToleranceMinus.find(t => t.size === size) : null;
+                      const sizeSpecTolPlus = Array.isArray(spec.TolerancePlus) ? spec.TolerancePlus.find(t => t.size === size) : null;
+                      
+                      const tolMinus = (sizeSpecTolMinus?.fraction || spec.TolMinus?.fraction || spec.ToleranceMinus?.fraction || spec.ToleranceMinus || '-').toString().trim();
+                      const tolPlus = (sizeSpecTolPlus?.fraction || spec.TolPlus?.fraction || spec.TolerancePlus?.fraction || spec.TolerancePlus || '-').toString().trim();
                       
                       if (shouldHide) return null;
                       
