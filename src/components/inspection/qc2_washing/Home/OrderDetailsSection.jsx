@@ -352,29 +352,27 @@ const autoSaveInspectionData = async (recordId) => {
   try {
     // Create default inspection data with "OK" decisions
     const defaultInspectionData = [
-      { checkedList: "Appearance", decision: "ok", remark: "" },
-      { checkedList: "Color Shade", decision: "ok", remark: "" },
+      { checkedList: "Shade Band", decision: "ok", remark: "" },
+      { checkedList: "Hand Feel", decision: "ok", remark: "" },
       { checkedList: "Fiber", decision: "ok", remark: "" },
-      { checkedList: "Measurement", decision: "ok", remark: "" },
-      { checkedList: "Pilling", decision: "ok", remark: "" },
-      { checkedList: "Shrinkage", decision: "ok", remark: "" }
+      { checkedList: "Pilling", decision: "ok", remark: "" }
     ];
 
-    // Create default defect data with calculated pass rate
+    // Create default defect data with calculated pass rate - ensure 0 values are preserved
     const washQtyNum = Number(formData.washQty) || 0;
     const defaultDefectData = [
       {
         parameter: "Color Shade 01",
-        checkedQty: washQtyNum,
-        failedQty: 0,
+        checkedQty: washQtyNum, // Keep 0 as 0, not null
+        failedQty: 0, // Keep 0 as 0, not null
         passRate: washQtyNum > 0 ? ((washQtyNum - 0) / washQtyNum * 100).toFixed(2) : "0.00",
         result: "Pass",
         remark: ""
       },
       {
         parameter: "Appearance",
-        checkedQty: washQtyNum,
-        failedQty: 0,
+        checkedQty: washQtyNum, // Keep 0 as 0, not null
+        failedQty: 0, // Keep 0 as 0, not null
         passRate: washQtyNum > 0 ? ((washQtyNum - 0) / washQtyNum * 100).toFixed(2) : "0.00",
         result: "Pass",
         remark: ""
@@ -419,14 +417,14 @@ const autoSaveInspectionData = async (recordId) => {
         if (standardRecord) {
           defaultStandardValues = {
             "Washing Machine": {
-              temperature: String(standardRecord.washingMachine?.temperature || ""),
-              time: String(standardRecord.washingMachine?.time || ""),
-              silicon: String(standardRecord.washingMachine?.silicon || ""),
-              softener: String(standardRecord.washingMachine?.softener || "")
+              temperature: standardRecord.washingMachine?.temperature === 0 ? "0" : String(standardRecord.washingMachine?.temperature || ""),
+              time: standardRecord.washingMachine?.time === 0 ? "0" : String(standardRecord.washingMachine?.time || ""),
+              silicon: standardRecord.washingMachine?.silicon === 0 ? "0" : String(standardRecord.washingMachine?.silicon || ""),
+              softener: standardRecord.washingMachine?.softener === 0 ? "0" : String(standardRecord.washingMachine?.softener || "")
             },
             "Tumble Dry": {
-              temperature: String(standardRecord.tumbleDry?.temperature || ""),
-              time: String(standardRecord.tumbleDry?.time || "")
+              temperature: standardRecord.tumbleDry?.temperature === 0 ? "0" : String(standardRecord.tumbleDry?.temperature || ""),
+              time: standardRecord.tumbleDry?.time === 0 ? "0" : String(standardRecord.tumbleDry?.time || "")
             }
           };
           
