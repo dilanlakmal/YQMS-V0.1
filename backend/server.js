@@ -116,8 +116,8 @@ import { Buffer } from "buffer";
 /* ------------------------------
    SQL Query Import
 ------------------------------ */
-import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Connection String
@@ -176,37 +176,10 @@ app.use(bodyParser.json());
 
 app.use(
   cors({
-    origin: [
-      "https://192.167.12.162:3001",
-      "https://yqms.yaikh.com",
-      " https://192.167.12.85:3001"
-    ], //["http://localhost:3001", "https://localhost:3001"],
-    // methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    // allowedHeaders: ["Content-Type", "Authorization"],
-    // credentials: true
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cache-Control",
-      "Origin",
-      "X-Requested-With",
-      "Accept",
-      "Pragma",
-      "Expires",
-      "Last-Modified",
-      "If-Modified-Since",
-      "If-None-Match",
-      "ETag"
-    ],
-    exposedHeaders: [
-      "Content-Length",
-      "Content-Type",
-      "Cache-Control",
-      "Last-Modified",
-      "ETag"
-    ],
-    credentials: true,
-    optionsSuccessStatus: 200
+    origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
   })
 );
 
@@ -335,7 +308,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs start
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 
 // /* ------------------------------
 //    YM DataSore SQL
@@ -19737,108 +19710,108 @@ const getConsolidatedDateFormats = (dateInput) => {
   };
 };
 
+/* -------------------------------------
+End Point - Final Consolidated HT Report
+------------------------------------- */
+
 app.get("/api/scc/final-report/ht", async (req, res) => {
   try {
-    const { date, empId, moNo, machineNo } = req.query;
-    if (!date) {
-      return res.status(400).json({ message: "Date is required." });
+    const { startDate, endDate, empId, moNo, machineNo } = req.query;
+
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ message: "Start date and end date are required." });
     }
 
-    const { stringDate, paddedStringDate, isoStartDate, isoEndDate } =
-      getConsolidatedDateFormats(date);
+    // --- Build Filters ---
+    const baseFilter = {};
+    if (empId && empId !== "All") baseFilter.emp_id = empId;
+    if (moNo && moNo !== "All") baseFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All") baseFilter.machineNo = machineNo;
 
-    // --- Build Filter Queries ---
-    // These objects will be passed to the find() method for each model
-    const stringDateFilter = { inspectionDate: stringDate };
-    if (empId && empId !== "All") stringDateFilter.emp_id = empId;
-    if (moNo && moNo !== "All") stringDateFilter.moNo = moNo;
-    if (machineNo && machineNo !== "All")
-      stringDateFilter.machineNo = machineNo;
+    const startOfDay = new Date(startDate);
+    startOfDay.setHours(0, 0, 0, 0);
 
-    const paddedDateFilter = { inspectionDate: paddedStringDate };
-    if (empId && empId !== "All") paddedDateFilter.emp_id = empId;
-    if (moNo && moNo !== "All") paddedDateFilter.moNo = moNo;
-    if (machineNo && machineNo !== "All")
-      paddedDateFilter.machineNo = machineNo;
+    const endOfDay = new Date(endDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-    const isoDateFilter = {
-      inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
-    };
-    if (empId && empId !== "All") isoDateFilter.emp_id = empId;
-    if (moNo && moNo !== "All") isoDateFilter.moNo = moNo;
-    if (machineNo && machineNo !== "All") isoDateFilter.machineNo = machineNo;
+    const dateFilter = { createdAt: { $gte: startOfDay, $lte: endOfDay } };
+    const finalFilter = { ...baseFilter, ...dateFilter };
+    const dropdownOptionsFilter = { ...dateFilter };
 
-    // --- Execute All Queries Concurrently using Promise.all ---
+    // --- Execute All Queries Concurrently ---
+    // NOTE: For this to work, ensure ALL 4 schemas have `timestamps: true`
     const [
       firstOutputData,
       dailyWashingData,
       machineCalibrationData,
       htInspectionData,
-      // Queries to get unique filter options for the selected DATE only
       uniqueEmpIds_1,
       uniqueEmpIds_2,
       uniqueEmpIds_3,
+      uniqueEmpIds_4,
       uniqueMoNos_1,
       uniqueMoNos_2,
-      uniqueMoNos_3
+      uniqueMoNos_3,
+      uniqueMoNos_4
     ] = await Promise.all([
-      // Data queries with filters applied
-      HTFirstOutput.find(stringDateFilter)
+      // Data queries
+      HTFirstOutput.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
-      SCCDailyTesting.find(stringDateFilter)
+      SCCDailyTesting.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
-      DailyTestingHTFU.find(paddedDateFilter)
+      DailyTestingHTFU.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
-      HTInspectionReport.find(isoDateFilter)
+      HTInspectionReport.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
 
-      // Filter option queries (only filter by date to get all options for that day)
-      HTFirstOutput.distinct("emp_id", { inspectionDate: stringDate }),
-      SCCDailyTesting.distinct("emp_id", { inspectionDate: stringDate }),
-      DailyTestingHTFU.distinct("emp_id", { inspectionDate: paddedStringDate }),
-      HTFirstOutput.distinct("moNo", { inspectionDate: stringDate }),
-      SCCDailyTesting.distinct("moNo", { inspectionDate: stringDate }),
-      DailyTestingHTFU.distinct("moNo", { inspectionDate: paddedStringDate })
+      // Filter option queries
+      HTFirstOutput.distinct("emp_id", dropdownOptionsFilter),
+      SCCDailyTesting.distinct("emp_id", dropdownOptionsFilter),
+      DailyTestingHTFU.distinct("emp_id", dropdownOptionsFilter),
+      HTInspectionReport.distinct("emp_id", dropdownOptionsFilter),
+      HTFirstOutput.distinct("moNo", dropdownOptionsFilter),
+      SCCDailyTesting.distinct("moNo", dropdownOptionsFilter),
+      DailyTestingHTFU.distinct("moNo", dropdownOptionsFilter),
+      HTInspectionReport.distinct("moNo", dropdownOptionsFilter)
     ]);
 
-    // Combine and get unique filter options
     const allEmpIds = [
       ...uniqueEmpIds_1,
       ...uniqueEmpIds_2,
       ...uniqueEmpIds_3,
-      ...htInspectionData.map((d) => d.emp_id)
+      ...uniqueEmpIds_4
     ];
     const uniqueEmpIds = [...new Set(allEmpIds)].filter(Boolean).sort();
-
     const allMoNos = [
       ...uniqueMoNos_1,
       ...uniqueMoNos_2,
       ...uniqueMoNos_3,
-      ...htInspectionData.map((d) => d.moNo)
+      ...uniqueMoNos_4
     ];
     const uniqueMoNos = [...new Set(allMoNos)].filter(Boolean).sort();
 
-    // Process First Output Data
     const processedFirstOutput = firstOutputData.map((doc) => {
       const firstSpec = doc.standardSpecification.find(
         (s) => s.type === "first"
@@ -19861,16 +19834,18 @@ app.get("/api/scc/final-report/ht", async (req, res) => {
               timeSec: secondSpec.timeSec,
               pressure: secondSpec.pressure
             }
-          : null
+          : null,
+        referenceSampleImage: doc.referenceSampleImage,
+        afterWashImage: doc.afterWashImage
       };
     });
 
-    // Process and Consolidate HT Inspection Data
     const consolidatedInspections = {};
     htInspectionData.forEach((doc) => {
       const key = `${doc.machineNo}-${doc.moNo}-${doc.color}-${doc.tableNo}`;
       if (!consolidatedInspections[key]) {
         consolidatedInspections[key] = {
+          inspectionDate: doc.inspectionDate,
           machineNo: doc.machineNo,
           moNo: doc.moNo,
           buyer: doc.buyer,
@@ -19890,14 +19865,12 @@ app.get("/api/scc/final-report/ht", async (req, res) => {
       group.totalPcs += doc.totalPcs || 0;
       group.totalInspectedQty += doc.aqlData?.sampleSize || 0;
       group.totalDefectsQty += doc.defectsQty || 0;
-
       if (
         doc.defectImageUrl &&
         !group.defectImageUrls.includes(doc.defectImageUrl)
       ) {
         group.defectImageUrls.push(doc.defectImageUrl);
       }
-
       doc.defects.forEach((defect) => {
         const name = defect.defectNameEng;
         group.defectSummary[name] =
@@ -19924,19 +19897,217 @@ app.get("/api/scc/final-report/ht", async (req, res) => {
       dailyWashing: dailyWashingData,
       machineCalibration: machineCalibrationData,
       htInspection: finalInspectionArray,
-      filterOptions: {
-        empIds: uniqueEmpIds,
-        moNos: uniqueMoNos
-      }
+      filterOptions: { empIds: uniqueEmpIds, moNos: uniqueMoNos }
     });
   } catch (error) {
-    console.error("Error creating consolidated HT report:", error);
+    console.error("Error creating consolidated HT report:", error); // Check server logs for this!
     res.status(500).json({
       message: "Failed to generate consolidated report",
       error: error.message
     });
   }
 });
+
+// app.get("/api/scc/final-report/ht", async (req, res) => {
+//   try {
+//     const { date, empId, moNo, machineNo } = req.query;
+//     if (!date) {
+//       return res.status(400).json({ message: "Date is required." });
+//     }
+
+//     const { stringDate, paddedStringDate, isoStartDate, isoEndDate } =
+//       getConsolidatedDateFormats(date);
+
+//     // --- Build Filter Queries ---
+//     // These objects will be passed to the find() method for each model
+//     const stringDateFilter = { inspectionDate: stringDate };
+//     if (empId && empId !== "All") stringDateFilter.emp_id = empId;
+//     if (moNo && moNo !== "All") stringDateFilter.moNo = moNo;
+//     if (machineNo && machineNo !== "All")
+//       stringDateFilter.machineNo = machineNo;
+
+//     const paddedDateFilter = { inspectionDate: paddedStringDate };
+//     if (empId && empId !== "All") paddedDateFilter.emp_id = empId;
+//     if (moNo && moNo !== "All") paddedDateFilter.moNo = moNo;
+//     if (machineNo && machineNo !== "All")
+//       paddedDateFilter.machineNo = machineNo;
+
+//     const isoDateFilter = {
+//       inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
+//     };
+//     if (empId && empId !== "All") isoDateFilter.emp_id = empId;
+//     if (moNo && moNo !== "All") isoDateFilter.moNo = moNo;
+//     if (machineNo && machineNo !== "All") isoDateFilter.machineNo = machineNo;
+
+//     // --- Execute All Queries Concurrently using Promise.all ---
+//     const [
+//       firstOutputData,
+//       dailyWashingData,
+//       machineCalibrationData,
+//       htInspectionData,
+//       // Queries to get unique filter options for the selected DATE only
+//       uniqueEmpIds_1,
+//       uniqueEmpIds_2,
+//       uniqueEmpIds_3,
+//       uniqueMoNos_1,
+//       uniqueMoNos_2,
+//       uniqueMoNos_3
+//     ] = await Promise.all([
+//       // Data queries with filters applied
+//       HTFirstOutput.find(stringDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+//       SCCDailyTesting.find(stringDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+//       DailyTestingHTFU.find(paddedDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+//       HTInspectionReport.find(isoDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+
+//       // Filter option queries (only filter by date to get all options for that day)
+//       HTFirstOutput.distinct("emp_id", { inspectionDate: stringDate }),
+//       SCCDailyTesting.distinct("emp_id", { inspectionDate: stringDate }),
+//       DailyTestingHTFU.distinct("emp_id", { inspectionDate: paddedStringDate }),
+//       HTFirstOutput.distinct("moNo", { inspectionDate: stringDate }),
+//       SCCDailyTesting.distinct("moNo", { inspectionDate: stringDate }),
+//       DailyTestingHTFU.distinct("moNo", { inspectionDate: paddedStringDate })
+//     ]);
+
+//     // Combine and get unique filter options
+//     const allEmpIds = [
+//       ...uniqueEmpIds_1,
+//       ...uniqueEmpIds_2,
+//       ...uniqueEmpIds_3,
+//       ...htInspectionData.map((d) => d.emp_id)
+//     ];
+//     const uniqueEmpIds = [...new Set(allEmpIds)].filter(Boolean).sort();
+
+//     const allMoNos = [
+//       ...uniqueMoNos_1,
+//       ...uniqueMoNos_2,
+//       ...uniqueMoNos_3,
+//       ...htInspectionData.map((d) => d.moNo)
+//     ];
+//     const uniqueMoNos = [...new Set(allMoNos)].filter(Boolean).sort();
+
+//     // Process First Output Data
+//     const processedFirstOutput = firstOutputData.map((doc) => {
+//       const firstSpec = doc.standardSpecification.find(
+//         (s) => s.type === "first"
+//       );
+//       const secondSpec = doc.standardSpecification.find(
+//         (s) => s.type === "2nd heat"
+//       );
+//       return {
+//         ...doc,
+//         specs: firstSpec
+//           ? {
+//               tempC: firstSpec.tempC,
+//               timeSec: firstSpec.timeSec,
+//               pressure: firstSpec.pressure
+//             }
+//           : {},
+//         secondHeatSpecs: secondSpec
+//           ? {
+//               tempC: secondSpec.tempC,
+//               timeSec: secondSpec.timeSec,
+//               pressure: secondSpec.pressure
+//             }
+//           : null
+//       };
+//     });
+
+//     // Process and Consolidate HT Inspection Data
+//     const consolidatedInspections = {};
+//     htInspectionData.forEach((doc) => {
+//       const key = `${doc.machineNo}-${doc.moNo}-${doc.color}-${doc.tableNo}`;
+//       if (!consolidatedInspections[key]) {
+//         consolidatedInspections[key] = {
+//           machineNo: doc.machineNo,
+//           moNo: doc.moNo,
+//           buyer: doc.buyer,
+//           buyerStyle: doc.buyerStyle,
+//           color: doc.color,
+//           operatorData: doc.operatorData,
+//           batchNo: doc.batchNo,
+//           tableNo: doc.tableNo,
+//           totalPcs: 0,
+//           totalInspectedQty: 0,
+//           totalDefectsQty: 0,
+//           defectSummary: {},
+//           defectImageUrls: []
+//         };
+//       }
+//       const group = consolidatedInspections[key];
+//       group.totalPcs += doc.totalPcs || 0;
+//       group.totalInspectedQty += doc.aqlData?.sampleSize || 0;
+//       group.totalDefectsQty += doc.defectsQty || 0;
+
+//       if (
+//         doc.defectImageUrl &&
+//         !group.defectImageUrls.includes(doc.defectImageUrl)
+//       ) {
+//         group.defectImageUrls.push(doc.defectImageUrl);
+//       }
+
+//       doc.defects.forEach((defect) => {
+//         const name = defect.defectNameEng;
+//         group.defectSummary[name] =
+//           (group.defectSummary[name] || 0) + defect.count;
+//       });
+//     });
+
+//     const finalInspectionArray = Object.values(consolidatedInspections).map(
+//       (group) => {
+//         const finalDefectRate =
+//           group.totalInspectedQty > 0
+//             ? group.totalDefectsQty / group.totalInspectedQty
+//             : 0;
+//         return {
+//           ...group,
+//           finalDefectRate,
+//           defectImageUrl: group.defectImageUrls[0] || null
+//         };
+//       }
+//     );
+
+//     res.json({
+//       firstOutput: processedFirstOutput,
+//       dailyWashing: dailyWashingData,
+//       machineCalibration: machineCalibrationData,
+//       htInspection: finalInspectionArray,
+//       filterOptions: {
+//         empIds: uniqueEmpIds,
+//         moNos: uniqueMoNos
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error creating consolidated HT report:", error);
+//     res.status(500).json({
+//       message: "Failed to generate consolidated report",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* -------------------------------------
    End Point - Final Consolidated FU Report
