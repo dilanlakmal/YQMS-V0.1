@@ -74,6 +74,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
     currentWashType
   ) => {
     setIsLoadingComparison(true);
+
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/qc-washing/results`,
@@ -81,27 +82,77 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
           params: {
             orderNo,
             color,
-            washType,
             reportType,
             factory
           }
         }
       );
 
-      // Find the opposite wash record based on current record type
       const targetWashType =
         currentWashType === "Before Wash" ? "After Wash" : "Before Wash";
-      const comparisonRecord = response.data.find(
-        (record) =>
-          record.orderNo === orderNo &&
-          record.color === color &&
-          record.washType === washType &&
-          record.reportType === reportType &&
-          record.factoryName === factory &&
-          record.before_after_wash === targetWashType
-      );
 
-      setComparisonData(comparisonRecord);
+      // Find all matching records with the target wash type
+      let comparisonRecords = [];
+
+      if (reportType === "First Output") {
+        // Get all records that match the criteria
+        comparisonRecords = response.data.filter(
+          (record) =>
+            record.orderNo === orderNo &&
+            record.color === color &&
+            record.reportType === reportType &&
+            record.before_after_wash === targetWashType &&
+            record.measurementDetails?.measurement?.length > 0
+        );
+      } else {
+        // For other report types, use exact match
+        comparisonRecords = response.data.filter(
+          (record) =>
+            record.orderNo === orderNo &&
+            record.color === color &&
+            record.washType === washType &&
+            record.reportType === reportType &&
+            record.factoryName === factory &&
+            record.before_after_wash === targetWashType &&
+            record.measurementDetails?.measurement?.length > 0
+        );
+      }
+
+      // Merge all measurement data from matching records
+      let mergedComparisonData = null;
+      if (comparisonRecords.length > 0) {
+        mergedComparisonData = {
+          ...comparisonRecords[0],
+          measurementDetails: {
+            ...comparisonRecords[0].measurementDetails,
+            measurement: []
+          }
+        };
+
+        // Collect all measurements from all matching records
+        const allMeasurements = [];
+        comparisonRecords.forEach((record) => {
+          if (record.measurementDetails?.measurement) {
+            allMeasurements.push(...record.measurementDetails.measurement);
+          }
+        });
+
+        mergedComparisonData.measurementDetails.measurement = allMeasurements;
+      }
+
+      console.log("Comparison search results:", {
+        targetWashType,
+        totalRecords: response.data.length,
+        foundRecords: comparisonRecords.length,
+        mergedSizes:
+          mergedComparisonData?.measurementDetails?.measurement?.map(
+            (m) => m.size
+          ) || [],
+        hasMeasurements:
+          !!mergedComparisonData?.measurementDetails?.measurement?.length
+      });
+
+      setComparisonData(mergedComparisonData);
     } catch (error) {
       console.error("Error fetching comparison data:", error);
       setComparisonData(null);
@@ -134,10 +185,11 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
         setSelectedKValue(uniqueKValues[0] || null);
       }
 
-      // Fetch comparison data if measurement data exists for both Before and After wash records
+      // Fetch comparison data for First Output and Inline reports with measurements
       if (
-        recordData.measurementDetails?.measurement &&
-        recordData.measurementDetails.measurement.length > 0 &&
+        recordData.measurementDetails?.measurement?.length > 0 &&
+        (recordData.reportType === "Inline" ||
+          recordData.reportType === "First Output") &&
         (recordData.before_after_wash === "After Wash" ||
           recordData.before_after_wash === "Before Wash")
       ) {
@@ -147,10 +199,9 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
           recordData.washType,
           recordData.reportType,
           recordData.factoryName,
-          recordData.before_after_wash // Pass current wash type
+          recordData.before_after_wash
         );
       } else {
-        // Clear comparison data if no measurements
         setComparisonData(null);
       }
     }
@@ -419,7 +470,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-green-600 dark:text-green-300 uppercase tracking-wide mb-1">
-                          Total Pass Points
+                          Total Pass
                         </p>
                         <p className="text-2xl font-bold text-green-900 dark:text-green-100">
                           {reportData.totalPass}
@@ -434,7 +485,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-red-600 dark:text-red-300 uppercase tracking-wide mb-1">
-                          Total Fail Points
+                          Total Fail
                         </p>
                         <p className="text-2xl font-bold text-red-900 dark:text-red-100">
                           {reportData.totalFail}
@@ -449,7 +500,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-amber-600 dark:text-amber-300 uppercase tracking-wide mb-1">
-                          Pass Rate (Measu.)
+                          Pass Rate(Measurment)
                         </p>
                         <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">
                           {reportData.passRate}%
@@ -461,7 +512,9 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                     className={`rounded-xl p-4 border hover:shadow-md transition-shadow ${
                       reportData.overallFinalResult === "Pass"
                         ? "bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-800"
-                        : "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 border-rose-200 dark:border-rose-800"
+                        : reportData.overallFinalResult === "Fail"
+                        ? "bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 border-rose-200 dark:border-rose-800"
+                        : "bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -469,13 +522,17 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                         className={`p-3 rounded-xl ${
                           reportData.overallFinalResult === "Pass"
                             ? "bg-emerald-500"
-                            : "bg-rose-500"
+                            : reportData.overallFinalResult === "Fail"
+                            ? "bg-rose-500"
+                            : "bg-amber-500"
                         }`}
                       >
                         {reportData.overallFinalResult === "Pass" ? (
                           <Award className="w-6 h-6 text-white" />
-                        ) : (
+                        ) : reportData.overallFinalResult === "Fail" ? (
                           <XCircle className="w-6 h-6 text-white" />
+                        ) : (
+                          <Clock className="w-6 h-6 text-white" />
                         )}
                       </div>
                       <div className="text-right">
@@ -483,7 +540,9 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                           className={`text-xs font-medium uppercase tracking-wide mb-1 ${
                             reportData.overallFinalResult === "Pass"
                               ? "text-emerald-600 dark:text-emerald-300"
-                              : "text-rose-600 dark:text-rose-300"
+                              : reportData.overallFinalResult === "Fail"
+                              ? "text-rose-600 dark:text-rose-300"
+                              : "text-amber-600 dark:text-amber-300"
                           }`}
                         >
                           Final Result
@@ -492,10 +551,12 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                           className={`text-2xl font-bold ${
                             reportData.overallFinalResult === "Pass"
                               ? "text-emerald-900 dark:text-emerald-100"
-                              : "text-rose-900 dark:text-rose-100"
+                              : reportData.overallFinalResult === "Fail"
+                              ? "text-rose-900 dark:text-rose-100"
+                              : "text-amber-900 dark:text-amber-100"
                           }`}
                         >
-                          {reportData.overallFinalResult}
+                          {reportData.overallFinalResult || "Pending"}
                         </p>
                       </div>
                     </div>
@@ -1905,277 +1966,572 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                 )}
 
               {/* Before vs After Wash Comparison */}
-              {(reportData.before_after_wash === "After Wash" ||
-                reportData.before_after_wash === "Before Wash") &&
-                comparisonData &&
-                comparisonData.measurementDetails?.measurement &&
-                comparisonData.measurementDetails.measurement.length > 0 && (
-                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
-                        <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg mr-3">
-                          <ArrowLeftRight className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                        </div>
-                        Before vs After Wash Comparison
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
-                          Before Wash
-                        </div>
-                        <div className="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
-                          After Wash
-                        </div>
-                        <div className="bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full">
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
-                            Size-wise Comparison
-                          </span>
-                        </div>
+              {(() => {
+                const shouldShowComparison =
+                  (reportData.before_after_wash === "After Wash" ||
+                    reportData.before_after_wash === "Before Wash") &&
+                  (reportData.reportType === "Inline" ||
+                    reportData.reportType === "First Output") &&
+                  reportData.measurementDetails?.measurement &&
+                  reportData.measurementDetails.measurement.length > 0;
+
+                return shouldShowComparison;
+              })() && (
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
+                      <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg mr-3">
+                        <ArrowLeftRight className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                      </div>
+                      Before vs After Wash Comparison
+                    </h3>
+                    <div className="flex items-center space-x-2">
+                      <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
+                        Before Wash
+                      </div>
+                      <div className="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
+                        After Wash
+                      </div>
+                      <div className="bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full">
+                        <span className="text-xs font-medium text-orange-700 dark:text-orange-300">
+                          Size-wise Comparison
+                        </span>
                       </div>
                     </div>
+                  </div>
+                  <div className="space-y-8">
+                    {(() => {
+                      let beforeData, afterData;
 
-                    <div className="space-y-8">
-                      {(() => {
-                        // Determine which is before and which is after
-                        const beforeData =
-                          reportData.before_after_wash === "Before Wash"
-                            ? reportData
-                            : comparisonData;
-                        const afterData =
+                      if (reportData.before_after_wash === "Before Wash") {
+                        beforeData = reportData;
+                        afterData = comparisonData;
+                      } else if (
+                        reportData.before_after_wash === "After Wash"
+                      ) {
+                        beforeData = comparisonData;
+                        afterData = reportData;
+                      } else {
+                        // Fallback - shouldn't happen with current conditions
+                        beforeData = reportData;
+                        afterData = comparisonData;
+                      }
+
+                      console.log("Comparison data debug:", {
+                        currentWashType: reportData.before_after_wash,
+                        reportType: reportData.reportType,
+                        hasComparisonData: !!comparisonData,
+                        comparisonWashType: comparisonData?.before_after_wash,
+                        beforeDataHasMeasurements:
+                          !!beforeData?.measurementDetails?.measurement?.length,
+                        afterDataHasMeasurements:
+                          !!afterData?.measurementDetails?.measurement?.length,
+                        beforeDataSource:
+                          beforeData === reportData
+                            ? "current report"
+                            : "comparison data",
+                        afterDataSource:
+                          afterData === reportData
+                            ? "current report"
+                            : "comparison data",
+                        beforeDataSizes:
+                          beforeData?.measurementDetails?.measurement?.map(
+                            (m) => m.size
+                          ) || [],
+                        afterDataSizes:
+                          afterData?.measurementDetails?.measurement?.map(
+                            (m) => m.size
+                          ) || [],
+                        comparisonDataFull: comparisonData
+                          ? {
+                              orderNo: comparisonData.orderNo,
+                              color: comparisonData.color,
+                              washType: comparisonData.washType,
+                              reportType: comparisonData.reportType,
+                              before_after_wash:
+                                comparisonData.before_after_wash,
+                              hasMeasurements:
+                                !!comparisonData.measurementDetails?.measurement
+                                  ?.length
+                            }
+                          : null
+                      });
+
+                      // Get all unique sizes from all available datasets
+                      const allSizes = new Set();
+
+                      // Always include sizes from current report data first
+                      reportData.measurementDetails?.measurement?.forEach(
+                        (sizeData) => allSizes.add(sizeData.size)
+                      );
+
+                      // Add sizes from comparison data if available
+                      if (comparisonData?.measurementDetails?.measurement) {
+                        comparisonData.measurementDetails.measurement.forEach(
+                          (sizeData) => allSizes.add(sizeData.size)
+                        );
+                      }
+
+                      // Add sizes from before data if available
+                      beforeData?.measurementDetails?.measurement?.forEach(
+                        (sizeData) => allSizes.add(sizeData.size)
+                      );
+
+                      // Add sizes from after data if available
+                      afterData?.measurementDetails?.measurement?.forEach(
+                        (sizeData) => allSizes.add(sizeData.size)
+                      );
+
+                      console.log("All sizes found:", Array.from(allSizes));
+                      console.log(
+                        "Current report sizes:",
+                        reportData.measurementDetails?.measurement?.map(
+                          (m) => m.size
+                        ) || []
+                      );
+                      console.log(
+                        "Before data sizes:",
+                        beforeData?.measurementDetails?.measurement?.map(
+                          (m) => m.size
+                        ) || []
+                      );
+                      console.log(
+                        "After data sizes:",
+                        afterData?.measurementDetails?.measurement?.map(
+                          (m) => m.size
+                        ) || []
+                      );
+
+                      return Array.from(allSizes).map((size) => {
+                        // Find size data for both before and after from all available sources
+                        let beforeSizeData = null;
+                        let afterSizeData = null;
+
+                        // Determine which data source has which wash type for this size
+                        const currentSizeData =
+                          reportData.measurementDetails?.measurement?.find(
+                            (s) => s.size === size
+                          );
+                        const comparisonSizeData =
+                          comparisonData?.measurementDetails?.measurement?.find(
+                            (s) => s.size === size
+                          );
+
+                        if (reportData.before_after_wash === "Before Wash") {
+                          beforeSizeData = currentSizeData;
+                          afterSizeData = comparisonSizeData;
+                        } else if (
                           reportData.before_after_wash === "After Wash"
-                            ? reportData
-                            : comparisonData;
+                        ) {
+                          beforeSizeData = comparisonSizeData;
+                          afterSizeData = currentSizeData;
+                        }
 
-                        // Get all unique sizes from both datasets
-                        const allSizes = new Set();
-                        beforeData.measurementDetails.measurement?.forEach(
-                          (sizeData) => allSizes.add(sizeData.size)
-                        );
-                        afterData.measurementDetails.measurement?.forEach(
-                          (sizeData) => allSizes.add(sizeData.size)
-                        );
-
-                        return Array.from(allSizes).map((size) => {
-                          // Find size data for both before and after
-                          const beforeSizeData =
-                            beforeData.measurementDetails.measurement?.find(
+                        // Fallback to beforeData/afterData if not found above
+                        if (!beforeSizeData) {
+                          beforeSizeData =
+                            beforeData?.measurementDetails?.measurement?.find(
                               (s) => s.size === size
                             );
-                          const afterSizeData =
-                            afterData.measurementDetails.measurement?.find(
+                        }
+                        if (!afterSizeData) {
+                          afterSizeData =
+                            afterData?.measurementDetails?.measurement?.find(
                               (s) => s.size === size
                             );
+                        }
 
-                          if (!beforeSizeData && !afterSizeData) return null;
-
-                          return (
-                            <div
-                              key={size}
-                              className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800"
-                            >
-                              <div className="flex items-center space-x-3 mb-6">
-                                <div className="bg-orange-500 p-2 rounded-lg">
-                                  <Ruler className="w-5 h-5 text-white" />
-                                </div>
-                                <h4 className="text-lg font-bold text-orange-800 dark:text-orange-200">
-                                  Size: {size}
-                                </h4>
-                                <div className="bg-orange-200 dark:bg-orange-700 px-3 py-1 rounded-full">
-                                  <span className="text-xs font-medium text-orange-800 dark:text-orange-200">
-                                    Before vs After Comparison
-                                  </span>
-                                </div>
+                        return (
+                          <div
+                            key={size}
+                            className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800"
+                          >
+                            <div className="flex items-center space-x-3 mb-6">
+                              <div className="bg-orange-500 p-2 rounded-lg">
+                                <Ruler className="w-5 h-5 text-white" />
                               </div>
+                              <h4 className="text-lg font-bold text-orange-800 dark:text-orange-200">
+                                Size: {size}
+                              </h4>
+                              <div className="bg-orange-200 dark:bg-orange-700 px-3 py-1 rounded-full">
+                                <span className="text-xs font-medium text-orange-800 dark:text-orange-200">
+                                  Before vs After Comparison
+                                </span>
+                              </div>
+                            </div>
 
-                              <div className="overflow-x-auto">
-                                <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                  <thead className="bg-gray-50 dark:bg-gray-700">
-                                    {(() => {
-                                      // Get all unique measurement values for this size
-                                      const allValues = new Set();
-                                      [beforeSizeData, afterSizeData].forEach(
-                                        (sizeData) => {
-                                          sizeData?.pcs?.forEach((pc) => {
-                                            pc.measurementPoints?.forEach(
-                                              (mp) => {
-                                                if (
-                                                  mp.measured_value_fraction
-                                                ) {
-                                                  allValues.add(
-                                                    mp.measured_value_fraction
-                                                  );
-                                                }
-                                              }
-                                            );
-                                          });
+                            <div className="overflow-x-auto">
+                              <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                <thead className="bg-gray-50 dark:bg-gray-700">
+                                  {(() => {
+                                    // Get all unique measurement values for this size from all available data
+                                    const allValues = new Set();
+
+                                    // Add values from current report data
+                                    const currentSizeData =
+                                      reportData.measurementDetails?.measurement?.find(
+                                        (s) => s.size === size
+                                      );
+                                    currentSizeData?.pcs?.forEach((pc) => {
+                                      pc.measurementPoints?.forEach((mp) => {
+                                        if (mp.measured_value_fraction) {
+                                          allValues.add(
+                                            mp.measured_value_fraction
+                                          );
                                         }
-                                      );
-
-                                      const sortedValues =
-                                        Array.from(allValues).sort();
-
-                                      return (
-                                        <>
-                                          <tr>
-                                            <th
-                                              rowSpan="2"
-                                              className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
-                                            >
-                                              Measurement Point
-                                            </th>
-                                            <th
-                                              rowSpan="2"
-                                              className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
-                                            >
-                                              Spec
-                                            </th>
-                                            <th
-                                              rowSpan="2"
-                                              className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
-                                            >
-                                              Tolerance (-)
-                                            </th>
-                                            <th
-                                              rowSpan="2"
-                                              className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
-                                            >
-                                              Tolerance (+)
-                                            </th>
-                                            <th
-                                              colSpan={sortedValues.length}
-                                              className="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
-                                            >
-                                              Before Wash - Measurement Values
-                                              (Count)
-                                            </th>
-                                            <th
-                                              colSpan={sortedValues.length}
-                                              className="px-4 py-3 text-center text-xs font-bold text-green-600 dark:text-green-300 uppercase tracking-wider"
-                                            >
-                                              After Wash - Measurement Values
-                                              (Count)
-                                            </th>
-                                          </tr>
-                                          <tr>
-                                            {/* Before Wash Value Headers */}
-                                            {sortedValues.map((value) => (
-                                              <th
-                                                key={`before-${value}`}
-                                                className="px-2 py-2 text-center text-xs font-bold text-blue-600 dark:text-blue-300 border-r border-gray-200 dark:border-gray-600"
-                                              >
-                                                {value}
-                                              </th>
-                                            ))}
-                                            {/* After Wash Value Headers */}
-                                            {sortedValues.map((value) => (
-                                              <th
-                                                key={`after-${value}`}
-                                                className="px-2 py-2 text-center text-xs font-bold text-green-600 dark:text-green-300 border-r border-gray-200 dark:border-gray-600"
-                                              >
-                                                {value}
-                                              </th>
-                                            ))}
-                                          </tr>
-                                        </>
-                                      );
-                                    })()}
-                                  </thead>
-                                  <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
-                                    {(() => {
-                                      // Get all unique measurement points for this size
-                                      const measurementPoints = new Set();
-                                      beforeSizeData?.pcs?.forEach((pc) => {
-                                        pc.measurementPoints?.forEach((mp) =>
-                                          measurementPoints.add(mp.pointName)
-                                        );
                                       });
-                                      afterSizeData?.pcs?.forEach((pc) => {
-                                        pc.measurementPoints?.forEach((mp) =>
-                                          measurementPoints.add(mp.pointName)
-                                        );
+                                    });
+
+                                    // Add values from comparison data
+                                    const comparisonSizeData =
+                                      comparisonData?.measurementDetails?.measurement?.find(
+                                        (s) => s.size === size
+                                      );
+                                    comparisonSizeData?.pcs?.forEach((pc) => {
+                                      pc.measurementPoints?.forEach((mp) => {
+                                        if (mp.measured_value_fraction) {
+                                          allValues.add(
+                                            mp.measured_value_fraction
+                                          );
+                                        }
                                       });
+                                    });
 
-                                      return Array.from(measurementPoints).map(
-                                        (pointName, pointIndex) => {
-                                          // Get first measurement point for spec info
-                                          let firstMeasurement = null;
-                                          if (
-                                            beforeSizeData?.pcs?.[0]
-                                              ?.measurementPoints
-                                          ) {
-                                            firstMeasurement =
-                                              beforeSizeData.pcs[0].measurementPoints.find(
-                                                (mp) =>
-                                                  mp.pointName === pointName
-                                              );
-                                          }
-                                          if (
-                                            !firstMeasurement &&
-                                            afterSizeData?.pcs?.[0]
-                                              ?.measurementPoints
-                                          ) {
-                                            firstMeasurement =
-                                              afterSizeData.pcs[0].measurementPoints.find(
-                                                (mp) =>
-                                                  mp.pointName === pointName
-                                              );
-                                          }
+                                    // Also add from before/after data
+                                    [beforeSizeData, afterSizeData].forEach(
+                                      (sizeData) => {
+                                        sizeData?.pcs?.forEach((pc) => {
+                                          pc.measurementPoints?.forEach(
+                                            (mp) => {
+                                              if (mp.measured_value_fraction) {
+                                                allValues.add(
+                                                  mp.measured_value_fraction
+                                                );
+                                              }
+                                            }
+                                          );
+                                        });
+                                      }
+                                    );
 
-                                          if (!firstMeasurement) return null;
+                                    const sortedValues =
+                                      Array.from(allValues).sort();
 
-                                          return (
-                                            <tr
-                                              key={pointIndex}
-                                              className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                                    return (
+                                      <>
+                                        <tr>
+                                          <th
+                                            rowSpan="2"
+                                            className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
+                                          >
+                                            Measurement Point
+                                          </th>
+                                          <th
+                                            rowSpan="2"
+                                            className="px-4 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
+                                          >
+                                            Spec
+                                          </th>
+                                          <th
+                                            rowSpan="2"
+                                            className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
+                                          >
+                                            Tolerance (-)
+                                          </th>
+                                          <th
+                                            rowSpan="2"
+                                            className="px-2 py-3 text-center text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
+                                          >
+                                            Tolerance (+)
+                                          </th>
+                                          <th
+                                            colSpan={sortedValues.length}
+                                            className="px-4 py-3 text-center text-xs font-bold text-blue-600 dark:text-blue-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
+                                          >
+                                            Before Wash - Measurement Values
+                                            (Count)
+                                          </th>
+                                          <th
+                                            colSpan={sortedValues.length}
+                                            className="px-4 py-3 text-center text-xs font-bold text-green-600 dark:text-green-300 uppercase tracking-wider"
+                                          >
+                                            After Wash - Measurement Values
+                                            (Count)
+                                          </th>
+                                        </tr>
+                                        <tr>
+                                          {/* Before Wash Value Headers */}
+                                          {sortedValues.map((value) => (
+                                            <th
+                                              key={`before-${value}`}
+                                              className="px-2 py-2 text-center text-xs font-bold text-blue-600 dark:text-blue-300 border-r border-gray-200 dark:border-gray-600"
                                             >
-                                              <td className="px-4 py-3 text-sm font-bold text-gray-800 dark:text-gray-200 border-r border-gray-200 dark:border-gray-600">
-                                                {pointName}
-                                              </td>
-                                              <td className="px-4 py-3 text-center text-sm font-medium text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-600">
-                                                {firstMeasurement.specs}
-                                              </td>
-                                              <td className="px-2 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
-                                                {getToleranceAsFraction(
-                                                  firstMeasurement,
-                                                  "minus"
-                                                )}
-                                              </td>
-                                              <td className="px-2 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
-                                                +
-                                                {getToleranceAsFraction(
-                                                  firstMeasurement,
-                                                  "plus"
-                                                )}
-                                              </td>
-                                              {(() => {
-                                                // Get all unique measurement values for this size
-                                                const allValues = new Set();
-                                                [
-                                                  beforeSizeData,
-                                                  afterSizeData
-                                                ].forEach((sizeData) => {
-                                                  sizeData?.pcs?.forEach(
-                                                    (pc) => {
-                                                      pc.measurementPoints?.forEach(
-                                                        (mp) => {
-                                                          if (
+                                              {value}
+                                            </th>
+                                          ))}
+                                          {/* After Wash Value Headers */}
+                                          {sortedValues.map((value) => (
+                                            <th
+                                              key={`after-${value}`}
+                                              className="px-2 py-2 text-center text-xs font-bold text-green-600 dark:text-green-300 border-r border-gray-200 dark:border-gray-600"
+                                            >
+                                              {value}
+                                            </th>
+                                          ))}
+                                        </tr>
+                                      </>
+                                    );
+                                  })()}
+                                </thead>
+                                <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                                  {(() => {
+                                    // Get all unique measurement points for this size from all available data
+                                    const measurementPoints = new Set();
+
+                                    // Always include measurement points from current report data
+                                    const currentSizeData =
+                                      reportData.measurementDetails?.measurement?.find(
+                                        (s) => s.size === size
+                                      );
+                                    currentSizeData?.pcs?.forEach((pc) => {
+                                      pc.measurementPoints?.forEach((mp) =>
+                                        measurementPoints.add(mp.pointName)
+                                      );
+                                    });
+
+                                    // Add measurement points from comparison data
+                                    const comparisonSizeData =
+                                      comparisonData?.measurementDetails?.measurement?.find(
+                                        (s) => s.size === size
+                                      );
+                                    comparisonSizeData?.pcs?.forEach((pc) => {
+                                      pc.measurementPoints?.forEach((mp) =>
+                                        measurementPoints.add(mp.pointName)
+                                      );
+                                    });
+
+                                    // Add measurement points from before data
+                                    beforeSizeData?.pcs?.forEach((pc) => {
+                                      pc.measurementPoints?.forEach((mp) =>
+                                        measurementPoints.add(mp.pointName)
+                                      );
+                                    });
+
+                                    // Add measurement points from after data
+                                    afterSizeData?.pcs?.forEach((pc) => {
+                                      pc.measurementPoints?.forEach((mp) =>
+                                        measurementPoints.add(mp.pointName)
+                                      );
+                                    });
+
+                                    console.log(
+                                      "Measurement points for size",
+                                      size,
+                                      ":",
+                                      Array.from(measurementPoints)
+                                    );
+
+                                    return Array.from(measurementPoints).map(
+                                      (pointName, pointIndex) => {
+                                        // Get first measurement point for spec info from any available data
+                                        let firstMeasurement = null;
+
+                                        // Try current report data first
+                                        if (
+                                          currentSizeData?.pcs?.[0]
+                                            ?.measurementPoints
+                                        ) {
+                                          firstMeasurement =
+                                            currentSizeData.pcs[0].measurementPoints.find(
+                                              (mp) => mp.pointName === pointName
+                                            );
+                                        }
+
+                                        // Try comparison data
+                                        if (
+                                          !firstMeasurement &&
+                                          comparisonSizeData?.pcs?.[0]
+                                            ?.measurementPoints
+                                        ) {
+                                          firstMeasurement =
+                                            comparisonSizeData.pcs[0].measurementPoints.find(
+                                              (mp) => mp.pointName === pointName
+                                            );
+                                        }
+
+                                        // Try before data
+                                        if (
+                                          !firstMeasurement &&
+                                          beforeSizeData?.pcs?.[0]
+                                            ?.measurementPoints
+                                        ) {
+                                          firstMeasurement =
+                                            beforeSizeData.pcs[0].measurementPoints.find(
+                                              (mp) => mp.pointName === pointName
+                                            );
+                                        }
+
+                                        // Try after data
+                                        if (
+                                          !firstMeasurement &&
+                                          afterSizeData?.pcs?.[0]
+                                            ?.measurementPoints
+                                        ) {
+                                          firstMeasurement =
+                                            afterSizeData.pcs[0].measurementPoints.find(
+                                              (mp) => mp.pointName === pointName
+                                            );
+                                        }
+
+                                        if (!firstMeasurement) return null;
+
+                                        return (
+                                          <tr
+                                            key={pointIndex}
+                                            className="hover:bg-gray-50 dark:hover:bg-gray-700"
+                                          >
+                                            <td className="px-4 py-3 text-sm font-bold text-gray-800 dark:text-gray-200 border-r border-gray-200 dark:border-gray-600">
+                                              {pointName}
+                                            </td>
+                                            <td className="px-4 py-3 text-center text-sm font-medium text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-600">
+                                              {firstMeasurement.specs}
+                                            </td>
+                                            <td className="px-2 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
+                                              {getToleranceAsFraction(
+                                                firstMeasurement,
+                                                "minus"
+                                              )}
+                                            </td>
+                                            <td className="px-2 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
+                                              +
+                                              {getToleranceAsFraction(
+                                                firstMeasurement,
+                                                "plus"
+                                              )}
+                                            </td>
+                                            {(() => {
+                                              // Get all unique measurement values for this size from all available datasets
+                                              const allValues = new Set();
+
+                                              // Add values from current report data
+                                              if (currentSizeData) {
+                                                currentSizeData.pcs?.forEach(
+                                                  (pc) => {
+                                                    pc.measurementPoints?.forEach(
+                                                      (mp) => {
+                                                        if (
+                                                          mp.measured_value_fraction
+                                                        ) {
+                                                          allValues.add(
                                                             mp.measured_value_fraction
-                                                          ) {
-                                                            allValues.add(
-                                                              mp.measured_value_fraction
-                                                            );
-                                                          }
+                                                          );
                                                         }
-                                                      );
-                                                    }
-                                                  );
-                                                });
+                                                      }
+                                                    );
+                                                  }
+                                                );
+                                              }
 
-                                                const sortedValues =
-                                                  Array.from(allValues).sort();
+                                              // Add values from comparison data
+                                              if (comparisonSizeData) {
+                                                comparisonSizeData.pcs?.forEach(
+                                                  (pc) => {
+                                                    pc.measurementPoints?.forEach(
+                                                      (mp) => {
+                                                        if (
+                                                          mp.measured_value_fraction
+                                                        ) {
+                                                          allValues.add(
+                                                            mp.measured_value_fraction
+                                                          );
+                                                        }
+                                                      }
+                                                    );
+                                                  }
+                                                );
+                                              }
 
-                                                // Count values for before wash
-                                                const beforeValueCount = {};
-                                                beforeSizeData?.pcs?.forEach(
+                                              // Add values from before wash data
+                                              if (beforeSizeData) {
+                                                beforeSizeData.pcs?.forEach(
+                                                  (pc) => {
+                                                    pc.measurementPoints?.forEach(
+                                                      (mp) => {
+                                                        if (
+                                                          mp.measured_value_fraction
+                                                        ) {
+                                                          allValues.add(
+                                                            mp.measured_value_fraction
+                                                          );
+                                                        }
+                                                      }
+                                                    );
+                                                  }
+                                                );
+                                              }
+
+                                              // Add values from after wash data
+                                              if (afterSizeData) {
+                                                afterSizeData.pcs?.forEach(
+                                                  (pc) => {
+                                                    pc.measurementPoints?.forEach(
+                                                      (mp) => {
+                                                        if (
+                                                          mp.measured_value_fraction
+                                                        ) {
+                                                          allValues.add(
+                                                            mp.measured_value_fraction
+                                                          );
+                                                        }
+                                                      }
+                                                    );
+                                                  }
+                                                );
+                                              }
+
+                                              // If no values found, add some common measurement values as fallback
+                                              if (allValues.size === 0) {
+                                                // Add common fractional values that might be used
+                                                [
+                                                  "-1/16",
+                                                  "-1/4",
+                                                  "-7/16",
+                                                  "0",
+                                                  "+1/16",
+                                                  "+1/4",
+                                                  "+7/16"
+                                                ].forEach((val) =>
+                                                  allValues.add(val)
+                                                );
+                                              }
+
+                                              console.log(
+                                                "All measurement values for size",
+                                                size,
+                                                ":",
+                                                Array.from(allValues)
+                                              );
+                                              console.log(
+                                                "Before size data available:",
+                                                !!beforeSizeData,
+                                                beforeSizeData?.pcs?.length ||
+                                                  0,
+                                                "pieces"
+                                              );
+                                              console.log(
+                                                "After size data available:",
+                                                !!afterSizeData,
+                                                afterSizeData?.pcs?.length || 0,
+                                                "pieces"
+                                              );
+
+                                              const sortedValues =
+                                                Array.from(allValues).sort();
+
+                                              // Count values for before wash
+                                              const beforeValueCount = {};
+                                              if (beforeSizeData) {
+                                                beforeSizeData.pcs?.forEach(
                                                   (pc) => {
                                                     const measurement =
                                                       pc.measurementPoints?.find(
@@ -2196,10 +2552,12 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                     }
                                                   }
                                                 );
+                                              }
 
-                                                // Count values for after wash
-                                                const afterValueCount = {};
-                                                afterSizeData?.pcs?.forEach(
+                                              // Count values for after wash
+                                              const afterValueCount = {};
+                                              if (afterSizeData) {
+                                                afterSizeData.pcs?.forEach(
                                                   (pc) => {
                                                     const measurement =
                                                       pc.measurementPoints?.find(
@@ -2220,158 +2578,184 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                     }
                                                   }
                                                 );
+                                              }
 
-                                                return (
-                                                  <>
-                                                    {/* Before Wash Value Counts */}
-                                                    {sortedValues.map(
-                                                      (value) => {
-                                                        const count =
-                                                          beforeValueCount[
-                                                            value
-                                                          ] || 0;
-                                                        const passCount =
-                                                          (() => {
-                                                            let pass = 0;
-                                                            beforeSizeData?.pcs?.forEach(
-                                                              (pc) => {
-                                                                const measurement =
-                                                                  pc.measurementPoints?.find(
-                                                                    (mp) =>
-                                                                      mp.pointName ===
-                                                                      pointName
-                                                                  );
-                                                                if (
-                                                                  measurement &&
-                                                                  measurement.measured_value_fraction ===
-                                                                    value &&
-                                                                  measurement.result ===
-                                                                    "pass"
-                                                                ) {
-                                                                  pass++;
-                                                                }
-                                                              }
+                                              return (
+                                                <>
+                                                  {/* Before Wash Value Counts */}
+                                                  {sortedValues.map((value) => {
+                                                    const count =
+                                                      beforeValueCount[value] ||
+                                                      0;
+                                                    const passCount = (() => {
+                                                      let pass = 0;
+                                                      beforeSizeData?.pcs?.forEach(
+                                                        (pc) => {
+                                                          const measurement =
+                                                            pc.measurementPoints?.find(
+                                                              (mp) =>
+                                                                mp.pointName ===
+                                                                pointName
                                                             );
-                                                            return pass;
-                                                          })();
-                                                        const failCount =
-                                                          count - passCount;
+                                                          if (
+                                                            measurement &&
+                                                            measurement.measured_value_fraction ===
+                                                              value &&
+                                                            measurement.result ===
+                                                              "pass"
+                                                          ) {
+                                                            pass++;
+                                                          }
+                                                        }
+                                                      );
+                                                      return pass;
+                                                    })();
+                                                    const failCount =
+                                                      count - passCount;
 
-                                                        return (
-                                                          <td
-                                                            key={`before-${value}`}
-                                                            className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20"
-                                                          >
-                                                            {count === 0 ? (
-                                                              <span className="font-bold text-gray-400">
-                                                                -
+                                                    return (
+                                                      <td
+                                                        key={`before-${value}`}
+                                                        className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20"
+                                                      >
+                                                        {count === 0 ? (
+                                                          <span className="font-bold text-gray-400">
+                                                            -
+                                                          </span>
+                                                        ) : (
+                                                          <div className="flex flex-col items-center">
+                                                            {passCount > 0 && (
+                                                              <span className="font-bold text-green-600 dark:text-green-400">
+                                                                {passCount}
                                                               </span>
-                                                            ) : (
-                                                              <div className="flex flex-col items-center">
-                                                                {passCount >
-                                                                  0 && (
-                                                                  <span className="font-bold text-green-600 dark:text-green-400">
-                                                                    {passCount}
-                                                                  </span>
-                                                                )}
-                                                                {failCount >
-                                                                  0 && (
-                                                                  <span className="font-bold text-red-600 dark:text-red-400">
-                                                                    {failCount}
-                                                                  </span>
-                                                                )}
-                                                              </div>
                                                             )}
-                                                          </td>
-                                                        );
-                                                      }
-                                                    )}
-                                                    {/* After Wash Value Counts */}
-                                                    {sortedValues.map(
-                                                      (value) => {
-                                                        const count =
-                                                          afterValueCount[
-                                                            value
-                                                          ] || 0;
-                                                        const passCount =
-                                                          (() => {
-                                                            let pass = 0;
-                                                            afterSizeData?.pcs?.forEach(
-                                                              (pc) => {
-                                                                const measurement =
-                                                                  pc.measurementPoints?.find(
-                                                                    (mp) =>
-                                                                      mp.pointName ===
-                                                                      pointName
-                                                                  );
-                                                                if (
-                                                                  measurement &&
-                                                                  measurement.measured_value_fraction ===
-                                                                    value &&
-                                                                  measurement.result ===
-                                                                    "pass"
-                                                                ) {
-                                                                  pass++;
-                                                                }
-                                                              }
+                                                            {failCount > 0 && (
+                                                              <span className="font-bold text-red-600 dark:text-red-400">
+                                                                {failCount}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </td>
+                                                    );
+                                                  })}
+                                                  {/* After Wash Value Counts */}
+                                                  {sortedValues.map((value) => {
+                                                    const count =
+                                                      afterValueCount[value] ||
+                                                      0;
+                                                    const passCount = (() => {
+                                                      let pass = 0;
+                                                      afterSizeData?.pcs?.forEach(
+                                                        (pc) => {
+                                                          const measurement =
+                                                            pc.measurementPoints?.find(
+                                                              (mp) =>
+                                                                mp.pointName ===
+                                                                pointName
                                                             );
-                                                            return pass;
-                                                          })();
-                                                        const failCount =
-                                                          count - passCount;
+                                                          if (
+                                                            measurement &&
+                                                            measurement.measured_value_fraction ===
+                                                              value &&
+                                                            measurement.result ===
+                                                              "pass"
+                                                          ) {
+                                                            pass++;
+                                                          }
+                                                        }
+                                                      );
+                                                      return pass;
+                                                    })();
+                                                    const failCount =
+                                                      count - passCount;
 
-                                                        return (
-                                                          <td
-                                                            key={`after-${value}`}
-                                                            className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20"
-                                                          >
-                                                            {count === 0 ? (
-                                                              <span className="font-bold text-gray-400">
-                                                                -
+                                                    return (
+                                                      <td
+                                                        key={`after-${value}`}
+                                                        className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20"
+                                                      >
+                                                        {count === 0 ? (
+                                                          <span className="font-bold text-gray-400">
+                                                            -
+                                                          </span>
+                                                        ) : (
+                                                          <div className="flex flex-col items-center">
+                                                            {passCount > 0 && (
+                                                              <span className="font-bold text-green-600 dark:text-green-400">
+                                                                {passCount}
                                                               </span>
-                                                            ) : (
-                                                              <div className="flex flex-col items-center">
-                                                                {passCount >
-                                                                  0 && (
-                                                                  <span className="font-bold text-green-600 dark:text-green-400">
-                                                                    {passCount}
-                                                                  </span>
-                                                                )}
-                                                                {failCount >
-                                                                  0 && (
-                                                                  <span className="font-bold text-red-600 dark:text-red-400">
-                                                                    {failCount}
-                                                                  </span>
-                                                                )}
-                                                              </div>
                                                             )}
-                                                          </td>
-                                                        );
-                                                      }
-                                                    )}
-                                                  </>
-                                                );
-                                              })()}
-                                            </tr>
-                                          );
-                                        }
+                                                            {failCount > 0 && (
+                                                              <span className="font-bold text-red-600 dark:text-red-400">
+                                                                {failCount}
+                                                              </span>
+                                                            )}
+                                                          </div>
+                                                        )}
+                                                      </td>
+                                                    );
+                                                  })}
+                                                </>
+                                              );
+                                            })()}
+                                          </tr>
+                                        );
+                                      }
+                                    );
+                                  })()}
+                                </tbody>
+                              </table>
+                            </div>
+
+                            {/* Size Summary */}
+                            <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-100 dark:border-blue-800">
+                                <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">
+                                  Before Wash (Size {size})
+                                </div>
+                                <div className="text-sm font-bold">
+                                  {beforeSizeData ? (
+                                    (() => {
+                                      let withinTolerance = 0,
+                                        outOfTolerance = 0;
+                                      beforeSizeData.pcs?.forEach((pc) => {
+                                        pc.measurementPoints?.forEach((mp) => {
+                                          if (mp.result === "pass") {
+                                            withinTolerance++;
+                                          } else {
+                                            outOfTolerance++;
+                                          }
+                                        });
+                                      });
+                                      return (
+                                        <div className="flex justify-between">
+                                          <span className="text-green-600 dark:text-green-400">
+                                            Within: {withinTolerance}
+                                          </span>
+                                          <span className="text-red-600 dark:text-red-400">
+                                            Out of: {outOfTolerance}
+                                          </span>
+                                        </div>
                                       );
-                                    })()}
-                                  </tbody>
-                                </table>
+                                    })()
+                                  ) : (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      No data
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-
-                              {/* Size Summary */}
-                              <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-100 dark:border-blue-800">
-                                  <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">
-                                    Before Wash (Size {size})
-                                  </div>
-                                  <div className="text-sm font-bold">
-                                    {(() => {
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-100 dark:border-green-800">
+                                <div className="text-xs text-green-600 dark:text-green-400 mb-1">
+                                  After Wash (Size {size})
+                                </div>
+                                <div className="text-sm font-bold">
+                                  {afterSizeData ? (
+                                    (() => {
                                       let withinTolerance = 0,
                                         outOfTolerance = 0;
-                                      beforeSizeData?.pcs?.forEach((pc) => {
+                                      afterSizeData.pcs?.forEach((pc) => {
                                         pc.measurementPoints?.forEach((mp) => {
                                           if (mp.result === "pass") {
                                             withinTolerance++;
@@ -2390,57 +2774,34 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                           </span>
                                         </div>
                                       );
-                                    })()}
-                                  </div>
+                                    })()
+                                  ) : (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      No data
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-100 dark:border-green-800">
-                                  <div className="text-xs text-green-600 dark:text-green-400 mb-1">
-                                    After Wash (Size {size})
-                                  </div>
-                                  <div className="text-sm font-bold">
-                                    {(() => {
-                                      let withinTolerance = 0,
-                                        outOfTolerance = 0;
-                                      afterSizeData?.pcs?.forEach((pc) => {
-                                        pc.measurementPoints?.forEach((mp) => {
-                                          if (mp.result === "pass") {
-                                            withinTolerance++;
-                                          } else {
-                                            outOfTolerance++;
-                                          }
-                                        });
-                                      });
-                                      return (
-                                        <div className="flex justify-between">
-                                          <span className="text-green-600 dark:text-green-400">
-                                            Within: {withinTolerance}
-                                          </span>
-                                          <span className="text-red-600 dark:text-red-400">
-                                            Out of: {outOfTolerance}
-                                          </span>
-                                        </div>
-                                      );
-                                    })()}
-                                  </div>
+                              </div>
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-orange-100 dark:border-orange-800">
+                                <div className="text-xs text-orange-600 dark:text-orange-400 mb-1">
+                                  Pieces Count
                                 </div>
-                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-orange-100 dark:border-orange-800">
-                                  <div className="text-xs text-orange-600 dark:text-orange-400 mb-1">
-                                    Pieces Count
-                                  </div>
-                                  <div className="text-sm font-bold text-orange-800 dark:text-orange-200">
-                                    Before: {beforeSizeData?.pcs?.length || 0} |
-                                    After: {afterSizeData?.pcs?.length || 0}
-                                  </div>
+                                <div className="text-sm font-bold text-orange-800 dark:text-orange-200">
+                                  Before: {beforeSizeData?.pcs?.length || 0} |
+                                  After: {afterSizeData?.pcs?.length || 0}
                                 </div>
-                                <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-purple-100 dark:border-purple-800">
-                                  <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
-                                    Quality Change
-                                  </div>
-                                  <div className="text-sm font-bold">
-                                    {(() => {
+                              </div>
+                              <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-purple-100 dark:border-purple-800">
+                                <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">
+                                  Quality Change
+                                </div>
+                                <div className="text-sm font-bold">
+                                  {beforeSizeData && afterSizeData ? (
+                                    (() => {
+                                      // Your existing quality change calculation
                                       const beforeWithin = (() => {
                                         let within = 0;
-                                        beforeSizeData?.pcs?.forEach((pc) => {
+                                        beforeSizeData.pcs?.forEach((pc) => {
                                           pc.measurementPoints?.forEach(
                                             (mp) => {
                                               if (mp.result === "pass")
@@ -2453,7 +2814,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
 
                                       const beforeOutOf = (() => {
                                         let outOf = 0;
-                                        beforeSizeData?.pcs?.forEach((pc) => {
+                                        beforeSizeData.pcs?.forEach((pc) => {
                                           pc.measurementPoints?.forEach(
                                             (mp) => {
                                               if (mp.result === "fail") outOf++;
@@ -2465,7 +2826,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
 
                                       const afterWithin = (() => {
                                         let within = 0;
-                                        afterSizeData?.pcs?.forEach((pc) => {
+                                        afterSizeData.pcs?.forEach((pc) => {
                                           pc.measurementPoints?.forEach(
                                             (mp) => {
                                               if (mp.result === "pass")
@@ -2478,7 +2839,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
 
                                       const afterOutOf = (() => {
                                         let outOf = 0;
-                                        afterSizeData?.pcs?.forEach((pc) => {
+                                        afterSizeData.pcs?.forEach((pc) => {
                                           pc.measurementPoints?.forEach(
                                             (mp) => {
                                               if (mp.result === "fail") outOf++;
@@ -2522,28 +2883,32 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                           </span>
                                         </div>
                                       );
-                                    })()}
-                                  </div>
+                                    })()
+                                  ) : (
+                                    <span className="text-gray-500 dark:text-gray-400">
+                                      Insufficient data
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </div>
-                          );
-                        });
-                      })()}
-                    </div>
-
-                    {isLoadingComparison && (
-                      <div className="text-center py-4">
-                        <div className="inline-flex items-center space-x-2 text-orange-600 dark:text-orange-400">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
-                          <span className="text-sm">
-                            Loading comparison data...
-                          </span>
-                        </div>
-                      </div>
-                    )}
+                          </div>
+                        );
+                      });
+                    })()}
                   </div>
-                )}
+                  {isLoadingComparison && (
+                    <div className="text-center py-4">
+                      <div className="inline-flex items-center space-x-2 text-orange-600 dark:text-orange-400">
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-orange-600"></div>
+                        <span className="text-sm">
+                          Loading comparison data...
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
