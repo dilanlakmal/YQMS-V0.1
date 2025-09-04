@@ -116,8 +116,8 @@ import { Buffer } from "buffer";
 /* ------------------------------
    SQL Query Import
 ------------------------------ */
-// import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
-// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
+import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Connection String
@@ -335,7 +335,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs start
 ------------------------------ */
-// app.use(sqlQuery);
+app.use(sqlQuery);
 
 // /* ------------------------------
 //    YM DataSore SQL
