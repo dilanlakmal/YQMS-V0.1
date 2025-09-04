@@ -36,36 +36,75 @@ const getImageUrl = (imagePath) => {
 // Fetch comparison data (opposite wash type measurements)
   const fetchComparisonData = async (orderNo, color, washType, reportType, factory, currentWashType) => {
   setIsLoadingComparison(true);
-  console.log('Fetching comparison data for:', { orderNo, color, washType, reportType, factory, currentWashType });
   
   try {
     const response = await axios.get(`${API_BASE_URL}/api/qc-washing/results`, {
       params: {
         orderNo,
         color,
-        washType,
         reportType,
         factory
       }
     });
     
-    console.log('All records found:', response.data);
-    
-    // Find the opposite wash record based on current record type
     const targetWashType = currentWashType === 'Before Wash' ? 'After Wash' : 'Before Wash';
-    const comparisonRecord = response.data.find(record => 
-      record.orderNo === orderNo &&
-      record.color === color &&
-      record.washType === washType &&
-      record.reportType === reportType &&
-      record.factoryName === factory &&
-      record.before_after_wash === targetWashType
-    );
     
-    console.log('Target wash type:', targetWashType);
-    console.log('Comparison record found:', comparisonRecord);
+    // Find all matching records with the target wash type
+    let comparisonRecords = [];
     
-    setComparisonData(comparisonRecord);
+    if (reportType === 'First Output') {
+      // Get all records that match the criteria
+      comparisonRecords = response.data.filter(record => 
+        record.orderNo === orderNo &&
+        record.color === color &&
+        record.reportType === reportType &&
+        record.before_after_wash === targetWashType &&
+        record.measurementDetails?.measurement?.length > 0
+      );
+    } else {
+      // For other report types, use exact match
+      comparisonRecords = response.data.filter(record => 
+        record.orderNo === orderNo &&
+        record.color === color &&
+        record.washType === washType &&
+        record.reportType === reportType &&
+        record.factoryName === factory &&
+        record.before_after_wash === targetWashType &&
+        record.measurementDetails?.measurement?.length > 0
+      );
+    }
+    
+    // Merge all measurement data from matching records
+    let mergedComparisonData = null;
+    if (comparisonRecords.length > 0) {
+      mergedComparisonData = {
+        ...comparisonRecords[0],
+        measurementDetails: {
+          ...comparisonRecords[0].measurementDetails,
+          measurement: []
+        }
+      };
+      
+      // Collect all measurements from all matching records
+      const allMeasurements = [];
+      comparisonRecords.forEach(record => {
+        if (record.measurementDetails?.measurement) {
+          allMeasurements.push(...record.measurementDetails.measurement);
+        }
+      });
+      
+      mergedComparisonData.measurementDetails.measurement = allMeasurements;
+    }
+    
+    console.log('Comparison search results:', {
+      targetWashType,
+      totalRecords: response.data.length,
+      foundRecords: comparisonRecords.length,
+      mergedSizes: mergedComparisonData?.measurementDetails?.measurement?.map(m => m.size) || [],
+      hasMeasurements: !!mergedComparisonData?.measurementDetails?.measurement?.length
+    });
+    
+    setComparisonData(mergedComparisonData);
   } catch (error) {
     console.error('Error fetching comparison data:', error);
     setComparisonData(null);
@@ -96,21 +135,19 @@ const getImageUrl = (imagePath) => {
       setSelectedKValue(uniqueKValues[0] || null);
     }
     
-    // Fetch comparison data if measurement data exists for both Before and After wash records
-    // UPDATED: Remove the reportType restriction - fetch for both "Inline" and "First Output"
-    if (recordData.measurementDetails?.measurement && 
-        recordData.measurementDetails.measurement.length > 0 &&
+    // Fetch comparison data for First Output and Inline reports with measurements
+    if (recordData.measurementDetails?.measurement?.length > 0 &&
+        (recordData.reportType === 'Inline' || recordData.reportType === 'First Output') &&
         (recordData.before_after_wash === 'After Wash' || recordData.before_after_wash === 'Before Wash')) {
       fetchComparisonData(
         recordData.orderNo,
         recordData.color,
         recordData.washType,
-        recordData.reportType, // Keep the same report type for comparison
+        recordData.reportType,
         recordData.factoryName,
-        recordData.before_after_wash // Pass current wash type
+        recordData.before_after_wash
       );
     } else {
-      // Clear comparison data if no measurements
       setComparisonData(null);
     }
   }
@@ -1310,49 +1347,120 @@ const getImageUrl = (imagePath) => {
                 )}
 
              {/* Before vs After Wash Comparison */}
-              {((reportData.before_after_wash === 'After Wash' || reportData.before_after_wash === 'Before Wash') && 
-                  comparisonData && 
-                  comparisonData.measurementDetails?.measurement && 
-                  comparisonData.measurementDetails.measurement.length > 0) && (
-                  <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
-                    <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
-                        <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg mr-3">
-                          <ArrowLeftRight className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                        </div>
-                        Before vs After Wash Comparison
-                      </h3>
-                      <div className="flex items-center space-x-2">
-                        <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
-                          Before Wash
-                        </div>
-                        <div className="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
-                          After Wash
-                        </div>
-                        <div className="bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full">
-                          <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Size-wise Comparison</span>
+              {(() => {
+                  const shouldShowComparison = (
+                    (reportData.before_after_wash === 'After Wash' || reportData.before_after_wash === 'Before Wash') && 
+                    (reportData.reportType === 'Inline' || reportData.reportType === 'First Output') &&
+                    reportData.measurementDetails?.measurement && 
+                    reportData.measurementDetails.measurement.length > 0
+                  );
+                
+                  return shouldShowComparison;
+                  })() && (
+                    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center">
+                          <div className="bg-orange-100 dark:bg-orange-900/30 p-2 rounded-lg mr-3">
+                            <ArrowLeftRight className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                          </div>
+                          Before vs After Wash Comparison
+                        </h3>
+                        <div className="flex items-center space-x-2">
+                          <div className="bg-blue-100 dark:bg-blue-900/50 text-blue-800 dark:text-blue-300 px-3 py-1 rounded-full text-sm font-medium">
+                            Before Wash
+                          </div>
+                          <div className="bg-green-100 dark:bg-green-900/50 text-green-800 dark:text-green-300 px-3 py-1 rounded-full text-sm font-medium">
+                            After Wash
+                          </div>
+                          <div className="bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded-full">
+                            <span className="text-xs font-medium text-orange-700 dark:text-orange-300">Size-wise Comparison</span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="space-y-8">
+                      <div className="space-y-8">
                       {(() => {
-                        // Determine which is before and which is after
-                        const beforeData = reportData.before_after_wash === 'Before Wash' ? reportData : comparisonData;
-                        const afterData = reportData.before_after_wash === 'After Wash' ? reportData : comparisonData;
-                        
-                        // Get all unique sizes from both datasets
-                        const allSizes = new Set();
-                        beforeData.measurementDetails.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
-                        afterData.measurementDetails.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
-                        
-                        return Array.from(allSizes).map(size => {
-                          // Find size data for both before and after
-                          const beforeSizeData = beforeData.measurementDetails.measurement?.find(s => s.size === size);
-                          const afterSizeData = afterData.measurementDetails.measurement?.find(s => s.size === size);
+                        let beforeData, afterData;
+        
+                          if (reportData.before_after_wash === 'Before Wash') {
+                            beforeData = reportData;
+                            afterData = comparisonData;
+                          } else if (reportData.before_after_wash === 'After Wash') {
+                            beforeData = comparisonData;
+                            afterData = reportData;
+                          } else {
+                            // Fallback - shouldn't happen with current conditions
+                            beforeData = reportData;
+                            afterData = comparisonData;
+                          }
                           
-                          if (!beforeSizeData && !afterSizeData) return null;
+                          console.log('Comparison data debug:', {
+                            currentWashType: reportData.before_after_wash,
+                            reportType: reportData.reportType,
+                            hasComparisonData: !!comparisonData,
+                            comparisonWashType: comparisonData?.before_after_wash,
+                            beforeDataHasMeasurements: !!beforeData?.measurementDetails?.measurement?.length,
+                            afterDataHasMeasurements: !!afterData?.measurementDetails?.measurement?.length,
+                            beforeDataSource: beforeData === reportData ? 'current report' : 'comparison data',
+                            afterDataSource: afterData === reportData ? 'current report' : 'comparison data',
+                            beforeDataSizes: beforeData?.measurementDetails?.measurement?.map(m => m.size) || [],
+                            afterDataSizes: afterData?.measurementDetails?.measurement?.map(m => m.size) || [],
+                            comparisonDataFull: comparisonData ? {
+                              orderNo: comparisonData.orderNo,
+                              color: comparisonData.color,
+                              washType: comparisonData.washType,
+                              reportType: comparisonData.reportType,
+                              before_after_wash: comparisonData.before_after_wash,
+                              hasMeasurements: !!comparisonData.measurementDetails?.measurement?.length
+                            } : null
+                            });
+                        
+                        // Get all unique sizes from all available datasets
+                          const allSizes = new Set();
                           
+                          // Always include sizes from current report data first
+                          reportData.measurementDetails?.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
+                          
+                          // Add sizes from comparison data if available
+                          if (comparisonData?.measurementDetails?.measurement) {
+                            comparisonData.measurementDetails.measurement.forEach(sizeData => allSizes.add(sizeData.size));
+                          }
+                          
+                          // Add sizes from before data if available
+                          beforeData?.measurementDetails?.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
+                          
+                          // Add sizes from after data if available
+                          afterData?.measurementDetails?.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
+                          
+                          console.log('All sizes found:', Array.from(allSizes));
+                          console.log('Current report sizes:', reportData.measurementDetails?.measurement?.map(m => m.size) || []);
+                          console.log('Before data sizes:', beforeData?.measurementDetails?.measurement?.map(m => m.size) || []);
+                          console.log('After data sizes:', afterData?.measurementDetails?.measurement?.map(m => m.size) || []);
+                          
+                          return Array.from(allSizes).map(size => {
+                            // Find size data for both before and after from all available sources
+                            let beforeSizeData = null;
+                            let afterSizeData = null;
+                            
+                            // Determine which data source has which wash type for this size
+                            const currentSizeData = reportData.measurementDetails?.measurement?.find(s => s.size === size);
+                            const comparisonSizeData = comparisonData?.measurementDetails?.measurement?.find(s => s.size === size);
+                            
+                            if (reportData.before_after_wash === 'Before Wash') {
+                              beforeSizeData = currentSizeData;
+                              afterSizeData = comparisonSizeData;
+                            } else if (reportData.before_after_wash === 'After Wash') {
+                              beforeSizeData = comparisonSizeData;
+                              afterSizeData = currentSizeData;
+                            }
+                            
+                            // Fallback to beforeData/afterData if not found above
+                            if (!beforeSizeData) {
+                              beforeSizeData = beforeData?.measurementDetails?.measurement?.find(s => s.size === size);
+                            }
+                            if (!afterSizeData) {
+                              afterSizeData = afterData?.measurementDetails?.measurement?.find(s => s.size === size);
+                            }
+                                            
                           return (
                             <div key={size} className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 rounded-xl p-6 border border-orange-200 dark:border-orange-800">
                               <div className="flex items-center space-x-3 mb-6">
@@ -1373,8 +1481,30 @@ const getImageUrl = (imagePath) => {
                                 <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
                                   <thead className="bg-gray-50 dark:bg-gray-700">
                                     {(() => {
-                                      // Get all unique measurement values for this size
+                                      // Get all unique measurement values for this size from all available data
                                       const allValues = new Set();
+                                      
+                                      // Add values from current report data
+                                      const currentSizeData = reportData.measurementDetails?.measurement?.find(s => s.size === size);
+                                      currentSizeData?.pcs?.forEach(pc => {
+                                        pc.measurementPoints?.forEach(mp => {
+                                          if (mp.measured_value_fraction) {
+                                            allValues.add(mp.measured_value_fraction);
+                                          }
+                                        });
+                                      });
+                                      
+                                      // Add values from comparison data
+                                      const comparisonSizeData = comparisonData?.measurementDetails?.measurement?.find(s => s.size === size);
+                                      comparisonSizeData?.pcs?.forEach(pc => {
+                                        pc.measurementPoints?.forEach(mp => {
+                                          if (mp.measured_value_fraction) {
+                                            allValues.add(mp.measured_value_fraction);
+                                          }
+                                        });
+                                      });
+                                      
+                                      // Also add from before/after data
                                       [beforeSizeData, afterSizeData].forEach(sizeData => {
                                         sizeData?.pcs?.forEach(pc => {
                                           pc.measurementPoints?.forEach(mp => {
@@ -1429,21 +1559,53 @@ const getImageUrl = (imagePath) => {
                                   </thead>
                                   <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
                                     {(() => {
-                                      // Get all unique measurement points for this size
+                                      // Get all unique measurement points for this size from all available data
                                       const measurementPoints = new Set();
+                                      
+                                      // Always include measurement points from current report data
+                                      const currentSizeData = reportData.measurementDetails?.measurement?.find(s => s.size === size);
+                                      currentSizeData?.pcs?.forEach(pc => {
+                                        pc.measurementPoints?.forEach(mp => measurementPoints.add(mp.pointName));
+                                      });
+                                      
+                                      // Add measurement points from comparison data
+                                      const comparisonSizeData = comparisonData?.measurementDetails?.measurement?.find(s => s.size === size);
+                                      comparisonSizeData?.pcs?.forEach(pc => {
+                                        pc.measurementPoints?.forEach(mp => measurementPoints.add(mp.pointName));
+                                      });
+                                      
+                                      // Add measurement points from before data
                                       beforeSizeData?.pcs?.forEach(pc => {
                                         pc.measurementPoints?.forEach(mp => measurementPoints.add(mp.pointName));
                                       });
+                                      
+                                      // Add measurement points from after data
                                       afterSizeData?.pcs?.forEach(pc => {
                                         pc.measurementPoints?.forEach(mp => measurementPoints.add(mp.pointName));
                                       });
                                       
+                                      console.log('Measurement points for size', size, ':', Array.from(measurementPoints));
+                                      
                                       return Array.from(measurementPoints).map((pointName, pointIndex) => {
-                                        // Get first measurement point for spec info
+                                        // Get first measurement point for spec info from any available data
                                         let firstMeasurement = null;
-                                        if (beforeSizeData?.pcs?.[0]?.measurementPoints) {
+                                        
+                                        // Try current report data first
+                                        if (currentSizeData?.pcs?.[0]?.measurementPoints) {
+                                          firstMeasurement = currentSizeData.pcs[0].measurementPoints.find(mp => mp.pointName === pointName);
+                                        }
+                                        
+                                        // Try comparison data
+                                        if (!firstMeasurement && comparisonSizeData?.pcs?.[0]?.measurementPoints) {
+                                          firstMeasurement = comparisonSizeData.pcs[0].measurementPoints.find(mp => mp.pointName === pointName);
+                                        }
+                                        
+                                        // Try before data
+                                        if (!firstMeasurement && beforeSizeData?.pcs?.[0]?.measurementPoints) {
                                           firstMeasurement = beforeSizeData.pcs[0].measurementPoints.find(mp => mp.pointName === pointName);
                                         }
+                                        
+                                        // Try after data
                                         if (!firstMeasurement && afterSizeData?.pcs?.[0]?.measurementPoints) {
                                           firstMeasurement = afterSizeData.pcs[0].measurementPoints.find(mp => mp.pointName === pointName);
                                         }
@@ -1465,39 +1627,88 @@ const getImageUrl = (imagePath) => {
                                               +{getToleranceAsFraction(firstMeasurement, 'plus')}
                                             </td>
                                             {(() => {
-                                              // Get all unique measurement values for this size
+                                              // Get all unique measurement values for this size from all available datasets
                                               const allValues = new Set();
-                                              [beforeSizeData, afterSizeData].forEach(sizeData => {
-                                                sizeData?.pcs?.forEach(pc => {
+                                              
+                                              // Add values from current report data
+                                              if (currentSizeData) {
+                                                currentSizeData.pcs?.forEach(pc => {
                                                   pc.measurementPoints?.forEach(mp => {
                                                     if (mp.measured_value_fraction) {
                                                       allValues.add(mp.measured_value_fraction);
                                                     }
                                                   });
                                                 });
-                                              });
+                                              }
+                                              
+                                              // Add values from comparison data
+                                              if (comparisonSizeData) {
+                                                comparisonSizeData.pcs?.forEach(pc => {
+                                                  pc.measurementPoints?.forEach(mp => {
+                                                    if (mp.measured_value_fraction) {
+                                                      allValues.add(mp.measured_value_fraction);
+                                                    }
+                                                  });
+                                                });
+                                              }
+                                              
+                                              // Add values from before wash data
+                                              if (beforeSizeData) {
+                                                beforeSizeData.pcs?.forEach(pc => {
+                                                  pc.measurementPoints?.forEach(mp => {
+                                                    if (mp.measured_value_fraction) {
+                                                      allValues.add(mp.measured_value_fraction);
+                                                    }
+                                                  });
+                                                });
+                                              }
+                                              
+                                              // Add values from after wash data
+                                              if (afterSizeData) {
+                                                afterSizeData.pcs?.forEach(pc => {
+                                                  pc.measurementPoints?.forEach(mp => {
+                                                    if (mp.measured_value_fraction) {
+                                                      allValues.add(mp.measured_value_fraction);
+                                                    }
+                                                  });
+                                                });
+                                              }
+                                              
+                                              // If no values found, add some common measurement values as fallback
+                                              if (allValues.size === 0) {
+                                                // Add common fractional values that might be used
+                                                ['-1/16', '-1/4', '-7/16', '0', '+1/16', '+1/4', '+7/16'].forEach(val => allValues.add(val));
+                                              }
+                                              
+                                              console.log('All measurement values for size', size, ':', Array.from(allValues));
+                                              console.log('Before size data available:', !!beforeSizeData, beforeSizeData?.pcs?.length || 0, 'pieces');
+                                              console.log('After size data available:', !!afterSizeData, afterSizeData?.pcs?.length || 0, 'pieces');
                                               
                                               const sortedValues = Array.from(allValues).sort();
                                               
                                               // Count values for before wash
                                               const beforeValueCount = {};
-                                              beforeSizeData?.pcs?.forEach(pc => {
-                                                const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
-                                                if (measurement && measurement.measured_value_fraction) {
-                                                  const value = measurement.measured_value_fraction;
-                                                  beforeValueCount[value] = (beforeValueCount[value] || 0) + 1;
-                                                }
-                                              });
+                                              if (beforeSizeData) {
+                                                beforeSizeData.pcs?.forEach(pc => {
+                                                  const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
+                                                  if (measurement && measurement.measured_value_fraction) {
+                                                    const value = measurement.measured_value_fraction;
+                                                    beforeValueCount[value] = (beforeValueCount[value] || 0) + 1;
+                                                  }
+                                                });
+                                              }
                                               
                                               // Count values for after wash
                                               const afterValueCount = {};
-                                              afterSizeData?.pcs?.forEach(pc => {
-                                                const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
-                                                if (measurement && measurement.measured_value_fraction) {
-                                                  const value = measurement.measured_value_fraction;
-                                                  afterValueCount[value] = (afterValueCount[value] || 0) + 1;
-                                                }
-                                              });
+                                              if (afterSizeData) {
+                                                afterSizeData.pcs?.forEach(pc => {
+                                                  const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
+                                                  if (measurement && measurement.measured_value_fraction) {
+                                                    const value = measurement.measured_value_fraction;
+                                                    afterValueCount[value] = (afterValueCount[value] || 0) + 1;
+                                                  }
+                                                });
+                                              }
                                               
                                               return (
                                                 <>
@@ -1581,9 +1792,9 @@ const getImageUrl = (imagePath) => {
                                 <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-blue-100 dark:border-blue-800">
                                   <div className="text-xs text-blue-600 dark:text-blue-400 mb-1">Before Wash (Size {size})</div>
                                   <div className="text-sm font-bold">
-                                    {(() => {
+                                    {beforeSizeData ? (() => {
                                       let withinTolerance = 0, outOfTolerance = 0;
-                                      beforeSizeData?.pcs?.forEach(pc => {
+                                      beforeSizeData.pcs?.forEach(pc => {
                                         pc.measurementPoints?.forEach(mp => {
                                           if (mp.result === 'pass') {
                                             withinTolerance++;
@@ -1598,15 +1809,17 @@ const getImageUrl = (imagePath) => {
                                           <span className="text-red-600 dark:text-red-400">Out of: {outOfTolerance}</span>
                                         </div>
                                       );
-                                    })()}
+                                    })() : (
+                                      <span className="text-gray-500 dark:text-gray-400">No data</span>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-green-100 dark:border-green-800">
                                   <div className="text-xs text-green-600 dark:text-green-400 mb-1">After Wash (Size {size})</div>
                                   <div className="text-sm font-bold">
-                                    {(() => {
+                                    {afterSizeData ? (() => {
                                       let withinTolerance = 0, outOfTolerance = 0;
-                                      afterSizeData?.pcs?.forEach(pc => {
+                                      afterSizeData.pcs?.forEach(pc => {
                                         pc.measurementPoints?.forEach(mp => {
                                           if (mp.result === 'pass') {
                                             withinTolerance++;
@@ -1621,7 +1834,9 @@ const getImageUrl = (imagePath) => {
                                           <span className="text-red-600 dark:text-red-400">Out of: {outOfTolerance}</span>
                                         </div>
                                       );
-                                    })()}
+                                    })() : (
+                                      <span className="text-gray-500 dark:text-gray-400">No data</span>
+                                    )}
                                   </div>
                                 </div>
                                 <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-orange-100 dark:border-orange-800">
@@ -1633,10 +1848,11 @@ const getImageUrl = (imagePath) => {
                                 <div className="bg-white dark:bg-gray-800 rounded-lg p-3 border border-purple-100 dark:border-purple-800">
                                   <div className="text-xs text-purple-600 dark:text-purple-400 mb-1">Quality Change</div>
                                   <div className="text-sm font-bold">
-                                    {(() => {
+                                    {beforeSizeData && afterSizeData ? (() => {
+                                      // Your existing quality change calculation
                                       const beforeWithin = (() => {
                                         let within = 0;
-                                        beforeSizeData?.pcs?.forEach(pc => {
+                                        beforeSizeData.pcs?.forEach(pc => {
                                           pc.measurementPoints?.forEach(mp => {
                                             if (mp.result === 'pass') within++;
                                           });
@@ -1646,7 +1862,7 @@ const getImageUrl = (imagePath) => {
                                       
                                       const beforeOutOf = (() => {
                                         let outOf = 0;
-                                        beforeSizeData?.pcs?.forEach(pc => {
+                                        beforeSizeData.pcs?.forEach(pc => {
                                           pc.measurementPoints?.forEach(mp => {
                                             if (mp.result === 'fail') outOf++;
                                           });
@@ -1656,7 +1872,7 @@ const getImageUrl = (imagePath) => {
                                       
                                       const afterWithin = (() => {
                                         let within = 0;
-                                        afterSizeData?.pcs?.forEach(pc => {
+                                        afterSizeData.pcs?.forEach(pc => {
                                           pc.measurementPoints?.forEach(mp => {
                                             if (mp.result === 'pass') within++;
                                           });
@@ -1666,7 +1882,7 @@ const getImageUrl = (imagePath) => {
                                       
                                       const afterOutOf = (() => {
                                         let outOf = 0;
-                                        afterSizeData?.pcs?.forEach(pc => {
+                                        afterSizeData.pcs?.forEach(pc => {
                                           pc.measurementPoints?.forEach(mp => {
                                             if (mp.result === 'fail') outOf++;
                                           });
@@ -1687,7 +1903,9 @@ const getImageUrl = (imagePath) => {
                                           </span>
                                         </div>
                                       );
-                                    })()}
+                                    })() : (
+                                      <span className="text-gray-500 dark:text-gray-400">Insufficient data</span>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -1696,7 +1914,6 @@ const getImageUrl = (imagePath) => {
                         });
                       })()}
                     </div>
-
                     {isLoadingComparison && (
                       <div className="text-center py-4">
                         <div className="inline-flex items-center space-x-2 text-orange-600 dark:text-orange-400">
