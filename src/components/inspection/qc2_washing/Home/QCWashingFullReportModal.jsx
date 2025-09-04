@@ -140,18 +140,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
         mergedComparisonData.measurementDetails.measurement = allMeasurements;
       }
 
-      console.log("Comparison search results:", {
-        targetWashType,
-        totalRecords: response.data.length,
-        foundRecords: comparisonRecords.length,
-        mergedSizes:
-          mergedComparisonData?.measurementDetails?.measurement?.map(
-            (m) => m.size
-          ) || [],
-        hasMeasurements:
-          !!mergedComparisonData?.measurementDetails?.measurement?.length
-      });
-
       setComparisonData(mergedComparisonData);
     } catch (error) {
       console.error("Error fetching comparison data:", error);
@@ -945,10 +933,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                 const imageUrl = getImageUrl(
                                                   point.image
                                                 );
-                                                console.log(
-                                                  "Point Image URL:",
-                                                  imageUrl
-                                                ); // Debug log
                                                 return imageUrl ? (
                                                   <img
                                                     src={imageUrl}
@@ -961,10 +945,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                       )
                                                     }
                                                     onError={(e) => {
-                                                      console.error(
-                                                        "Failed to load point image:",
-                                                        imageUrl
-                                                      );
                                                       e.target.style.display =
                                                         "none";
                                                       e.target.nextSibling.style.display =
@@ -1002,10 +982,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                   (img, imgIndex) => {
                                                     const imageUrl =
                                                       getImageUrl(img);
-                                                    console.log(
-                                                      `Comparison Image ${imgIndex} URL:`,
-                                                      imageUrl
-                                                    ); // Debug log
                                                     return (
                                                       <div
                                                         key={imgIndex}
@@ -1025,10 +1001,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                               )
                                                             }
                                                             onError={(e) => {
-                                                              console.error(
-                                                                "Failed to load comparison image:",
-                                                                imageUrl
-                                                              );
                                                               e.target.style.display =
                                                                 "none";
                                                               e.target.nextSibling.style.display =
@@ -2017,46 +1989,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                         afterData = comparisonData;
                       }
 
-                      console.log("Comparison data debug:", {
-                        currentWashType: reportData.before_after_wash,
-                        reportType: reportData.reportType,
-                        hasComparisonData: !!comparisonData,
-                        comparisonWashType: comparisonData?.before_after_wash,
-                        beforeDataHasMeasurements:
-                          !!beforeData?.measurementDetails?.measurement?.length,
-                        afterDataHasMeasurements:
-                          !!afterData?.measurementDetails?.measurement?.length,
-                        beforeDataSource:
-                          beforeData === reportData
-                            ? "current report"
-                            : "comparison data",
-                        afterDataSource:
-                          afterData === reportData
-                            ? "current report"
-                            : "comparison data",
-                        beforeDataSizes:
-                          beforeData?.measurementDetails?.measurement?.map(
-                            (m) => m.size
-                          ) || [],
-                        afterDataSizes:
-                          afterData?.measurementDetails?.measurement?.map(
-                            (m) => m.size
-                          ) || [],
-                        comparisonDataFull: comparisonData
-                          ? {
-                              orderNo: comparisonData.orderNo,
-                              color: comparisonData.color,
-                              washType: comparisonData.washType,
-                              reportType: comparisonData.reportType,
-                              before_after_wash:
-                                comparisonData.before_after_wash,
-                              hasMeasurements:
-                                !!comparisonData.measurementDetails?.measurement
-                                  ?.length
-                            }
-                          : null
-                      });
-
                       // Get all unique sizes from all available datasets
                       const allSizes = new Set();
 
@@ -2080,26 +2012,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                       // Add sizes from after data if available
                       afterData?.measurementDetails?.measurement?.forEach(
                         (sizeData) => allSizes.add(sizeData.size)
-                      );
-
-                      console.log("All sizes found:", Array.from(allSizes));
-                      console.log(
-                        "Current report sizes:",
-                        reportData.measurementDetails?.measurement?.map(
-                          (m) => m.size
-                        ) || []
-                      );
-                      console.log(
-                        "Before data sizes:",
-                        beforeData?.measurementDetails?.measurement?.map(
-                          (m) => m.size
-                        ) || []
-                      );
-                      console.log(
-                        "After data sizes:",
-                        afterData?.measurementDetails?.measurement?.map(
-                          (m) => m.size
-                        ) || []
                       );
 
                       return Array.from(allSizes).map((size) => {
@@ -2324,13 +2236,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                       );
                                     });
 
-                                    console.log(
-                                      "Measurement points for size",
-                                      size,
-                                      ":",
-                                      Array.from(measurementPoints)
-                                    );
-
                                     return Array.from(measurementPoints).map(
                                       (pointName, pointIndex) => {
                                         // Get first measurement point for spec info from any available data
@@ -2504,26 +2409,6 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
                                                   allValues.add(val)
                                                 );
                                               }
-
-                                              console.log(
-                                                "All measurement values for size",
-                                                size,
-                                                ":",
-                                                Array.from(allValues)
-                                              );
-                                              console.log(
-                                                "Before size data available:",
-                                                !!beforeSizeData,
-                                                beforeSizeData?.pcs?.length ||
-                                                  0,
-                                                "pieces"
-                                              );
-                                              console.log(
-                                                "After size data available:",
-                                                !!afterSizeData,
-                                                afterSizeData?.pcs?.length || 0,
-                                                "pieces"
-                                              );
 
                                               const sortedValues =
                                                 Array.from(allValues).sort();
