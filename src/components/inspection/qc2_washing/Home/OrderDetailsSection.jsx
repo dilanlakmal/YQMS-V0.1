@@ -371,13 +371,13 @@ const OrderDetailsSection = ({
         { checkedList: "Pilling", decision: "ok", remark: "" }
       ];
 
-      // Create default defect data with calculated pass rate
+      // Create default defect data with calculated pass rate - ensure 0 values are preserved
       const washQtyNum = Number(formData.washQty) || 0;
       const defaultDefectData = [
         {
           parameter: "Color Shade 01",
-          checkedQty: washQtyNum,
-          failedQty: 0,
+          checkedQty: washQtyNum, // Keep 0 as 0, not null
+          failedQty: 0, // Keep 0 as 0, not null
           passRate:
             washQtyNum > 0
               ? (((washQtyNum - 0) / washQtyNum) * 100).toFixed(2)
@@ -387,8 +387,8 @@ const OrderDetailsSection = ({
         },
         {
           parameter: "Appearance",
-          checkedQty: washQtyNum,
-          failedQty: 0,
+          checkedQty: washQtyNum, // Keep 0 as 0, not null
+          failedQty: 0, // Keep 0 as 0, not null
           passRate:
             washQtyNum > 0
               ? (((washQtyNum - 0) / washQtyNum) * 100).toFixed(2)
@@ -448,18 +448,32 @@ const OrderDetailsSection = ({
           if (standardRecord) {
             defaultStandardValues = {
               "Washing Machine": {
-                temperature: String(
-                  standardRecord.washingMachine?.temperature || ""
-                ),
-                time: String(standardRecord.washingMachine?.time || ""),
-                silicon: String(standardRecord.washingMachine?.silicon || ""),
-                softener: String(standardRecord.washingMachine?.softener || "")
+                temperature:
+                  standardRecord.washingMachine?.temperature === 0
+                    ? "0"
+                    : String(standardRecord.washingMachine?.temperature || ""),
+                time:
+                  standardRecord.washingMachine?.time === 0
+                    ? "0"
+                    : String(standardRecord.washingMachine?.time || ""),
+                silicon:
+                  standardRecord.washingMachine?.silicon === 0
+                    ? "0"
+                    : String(standardRecord.washingMachine?.silicon || ""),
+                softener:
+                  standardRecord.washingMachine?.softener === 0
+                    ? "0"
+                    : String(standardRecord.washingMachine?.softener || "")
               },
               "Tumble Dry": {
-                temperature: String(
-                  standardRecord.tumbleDry?.temperature || ""
-                ),
-                time: String(standardRecord.tumbleDry?.time || "")
+                temperature:
+                  standardRecord.tumbleDry?.temperature === 0
+                    ? "0"
+                    : String(standardRecord.tumbleDry?.temperature || ""),
+                time:
+                  standardRecord.tumbleDry?.time === 0
+                    ? "0"
+                    : String(standardRecord.tumbleDry?.time || "")
               }
             };
 

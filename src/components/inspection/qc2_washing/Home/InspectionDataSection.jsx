@@ -112,6 +112,8 @@ const InspectionDataSection = ({
                 washingMachineValues[key] === undefined
               ) {
                 washingMachineValues[key] = "";
+              } else if (washingMachineValues[key] === 0) {
+                washingMachineValues[key] = "0"; // Preserve 0 as "0" string
               } else {
                 washingMachineValues[key] = String(washingMachineValues[key]);
               }
@@ -123,6 +125,8 @@ const InspectionDataSection = ({
                 tumbleDryValues[key] === undefined
               ) {
                 tumbleDryValues[key] = "";
+              } else if (tumbleDryValues[key] === 0) {
+                tumbleDryValues[key] = "0"; // Preserve 0 as "0" string
               } else {
                 tumbleDryValues[key] = String(tumbleDryValues[key]);
               }
@@ -316,7 +320,7 @@ const InspectionDataSection = ({
                 [field]:
                   field === "checkedQty" || field === "failedQty"
                     ? value === ""
-                      ? ""
+                      ? 0 // Set to 0 instead of empty string to preserve 0 values
                       : Math.max(0, Number(value))
                     : value
               }
@@ -437,11 +441,12 @@ const InspectionDataSection = ({
 
   const handleActualValueChange = (machineType, param, value) => {
     // Update the actual value - keep 0 as "0" string, not empty
+    const processedValue = value === 0 || value === "0" ? "0" : value;
     setActualValues((prev) => ({
       ...prev,
       [machineType]: {
         ...prev[machineType],
-        [param]: value
+        [param]: processedValue
       }
     }));
 
@@ -1573,29 +1578,15 @@ const InspectionDataSection = ({
                                 <FaMinus />
                               </button>
                               <input
-                                // type="number"
+                                type="number"
                                 min={0}
-                                value={
-                                  item.checkedQty === 0 ? "" : item.checkedQty
-                                }
+                                value={item.checkedQty}
                                 placeholder="0"
-                                onFocus={(e) => {
-                                  if (e.target.value === "0")
-                                    e.target.value = "";
-                                }}
-                                onBlur={(e) => {
-                                  if (e.target.value === "")
-                                    handleParamInputChange(
-                                      rowIdx,
-                                      "checkedQty",
-                                      0
-                                    );
-                                }}
                                 onChange={(e) =>
                                   handleParamInputChange(
                                     rowIdx,
                                     "checkedQty",
-                                    e.target.value
+                                    e.target.value === "" ? 0 : e.target.value
                                   )
                                 }
                                 className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center disabled:bg-gray-400"
@@ -1638,29 +1629,15 @@ const InspectionDataSection = ({
                                 <FaMinus />
                               </button>
                               <input
-                                // type="number"
+                                type="number"
                                 min={0}
-                                value={
-                                  item.failedQty === 0 ? "" : item.failedQty
-                                }
+                                value={item.failedQty}
                                 placeholder="0"
-                                onFocus={(e) => {
-                                  if (e.target.value === "0")
-                                    e.target.value = "";
-                                }}
-                                onBlur={(e) => {
-                                  if (e.target.value === "")
-                                    handleParamInputChange(
-                                      rowIdx,
-                                      "failedQty",
-                                      0
-                                    );
-                                }}
                                 onChange={(e) =>
                                   handleParamInputChange(
                                     rowIdx,
                                     "failedQty",
-                                    e.target.value
+                                    e.target.value === "" ? 0 : e.target.value
                                   )
                                 }
                                 className="w-16 px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center disabled:bg-gray-400"
