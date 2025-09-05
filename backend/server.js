@@ -174,6 +174,35 @@ app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 //app.use(cors());
 app.use(bodyParser.json());
 
+// // --- Whitelist of allowed origins ---
+// const allowedOrigins = [
+//   "https://172.20.10.14:3001",
+//   "https://192.167.12.162:3001",
+//   "https://192.167.12.162:5001",
+//   "https://yqms.yaikh.com/"
+// ];
+
+// const corsOptions = {
+//   origin: function (origin, callback) {
+//     // Allow requests with no origin (like mobile apps or curl requests)
+//     if (!origin) return callback(null, true);
+
+//     if (allowedOrigins.indexOf(origin) === -1) {
+//       const msg =
+//         "The CORS policy for this site does not allow access from the specified Origin.";
+//       return callback(new Error(msg), false);
+//     }
+//     return callback(null, true);
+//   },
+//   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+//   allowedHeaders: ["Content-Type", "Authorization"],
+//   credentials: true
+// };
+
+// app.use(cors(corsOptions));
+
+// app.options("*", cors(corsOptions));
+
 app.use(
   cors({
     origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
@@ -27514,70 +27543,61 @@ app.put("/api/qc-washing/update/:recordId", async (req, res) => {
 });
 
 // GET - Get overall summary for a given orderNo and color
-app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
-  try {
-    const { recordId } = req.params;
-    const qcRecord = await QCWashing.findById(recordId);
-
-    if (!qcRecord) {
-      return res
-        .status(404)
-        .json({ success: false, message: "No data found for this record." });
-    }
-
-    // Use saved summary fields if available, fallback to 0 or "N/A"
-    res.json({
-      success: true,
-      summary: {
-        recordId,
-        orderNo: qcRecord.orderNo,
-        color: qcRecord.color,
-        totalCheckedPcs: qcRecord.totalCheckedPcs ?? 0,
-        checkedQty: qcRecord.checkedQty ?? "",
-        washQty: qcRecord.washQty ?? "",
-        rejectedDefectPcs: qcRecord.rejectedDefectPcs ?? 0,
-        totalDefectCount: qcRecord.totalDefectCount ?? 0,
-        defectRate: qcRecord.defectRate ?? 0,
-        defectRatio: qcRecord.defectRatio ?? 0,
-        overallResult:
-          qcRecord.overallFinalResult ?? qcRecord.overallResult ?? "N/A",
-        // Optionally include these if you want to show them in the UI:
-        passRate: qcRecord.passRate ?? "",
-        measurementPoints: qcRecord.measurementPoints ?? "",
-        measurementPass: qcRecord.measurementPass ?? "",
-        totalFail: qcRecord.totalFail ?? "",
-        measurementOverallResult: qcRecord.measurementOverallResult ?? "",
-        defectOverallResult: qcRecord.defectDetails?.result ?? "N/A",
-        defectDetails: qcRecord.defectDetails ?? {}
-      }
-    });
-  } catch (error) {
-    console.error("Error fetching overall summary by id:", error);
-    res.status(500).json({
-      success: false,
-      message: "Server error while fetching overall summary."
-    });
-  }
-});
-
 app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
   try {
     const { recordId } = req.params;
     const summary = req.body.summary || {};
 
     const qcRecord = await QCWashing.findById(recordId);
-    if (!qcRecord)
+    if (!qcRecord) {
       return res
         .status(404)
         .json({ success: false, message: "Record not found." });
+    }
 
-    // Calculate totalCheckedPcs correctly from measurement data
+    // ALWAYS recalculate from fresh data - ignore previous overallFinalResult
+
+    // 1. Calculate measurement statistics from current data
+    let totalMeasurementPoints = 0;
+    let totalMeasurementPass = 0;
+    let totalMeasurementFail = 0;
+
+    // Use measurementSizeSummary if available (most accurate)
+    if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
+      qcRecord.measurementDetails.measurementSizeSummary.forEach((sizeData) => {
+        totalMeasurementPoints += sizeData.checkedPoints || 0;
+        totalMeasurementPass += sizeData.totalPass || 0;
+        totalMeasurementFail += sizeData.totalFail || 0;
+      });
+    } else if (qcRecord.measurementDetails?.measurement?.length > 0) {
+      // Fallback: Calculate from measurement array
+      qcRecord.measurementDetails.measurement.forEach((data) => {
+        if (data.pcs && Array.isArray(data.pcs)) {
+          data.pcs.forEach((pc) => {
+            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+              pc.measurementPoints.forEach((point) => {
+                if (point.result === "pass" || point.result === "fail") {
+                  totalMeasurementPoints++;
+                  if (point.result === "pass") {
+                    totalMeasurementPass++;
+                  } else {
+                    totalMeasurementFail++;
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // 2. Calculate defect statistics from current data
     let totalCheckedPcs = 0;
-    if (
-      qcRecord.measurementDetails &&
-      qcRecord.measurementDetails.measurement
-    ) {
-      // Sum up the qty from each size measurement
+    let rejectedDefectPcs = 0;
+    let totalDefectCount = 0;
+
+    // Calculate totalCheckedPcs from measurement data
+    if (qcRecord.measurementDetails?.measurement) {
       qcRecord.measurementDetails.measurement.forEach((measurement) => {
         if (typeof measurement.qty === "number" && measurement.qty > 0) {
           totalCheckedPcs += measurement.qty;
@@ -27585,16 +27605,13 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
       });
     }
 
-    // If no measurement data, use checkedQty as fallback
+    // Fallback to checkedQty if no measurement data
     if (totalCheckedPcs === 0) {
       totalCheckedPcs = parseInt(qcRecord.checkedQty, 10) || 0;
     }
 
-    // Calculate defect statistics
-    let rejectedDefectPcs = 0;
-    let totalDefectCount = 0;
+    // Calculate defects
     const defectDetails = qcRecord.defectDetails || {};
-
     if (Array.isArray(defectDetails.defectsByPc)) {
       rejectedDefectPcs = defectDetails.defectsByPc.length;
       totalDefectCount = defectDetails.defectsByPc.reduce(
@@ -27611,7 +27628,49 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
       );
     }
 
-    // Always use calculated values to ensure consistency
+    // 3. Calculate pass rate
+    const passRate =
+      totalMeasurementPoints > 0
+        ? Number(
+            ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
+          )
+        : 100;
+
+    // 4. Determine measurement result based on current data
+    let measurementResult = "Pass";
+    if (totalMeasurementPoints > 0 && totalMeasurementFail > 0) {
+      // You can adjust this logic based on your business rules:
+
+      // Option 1: Any failure = Fail (strict)
+      measurementResult = "Fail";
+
+      // Option 2: Use threshold (e.g., 95% pass rate required)
+      // measurementResult = passRate >= 95 ? "Pass" : "Fail";
+
+      // Option 3: Allow small number of failures
+      // const failureThreshold = Math.ceil(totalMeasurementPoints * 0.05); // 5% threshold
+      // measurementResult = totalMeasurementFail <= failureThreshold ? "Pass" : "Fail";
+    }
+
+    // 5. Determine defect result based on current data and AQL
+    let defectResult = "Pass";
+    const aql = qcRecord.aql?.[0];
+
+    if (aql && typeof aql.acceptedDefect === "number") {
+      // Use AQL logic
+      defectResult = totalDefectCount <= aql.acceptedDefect ? "Pass" : "Fail";
+    } else {
+      // Fallback: use saved defect result or assume Pass if no defects
+      defectResult =
+        qcRecord.defectDetails?.result ||
+        (totalDefectCount === 0 ? "Pass" : "Fail");
+    }
+
+    // 6. Calculate FRESH overall result - this is the key fix
+    const overallFinalResult =
+      measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+
+    // 7. Update ALL calculated fields with fresh values
     qcRecord.totalCheckedPcs = totalCheckedPcs;
     qcRecord.rejectedDefectPcs = rejectedDefectPcs;
     qcRecord.totalDefectCount = totalDefectCount;
@@ -27623,10 +27682,37 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
       totalCheckedPcs > 0
         ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
         : 0;
-    qcRecord.overallFinalResult = summary.overallFinalResult ?? "N/A";
+    qcRecord.totalCheckedPoint = totalMeasurementPoints;
+    qcRecord.totalPass = totalMeasurementPass;
+    qcRecord.totalFail = totalMeasurementFail;
+    qcRecord.passRate = passRate;
+
+    // FORCE update the overall result with fresh calculation
+    qcRecord.overallFinalResult = overallFinalResult;
+
+    // Mark the field as modified to ensure it gets saved
+    qcRecord.markModified("overallFinalResult");
 
     await qcRecord.save();
-    res.json({ success: true });
+
+    res.json({
+      success: true,
+      message: "Overall result recalculated successfully",
+      previousResult: qcRecord.overallFinalResult,
+      newResult: overallFinalResult,
+      calculatedValues: {
+        totalCheckedPcs,
+        rejectedDefectPcs,
+        totalDefectCount,
+        totalMeasurementPoints,
+        totalMeasurementPass,
+        totalMeasurementFail,
+        passRate,
+        measurementResult,
+        defectResult,
+        overallFinalResult
+      }
+    });
   } catch (error) {
     console.error("Save summary error:", error);
     res
@@ -27634,6 +27720,193 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
       .json({ success: false, message: "Failed to save summary." });
   }
 });
+
+app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const qcRecord = await QCWashing.findById(recordId);
+
+    if (!qcRecord) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No data found for this record." });
+    }
+
+    // Recalculate overall result to ensure accuracy
+    let totalMeasurementPoints = 0;
+    let totalMeasurementPass = 0;
+    let totalMeasurementFail = 0;
+
+    // Use measurementSizeSummary if available
+    if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
+      qcRecord.measurementDetails.measurementSizeSummary.forEach((sizeData) => {
+        totalMeasurementPoints += sizeData.checkedPoints || 0;
+        totalMeasurementPass += sizeData.totalPass || 0;
+        totalMeasurementFail += sizeData.totalFail || 0;
+      });
+    } else if (qcRecord.measurementDetails?.measurement?.length > 0) {
+      // Fallback calculation
+      qcRecord.measurementDetails.measurement.forEach((data) => {
+        if (data.pcs && Array.isArray(data.pcs)) {
+          data.pcs.forEach((pc) => {
+            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+              pc.measurementPoints.forEach((point) => {
+                if (point.result === "pass" || point.result === "fail") {
+                  totalMeasurementPoints++;
+                  if (point.result === "pass") {
+                    totalMeasurementPass++;
+                  } else {
+                    totalMeasurementFail++;
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    const passRate =
+      totalMeasurementPoints > 0
+        ? Number(
+            ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
+          )
+        : 100;
+
+    const measurementResult =
+      totalMeasurementPoints === 0
+        ? "Pass"
+        : totalMeasurementFail > 0
+        ? "Fail"
+        : "Pass";
+
+    const defectResult = qcRecord.defectDetails?.result || "Pass";
+
+    const overallResult =
+      measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+
+    res.json({
+      success: true,
+      summary: {
+        recordId,
+        orderNo: qcRecord.orderNo,
+        color: qcRecord.color,
+        totalCheckedPcs: qcRecord.totalCheckedPcs ?? 0,
+        checkedQty: qcRecord.checkedQty ?? "",
+        washQty: qcRecord.washQty ?? "",
+        rejectedDefectPcs: qcRecord.rejectedDefectPcs ?? 0,
+        totalDefectCount: qcRecord.totalDefectCount ?? 0,
+        defectRate: qcRecord.defectRate ?? 0,
+        defectRatio: qcRecord.defectRatio ?? 0,
+        passRate: passRate,
+        overallResult: overallResult,
+        overallFinalResult: overallResult, // Ensure consistency
+
+        // Additional debug information
+        measurementStats: {
+          totalPoints: totalMeasurementPoints,
+          totalPass: totalMeasurementPass,
+          totalFail: totalMeasurementFail,
+          measurementResult: measurementResult
+        },
+        defectStats: {
+          defectResult: defectResult
+        },
+
+        // Include the measurement details for frontend calculation
+        measurementDetails: qcRecord.measurementDetails,
+        defectDetails: qcRecord.defectDetails ?? {}
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching overall summary by id:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching overall summary."
+    });
+  }
+});
+
+app.post(
+  "/api/qc-washing/recalculate-overall-result/:recordId",
+  async (req, res) => {
+    try {
+      const { recordId } = req.params;
+      const qcRecord = await QCWashing.findById(recordId);
+
+      if (!qcRecord) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Record not found." });
+      }
+
+      // Recalculate everything from scratch
+      let totalMeasurementPoints = 0;
+      let totalMeasurementPass = 0;
+      let totalMeasurementFail = 0;
+
+      if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
+        qcRecord.measurementDetails.measurementSizeSummary.forEach(
+          (sizeData) => {
+            totalMeasurementPoints += sizeData.checkedPoints || 0;
+            totalMeasurementPass += sizeData.totalPass || 0;
+            totalMeasurementFail += sizeData.totalFail || 0;
+          }
+        );
+      }
+
+      const passRate =
+        totalMeasurementPoints > 0
+          ? Number(
+              ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
+            )
+          : 100;
+
+      const measurementResult =
+        totalMeasurementPoints === 0
+          ? "Pass"
+          : totalMeasurementFail > 0
+          ? "Fail"
+          : "Pass";
+
+      const defectResult = qcRecord.defectDetails?.result || "Pass";
+
+      const overallResult =
+        measurementResult === "Pass" && defectResult === "Pass"
+          ? "Pass"
+          : "Fail";
+
+      // Update the record
+      qcRecord.totalCheckedPoint = totalMeasurementPoints;
+      qcRecord.totalPass = totalMeasurementPass;
+      qcRecord.totalFail = totalMeasurementFail;
+      qcRecord.passRate = passRate;
+      qcRecord.overallFinalResult = overallResult;
+
+      await qcRecord.save();
+
+      res.json({
+        success: true,
+        message: "Overall result recalculated successfully",
+        result: {
+          overallResult,
+          measurementResult,
+          defectResult,
+          passRate,
+          totalMeasurementPoints,
+          totalMeasurementPass,
+          totalMeasurementFail
+        }
+      });
+    } catch (error) {
+      console.error("Error recalculating overall result:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to recalculate overall result."
+      });
+    }
+  }
+);
 
 const getAqlLevelForBuyer = (buyer) => {
   if (!buyer) return 1.0;
@@ -28970,7 +29243,7 @@ app.post(
       // Define the machine types and their parameters
       const machineTypes = {
         "Washing Machine": ["temperature", "time", "silicon", "softener"],
-        "Tumble Dry": ["temperature", "time"]
+        "Tumble Dry": ["temperature", "timeCool", "timeHot"]
       };
 
       Object.entries(machineTypes).forEach(([machineType, parameters]) => {

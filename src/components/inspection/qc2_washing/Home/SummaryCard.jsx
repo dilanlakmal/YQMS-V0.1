@@ -45,7 +45,7 @@ const SummaryCard = ({
   const overallResult =
     measurementPoints === 0
       ? "PENDING"
-      : parseFloat(passRate) >= 90
+      : parseFloat(passRate) >= 95
       ? "PASS"
       : "FAIL";
 

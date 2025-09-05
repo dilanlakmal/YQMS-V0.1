@@ -17,12 +17,19 @@ const MACHINE_TYPES = [
     label: "Washing Machine",
     fields: ["temperature", "time", "silicon", "softener"]
   },
-  { key: "tumbleDry", label: "Tumble Dry", fields: ["temperature", "time"] }
+  {
+    key: "tumbleDry",
+    label: "Tumble Dry",
+    fields: ["temperature", "timeCool", "timeHot"]
+  }
+  // { key: "tumbleDry", label: "Tumble Dry", fields: ["temperature", "time"] }
 ];
 
 const FIELD_LABELS = {
   temperature: "Temp (°C)",
   time: "Time (min)",
+  timeCool: "Time Cool (min)",
+  timeHot: "Time Hot (min)",
   silicon: "Silicon (g)",
   softener: "Softener (g)"
 };
@@ -30,6 +37,8 @@ const FIELD_LABELS = {
 const FIELD_ICONS = {
   temperature: <FaThermometerHalf className="text-blue-500 mr-1" />,
   time: <FaClock className="text-yellow-500 mr-1" />,
+  timeCool: <FaClock className="text-cyan-500 mr-1" />,
+  timeHot: <FaClock className="text-red-500 mr-1" />,
   silicon: <FaFlask className="text-purple-500 mr-1" />,
   softener: <FaTint className="text-pink-500 mr-1" />
 };

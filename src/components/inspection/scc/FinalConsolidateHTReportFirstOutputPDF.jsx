@@ -252,7 +252,11 @@ const FinalConsolidateHTReportFirstOutputPDF = ({ data }) => {
             <View style={styles.imageBox}>
               <Text style={styles.imageTitle}>Reference Sample Image</Text>
               {row.referenceSampleImage ? (
-                <Image style={styles.image} src={row.referenceSampleImage} />
+                <Image
+                  style={styles.image}
+                  src={row.referenceSampleImage}
+                  crossOrigin="anonymous"
+                />
               ) : (
                 <Text style={styles.noImageText}>No Image Provided</Text>
               )}
@@ -260,7 +264,11 @@ const FinalConsolidateHTReportFirstOutputPDF = ({ data }) => {
             <View style={styles.imageBox}>
               <Text style={styles.imageTitle}>After Wash Image</Text>
               {row.afterWashImage ? (
-                <Image style={styles.image} src={row.afterWashImage} />
+                <Image
+                  style={styles.image}
+                  src={row.afterWashImage}
+                  crossOrigin="anonymous"
+                />
               ) : (
                 <Text style={styles.noImageText}>No Image Provided</Text>
               )}

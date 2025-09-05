@@ -26,7 +26,11 @@ const MeasurementPointSchema = new mongoose.Schema(
     rowNo: Number,
     measured_value_decimal: Number,
     measured_value_fraction: String,
-    result: { type: String, enum: ["pass", "fail"], default: "pass" }
+    result: {
+      type: String,
+      enum: ["pass", "fail", "pending"],
+      default: "pending"
+    }
   },
   { _id: false }
 );
@@ -126,7 +130,23 @@ const QCWashingSchema = new mongoose.Schema(
           },
           time: {
             actualValue: Number,
-            standardValue: Number,
+            standardValue: String,
+            status: {
+              ok: { type: Boolean, default: false },
+              no: { type: Boolean, default: false }
+            }
+          },
+          timeCool: {
+            actualValue: Number,
+            standardValue: String,
+            status: {
+              ok: { type: Boolean, default: false },
+              no: { type: Boolean, default: false }
+            }
+          },
+          timeHot: {
+            actualValue: Number,
+            standardValue: String,
             status: {
               ok: { type: Boolean, default: false },
               no: { type: Boolean, default: false }

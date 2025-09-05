@@ -17,6 +17,7 @@ import { API_BASE_URL } from "../../../../../config";
 
 const SubmittedWashingDataFilter = ({
   data,
+  filteredData,
   onFilterChange,
   onReset,
   isVisible,
@@ -52,9 +53,10 @@ const SubmittedWashingDataFilter = ({
     qcId: false
   });
 
-  const getUniqueUsersWithNames = () => {
+  const getUniqueUsersWithNames = (useFilteredData = false) => {
+    const dataSource = useFilteredData ? filteredData : data;
     const uniqueUserIds = [
-      ...new Set(data.map((item) => item.userId).filter(Boolean))
+      ...new Set(dataSource.map((item) => item.userId).filter(Boolean))
     ];
     return uniqueUserIds
       .map((userId) => {
@@ -90,8 +92,9 @@ const SubmittedWashingDataFilter = ({
   }, []);
 
   // Extract unique values for dropdown options
-  const getUniqueValues = (field) => {
-    const values = data
+  const getUniqueValues = (field, useFilteredData = false) => {
+    const dataSource = useFilteredData ? filteredData : data;
+    const values = dataSource
       .map((item) => {
         switch (field) {
           case "color":
@@ -121,8 +124,11 @@ const SubmittedWashingDataFilter = ({
 
   // Filter options based on search term
   const getFilteredOptions = (field, searchTerm) => {
+    const useFilteredData = filteredData && filteredData.length !== data.length;
     const options =
-      field === "qcId" ? getUniqueUsersWithNames() : getUniqueValues(field);
+      field === "qcId"
+        ? getUniqueUsersWithNames(useFilteredData)
+        : getUniqueValues(field, useFilteredData);
     if (!searchTerm) return options;
 
     if (field === "qcId") {
@@ -157,8 +163,14 @@ const SubmittedWashingDataFilter = ({
       [field]: value
     }));
 
-    // Also update the filter value
-    handleFilterChange(field, value);
+    // For QC ID, we need to extract the actual ID from the display value
+    if (field === "qcId") {
+      // If the value contains ' - ', extract the ID part (before the dash)
+      const actualId = value.includes(" - ") ? value.split(" - ")[0] : value;
+      handleFilterChange(field, actualId);
+    } else {
+      handleFilterChange(field, value);
+    }
   };
 
   // Handle dropdown toggle
@@ -353,7 +365,7 @@ const SubmittedWashingDataFilter = ({
                 {dropdownStates.orderNo && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div
-                      className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                      className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
                       onClick={() => handleOptionSelect("orderNo", "")}
                     >
                       All MO Numbers
@@ -362,7 +374,7 @@ const SubmittedWashingDataFilter = ({
                       (orderNo) => (
                         <div
                           key={orderNo}
-                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
                           onClick={() => handleOptionSelect("orderNo", orderNo)}
                         >
                           {orderNo}
@@ -416,7 +428,7 @@ const SubmittedWashingDataFilter = ({
                 {dropdownStates.qcId && !loadingUsers && (
                   <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div
-                      className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                      className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
                       onClick={() => handleOptionSelect("qcId", "")}
                     >
                       All QC IDs
@@ -425,7 +437,7 @@ const SubmittedWashingDataFilter = ({
                       (user) => (
                         <div
                           key={user.id}
-                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm"
+                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
                           onClick={() => handleOptionSelect("qcId", user.id)}
                         >
                           {user.display}
@@ -450,7 +462,10 @@ const SubmittedWashingDataFilter = ({
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Colors</option>
-                  {getUniqueValues("color").map((color) => (
+                  {getUniqueValues(
+                    "color",
+                    filteredData && filteredData.length !== data.length
+                  ).map((color) => (
                     <option key={color} value={color}>
                       {color}
                     </option>
@@ -489,13 +504,14 @@ const SubmittedWashingDataFilter = ({
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All</option>
-                  {getUniqueValues("before_after_wash").map(
-                    (before_after_wash) => (
-                      <option key={before_after_wash} value={before_after_wash}>
-                        {before_after_wash}
-                      </option>
-                    )
-                  )}
+                  {getUniqueValues(
+                    "before_after_wash",
+                    filteredData && filteredData.length !== data.length
+                  ).map((before_after_wash) => (
+                    <option key={before_after_wash} value={before_after_wash}>
+                      {before_after_wash}
+                    </option>
+                  ))}
                 </select>
                 <CheckCircle className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -556,7 +572,10 @@ const SubmittedWashingDataFilter = ({
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Factories</option>
-                  {getUniqueValues("factoryName").map((factory) => (
+                  {getUniqueValues(
+                    "factoryName",
+                    filteredData && filteredData.length !== data.length
+                  ).map((factory) => (
                     <option key={factory} value={factory}>
                       {factory}
                     </option>
@@ -595,7 +614,10 @@ const SubmittedWashingDataFilter = ({
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Report Types</option>
-                  {getUniqueValues("reportType").map((type) => (
+                  {getUniqueValues(
+                    "reportType",
+                    filteredData && filteredData.length !== data.length
+                  ).map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>
@@ -634,7 +656,10 @@ const SubmittedWashingDataFilter = ({
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Wash Types</option>
-                  {getUniqueValues("washType").map((type) => (
+                  {getUniqueValues(
+                    "washType",
+                    filteredData && filteredData.length !== data.length
+                  ).map((type) => (
                     <option key={type} value={type}>
                       {type}
                     </option>
