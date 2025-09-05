@@ -10,6 +10,7 @@ import { PDFDownloadLink } from '@react-pdf/renderer';
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
+  const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -674,17 +675,24 @@ const processImageToBase64 = async (imagePath) => {
 
   // Handle filter changes
   const handleFilterChange = (filters) => {
+    setCurrentFilters(filters);
     applyFilters(filters);
   };
 
   // Reset filters
   const handleFilterReset = () => {
+    setCurrentFilters(null);
     setFilteredData(submittedData);
+    setCurrentPage(1); // Reset to first page when filters are reset
   };
 
   // Update filtered data when original data changes
   useEffect(() => {
-    setFilteredData(submittedData);
+    if (currentFilters) {
+      applyFilters(currentFilters);
+    } else {
+      setFilteredData(submittedData);
+    }
   }, [submittedData]);
 
   // Update paginated data when filtered data or current page changes
@@ -747,7 +755,8 @@ const processImageToBase64 = async (imagePath) => {
     <div className="space-y-6">
       {/* Filter Component */}
       <SubmittedWashingDataFilter
-        data={filteredData.length > 0 ? filteredData : submittedData}
+        data={submittedData}
+        filteredData={filteredData}
         onFilterChange={handleFilterChange}
         onReset={handleFilterReset}
         isVisible={filterVisible}

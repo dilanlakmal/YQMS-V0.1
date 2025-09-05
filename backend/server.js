@@ -283,6 +283,10 @@ const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
 const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
+const IEWorkerTask = createIEWorkerTaskModel(ymProdConnection);
+const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
+const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
+const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 
 
 /* ------------------------------
