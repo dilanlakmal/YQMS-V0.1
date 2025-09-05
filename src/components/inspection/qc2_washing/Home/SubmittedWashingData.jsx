@@ -79,17 +79,10 @@ const handleCloseFullReport = () => {
 // Function to fetch wash qty from qc_washing_qty_old collection
 const fetchWashQty = async (record) => {
   try {
-    console.log('Processing record:', {
-      reportType: record.reportType,
-      originalWashQty: record.washQty,
-      orderNo: record.orderNo,
-      color: record.color
-    });
 
     // If report type is "First output", always use original wash qty and mark as green
     if (record.reportType === 'First output') {
       const washQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
-      console.log('First output - using original washQty:', washQty);
       return {
         washQty: washQty,
         fromOldCollection: true, // This ensures it displays in green
@@ -99,13 +92,6 @@ const fetchWashQty = async (record) => {
 
     // For other report types, try to fetch from qc_washing_qty_old collection
     const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
-    
-    console.log('Fetching from API with params:', {
-      date: dateStr,
-      color: record.color,
-      orderNo: record.orderNo,
-      qcId: record.userId
-    });
 
     const response = await fetch(
       `${API_BASE_URL}/api/qc-washing/wash-qty?date=${dateStr}&color=${encodeURIComponent(record.color)}&orderNo=${encodeURIComponent(record.orderNo)}&qcId=${encodeURIComponent(record.userId)}`
@@ -113,24 +99,19 @@ const fetchWashQty = async (record) => {
     
     if (response.ok) {
       const data = await response.json();
-      console.log('API response:', data);
       
       // Only use the value from old collection if it's greater than 0
       if (data.success && data.washQty !== undefined && data.washQty !== null && data.washQty > 0) {
-        console.log('Found valid wash qty in old collection:', data.washQty);
         return {
           washQty: data.washQty,
           fromOldCollection: true,
           isFirstOutput: false
         };
-      } else {
-        console.log('Old collection returned 0 or invalid value, using original washQty');
-      }
+      } 
     }
     
     // If not found in old collection OR the value is 0, use the original washQty from qcWashing collection
     const fallbackWashQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
-    console.log('Using fallback washQty from qcWashing collection:', fallbackWashQty);
     
     return {
       washQty: fallbackWashQty,
@@ -140,7 +121,6 @@ const fetchWashQty = async (record) => {
   } catch (error) {
     console.error('Error fetching wash qty:', error);
     const errorFallbackWashQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
-    console.log('Error fallback washQty:', errorFallbackWashQty);
     
     return {
       washQty: errorFallbackWashQty,
@@ -150,92 +130,74 @@ const fetchWashQty = async (record) => {
   }
 };
 
-// Update the data fetching logic
-useEffect(() => {
-  const fetchSubmittedData = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/all-submitted`
-      );
-      
-      if (!response.ok) {
-        if (response.status === 404) {
-          setError("Report feature is not yet implemented on the server.");
-        } else {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return;
-      }
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        const records = data.data || [];
-        console.log('Original records count:', records.length);
-        console.log('Original washQty values:', records.map(r => ({ 
-          orderNo: r.orderNo, 
-          washQty: r.washQty,
-          washQtyType: typeof r.washQty,
-          reportType: r.reportType
-        })));
-        
-        // Fetch wash qty for each record
-        const recordsWithWashQty = await Promise.all(
-          records.map(async (record, index) => {
-            console.log(`Processing record ${index + 1}:`, {
-              orderNo: record.orderNo,
-              color: record.color,
-              reportType: record.reportType,
-              originalWashQty: record.washQty
-            });
-            
-            // Store original wash qty before API call
-            const originalWashQty = record.washQty;
-            const washQtyData = await fetchWashQty(record);
-            
-            const processedRecord = { 
-              ...record, 
-              originalWashQty: originalWashQty, // Keep original for reference
-              washQty: washQtyData.washQty,
-              washQtyFromOldCollection: washQtyData.fromOldCollection,
-              isFirstOutput: washQtyData.isFirstOutput || record.reportType === 'First output'
-            };
-            
-            console.log(`Processed record ${index + 1}:`, {
-              orderNo: processedRecord.orderNo,
-              finalWashQty: processedRecord.washQty,
-              fromOldCollection: processedRecord.washQtyFromOldCollection,
-              isFirstOutput: processedRecord.isFirstOutput,
-              reportType: processedRecord.reportType
-            });
-            
-            return processedRecord;
-          })
-        );
-        
-        console.log('Final processed records:', recordsWithWashQty.length);
-        setSubmittedData(recordsWithWashQty); 
-      } else {
-        setError(data.message || "Failed to fetch submitted data.");
-      }
-    } catch (err) {
-      console.error('Fetch error:', err);
-      if (err.message.includes('404')) {
+// Update the data fetching logic with live updates
+const fetchSubmittedData = async (showLoading = true) => {
+  try {
+    if (showLoading) setIsLoading(true);
+    setError(null);
+    
+    const response = await fetch(
+      `${API_BASE_URL}/api/qc-washing/all-submitted`
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) {
         setError("Report feature is not yet implemented on the server.");
-      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-        setError("Could not connect to server. Please check your connection.");
       } else {
-        setError(`Error: ${err.message}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    } finally {
-      setIsLoading(false);
+      return;
     }
-  };
+    
+    const data = await response.json();
+    
+    if (data.success) {
+      const records = data.data || [];
+      
+      // Fetch wash qty for each record
+      const recordsWithWashQty = await Promise.all(
+        records.map(async (record, index) => {
+          // Store original wash qty before API call
+          const originalWashQty = record.washQty;
+          const washQtyData = await fetchWashQty(record);
+          
+          const processedRecord = { 
+            ...record, 
+            originalWashQty: originalWashQty, // Keep original for reference
+            washQty: washQtyData.washQty,
+            washQtyFromOldCollection: washQtyData.fromOldCollection,
+            isFirstOutput: washQtyData.isFirstOutput || record.reportType === 'First output'
+          };
+          
+          return processedRecord;
+        })
+      );
+      setSubmittedData(recordsWithWashQty); 
+    } else {
+      setError(data.message || "Failed to fetch submitted data.");
+    }
+  } catch (err) {
+    if (err.message.includes('404')) {
+      setError("Report feature is not yet implemented on the server.");
+    } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+      setError("Could not connect to server. Please check your connection.");
+    } else {
+      setError(`Error: ${err.message}`);
+    }
+  } finally {
+    if (showLoading) setIsLoading(false);
+  }
+};
 
+useEffect(() => {
   fetchSubmittedData();
+  
+  // Set up live updates every 3 seconds
+  const interval = setInterval(() => {
+    fetchSubmittedData(false); // Don't show loading for background updates
+  }, 3000);
+  
+  return () => clearInterval(interval);
 }, []);
 
 
@@ -319,6 +281,25 @@ useEffect(() => {
     };
   };
 
+  // Helper function to calculate overall result dynamically
+  const calculateOverallResult = (record) => {
+    const defectResult = record.defectDetails?.result || "Pass";
+    
+    // Calculate measurement result based on pass rate >= 95%
+    let measurementResult = "Pass";
+    if (record.measurementDetails?.measurementSizeSummary?.length > 0) {
+      measurementResult = record.measurementDetails.measurementSizeSummary.every(size => {
+        const total = (size.totalPass || 0) + (size.totalFail || 0);
+        if (total === 0) return true; // No measurements, consider as pass
+        const passRate = ((size.totalPass || 0) / total) * 100;
+        return passRate >= 95;
+      }) ? "Pass" : "Fail";
+    }
+    
+    // Overall result is Pass only if both defect and measurement results are Pass
+    return (defectResult === "Pass" && measurementResult === "Pass") ? "Pass" : "Fail";
+  };
+
   const handleFullReport = (record) => {
   setFullReportModal({
     isOpen: true,
@@ -334,10 +315,6 @@ const convertImageToBase64 = async (imagePath, API_BASE_URL) => {
   if (imagePath.startsWith('data:image/')) {
     return imagePath;
   }
-  
-  // For now, return null to show placeholders due to CORS issues
-  // This avoids the fetch errors and provides a clean PDF with placeholders
-  console.log(`🖼️ Skipping image conversion due to CORS, will show placeholder: ${imagePath.substring(0, 50)}...`);
   return null;
 };
 
@@ -350,38 +327,31 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
     
     // Process defect images
     if (processedRecord.defectDetails?.defectsByPc) {
-      console.log('📋 Found defectsByPc:', processedRecord.defectDetails.defectsByPc.length);
       
       for (let pcIndex = 0; pcIndex < processedRecord.defectDetails.defectsByPc.length; pcIndex++) {
         const pcDefect = processedRecord.defectDetails.defectsByPc[pcIndex];
         
         if (pcDefect.pcDefects) {
-          console.log(`🔍 Processing ${pcDefect.pcDefects.length} defects for PC:`, pcDefect.garmentNo || pcDefect.pcNumber);
           
           for (let defectIndex = 0; defectIndex < pcDefect.pcDefects.length; defectIndex++) {
             const defect = pcDefect.pcDefects[defectIndex];
             
             if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              console.log(`🖼️ Processing ${defect.defectImages.length} images for defect:`, defect.defectName);
-              console.log('📷 Original defect images:', defect.defectImages);
               
               const processedImages = [];
               for (const imagePath of defect.defectImages) {
                 // Skip if already base64
                 if (imagePath && imagePath.startsWith('data:image/')) {
                   processedImages.push(imagePath);
-                  console.log('✅ Image already in base64 format');
                   continue;
                 }
                 
                 // For CORS-blocked images, add placeholder info
-                console.log(`🖼️ Adding defect image placeholder for: ${imagePath}`);
                 processedImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'defect' });
               }
               
               // IMPORTANT: Assign the processed images back to the correct location
               processedRecord.defectDetails.defectsByPc[pcIndex].pcDefects[defectIndex].defectImages = processedImages;
-              console.log(`📊 Final defect images count: ${processedImages.length}`);
             }
           }
         }
@@ -395,18 +365,14 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
         // Skip if already base64
         if (imagePath && imagePath.startsWith('data:image/')) {
           processedAdditionalImages.push(imagePath);
-          console.log('✅ Additional image already in base64 format');
           continue;
         }
         
-        // For CORS-blocked images, add placeholder info
-        console.log(`🖼️ Adding additional image placeholder for: ${imagePath}`);
         processedAdditionalImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'additional' });
       }
       
       // IMPORTANT: Assign the processed images back
       processedRecord.defectDetails.additionalImages = processedAdditionalImages;
-      console.log(`📊 Final additional images count: ${processedAdditionalImages.length}`);
     }
 
     // Process inspection images
@@ -460,14 +426,6 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
         }
       }
     }
-
-    // Log final summary
-    console.log('📈 Image processing complete:', {
-      defectsByPc: processedRecord.defectDetails?.defectsByPc?.length || 0,
-      additionalImages: processedRecord.defectDetails?.additionalImages?.length || 0,
-      checkedPoints: processedRecord.inspectionDetails?.checkedPoints?.length || 0,
-      machineProcesses: processedRecord.inspectionDetails?.machineProcesses?.length || 0
-    });
     
     return processedRecord;
   } catch (error) {
@@ -478,7 +436,6 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
 
 const processImageToBase64 = async (imagePath) => {
   try {
-    console.log('🔄 Processing image:', imagePath);
     
     const cleanPath = imagePath.replace('./public/', '');
     const response = await fetch(`${API_BASE_URL}/${cleanPath}`);
@@ -496,7 +453,6 @@ const processImageToBase64 = async (imagePath) => {
     }
     
     if (uint8Array[0] !== 0xFF || uint8Array[1] !== 0xD8) {
-      console.warn('⚠️ Invalid JPEG header detected, attempting to fix...');
       // Sometimes the header gets corrupted, try to find the actual start
       let soi = -1;
       for (let i = 0; i < Math.min(100, uint8Array.length - 1); i++) {
@@ -507,7 +463,6 @@ const processImageToBase64 = async (imagePath) => {
       }
       
       if (soi > 0) {
-        console.log('✅ Found JPEG SOI at position:', soi);
         // Create new array starting from the actual SOI
         const correctedArray = uint8Array.slice(soi);
         const base64 = btoa(String.fromCharCode.apply(null, correctedArray));
@@ -528,14 +483,10 @@ const processImageToBase64 = async (imagePath) => {
     const base64 = btoa(binary);
     const dataUrl = `data:image/jpeg;base64,${base64}`;
     
-    console.log('✅ Image processed successfully');
-    console.log('   Original size:', uint8Array.length, 'bytes');
-    console.log('   Base64 length:', base64.length);
     
     // Final validation
     try {
       atob(base64);
-      console.log('✅ Base64 validation passed');
     } catch (e) {
       console.error('❌ Base64 validation failed:', e);
       return null;
@@ -556,11 +507,9 @@ const processImageToBase64 = async (imagePath) => {
       throw new Error('API_BASE_URL is not defined');
     }
     
-    console.log('📝 Generating PDF with base64 images for record:', record._id);
     
     // Process images to base64 using the centralized function
     const processedRecord = await processImagesInRecord(record, API_BASE_URL);
-    console.log('✅ Image processing completed, generating PDF...');
     
     // Fetch comparison data
     let comparisonData = null;
@@ -610,8 +559,6 @@ const processImageToBase64 = async (imagePath) => {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
-    console.log('✅ PDF generated successfully with base64 images');
     
   } catch (error) {
     console.error('Error generating PDF:', error);
@@ -810,9 +757,11 @@ const processImageToBase64 = async (imagePath) => {
       {/* Main Table */}
       <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md w-full">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-            Submitted QC Washing Reports
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
+              Submitted QC Washing Reports
+            </h2>
+          </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -1009,18 +958,31 @@ const processImageToBase64 = async (imagePath) => {
                         {record.before_after_wash || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          record.overallFinalResult === 'Pass' 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
-                            : record.overallFinalResult === 'Fail'
-                            ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
-                            : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
-                        }`}>
-                          {record.overallFinalResult || 'N/A'}
-                        </span>
+                        {(() => {
+                          const dynamicResult = calculateOverallResult(record);
+                          return (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              dynamicResult === 'Pass' 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
+                                : dynamicResult === 'Fail'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
+                            }`}>
+                              {dynamicResult}
+                            </span>
+                          );
+                        })()}
                       </td>
                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.passRate || '0'}
+                        {(() => {
+                          if (record.measurementDetails?.measurementSizeSummary?.length > 0) {
+                            const totalPass = record.measurementDetails.measurementSizeSummary.reduce((sum, size) => sum + (size.totalPass || 0), 0);
+                            const totalFail = record.measurementDetails.measurementSizeSummary.reduce((sum, size) => sum + (size.totalFail || 0), 0);
+                            const total = totalPass + totalFail;
+                            return total > 0 ? Math.round((totalPass / total) * 100) : 0;
+                          }
+                          return record.passRate || 0;
+                        })()}
                       </td>
                       {showDefectColumn && (
                         <td className="px-3 py-4 text-sm text-gray-900 dark:text-gray-200">

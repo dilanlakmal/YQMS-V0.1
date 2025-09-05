@@ -22,23 +22,8 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
   const calculateWashQuantities = () => {
   if (!itemData) return;
 
-  console.log('=== Wash Quantity Calculation Debug ===');
-  console.log('itemData:', {
-    id: itemData._id,
-    orderNo: itemData.orderNo,
-    color: itemData.color,
-    washType: itemData.washType,
-    reportType: itemData.reportType,
-    // factoryName: itemData.factoryName,
-    before_after_wash: itemData.before_after_wash,
-    washQty: itemData.washQty,
-    colorOrderQty: itemData.colorOrderQty
-  });
-  console.log('allRecords length:', allRecords.length);
-
   // If no allRecords, treat current record as the only record
   if (!allRecords || allRecords.length === 0) {
-    console.log('No allRecords available, using current record only');
     const alreadyWashedQty = parseInt(itemData.washQty) || 0;
     const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
     
@@ -58,23 +43,13 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
       record.color === itemData.color &&
       record.washType === itemData.washType &&
       record.reportType === itemData.reportType;
-      // record.factoryName === itemData.factoryName;
-    
-    if (matches) {
-      console.log('Matching record found:', {
-        id: record._id,
-        washQty: record.washQty,
-        createdAt: record.createdAt
-      });
-    }
+      // record.factoryName === itemData.factoryName; 
     return matches;
   });
 
-  console.log('Matching records count:', matchingRecords.length);
 
   // If no matching records found, treat current record as the only record
   if (matchingRecords.length === 0) {
-    console.log('No matching records found, using current record only');
     const alreadyWashedQty = parseInt(itemData.washQty) || 0;
     const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
     
@@ -93,13 +68,6 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
     const dateB = new Date(b.createdAt || b.date || b.submittedAt);
     return dateA - dateB;
   });
-
-  console.log('Sorted records:', sortedRecords.map(r => ({
-    id: r._id,
-    washQty: r.washQty,
-    createdAt: r.createdAt,
-    date: r.date
-  })));
 
   // Find current record position - try multiple matching strategies
   let currentRecordIndex = -1;
@@ -121,7 +89,6 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
     return false;
   });
 
-  console.log('Direct ID match index:', currentRecordIndex);
 
   // Strategy 2: Match by washQty and approximate date if ID match fails
   if (currentRecordIndex === -1) {
@@ -134,32 +101,21 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
       
       return washQtyMatch && dateMatch;
     });
-    console.log('WashQty + Date match index:', currentRecordIndex);
   }
 
   // Strategy 3: If still not found, assume it's the latest record
   if (currentRecordIndex === -1) {
     currentRecordIndex = sortedRecords.length - 1;
-    console.log('Using latest record index:', currentRecordIndex);
   }
 
   // Calculate cumulative wash quantity up to current record (inclusive)
   const recordsUpToCurrent = sortedRecords.slice(0, currentRecordIndex + 1);
   const alreadyWashedQty = recordsUpToCurrent.reduce((sum, record) => {
     const washQty = parseInt(record.washQty) || 0;
-    console.log(`Adding washQty: ${washQty} from record:`, record._id);
     return sum + washQty;
   }, 0);
 
   const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
-
-  console.log('Final calculation:', {
-    recordsUpToCurrent: recordsUpToCurrent.length,
-    alreadyWashedQty,
-    remainingQty,
-    currentRecordIndex,
-    totalRecords: sortedRecords.length
-  });
 
   setWashQuantityData({
     alreadyWashedQty,

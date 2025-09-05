@@ -5,11 +5,10 @@ import { WashingMachine, ClipboardCheck } from "lucide-react";
 const OverAllSummaryCard = ({ summary }) => {
   if (!summary) {
     return (
-      <div className="bg-white dark:bg-gray-800 shadow-lg   rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-6">Overall Summary</h2>
         <div className="text-center text-gray-500 dark:text-gray-300">No summary data available.</div>
       </div>
-
     );
   }
 
@@ -23,16 +22,91 @@ const OverAllSummaryCard = ({ summary }) => {
     totalDefectCount,
     defectRate,
     defectRatio,
-    overallFinalResult,
-    overallResult,
+    defectDetails,
+    measurementDetails,
   } = summary;
+
+  // Calculate overall result dynamically based on current data
+  const calculateOverallResult = () => {
+    const defectResult = defectDetails?.result || "Pass";
+    
+    // Calculate overall measurement result from measurementSizeSummary
+    let measurementResult = "Pass";
+    let calculatedPassRate = 100;
+    let totalPassPoints = 0;
+    let totalFailPoints = 0;
+    
+    // Check if measurementSizeSummary exists in the data structure
+    if (measurementDetails?.measurementSizeSummary?.length > 0) {
+      // Use the measurementSizeSummary data directly
+      measurementDetails.measurementSizeSummary.forEach(sizeData => {
+        totalPassPoints += (sizeData.totalPass || 0);
+        totalFailPoints += (sizeData.totalFail || 0);
+      });
+    } else if (measurementDetails?.measurement?.length > 0) {
+      // Fallback: Calculate from measurement array if measurementSizeSummary doesn't exist
+      measurementDetails.measurement.forEach((data) => {
+        if (data.pcs && Array.isArray(data.pcs)) {
+          data.pcs.forEach((pc) => {
+            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+              pc.measurementPoints.forEach((point) => {
+                if (point.result === "pass") {
+                  totalPassPoints++;
+                } else if (point.result === "fail") {
+                  totalFailPoints++;
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    const totalPoints = totalPassPoints + totalFailPoints;
+    
+    if (totalPoints > 0) {
+      calculatedPassRate = (totalPassPoints / totalPoints) * 100;
+      // You can adjust this threshold as needed (currently set to 95%)
+      measurementResult = calculatedPassRate >= 95 ? "Pass" : "Fail";
+    } else {
+      // If no measurement points, consider it as Pass (or adjust based on your business logic)
+      measurementResult = "Pass";
+      calculatedPassRate = 100;
+    }
+    
+    // Overall result is Pass only if both defect and measurement results are Pass
+    const overallResult = (defectResult === "Pass" && measurementResult === "Pass") ? "Pass" : "Fail";
+    
+    return {
+      overallResult,
+      calculatedPassRate: Number(calculatedPassRate.toFixed(1)),
+      measurementResult,
+      defectResult,
+      totalMeasurementPoints: totalPoints,
+      totalMeasurementPass: totalPassPoints,
+      totalMeasurementFail: totalFailPoints
+    };
+  };
+
+  const { 
+    overallResult, 
+    calculatedPassRate, 
+    measurementResult, 
+    defectResult,
+    totalMeasurementPoints,
+    totalMeasurementPass,
+    totalMeasurementFail
+  } = calculateOverallResult();
+
+  // Use calculated pass rate instead of saved one
+  const displayPassRate = calculatedPassRate;
 
   let resultColor = "text-green-600 dark:text-green-400";
   let resultBgColor = "bg-green-50 dark:bg-green-900/50";
   if (overallResult === "Fail") {
     resultColor = "text-red-600 dark:text-red-400";
     resultBgColor = "bg-red-50 dark:bg-red-900/50";
-  } else if (overallResult === "N/A") {
+  } else if (overallResult === "N/A" || overallResult === "Pending") {
     resultColor = "text-gray-600 dark:text-gray-400";
     resultBgColor = "bg-gray-100 dark:bg-gray-700";
   }
@@ -47,7 +121,7 @@ const OverAllSummaryCard = ({ summary }) => {
           </span>
         )}
       </h2>
-
+    
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-slate-50 dark:bg-slate-700/50 rounded-lg p-3 text-center">
           <div className="text-sm font-medium text-slate-500 dark:text-slate-400">
@@ -97,10 +171,10 @@ const OverAllSummaryCard = ({ summary }) => {
 
         <div className="bg-yellow-50 dark:bg-yellow-900/50 rounded-lg p-3 text-center">
           <div className="text-sm font-medium text-yellow-500 dark:text-yellow-400/80">
-            Defect Ratio
+            Pass Rate
           </div>
           <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
-            {defectRatio || 0}%
+            {displayPassRate}%
           </div>
         </div>
 
@@ -114,6 +188,7 @@ const OverAllSummaryCard = ({ summary }) => {
     </div>
   );
 };
+
 OverAllSummaryCard.propTypes = {
   summary: PropTypes.shape({
     orderNo: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
@@ -126,7 +201,8 @@ OverAllSummaryCard.propTypes = {
     defectRate: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     defectRatio: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     overallFinalResult: PropTypes.string,
-    overallResult: PropTypes.string,
+    defectDetails: PropTypes.object,
+    measurementDetails: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
   }),
 };
 

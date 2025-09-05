@@ -113,16 +113,7 @@ const setKValueForSize = (size, washType, kValue) => {
     [key]: kValue
   }));
   
-  // Clear measurement data for this specific size and wash type when switching K-values
-  setMeasurementValues(prev => {
-    const newValues = { ...prev };
-    Object.keys(newValues).forEach(key => {
-      if (key.startsWith(`${size}-${washType}-`)) {
-        delete newValues[key];
-      }
-    });
-    return newValues;
-  });
+  // Don't clear measurement data when switching K-values - preserve existing data
   
   // Get the new specs for the selected K-value
   const specs = washType === 'before'
@@ -142,7 +133,7 @@ const setKValueForSize = (size, washType, kValue) => {
     }));
     patternApplied = true;
     
-    // Initialize measurement values for selected rows with 0 values (not previous values)
+    // Initialize measurement values for selected rows only if they don't exist
     const tableType = washType;
     setMeasurementValues(prevValues => {
       const newValues = { ...prevValues };
@@ -150,9 +141,11 @@ const setKValueForSize = (size, washType, kValue) => {
       globalPattern.forEach((isSelected, rowIndex) => {
         if (isSelected) {
           for (let colIndex = 0; colIndex < 3; colIndex++) {
-            const cellKey = `${size}-${tableType}-${rowIndex}-${colIndex}`;
-            // Always set to 0, don't carry over previous values
-            newValues[cellKey] = { decimal: 0, fraction: '0' };
+            const cellKey = `${size}-${tableType}-${kValue}-${rowIndex}-${colIndex}`;
+            // Only initialize if not already set
+            if (!newValues[cellKey]) {
+              newValues[cellKey] = { decimal: 0, fraction: '0' };
+            }
           }
         }
       });
@@ -175,7 +168,7 @@ const setKValueForSize = (size, washType, kValue) => {
         }));
         patternApplied = true;
         
-        // Initialize measurement values for selected rows with 0 values (not previous values)
+        // Initialize measurement values for selected rows only if they don't exist
         const tableType = washType;
         setMeasurementValues(prevValues => {
           const newValues = { ...prevValues };
@@ -183,9 +176,11 @@ const setKValueForSize = (size, washType, kValue) => {
           mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
             if (isSelected) {
               for (let colIndex = 0; colIndex < 3; colIndex++) {
-                const cellKey = `${size}-${tableType}-${rowIndex}-${colIndex}`;
-                // Always set to 0, don't carry over previous values
-                newValues[cellKey] = { decimal: 0, fraction: '0' };
+                const cellKey = `${size}-${tableType}-${kValue}-${rowIndex}-${colIndex}`;
+                // Only initialize if not already set
+                if (!newValues[cellKey]) {
+                  newValues[cellKey] = { decimal: 0, fraction: '0' };
+                }
               }
             }
           });
@@ -262,37 +257,77 @@ const setKValueForSize = (size, washType, kValue) => {
         const isRowIndividuallySelected = selectedRows?.[specIndex] ?? false;
         if (!isFullColumn && !isRowIndividuallySelected) return;
 
-        const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
+        const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
 
-        let result = '';
-        if (measurementValue && typeof measurementValue.decimal === 'number') {
-          const measuredDeviation = measurementValue.decimal;
-          const tolMinus = spec.ToleranceMinus || '0';
-          const tolPlus = spec.TolerancePlus || '0';
-          const tolMinusValue = fractionToDecimal(tolMinus);
-          const tolPlusValue = fractionToDecimal(tolPlus);
+        let result = 'pending'; // Default to pending
+        if (measurementValue && (typeof measurementValue.decimal === 'number' || measurementValue.fraction)) {
+          const measuredDeviation = typeof measurementValue.decimal === 'number' ? measurementValue.decimal : parseFloat(measurementValue.fraction) || 0;
+          
+          // Get size-specific tolerances for result calculation
+          let tolMinusValue = 0;
+          let tolPlusValue = 0;
+          
+          if (Array.isArray(spec.ToleranceMinus)) {
+            const sizeSpecTolMinus = spec.ToleranceMinus.find(t => t.size === size);
+            tolMinusValue = fractionToDecimal(sizeSpecTolMinus?.fraction || spec.ToleranceMinus || '0');
+          } else {
+            tolMinusValue = fractionToDecimal(spec.TolMinus?.fraction || spec.ToleranceMinus?.fraction || spec.ToleranceMinus || '0');
+          }
+          
+          if (Array.isArray(spec.TolerancePlus)) {
+            const sizeSpecTolPlus = spec.TolerancePlus.find(t => t.size === size);
+            tolPlusValue = fractionToDecimal(sizeSpecTolPlus?.fraction || spec.TolerancePlus || '0');
+          } else {
+            tolPlusValue = fractionToDecimal(spec.TolPlus?.fraction || spec.TolerancePlus?.fraction || spec.TolerancePlus || '0');
+          }
 
-          if (!isNaN(tolMinusValue) && !isNaN(tolPlusValue)) {
-            if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
-              result = 'pass';
-            } else {
-              result = 'fail';
-            }
+          // Always calculate result if we have a measurement value
+          if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
+            result = 'pass';
+          } else {
+            result = 'fail';
           }
         }
 
-        // Only push if result is 'pass' or 'fail'
-        if (result === 'pass' || result === 'fail') {
+        // Always push measurement points if there's a measurement value
+        if (measurementValue && (measurementValue.decimal !== null || measurementValue.fraction)) {
+          // Get size-specific specs or default specs as string
+          let specsValue = '-';
+          if (Array.isArray(spec.Specs)) {
+            const sizeSpec = spec.Specs.find(s => s.size === size);
+            specsValue = sizeSpec ? sizeSpec.fraction : '-';
+          } else {
+            specsValue = spec.Specs?.fraction || spec.Specs || '-';
+          }
+          
+          // Get size-specific tolerances
+          let tolMinusValue = 0;
+          let tolPlusValue = 0;
+          
+          if (Array.isArray(spec.ToleranceMinus)) {
+            const sizeSpecTolMinus = spec.ToleranceMinus.find(t => t.size === size);
+            tolMinusValue = fractionToDecimal(sizeSpecTolMinus?.fraction || spec.ToleranceMinus || '0');
+          } else {
+            tolMinusValue = fractionToDecimal(spec.TolMinus?.fraction || spec.ToleranceMinus?.fraction || spec.ToleranceMinus || '0');
+          }
+          
+          if (Array.isArray(spec.TolerancePlus)) {
+            const sizeSpecTolPlus = spec.TolerancePlus.find(t => t.size === size);
+            tolPlusValue = fractionToDecimal(sizeSpecTolPlus?.fraction || spec.TolerancePlus || '0');
+          } else {
+            tolPlusValue = fractionToDecimal(spec.TolPlus?.fraction || spec.TolerancePlus?.fraction || spec.TolerancePlus || '0');
+          }
+          
           measurementPoints.push({
             pointName: spec.MeasurementPointEngName || `Point ${specIndex + 1}`,
             pointNo: specIndex + 1,
             rowNo: specIndex,
             measured_value_decimal: measurementValue?.decimal ?? null,
             measured_value_fraction: measurementValue?.fraction ?? '',
-            specs: spec.Specs?.fraction || spec.Specs || '-',
-            toleranceMinus: fractionToDecimal(spec.ToleranceMinus || '0'),
-            tolerancePlus: fractionToDecimal(spec.TolerancePlus || '0'),
+            specs: specsValue,
+            toleranceMinus: tolMinusValue,
+            tolerancePlus: tolPlusValue,
             result: result,
           });
         }
@@ -351,7 +386,7 @@ const setKValueForSize = (size, washType, kValue) => {
   };
 
   const fractionToDecimal = (frac) => {
-    if (typeof frac !== 'string' || !frac || frac.trim() === '-') return NaN;
+    if (typeof frac !== 'string' || !frac || frac.trim() === '-') return 0; // Return 0 instead of NaN
     frac = frac
       .replace('⁄', '/')
       .replace('½', '1/2').replace('¼', '1/4').replace('¾', '3/4')
@@ -374,13 +409,13 @@ const setKValueForSize = (size, washType, kValue) => {
       if (!isNaN(num) && !isNaN(den) && den !== 0) {
         total += num / den;
       } else {
-        return NaN;
+        return 0; // Return 0 instead of NaN
       }
     } else {
       total = parseFloat(frac);
     }
 
-    if (isNaN(total)) return NaN;
+    if (isNaN(total)) return 0; // Return 0 instead of NaN
     return isNegative ? -total : total;
   };
 
@@ -391,31 +426,7 @@ const setKValueForSize = (size, washType, kValue) => {
     setActiveAfterTab(newKValue);
   }
   
-  // Clear measurement data for all selected sizes when switching K-values
-  selectedSizes.forEach(({ size }) => {
-    // Clear measurement values for this size and table type
-    setMeasurementValues(prev => {
-      const newValues = { ...prev };
-      Object.keys(newValues).forEach(key => {
-        if (key.startsWith(`${size}-${washType}-`)) {
-          delete newValues[key];
-        }
-      });
-      return newValues;
-    });
-    
-    // Reset row selections for this size
-    setSelectedRowsBySize(prev => {
-      const specs = washType === 'before'
-        ? (measurementSpecs.beforeWashGrouped[newKValue] || measurementSpecs.beforeWash)
-        : (measurementSpecs.afterWashGrouped[newKValue] || measurementSpecs.afterWash);
-      
-      return {
-        ...prev,
-        [size]: Array(specs.length).fill(false)
-      };
-    });
-  });
+  // Don't clear measurement data when switching K-values globally
 };
 
 
@@ -458,33 +469,9 @@ const setKValueForSize = (size, washType, kValue) => {
       setActiveAfterTab(kvalue);
     }
 
-    // Reset UI state for this size
-    setSelectedRowsBySize(prev => {
-      const next = { ...prev };
-      delete next[sizeToEdit];
-      return next;
-    });
-
-    setFullColumnsBySize(prev => {
-      const next = { ...prev };
-      delete next[sizeToEdit];
-      return next;
-    });
-
-    setMeasurementValues(prev => {
-      const newValues = { ...prev };
-      Object.keys(newValues).forEach(key => {
-        if (key.startsWith(`${sizeToEdit}-before-`) || key.startsWith(`${sizeToEdit}-after-`)) {
-          delete newValues[key];
-        }
-      });
-      return newValues;
-    });
-
-    // Don't remove from measurementData here - let the parent component handle it
-
-    // Hydrate from the saved record
-    hydrateMeasurementUIFromSavedData([dataToEdit], before_after_wash === 'Before Wash' ? 'before' : 'after');
+    // Hydrate from the saved record BEFORE clearing state
+    // This ensures the data is properly restored
+    hydrateMeasurementUIFromSavedData([dataToEdit], tableType);
 
     if (onMeasurementEdit) onMeasurementEdit(sizeToEdit, kvalue);
   };
@@ -553,7 +540,7 @@ const setKValueForSize = (size, washType, kValue) => {
       for (let colIndex = 0; colIndex < numCols; colIndex++) {
         pcs[colIndex].measurementPoints.forEach((point) => {
           const rowIndex = point.rowNo;
-          const cellKey = `${size}-${tableType}-${rowIndex}-${colIndex}`;
+          const cellKey = `${size}-${tableType}-${data.kvalue}-${rowIndex}-${colIndex}`;
           newMeasurementValues[cellKey] = {
             decimal: point.measured_value_decimal,
             fraction: point.measured_value_fraction
@@ -664,16 +651,18 @@ const addSize = (size) => {
       }));
       patternApplied = true;
       
-      // Initialize measurement values for selected rows with 0 values
+      // Initialize measurement values for selected rows only if they don't exist
       setMeasurementValues(prevValues => {
         const newValues = { ...prevValues };
         
         globalPattern.forEach((isSelected, rowIndex) => {
           if (isSelected) {
             for (let colIndex = 0; colIndex < 3; colIndex++) {
-              const cellKey = `${sizeStr}-${tableType}-${rowIndex}-${colIndex}`;
-              // Always initialize with 0, not previous values
-              newValues[cellKey] = { decimal: 0, fraction: '0' };
+              const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
+              // Only initialize if not already set
+              if (!newValues[cellKey]) {
+                newValues[cellKey] = { decimal: 0, fraction: '0' };
+              }
             }
           }
         });
@@ -698,16 +687,18 @@ const addSize = (size) => {
           }));
           patternApplied = true;
           
-          // Initialize measurement values for selected rows with 0 values
+          // Initialize measurement values for selected rows only if they don't exist
           setMeasurementValues(prevValues => {
             const newValues = { ...prevValues };
             
             mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
               if (isSelected) {
                 for (let colIndex = 0; colIndex < 3; colIndex++) {
-                  const cellKey = `${sizeStr}-${tableType}-${rowIndex}-${colIndex}`;
-                  // Always initialize with 0, not previous values
-                  newValues[cellKey] = { decimal: 0, fraction: '0' };
+                  const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
+                  // Only initialize if not already set
+                  if (!newValues[cellKey]) {
+                    newValues[cellKey] = { decimal: 0, fraction: '0' };
+                  }
                 }
               }
             });
@@ -739,16 +730,18 @@ const addSize = (size) => {
             }));
             patternApplied = true;
 
-            // Initialize measurement values for selected rows with 0 values
+            // Initialize measurement values for selected rows only if they don't exist
             setMeasurementValues((prevValues) => {
               const newValues = { ...prevValues };
 
               mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
                 if (isSelected) {
                   for (let colIndex = 0; colIndex < 3; colIndex++) {
-                    const cellKey = `${sizeStr}-${tableType}-${rowIndex}-${colIndex}`;
-                    // Always initialize with 0, not previous values
-                    newValues[cellKey] = { decimal: 0, fraction: "0" };
+                    const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
+                    // Only initialize if not already set
+                    if (!newValues[cellKey]) {
+                      newValues[cellKey] = { decimal: 0, fraction: "0" };
+                    }
                   }
                 }
               });
@@ -798,7 +791,7 @@ const removeSize = (size) => {
   setMeasurementValues(prev => {
     const newValues = { ...prev };
     Object.keys(newValues).forEach(key => {
-      if (key.startsWith(`${size}-before-`) || key.startsWith(`${size}-after-`)) {
+      if (key.includes(`${size}-before-`) || key.includes(`${size}-after-`)) {
         delete newValues[key];
       }
     });
@@ -831,7 +824,8 @@ const removeSize = (size) => {
         setMeasurementValues(prevValues => {
           const newValues = { ...prevValues };
           specs.forEach((spec, specIndex) => {
-            const cellKey = `${size}-${tableType}-${specIndex}-${columnIndex}`;
+            const currentKValue = getKValueForSize(size, tableType);
+            const cellKey = `${size}-${tableType}-${currentKValue}-${specIndex}-${columnIndex}`;
             if (!newValues[cellKey]) {
               newValues[cellKey] = { decimal: 0, fraction: '0' };
             }
@@ -871,9 +865,12 @@ const removeSize = (size) => {
       setMeasurementValues(prevValues => {
         const newValues = { ...prevValues };
         for (let i = 0; i < qty; i++) {
-          const cellKey = `${size}-${tableType}-${rowIndex}-${i}`;
-          // Always initialize with 0
-          newValues[cellKey] = { decimal: 0, fraction: '0' };
+          const currentKValue = getKValueForSize(size, tableType);
+          const cellKey = `${size}-${tableType}-${currentKValue}-${rowIndex}-${i}`;
+          // Initialize with proper values if not already set
+          if (!newValues[cellKey]) {
+            newValues[cellKey] = { decimal: 0, fraction: '0' };
+          }
         }
         return newValues;
       });
@@ -1069,8 +1066,10 @@ const removeSize = (size) => {
                           {specs !== '-' ? specs : '-'}
                         </td>
                         {[...Array(qty)].map((_, i) => {
-                          const cellKey = `${size}-before-${index}-${i}`;
+                          const currentKValue = getKValueForSize(size, 'before');
+                          const cellKey = `${size}-before-${currentKValue}-${index}-${i}`;
                           const value = measurementValues[cellKey];
+                        
                           const isFull = fullColumnsBySize[size]?.[i] === true;
                           const isRowSelected = selectedRowsBySize[size]?.[index] === true;
                           const isEnabled = isFull || isRowSelected;
@@ -1257,8 +1256,11 @@ const removeSize = (size) => {
                             {specs !== '-' ? specs : '-'}
                           </td>
                           {[...Array(qty)].map((_, i) => {
-                            const cellKey = `${size}-after-${index}-${i}`;
+                            const currentKValue = getKValueForSize(size, 'after');
+                            const cellKey = `${size}-after-${currentKValue}-${index}-${i}`;
                             const value = measurementValues[cellKey];
+                          
+                            
                             const isFull = fullColumnsBySize[size]?.[i] === true;
                             const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
                             const isEnabled = isFull || isRowSelected;
@@ -1599,8 +1601,9 @@ const removeSize = (size) => {
                                 const isFull = isFullColumnChecked[pcIndex];
                                 if (isFull) {
                                   const isAnyEmpty = specsForSubmit.some((spec, specIndex) => {
-                                    const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
-                                    return !measurementValues[cellKey] || !measurementValues[cellKey].fraction;
+                                    const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
+                                    const value = measurementValues[cellKey];
+                                    return !value || (!value.fraction && value.decimal === 0);
                                   });
                                   if (isAnyEmpty) {
                                     validationErrors.push(`You must fill all the measurement points in "pcs ${pcIndex + 1}".`);
@@ -1608,8 +1611,9 @@ const removeSize = (size) => {
                                 } else {
                                   specsForSubmit.forEach((spec, specIndex) => {
                                     if (isRowSelected[specIndex]) {
-                                      const cellKey = `${size}-${tableType}-${specIndex}-${pcIndex}`;
-                                      if (!measurementValues[cellKey] || !measurementValues[cellKey].fraction) {
+                                      const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
+                                      const value = measurementValues[cellKey];
+                                      if (!value || (!value.fraction && value.decimal === 0)) {
                                         validationErrors.push(`Piece ${pcIndex + 1}: Measurement for selected row "${spec.MeasurementPointEngName}" is required.`);
                                       }
                                     }
@@ -1638,7 +1642,6 @@ const removeSize = (size) => {
                                 before_after_wash,
                                 isEditing // Pass editing flag
                               );
-                              
                               // Save the pattern for future use
                               saveMeasurementPattern(size, selectedRowsBySize[size], tableType);
                               onSizeSubmit(transformedData);
@@ -1670,7 +1673,7 @@ const removeSize = (size) => {
                               setMeasurementValues(prev => {
                                 const newValues = { ...prev };
                                 Object.keys(newValues).forEach(key => {
-                                  if (key.startsWith(`${size}-before-`) || key.startsWith(`${size}-after-`)) {
+                                  if (key.startsWith(`${size}-${tableType}-${kvalue}-`)) {
                                     delete newValues[key];
                                   }
                                 });
@@ -1706,7 +1709,8 @@ const removeSize = (size) => {
         onClose={() => setShowNumPad(false)}
         onInput={(decimalValue, fractionValue) => {
           const { size, table, rowIndex, colIndex } = currentCell;
-          const cellKey = `${size}-${table}-${rowIndex}-${colIndex}`;
+          const currentKValue = getKValueForSize(size, table);
+          const cellKey = `${size}-${table}-${currentKValue}-${rowIndex}-${colIndex}`;
           setMeasurementValues(prev => ({
             ...prev,
             [cellKey]: { decimal: decimalValue, fraction: fractionValue }

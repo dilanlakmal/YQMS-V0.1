@@ -105,7 +105,23 @@ const QCWashingSchema = new mongoose.Schema({
       },
       time: {
         actualValue: Number,
-        standardValue: Number,
+        standardValue:String,
+        status: {
+          ok: { type: Boolean, default: false },
+          no: { type: Boolean, default: false }
+        }
+      },
+      timeCool: {
+        actualValue: Number,
+        standardValue: String,
+        status: {
+          ok: { type: Boolean, default: false },
+          no: { type: Boolean, default: false }
+        }
+      },
+      timeHot: {
+        actualValue: Number,
+        standardValue: String,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
