@@ -227,12 +227,20 @@ function calculateSummaryData(currentFormData) {
 function machineProcessesToObject(machineProcesses) {
   const obj = {};
   (machineProcesses || []).forEach((proc) => {
-    obj[proc.machineType] = {
-      temperature: proc.temperature || "",
-      time: proc.time || "",
-      silicon: proc.silicon || "",
-      softener: proc.softener || ""
-    };
+    if (proc.machineType === "Washing Machine") {
+      obj[proc.machineType] = {
+        temperature: proc.temperature || "",
+        time: proc.time || "",
+        silicon: proc.silicon || "",
+        softener: proc.softener || ""
+      };
+    } else if (proc.machineType === "Tumble Dry") {
+      obj[proc.machineType] = {
+        temperature: proc.temperature || "",
+        timeCool: proc.timeCool || "",
+        timeHot: proc.timeHot || ""
+      };
+    }
   });
   return obj;
 }
@@ -369,7 +377,7 @@ const QCWashingPage = () => {
   const [inspectionData, setInspectionData] = useState([]);
   const [processData, setProcessData] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", time: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
   });
   const defaultDefectData = [
     {
@@ -457,12 +465,12 @@ const QCWashingPage = () => {
 
   const [standardValues, setStandardValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", time: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
   });
 
   const [actualValues, setActualValues] = useState({
     "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
-    "Tumble Dry": { temperature: "", time: "" }
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
   });
 
   const [machineStatus, setMachineStatus] = useState({
@@ -474,7 +482,8 @@ const QCWashingPage = () => {
     },
     "Tumble Dry": {
       temperature: { ok: true, no: false },
-      time: { ok: true, no: false }
+      timeCool: { ok: true, no: false },
+      timeHot: { ok: true, no: false }
     }
   });
 
@@ -1095,7 +1104,7 @@ const QCWashingPage = () => {
           const parameters =
             machineType === "Washing Machine"
               ? ["temperature", "time", "silicon", "softener"]
-              : ["temperature", "time"];
+              : ["temperature", "timeCool", "timeHot"];
 
           parameters.forEach((param) => {
             if (machine[param]) {
@@ -1149,7 +1158,7 @@ const QCWashingPage = () => {
             silicon: "",
             softener: ""
           },
-          "Tumble Dry": { temperature: "", time: "" }
+          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
         });
         setActualValues({
           "Washing Machine": {
@@ -1158,7 +1167,7 @@ const QCWashingPage = () => {
             silicon: "",
             softener: ""
           },
-          "Tumble Dry": { temperature: "", time: "" }
+          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
         });
         setMachineStatus({
           "Washing Machine": {
@@ -1169,7 +1178,8 @@ const QCWashingPage = () => {
           },
           "Tumble Dry": {
             temperature: { ok: true, no: false },
-            time: { ok: true, no: false }
+            timeCool: { ok: true, no: false },
+            timeHot: { ok: true, no: false }
           }
         });
       }
@@ -1854,7 +1864,7 @@ const QCWashingPage = () => {
         silicon: "",
         softener: ""
       },
-      "Tumble Dry": { temperature: "", time: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
     });
     setDefectData(normalizeDefectData(defaultDefectData));
     setAddedDefects([]);
@@ -1888,7 +1898,7 @@ const QCWashingPage = () => {
         silicon: "",
         softener: ""
       },
-      "Tumble Dry": { temperature: "", time: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
     });
     setActualValues({
       "Washing Machine": {
@@ -1897,7 +1907,7 @@ const QCWashingPage = () => {
         silicon: "",
         softener: ""
       },
-      "Tumble Dry": { temperature: "", time: "" }
+      "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
     });
     setMachineStatus({
       "Washing Machine": {
@@ -1908,7 +1918,8 @@ const QCWashingPage = () => {
       },
       "Tumble Dry": {
         temperature: { ok: true, no: false },
-        time: { ok: true, no: false }
+        timeCool: { ok: true, no: false },
+        timeHot: { ok: true, no: false }
       }
     });
 

@@ -38,7 +38,9 @@ const machineTypes = [
     label: "Tumble Dry",
     parameters: [
       { key: "temperature", label: "Temp", unit: "°C" },
-      { key: "time", label: "Time", unit: "min" }
+      // { key: "time", label: "Time", unit: "min" }
+      { key: "timeCool", label: "Time Cool", unit: "min" },
+      { key: "timeHot", label: "Time Hot", unit: "min" }
     ]
   }
 ];
@@ -94,7 +96,12 @@ const InspectionDataSection = ({
               silicon: "",
               softener: ""
             };
-            const tumbleDryDefaults = { temperature: "", time: "" };
+            //  const tumbleDryDefaults = { temperature: "", time: "" };
+            const tumbleDryDefaults = {
+              temperature: "",
+              timeCool: "",
+              timeHot: ""
+            };
 
             const washingMachineValues = {
               ...washingMachineDefaults,
@@ -278,7 +285,8 @@ const InspectionDataSection = ({
           },
           "Tumble Dry": {
             temperature: { ok: true, no: false },
-            time: { ok: true, no: false }
+            timeCool: { ok: true, no: false },
+            timeHot: { ok: true, no: false }
           }
         });
       }
@@ -439,6 +447,36 @@ const InspectionDataSection = ({
     }
   };
 
+  // Helper function to evaluate string expressions like "(40+10)"
+  const evaluateExpression = (expression) => {
+    if (!expression || typeof expression !== "string") return null;
+
+    try {
+      // Remove spaces and check if it's a simple number
+      const cleaned = expression.trim();
+      if (/^\d+(\.\d+)?$/.test(cleaned)) {
+        return parseFloat(cleaned);
+      }
+
+      // Check if it's a parenthetical expression like (40+10)
+      const match = cleaned.match(/^\(([^)]+)\)$/);
+      if (match) {
+        const innerExpression = match[1];
+        // Simple evaluation for basic arithmetic (only + and - for safety)
+        if (/^[\d+\-\s\.]+$/.test(innerExpression)) {
+          // Replace spaces and evaluate
+          const sanitized = innerExpression.replace(/\s/g, "");
+          // Use Function constructor for safe evaluation of simple arithmetic
+          return Function('"use strict"; return (' + sanitized + ")")();
+        }
+      }
+
+      return null;
+    } catch (error) {
+      return null;
+    }
+  };
+
   const handleActualValueChange = (machineType, param, value) => {
     // Update the actual value - keep 0 as "0" string, not empty
     const processedValue = value === 0 || value === "0" ? "0" : value;
@@ -459,16 +497,32 @@ const InspectionDataSection = ({
     const actualStr =
       value === null || value === undefined ? "" : String(value).trim();
 
-    // Special handling for temperature parameter
-    if (param === "temperature" && actualStr !== "" && standardStr !== "") {
+    // Special handling for parameters that need ±5 tolerance (temperature, timeCool, timeHot)
+    if (
+      (param === "temperature" ||
+        param === "timeCool" ||
+        param === "timeHot") &&
+      actualStr !== "" &&
+      standardStr !== ""
+    ) {
       const standardNum = parseFloat(standardStr);
-      const actualNum = parseFloat(actualStr);
+      let actualNum;
+
+      // For time parameters, evaluate expressions like "(40+10)"
+      if (param === "timeCool" || param === "timeHot") {
+        actualNum = evaluateExpression(actualStr);
+        if (actualNum === null) {
+          actualNum = parseFloat(actualStr);
+        }
+      } else {
+        actualNum = parseFloat(actualStr);
+      }
 
       // Check if both values are valid numbers
       if (!isNaN(standardNum) && !isNaN(actualNum)) {
         const difference = Math.abs(standardNum - actualNum);
 
-        // If temperature difference is within 5 degrees, consider it OK
+        // If difference is within 5 units, consider it OK
         if (difference <= 5) {
           setMachineStatus((prev) => ({
             ...prev,
@@ -481,7 +535,7 @@ const InspectionDataSection = ({
             }
           }));
         } else {
-          // Temperature difference is more than 5 degrees
+          // Difference is more than 5 units
           setMachineStatus((prev) => ({
             ...prev,
             [machineType]: {
@@ -493,7 +547,7 @@ const InspectionDataSection = ({
             }
           }));
         }
-        return; // Exit early for temperature
+        return; // Exit early for tolerance-based parameters
       }
     }
 
@@ -1388,6 +1442,12 @@ const InspectionDataSection = ({
                               )}
                               {param.key === "softener" && (
                                 <FaTint className="text-pink-500" />
+                              )}
+                              {param.key === "timeCool" && (
+                                <FaClock className="text-cyan-500" />
+                              )}
+                              {param.key === "timeHot" && (
+                                <FaClock className="text-red-500" />
                               )}
                               <span className="font-medium dark:text-white">
                                 {param.label}

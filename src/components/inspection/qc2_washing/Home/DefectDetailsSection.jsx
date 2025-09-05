@@ -41,9 +41,13 @@ const DefectDetailsSection = ({
   normalizeImageSrc
 }) => {
   const imageInputRef = useRef(null);
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
   const { i18n } = useTranslation();
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [stream, setStream] = useState(null);
   const aql = formData.aql && formData.aql[0];
   // console.log("AQL array in DefectDetailsSection:", formData.aql);
 
@@ -259,6 +263,137 @@ const DefectDetailsSection = ({
     }));
   };
 
+  const startCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }
+      });
+      setStream(mediaStream);
+      setIsCapturing(true);
+
+      const result = await Swal.fire({
+        title: "Camera Active",
+        html: `
+          <video id="camera-video" autoplay playsinline style="width: 100%; max-width: 400px; border-radius: 8px;"></video>
+          <canvas id="camera-canvas" style="display: none;"></canvas>
+        `,
+        showCancelButton: true,
+        confirmButtonText: "Capture Photo",
+        cancelButtonText: "Close Camera",
+        allowOutsideClick: false,
+        didOpen: () => {
+          const video = document.getElementById("camera-video");
+          if (video && mediaStream) {
+            video.srcObject = mediaStream;
+          }
+        },
+        preConfirm: async () => {
+          return await capturePhoto();
+        }
+      });
+
+      stopCamera();
+
+      if (result.isConfirmed && result.value) {
+        return result.value;
+      }
+      return null;
+    } catch (error) {
+      console.error("Camera access failed:", error);
+      Swal.fire(
+        "Error",
+        "Unable to access camera. Please check permissions.",
+        "error"
+      );
+      return null;
+    }
+  };
+
+  const capturePhoto = async () => {
+    const video = document.getElementById("camera-video");
+    const canvas = document.getElementById("camera-canvas");
+
+    if (video && canvas && video.videoWidth > 0) {
+      const context = canvas.getContext("2d");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0);
+
+      return new Promise((resolve) => {
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const file = new File([blob], `captured-${Date.now()}.jpg`, {
+                type: "image/jpeg"
+              });
+              const preview = URL.createObjectURL(blob);
+              resolve({ file, preview, name: file.name });
+            } else {
+              resolve(null);
+            }
+          },
+          "image/jpeg",
+          0.8
+        );
+      });
+    }
+    return Promise.resolve(null);
+  };
+
+  const stopCamera = () => {
+    if (stream) {
+      stream.getTracks().forEach((track) => track.stop());
+      setStream(null);
+    }
+    setIsCapturing(false);
+  };
+
+  const handleDefectCapture = async (pc, defectId) => {
+    try {
+      const capturedImage = await startCamera();
+      if (capturedImage) {
+        setDefectsByPc((prev) => ({
+          ...prev,
+          [pc]: prev[pc].map((d) =>
+            d.id === defectId
+              ? {
+                  ...d,
+                  defectImages: [...(d.defectImages || []), capturedImage]
+                }
+              : d
+          )
+        }));
+        Swal.fire({
+          icon: "success",
+          title: "Image captured successfully!",
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
+    } catch (error) {
+      console.error("Capture failed:", error);
+      Swal.fire("Error", "Failed to capture image", "error");
+    }
+  };
+
+  const handleAdditionalCapture = async () => {
+    try {
+      const capturedImage = await startCamera();
+      if (capturedImage) {
+        setUploadedImages((prev) => [...prev, capturedImage]);
+        Swal.fire({
+          icon: "success",
+          title: "Image captured successfully!",
+          timer: 1500,
+          showConfirmButton: false
+        });
+      }
+    } catch (error) {
+      console.error("Capture failed:", error);
+      Swal.fire("Error", "Failed to capture image", "error");
+    }
+  };
+
   function stripFileFromDefectImages(defectsByPc, uploadedImages) {
     const newDefectsByPc = {};
     Object.entries(defectsByPc).forEach(([pc, pcDefects]) => {
@@ -293,6 +428,27 @@ const DefectDetailsSection = ({
       Swal.fire("Order details must be saved first!", "", "warning");
       return;
     }
+
+    // Validate defect names are selected
+    const missingDefects = [];
+    Object.entries(defectsByPc).forEach(([pc, pcDefects]) => {
+      pcDefects.forEach((defect, index) => {
+        if (!defect.selectedDefect || defect.selectedDefect === "") {
+          missingDefects.push(`PC ${pc} - Defect ${index + 1}`);
+        }
+      });
+    });
+
+    if (missingDefects.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please select defect names",
+        text: `Missing defect names for: ${missingDefects.join(", ")}`,
+        confirmButtonText: "OK"
+      });
+      return;
+    }
+
     try {
       // 1. Build defectDetails object
       const defectDetails = {
@@ -463,6 +619,27 @@ const DefectDetailsSection = ({
       Swal.fire("Order details must be saved first!", "", "warning");
       return;
     }
+
+    // Validate defect names are selected
+    const missingDefects = [];
+    Object.entries(defectsByPc).forEach(([pc, pcDefects]) => {
+      pcDefects.forEach((defect, index) => {
+        if (!defect.selectedDefect || defect.selectedDefect === "") {
+          missingDefects.push(`PC ${pc} - Defect ${index + 1}`);
+        }
+      });
+    });
+
+    if (missingDefects.length > 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please select defect names",
+        text: `Missing defect names for: ${missingDefects.join(", ")}`,
+        confirmButtonText: "OK"
+      });
+      return;
+    }
+
     try {
       // Same logic as save, but for update
       const defectDetails = {
@@ -910,7 +1087,9 @@ const DefectDetailsSection = ({
                                 disabled={!isEditing}
                               />
                               <button
-                                // onClick={capture}
+                                onClick={() =>
+                                  handleDefectCapture(pc, defect.id)
+                                }
                                 disabled={!isEditing}
                                 className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300 disabled:bg-gray-200 disabled:dark:bg-gray-500"
                               >
@@ -1026,7 +1205,7 @@ const DefectDetailsSection = ({
               />
               <button
                 disabled={!isEditing}
-                // onClick={capture}
+                onClick={handleAdditionalCapture}
                 className="flex items-center px-4 py-2 bg-blue-200 rounded-md hover:bg-blue-300 disabled:bg-gray-200 disabled:dark:bg-gray-500"
               >
                 <Camera size={18} className="mr-2" />

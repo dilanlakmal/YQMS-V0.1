@@ -21,7 +21,9 @@ const MachineStandardSchema = new mongoose.Schema(
     },
     tumbleDry: {
       temperature: Number,
-      time: Number
+      //  time: Number,
+      timeCool: Number,
+      timeHot: Number
     }
   },
   { timestamps: true }

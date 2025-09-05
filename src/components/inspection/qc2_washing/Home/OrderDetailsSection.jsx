@@ -408,7 +408,8 @@ const OrderDetailsSection = ({
         },
         "Tumble Dry": {
           temperature: { ok: true, no: false },
-          time: { ok: true, no: false }
+          timeCool: { ok: true, no: false },
+          timeHot: { ok: true, no: false }
         }
       };
 
@@ -420,7 +421,7 @@ const OrderDetailsSection = ({
           silicon: "",
           softener: ""
         },
-        "Tumble Dry": { temperature: "", time: "" }
+        "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
       };
 
       let defaultActualValues = {
@@ -430,7 +431,7 @@ const OrderDetailsSection = ({
           silicon: "",
           softener: ""
         },
-        "Tumble Dry": { temperature: "", time: "" }
+        "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
       };
 
       // Fetch standard values for the wash type
@@ -470,10 +471,14 @@ const OrderDetailsSection = ({
                   standardRecord.tumbleDry?.temperature === 0
                     ? "0"
                     : String(standardRecord.tumbleDry?.temperature || ""),
-                time:
-                  standardRecord.tumbleDry?.time === 0
+                timeCool:
+                  standardRecord.tumbleDry?.timeCool === 0
                     ? "0"
-                    : String(standardRecord.tumbleDry?.time || "")
+                    : String(standardRecord.tumbleDry?.timeCool || ""),
+                timeHot:
+                  standardRecord.tumbleDry?.timeHot === 0
+                    ? "0"
+                    : String(standardRecord.tumbleDry?.timeHot || "")
               }
             };
 
