@@ -604,7 +604,7 @@ const processImageToBase64 = async (imagePath) => {
   }, []);
 
   // Cross-filtering function with proper cumulative filtering
-  const applyFilters = (filters) => {
+  const applyFilters = (filters, resetPage = true) => {
     let filtered = [...submittedData];
 
     // Date range filter
@@ -670,7 +670,9 @@ const processImageToBase64 = async (imagePath) => {
     }
 
     setFilteredData(filtered);
-    setCurrentPage(1); // Reset to first page when filters change
+    if (resetPage) {
+      setCurrentPage(1); // Reset to first page only when filters change
+    }
   };
 
   // Handle filter changes
@@ -689,7 +691,7 @@ const processImageToBase64 = async (imagePath) => {
   // Update filtered data when original data changes
   useEffect(() => {
     if (currentFilters) {
-      applyFilters(currentFilters);
+      applyFilters(currentFilters, false); // Don't reset page when data refreshes
     } else {
       setFilteredData(submittedData);
     }
