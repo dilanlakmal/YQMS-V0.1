@@ -25292,7 +25292,7 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
     // 3. Calculate pass rate
     const passRate = totalMeasurementPoints > 0 
       ? Number(((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1))
-      : 100;
+      : 0;
 
     // 4. Determine measurement result based on current data
     let measurementResult = "Pass";
