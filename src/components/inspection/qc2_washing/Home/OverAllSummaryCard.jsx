@@ -176,10 +176,10 @@ const OverAllSummaryCard = ({ summary }) => {
 
         <div className="bg-yellow-50 dark:bg-yellow-900/50 rounded-lg p-3 text-center">
           <div className="text-sm font-medium text-yellow-500 dark:text-yellow-400/80">
-            Pass Rate
+            Defect Ratio
           </div>
           <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400 mt-1">
-            {displayPassRate}%
+            {defectRatio || 0}%
           </div>
         </div>
 
