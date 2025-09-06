@@ -440,7 +440,7 @@ const InspectionDataSection = ({
     }
   };
 
-  // Helper function to evaluate string expressions like "(40+10)"
+  // Helper function to evaluate string expressions like "(40+10)" or "40 + 10"
   const evaluateExpression = (expression) => {
     if (!expression || typeof expression !== 'string') return null;
     
@@ -462,6 +462,14 @@ const InspectionDataSection = ({
           // Use Function constructor for safe evaluation of simple arithmetic
           return Function('"use strict"; return (' + sanitized + ')')();
         }
+      }
+      
+      // Check if it's a simple expression without parentheses like "40 + 10" or "40+10"
+      if (/^[\d+\-\s\.]+$/.test(cleaned)) {
+        // Replace spaces and evaluate
+        const sanitized = cleaned.replace(/\s/g, '');
+        // Use Function constructor for safe evaluation of simple arithmetic
+        return Function('"use strict"; return (' + sanitized + ')')();
       }
       
       return null;
@@ -490,20 +498,50 @@ const InspectionDataSection = ({
     const actualStr =
       value === null || value === undefined ? "" : String(value).trim();
 
-    // Special handling for parameters that need ±5 tolerance (temperature, timeCool, timeHot)
-    if ((param === "temperature" || param === "timeCool" || param === "timeHot") && actualStr !== "" && standardStr !== "") {
+    // Special handling for time parameters (timeCool, timeHot) with expression evaluation
+    if ((param === "timeCool" || param === "timeHot") && actualStr !== "" && standardStr !== "") {
       const standardNum = parseFloat(standardStr);
-      let actualNum;
+      let actualNum = evaluateExpression(actualStr);
       
-      // For time parameters, evaluate expressions like "(40+10)"
-      if (param === "timeCool" || param === "timeHot") {
-        actualNum = evaluateExpression(actualStr);
-        if (actualNum === null) {
-          actualNum = parseFloat(actualStr);
-        }
-      } else {
+      if (actualNum === null) {
         actualNum = parseFloat(actualStr);
       }
+
+      // Check if both values are valid numbers
+      if (!isNaN(standardNum) && !isNaN(actualNum)) {
+        // Compare actual calculated value with standard value
+        if (actualNum === standardNum) {
+          setMachineStatus((prev) => ({
+            ...prev,
+            [machineType]: {
+              ...prev[machineType],
+              [param]: {
+                ok: true,
+                no: false
+              }
+            }
+          }));
+        } else {
+          // If values don't match exactly, set to "no"
+          setMachineStatus((prev) => ({
+            ...prev,
+            [machineType]: {
+              ...prev[machineType],
+              [param]: {
+                ok: false,
+                no: true
+              }
+            }
+          }));
+        }
+        return; // Exit early for time parameters
+      }
+    }
+
+    // Special handling for temperature with ±5 tolerance
+    if (param === "temperature" && actualStr !== "" && standardStr !== "") {
+      const standardNum = parseFloat(standardStr);
+      const actualNum = parseFloat(actualStr);
 
       // Check if both values are valid numbers
       if (!isNaN(standardNum) && !isNaN(actualNum)) {
@@ -534,7 +572,7 @@ const InspectionDataSection = ({
             }
           }));
         }
-        return; // Exit early for tolerance-based parameters
+        return; // Exit early for temperature parameter
       }
     }
 
