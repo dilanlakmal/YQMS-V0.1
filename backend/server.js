@@ -31783,6 +31783,160 @@ app.delete("/api/subcon-defects-manage/:id", async (req, res) => {
   }
 });
 
+/* ------------------------------------------------------------------
+   End Point - Sub-Con QC Dashboard
+------------------------------------------------------------------ */
+
+app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
+  try {
+    const { startDate, endDate, factory, lineNo, moNo, color } = req.query;
+
+    const matchQuery = {};
+    if (startDate && endDate) {
+      matchQuery.inspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (factory) matchQuery.factory = factory;
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (moNo) matchQuery.moNo = moNo;
+    if (color) matchQuery.color = color;
+
+    const result = await SubconSewingQc1Report.aggregate([
+      { $match: matchQuery },
+      {
+        $facet: {
+          // --- 1. Main Table Data: Raw reports, sorted correctly ---
+          mainData: [
+            // First, add a field for the defect rate so we can sort by it
+            {
+              $addFields: {
+                defectRate: {
+                  $cond: [
+                    { $gt: ["$checkedQty", 0] }, // If checkedQty is greater than 0
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefectQty", "$checkedQty"] },
+                        100
+                      ]
+                    }, // then calculate rate
+                    0 // else, rate is 0
+                  ]
+                }
+              }
+            },
+            // Now, apply the requested sorting
+            {
+              $sort: {
+                inspectionDate: 1, // Ascending by date
+                defectRate: -1 // Descending by the newly calculated defect rate
+              }
+            }
+          ],
+
+          // --- 2. Top N Defects Calculation ---
+          topDefects: [
+            { $unwind: "$defectList" },
+            {
+              $group: {
+                _id: "$defectList.defectName",
+                totalQty: { $sum: "$defectList.qty" }
+              }
+            },
+            { $sort: { totalQty: -1 } }
+            // We get total checked qty in another stage
+          ],
+
+          // --- 3. Defect Rate by Line Calculation ---
+          linePerformance: [
+            {
+              $group: {
+                _id: { factory: "$factory", lineNo: "$lineNo" },
+                totalChecked: { $sum: "$checkedQty" },
+                totalDefects: { $sum: "$totalDefectQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                factory: "$_id.factory",
+                lineNo: "$_id.lineNo",
+                defectRate: {
+                  $cond: [
+                    { $eq: ["$totalChecked", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefects", "$totalChecked"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $sort: { factory: 1, lineNo: 1 } }
+          ],
+
+          // --- 4. Overall Totals for Rate Calculations ---
+          overallTotalChecked: [
+            { $group: { _id: null, total: { $sum: "$checkedQty" } } }
+          ],
+
+          // --- 5. Filter Options for Dropdowns ---
+          filterOptions: [
+            {
+              $group: {
+                _id: null,
+                factories: { $addToSet: "$factory" },
+                lineNos: { $addToSet: "$lineNo" },
+                moNos: { $addToSet: "$moNo" },
+                colors: { $addToSet: "$color" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                factories: { $sortArray: { input: "$factories", sortBy: 1 } },
+                lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
+                moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
+                colors: { $sortArray: { input: "$colors", sortBy: 1 } }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
+    // --- Reshape Data for Frontend ---
+    const rawData = result[0];
+    const totalChecked = rawData.overallTotalChecked[0]?.total || 0;
+
+    // Manually calculate rates for top defects
+    const topDefectsWithRate = rawData.topDefects.map((d) => ({
+      defectName: d._id,
+      defectQty: d.totalQty,
+      defectRate: totalChecked > 0 ? (d.totalQty / totalChecked) * 100 : 0
+    }));
+
+    res.json({
+      mainData: rawData.mainData || [],
+      topDefects: topDefectsWithRate || [],
+      linePerformance: rawData.linePerformance || [],
+      filterOptions: rawData.filterOptions[0] || {
+        factories: [],
+        lineNos: [],
+        moNos: [],
+        colors: []
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching Sub-Con QC dashboard data:", error);
+    res.status(500).json({ error: "Failed to fetch dashboard data" });
+  }
+});
+
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`HTTPS Server is running on https://localhost:${PORT}`);
