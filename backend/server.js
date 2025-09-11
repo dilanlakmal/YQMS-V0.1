@@ -31372,6 +31372,9 @@ app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
   try {
     const reportData = req.body;
 
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
     // Generate a unique report ID
     const reportID = await generateSubconReportID();
 
@@ -31379,6 +31382,7 @@ app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
 
     const newReport = new SubconSewingQc1Report({
       ...reportData,
+      inspectionDate: startOfDay,
       reportID: reportID,
       buyer: buyer
     });
@@ -31408,13 +31412,15 @@ app.put("/api/subcon-sewing-qc1-reports/:id", async (req, res) => {
     const { id } = req.params;
     const reportData = req.body;
 
-    // We don't need to generate a new reportID, as we're updating.
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
     // We also re-calculate the buyer in case the MO number was somehow changed.
     const buyer = getBuyerFromMoNumber(reportData.moNo);
 
     const updatedReport = await SubconSewingQc1Report.findByIdAndUpdate(
       id,
-      { ...reportData, buyer: buyer },
+      { ...reportData, inspectionDate: startOfDay, buyer: buyer },
       { new: true, runValidators: true } // {new: true} returns the updated document
     );
 
