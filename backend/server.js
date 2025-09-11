@@ -92,6 +92,7 @@ import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
 import createSubConDefectsModel from "./models/sub_con_defects.js";
+import createSubconSewingQAReportModel from "./models/subconSewingQAReportSchema.js";
 import createSubconSewingFactoryModel from "./models/subcon_sewing_factory.js";
 import createSubconSewingQc1ReportModel from "./models/subcon_sewing_qc1_report.js";
 
@@ -320,6 +321,8 @@ const SubConDefect = createSubConDefectsModel(ymProdConnection);
 const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
 const SubconSewingQc1Report =
   createSubconSewingQc1ReportModel(ymProdConnection);
+
+const SubconSewingQAReport = createSubconSewingQAReportModel(ymProdConnection);
 
 const QCWashingMachineStandard =
   createQCWashingMachineStandard(ymProdConnection);
@@ -31468,6 +31471,61 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
 
     const result = await SubconSewingQc1Report.aggregate([
       { $match: matchQuery },
+      { $sort: { inspectionDate: -1, _id: -1 } },
+      // --- NEW: Join with QA reports collection using $lookup ---
+      {
+        $lookup: {
+          from: "subcon_sewing_qa_reports", // The exact name of the QA reports collection
+          let: {
+            insp_date: "$inspectionDate",
+            insp_factory: "$factory",
+            insp_line: "$lineNo",
+            insp_mo: "$moNo",
+            insp_color: "$color"
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$factory", "$$insp_factory"] },
+                    { $eq: ["$lineNo", "$$insp_line"] },
+                    { $eq: ["$moNo", "$$insp_mo"] },
+                    { $eq: ["$color", "$$insp_color"] },
+                    // Robustly match the date part only, ignoring time
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$inspectionDate",
+                            timezone: "UTC"
+                          }
+                        },
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$$insp_date",
+                            timezone: "UTC"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $limit: 1 } // Ensure only one matching QA report is returned
+          ],
+          as: "qaData" // Store the result in a temporary array 'qaData'
+        }
+      },
+      // --- NEW: Promote the matched QA report to a top-level object ---
+      {
+        $addFields: {
+          qaReport: { $arrayElemAt: ["$qaData", 0] } // Get the first (or only) item from qaData
+        }
+      },
       // Use $facet to run multiple aggregations on the filtered data in parallel
       {
         $facet: {
@@ -31480,6 +31538,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: null,
                 totalCheckedQty: { $sum: "$checkedQty" },
                 totalDefectQty: { $sum: "$totalDefectQty" },
+                totalQASampleSize: { $sum: "$qaReport.sampleSize" },
+                totalQADefectQty: { $sum: "$qaReport.totalDefectQty" },
                 allDefects: { $push: "$defectList" }
               }
             },
@@ -31490,7 +31550,9 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: "$allDefects.defectName",
                 totalQty: { $sum: "$allDefects.qty" },
                 totalCheckedQty: { $first: "$totalCheckedQty" },
-                totalDefectQty: { $first: "$totalDefectQty" }
+                totalDefectQty: { $first: "$totalDefectQty" },
+                totalQASampleSize: { $first: "$totalQASampleSize" },
+                totalQADefectQty: { $first: "$totalQADefectQty" }
               }
             },
             { $sort: { totalQty: -1 } },
@@ -31499,6 +31561,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: null,
                 totalCheckedQty: { $first: "$totalCheckedQty" },
                 totalDefectQty: { $first: "$totalDefectQty" },
+                totalQASampleSize: { $first: "$totalQASampleSize" },
+                totalQADefectQty: { $first: "$totalQADefectQty" },
                 topDefects: { $push: { defectName: "$_id", qty: "$totalQty" } }
               }
             },
@@ -31507,6 +31571,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: 0,
                 totalCheckedQty: { $ifNull: ["$totalCheckedQty", 0] },
                 totalDefectQty: { $ifNull: ["$totalDefectQty", 0] },
+                totalQASampleSize: { $ifNull: ["$totalQASampleSize", 0] },
+                totalQADefectQty: { $ifNull: ["$totalQADefectQty", 0] },
                 overallDefectRate: {
                   $cond: [
                     { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
@@ -31601,6 +31667,179 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
     res.status(500).json({ error: "Failed to fetch report data" });
   }
 });
+
+// --- NEW ENDPOINT: Get specific user info for QA ID popups ---
+app.get("/api/user-info-subcon-qa/:empId", async (req, res) => {
+  try {
+    const { empId } = req.params;
+    // --- CORRECTED: Using 'UserMain' as the model name ---
+    const user = await UserMain.findOne({ emp_id: empId }).select(
+      "emp_id eng_name face_photo job_title"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error("Error fetching user info:", error);
+    res.status(500).json({ error: "Failed to fetch user details" });
+  }
+});
+
+// app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
+//   try {
+//     const { startDate, endDate, factory, lineNo, moNo, color } = req.query;
+
+//     const matchQuery = {};
+//     if (startDate && endDate) {
+//       matchQuery.inspectionDate = {
+//         $gte: new Date(startDate),
+//         $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+//       };
+//     }
+//     if (factory) matchQuery.factory = factory;
+//     if (lineNo) matchQuery.lineNo = lineNo;
+//     if (moNo) matchQuery.moNo = moNo;
+//     if (color) matchQuery.color = color;
+
+//     // --- Main Aggregation Pipeline ---
+
+//     const result = await SubconSewingQc1Report.aggregate([
+//       { $match: matchQuery },
+//       // Use $facet to run multiple aggregations on the filtered data in parallel
+//       {
+//         $facet: {
+//           // --- 1. Get the report data for the main table ---
+//           reports: [{ $sort: { inspectionDate: -1, _id: -1 } }],
+//           // --- 2. Calculate summary statistics for the cards ---
+//           summary: [
+//             {
+//               $group: {
+//                 _id: null,
+//                 totalCheckedQty: { $sum: "$checkedQty" },
+//                 totalDefectQty: { $sum: "$totalDefectQty" },
+//                 allDefects: { $push: "$defectList" }
+//               }
+//             },
+//             { $unwind: "$allDefects" },
+//             { $unwind: "$allDefects" },
+//             {
+//               $group: {
+//                 _id: "$allDefects.defectName",
+//                 totalQty: { $sum: "$allDefects.qty" },
+//                 totalCheckedQty: { $first: "$totalCheckedQty" },
+//                 totalDefectQty: { $first: "$totalDefectQty" }
+//               }
+//             },
+//             { $sort: { totalQty: -1 } },
+//             {
+//               $group: {
+//                 _id: null,
+//                 totalCheckedQty: { $first: "$totalCheckedQty" },
+//                 totalDefectQty: { $first: "$totalDefectQty" },
+//                 topDefects: { $push: { defectName: "$_id", qty: "$totalQty" } }
+//               }
+//             },
+//             {
+//               $project: {
+//                 _id: 0,
+//                 totalCheckedQty: { $ifNull: ["$totalCheckedQty", 0] },
+//                 totalDefectQty: { $ifNull: ["$totalDefectQty", 0] },
+//                 overallDefectRate: {
+//                   $cond: [
+//                     { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
+//                     0,
+//                     {
+//                       $multiply: [
+//                         { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+//                         100
+//                       ]
+//                     }
+//                   ]
+//                 },
+//                 topDefects: {
+//                   $map: {
+//                     input: { $slice: ["$topDefects", 3] },
+//                     as: "d",
+//                     in: {
+//                       name: "$$d.defectName",
+//                       qty: "$$d.qty",
+//                       rate: {
+//                         $cond: [
+//                           { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
+//                           0,
+//                           {
+//                             $multiply: [
+//                               { $divide: ["$$d.qty", "$totalCheckedQty"] },
+//                               100
+//                             ]
+//                           }
+//                         ]
+//                       }
+//                     }
+//                   }
+//                 }
+//               }
+//             }
+//           ],
+//           // --- 3. Get available options for cascading filters ---
+//           filterOptions: [
+//             {
+//               $group: {
+//                 _id: null,
+//                 factories: { $addToSet: "$factory" },
+//                 lineNos: { $addToSet: "$lineNo" },
+//                 moNos: { $addToSet: "$moNo" },
+//                 colors: { $addToSet: "$color" }
+//               }
+//             },
+//             {
+//               $project: {
+//                 _id: 0,
+//                 factories: { $sortArray: { input: "$factories", sortBy: 1 } },
+//                 lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
+//                 moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
+//                 colors: { $sortArray: { input: "$colors", sortBy: 1 } }
+//               }
+//             }
+//           ]
+//         }
+//       },
+//       // --- Reshape the final output ---
+//       {
+//         $project: {
+//           reports: "$reports",
+//           summary: { $arrayElemAt: ["$summary", 0] },
+//           filterOptions: { $arrayElemAt: ["$filterOptions", 0] }
+//         }
+//       }
+//     ]);
+
+//     // --- GUARANTEE A SAFE RESPONSE STRUCTURE ---
+//     const rawData = result[0];
+//     const responseData = {
+//       reports: rawData?.reports || [],
+//       summary: rawData?.summary || {
+//         totalCheckedQty: 0,
+//         totalDefectQty: 0,
+//         overallDefectRate: 0,
+//         topDefects: []
+//       },
+//       filterOptions: rawData?.filterOptions || {
+//         factories: [],
+//         lineNos: [],
+//         moNos: [],
+//         colors: []
+//       }
+//     };
+
+//     res.json(responseData);
+//   } catch (error) {
+//     console.error("Error fetching Sub-Con QC report data:", error);
+//     res.status(500).json({ error: "Failed to fetch report data" });
+//   }
+// });
 
 /* ------------------------------------------------------------------
    End Points - Sub-Con QC Management (Admin Panel)
@@ -31940,6 +32179,233 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
   } catch (error) {
     console.error("Error fetching Sub-Con QC dashboard data:", error);
     res.status(500).json({ error: "Failed to fetch dashboard data" });
+  }
+});
+
+/* ----------------------------------------------------
+   End Points - NEW for Sub-Con QA Sample Data
+---------------------------------------------------- */
+
+// 1. ENDPOINT: Search for QA Standard Defects
+app.get("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const { searchTerm } = req.query;
+    if (!searchTerm) {
+      return res.json([]);
+    }
+
+    const searchNumber = parseInt(searchTerm, 10);
+    const query = isNaN(searchNumber)
+      ? { english: { $regex: searchTerm, $options: "i" } } // Search by name (case-insensitive)
+      : { code: searchNumber }; // Search by code
+
+    const defects = await QAStandardDefectsModel.find(query)
+      .limit(20)
+      .sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA standard defects:", error);
+    res.status(500).json({ error: "Failed to fetch QA defects" });
+  }
+});
+
+// 2. ENDPOINT: Image Upload for QA Module
+const qaImageStorage = multer.memoryStorage();
+const qaImageUpload = multer({
+  storage: qaImageStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+});
+
+app.post(
+  "/api/subcon-qa/upload-image",
+  qaImageUpload.single("imageFile"),
+  async (req, res) => {
+    try {
+      const { date, factory, lineNo, moNo, defectCode } = req.body;
+      const imageFile = req.file;
+
+      if (!imageFile) {
+        return res.status(400).json({ message: "No image file provided." });
+      }
+      if (!date || !factory || !lineNo || !moNo || !defectCode) {
+        return res.status(400).json({ message: "Missing required metadata." });
+      }
+
+      const uploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "sub-con-qc1"
+      );
+      await fsPromises.mkdir(uploadPath, { recursive: true });
+
+      const sanitizedFactory = sanitize(factory);
+      const sanitizedDate = sanitize(date);
+      const sanitizedLineNo = sanitize(lineNo);
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedDefectCode = sanitize(defectCode);
+
+      const imagePrefix = `QA_${sanitizedDate}_${sanitizedFactory}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedDefectCode}_`;
+
+      const filesInDir = await fsPromises.readdir(uploadPath);
+      const existingImageCount = filesInDir.filter((f) =>
+        f.startsWith(imagePrefix)
+      ).length;
+      const imageIndex = existingImageCount + 1;
+
+      const newFilename = `${imagePrefix}${imageIndex}.webp`;
+      const finalDiskPath = path.join(uploadPath, newFilename);
+
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
+
+      // Use your API_BASE_URL from your config
+      const publicUrl = `${process.env.API_BASE_URL}/storage/sub-con-qc1/${newFilename}`;
+
+      res.json({ success: true, filePath: publicUrl });
+    } catch (error) {
+      console.error("Error in QA image upload:", error);
+      res
+        .status(500)
+        .json({ message: "Server error during image processing." });
+    }
+  }
+);
+
+// Helper function to generate a unique Report ID for QA
+const generateSubconQAReportID = async () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+  let reportID = `SQA${year}${month}${day}${randomPart}`;
+
+  let existingReport = await SubconSewingQAReport.findOne({ reportID });
+  while (existingReport) {
+    const newRandomPart = Math.floor(1000 + Math.random() * 9000).toString();
+    reportID = `SQA${year}${month}${day}${newRandomPart}`;
+    existingReport = await SubconSewingQAReport.findOne({ reportID });
+  }
+  return reportID;
+};
+
+// 3. ENDPOINT: Save a new QA Sample Report
+app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
+  try {
+    const reportData = req.body;
+
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const reportID = await generateSubconQAReportID();
+    const buyer = getBuyerFromMoNumber(reportData.moNo); // Assuming you have this helper function
+
+    const newReport = new SubconSewingQAReport({
+      ...reportData,
+      inspectionDate: startOfDay,
+      reportID: reportID,
+      buyer: buyer
+    });
+
+    await newReport.save();
+
+    res.status(201).json({
+      message: "QA Report saved successfully!",
+      reportID: reportID
+    });
+  } catch (error) {
+    console.error("Error saving Sub-Con QA report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to save QA report" });
+  }
+});
+
+/* -----------------------------------------------------------
+   End Points - ADDITIONS for Sub-Con QA Sample Data (Find & Update)
+----------------------------------------------------------- */
+
+// 4. ENDPOINT: Find a specific QA report to check for existence/edit
+app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
+  try {
+    const { inspectionDate, factory, lineNo, moNo, color } = req.query;
+
+    if (!inspectionDate || !factory || !lineNo || !moNo || !color) {
+      return res
+        .status(400)
+        .json({ error: "Missing required search parameters." });
+    }
+
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const report = await SubconSewingQAReport.findOne({
+      factory,
+      lineNo,
+      moNo,
+      color,
+      inspectionDate: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    });
+
+    // If a report is found, send it. Otherwise, `report` will be null.
+    res.json(report);
+  } catch (error) {
+    console.error("Error finding Sub-Con QA report:", error);
+    res.status(500).json({ error: "Failed to find QA report" });
+  }
+});
+
+// 5. ENDPOINT: Update an existing QA report by its ID
+app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reportData = req.body;
+
+    // Always normalize the inspection date to the start of the day
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const buyer = getBuyerFromMoNumber(reportData.moNo);
+
+    const updatedReport = await SubconSewingQAReport.findByIdAndUpdate(
+      id,
+      { ...reportData, inspectionDate: startOfDay, buyer: buyer },
+      { new: true, runValidators: true } // Return the updated document
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({ error: "QA Report not found." });
+    }
+
+    res.json({
+      message: "QA Report updated successfully!",
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error("Error updating Sub-Con QA report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to update QA report" });
   }
 });
 
