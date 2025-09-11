@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import SubConQCInspection from "../components/inspection/sub-con-qc1/SubConQCInspection";
 import SubConQCReport from "../components/inspection/sub-con-qc1/SubConQCReport";
+import SubConQCDashboard from "../components/inspection/sub-con-qc1/dashboard/SubConQCDashboard";
 
 const PlaceholderComponent = ({ title }) => {
   return (
@@ -57,7 +58,7 @@ const SubConQC = () => {
         id: "dashboard",
         labelKey: "subcon.tabs.dashboard",
         icon: <LayoutDashboard size={18} />,
-        component: <PlaceholderComponent title="Dashboard" />
+        component: <SubConQCDashboard title="Dashboard" />
       }
     ],
     [inspectionState] // Dependency ensures component gets latest state

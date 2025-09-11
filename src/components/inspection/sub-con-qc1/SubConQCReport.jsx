@@ -97,28 +97,25 @@ const SubConQCReport = () => {
   });
 
   const [allDefects, setAllDefects] = useState([]);
+  const [allFactories, setAllFactories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState("qty"); // 'qty' or 'rate'
 
-  // === NEW LOGIC: Determine the user's factory based on their name ===
-
   const userFactory = useMemo(() => {
-    // Check if we have a user, a name, and a list of factories from the API
-    if (user && user.name && data.filterOptions.factories?.length > 0) {
-      // Find a factory name that matches the user's name (case-insensitive)
-      const matchedFactoryName = data.filterOptions.factories.find(
+    // Check if we have a user, a name, and our NEW master list of factories
+    if (user && user.name && allFactories.length > 0) {
+      // Find a factory name in our master list that matches the user's name
+      const matchedFactoryName = allFactories.find(
         (f) => f.toLowerCase() === user.name.toLowerCase()
       );
 
-      // If a match is found, return it in the format react-select expects
       if (matchedFactoryName) {
         return { value: matchedFactoryName, label: matchedFactoryName };
       }
     }
-    // If no match is found, or data is not ready, return null
     return null;
-  }, [user, data.filterOptions.factories]);
+  }, [user, allFactories]); // <-- DEPENDENCY CHANGED
 
   // Fetch the master list of all defects once on component mount
   useEffect(() => {
@@ -143,6 +140,25 @@ const SubConQCReport = () => {
       handleFilterChange("factory", userFactory);
     }
   }, [userFactory, filters.factory]);
+
+  // === NEW useEffect TO FETCH ALL FACTORIES ONCE ===
+  useEffect(() => {
+    const fetchAllFactories = async () => {
+      try {
+        // This uses the same pattern as your Inspection page
+        const res = await axios.get(
+          `${API_BASE_URL}/api/subcon-sewing-factories`
+        );
+        if (Array.isArray(res.data)) {
+          // We only need the factory names for our logic
+          setAllFactories(res.data.map((f) => f.factory));
+        }
+      } catch (err) {
+        console.error("Failed to fetch master factory list", err);
+      }
+    };
+    fetchAllFactories();
+  }, []); // Empty dependency array means it runs only once
 
   // Fetch all report data based on filters
   useEffect(() => {
@@ -225,7 +241,6 @@ const SubConQCReport = () => {
   };
 
   // === NEW LOGIC: Create a conditional options list for the factory filter ===
-
   const factoryFilterOptions = useMemo(() => {
     // If the user is a factory user, the dropdown should only contain their factory
     if (userFactory) {
@@ -251,7 +266,7 @@ const SubConQCReport = () => {
     menu: (base) => ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
-      zIndex: 9999
+      zIndex: 50
     }),
     option: (base, { isFocused, isSelected }) => ({
       ...base,
@@ -293,7 +308,7 @@ const SubConQCReport = () => {
               onChange={(date) => handleFilterChange("startDate", date)}
               maxDate={filters.endDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
-              popperClassName="z-[9999]"
+              popperClassName="react-datepicker-popper-z-50"
             />
           </div>
           <div className="flex-shrink-0">
@@ -303,7 +318,7 @@ const SubConQCReport = () => {
               onChange={(date) => handleFilterChange("endDate", date)}
               minDate={filters.startDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
-              popperClassName="z-[9999]"
+              popperClassName="react-datepicker-popper-z-50"
             />
           </div>
           <div className="flex-1 min-w-[150px]">
