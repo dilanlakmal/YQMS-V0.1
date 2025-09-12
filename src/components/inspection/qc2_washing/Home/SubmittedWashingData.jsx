@@ -19,7 +19,7 @@ const SubmittedWashingDataPage = () => {
   const [itemsPerPage] = useState(10);
   const [paginatedData, setPaginatedData] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
-  const [filterVisible, setFilterVisible] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(true);
   const [showDefectColumn, setShowDefectColumn] = useState(false);
   const [showMeasurementColumn, setShowMeasurementColumn] = useState(false);
   const [viewDetailsModal, setViewDetailsModal] = useState({
@@ -911,7 +911,7 @@ const processImageToBase64 = async (imagePath) => {
                   const defectDetails = getDefectDetails(record);
                   const measurementDetails = getMeasurementDetails(record);
                   const totalDefectCount = defectDetails.reduce((sum, defect) => sum + (defect.qty || 0), 0);
-                  const defectRate = record.checkedQty > 0 ? ((totalDefectCount / record.checkedQty) * 100).toFixed(2) : "0";
+                  const defectRate = record.checkedQty > 0 ? ((totalDefectCount / record.checkedQty) * 100).toFixed(0) : "0";
                   
                   return (
                     <tr key={record._id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">

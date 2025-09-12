@@ -547,20 +547,21 @@ const SubmittedWashingDataFilter = ({
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-6 mt-6 border-t border-gray-200 dark:border-gray-700 space-y-3 sm:space-y-0">
-            <div className="text-sm text-gray-500 dark:text-gray-400">
+            {/* Reset Button */}
+            <div className="relative">
+              <label className="flex items-center text-sm font-medium text-transparent dark:text-transparent mb-2 select-none">
+                Action
+              </label>
+              <button
+                onClick={handleReset}
+                disabled={!hasActiveFilters()}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all font-medium"
+              >
+                <RotateCcw size={16} />
+                <span>Clear</span>
+              </button>
             </div>
-            <button
-              onClick={handleReset}
-              disabled={!hasActiveFilters()}
-              className="flex items-center space-x-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all font-medium"
-            >
-              <RotateCcw size={16} />
-              <span>Clear</span>
-            </button>
           </div>
         </div>
       )}
