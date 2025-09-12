@@ -50,8 +50,46 @@ const MeasurementDetailsSchema = new mongoose.Schema({
   measurement: [MeasurementSchema]
 }, { _id: false });
 
-// --- Main Schema ---
+// Sub-point Schema (nested under main checkpoint)
+const SubPointInspectionDataSchema = new mongoose.Schema({
+  id: String, // e.g., "sub_68c0fe91b40bc0ea8b112b81_1757478505863.4636"
+  subPointId: String, // e.g., "1757478505863.4636"
+  name: String, // Sub-point name (e.g., "1", "2", "3")
+  optionType: { type: String, enum: ['passfail', 'custom'] },
+  decision: String, // Selected decision (e.g., "Soft", "Dry", "Smooth", "Rough", etc.)
+  remark: String, // Remark text
+  comparisonImages: [String] // Array of image URLs
+}, { _id: false });
 
+// Main Checkpoint Inspection Data Schema (with nested sub-points)
+const CheckpointInspectionDataSchema = new mongoose.Schema({
+  id: String, // e.g., "main_68c0fe91b40bc0ea8b112b81"
+  checkpointId: String, // Reference to the checkpoint collection _id
+  name: String, // Checkpoint name (e.g., "Hand Feel")
+  optionType: { type: String, enum: ['passfail', 'custom'] },
+  decision: String, // Selected decision for main checkpoint (e.g., "Pass", "Fail")
+  remark: String, // Remark text for main checkpoint
+  comparisonImages: [String], // Array of image URLs for main checkpoint
+  failureImpact: { 
+    type: String, 
+    enum: ["customize", "any", "all", "majority"],
+    default: 'customize'
+  },
+  // Sub-points nested under main checkpoint
+  subPoints: [SubPointInspectionDataSchema]
+}, { _id: false });
+
+// Legacy checked points schema (for backward compatibility)
+// const LegacyCheckedPointSchema = new mongoose.Schema({
+//   pointName: String,
+//   decision: mongoose.Schema.Types.Mixed, // Can be boolean or string
+//   comparison: [String], // Array of image URLs
+//   remark: String,
+//   approvedDate: String,
+//   condition: String
+// }, { _id: false });
+
+// Main Schema
 const QCWashingSchema = new mongoose.Schema({
   date: { type: Date, default: Date.now },
   orderNo: { type: String, required: true },
@@ -87,72 +125,78 @@ const QCWashingSchema = new mongoose.Schema({
     empId: String
   },
   inspectionDetails: {
-    checkedPoints: [{
-      pointName: String,
-      decision:{ type: String }, 
-      comparison: [String],
-      remark: String
-    }],
-   machineProcesses: [{
+    // NEW: Nested checkpoint inspection data
+    checkpointInspectionData: [CheckpointInspectionDataSchema],
+    
+    // LEGACY: Keep for backward compatibility
+    // checkedPoints: [LegacyCheckedPointSchema],
+    
+    // Machine processes
+    machineProcesses: [{
       machineType: String,
       temperature: {
-        actualValue: Number,
-        standardValue: Number,
+        actualValue: mongoose.Schema.Types.Mixed,
+        standardValue: mongoose.Schema.Types.Mixed,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
         }
       },
       time: {
-        actualValue: String,
-        standardValue: String,
+        actualValue: mongoose.Schema.Types.Mixed,
+        standardValue: mongoose.Schema.Types.Mixed,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
         }
       },
       timeCool: {
-        actualValue: String,
-        standardValue: String,
+        actualValue: mongoose.Schema.Types.Mixed,
+        standardValue: mongoose.Schema.Types.Mixed,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
         }
       },
       timeHot: {
-        actualValue: String,
-        standardValue: String,
+        actualValue: mongoose.Schema.Types.Mixed,
+        standardValue: mongoose.Schema.Types.Mixed,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
         }
       },
       silicon: {
-        actualValue: Number,
-        standardValue: Number,
+        actualValue: mongoose.Schema.Types.Mixed,
+        standardValue: mongoose.Schema.Types.Mixed,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
         }
       },
       softener: {
-        actualValue: Number,
-        standardValue: Number,
+        actualValue: mongoose.Schema.Types.Mixed,
+        standardValue: mongoose.Schema.Types.Mixed,
         status: {
           ok: { type: Boolean, default: false },
           no: { type: Boolean, default: false }
         }
       }
     }],
-   
+    
+    // Defect analysis parameters
     parameters: [{
       parameterName: String,
       checkedQty: { type: Number, default: 0 },
       defectQty: { type: Number, default: 0 },
-      passRate: { type: Number, default: 0.00 },
+      passRate: { type: mongoose.Schema.Types.Mixed, default: 0.00 },
       result: { type: String, default: '' },
       remark: String
-    }]
+    }],
+    
+    // Machine settings
+    timeCoolEnabled: { type: Boolean, default: false },
+    timeHotEnabled: { type: Boolean, default: false }
   },
   defectDetails: {
     checkedQty: Number,
@@ -160,12 +204,13 @@ const QCWashingSchema = new mongoose.Schema({
     result: String,
     levelUsed: Number,
     defectsByPc: [{
-      pcNumber: Number,
+      pcNumber: String,
       isFullColumn: Boolean,
       pcDefects: [{
         defectId: String,
         defectName: String,
         defectQty: Number,
+        remark: String,
         defectImages: [String]
       }]
     }],
@@ -182,6 +227,12 @@ const QCWashingSchema = new mongoose.Schema({
     default: 'processing'
   }
 }, { timestamps: true });
+
+// Add indexes for better performance
+QCWashingSchema.index({ orderNo: 1, date: 1, color: 1 });
+QCWashingSchema.index({ userId: 1, createdAt: -1 });
+QCWashingSchema.index({ status: 1 });
+QCWashingSchema.index({ 'inspectionDetails.checkpointInspectionData.checkpointId': 1 });
 
 QCWashingSchema.pre('save', function(next) {
   if (this.totalCheckedPoint > 0) {

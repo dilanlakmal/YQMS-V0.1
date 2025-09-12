@@ -318,9 +318,10 @@ const handleSave = async () => {
      
       if (result.id && setRecordId) {
         setRecordId(result.id);
-        
-        // Auto-save inspection data with defaults after order is saved
-        await autoSaveInspectionData(result.id);
+         // Only auto-save inspection data if before_after_wash is "After Wash"
+        if (formData.before_after_wash === "After Wash") {
+          await autoSaveInspectionData(result.id);
+        }
       }
     } else {
       Swal.fire({
@@ -347,39 +348,98 @@ const handleSave = async () => {
   }
 };
 
-// Auto-save inspection data with default values
+// Auto-save inspection data - get ALL data from existing collection endpoint
 const autoSaveInspectionData = async (recordId) => {
   try {
-    // Create default inspection data with "OK" decisions
-    const defaultInspectionData = [
-      { checkedList: "Shade Band", decision: "ok", remark: "" },
-      { checkedList: "Hand Feel", decision: "ok", remark: "" },
-      { checkedList: "Fiber", decision: "ok", remark: "" },
-      { checkedList: "Pilling", decision: "ok", remark: "" }
-    ];
+    // Fetch ALL checkpoint data from the existing QCWashingCheckpoints collection
+    let standardInspectionData = [];
+    let checkpointInspectionData = [];
+    
+    try {
+      const checkpointResponse = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
+      const checkpointResult = await checkpointResponse.json();
+      
+      if (Array.isArray(checkpointResult)) {
+        checkpointResult.forEach(checkpoint => {
+          // ALL data from the collection goes to checkpointInspectionData
+          // Add main checkpoint
+          const defaultOption = checkpoint.options.find(opt => opt.isDefault);
+          let defaultRemark = '';
+          
+          if (defaultOption?.hasRemark && defaultOption?.remark) {
+            defaultRemark = typeof defaultOption.remark === 'object' 
+              ? defaultOption.remark.english || ''
+              : defaultOption.remark || '';
+          }
+          
+          checkpointInspectionData.push({
+            id: `main_${checkpoint._id}`,
+            checkpointId: checkpoint._id,
+            type: 'main',
+            name: checkpoint.name,
+            optionType: checkpoint.optionType,
+            options: checkpoint.options,
+            decision: defaultOption?.name || '',
+            remark: defaultRemark,
+            comparisonImages: []
+          });
+          
+          // Add subpoints
+          checkpoint.subPoints?.forEach(subPoint => {
+            const defaultSubOption = subPoint.options.find(opt => opt.isDefault);
+            let defaultSubRemark = '';
+            
+            if (defaultSubOption?.hasRemark && defaultSubOption?.remark) {
+              defaultSubRemark = typeof defaultSubOption.remark === 'object'
+                ? defaultSubOption.remark.english || ''
+                : defaultSubOption.remark || '';
+            }
+            
+            checkpointInspectionData.push({
+              id: `sub_${checkpoint._id}_${subPoint.id}`,
+              checkpointId: checkpoint._id,
+              subPointId: subPoint.id,
+              type: 'sub',
+              name: subPoint.name,
+              parentName: checkpoint.name,
+              optionType: subPoint.optionType,
+              options: subPoint.options,
+              decision: defaultSubOption?.name || '',
+              remark: defaultSubRemark,
+              comparisonImages: []
+            });
+          });
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching checkpoint data:", error);
+    }
 
-    // Create default defect data with calculated pass rate - ensure 0 values are preserved
+    // Keep standardInspectionData empty since all inspection points are now in the checkpoint collection
+    // No separate standard inspection points endpoint needed
+
+    // Create default defect data with calculated pass rate
     const washQtyNum = Number(formData.washQty) || 0;
     const defaultDefectData = [
       {
         parameter: "Color Shade 01",
-        checkedQty: washQtyNum, // Keep 0 as 0, not null
-        failedQty: 0, // Keep 0 as 0, not null
+        checkedQty: washQtyNum,
+        failedQty: 0,
         passRate: washQtyNum > 0 ? ((washQtyNum - 0) / washQtyNum * 100).toFixed(2) : "0.00",
         result: "Pass",
         remark: ""
       },
       {
         parameter: "Appearance",
-        checkedQty: washQtyNum, // Keep 0 as 0, not null
-        failedQty: 0, // Keep 0 as 0, not null
+        checkedQty: washQtyNum,
+        failedQty: 0,
         passRate: washQtyNum > 0 ? ((washQtyNum - 0) / washQtyNum * 100).toFixed(2) : "0.00",
         result: "Pass",
         remark: ""
       }
     ];
 
-    // Create default machine status with "OK" status
+    // Create default machine status with "OK" status (timeCool and timeHot disabled by default)
     const defaultMachineStatus = {
       "Washing Machine": {
         temperature: { ok: true, no: false },
@@ -389,8 +449,8 @@ const autoSaveInspectionData = async (recordId) => {
       },
       "Tumble Dry": {
         temperature: { ok: true, no: false },
-        timeCool: { ok: true, no: false },
-        timeHot: { ok: true, no: false }
+        timeCool: { ok: false, no: false },
+        timeHot: { ok: false, no: false }
       }
     };
 
@@ -425,12 +485,12 @@ const autoSaveInspectionData = async (recordId) => {
             },
             "Tumble Dry": {
               temperature: standardRecord.tumbleDry?.temperature === 0 ? "0" : String(standardRecord.tumbleDry?.temperature || ""),
-              timeCool: standardRecord.tumbleDry?.timeCool === 0 ? "0" : String(standardRecord.tumbleDry?.timeCool || ""),
-              timeHot: standardRecord.tumbleDry?.timeHot === 0 ? "0" : String(standardRecord.tumbleDry?.timeHot || "")
+              timeCool: "", // Default empty since switch is off
+              timeHot: "" // Default empty since switch is off
             }
           };
           
-          // Set actual values to standard values initially (current display values)
+          // Set actual values to standard values initially
           defaultActualValues = { ...defaultStandardValues };
         }
       }
@@ -441,12 +501,15 @@ const autoSaveInspectionData = async (recordId) => {
     // Build FormData for inspection save
     const formDataForInspection = new FormData();
     formDataForInspection.append("recordId", recordId);
-    formDataForInspection.append("inspectionData", JSON.stringify(defaultInspectionData));
+    formDataForInspection.append("inspectionData", JSON.stringify(standardInspectionData)); // Empty array
     formDataForInspection.append("processData", JSON.stringify({}));
     formDataForInspection.append("defectData", JSON.stringify(defaultDefectData));
     formDataForInspection.append("standardValues", JSON.stringify(defaultStandardValues));
     formDataForInspection.append("actualValues", JSON.stringify(defaultActualValues));
     formDataForInspection.append("machineStatus", JSON.stringify(defaultMachineStatus));
+    formDataForInspection.append("checkpointInspectionData", JSON.stringify(checkpointInspectionData)); // All from existing endpoint
+    formDataForInspection.append("timeCoolEnabled", JSON.stringify(false));
+    formDataForInspection.append("timeHotEnabled", JSON.stringify(false));
 
     // Send to backend
     const response = await fetch(`${API_BASE_URL}/api/qc-washing/inspection-save`, {
@@ -456,7 +519,7 @@ const autoSaveInspectionData = async (recordId) => {
 
     const result = await response.json();
     if (result.success) {
-      console.log("Inspection data auto-saved successfully");
+      console.log("Inspection data auto-saved successfully - all checkpoint data from existing collection");
     } else {
       console.error("Failed to auto-save inspection data:", result.message);
     }

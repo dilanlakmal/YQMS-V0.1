@@ -18,7 +18,8 @@ const MeasurementDetailsSection = ({
   showMeasurementTable = true,
   onMeasurementEdit,
   before_after_wash,
-  recordId
+  recordId,
+  formData = {}
 }) => {
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -44,8 +45,8 @@ const MeasurementDetailsSection = ({
   const [savedSizeKValueCombinations, setSavedSizeKValueCombinations] = useState([]);
   const [sizeSpecificKValues, setSizeSpecificKValues] = useState({});
   const [editingMeasurements, setEditingMeasurements] = useState(new Set());
-
   const currentWashMeasurements = (before_after_wash === 'Before Wash' ? measurementData.beforeWash : measurementData.afterWash) || [];
+  const [buyerSpecData, setBuyerSpecData] = useState(null);
 
   const saveMeasurementPattern = (size, selectedRows, tableType) => {
     const washType = tableType === 'before' ? 'beforeWash' : 'afterWash';
@@ -59,38 +60,37 @@ const MeasurementDetailsSection = ({
     }));
   };
 
-
   // Helper function to get next available K-value for a size
   const getKValueForSize = (size, washType) => {
-  const key = `${size}-${washType}`;
-  
-  // If already set for this specific size, return it (unless it's saved)
-  if (sizeSpecificKValues[key]) {
-    const currentKValue = sizeSpecificKValues[key];
-    const isCurrentSaved = currentWashMeasurements.some(
-      m => m.size === size && m.kvalue === currentKValue
-    );
+    const key = `${size}-${washType}`;
     
-    // If current K-value is not saved, return it
-    if (!isCurrentSaved) {
-      return currentKValue;
+    // If already set for this specific size, return it (unless it's saved)
+    if (sizeSpecificKValues[key]) {
+      const currentKValue = sizeSpecificKValues[key];
+      const isCurrentSaved = currentWashMeasurements.some(
+        m => m.size === size && m.kvalue === currentKValue
+      );
+      
+      // If current K-value is not saved, return it
+      if (!isCurrentSaved) {
+        return currentKValue;
+      }
     }
-  }
-  
-  // Find next available (unsaved) K-value
-  const specs = washType === 'before' 
-    ? measurementSpecs.beforeWashGrouped 
-    : measurementSpecs.afterWashGrouped;
-  const availableKValues = Object.keys(specs);
-  const savedKValues = getSavedKValuesForSize(size);
-  
-  // Find first K-value that is not saved for this size
-  const nextAvailable = availableKValues.find(kValue => !savedKValues.includes(kValue));
-  return nextAvailable || (availableKValues.length > 0 ? availableKValues[0] : '');
-};
+    
+    // Find next available (unsaved) K-value
+    const specs = washType === 'before' 
+      ? measurementSpecs.beforeWashGrouped 
+      : measurementSpecs.afterWashGrouped;
+    const availableKValues = Object.keys(specs);
+    const savedKValues = getSavedKValuesForSize(size);
+    
+    // Find first K-value that is not saved for this size
+    const nextAvailable = availableKValues.find(kValue => !savedKValues.includes(kValue));
+    return nextAvailable || (availableKValues.length > 0 ? availableKValues[0] : '');
+  };
 
 // Helper function to set K-value for a specific size
-const setKValueForSize = (size, washType, kValue) => {
+const setKValueForSize = async (size, washType, kValue) => {
   // Check if this K-value is already saved for this size (but allow editing)
   const isKValueSaved = currentWashMeasurements.some(
     m => m.size === size && m.kvalue === kValue
@@ -113,36 +113,125 @@ const setKValueForSize = (size, washType, kValue) => {
     [key]: kValue
   }));
   
-  // Don't clear measurement data when switching K-values - preserve existing data
-  
   // Get the new specs for the selected K-value
   const specs = washType === 'before'
     ? (measurementSpecs.beforeWashGrouped[kValue] || measurementSpecs.beforeWash)
     : (measurementSpecs.afterWashGrouped[kValue] || measurementSpecs.afterWash);
   
-  // Try to apply global pattern first
-  const globalWashType = washType === 'before' ? 'beforeWash' : 'afterWash';
-  const globalPattern = lastSelectedPattern[globalWashType];
-  
   let patternApplied = false;
+  let defaultSelectedRows = Array(specs.length).fill(false);
   
-  if (globalPattern && globalPattern.length === specs.length) {
+  // Apply pattern function
+  const applyPattern = async () => {
+    // Apply default measurement points based on wash type
+    if (washType === 'before') {
+      // For Before Wash: Use buyerspectemplate data
+      if (buyerSpecData) {
+        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, size, 'Before Wash');
+        if (defaultMeasurementPoints.length > 0) {
+          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+          patternApplied = true;
+          console.log('Applied buyerspectemplate pattern for Before Wash, size:', size);
+        }
+      }
+    } else {
+      // For After Wash: Priority order - saved Before Wash > buyerspectemplate > dt_orders
+      try {
+        console.log('Searching for saved Before Wash data for After Wash...');
+        
+        // 1. First priority: Check for saved Before Wash data with same criteria
+        const savedBeforeWashData = await findSavedMeasurementData(
+          formData.orderNo || orderNo,
+          formData.color || color,
+          formData.reportType || 'First Output', // Use a default or get from current record
+          'Before Wash',
+          formData.factoryName || 'YM' // Use a default or get from current record
+        );
+        
+        if (savedBeforeWashData && savedBeforeWashData.length > 0) {
+          console.log('Found saved Before Wash data:', savedBeforeWashData);
+          
+          // Use the new helper function to get selected rows from saved data
+          const savedSelectedRows = getSelectedRowsFromSavedData(savedBeforeWashData, size, specs);
+          
+          if (savedSelectedRows.length === specs.length && savedSelectedRows.some(row => row)) {
+            defaultSelectedRows = savedSelectedRows;
+            patternApplied = true;
+            console.log('Applied pattern from saved Before Wash data for size:', size);
+            console.log('Selected rows:', savedSelectedRows);
+          }
+        }
+        
+        // 2. Second priority: If no saved Before Wash data, use buyerspectemplate
+        if (!patternApplied && buyerSpecData) {
+          console.log('Trying buyerspectemplate for After Wash...');
+          const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, size, 'After Wash');
+          if (defaultMeasurementPoints.length > 0) {
+            defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+            patternApplied = true;
+            console.log('Applied buyerspectemplate pattern for After Wash, size:', size);
+          }
+        }
+        
+        // 3. Third priority: If no buyerspectemplate, use all dt_orders measurement points
+        if (!patternApplied && specs && specs.length > 0) {
+          console.log('Using all dt_orders measurement points as fallback for size:', size);
+          defaultSelectedRows = Array(specs.length).fill(true); // Select all available measurement points
+          patternApplied = true;
+        }
+        
+      } catch (error) {
+        console.error('Error loading saved measurement data:', error);
+        // Fallback to all measurement points if there's an error
+        if (specs && specs.length > 0) {
+          defaultSelectedRows = Array(specs.length).fill(true);
+          patternApplied = true;
+        }
+      }
+    }
+    
+    // Try to apply global pattern if no specific pattern found
+    if (!patternApplied) {
+      const globalWashType = washType === 'before' ? 'beforeWash' : 'afterWash';
+      const globalPattern = lastSelectedPattern[globalWashType];
+      
+      if (globalPattern && globalPattern.length === specs.length) {
+        defaultSelectedRows = [...globalPattern];
+        patternApplied = true;
+        console.log('Applied global pattern for size:', size);
+      }
+    }
+    
+    // If no global pattern, try to apply pattern from saved data for this size
+    if (!patternApplied) {
+      const savedDataForThisSize = currentWashMeasurements.filter(m => m.size === size);
+      
+      if (savedDataForThisSize.length > 0) {
+        // Use the pattern from the most recent saved K-value for this size
+        const mostRecentSaved = savedDataForThisSize[savedDataForThisSize.length - 1];
+        if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
+          defaultSelectedRows = [...mostRecentSaved.selectedRows];
+          patternApplied = true;
+          console.log('Applied pattern from most recent saved data for size:', size);
+        }
+      }
+    }
+    
+    // Apply the selected rows
     setSelectedRowsBySize(prev => ({
       ...prev,
-      [size]: [...globalPattern]
+      [size]: defaultSelectedRows
     }));
-    patternApplied = true;
     
-    // Initialize measurement values for selected rows only if they don't exist
-    const tableType = washType;
+    // Initialize measurement values for selected rows - KEEP EXISTING VALUES
     setMeasurementValues(prevValues => {
       const newValues = { ...prevValues };
       
-      globalPattern.forEach((isSelected, rowIndex) => {
+      defaultSelectedRows.forEach((isSelected, rowIndex) => {
         if (isSelected) {
           for (let colIndex = 0; colIndex < 3; colIndex++) {
-            const cellKey = `${size}-${tableType}-${kValue}-${rowIndex}-${colIndex}`;
-            // Only initialize if not already set
+            const cellKey = `${size}-${washType}-${kValue}-${rowIndex}-${colIndex}`;
+            // Only initialize if not already set - this preserves existing values
             if (!newValues[cellKey]) {
               newValues[cellKey] = { decimal: 0, fraction: '0' };
             }
@@ -152,53 +241,116 @@ const setKValueForSize = (size, washType, kValue) => {
       
       return newValues;
     });
-  }
-  
-  // If no global pattern, try to apply pattern from saved data for this size
-  if (!patternApplied) {
-    const savedDataForThisSize = currentWashMeasurements.filter(m => m.size === size);
     
-    if (savedDataForThisSize.length > 0) {
-      // Use the pattern from the most recent saved K-value for this size
-      const mostRecentSaved = savedDataForThisSize[savedDataForThisSize.length - 1];
-      if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
-        setSelectedRowsBySize(prev => ({
-          ...prev,
-          [size]: [...mostRecentSaved.selectedRows]
-        }));
-        patternApplied = true;
-        
-        // Initialize measurement values for selected rows only if they don't exist
-        const tableType = washType;
-        setMeasurementValues(prevValues => {
-          const newValues = { ...prevValues };
-          
-          mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
-            if (isSelected) {
-              for (let colIndex = 0; colIndex < 3; colIndex++) {
-                const cellKey = `${size}-${tableType}-${kValue}-${rowIndex}-${colIndex}`;
-                // Only initialize if not already set
-                if (!newValues[cellKey]) {
-                  newValues[cellKey] = { decimal: 0, fraction: '0' };
-                }
-              }
-            }
-          });
-          
-          return newValues;
-        });
-      }
+    // If no pattern was applied, reset to default
+    if (!patternApplied) {
+      setSelectedRowsBySize(prev => ({
+        ...prev,
+        [size]: Array(specs.length).fill(false)
+      }));
     }
+    
+    console.log(`Final pattern applied for size ${size}:`, defaultSelectedRows);
+  };
+  
+  // Execute the pattern application
+  await applyPattern();
+};
+
+
+// Helper function to get default measurement points from saved Before Wash data
+const getDefaultMeasurementPointsFromSavedData = (savedMeasurementData, size) => {
+  if (!savedMeasurementData || savedMeasurementData.length === 0) return [];
+  
+  // Find measurement data for the specific size
+  const sizeData = savedMeasurementData.find(data => data.size === size);
+  if (!sizeData) return [];
+  
+  // Return the measurement point names extracted from the nested structure
+  return sizeData.measurementPointNames || [];
+};
+
+// Helper function to get selected rows from saved Before Wash data
+const getSelectedRowsFromSavedData = (savedMeasurementData, size, currentSpecs) => {
+  if (!savedMeasurementData || savedMeasurementData.length === 0) return [];
+  
+  // Find measurement data for the specific size
+  const sizeData = savedMeasurementData.find(data => data.size === size);
+  if (!sizeData) return [];
+  
+  // If we have the selectedRows directly, use them
+  if (sizeData.selectedRows && sizeData.selectedRows.length === currentSpecs.length) {
+    return [...sizeData.selectedRows];
   }
   
-  // If no pattern was applied, reset to default
-  if (!patternApplied) {
-    setSelectedRowsBySize(prev => ({
-      ...prev,
-      [size]: Array(specs.length).fill(false)
-    }));
+  // If we have measurementPointNames, map them to current specs
+  if (sizeData.measurementPointNames && sizeData.measurementPointNames.length > 0) {
+    return currentSpecs.map(spec => {
+      const specName = spec.MeasurementPointEngName || '';
+      return sizeData.measurementPointNames.includes(specName);
+    });
   }
+  
+  return [];
 };
+
+
+  // Helper function to get default measurement points from buyerspectemplate
+  const getDefaultMeasurementPoints = (buyerSpecData, size, washType) => {
+    if (!buyerSpecData || !buyerSpecData.specData) return [];
+    
+    // Find spec data for the specific size
+    const sizeSpecData = buyerSpecData.specData.find(spec => spec.size === size);
+    if (!sizeSpecData || !sizeSpecData.specDetails) return [];
+    
+    // Extract measurement point names from buyerspectemplate
+    return sizeSpecData.specDetails.map(detail => detail.specName);
+  };
+
+  // Helper function to match measurement points with current specs
+  const getDefaultSelectedRows = (defaultMeasurementPoints, currentSpecs) => {
+    if (!defaultMeasurementPoints || !currentSpecs) return [];
+    
+    return currentSpecs.map(spec => {
+      const specName = spec.MeasurementPointEngName || '';
+      return defaultMeasurementPoints.includes(specName);
+    });
+  };
+
+// Helper function to find saved measurement data for reference
+const findSavedMeasurementData = async (styleNo, color, reportType, washType, factory) => {
+  console.log('findSavedMeasurementData called with:', { styleNo, color, reportType, washType, factory });
+  
+  try {
+    const requestBody = {
+      styleNo,
+      color,
+      reportType: reportType || undefined, // Ensure it's undefined if empty
+      washType,
+      factory: factory || undefined // Ensure it's undefined if empty
+    };
+    
+    console.log('Sending request body:', requestBody);
+    
+    const response = await fetch(`${API_BASE_URL}/api/qc-washing/find-saved-measurement`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(requestBody)
+    });
+    
+    if (response.ok) {
+      const data = await response.json();
+      console.log('API Response:', data);
+      return data.success ? data.measurementData : null;
+    } else {
+      console.error('API Response not OK:', response.status, response.statusText);
+    }
+  } catch (error) {
+    console.error('Error finding saved measurement data:', error);
+  }
+  return null;
+};
+
 
   const getSavedKValuesForSize = (size) => {
     return currentWashMeasurements
@@ -225,16 +377,168 @@ const setKValueForSize = (size, washType, kValue) => {
   };
 
   const areAllKValuesSaved = (size) => {
-  const currentSpecs = before_after_wash === 'Before Wash' 
-    ? measurementSpecs.beforeWashGrouped 
-    : measurementSpecs.afterWashGrouped;
+    const currentSpecs = before_after_wash === 'Before Wash' 
+      ? measurementSpecs.beforeWashGrouped 
+      : measurementSpecs.afterWashGrouped;
+    
+    const availableKValues = Object.keys(currentSpecs);
+    const savedKValues = getSavedKValuesForSize(size);
+    
+    return availableKValues.length > 0 && availableKValues.every(kvalue => savedKValues.includes(kvalue));
+  };
+
+  const addSize = async (size) => {
+  const sizeStr = String(size);
   
-  const availableKValues = Object.keys(currentSpecs);
-  const savedKValues = getSavedKValuesForSize(size);
-  
-  return availableKValues.length > 0 && availableKValues.every(kvalue => savedKValues.includes(kvalue));
+  // If size is not in selectedSizes, add it
+  if (!selectedSizes.find(s => s.size === sizeStr)) {
+    const newSize = { size: sizeStr, qty: 3 };
+    setSelectedSizes(prev => [...prev, newSize]);
+    
+    // Get current wash type and automatically select next available K-value
+    const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+    
+    // Get next available K-value for this size
+    const currentKValue = getKValueForSize(sizeStr, tableType);
+    
+    // Set the K-value for this size
+    const key = `${sizeStr}-${tableType}`;
+    setSizeSpecificKValues(prev => ({
+      ...prev,
+      [key]: currentKValue
+    }));
+    
+    // Get the specs for current K-value
+    const specs = before_after_wash === 'Before Wash'
+      ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash || [])
+      : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash || []);
+    
+    let patternApplied = false;
+    let defaultSelectedRows = Array(specs.length).fill(false);
+    
+    // Apply default measurement points based on wash type
+    if (before_after_wash === 'Before Wash') {
+      // For Before Wash: Use buyerspectemplate data
+      if (buyerSpecData) {
+        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'Before Wash');
+        if (defaultMeasurementPoints.length > 0) {
+          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+          patternApplied = true;
+        }
+      }
+      
+      // Apply pattern immediately for before wash
+      applyPatternAndValues();
+    } else {
+      // For After Wash: Priority order - saved Before Wash > buyerspectemplate > dt_orders
+      (async () => {
+        try {
+          // 1. First priority: Check for saved Before Wash data
+          const savedBeforeWashData = await findSavedMeasurementData(
+            formData.orderNo || orderNo,
+            formData.color || color,
+            formData.reportType || 'First Output', // Use a default or get from current record
+            'Before Wash',
+            formData.factoryName || 'YM' // Use a default or get from current record
+          );
+
+          if (savedBeforeWashData && savedBeforeWashData.length > 0) {
+            // Use the new helper function to get selected rows from saved data
+            const savedSelectedRows = getSelectedRowsFromSavedData(savedBeforeWashData, sizeStr, specs);
+            if (savedSelectedRows.length === specs.length && savedSelectedRows.some(row => row)) {
+              defaultSelectedRows = savedSelectedRows;
+              patternApplied = true;
+              console.log('Applied saved Before Wash pattern for size:', sizeStr);
+            }
+          }
+          
+          // 2. Second priority: If no saved Before Wash data, use buyerspectemplate
+          if (!patternApplied && buyerSpecData) {
+            const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'After Wash');
+            if (defaultMeasurementPoints.length > 0) {
+              defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+              patternApplied = true;
+              console.log('Applied buyerspectemplate pattern for size:', sizeStr);
+            }
+          }
+          
+          // 3. Third priority: If no buyerspectemplate, use all dt_orders measurement points
+          if (!patternApplied && specs && specs.length > 0) {
+            defaultSelectedRows = Array(specs.length).fill(true); // Select all available measurement points
+            patternApplied = true;
+            console.log('Applied all dt_orders points for size:', sizeStr);
+          }
+          
+        } catch (error) {
+          console.error('Error loading saved measurement data:', error);
+          // Fallback to all measurement points if there's an error
+          if (specs && specs.length > 0) {
+            defaultSelectedRows = Array(specs.length).fill(true);
+            patternApplied = true;
+          }
+        }
+        
+        // Apply pattern after async operations
+        applyPatternAndValues();
+      })();
+    }
+    
+    function applyPatternAndValues() {
+      // If still no pattern applied, try global pattern
+      if (!patternApplied) {
+        const globalPattern = lastSelectedPattern[washType];
+        if (globalPattern && globalPattern.length === specs.length) {
+          defaultSelectedRows = [...globalPattern];
+          patternApplied = true;
+        }
+      }
+      
+      // If still no pattern, try saved data for this size
+      if (!patternApplied) {
+        const savedDataForThisSize = currentWashMeasurements.filter(m => m.size === sizeStr);
+        if (savedDataForThisSize.length > 0) {
+          const mostRecentSaved = savedDataForThisSize[savedDataForThisSize.length - 1];
+          if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
+            defaultSelectedRows = [...mostRecentSaved.selectedRows];
+            patternApplied = true;
+          }
+        }
+      }
+      
+      // Apply the selected rows
+      setSelectedRowsBySize(prev => ({
+        ...prev,
+        [sizeStr]: defaultSelectedRows
+      }));
+      
+      // Initialize measurement values for selected rows - preserve existing values
+      if (patternApplied) {
+        setMeasurementValues(prevValues => {
+          const newValues = { ...prevValues };
+          
+          defaultSelectedRows.forEach((isSelected, rowIndex) => {
+            if (isSelected) {
+              for (let colIndex = 0; colIndex < 3; colIndex++) {
+                const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
+                // Only initialize if not already set - preserves existing values
+                if (!newValues[cellKey]) {
+                  newValues[cellKey] = { decimal: 0, fraction: '0' };
+                }
+              }
+            }
+          });
+          
+          return newValues;
+        });
+      }
+    }
+  }
 };
 
+
+
+  // Rest of your functions remain the same...
   const transformMeasurementData = (
     size,
     qty,
@@ -247,11 +551,11 @@ const setKValueForSize = (size, washType, kValue) => {
     before_after_wash,
     isEdit = false
   ) => {
+    // ... your existing transformMeasurementData implementation
     const pcs = [];
     for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
       const measurementPoints = [];
       const isFullColumn = fullColumns?.[pcIndex] || false;
-
       measurementSpecs.forEach((spec, specIndex) => {
         // Only include if full, or row is selected
         const isRowIndividuallySelected = selectedRows?.[specIndex] ?? false;
@@ -259,8 +563,8 @@ const setKValueForSize = (size, washType, kValue) => {
 
         const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
-
         let result = 'pending'; // Default to pending
+
         if (measurementValue && (typeof measurementValue.decimal === 'number' || measurementValue.fraction)) {
           const measuredDeviation = typeof measurementValue.decimal === 'number' ? measurementValue.decimal : parseFloat(measurementValue.fraction) || 0;
           
@@ -281,7 +585,6 @@ const setKValueForSize = (size, washType, kValue) => {
           } else {
             tolPlusValue = fractionToDecimal(spec.TolPlus?.fraction || spec.TolerancePlus?.fraction || spec.TolerancePlus || '0');
           }
-
           // Always calculate result if we have a measurement value
           if (measuredDeviation >= tolMinusValue && measuredDeviation <= tolPlusValue) {
             result = 'pass';
@@ -360,7 +663,6 @@ const setKValueForSize = (size, washType, kValue) => {
     );
 
     const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
-
     return {
       size: size,
       qty: qty,
@@ -387,6 +689,7 @@ const setKValueForSize = (size, washType, kValue) => {
 
   const fractionToDecimal = (frac) => {
     if (typeof frac !== 'string' || !frac || frac.trim() === '-') return 0; // Return 0 instead of NaN
+
     frac = frac
       .replace('⁄', '/')
       .replace('½', '1/2').replace('¼', '1/4').replace('¾', '3/4')
@@ -420,22 +723,20 @@ const setKValueForSize = (size, washType, kValue) => {
   };
 
   const handleKValueChange = (newKValue, washType) => {
-  if (washType === 'before') {
-    setActiveBeforeTab(newKValue);
-  } else {
-    setActiveAfterTab(newKValue);
-  }
-  
-  // Don't clear measurement data when switching K-values globally
-};
-
+    if (washType === 'before') {
+      setActiveBeforeTab(newKValue);
+    } else {
+      setActiveAfterTab(newKValue);
+    }
+    
+    // Don't clear measurement data when switching K-values globally
+  };
 
   const handleEditClick = (sizeToEdit, kvalue) => {
     const before_after_wash_Key = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     const dataToEdit = (measurementData[before_after_wash_Key] || []).find(
       item => item.size === sizeToEdit && item.kvalue === kvalue
     );
-
     if (!dataToEdit) return;
 
     // Remove from saved combinations
@@ -472,7 +773,6 @@ const setKValueForSize = (size, washType, kValue) => {
     // Hydrate from the saved record BEFORE clearing state
     // This ensures the data is properly restored
     hydrateMeasurementUIFromSavedData([dataToEdit], tableType);
-
     if (onMeasurementEdit) onMeasurementEdit(sizeToEdit, kvalue);
   };
 
@@ -487,7 +787,7 @@ const setKValueForSize = (size, washType, kValue) => {
     }
   }, [orderNo, color]);
 
-  const fetchSizes = async () => {
+    const fetchSizes = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -577,6 +877,11 @@ const setKValueForSize = (size, washType, kValue) => {
         if (beforeKeys.length > 0) setActiveBeforeTab(beforeKeys[0]);
         if (afterKeys.length > 0) setActiveAfterTab(afterKeys[0]);
         
+        // NEW: Store buyer spec data for default measurement point selection
+        if (data.buyerSpecData) {
+          setBuyerSpecData(data.buyerSpecData);
+        }
+        
       } else {
         setNoMeasurementData(false);
         setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
@@ -609,196 +914,32 @@ const setKValueForSize = (size, washType, kValue) => {
     return num.toString();
   };
 
-const addSize = (size) => {
-  const sizeStr = String(size);
-  
-  // If size is not in selectedSizes, add it
-  if (!selectedSizes.find(s => s.size === sizeStr)) {
-    const newSize = { size: sizeStr, qty: 3 };
-    setSelectedSizes(prev => [...prev, newSize]);
+  const removeSize = (size) => {
+    setSelectedSizes(prev => prev.filter(s => s.size !== size));
     
-    // Get current wash type and automatically select next available K-value
-    const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
-    const kValueField = before_after_wash === 'Before Wash' ? 'beforeWashKValue' : 'afterWashKValue';
-    const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
-    
-    // Get next available K-value for this size (first unsaved one)
-    const currentKValue = getKValueForSize(sizeStr, tableType);
-    
-    // Set the K-value for this size
-    const key = `${sizeStr}-${tableType}`;
-    setSizeSpecificKValues(prev => ({
-      ...prev,
-      [key]: currentKValue
-    }));
-    
-    // Get the specs for current K-value
-    const specs = before_after_wash === 'Before Wash'
-      ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash)
-      : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash);
-    
-    // Try to apply pattern from global last selected pattern first
-    const globalPattern = lastSelectedPattern[washType];
-    const globalKValue = lastSelectedPattern[kValueField];
-    
-    let patternApplied = false;
-    
-    // Apply global pattern if available and specs length matches
-    if (globalPattern && globalPattern.length === specs.length) {
-      setSelectedRowsBySize(prev => ({
-        ...prev,
-        [sizeStr]: [...globalPattern]
-      }));
-      patternApplied = true;
-      
-      // Initialize measurement values for selected rows only if they don't exist
-      setMeasurementValues(prevValues => {
-        const newValues = { ...prevValues };
-        
-        globalPattern.forEach((isSelected, rowIndex) => {
-          if (isSelected) {
-            for (let colIndex = 0; colIndex < 3; colIndex++) {
-              const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-              // Only initialize if not already set
-              if (!newValues[cellKey]) {
-                newValues[cellKey] = { decimal: 0, fraction: '0' };
-              }
-            }
-          }
-        });
-        
-        return newValues;
-      });
-    }
-    
-    // If no global pattern, try to apply pattern from saved data for this size
-    if (!patternApplied) {
-      const savedDataForThisSize = currentWashMeasurements.filter(m => m.size === sizeStr);
-      
-      if (savedDataForThisSize.length > 0) {
-        // Use the pattern from the most recent saved K-value for this size
-        const mostRecentSaved = savedDataForThisSize[savedDataForThisSize.length - 1];
-        
-        // Apply pattern if the specs length matches
-        if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
-          setSelectedRowsBySize(prev => ({
-            ...prev,
-            [sizeStr]: [...mostRecentSaved.selectedRows]
-          }));
-          patternApplied = true;
-          
-          // Initialize measurement values for selected rows only if they don't exist
-          setMeasurementValues(prevValues => {
-            const newValues = { ...prevValues };
-            
-            mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
-              if (isSelected) {
-                for (let colIndex = 0; colIndex < 3; colIndex++) {
-                  const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-                  // Only initialize if not already set
-                  if (!newValues[cellKey]) {
-                    newValues[cellKey] = { decimal: 0, fraction: '0' };
-                  }
-                }
-              }
-            });
-            
-            return newValues;
-          });
-        }
-      }
-
-      // If no global pattern, try to apply pattern from saved data for this size
-      if (!patternApplied) {
-        const savedDataForThisSize = currentWashMeasurements.filter(
-          (m) => m.size === sizeStr
-        );
-
-        if (savedDataForThisSize.length > 0) {
-          // Use the pattern from the most recent saved K-value for this size
-          const mostRecentSaved =
-            savedDataForThisSize[savedDataForThisSize.length - 1];
-
-          // Apply pattern if the specs length matches
-          if (
-            mostRecentSaved.selectedRows &&
-            mostRecentSaved.selectedRows.length === specs.length
-          ) {
-            setSelectedRowsBySize((prev) => ({
-              ...prev,
-              [sizeStr]: [...mostRecentSaved.selectedRows]
-            }));
-            patternApplied = true;
-
-            // Initialize measurement values for selected rows only if they don't exist
-            setMeasurementValues((prevValues) => {
-              const newValues = { ...prevValues };
-
-              mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
-                if (isSelected) {
-                  for (let colIndex = 0; colIndex < 3; colIndex++) {
-                    const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-                    // Only initialize if not already set
-                    if (!newValues[cellKey]) {
-                      newValues[cellKey] = { decimal: 0, fraction: "0" };
-                    }
-                  }
-                }
-              });
-
-              return newValues;
-            });
-          }
-        }
-      }
-
-      // If no pattern was applied, reset to default
-      if (!patternApplied) {
-        setSelectedRowsBySize((prev) => ({
-          ...prev,
-          [sizeStr]: Array(specs.length).fill(false)
-        }));
-      }
-    }
-    
-    // If no pattern was applied, reset to default
-    if (!patternApplied) {
-      setSelectedRowsBySize(prev => ({
-        ...prev,
-        [sizeStr]: Array(specs.length).fill(false)
-      }));
-    }
-  }
-};
-
-
-const removeSize = (size) => {
-  setSelectedSizes(prev => prev.filter(s => s.size !== size));
-  
-  // Clean up related state
-  setSelectedRowsBySize(prev => {
-    const next = { ...prev };
-    delete next[size];
-    return next;
-  });
-  
-  setFullColumnsBySize(prev => {
-    const next = { ...prev };
-    delete next[size];
-    return next;
-  });
-  
-  setMeasurementValues(prev => {
-    const newValues = { ...prev };
-    Object.keys(newValues).forEach(key => {
-      if (key.includes(`${size}-before-`) || key.includes(`${size}-after-`)) {
-        delete newValues[key];
-      }
+    // Clean up related state
+    setSelectedRowsBySize(prev => {
+      const next = { ...prev };
+      delete next[size];
+      return next;
     });
-    return newValues;
-  });
-};
-
+    
+    setFullColumnsBySize(prev => {
+      const next = { ...prev };
+      delete next[size];
+      return next;
+    });
+    
+    setMeasurementValues(prev => {
+      const newValues = { ...prev };
+      Object.keys(newValues).forEach(key => {
+        if (key.includes(`${size}-before-`) || key.includes(`${size}-after-`)) {
+          delete newValues[key];
+        }
+      });
+      return newValues;
+    });
+  };
 
   const updateQty = (size, change) => {
     setSelectedSizes(prev => prev.map(s => 
@@ -813,14 +954,12 @@ const removeSize = (size) => {
       const prevForSize = prev[size] || [];
       const updated = [...prevForSize];
       updated[columnIndex] = !updated[columnIndex];
-
       if (updated[columnIndex]) {
         const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
         const currentKValue = getKValueForSize(size, tableType);
         const specs = before_after_wash === 'Before Wash'
           ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash)
           : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash);
-
         setMeasurementValues(prevValues => {
           const newValues = { ...prevValues };
           specs.forEach((spec, specIndex) => {
@@ -833,7 +972,6 @@ const removeSize = (size) => {
           return newValues;
         });
       }
-
       return {
         ...prev,
         [size]: updated
@@ -853,39 +991,38 @@ const removeSize = (size) => {
   };
 
   const toggleRowSelection = (size, rowIndex) => {
-  setSelectedRowsBySize(prev => {
-    const prevSelections = prev[size] || Array(measurementSpecs.beforeWash?.length || measurementSpecs.afterWash?.length).fill(true);
-    const updatedSelections = [...prevSelections];
-    updatedSelections[rowIndex] = !updatedSelections[rowIndex];
-    
-    // If now checked, set all related cells to 0 (not previous values)
-    if (updatedSelections[rowIndex]) {
-      const qty = selectedSizes.find(s => s.size === size)?.qty || 1;
-      const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
-      setMeasurementValues(prevValues => {
-        const newValues = { ...prevValues };
-        for (let i = 0; i < qty; i++) {
-          const currentKValue = getKValueForSize(size, tableType);
-          const cellKey = `${size}-${tableType}-${currentKValue}-${rowIndex}-${i}`;
-          // Initialize with proper values if not already set
-          if (!newValues[cellKey]) {
-            newValues[cellKey] = { decimal: 0, fraction: '0' };
+    setSelectedRowsBySize(prev => {
+      const prevSelections = prev[size] || Array(measurementSpecs.beforeWash?.length || measurementSpecs.afterWash?.length).fill(true);
+      const updatedSelections = [...prevSelections];
+      updatedSelections[rowIndex] = !updatedSelections[rowIndex];
+      
+      // If now checked, set all related cells to 0 (not previous values)
+      if (updatedSelections[rowIndex]) {
+        const qty = selectedSizes.find(s => s.size === size)?.qty || 1;
+        const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+        setMeasurementValues(prevValues => {
+          const newValues = { ...prevValues };
+          for (let i = 0; i < qty; i++) {
+            const currentKValue = getKValueForSize(size, tableType);
+            const cellKey = `${size}-${tableType}-${currentKValue}-${rowIndex}-${i}`;
+            // Initialize with proper values if not already set
+            if (!newValues[cellKey]) {
+              newValues[cellKey] = { decimal: 0, fraction: '0' };
+            }
           }
-        }
-        return newValues;
-      });
-    }
-
-    // Update selectAll state based on row selections
-    const allSelected = updatedSelections.every(Boolean);
-    setSelectAllBySize(prevSelectAll => ({
-      ...prevSelectAll,
-      [size]: allSelected
-    }));
-    
-    return { ...prev, [size]: updatedSelections };
-  });
-};
+          return newValues;
+        });
+      }
+      // Update selectAll state based on row selections
+      const allSelected = updatedSelections.every(Boolean);
+      setSelectAllBySize(prevSelectAll => ({
+        ...prevSelectAll,
+        [size]: allSelected
+      }));
+      
+      return { ...prev, [size]: updatedSelections };
+    });
+  };
 
   const toggleSelectAllRows = (size, checked, tableType) => {
     const currentKValue = getKValueForSize(size, tableType);
@@ -894,7 +1031,6 @@ const removeSize = (size) => {
         ? measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash
         : measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash;
     const newSelections = specs.map(() => checked);
-
     setSelectedRowsBySize(prev => ({
       ...prev,
       [size]: newSelections,
@@ -909,17 +1045,17 @@ const removeSize = (size) => {
   }, [measurementData, before_after_wash]);
 
   // Function to check if current selection matches the saved pattern
- const isPatternAutoApplied = (size) => {
-  const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
-  const globalPattern = lastSelectedPattern[washType];
-  const currentSelection = selectedRowsBySize[size];
-  
-  if (!globalPattern || !currentSelection) return false;
-  
-  const patternMatches = JSON.stringify(globalPattern) === JSON.stringify(currentSelection);
-  
-  return patternMatches;
-};
+  const isPatternAutoApplied = (size) => {
+    const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
+    const globalPattern = lastSelectedPattern[washType];
+    const currentSelection = selectedRowsBySize[size];
+    
+    if (!globalPattern || !currentSelection) return false;
+    
+    const patternMatches = JSON.stringify(globalPattern) === JSON.stringify(currentSelection);
+    
+    return patternMatches;
+  };
 
   const renderMeasurementTable = (size, qty) => {
     return (
@@ -979,6 +1115,7 @@ const removeSize = (size) => {
                 )}
               </div>
             )}
+
             <div className="flex justify-end mb-2">
               <button
                 onClick={() =>
@@ -1132,7 +1269,6 @@ const removeSize = (size) => {
               {hideUnselectedRowsBySize[size] ? 'Show All' : 'Hide Unselected'}
             </button>
           </div>
-
           <div className="bg-green-50 p-4 rounded-lg mb-4 dark:bg-gray-800 dark:text-white">
             <h5 className="text-sm font-medium mb-3">After Wash</h5>
             
@@ -1246,7 +1382,7 @@ const removeSize = (size) => {
                             />
                           </td>
                           <td className="border border-gray-300 px-2 py-1 dark:bg-gray-800 dark:text-white">{area}</td>
-                          <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
+                                                    <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
                             {tolMinus !== '-' && tolMinus !== '0' ? (tolMinus.startsWith('-') ? tolMinus : `-${tolMinus}`) : '0'}
                           </td>
                           <td className="border border-gray-300 px-2 py-1 text-center dark:bg-gray-800 dark:text-white">
@@ -1260,7 +1396,6 @@ const removeSize = (size) => {
                             const cellKey = `${size}-after-${currentKValue}-${index}-${i}`;
                             const value = measurementValues[cellKey];
                           
-                            
                             const isFull = fullColumnsBySize[size]?.[i] === true;
                             const isRowSelected = selectedRowsBySize[size]?.[index] ?? true;
                             const isEnabled = isFull || isRowSelected;
@@ -1271,7 +1406,6 @@ const removeSize = (size) => {
                                       ? 'bg-green-200 dark:bg-green-700'
                                       : 'bg-red-200 dark:bg-red-700')
                                   : 'bg-transparent');
-
                             return (
                               <td
                                 key={`measurement-input-${index}-${i}`}
@@ -1308,420 +1442,419 @@ const removeSize = (size) => {
   };
 
   return (
-  <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-    <div>
-      <div className="flex justify-between items-center mb-4 border-b pb-2">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Measurement Details</h2>
-        <button 
-          onClick={onToggle}
-          className="text-indigo-600 hover:text-indigo-800 font-medium"
-        >
-          {isVisible ? 'Hide' : 'Show'}
-        </button>
-      </div>
-      <SummaryCard
-        measurementData={measurementData}
-        showMeasurementTable={showMeasurementTable}
-        before_after_wash={before_after_wash}
-        recordId={recordId}
-        API_BASE_URL={API_BASE_URL}
-      />
-    </div>
-
-    {noMeasurementData ? (
-      <div className="mb-8">
-        <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
-          Measurement Details
-        </h4>
-        <div className="text-sm text-gray-500 p-4 border border-gray-300 rounded">
-          No measurement data are available for this style.
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div>
+        <div className="flex justify-between items-center mb-4 border-b pb-2">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Measurement Details</h2>
+          <button 
+            onClick={onToggle}
+            className="text-indigo-600 hover:text-indigo-800 font-medium"
+          >
+            {isVisible ? 'Hide' : 'Show'}
+          </button>
         </div>
+        <SummaryCard
+          measurementData={measurementData}
+          showMeasurementTable={showMeasurementTable}
+          before_after_wash={before_after_wash}
+          recordId={recordId}
+          API_BASE_URL={API_BASE_URL}
+        />
       </div>
-    ) : (
-      isVisible && (
-        <div className="space-y-6">
-          {!orderNo || !color ? (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-              <div className="text-sm text-yellow-700">Please select Order No and Color from Order Details section first.</div>
-            </div>
-          ) : (
-            <>
-              {loading && (
-                <div className="text-center py-4">
-                  <div className="text-sm text-gray-600">Loading sizes...</div>
-                </div>
-              )}
-              
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                  <div className="text-sm text-red-600">{error}</div>
-                </div>
-              )}
-              
-              {!loading && !error && (
-                <div>
-                  {sizes.length > 0 ? (
-                    <div className="space-y-2 mt-4">
-                      <div className="flex items-center space-x-4">
-                        <label htmlFor="size-select" className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800">Select Sizes:</label>
-                        <select 
-                          id="size-select"
-                          onChange={(e) => e.target.value && addSize(e.target.value)}
-                          value=""
-                          className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:text-gray-300 dark:bg-gray-800"
-                        >
-                          <option className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800" value="">-- Select Size to Add --</option>
-                          {sizes.map((size, index) => {
-                            let sizeValue;
-                            if (typeof size === 'object' && size !== null) {
-                              sizeValue = size.size || size.Size || size.name || size.value || Object.values(size)[0] || 'Unknown';
-                            } else {
-                              sizeValue = size;
-                            }
-                            sizeValue = String(sizeValue);
-                            
-                            const isSelected = selectedSizes.find(s => s.size === sizeValue);
-                            
-                            // Check if ALL K-values are saved for this size
-                            const currentSpecs = before_after_wash === 'Before Wash' 
-                              ? measurementSpecs.beforeWashGrouped 
-                              : measurementSpecs.afterWashGrouped;
-                            const availableKValues = Object.keys(currentSpecs);
-                            const savedKValues = currentWashMeasurements
-                              .filter(m => m.size === sizeValue)
-                              .map(m => m.kvalue);
-                            
-                            // Only hide if ALL K-values are saved AND not currently selected
-                            const allKValuesSaved = availableKValues.length > 0 && availableKValues.every(kValue => savedKValues.includes(kValue));
-                            const shouldShow = !allKValuesSaved || isSelected;
-                            
-                            return (
-                              <option 
-                                key={`size-${index}-${sizeValue}`} 
-                                value={sizeValue}
-                                style={!shouldShow ? { display: 'none' } : {}}
-                              >
-                                {sizeValue}
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-300">
-                        Note: Sizes are only hidden when ALL K-values are saved. You can re-select sizes with remaining K-values.
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="text-sm text-gray-500 p-4 border border-gray-200 rounded-md">
-                      No sizes available for this order and color
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
-          )}
 
-          {selectedSizes.length > 0 && (
-            <div>
-              <h3 className="text-md font-semibold mb-3 dark:text-white dark:bg-gray-800">Selected Sizes</h3>
-              <div className="space-y-2">
-                {selectedSizes.map(({ size, qty }) => {
-                  // Check if current K-value for this size is saved
-                  const currentKValue = getKValueForSize(size, before_after_wash === 'Before Wash' ? 'before' : 'after');
-                  const isCurrentKValueSaved = isSizeKValueSaved(size, currentKValue);
-                  const savedKValues = getSavedKValuesForSize(size);
-                  const hasAvailableKVals = hasAvailableKValues(size);
-                  
-                  return (
-                    <div key={size} className={`flex items-center justify-between p-3 border rounded-md ${
-                      isCurrentKValueSaved ? 'bg-gray-100 border-gray-300 dark:bg-gray-600 dark:border-gray-500' : 'bg-white dark:bg-gray-800'
-                    }`}>
-                      <div className={`font-medium ${
-                        isCurrentKValueSaved ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'
-                      }`}>
-                        <div>Size: {size} (K: {currentKValue}) {isCurrentKValueSaved ? '(Current K-value saved)' : ''}</div>
-                        {savedKValues.length > 0 && (
-                          <div className="text-xs text-blue-600 mt-1">
-                            Saved K-values: {savedKValues.join(', ')}
-                          </div>
-                        )}
-                        {!areAllKValuesSaved(size) && (
-                          <div className="text-xs text-green-600 mt-1">
-                            More K-values available
-                          </div>
-                        )}
+      {noMeasurementData ? (
+        <div className="mb-8">
+          <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
+            Measurement Details
+          </h4>
+          <div className="text-sm text-gray-500 p-4 border border-gray-300 rounded">
+            No measurement data are available for this style.
+          </div>
+        </div>
+      ) : (
+        isVisible && (
+          <div className="space-y-6">
+            {!orderNo || !color ? (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
+                <div className="text-sm text-yellow-700">Please select Order No and Color from Order Details section first.</div>
+              </div>
+            ) : (
+              <>
+                {loading && (
+                  <div className="text-center py-4">
+                    <div className="text-sm text-gray-600">Loading sizes...</div>
+                  </div>
+                )}
+                
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3">
+                    <div className="text-sm text-red-600">{error}</div>
+                  </div>
+                )}
+                
+                {!loading && !error && (
+                  <div>
+                    {sizes.length > 0 ? (
+                      <div className="space-y-2 mt-4">
+                        <div className="flex items-center space-x-4">
+                          <label htmlFor="size-select" className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800">Select Sizes:</label>
+                          <select 
+                            id="size-select"
+                            onChange={(e) => e.target.value && addSize(e.target.value)}
+                            value=""
+                            className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:text-gray-300 dark:bg-gray-800"
+                          >
+                            <option className="text-sm font-medium dark:text-gray-300 dark:bg-gray-800" value="">-- Select Size to Add --</option>
+                            {sizes.map((size, index) => {
+                              let sizeValue;
+                              if (typeof size === 'object' && size !== null) {
+                                sizeValue = size.size || size.Size || size.name || size.value || Object.values(size)[0] || 'Unknown';
+                              } else {
+                                sizeValue = size;
+                              }
+                              sizeValue = String(sizeValue);
+                              
+                              const isSelected = selectedSizes.find(s => s.size === sizeValue);
+                              
+                              // Check if ALL K-values are saved for this size
+                              const currentSpecs = before_after_wash === 'Before Wash' 
+                                ? measurementSpecs.beforeWashGrouped 
+                                : measurementSpecs.afterWashGrouped;
+                              const availableKValues = Object.keys(currentSpecs);
+                              const savedKValues = currentWashMeasurements
+                                .filter(m => m.size === sizeValue)
+                                .map(m => m.kvalue);
+                              
+                              // Only hide if ALL K-values are saved AND not currently selected
+                              const allKValuesSaved = availableKValues.length > 0 && availableKValues.every(kValue => savedKValues.includes(kValue));
+                              const shouldShow = !allKValuesSaved || isSelected;
+                              
+                              return (
+                                <option 
+                                  key={`size-${index}-${sizeValue}`} 
+                                  value={sizeValue}
+                                  style={!shouldShow ? { display: 'none' } : {}}
+                                >
+                                  {sizeValue}
+                                </option>
+                              );
+                            })}
+                          </select>
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-300">
+                          Note: Sizes are only hidden when ALL K-values are saved. You can re-select sizes with remaining K-values.
+                        </div>
                       </div>
-                      <div className="flex items-center space-x-3">
-                        <div className="flex items-center space-x-2">
+                    ) : (
+                      <div className="text-sm text-gray-500 p-4 border border-gray-200 rounded-md">
+                        No sizes available for this order and color
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
+            {selectedSizes.length > 0 && (
+              <div>
+                <h3 className="text-md font-semibold mb-3 dark:text-white dark:bg-gray-800">Selected Sizes</h3>
+                <div className="space-y-2">
+                  {selectedSizes.map(({ size, qty }) => {
+                    // Check if current K-value for this size is saved
+                    const currentKValue = getKValueForSize(size, before_after_wash === 'Before Wash' ? 'before' : 'after');
+                    const isCurrentKValueSaved = isSizeKValueSaved(size, currentKValue);
+                    const savedKValues = getSavedKValuesForSize(size);
+                    const hasAvailableKVals = hasAvailableKValues(size);
+                    
+                    return (
+                      <div key={size} className={`flex items-center justify-between p-3 border rounded-md ${
+                        isCurrentKValueSaved ? 'bg-gray-100 border-gray-300 dark:bg-gray-600 dark:border-gray-500' : 'bg-white dark:bg-gray-800'
+                      }`}>
+                        <div className={`font-medium ${
+                          isCurrentKValueSaved ? 'text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-white'
+                        }`}>
+                          <div>Size: {size} (K: {currentKValue}) {isCurrentKValueSaved ? '(Current K-value saved)' : ''}</div>
+                          {savedKValues.length > 0 && (
+                            <div className="text-xs text-blue-600 mt-1">
+                              Saved K-values: {savedKValues.join(', ')}
+                            </div>
+                          )}
+                          {!areAllKValuesSaved(size) && (
+                            <div className="text-xs text-green-600 mt-1">
+                              More K-values available
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => updateQty(size, -1)}
+                              disabled={isCurrentKValueSaved}
+                              className={`p-1 rounded-full dark:bg-gray-700 ${
+                                isCurrentKValueSaved 
+                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:text-gray-500'
+                                  : 'bg-red-100 text-red-600 hover:bg-red-200 dark:text-red-400'
+                              }`}
+                            >
+                              <Minus size={16} />
+                            </button>
+                            <span className="w-8 text-center dark:text-gray-300">{qty}</span>
+                            <button
+                              onClick={() => updateQty(size, 1)}
+                              disabled={isCurrentKValueSaved}
+                              className={`p-1 rounded-full dark:bg-gray-700 ${
+                                isCurrentKValueSaved 
+                                  ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:text-gray-500'
+                                  : 'bg-green-100 text-green-600 hover:bg-green-200 dark:text-green-400'
+                              }`}
+                            >
+                              <Plus size={16} />
+                            </button>
+                          </div>
                           <button
-                            onClick={() => updateQty(size, -1)}
-                            disabled={isCurrentKValueSaved}
-                            className={`p-1 rounded-full dark:bg-gray-700 ${
-                              isCurrentKValueSaved 
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:text-gray-500'
-                                : 'bg-red-100 text-red-600 hover:bg-red-200 dark:text-red-400'
-                            }`}
+                            onClick={() => removeSize(size)}
+                            className="px-3 py-1 rounded-md text-sm bg-red-500 text-white hover:bg-red-600 dark:bg-gray-600"
                           >
-                            <Minus size={16} />
-                          </button>
-                          <span className="w-8 text-center dark:text-gray-300">{qty}</span>
-                          <button
-                            onClick={() => updateQty(size, 1)}
-                            disabled={isCurrentKValueSaved}
-                            className={`p-1 rounded-full dark:bg-gray-700 ${
-                              isCurrentKValueSaved 
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed dark:text-gray-500'
-                                : 'bg-green-100 text-green-600 hover:bg-green-200 dark:text-green-400'
-                            }`}
-                          >
-                            <Plus size={16} />
+                            Remove
                           </button>
                         </div>
-                        <button
-                          onClick={() => removeSize(size)}
-                          className="px-3 py-1 rounded-md text-sm bg-red-500 text-white hover:bg-red-600 dark:bg-gray-600"
-                        >
-                          Remove
-                        </button>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            )}
 
-          {/* Show saved measurement data */}
-          {currentWashMeasurements.length > 0 && (
-            <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Saved Measurement Data</h3>
-              </div>
-              <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
-                {currentWashMeasurements.map((data, index) => (
-                  <div key={`saved-${data.size}-${data.kvalue}-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <h4 className="font-medium text-gray-800 text-xs">
-                        {data.size} : {data.qty}
-                        <br />
-                        <span className="text-blue-600">K: {data.kvalue || 'N/A'}</span>
-                      </h4>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => handleEditClick(data.size, data.kvalue)}
-                          className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
-                        >
-                          Edit
-                        </button>
-                        <span className="text-xs text-gray-900 font-bold bg-green-300 px-2 py-1 rounded-full">
-                          Saved
-                        </span>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-2 grid grid-cols-3 gap-2">
-                      {/* Total Checked Points */}
-                      <div className="bg-gray-100 p-2 rounded-md text-center">
-                        <span className="text-blue-500 font-semibold text-xl">
-                          {data.pcs.flatMap(pc => pc.measurementPoints).length}
-                        </span>
-                        <p className="text-s text-gray-900">📝</p>
-                      </div>
-                      {/* Pass Count */}
-                      <div className="bg-green-100 p-2 rounded-md text-center">
-                        <span className="text-green-500 font-semibold text-xl">
-                          {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'pass').length}
-                        </span>
-                        <p className="text-s text-gray-900">✔️</p>
-                      </div>
-                      {/* Fail Count */}
-                      <div className="bg-red-100 p-2 rounded-md text-center">
-                        <span className="text-red-500 font-semibold text-xl">
-                          {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'fail').length}
-                        </span>
-                        <p className="text-s text-gray-900">❌</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Show measurement table for new sizes */}
-          {showMeasurementTable && selectedSizes.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Measurement Input</h3>
-              <div className="grid grid-cols-1 gap-6">
-                {selectedSizes.map(({ size, qty }) => {
-                  // Check if current K-value for this size is saved
-                  const currentKValue = getKValueForSize(size, before_after_wash === 'Before Wash' ? 'before' : 'after');
-                  const isCurrentKValueSaved = currentWashMeasurements.some(
-                    m => m.size === size && m.kvalue === currentKValue
-                  );
-                  const isEditing = editingMeasurements.has(`${size}-${currentKValue}`);
-                  
-                  // Only show measurement table if current K-value is NOT saved OR is being edited
-                  if (isCurrentKValueSaved && !isEditing) return null;
-                  
-                  return (
-                    <div key={`measurement-container-${size}`} className="border rounded-lg p-4 bg-white border-gray-200 dark:bg-gray-800 dark:text-white">
-                      {renderMeasurementTable(size, qty)}
-                      {onSizeSubmit && (
-                        <div className="mt-4 flex justify-end">
+            {/* Show saved measurement data */}
+            {currentWashMeasurements.length > 0 && (
+              <div>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Saved Measurement Data</h3>
+                </div>
+                <div className="grid grid-cols-3 lg:grid-cols-4 gap-2 mb-6">
+                  {currentWashMeasurements.map((data, index) => (
+                    <div key={`saved-${data.size}-${data.kvalue}-${index}`} className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <h4 className="font-medium text-gray-800 text-xs">
+                          {data.size} : {data.qty}
+                          <br />
+                          <span className="text-blue-600">K: {data.kvalue || 'N/A'}</span>
+                        </h4>
+                        <div className="flex space-x-2">
                           <button
-                            onClick={() => {
-                              const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
-                              const kvalue = getKValueForSize(size, tableType);
-                              
-                              // Check if this K-value is already saved for this size (but allow editing)
-                              const isAlreadySaved = currentWashMeasurements.some(
-                                m => m.size === size && m.kvalue === kvalue
-                              );
-                              const isEditing = editingMeasurements.has(`${size}-${kvalue}`);
-                              
-                              if (isAlreadySaved && !isEditing) {
-                                Swal.fire({
-                                  icon: 'warning',
-                                  title: 'K-Value Already Saved',
-                                  text: `Size ${size} with K-value ${kvalue} is already saved. Please select a different K-value.`,
-                                });
-                                return;
-                              }
-                              
-                              const validationErrors = [];
-                              const specsForSubmit = before_after_wash === 'Before Wash'
-                                ? (measurementSpecs.beforeWashGrouped[kvalue] || measurementSpecs.beforeWash || [])
-                                : (measurementSpecs.afterWashGrouped[kvalue] || measurementSpecs.afterWash || []);
-                              
-                              const isFullColumnChecked = fullColumnsBySize[size] || [];
-                              const isRowSelected = selectedRowsBySize[size] || Array(specsForSubmit.length).fill(true);
-                              
-                              for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
-                                const isFull = isFullColumnChecked[pcIndex];
-                                if (isFull) {
-                                  const isAnyEmpty = specsForSubmit.some((spec, specIndex) => {
-                                    const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
-                                    const value = measurementValues[cellKey];
-                                    return !value || (!value.fraction && value.decimal === 0);
+                            onClick={() => handleEditClick(data.size, data.kvalue)}
+                            className="px-2 py-1 bg-blue-600 text-white rounded text-xs hover:bg-blue-700"
+                          >
+                            Edit
+                          </button>
+                          <span className="text-xs text-gray-900 font-bold bg-green-300 px-2 py-1 rounded-full">
+                            Saved
+                          </span>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-2 grid grid-cols-3 gap-2">
+                        {/* Total Checked Points */}
+                        <div className="bg-gray-100 p-2 rounded-md text-center">
+                          <span className="text-blue-500 font-semibold text-xl">
+                            {data.pcs.flatMap(pc => pc.measurementPoints).length}
+                          </span>
+                          <p className="text-s text-gray-900">📝</p>
+                        </div>
+                        {/* Pass Count */}
+                        <div className="bg-green-100 p-2 rounded-md text-center">
+                          <span className="text-green-500 font-semibold text-xl">
+                            {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'pass').length}
+                          </span>
+                          <p className="text-s text-gray-900">✔️</p>
+                        </div>
+                        {/* Fail Count */}
+                        <div className="bg-red-100 p-2 rounded-md text-center">
+                          <span className="text-red-500 font-semibold text-xl">
+                            {data.pcs.flatMap(pc => pc.measurementPoints).filter(point => point.result === 'fail').length}
+                          </span>
+                          <p className="text-s text-gray-900">❌</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Show measurement table for new sizes */}
+            {showMeasurementTable && selectedSizes.length > 0 && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4 text-gray-800 dark:text-white">Measurement Input</h3>
+                <div className="grid grid-cols-1 gap-6">
+                  {selectedSizes.map(({ size, qty }) => {
+                    // Check if current K-value for this size is saved
+                    const currentKValue = getKValueForSize(size, before_after_wash === 'Before Wash' ? 'before' : 'after');
+                    const isCurrentKValueSaved = currentWashMeasurements.some(
+                      m => m.size === size && m.kvalue === currentKValue
+                    );
+                    const isEditing = editingMeasurements.has(`${size}-${currentKValue}`);
+                    
+                    // Only show measurement table if current K-value is NOT saved OR is being edited
+                    if (isCurrentKValueSaved && !isEditing) return null;
+                    
+                    return (
+                      <div key={`measurement-container-${size}`} className="border rounded-lg p-4 bg-white border-gray-200 dark:bg-gray-800 dark:text-white">
+                        {renderMeasurementTable(size, qty)}
+                        {onSizeSubmit && (
+                          <div className="mt-4 flex justify-end">
+                            <button
+                              onClick={() => {
+                                const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+                                const kvalue = getKValueForSize(size, tableType);
+                                
+                                // Check if this K-value is already saved for this size (but allow editing)
+                                const isAlreadySaved = currentWashMeasurements.some(
+                                  m => m.size === size && m.kvalue === kvalue
+                                );
+                                const isEditing = editingMeasurements.has(`${size}-${kvalue}`);
+                                
+                                if (isAlreadySaved && !isEditing) {
+                                  Swal.fire({
+                                    icon: 'warning',
+                                    title: 'K-Value Already Saved',
+                                    text: `Size ${size} with K-value ${kvalue} is already saved. Please select a different K-value.`,
                                   });
-                                  if (isAnyEmpty) {
-                                    validationErrors.push(`You must fill all the measurement points in "pcs ${pcIndex + 1}".`);
-                                  }
-                                } else {
-                                  specsForSubmit.forEach((spec, specIndex) => {
-                                    if (isRowSelected[specIndex]) {
+                                  return;
+                                }
+                                
+                                const validationErrors = [];
+                                const specsForSubmit = before_after_wash === 'Before Wash'
+                                  ? (measurementSpecs.beforeWashGrouped[kvalue] || measurementSpecs.beforeWash || [])
+                                  : (measurementSpecs.afterWashGrouped[kvalue] || measurementSpecs.afterWash || []);
+                                
+                                const isFullColumnChecked = fullColumnsBySize[size] || [];
+                                const isRowSelected = selectedRowsBySize[size] || Array(specsForSubmit.length).fill(true);
+                                
+                                for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
+                                  const isFull = isFullColumnChecked[pcIndex];
+                                  if (isFull) {
+                                    const isAnyEmpty = specsForSubmit.some((spec, specIndex) => {
                                       const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
                                       const value = measurementValues[cellKey];
-                                      if (!value || (!value.fraction && value.decimal === 0)) {
-                                        validationErrors.push(`Piece ${pcIndex + 1}: Measurement for selected row "${spec.MeasurementPointEngName}" is required.`);
+                                      return !value || (!value.fraction && value.decimal === 0);
+                                    });
+                                    if (isAnyEmpty) {
+                                      validationErrors.push(`You must fill all the measurement points in "pcs ${pcIndex + 1}".`);
+                                    }
+                                  } else {
+                                    specsForSubmit.forEach((spec, specIndex) => {
+                                      if (isRowSelected[specIndex]) {
+                                        const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
+                                        const value = measurementValues[cellKey];
+                                        if (!value || (!value.fraction && value.decimal === 0)) {
+                                          validationErrors.push(`Piece ${pcIndex + 1}: Measurement for selected row "${spec.MeasurementPointEngName}" is required.`);
+                                        }
                                       }
+                                    });
+                                  }
+                                }
+                                
+                                if (validationErrors.length > 0) {
+                                  Swal.fire({
+                                    icon: 'error',
+                                    title: 'Incomplete Measurements',
+                                    html: `<div style="text-align: left; max-height: 200px; overflow-y: auto;"><ul>${validationErrors.map(e => `<li>${e}</li>`).join('')}</ul></div>`,
+                                  });
+                                  return;
+                                }
+                                
+                                const transformedData = transformMeasurementData(
+                                  size, 
+                                  qty, 
+                                  measurementValues, 
+                                  selectedRowsBySize[size], 
+                                  fullColumnsBySize[size], 
+                                  specsForSubmit, 
+                                  tableType, 
+                                  kvalue,
+                                  before_after_wash,
+                                  isEditing // Pass editing flag
+                                );
+                                // Save the pattern for future use
+                                saveMeasurementPattern(size, selectedRowsBySize[size], tableType);
+                                onSizeSubmit(transformedData);
+                                
+                                // Remove from editing state
+                                setEditingMeasurements(prev => {
+                                  const newSet = new Set(prev);
+                                  newSet.delete(`${size}-${kvalue}`);
+                                  return newSet;
+                                });
+                                
+                                // Always remove the size from selectedSizes after saving
+                                // User needs to manually select it again to work on next K-value
+                                setSelectedSizes(prev => prev.filter(s => s.size !== size));
+                                
+                                // Clean up related state
+                                setSelectedRowsBySize(prev => {
+                                  const next = { ...prev };
+                                  delete next[size];
+                                  return next;
+                                });
+                                
+                                setFullColumnsBySize(prev => {
+                                  const next = { ...prev };
+                                  delete next[size];
+                                  return next;
+                                });
+                                
+                                setMeasurementValues(prev => {
+                                  const newValues = { ...prev };
+                                  Object.keys(newValues).forEach(key => {
+                                    if (key.startsWith(`${size}-${tableType}-${kvalue}-`)) {
+                                      delete newValues[key];
                                     }
                                   });
-                                }
-                              }
-                              
-                              if (validationErrors.length > 0) {
-                                Swal.fire({
-                                  icon: 'error',
-                                  title: 'Incomplete Measurements',
-                                  html: `<div style="text-align: left; max-height: 200px; overflow-y: auto;"><ul>${validationErrors.map(e => `<li>${e}</li>`).join('')}</ul></div>`,
+                                  return newValues;
                                 });
-                                return;
-                              }
-                              
-                              const transformedData = transformMeasurementData(
-                                size, 
-                                qty, 
-                                measurementValues, 
-                                selectedRowsBySize[size], 
-                                fullColumnsBySize[size], 
-                                specsForSubmit, 
-                                tableType, 
-                                kvalue,
-                                before_after_wash,
-                                isEditing // Pass editing flag
-                              );
-                              // Save the pattern for future use
-                              saveMeasurementPattern(size, selectedRowsBySize[size], tableType);
-                              onSizeSubmit(transformedData);
-                              
-                              // Remove from editing state
-                              setEditingMeasurements(prev => {
-                                const newSet = new Set(prev);
-                                newSet.delete(`${size}-${kvalue}`);
-                                return newSet;
-                              });
-                              
-                              // Always remove the size from selectedSizes after saving
-                              // User needs to manually select it again to work on next K-value
-                              setSelectedSizes(prev => prev.filter(s => s.size !== size));
-                              
-                              // Clean up related state
-                              setSelectedRowsBySize(prev => {
-                                const next = { ...prev };
-                                delete next[size];
-                                return next;
-                              });
-                              
-                              setFullColumnsBySize(prev => {
-                                const next = { ...prev };
-                                delete next[size];
-                                return next;
-                              });
-                              
-                              setMeasurementValues(prev => {
-                                const newValues = { ...prev };
-                                Object.keys(newValues).forEach(key => {
-                                  if (key.startsWith(`${size}-${tableType}-${kvalue}-`)) {
-                                    delete newValues[key];
-                                  }
+                                
+                                // Clear size-specific K-values
+                                setSizeSpecificKValues(prev => {
+                                  const newValues = { ...prev };
+                                  delete newValues[`${size}-before`];
+                                  delete newValues[`${size}-after`];
+                                  return newValues;
                                 });
-                                return newValues;
-                              });
-                              
-                              // Clear size-specific K-values
-                              setSizeSpecificKValues(prev => {
-                                const newValues = { ...prev };
-                                delete newValues[`${size}-before`];
-                                delete newValues[`${size}-after`];
-                                return newValues;
-                              });
-                            }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
-                          >
-                            Save Size {size} (K: {getKValueForSize(size, before_after_wash === 'Before Wash' ? 'before' : 'after')})
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+                              }}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                            >
+                              Save Size {size} (K: {getKValueForSize(size, before_after_wash === 'Before Wash' ? 'before' : 'after')})
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
-        </div>
-      )
-    )}
+            )}
+          </div>
+        )
+      )}
 
-    {showNumPad && (
-      <MeasurementNumPad
-        onClose={() => setShowNumPad(false)}
-        onInput={(decimalValue, fractionValue) => {
-          const { size, table, rowIndex, colIndex } = currentCell;
-          const currentKValue = getKValueForSize(size, table);
-          const cellKey = `${size}-${table}-${currentKValue}-${rowIndex}-${colIndex}`;
-          setMeasurementValues(prev => ({
-            ...prev,
-            [cellKey]: { decimal: decimalValue, fraction: fractionValue }
-          }));
-          setShowNumPad(false);
-        }}
-      />
-    )}
-  </div>
-);
-
+      {showNumPad && (
+        <MeasurementNumPad
+          onClose={() => setShowNumPad(false)}
+          onInput={(decimalValue, fractionValue) => {
+            const { size, table, rowIndex, colIndex } = currentCell;
+            const currentKValue = getKValueForSize(size, table);
+            const cellKey = `${size}-${table}-${currentKValue}-${rowIndex}-${colIndex}`;
+            setMeasurementValues(prev => ({
+              ...prev,
+              [cellKey]: { decimal: decimalValue, fraction: fractionValue }
+            }));
+            setShowNumPad(false);
+          }}
+        />
+      )}
+    </div>
+  );
 };
 
 MeasurementDetailsSection.propTypes = {
@@ -1740,6 +1873,8 @@ MeasurementDetailsSection.propTypes = {
   onMeasurementEdit: PropTypes.func,
   before_after_wash: PropTypes.string,
   recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  formData: PropTypes.object,
 };
 
 export default MeasurementDetailsSection;
+
