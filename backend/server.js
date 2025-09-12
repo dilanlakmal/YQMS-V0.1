@@ -32266,10 +32266,10 @@ app.post(
         .webp({ quality: 80 })
         .toFile(finalDiskPath);
 
-      // Use your API_BASE_URL from your config
-      const publicUrl = `${process.env.API_BASE_URL}/storage/sub-con-qc1/${newFilename}`;
+      // ---Use a relative URL for the frontend ---
+      const relativeUrl = `/storage/sub-con-qc1/${newFilename}`;
 
-      res.json({ success: true, filePath: publicUrl });
+      res.json({ success: true, filePath: relativeUrl }); // Send the relative path
     } catch (error) {
       console.error("Error in QA image upload:", error);
       res

@@ -1,4 +1,5 @@
 import axios from "axios";
+import imageCompression from "browser-image-compression";
 import { Camera, Loader2, Minus, Plus, Upload, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 import Webcam from "react-webcam";
@@ -27,6 +28,7 @@ const SubConQCQADefect = ({
     setQty((prevQty) => Math.max(1, prevQty + amount));
   };
 
+  // --- MODIFIED: This function now takes a compressed file ---
   const uploadFile = async (file) => {
     if (
       !inspectionContext.date ||
@@ -68,7 +70,7 @@ const SubConQCQADefect = ({
         }
       );
       if (res.data.success) {
-        setImages([...images, res.data.filePath]);
+        setImages([...images, res.data.filePath]); // The relative path is stored
       }
     } catch (error) {
       console.error("Image upload failed:", error);
@@ -82,23 +84,55 @@ const SubConQCQADefect = ({
     }
   };
 
-  const handleFileSelect = (event) => {
+  // --- MODIFIED: Intercept file selection for compression ---
+  const handleFileSelect = async (event) => {
     const file = event.target.files[0];
-    if (file) {
-      uploadFile(file);
+    if (file && file.type.startsWith("image/")) {
+      setIsUploading(true);
+      try {
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1024,
+          useWebWorker: true,
+          fileType: "image/webp"
+        };
+        const compressedFile = await imageCompression(file, options);
+        await uploadFile(compressedFile); // Upload the compressed file
+      } catch (error) {
+        console.error("Compression error:", error);
+        await uploadFile(file); // Fallback to original if compression fails
+      } finally {
+        setIsUploading(false);
+      }
     }
     event.target.value = null; // Reset input
   };
 
+  // --- MODIFIED: Intercept webcam capture for compression ---
   const handleCapture = async () => {
     const imageSrc = webcamRef.current.getScreenshot();
     if (imageSrc) {
-      const blob = await (await fetch(imageSrc)).blob();
-      const file = new File([blob], `capture-${Date.now()}.jpg`, {
-        type: "image/jpeg"
-      });
-      uploadFile(file);
       setShowWebcam(false);
+      setIsUploading(true);
+      try {
+        const blob = await (await fetch(imageSrc)).blob();
+        const file = new File([blob], `capture-${Date.now()}.jpg`, {
+          type: "image/jpeg"
+        });
+
+        // Compress the captured image
+        const options = {
+          maxSizeMB: 1,
+          maxWidthOrHeight: 1024,
+          useWebWorker: true,
+          fileType: "image/webp"
+        };
+        const compressedFile = await imageCompression(file, options);
+        await uploadFile(compressedFile);
+      } catch (e) {
+        console.error("Error creating/compressing file from blob:", e);
+        setIsUploading(false); // Ensure loader stops on error
+      }
     }
   };
 
@@ -180,8 +214,9 @@ const SubConQCQADefect = ({
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {images.map((imgUrl, index) => (
               <div key={index} className="relative group">
+                {/* --- MODIFIED: Prepend API_BASE_URL to the src --- */}
                 <img
-                  src={imgUrl}
+                  src={`${API_BASE_URL}${imgUrl}`}
                   alt={`Defect ${index + 1}`}
                   className="w-full h-24 object-cover rounded-md"
                 />
