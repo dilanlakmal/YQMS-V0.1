@@ -32237,7 +32237,7 @@ app.post(
         "storage",
         "sub-con-qc1"
       );
-      await fsPromises.mkdir(uploadPath, { recursive: true });
+      //await fsPromises.mkdir(uploadPath, { recursive: true });
 
       const sanitizedFactory = sanitize(factory);
       const sanitizedDate = sanitize(date);
