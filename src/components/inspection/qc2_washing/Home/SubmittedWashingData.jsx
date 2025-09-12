@@ -282,25 +282,6 @@ useEffect(() => {
     };
   };
 
-  // Helper function to calculate overall result dynamically
-  const calculateOverallResult = (record) => {
-    const defectResult = record.defectDetails?.result || "Pass";
-    
-    // Calculate measurement result based on pass rate >= 95%
-    let measurementResult = "Pass";
-    if (record.measurementDetails?.measurementSizeSummary?.length > 0) {
-      measurementResult = record.measurementDetails.measurementSizeSummary.every(size => {
-        const total = (size.totalPass || 0) + (size.totalFail || 0);
-        if (total === 0) return true; // No measurements, consider as pass
-        const passRate = ((size.totalPass || 0) / total) * 100;
-        return passRate >= 95;
-      }) ? "Pass" : "Fail";
-    }
-    
-    // Overall result is Pass only if both defect and measurement results are Pass
-    return (defectResult === "Pass" && measurementResult === "Pass") ? "Pass" : "Fail";
-  };
-
   const handleFullReport = (record) => {
   setFullReportModal({
     isOpen: true,
@@ -833,6 +814,9 @@ const processImageToBase64 = async (imagePath) => {
                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                  Report Type
                   </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
+                   Before/After Wash
+                  </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     MO No
                   </th>
@@ -854,15 +838,19 @@ const processImageToBase64 = async (imagePath) => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                    Checked Qty
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                   Before/After Wash
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Status
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   Defect Qty
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
                     Pass Rate (Measur.) (%)
                   </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
+                    Defect Rate (%)
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
+                    Status
+                  </th>
+                  
                   {showDefectColumn && (
                     <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
                       Defect Details
@@ -882,6 +870,8 @@ const processImageToBase64 = async (imagePath) => {
                   <th className="px-3 py-2"></th>
                   {/* <th className="px-3 py-2"></th> */}
                   {/* <th className="px-3 py-2"></th> */}
+                  <th className="px-3 py-2"></th>
+                  <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
@@ -920,6 +910,8 @@ const processImageToBase64 = async (imagePath) => {
                 {paginatedData.map((record, index) => {
                   const defectDetails = getDefectDetails(record);
                   const measurementDetails = getMeasurementDetails(record);
+                  const totalDefectCount = defectDetails.reduce((sum, defect) => sum + (defect.qty || 0), 0);
+                  const defectRate = record.checkedQty > 0 ? ((totalDefectCount / record.checkedQty) * 100).toFixed(2) : "0";
                   
                   return (
                     <tr key={record._id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -937,6 +929,9 @@ const processImageToBase64 = async (imagePath) => {
                       </td>
                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.reportType || 'N/A'}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                        {record.before_after_wash || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.orderNo || 'N/A'}
@@ -966,23 +961,7 @@ const processImageToBase64 = async (imagePath) => {
                         {record.checkedQty || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.before_after_wash || 'N/A'}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap text-sm">
-                        {(() => {
-                          const dynamicResult = calculateOverallResult(record);
-                          return (
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              dynamicResult === 'Pass' 
-                                ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
-                                : dynamicResult === 'Fail'
-                                ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
-                                : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
-                            }`}>
-                              {dynamicResult}
-                            </span>
-                          );
-                        })()}
+                        {totalDefectCount}
                       </td>
                        <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {(() => {
@@ -995,6 +974,26 @@ const processImageToBase64 = async (imagePath) => {
                           return record.passRate || 0;
                         })()}
                       </td>
+                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                        {defectRate}
+                      </td>
+                      <td className="px-3 py-4 whitespace-nowrap text-sm">
+                        {(() => {
+                          const finalResult = record.overallFinalResult || 'Pending';
+                          return (
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              finalResult === 'Pass' 
+                                ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
+                                : finalResult === 'Fail'
+                                ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
+                                : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
+                            }`}>
+                              {finalResult}
+                            </span>
+                          );
+                        })()}
+                      </td>
+                      
                       {showDefectColumn && (
                         <td className="px-3 py-4 text-sm text-gray-900 dark:text-gray-200">
                           {defectDetails.length > 0 ? (

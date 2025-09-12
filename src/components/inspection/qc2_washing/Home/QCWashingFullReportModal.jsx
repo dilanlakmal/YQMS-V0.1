@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { X, FileText, Palette, Building, User, Hash, Droplets, ClipboardCheck, Package, Target, CheckCircle, XCircle, TrendingUp, BarChart3, AlertTriangle, Ruler, Thermometer, Clock, Zap, Beaker, ShoppingCart, Factory, Eye, Camera, MessageSquare, Award, Activity, ArrowLeftRight } from "lucide-react";
 import axios from "axios";
 
@@ -11,6 +11,9 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
   const [selectedKValue, setSelectedKValue] = useState(null);
   const [availableKValues, setAvailableKValues] = useState([]);
+  // New state for checkboxes
+  const [showFullChart, setShowFullChart] = useState(true);
+  const [showSizeBySizeChart, setShowSizeBySizeChart] = useState(false);
 
   // Helper function to convert file paths to accessible URLs
 // Helper function to convert file paths to accessible URLs
@@ -95,14 +98,8 @@ const getImageUrl = (imagePath) => {
       
       mergedComparisonData.measurementDetails.measurement = allMeasurements;
     }
+  
     
-    console.log('Comparison search results:', {
-      targetWashType,
-      totalRecords: response.data.length,
-      foundRecords: comparisonRecords.length,
-      mergedSizes: mergedComparisonData?.measurementDetails?.measurement?.map(m => m.size) || [],
-      hasMeasurements: !!mergedComparisonData?.measurementDetails?.measurement?.length
-    });
     
     setComparisonData(mergedComparisonData);
   } catch (error) {
@@ -163,7 +160,7 @@ const getImageUrl = (imagePath) => {
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-hidden">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-8xl w-full max-h-[90vh] overflow-hidden">
         {/* Modal Header */}
         <div className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white p-6">
           <div className="flex items-center justify-between">
@@ -626,148 +623,220 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="space-y-6">
                         {/* Checked Points */}
-                        {inspectionDetails.checkedPoints && inspectionDetails.checkedPoints.length > 0 && (
+                        {inspectionDetails.checkpointInspectionData && inspectionDetails.checkpointInspectionData.length > 0 ? (
                           <div>
-                            <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checked Points</h4>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                              {inspectionDetails.checkedPoints.map((point, index) => (
-                                <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
+                            <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checkpoints</h4>
+                            <div className="space-y-6">
+                              {inspectionDetails.checkpointInspectionData.map((mainPoint, index) => (
+                                <div key={mainPoint.id || index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center space-x-3">
                                       <div className={`p-2 rounded-lg ${
-                                        point.decision === 'ok' || point.status === 'Pass' 
-                                          ? 'bg-green-500'
-                                          : 'bg-red-500'
+                                        mainPoint.decision === 'Pass' ? 'bg-green-500' : 'bg-red-500'
                                       }`}>
                                         <Target className="w-4 h-4 text-white" />
                                       </div>
-                                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{point.pointName}</span>
+                                      <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{mainPoint.name}</span>
                                     </div>
-                                    <div className="flex items-center space-x-2">
-                                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                        point.decision === 'ok' || point.status === 'Pass' 
-                                          ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                                          : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
-                                      }`}>
-                                        {point.status || (point.decision === 'ok' ? 'Pass' : 'Fail')}
-                                      </span>
-                                    </div>
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                      mainPoint.decision === 'Pass' 
+                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                        : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                    }`}>
+                                      {mainPoint.decision}
+                                    </span>
                                   </div>
-                                  
-                                  {/* Point Details */}
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                      {point.expectedValue && (
-                                        <div className="mb-2">
-                                          <span className="text-xs text-gray-600 dark:text-gray-400">Expected: </span>
-                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.expectedValue}</span>
-                                        </div>
-                                      )}
-                                      {point.actualValue && (
-                                        <div className="mb-2">
-                                          <span className="text-xs text-gray-600 dark:text-gray-400">Actual: </span>
-                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.actualValue}</span>
-                                        </div>
-                                      )}
-                                      {point.tolerance && (
-                                        <div className="mb-2">
-                                          <span className="text-xs text-gray-600 dark:text-gray-400">Tolerance: </span>
-                                          <span className="text-sm font-medium text-gray-800 dark:text-gray-200">±{point.tolerance}</span>
-                                        </div>
-                                      )}
-                                      {point.decision && (
-                                        <div className="mb-2">
-                                          <span className="text-xs text-gray-600 dark:text-gray-400">Decision: </span>
-                                          <span className={`text-sm font-bold ${
-                                            point.decision.toLowerCase() === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-                                          }`}>{point.decision.toUpperCase()}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                    
-                                    {/* Images */}
-                                    <div>
-                                      {/* Point Image */}
-                                      {point.image && (
-                                        <div className="mb-3">
-                                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Point Image:</p>
-                                          <div className="w-full h-24 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
-                                            {(() => {
-                                              const imageUrl = getImageUrl(point.image);
-                                              console.log('Point Image URL:', imageUrl); // Debug log
-                                              return imageUrl ? (
-                                                <img 
-                                                  src={imageUrl}
-                                                  alt={`Point: ${point.pointName}`}
-                                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                                  onClick={() => window.open(imageUrl, '_blank')}
-                                                  onError={(e) => {
-                                                    console.error('Failed to load point image:', imageUrl);
-                                                    e.target.style.display = 'none';
-                                                    e.target.nextSibling.style.display = 'flex';
-                                                  }}
-                                                />
-                                              ) : null;
-                                            })()}
-                                            <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
-                                              <div>
-                                                <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
-                                                <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        </div>
-                                      )}
-                                      
-                                      {/* Comparison Images */}
-                                      {point.comparison && point.comparison.length > 0 && (
-                                        <div>
-                                          <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Comparison Images:</p>
-                                          <div className="grid grid-cols-2 gap-2">
-                                            {point.comparison.map((img, imgIndex) => {
-                                              const imageUrl = getImageUrl(img);
-                                              console.log(`Comparison Image ${imgIndex} URL:`, imageUrl); // Debug log
-                                              return (
-                                                <div key={imgIndex} className="w-full h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
-                                                  {imageUrl ? (
-                                                    <img 
-                                                      src={imageUrl}
-                                                      alt={`Comparison ${imgIndex + 1}`}
-                                                      className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                                      onClick={() => window.open(imageUrl, '_blank')}
-                                                      onError={(e) => {
-                                                        console.error('Failed to load comparison image:', imageUrl);
-                                                        e.target.style.display = 'none';
-                                                        e.target.nextSibling.style.display = 'flex';
-                                                      }}
-                                                    />
-                                                  ) : null}
-                                                  <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
-                                                    <div>
-                                                      <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
-                                                      <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
-                                                    </div>
-                                                  </div>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  
-                                  {/* Remark */}
-                                  {point.remark && (
+                                  {mainPoint.remark && (
                                     <div className="mt-3 bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-600">
                                       <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Remark:</p>
-                                      <p className="text-sm text-gray-800 dark:text-gray-200">{point.remark}</p>
+                                      <p className="text-sm text-gray-800 dark:text-gray-200">{mainPoint.remark}</p>
+                                    </div>
+                                  )}
+                                  {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
+                                    <div className="mt-4 pl-4 border-l-2 border-gray-300 dark:border-gray-500 space-y-3">
+                                      <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 -ml-4 mb-2">Sub-points:</h5>
+                                      {mainPoint.subPoints.map((subPoint, subIndex) => (
+                                        <div key={subPoint.id || subIndex} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+                                          <div className="flex justify-between items-center">
+                                            <p className="text-sm text-gray-700 dark:text-gray-300">{subPoint.name}:</p>
+                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{subPoint.decision}</span>
+                                          </div>
+                                          {subPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">Remark: {subPoint.remark}</p>}
+                                          {subPoint.comparisonImages && subPoint.comparisonImages.length > 0 && (
+                                            <div className="mt-2">
+                                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Images:</p>
+                                              <div className="grid grid-cols-3 gap-2">
+                                                {subPoint.comparisonImages.map((img, imgIdx) => {
+                                                  const imageUrl = getImageUrl(img);
+                                                  return (
+                                                    <div key={imgIdx} className="w-full h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                                      {imageUrl ? (
+                                                        <img 
+                                                          src={imageUrl}
+                                                          alt={`Sub-point image ${imgIdx + 1}`}
+                                                          className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                          onClick={() => window.open(imageUrl, '_blank')}
+                                                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                                        />
+                                                      ) : null}
+                                                      <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400">No Image</div>
+                                                      </div>
+                                                    </div>
+                                                  );
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
                                     </div>
                                   )}
                                 </div>
                               ))}
                             </div>
                           </div>
+                        ) : (
+                          // Fallback to legacy checkedPoints
+                          inspectionDetails.checkedPoints && inspectionDetails.checkedPoints.length > 0 && (
+                            <div>
+                              <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checked Points</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                                {inspectionDetails.checkedPoints.map((point, index) => (
+                                  <div key={index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
+                                    <div className="flex items-center justify-between mb-4">
+                                      <div className="flex items-center space-x-3">
+                                        <div className={`p-2 rounded-lg ${
+                                          point.decision === 'ok' || point.status === 'Pass' 
+                                            ? 'bg-green-500'
+                                            : 'bg-red-500'
+                                        }`}>
+                                          <Target className="w-4 h-4 text-white" />
+                                        </div>
+                                        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{point.pointName}</span>
+                                      </div>
+                                      <div className="flex items-center space-x-2">
+                                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                          point.decision === 'ok' || point.status === 'Pass' 
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                            : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                        }`}>
+                                          {point.status || (point.decision === 'ok' ? 'Pass' : 'Fail')}
+                                        </span>
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Point Details */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      <div>
+                                        {point.expectedValue && (
+                                          <div className="mb-2">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Expected: </span>
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.expectedValue}</span>
+                                          </div>
+                                        )}
+                                        {point.actualValue && (
+                                          <div className="mb-2">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Actual: </span>
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{point.actualValue}</span>
+                                          </div>
+                                        )}
+                                        {point.tolerance && (
+                                          <div className="mb-2">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Tolerance: </span>
+                                            <span className="text-sm font-medium text-gray-800 dark:text-gray-200">±{point.tolerance}</span>
+                                          </div>
+                                        )}
+                                        {point.decision && (
+                                          <div className="mb-2">
+                                            <span className="text-xs text-gray-600 dark:text-gray-400">Decision: </span>
+                                            <span className={`text-sm font-bold ${
+                                              point.decision.toLowerCase() === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                                            }`}>{point.decision.toUpperCase()}</span>
+                                          </div>
+                                        )}
+                                      </div>
+                                      
+                                      {/* Images */}
+                                      <div>
+                                        {/* Point Image */}
+                                        {point.image && (
+                                          <div className="mb-3">
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Point Image:</p>
+                                            <div className="w-full h-24 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                              {(() => {
+                                                const imageUrl = getImageUrl(point.image);
+                                                return imageUrl ? (
+                                                  <img 
+                                                    src={imageUrl}
+                                                    alt={`Point: ${point.pointName}`}
+                                                    className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                    onClick={() => window.open(imageUrl, '_blank')}
+                                                    onError={(e) => {
+                                                      e.target.style.display = 'none';
+                                                      e.target.nextSibling.style.display = 'flex';
+                                                    }}
+                                                  />
+                                                ) : null;
+                                              })()}
+                                              <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                                <div>
+                                                  <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
+                                                  <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
+                                                </div>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        )}
+                                        
+                                        {/* Comparison Images */}
+                                        {point.comparison && point.comparison.length > 0 && (
+                                          <div>
+                                            <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Comparison Images:</p>
+                                            <div className="grid grid-cols-2 gap-2">
+                                              {point.comparison.map((img, imgIndex) => {
+                                                const imageUrl = getImageUrl(img);
+                                                return (
+                                                  <div key={imgIndex} className="w-full h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                                    {imageUrl ? (
+                                                      <img 
+                                                        src={imageUrl}
+                                                        alt={`Comparison ${imgIndex + 1}`}
+                                                        className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                        onClick={() => window.open(imageUrl, '_blank')}
+                                                        onError={(e) => {
+                                                          e.target.style.display = 'none';
+                                                          e.target.nextSibling.style.display = 'flex';
+                                                        }}
+                                                      />
+                                                    ) : null}
+                                                    <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                                      <div>
+                                                        <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">📷</div>
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400">Image not available</div>
+                                                      </div>
+                                                    </div>
+                                                  </div>
+                                                );
+                                              })}
+                                            </div>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    {/* Remark */}
+                                    {point.remark && (
+                                      <div className="mt-3 bg-white dark:bg-gray-800 rounded p-3 border border-gray-200 dark:border-gray-600">
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Remark:</p>
+                                        <p className="text-sm text-gray-800 dark:text-gray-200">{point.remark}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
                         )}
                                       
                       {/* Parameters */}
@@ -866,7 +935,8 @@ const getImageUrl = (imagePath) => {
                                   <h5 className="text-sm font-bold text-gray-800 dark:text-gray-200">{machine.machineType}</h5>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  {machine.temperature && (
+                                  {/* Temperature */}
+                                  {machine.temperature && (machine.temperature.actualValue !== undefined && machine.temperature.actualValue !== null && machine.temperature.actualValue !== "") && (
                                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-orange-100 dark:border-orange-800 hover:shadow-sm transition-shadow">
                                       <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center space-x-2">
@@ -897,7 +967,9 @@ const getImageUrl = (imagePath) => {
                                       </div>
                                     </div>
                                   )}
-                                  {machine.time && (
+
+                                  {/* Regular Time (for Washing Machine) */}
+                                  {machine.time && (machine.time.actualValue !== undefined && machine.time.actualValue !== null && machine.time.actualValue !== "") && (
                                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-blue-100 dark:border-blue-800 hover:shadow-sm transition-shadow">
                                       <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center space-x-2">
@@ -928,7 +1000,75 @@ const getImageUrl = (imagePath) => {
                                       </div>
                                     </div>
                                   )}
-                                  {machine.silicon && machine.silicon.actualValue && (
+
+                                  {/* Time Hot (for Tumble Dry) */}
+                                  {machine.timeHot && (machine.timeHot.actualValue !== undefined && machine.timeHot.actualValue !== null && machine.timeHot.actualValue !== "") && (
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-red-100 dark:border-red-800 hover:shadow-sm transition-shadow">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center space-x-2">
+                                          <div className={`p-1 rounded ${
+                                            machine.timeHot.status?.ok ? 'bg-green-100' : 'bg-red-100'
+                                          }`}>
+                                            <Clock className={`w-4 h-4 ${
+                                              machine.timeHot.status?.ok ? 'text-green-500' : 'text-red-500'
+                                            }`} />
+                                          </div>
+                                          <span className="text-sm font-bold text-gray-800 dark:text-gray-200">Time Hot</span>
+                                        </div>
+                                        {machine.timeHot.status?.ok ? (
+                                          <CheckCircle className="w-4 h-4 text-green-500" />
+                                        ) : (
+                                          <XCircle className="w-4 h-4 text-red-500" />
+                                        )}
+                                      </div>
+                                      <div className="text-xs space-y-1">
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600 dark:text-gray-400">Standard:</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.timeHot.standardValue !== undefined && machine.timeHot.standardValue !== null ? machine.timeHot.standardValue : 'N/A'}min</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600 dark:text-gray-400">Actual:</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.timeHot.actualValue !== undefined && machine.timeHot.actualValue !== null ? machine.timeHot.actualValue : 'N/A'}min</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Time Cool (for Tumble Dry) */}
+                                  {machine.timeCool && (machine.timeCool.actualValue !== undefined && machine.timeCool.actualValue !== null && machine.timeCool.actualValue !== "") && (
+                                    <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-cyan-100 dark:border-cyan-800 hover:shadow-sm transition-shadow">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div className="flex items-center space-x-2">
+                                          <div className={`p-1 rounded ${
+                                            machine.timeCool.status?.ok ? 'bg-green-100' : 'bg-red-100'
+                                          }`}>
+                                            <Clock className={`w-4 h-4 ${
+                                              machine.timeCool.status?.ok ? 'text-green-500' : 'text-red-500'
+                                            }`} />
+                                          </div>
+                                          <span className="text-sm font-bold text-gray-800 dark:text-gray-200">Time Cool</span>
+                                        </div>
+                                        {machine.timeCool.status?.ok ? (
+                                          <CheckCircle className="w-4 h-4 text-green-500" />
+                                        ) : (
+                                          <XCircle className="w-4 h-4 text-red-500" />
+                                        )}
+                                      </div>
+                                      <div className="text-xs space-y-1">
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600 dark:text-gray-400">Standard:</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.timeCool.standardValue !== undefined && machine.timeCool.standardValue !== null ? machine.timeCool.standardValue : 'N/A'}min</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-gray-600 dark:text-gray-400">Actual:</span>
+                                          <span className="font-medium text-gray-800 dark:text-gray-200">{machine.timeCool.actualValue !== undefined && machine.timeCool.actualValue !== null ? machine.timeCool.actualValue : 'N/A'}min</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Silicon */}
+                                  {machine.silicon && (machine.silicon.actualValue !== undefined && machine.silicon.actualValue !== null && machine.silicon.actualValue !== "") && (
                                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-purple-100 dark:border-purple-800 hover:shadow-sm transition-shadow">
                                       <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center space-x-2">
@@ -959,7 +1099,9 @@ const getImageUrl = (imagePath) => {
                                       </div>
                                     </div>
                                   )}
-                                  {machine.softener && machine.softener.actualValue && (
+
+                                  {/* Softener */}
+                                  {machine.softener && (machine.softener.actualValue !== undefined && machine.softener.actualValue !== null && machine.softener.actualValue !== "") && (
                                     <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-cyan-100 dark:border-cyan-800 hover:shadow-sm transition-shadow">
                                       <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center space-x-2">
@@ -1026,6 +1168,7 @@ const getImageUrl = (imagePath) => {
                           </div>
                         </div>
                       )}
+
                     </div>
                   </div>
                 );
@@ -1219,9 +1362,27 @@ const getImageUrl = (imagePath) => {
                         <div className="bg-teal-100 dark:bg-teal-900/30 p-2 rounded-lg mr-3">
                           <Ruler className="w-5 h-5 text-teal-600 dark:text-teal-400" />
                         </div>
-                        Selected Measurement Points
+                      Measurement Results
                       </h3>
-                      <div className="flex items-center space-x-3">
+                    <div className="flex items-center space-x-4">
+                      <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={showFullChart}
+                          onChange={() => setShowFullChart(!showFullChart)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Full Chart</span>
+                      </label>
+                      <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                          type="checkbox"
+                          checked={showSizeBySizeChart}
+                          onChange={() => setShowSizeBySizeChart(!showSizeBySizeChart)}
+                          className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                        />
+                        <span>Size-by-Size</span>
+                      </label>
                         {availableKValues.length > 1 && (
                           <div className="flex items-center space-x-2">
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">K-Value:</label>
@@ -1242,7 +1403,330 @@ const getImageUrl = (imagePath) => {
                       </div>
                     </div>
 
+                    {/* NEW: Conditional rendering for Full Chart */}
+                    {showFullChart && (
+                      <div className="mb-8">
+                      <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800">
+                        <div className="flex items-center space-x-3 mb-6">
+                          <div className="bg-indigo-500 p-2 rounded-lg">
+                            <BarChart3 className="w-5 h-5 text-white" />
+                          </div>
+                          <h4 className="text-lg font-bold text-indigo-800 dark:text-indigo-200">
+                            Complete Measurement Data Sheet - All Sizes
+                          </h4>
+                          <div className="bg-indigo-200 dark:bg-indigo-700 px-3 py-1 rounded-full">
+                            <span className="text-xs font-medium text-indigo-800 dark:text-indigo-200">
+                              Consolidated View
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                            <thead className="bg-gray-50 dark:bg-gray-700">
+                              {(() => {
+                                // Get all unique sizes and sort them
+                                const allSizes = [...new Set(
+                                  reportData.measurementDetails.measurement
+                                    .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
+                                    .map(sizeData => sizeData.size)
+                                )].sort();
+
+                                // Get size data with pieces
+                                const sizeDataMap = {};
+                                reportData.measurementDetails.measurement
+                                  .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
+                                  .forEach(sizeData => {
+                                    sizeDataMap[sizeData.size] = {
+                                      ...sizeData,
+                                      sortedPcs: sizeData.pcs.sort((a, b) => {
+                                        const aNum = parseInt(String(a.pcNumber));
+                                        const bNum = parseInt(String(b.pcNumber));
+                                        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+                                        return String(a.pcNumber).localeCompare(String(b.pcNumber));
+                                      })
+                                    };
+                                  });
+
+                                return (
+                                  <>
+                                    {/* First header row - Size names with K-values */}
+                                    <tr>
+                                      <th rowSpan="2" className="px-4 py-3 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r-2 border-gray-400 dark:border-gray-500 bg-gray-100 dark:bg-gray-600">
+                                        Measurement Point
+                                      </th>
+                                      {allSizes.map((size, sizeIndex) => {
+                                        const sizeData = sizeDataMap[size];
+                                        const pieceCount = sizeData.sortedPcs.length;
+                                        const colSpan = pieceCount + 1; // +1 for Spec, Tol(-), Tol(+)
+
+                                        return (
+                                          <th key={size} colSpan={colSpan} className={`px-3 py-3 text-center text-xs font-bold text-white uppercase tracking-wider border-r-2 border-gray-400 dark:border-gray-500 ${
+                                            sizeIndex % 2 === 0 
+                                              ? 'bg-blue-600 dark:bg-blue-700' 
+                                              : 'bg-green-600 dark:bg-green-700'
+                                          }`}>
+                                            <div className="flex flex-col items-center space-y-1">
+                                              <span className="text-sm font-bold">SIZE: {size}</span>
+                                              <span className="text-xs bg-white/20 px-2 py-1 rounded">K-Value: {sizeData.kvalue}</span>
+                                            </div>
+                                          </th>
+                                        );
+                                      })}
+                                    </tr>
+                                    
+                                    {/* Second header row - Spec, Tolerance, and Piece numbers */}
+                                    <tr>
+                                      {allSizes.map((size, sizeIndex) => {
+                                        const sizeData = sizeDataMap[size];
+                                        const bgColorClass = sizeIndex % 2 === 0 
+                                          ? 'bg-blue-100 dark:bg-blue-900/30' 
+                                          : 'bg-green-100 dark:bg-green-900/30';
+                                        const textColorClass = sizeIndex % 2 === 0 
+                                          ? 'text-blue-800 dark:text-blue-200' 
+                                          : 'text-green-800 dark:text-green-200';
+                                        
+                                        return (
+                                          <React.Fragment key={size}>
+                                            <th className={`px-3 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} ${textColorClass}`}>
+                                              Spec
+                                            </th>
+                                            {/* <th className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} text-red-700 dark:text-red-400`}>
+                                              Tol (-)
+                                            </th> */}
+                                            {/* <th className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} text-green-700 dark:text-green-400`}>
+                                              Tol (+)
+                                            </th> */}
+                                            {sizeData.sortedPcs.map(pc => (
+                                              <th key={`${size}-${pc.pcNumber}`} className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} ${textColorClass}`}>
+                                                PC-{pc.pcNumber}
+                                              </th>
+                                            ))}
+                                          </React.Fragment>
+                                        );
+                                      })}
+                                    </tr>
+                                  </>
+                                );
+                              })()}
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                              {(() => {
+                                // Get all unique measurement points across all sizes
+                                const allMeasurementPoints = new Set();
+                                const measurementPointsData = {};
+
+                                // Get all sizes and their data
+                                const allSizes = [...new Set(
+                                  reportData.measurementDetails.measurement
+                                    .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
+                                    .map(sizeData => sizeData.size)
+                                )].sort();
+
+                                const sizeDataMap = {};
+                                reportData.measurementDetails.measurement
+                                  .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
+                                  .forEach(sizeData => {
+                                    sizeDataMap[sizeData.size] = {
+                                      ...sizeData,
+                                      sortedPcs: sizeData.pcs.sort((a, b) => {
+                                        const aNum = parseInt(String(a.pcNumber));
+                                        const bNum = parseInt(String(b.pcNumber));
+                                        if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+                                        return String(a.pcNumber).localeCompare(String(b.pcNumber));
+                                      })
+                                    };
+                                  });
+
+                                // Collect all measurement points and their data per size
+                                allSizes.forEach(size => {
+                                  const sizeData = sizeDataMap[size];
+                                  sizeData.sortedPcs.forEach(pc => {
+                                    pc.measurementPoints.forEach(point => {
+                                      allMeasurementPoints.add(point.pointName);
+                                      
+                                      if (!measurementPointsData[point.pointName]) {
+                                        measurementPointsData[point.pointName] = {};
+                                      }
+                                      
+                                      if (!measurementPointsData[point.pointName][size]) {
+                                        measurementPointsData[point.pointName][size] = {
+                                          specs: point.specs,
+                                          toleranceMinus: getToleranceAsFraction(point, 'minus'),
+                                          tolerancePlus: getToleranceAsFraction(point, 'plus'),
+                                          measurements: {}
+                                        };
+                                      }
+                                      
+                                      measurementPointsData[point.pointName][size].measurements[pc.pcNumber] = {
+                                        value: point.measured_value_fraction || 'N/A',
+                                        result: point.result
+                                      };
+                                    });
+                                  });
+                                });
+
+                                return Array.from(allMeasurementPoints).sort().map((pointName, index) => {
+                                  return (
+                                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                                      {/* Measurement Point Name */}
+                                      <td className="px-4 py-3 text-sm font-bold text-gray-800 dark:text-gray-200 border-r-2 border-gray-400 dark:border-gray-500 bg-gray-50 dark:bg-gray-700">
+                                        {pointName}
+                                      </td>
+                                      
+                                      {/* Data for each size */}
+                                      {allSizes.map((size, sizeIndex) => {
+                                        const sizeData = sizeDataMap[size];
+                                        const pointData = measurementPointsData[pointName]?.[size];
+                                        const bgColorClass = sizeIndex % 2 === 0 ? 'bg-blue-50 dark:bg-blue-900/10' : 'bg-green-50 dark:bg-green-900/10';
+                                        
+                                        return (
+                                          <React.Fragment key={size}>
+                                            {/* Spec for this size */}
+                                            <td className={`px-3 py-3 text-center text-sm font-medium text-blue-800 dark:text-blue-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
+                                              {pointData?.specs || '-'}
+                                            </td>
+                                            
+                                            {/* Tolerance (-) for this size */}
+                                            {/* <td className={`px-2 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
+                                              {pointData?.toleranceMinus || '-'}
+                                            </td> */}
+                                            
+                                            {/* Tolerance (+) for this size */}
+                                            {/* <td className={`px-2 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
+                                              {pointData?.tolerancePlus ? `+${pointData.tolerancePlus}` : '-'}
+                                            </td> */}
+                                            
+                                            {/* Measurement values for each piece in this size */}
+                                            {sizeData.sortedPcs.map(pc => {
+                                              const measurement = pointData?.measurements?.[pc.pcNumber];
+                                              const isPass = measurement?.result === 'pass';
+                                              const hasData = !!measurement;
+                                              
+                                              return (
+                                                <td key={`${size}-${pc.pcNumber}`} className={`px-2 py-3 text-center text-sm font-bold border-r border-gray-300 dark:border-gray-600 ${
+                                                  hasData ? (
+                                                    isPass 
+                                                      ? `text-green-800 dark:text-green-200 bg-green-100 dark:bg-green-900/20` 
+                                                      : `text-red-800 dark:text-red-200 bg-red-100 dark:bg-red-900/20`
+                                                  ) : `text-gray-400 dark:text-gray-500 ${bgColorClass}`
+                                                }`}>
+                                                  <div className="flex flex-col items-center space-y-1">
+                                                    <span className="text-xs font-bold">
+                                                      {measurement?.value || '-'}
+                                                    </span>
+                                                    {hasData && (
+                                                      <div className="flex items-center justify-center">
+                                                        {isPass ? (
+                                                          <CheckCircle className="w-3 h-3 text-green-500" />
+                                                        ) : (
+                                                          <XCircle className="w-3 h-3 text-red-500" />
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </td>
+                                              );
+                                            })}
+                                          </React.Fragment>
+                                        );
+                                      })}
+                                    </tr>
+                                  );
+                                });
+                              })()}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Summary Statistics for All Sizes */}
+                        <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {(() => {
+                            let totalMeasurements = 0;
+                            let totalPass = 0;
+                            let totalFail = 0;
+                            const sizeCount = new Set();
+
+                            reportData.measurementDetails.measurement
+                              .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
+                              .forEach((sizeData) => {
+                                sizeCount.add(sizeData.size);
+                                sizeData.pcs.forEach((pc) => {
+                                  pc.measurementPoints.forEach((point) => {
+                                    totalMeasurements++;
+                                    if (point.result === 'pass') {
+                                      totalPass++;
+                                    } else {
+                                      totalFail++;
+                                    }
+                                  });
+                                });
+                              });
+
+                            const passRate = totalMeasurements > 0 ? ((totalPass / totalMeasurements) * 100).toFixed(1) : 0;
+
+                            return (
+                              <>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-blue-100 dark:border-blue-800">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <Ruler className="w-4 h-4 text-blue-500" />
+                                      <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">Total Sizes</span>
+                                    </div>
+                                    <span className="text-lg font-bold text-blue-800 dark:text-blue-200">{sizeCount.size}</span>
+                                  </div>
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-indigo-100 dark:border-indigo-800">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <Target className="w-4 h-4 text-indigo-500" />
+                                      <span className="text-sm text-indigo-600 dark:text-indigo-400 font-medium">Total Measurements</span>
+                                    </div>
+                                    <span className="text-lg font-bold text-indigo-800 dark:text-indigo-200">{totalMeasurements}</span>
+                                  </div>
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-green-100 dark:border-green-800">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <CheckCircle className="w-4 h-4 text-green-500" />
+                                      <span className="text-sm text-green-600 dark:text-green-400 font-medium">Pass / Fail</span>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-sm font-bold text-green-600 dark:text-green-400">{totalPass}</div>
+                                      <div className="text-sm font-bold text-red-600 dark:text-red-400">{totalFail}</div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-amber-100 dark:border-amber-800">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                      <TrendingUp className="w-4 h-4 text-amber-500" />
+                                      <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">Pass Rate</span>
+                                    </div>
+                                    <span className="text-lg font-bold text-amber-800 dark:text-amber-200">{passRate}%</span>
+                                  </div>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    </div>
+                    )}
+
+                    {/* NEW: Conditional rendering for Size-by-Size */}
+                    {showSizeBySizeChart && (
+
                     <div className="space-y-8">
+                      <div className="flex items-center space-x-3 mb-4">
+                        <div className="bg-teal-500 p-2 rounded-lg">
+                          <Ruler className="w-5 h-5 text-white" />
+                        </div>
+                        <h4 className="text-lg font-bold text-teal-800 dark:text-teal-200">
+                          Size-by-Size Detailed View
+                        </h4>
+                      </div>
+                      
                       {reportData.measurementDetails.measurement
                         .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                         .map((sizeData, sizeIndex) => (
@@ -1298,11 +1782,11 @@ const getImageUrl = (imagePath) => {
                                       <td className="px-4 py-3 text-center text-sm font-medium text-blue-800 dark:text-blue-200 border-r border-gray-200 dark:border-gray-600">
                                         {point.specs}
                                       </td>
-                                     <td className="px-4 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
-                                       {getToleranceAsFraction(point, 'minus')}
+                                    <td className="px-4 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-200 dark:border-gray-600">
+                                      {getToleranceAsFraction(point, 'minus')}
                                       </td>
-                                     <td className="px-4 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
-                                       +{getToleranceAsFraction(point, 'plus')}
+                                    <td className="px-4 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-200 dark:border-gray-600">
+                                      +{getToleranceAsFraction(point, 'plus')}
                                       </td>
                                       {sizeData.pcs.map((pc, pcIndex) => {
                                         // Find the corresponding measurement point for this piece
@@ -1343,6 +1827,7 @@ const getImageUrl = (imagePath) => {
                         </div>
                       ))}
                     </div>
+                    )}
                   </div>
                 )}
 
@@ -1392,28 +1877,6 @@ const getImageUrl = (imagePath) => {
                             beforeData = reportData;
                             afterData = comparisonData;
                           }
-                          
-                          console.log('Comparison data debug:', {
-                            currentWashType: reportData.before_after_wash,
-                            reportType: reportData.reportType,
-                            hasComparisonData: !!comparisonData,
-                            comparisonWashType: comparisonData?.before_after_wash,
-                            beforeDataHasMeasurements: !!beforeData?.measurementDetails?.measurement?.length,
-                            afterDataHasMeasurements: !!afterData?.measurementDetails?.measurement?.length,
-                            beforeDataSource: beforeData === reportData ? 'current report' : 'comparison data',
-                            afterDataSource: afterData === reportData ? 'current report' : 'comparison data',
-                            beforeDataSizes: beforeData?.measurementDetails?.measurement?.map(m => m.size) || [],
-                            afterDataSizes: afterData?.measurementDetails?.measurement?.map(m => m.size) || [],
-                            comparisonDataFull: comparisonData ? {
-                              orderNo: comparisonData.orderNo,
-                              color: comparisonData.color,
-                              washType: comparisonData.washType,
-                              reportType: comparisonData.reportType,
-                              before_after_wash: comparisonData.before_after_wash,
-                              hasMeasurements: !!comparisonData.measurementDetails?.measurement?.length
-                            } : null
-                            });
-                        
                         // Get all unique sizes from all available datasets
                           const allSizes = new Set();
                           
@@ -1430,12 +1893,7 @@ const getImageUrl = (imagePath) => {
                           
                           // Add sizes from after data if available
                           afterData?.measurementDetails?.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
-                          
-                          console.log('All sizes found:', Array.from(allSizes));
-                          console.log('Current report sizes:', reportData.measurementDetails?.measurement?.map(m => m.size) || []);
-                          console.log('Before data sizes:', beforeData?.measurementDetails?.measurement?.map(m => m.size) || []);
-                          console.log('After data sizes:', afterData?.measurementDetails?.measurement?.map(m => m.size) || []);
-                          
+
                           return Array.from(allSizes).map(size => {
                             // Find size data for both before and after from all available sources
                             let beforeSizeData = null;
@@ -1584,8 +2042,6 @@ const getImageUrl = (imagePath) => {
                                         pc.measurementPoints?.forEach(mp => measurementPoints.add(mp.pointName));
                                       });
                                       
-                                      console.log('Measurement points for size', size, ':', Array.from(measurementPoints));
-                                      
                                       return Array.from(measurementPoints).map((pointName, pointIndex) => {
                                         // Get first measurement point for spec info from any available data
                                         let firstMeasurement = null;
@@ -1679,10 +2135,6 @@ const getImageUrl = (imagePath) => {
                                                 // Add common fractional values that might be used
                                                 ['-1/16', '-1/4', '-7/16', '0', '+1/16', '+1/4', '+7/16'].forEach(val => allValues.add(val));
                                               }
-                                              
-                                              console.log('All measurement values for size', size, ':', Array.from(allValues));
-                                              console.log('Before size data available:', !!beforeSizeData, beforeSizeData?.pcs?.length || 0, 'pieces');
-                                              console.log('After size data available:', !!afterSizeData, afterSizeData?.pcs?.length || 0, 'pieces');
                                               
                                               const sortedValues = Array.from(allValues).sort();
                                               

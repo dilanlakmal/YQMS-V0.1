@@ -352,7 +352,11 @@ const RecordsListModal = () => (
               <Calculator className="w-5 h-5 mr-2" />
               Wash Quantity Tracking
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div
+              className={`grid grid-cols-1 ${
+                itemData.reportType === "Inline" ? "md:grid-cols-4" : "md:grid-cols-3"
+              } gap-4`}
+            >
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center">
                   <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
@@ -383,8 +387,8 @@ const RecordsListModal = () => (
                 </div>
               </div>
 
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
-               <div 
+              {itemData.reportType === "Inline" && (
+                <div
                   className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
                   onClick={handleRecordCardClick}
                   title="Click to view all related records"
@@ -399,7 +403,7 @@ const RecordsListModal = () => (
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Progress Bar */}
@@ -680,28 +684,64 @@ const RecordsListModal = () => (
               </h3>
               <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                 <div className="space-y-4">
-                  {/* Checked Points */}
-                  {inspectionDetails.checkedPoints && inspectionDetails.checkedPoints.length > 0 && (
+                  {/* NEW: Checkpoint Inspection Data */}
+                  {inspectionDetails.checkpointInspectionData && inspectionDetails.checkpointInspectionData.length > 0 ? (
                     <div>
-                      <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checked Points</h4>
-                      <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3">
-                        {inspectionDetails.checkedPoints.map((point, index) => (
-                          <div key={index} className="flex items-center">
-                            <div className={`w-2 h-2 rounded-full mr-3 ${
-                              point.decision === 'ok' ? 'bg-green-500' : 
-                              point.decision === 'no' ? 'bg-red-500' : 'bg-yellow-500'
-                            }`}></div>
-                            <div>
-                              <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{point.pointName}</p>
-                              <p className={`text-sm ${
-                                point.decision === 'ok' ? 'text-green-600 dark:text-green-400' : 
-                                point.decision === 'no' ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
-                              }`}>{point.decision?.toUpperCase()}</p>
+                      <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checkpoints</h4>
+                      <div className="space-y-4">
+                        {inspectionDetails.checkpointInspectionData.map((mainPoint, index) => (
+                          <div key={mainPoint.id || index} className="bg-gray-50 dark:bg-gray-600/50 p-3 rounded-lg">
+                            <div className="flex justify-between items-center">
+                              <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{mainPoint.name}</p>
+                              <span className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                mainPoint.decision === 'Pass' ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' : 
+                                mainPoint.decision === 'Fail' ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100'
+                              }`}>
+                                {mainPoint.decision}
+                              </span>
                             </div>
+                            {mainPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">Remark: {mainPoint.remark}</p>}
+                            {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
+                              <div className="mt-3 pl-4 border-l-2 border-gray-200 dark:border-gray-500 space-y-2">
+                                {mainPoint.subPoints.map((subPoint, subIndex) => (
+                                  <div key={subPoint.id || subIndex}>
+                                    <div className="flex justify-between items-center">
+                                      <p className="text-sm text-gray-700 dark:text-gray-300">{subPoint.name}:</p>
+                                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{subPoint.decision}</span>
+                                    </div>
+                                    {subPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">Remark: {subPoint.remark}</p>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
                     </div>
+                  ) : (
+                    // Fallback to legacy checkedPoints
+                    inspectionDetails.checkedPoints && inspectionDetails.checkedPoints.length > 0 && (
+                      <div>
+                        <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checked Points</h4>
+                        <div className="grid grid-cols-3 md:grid-cols-3 lg:grid-cols-3 gap-3">
+                          {inspectionDetails.checkedPoints.map((point, index) => (
+                            <div key={index} className="flex items-center">
+                              <div className={`w-2 h-2 rounded-full mr-3 ${
+                                point.decision === 'ok' ? 'bg-green-500' : 
+                                point.decision === 'no' ? 'bg-red-500' : 'bg-yellow-500'
+                              }`}></div>
+                              <div>
+                                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">{point.pointName}</p>
+                                <p className={`text-sm ${
+                                  point.decision === 'ok' ? 'text-green-600 dark:text-green-400' : 
+                                  point.decision === 'no' ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+                                }`}>{point.decision?.toUpperCase()}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )
                   )}
                   
                   {/* Parameters */}
@@ -753,6 +793,22 @@ const RecordsListModal = () => (
                                     machine.time.status?.ok ? 'bg-green-500' : 'bg-red-500'
                                   }`}></div>
                                   <span>Time: {machine.time.actualValue}min</span>
+                                </div>
+                              )}
+                              {machine.timeCool && machine.timeCool.actualValue && (
+                                <div className="flex items-center">
+                                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                                    machine.timeCool.status?.ok ? 'bg-green-500' : 'bg-red-500'
+                                  }`}></div>
+                                  <span>Time Cool: {machine.timeCool.actualValue}min</span>
+                                </div>
+                              )}
+                              {machine.timeHot && machine.timeHot.actualValue && (
+                                <div className="flex items-center">
+                                  <div className={`w-2 h-2 rounded-full mr-2 ${
+                                    machine.timeHot.status?.ok ? 'bg-green-500' : 'bg-red-500'
+                                  }`}></div>
+                                  <span>Time Hot: {machine.timeHot.actualValue}min</span>
                                 </div>
                               )}
                               {machine.silicon && machine.silicon.actualValue && (
