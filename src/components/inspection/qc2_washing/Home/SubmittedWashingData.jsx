@@ -16,7 +16,7 @@ const SubmittedWashingDataPage = () => {
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
   const [paginatedData, setPaginatedData] = useState([]);
   const [openDropdown, setOpenDropdown] = useState(null);
   const [filterVisible, setFilterVisible] = useState(true);
@@ -794,74 +794,74 @@ const processImageToBase64 = async (imagePath) => {
             </div>
           </div>
         ) : (
-          <div className="overflow-x-auto w-full">
+          <div className="overflow-x-auto w-full max-h-[70vh]">
             <table className="w-full divide-y divide-gray-200 dark:divide-gray-700 min-w-max">
               {/* Table headers */}
-              <thead className="bg-gray-50 dark:bg-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0 z-10">
                 <tr>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                     Inspection Date
                   </th>
-                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                    Factory
                   </th>
                    {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                    Buyer
                   </th> */}
-                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                   Wash Type
                   </th>
-                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                  Report Type
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                    Before/After Wash
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                     MO No
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[100px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                     Color
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                     QC/QA ID
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                     Total Order Qty
                   </th>
                   {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                     Color Order Qty
                   </th> */}
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                    Wash Qty
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                    Checked Qty
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                    Defect Qty
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Pass Rate (Measur.) (%)
+                  <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32 whitespace-normal">
+                    Measurement Result / Pass Rate (%)
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Defect Rate (%)
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32 whitespace-normal">
+                    Result / Defect Rate
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
-                    Status
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-32 whitespace-normal">
+                    Overall Result
                   </th>
                   
                   {showDefectColumn && (
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-48 whitespace-normal">
                       Defect Details
                     </th>
                   )}
                   {showMeasurementColumn && (
-                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[300px]">
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-64 whitespace-normal">
                       Measurement Details
                     </th>
                   )}
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[80px]">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-20 whitespace-normal">
                     Actions
                   </th>
                 </tr>
@@ -910,8 +910,8 @@ const processImageToBase64 = async (imagePath) => {
                 {paginatedData.map((record, index) => {
                   const defectDetails = getDefectDetails(record);
                   const measurementDetails = getMeasurementDetails(record);
-                  const totalDefectCount = defectDetails.reduce((sum, defect) => sum + (defect.qty || 0), 0);
-                  const defectRate = record.checkedQty > 0 ? ((totalDefectCount / record.checkedQty) * 100).toFixed(0) : "0";
+                  const totalDefectCount = record.totalDefectCount ?? defectDetails.reduce((sum, defect) => sum + (defect.qty || 0), 0);
+                  const defectRate = record.defectRate?.toFixed(1) ?? "0.0";
                   
                   return (
                     <tr key={record._id || index} className="hover:bg-gray-50 dark:hover:bg-gray-700">
@@ -963,19 +963,52 @@ const processImageToBase64 = async (imagePath) => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {totalDefectCount}
                       </td>
-                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                       <td className="px-3 py-4 whitespace-nowrap text-sm text-center">
                         {(() => {
-                          if (record.measurementDetails?.measurementSizeSummary?.length > 0) {
-                            const totalPass = record.measurementDetails.measurementSizeSummary.reduce((sum, size) => sum + (size.totalPass || 0), 0);
-                            const totalFail = record.measurementDetails.measurementSizeSummary.reduce((sum, size) => sum + (size.totalFail || 0), 0);
-                            const total = totalPass + totalFail;
-                            return total > 0 ? Math.round((totalPass / total) * 100) : 0;
-                          }
-                          return record.passRate || 0;
+                          const { totalPass, totalFail } = measurementDetails;
+                          const totalPoints = totalPass + totalFail;
+                          const passRateValue = totalPoints > 0 
+                            ? Math.round((totalPass / totalPoints) * 100) 
+                            : (record.passRate || 0);
+                          
+                          const status = passRateValue >= 95 ? 'Pass' : 'Fail';
+
+                          return (
+                            <div>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                status === 'Pass' 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
+                                  : 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
+                              }`}>
+                                {status}
+                              </span>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                ({passRateValue}%)
+                              </div>
+                            </div>
+                          );
                         })()}
                       </td>
-                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {defectRate}
+                      <td className="px-3 py-4 whitespace-nowrap text-sm text-center">
+                        {(() => {
+                          const result = record.defectDetails?.result || 'Pending';
+                          return (
+                            <div>
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                result === 'Pass' 
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200' 
+                                  : result === 'Fail'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200'
+                                  : 'bg-gray-100 text-gray-800 dark:bg-yellow-600 dark:text-gray-200'
+                              }`}>
+                                {result}
+                              </span>
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                ({defectRate}%)
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm">
                         {(() => {
