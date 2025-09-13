@@ -31687,160 +31687,6 @@ app.get("/api/user-info-subcon-qa/:empId", async (req, res) => {
   }
 });
 
-// app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
-//   try {
-//     const { startDate, endDate, factory, lineNo, moNo, color } = req.query;
-
-//     const matchQuery = {};
-//     if (startDate && endDate) {
-//       matchQuery.inspectionDate = {
-//         $gte: new Date(startDate),
-//         $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
-//       };
-//     }
-//     if (factory) matchQuery.factory = factory;
-//     if (lineNo) matchQuery.lineNo = lineNo;
-//     if (moNo) matchQuery.moNo = moNo;
-//     if (color) matchQuery.color = color;
-
-//     // --- Main Aggregation Pipeline ---
-
-//     const result = await SubconSewingQc1Report.aggregate([
-//       { $match: matchQuery },
-//       // Use $facet to run multiple aggregations on the filtered data in parallel
-//       {
-//         $facet: {
-//           // --- 1. Get the report data for the main table ---
-//           reports: [{ $sort: { inspectionDate: -1, _id: -1 } }],
-//           // --- 2. Calculate summary statistics for the cards ---
-//           summary: [
-//             {
-//               $group: {
-//                 _id: null,
-//                 totalCheckedQty: { $sum: "$checkedQty" },
-//                 totalDefectQty: { $sum: "$totalDefectQty" },
-//                 allDefects: { $push: "$defectList" }
-//               }
-//             },
-//             { $unwind: "$allDefects" },
-//             { $unwind: "$allDefects" },
-//             {
-//               $group: {
-//                 _id: "$allDefects.defectName",
-//                 totalQty: { $sum: "$allDefects.qty" },
-//                 totalCheckedQty: { $first: "$totalCheckedQty" },
-//                 totalDefectQty: { $first: "$totalDefectQty" }
-//               }
-//             },
-//             { $sort: { totalQty: -1 } },
-//             {
-//               $group: {
-//                 _id: null,
-//                 totalCheckedQty: { $first: "$totalCheckedQty" },
-//                 totalDefectQty: { $first: "$totalDefectQty" },
-//                 topDefects: { $push: { defectName: "$_id", qty: "$totalQty" } }
-//               }
-//             },
-//             {
-//               $project: {
-//                 _id: 0,
-//                 totalCheckedQty: { $ifNull: ["$totalCheckedQty", 0] },
-//                 totalDefectQty: { $ifNull: ["$totalDefectQty", 0] },
-//                 overallDefectRate: {
-//                   $cond: [
-//                     { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
-//                     0,
-//                     {
-//                       $multiply: [
-//                         { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
-//                         100
-//                       ]
-//                     }
-//                   ]
-//                 },
-//                 topDefects: {
-//                   $map: {
-//                     input: { $slice: ["$topDefects", 3] },
-//                     as: "d",
-//                     in: {
-//                       name: "$$d.defectName",
-//                       qty: "$$d.qty",
-//                       rate: {
-//                         $cond: [
-//                           { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
-//                           0,
-//                           {
-//                             $multiply: [
-//                               { $divide: ["$$d.qty", "$totalCheckedQty"] },
-//                               100
-//                             ]
-//                           }
-//                         ]
-//                       }
-//                     }
-//                   }
-//                 }
-//               }
-//             }
-//           ],
-//           // --- 3. Get available options for cascading filters ---
-//           filterOptions: [
-//             {
-//               $group: {
-//                 _id: null,
-//                 factories: { $addToSet: "$factory" },
-//                 lineNos: { $addToSet: "$lineNo" },
-//                 moNos: { $addToSet: "$moNo" },
-//                 colors: { $addToSet: "$color" }
-//               }
-//             },
-//             {
-//               $project: {
-//                 _id: 0,
-//                 factories: { $sortArray: { input: "$factories", sortBy: 1 } },
-//                 lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
-//                 moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
-//                 colors: { $sortArray: { input: "$colors", sortBy: 1 } }
-//               }
-//             }
-//           ]
-//         }
-//       },
-//       // --- Reshape the final output ---
-//       {
-//         $project: {
-//           reports: "$reports",
-//           summary: { $arrayElemAt: ["$summary", 0] },
-//           filterOptions: { $arrayElemAt: ["$filterOptions", 0] }
-//         }
-//       }
-//     ]);
-
-//     // --- GUARANTEE A SAFE RESPONSE STRUCTURE ---
-//     const rawData = result[0];
-//     const responseData = {
-//       reports: rawData?.reports || [],
-//       summary: rawData?.summary || {
-//         totalCheckedQty: 0,
-//         totalDefectQty: 0,
-//         overallDefectRate: 0,
-//         topDefects: []
-//       },
-//       filterOptions: rawData?.filterOptions || {
-//         factories: [],
-//         lineNos: [],
-//         moNos: [],
-//         colors: []
-//       }
-//     };
-
-//     res.json(responseData);
-//   } catch (error) {
-//     console.error("Error fetching Sub-Con QC report data:", error);
-//     res.status(500).json({ error: "Failed to fetch report data" });
-//   }
-// });
-
 /* ------------------------------------------------------------------
    End Points - Sub-Con QC Management (Admin Panel)
 ------------------------------------------------------------------ */
@@ -32034,7 +31880,8 @@ app.delete("/api/subcon-defects-manage/:id", async (req, res) => {
 
 app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
   try {
-    const { startDate, endDate, factory, lineNo, moNo, color } = req.query;
+    const { startDate, endDate, factory, buyer, lineNo, moNo, color } =
+      req.query;
 
     const matchQuery = {};
     if (startDate && endDate) {
@@ -32044,43 +31891,92 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
       };
     }
     if (factory) matchQuery.factory = factory;
+    if (buyer) matchQuery.buyer = buyer;
     if (lineNo) matchQuery.lineNo = lineNo;
     if (moNo) matchQuery.moNo = moNo;
     if (color) matchQuery.color = color;
 
     const result = await SubconSewingQc1Report.aggregate([
       { $match: matchQuery },
+
+      // --- NEW: Join with QA reports collection using $lookup ---
+      {
+        $lookup: {
+          from: "subcon_sewing_qa_reports", // The exact name of the QA reports collection
+          let: {
+            insp_date: "$inspectionDate",
+            insp_factory: "$factory",
+            insp_line: "$lineNo",
+            insp_mo: "$moNo",
+            insp_color: "$color"
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$factory", "$$insp_factory"] },
+                    { $eq: ["$lineNo", "$$insp_line"] },
+                    { $eq: ["$moNo", "$$insp_mo"] },
+                    { $eq: ["$color", "$$insp_color"] },
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$inspectionDate",
+                            timezone: "UTC"
+                          }
+                        },
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$$insp_date",
+                            timezone: "UTC"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $limit: 1 }
+          ],
+          as: "qaData"
+        }
+      },
+      // --- NEW: Promote the matched QA report to a top-level object ---
+      {
+        $addFields: {
+          qaReport: { $arrayElemAt: ["$qaData", 0] }
+        }
+      },
+
       {
         $facet: {
-          // --- 1. Main Table Data: Raw reports, sorted correctly ---
+          // --- 1. Main Table Data: Now includes the qaReport object ---
           mainData: [
-            // First, add a field for the defect rate so we can sort by it
             {
               $addFields: {
                 defectRate: {
                   $cond: [
-                    { $gt: ["$checkedQty", 0] }, // If checkedQty is greater than 0
+                    { $gt: ["$checkedQty", 0] },
                     {
                       $multiply: [
                         { $divide: ["$totalDefectQty", "$checkedQty"] },
                         100
                       ]
-                    }, // then calculate rate
-                    0 // else, rate is 0
+                    },
+                    0
                   ]
                 }
               }
             },
-            // Now, apply the requested sorting
-            {
-              $sort: {
-                inspectionDate: 1, // Ascending by date
-                defectRate: -1 // Descending by the newly calculated defect rate
-              }
-            }
+            { $sort: { inspectionDate: 1, defectRate: -1 } }
           ],
 
-          // --- 2. Top N Defects Calculation ---
+          // --- 2. Top N Defects Calculation (No Change) ---
           topDefects: [
             { $unwind: "$defectList" },
             {
@@ -32090,10 +31986,9 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
               }
             },
             { $sort: { totalQty: -1 } }
-            // We get total checked qty in another stage
           ],
 
-          // --- 3. Defect Rate by Line Calculation ---
+          // --- 3. Defect Rate by Line Calculation (No Change) ---
           linePerformance: [
             {
               $group: {
@@ -32124,17 +32019,167 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
             { $sort: { factory: 1, lineNo: 1 } }
           ],
 
-          // --- 4. Overall Totals for Rate Calculations ---
+          // --- NEW STAGE FOR THE BUYER CHART ---
+          buyerPerformance: [
+            {
+              $group: {
+                _id: "$buyer", // Group all records by the buyer's name
+                totalChecked: { $sum: "$checkedQty" },
+                totalDefects: { $sum: "$totalDefectQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0, // Remove the default _id field
+                buyer: "$_id", // Rename _id to 'buyer' for clarity
+                defectRate: {
+                  // Calculate the defect rate, safely handling division by zero
+                  $cond: [
+                    { $eq: ["$totalChecked", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefects", "$totalChecked"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $sort: { defectRate: -1 } } // Sort by the highest defect rate first
+          ],
+
+          // --- NEW PIPELINE FOR THE TREND CHART ---
+          dailyTrend: [
+            {
+              // Group all documents by the day of the inspection
+              $group: {
+                _id: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$inspectionDate"
+                  }
+                },
+                totalChecked: { $sum: "$checkedQty" },
+                totalDefects: { $sum: "$totalDefectQty" }
+              }
+            },
+            {
+              // Calculate the defect rate for each day
+              $project: {
+                _id: 0, // Remove the default _id
+                date: "$_id", // Rename _id to 'date'
+                defectRate: {
+                  $cond: [
+                    { $eq: ["$totalChecked", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefects", "$totalChecked"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            // Sort the results by date in ascending order for the line chart
+            { $sort: { date: 1 } }
+          ],
+
+          // --- NEW PIPELINE FOR THE PIVOT TABLE DATA ---
+          individualDefectTrend: [
+            // First, pre-calculate the total checked qty for each day
+            {
+              $group: {
+                _id: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$inspectionDate"
+                  }
+                },
+                dailyCheckedQty: { $sum: "$checkedQty" },
+                reports: { $push: "$$ROOT" } // Push the full documents for later processing
+              }
+            },
+            // Unwind the reports and then their defect lists
+            { $unwind: "$reports" },
+            { $unwind: "$reports.defectList" },
+            // Now group by date and defect name to get the total defect qty
+            {
+              $group: {
+                _id: {
+                  date: "$_id",
+                  defectName: "$reports.defectList.defectName"
+                },
+                totalQty: { $sum: "$reports.defectList.qty" },
+                dailyChecked: { $first: "$dailyCheckedQty" } // Carry over the daily total
+              }
+            },
+            // Project the final shape with the calculated defect rate
+            {
+              $project: {
+                _id: 0,
+                date: "$_id.date",
+                defectName: "$_id.defectName",
+                qty: "$totalQty",
+                defectRate: {
+                  $cond: [
+                    { $gt: ["$dailyChecked", 0] },
+                    {
+                      $multiply: [
+                        { $divide: ["$totalQty", "$dailyChecked"] },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+
+          // --- NEW PIPELINE TO GET UNIQUE DEFECT NAMES FOR THE FILTER ---
+          uniqueDefectNames: [
+            { $unwind: "$defectList" },
+            {
+              $group: {
+                _id: null,
+                names: { $addToSet: "$defectList.defectName" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                names: { $sortArray: { input: "$names", sortBy: 1 } }
+              }
+            }
+          ],
+
+          // --- 4. Overall QC Totals (No Change) ---
           overallTotalChecked: [
             { $group: { _id: null, total: { $sum: "$checkedQty" } } }
           ],
 
-          // --- 5. Filter Options for Dropdowns ---
+          // --- NEW 5. Overall QA Totals ---
+          qaSummary: [
+            {
+              $group: {
+                _id: null,
+                totalQASampleSize: { $sum: "$qaReport.sampleSize" },
+                totalQADefectQty: { $sum: "$qaReport.totalDefectQty" }
+              }
+            }
+          ],
+
+          // --- 6. Filter Options (No Change) ---
           filterOptions: [
             {
               $group: {
                 _id: null,
                 factories: { $addToSet: "$factory" },
+                buyers: { $addToSet: "$buyer" },
                 lineNos: { $addToSet: "$lineNo" },
                 moNos: { $addToSet: "$moNo" },
                 colors: { $addToSet: "$color" }
@@ -32144,6 +32189,7 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
               $project: {
                 _id: 0,
                 factories: { $sortArray: { input: "$factories", sortBy: 1 } },
+                buyers: { $sortArray: { input: "$buyers", sortBy: 1 } },
                 lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
                 moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
                 colors: { $sortArray: { input: "$colors", sortBy: 1 } }
@@ -32158,19 +32204,33 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
     const rawData = result[0];
     const totalChecked = rawData.overallTotalChecked[0]?.total || 0;
 
-    // Manually calculate rates for top defects
     const topDefectsWithRate = rawData.topDefects.map((d) => ({
       defectName: d._id,
       defectQty: d.totalQty,
       defectRate: totalChecked > 0 ? (d.totalQty / totalChecked) * 100 : 0
     }));
 
+    // --- NEW: Safely get QA summary data ---
+    const qaSummaryData = rawData.qaSummary[0] || {
+      totalQASampleSize: 0,
+      totalQADefectQty: 0
+    };
+
+    // Get unique defect names, providing an empty array as a default
+    const uniqueDefectNames = rawData.uniqueDefectNames[0]?.names || [];
+
     res.json({
       mainData: rawData.mainData || [],
       topDefects: topDefectsWithRate || [],
       linePerformance: rawData.linePerformance || [],
+      buyerPerformance: rawData.buyerPerformance || [],
+      dailyTrend: rawData.dailyTrend || [],
+      individualDefectTrend: rawData.individualDefectTrend || [],
+      uniqueDefectNames: uniqueDefectNames,
+      qaSummary: qaSummaryData,
       filterOptions: rawData.filterOptions[0] || {
         factories: [],
+        buyers: [],
         lineNos: [],
         moNos: [],
         colors: []
