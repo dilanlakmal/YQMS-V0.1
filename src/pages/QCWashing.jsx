@@ -2503,7 +2503,7 @@ if (
           >
             New Inspection
           </button>
-          {/* <button
+          <button
             onClick={() => handleTabChange("subConEditQty")}
             className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
                           ${
@@ -2513,7 +2513,7 @@ if (
                           }`}
           >
             Sub_Con Edit
-          </button> */}
+          </button>
           <button
             onClick={() => handleTabChange("submittedData")}
             className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
@@ -2897,7 +2897,7 @@ if (
         )}
 
         {activeTab === "submittedData" && <SubmittedWashingDataPage />}
-        {/* {activeTab === "subConEditQty" && <SubConEdit />} */}
+        {activeTab === "subConEditQty" && <SubConEdit />}
       </main>
     </div>
   );

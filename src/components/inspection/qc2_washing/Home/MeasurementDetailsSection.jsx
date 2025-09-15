@@ -55,7 +55,7 @@ const MeasurementDetailsSection = ({
     
     setLastSelectedPattern(prev => ({
       ...prev,
-      [washType]: selectedRows,
+      [washType]: [...selectedRows],
       [kValueField]: currentKValue 
     }));
   };
@@ -390,26 +390,21 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
   const addSize = async (size) => {
   const sizeStr = String(size);
   
-  // If size is not in selectedSizes, add it
   if (!selectedSizes.find(s => s.size === sizeStr)) {
     const newSize = { size: sizeStr, qty: 3 };
     setSelectedSizes(prev => [...prev, newSize]);
     
-    // Get current wash type and automatically select next available K-value
     const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
     
-    // Get next available K-value for this size
     const currentKValue = getKValueForSize(sizeStr, tableType);
     
-    // Set the K-value for this size
     const key = `${sizeStr}-${tableType}`;
     setSizeSpecificKValues(prev => ({
       ...prev,
       [key]: currentKValue
     }));
     
-    // Get the specs for current K-value
     const specs = before_after_wash === 'Before Wash'
       ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash || [])
       : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash || []);
@@ -417,34 +412,28 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
     let patternApplied = false;
     let defaultSelectedRows = Array(specs.length).fill(false);
     
-    // Apply default measurement points based on wash type
-    if (before_after_wash === 'Before Wash') {
-      // For Before Wash: Use buyerspectemplate data
-      if (buyerSpecData) {
-        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'Before Wash');
-        if (defaultMeasurementPoints.length > 0) {
-          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
-          patternApplied = true;
-        }
+    // Pattern application with priority order
+    const applyPatternAndValues = async () => {
+      // Priority 1: Apply previous user selection pattern (most recent)
+      const globalPattern = lastSelectedPattern[washType];
+      if (globalPattern && globalPattern.length === specs.length) {
+        defaultSelectedRows = [...globalPattern];
+        patternApplied = true;
+        console.log('Applied previous user selection pattern for size:', sizeStr);
       }
       
-      // Apply pattern immediately for before wash
-      applyPatternAndValues();
-    } else {
-      // For After Wash: Priority order - saved Before Wash > buyerspectemplate > dt_orders
-      (async () => {
+      // Priority 2: For After Wash - check saved Before Wash data
+      if (!patternApplied && before_after_wash === 'After Wash') {
         try {
-          // 1. First priority: Check for saved Before Wash data
           const savedBeforeWashData = await findSavedMeasurementData(
             formData.orderNo || orderNo,
             formData.color || color,
-            formData.reportType || 'First Output', // Use a default or get from current record
+            formData.reportType || 'First Output',
             'Before Wash',
-            formData.factoryName || 'YM' // Use a default or get from current record
+            formData.factoryName || 'YM'
           );
-
+          
           if (savedBeforeWashData && savedBeforeWashData.length > 0) {
-            // Use the new helper function to get selected rows from saved data
             const savedSelectedRows = getSelectedRowsFromSavedData(savedBeforeWashData, sizeStr, specs);
             if (savedSelectedRows.length === specs.length && savedSelectedRows.some(row => row)) {
               defaultSelectedRows = savedSelectedRows;
@@ -452,49 +441,32 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
               console.log('Applied saved Before Wash pattern for size:', sizeStr);
             }
           }
-          
-          // 2. Second priority: If no saved Before Wash data, use buyerspectemplate
-          if (!patternApplied && buyerSpecData) {
-            const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'After Wash');
-            if (defaultMeasurementPoints.length > 0) {
-              defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
-              patternApplied = true;
-              console.log('Applied buyerspectemplate pattern for size:', sizeStr);
-            }
-          }
-          
-          // 3. Third priority: If no buyerspectemplate, use all dt_orders measurement points
-          if (!patternApplied && specs && specs.length > 0) {
-            defaultSelectedRows = Array(specs.length).fill(true); // Select all available measurement points
-            patternApplied = true;
-            console.log('Applied all dt_orders points for size:', sizeStr);
-          }
-          
         } catch (error) {
           console.error('Error loading saved measurement data:', error);
-          // Fallback to all measurement points if there's an error
-          if (specs && specs.length > 0) {
-            defaultSelectedRows = Array(specs.length).fill(true);
-            patternApplied = true;
-          }
-        }
-        
-        // Apply pattern after async operations
-        applyPatternAndValues();
-      })();
-    }
-    
-    function applyPatternAndValues() {
-      // If still no pattern applied, try global pattern
-      if (!patternApplied) {
-        const globalPattern = lastSelectedPattern[washType];
-        if (globalPattern && globalPattern.length === specs.length) {
-          defaultSelectedRows = [...globalPattern];
-          patternApplied = true;
         }
       }
       
-      // If still no pattern, try saved data for this size
+      // Priority 3: For Before Wash - use buyerspectemplate
+      if (!patternApplied && before_after_wash === 'Before Wash' && buyerSpecData) {
+        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'Before Wash');
+        if (defaultMeasurementPoints.length > 0) {
+          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+          patternApplied = true;
+          console.log('Applied buyerspectemplate pattern for Before Wash, size:', sizeStr);
+        }
+      }
+      
+      // Priority 4: For After Wash - use buyerspectemplate if no saved Before Wash
+      if (!patternApplied && before_after_wash === 'After Wash' && buyerSpecData) {
+        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'After Wash');
+        if (defaultMeasurementPoints.length > 0) {
+          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+          patternApplied = true;
+          console.log('Applied buyerspectemplate pattern for After Wash, size:', sizeStr);
+        }
+      }
+      
+      // Priority 5: Check saved data for this specific size
       if (!patternApplied) {
         const savedDataForThisSize = currentWashMeasurements.filter(m => m.size === sizeStr);
         if (savedDataForThisSize.length > 0) {
@@ -502,7 +474,20 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
           if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
             defaultSelectedRows = [...mostRecentSaved.selectedRows];
             patternApplied = true;
+            console.log('Applied pattern from saved data for size:', sizeStr);
           }
+        }
+      }
+      
+      // Priority 6: Fallback - select all for After Wash, none for Before Wash
+      if (!patternApplied) {
+        if (before_after_wash === 'After Wash' && specs && specs.length > 0) {
+          defaultSelectedRows = Array(specs.length).fill(true);
+          patternApplied = true;
+          console.log('Applied fallback (all selected) for After Wash, size:', sizeStr);
+        } else {
+          defaultSelectedRows = Array(specs.length).fill(false);
+          console.log('Applied fallback (none selected) for Before Wash, size:', sizeStr);
         }
       }
       
@@ -512,8 +497,8 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
         [sizeStr]: defaultSelectedRows
       }));
       
-      // Initialize measurement values for selected rows - preserve existing values
-      if (patternApplied) {
+      // Initialize measurement values for selected rows
+      if (patternApplied || defaultSelectedRows.some(row => row)) {
         setMeasurementValues(prevValues => {
           const newValues = { ...prevValues };
           
@@ -521,7 +506,6 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
             if (isSelected) {
               for (let colIndex = 0; colIndex < 3; colIndex++) {
                 const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-                // Only initialize if not already set - preserves existing values
                 if (!newValues[cellKey]) {
                   newValues[cellKey] = { decimal: 0, fraction: '0' };
                 }
@@ -532,11 +516,19 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
           return newValues;
         });
       }
+      
+      console.log(`Final pattern applied for size ${sizeStr}:`, defaultSelectedRows);
+    };
+    
+    // Execute pattern application
+    if (before_after_wash === 'Before Wash') {
+      applyPatternAndValues();
+    } else {
+      // For After Wash, handle async operations
+      applyPatternAndValues();
     }
   }
 };
-
-
 
   // Rest of your functions remain the same...
   const transformMeasurementData = (

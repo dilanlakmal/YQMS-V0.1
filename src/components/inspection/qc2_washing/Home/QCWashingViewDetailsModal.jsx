@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { X, Package, Droplets, Target, CheckCircle, XCircle, TrendingUp, BarChart3, FileText, Palette, Building, User, Hash, AlertTriangle, ClipboardCheck, Calculator } from "lucide-react";
 import { getToleranceAsFraction } from "./fractionConverter";
+import { API_BASE_URL } from "../../../../../config";
 
 const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] }) => {
   const [washQuantityData, setWashQuantityData] = useState({
@@ -12,10 +13,36 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
 
   const [selectedRecords, setSelectedRecords] = useState([]);
   const [showRecordsList, setShowRecordsList] = useState(false);
+  const [inspectorDetails, setInspectorDetails] = useState(null);
 
   useEffect(() => {
-    if (isOpen && itemData && allRecords.length > 0) {
+    if (isOpen && itemData) {
       calculateWashQuantities();
+      
+      // Fetch inspector details
+      if (itemData.userId) {
+        fetch(`${API_BASE_URL}/api/users/${itemData.userId}`)
+          .then(res => {
+            if (!res.ok) {
+              throw new Error('Inspector not found');
+            }
+            return res.json();
+          })
+          .then(data => {
+            if (!data.error) {
+              setInspectorDetails(data);
+            } else {
+              console.error("Inspector not found:", data.error);
+              setInspectorDetails(null);
+            }
+          })
+          .catch(err => {
+            console.error("Error fetching inspector details:", err);
+            setInspectorDetails(null);
+          });
+      }
+    } else {
+      setInspectorDetails(null);
     }
   }, [isOpen, itemData, allRecords]);
 
@@ -24,7 +51,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
 
   // If no allRecords, treat current record as the only record
   if (!allRecords || allRecords.length === 0) {
-    const alreadyWashedQty = parseInt(itemData.washQty) || 0;
+    const alreadyWashedQty = parseInt(itemData.displayWashQty ?? itemData.washQty) || 0;
     const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
     
     setWashQuantityData({
@@ -50,7 +77,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
 
   // If no matching records found, treat current record as the only record
   if (matchingRecords.length === 0) {
-    const alreadyWashedQty = parseInt(itemData.washQty) || 0;
+    const alreadyWashedQty = parseInt(itemData.displayWashQty ?? itemData.washQty) || 0;
     const remainingQty = Math.max(0, (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty);
     
     setWashQuantityData({
@@ -93,7 +120,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
   // Strategy 2: Match by washQty and approximate date if ID match fails
   if (currentRecordIndex === -1) {
     currentRecordIndex = sortedRecords.findIndex(record => {
-      const washQtyMatch = record.washQty === itemData.washQty;
+      const washQtyMatch = (record.displayWashQty ?? record.washQty) === (itemData.displayWashQty ?? itemData.washQty);
       const dateA = new Date(record.createdAt || record.date || record.submittedAt);
       const dateB = new Date(itemData.createdAt || itemData.date || itemData.submittedAt);
       const timeDiff = Math.abs(dateA - dateB);
@@ -111,7 +138,7 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
   // Calculate cumulative wash quantity up to current record (inclusive)
   const recordsUpToCurrent = sortedRecords.slice(0, currentRecordIndex + 1);
   const alreadyWashedQty = recordsUpToCurrent.reduce((sum, record) => {
-    const washQty = parseInt(record.washQty) || 0;
+    const washQty = parseInt(record.displayWashQty ?? record.washQty, 10) || 0;
     return sum + washQty;
   }, 0);
 
@@ -233,7 +260,9 @@ const RecordsListModal = () => (
                     Date
                   </th>
                   <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
-                    Wash Qty
+                    Wash Qty <span className="text-xs text-gray-400">
+                      ({itemData.isActualWashQty ? 'Actual' : 'Estimated'})
+                    </span>
                   </th>
                   <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
                     Inspector
@@ -272,7 +301,9 @@ const RecordsListModal = () => (
                         {new Date(record.date || record.createdAt).toLocaleDateString()}
                       </td>
                       <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm font-semibold">
-                        {record.washQty}
+                        <span className={record.isActualWashQty ? 'text-green-500' : ''}>
+                          {record.displayWashQty ?? record.washQty}
+                        </span>
                       </td>
                       <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
                         {record.inspector?.empId || record.userId || 'N/A'}
@@ -311,7 +342,7 @@ const RecordsListModal = () => (
               <div className="text-center">
                 <p className="text-gray-600 dark:text-gray-400">Total Washed</p>
                 <p className="font-semibold text-lg dark:text-white">
-                  {selectedRecords.reduce((sum, record) => sum + (parseInt(record.washQty) || 0), 0)}
+                  {selectedRecords.reduce((sum, record) => sum + (parseInt(record.displayWashQty ?? record.washQty) || 0), 0)}
                 </p>
               </div>
               <div className="text-center">
@@ -333,16 +364,32 @@ const RecordsListModal = () => (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             QC-Washing Detail View
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-4">
+            {inspectorDetails && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={inspectorDetails.face_photo || '/assets/img/avatars/default-profile.png'}
+                  alt={inspectorDetails.eng_name}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                  onError={(e) => { e.target.onerror = null; e.target.src = '/assets/img/avatars/default-profile.png'; }}
+                />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{inspectorDetails.eng_name}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{inspectorDetails.emp_id}</p>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6">
@@ -528,6 +575,7 @@ const RecordsListModal = () => (
                     </div>
                   </div>
                 </div>
+
               </div>
             </div>
 
@@ -562,8 +610,10 @@ const RecordsListModal = () => (
                   <div className="flex items-center">
                     <Droplets className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-cyan-600 dark:text-cyan-300">Wash Qty</p>
-                      <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{itemData.washQty}</p>
+                      <p className="text-sm font-medium text-cyan-600 dark:text-cyan-300">
+                        Wash Qty {itemData.isActualWashQty && <span className="text-green-500">(Actual)</span>}
+                      </p>
+                      <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{itemData.displayWashQty ?? itemData.washQty}</p>
                     </div>
                   </div>
                 </div>

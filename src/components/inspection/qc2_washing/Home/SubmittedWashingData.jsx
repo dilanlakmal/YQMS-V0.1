@@ -12,7 +12,10 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [viewMode, setViewMode] = useState('estimated'); // 'estimated' or 'actual'
   const [error, setError] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -34,31 +37,10 @@ const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
 
   // Single handleViewDetails function (removed the duplicate)
   const handleViewDetails = (record) => {
-    
-    const transformedData = {
-      ...record,
-      orderNo: record.orderNo,
-      colorName: record.color,
-      buyer: record.buyer,
-      factoryName: record.factoryName,
-      orderQty: record.orderQty,
-      colorOrderQty: record.colorOrderQty,
-      status: record.status || 'submitted',
-      checkedQty: record.checkedQty,
-      washQty: record.washQty,
-      totalCheckedPoint: record.totalCheckedPoint,
-      totalPass: record.totalPass,
-      totalFail: record.totalFail,
-      passRate: record.passRate,
-      overallFinalResult: record.overallFinalResult,
-      measurementDetails: record.measurementDetails,
-      defectDetails: record.defectDetails,
-      before_after_wash: record.before_after_wash,
-    };
-    
+    // Ensure the record passed is the one from the currently rendered (and processed) data
     setViewDetailsModal({
       isOpen: true,
-      itemData: transformedData
+      itemData: record,
     });
   };
 
@@ -77,61 +59,8 @@ const handleCloseFullReport = () => {
   });
 }
 
-// Function to fetch wash qty from qc_washing_qty_old collection
-const fetchWashQty = async (record) => {
-  try {
 
-    // If report type is "First output", always use original wash qty and mark as green
-    if (record.reportType === 'First output') {
-      const washQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
-      return {
-        washQty: washQty,
-        fromOldCollection: true, // This ensures it displays in green
-        isFirstOutput: true
-      };
-    }
-
-    // For other report types, try to fetch from qc_washing_qty_old collection
-    const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
-
-    const response = await fetch(
-      `${API_BASE_URL}/api/qc-washing/wash-qty?date=${dateStr}&color=${encodeURIComponent(record.color)}&orderNo=${encodeURIComponent(record.orderNo)}&qcId=${encodeURIComponent(record.userId)}`
-    );
-    
-    if (response.ok) {
-      const data = await response.json();
-      
-      // Only use the value from old collection if it's greater than 0
-      if (data.success && data.washQty !== undefined && data.washQty !== null && data.washQty > 0) {
-        return {
-          washQty: data.washQty,
-          fromOldCollection: true,
-          isFirstOutput: false
-        };
-      } 
-    }
-    
-    // If not found in old collection OR the value is 0, use the original washQty from qcWashing collection
-    const fallbackWashQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
-    
-    return {
-      washQty: fallbackWashQty,
-      fromOldCollection: false,
-      isFirstOutput: false
-    };
-  } catch (error) {
-    console.error('Error fetching wash qty:', error);
-    const errorFallbackWashQty = record.washQty !== undefined && record.washQty !== null ? record.washQty : 0;
-    
-    return {
-      washQty: errorFallbackWashQty,
-      fromOldCollection: false,
-      isFirstOutput: false
-    };
-  }
-};
-
-// Update the data fetching logic with live updates
+// Update the data fetching logic
 const fetchSubmittedData = async (showLoading = true) => {
   try {
     if (showLoading) setIsLoading(true);
@@ -153,27 +82,7 @@ const fetchSubmittedData = async (showLoading = true) => {
     const data = await response.json();
     
     if (data.success) {
-      const records = data.data || [];
-      
-      // Fetch wash qty for each record
-      const recordsWithWashQty = await Promise.all(
-        records.map(async (record, index) => {
-          // Store original wash qty before API call
-          const originalWashQty = record.washQty;
-          const washQtyData = await fetchWashQty(record);
-          
-          const processedRecord = { 
-            ...record, 
-            originalWashQty: originalWashQty, // Keep original for reference
-            washQty: washQtyData.washQty,
-            washQtyFromOldCollection: washQtyData.fromOldCollection,
-            isFirstOutput: washQtyData.isFirstOutput || record.reportType === 'First output'
-          };
-          
-          return processedRecord;
-        })
-      );
-      setSubmittedData(recordsWithWashQty); 
+      setSubmittedData(data.data || []);
     } else {
       setError(data.message || "Failed to fetch submitted data.");
     }
@@ -190,16 +99,143 @@ const fetchSubmittedData = async (showLoading = true) => {
   }
 };
 
-useEffect(() => {
-  fetchSubmittedData();
-  
-  // Set up live updates every 3 seconds
-  const interval = setInterval(() => {
-    fetchSubmittedData(false); // Don't show loading for background updates
-  }, 3000);
-  
-  return () => clearInterval(interval);
-}, []);
+  useEffect(() => {
+    fetchSubmittedData();
+    const interval = setInterval(() => fetchSubmittedData(false), 5000); // Refresh every 5 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        setLoadingUsers(true);
+        const response = await fetch(`${API_BASE_URL}/api/users`);
+        if (response.ok) {
+          const data = await response.json();
+          // Ensure that `users` is always an array to prevent crashes
+          const usersArray = data.users || (Array.isArray(data) ? data : []);
+          setUsers(usersArray);
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+        setUsers([]); // On error, ensure it's an empty array
+      } finally {
+        setLoadingUsers(false);
+      }
+    };
+
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    const processDataForView = async () => {
+      if (isLoading) return;
+
+      let dataToProcess = [...submittedData];
+
+      if (viewMode === 'actual') {
+        dataToProcess = await Promise.all(
+          submittedData.map(async (record) => {
+            const washQtyData = await fetchRealWashQty(record);
+            let finalRecord = { ...record, ...washQtyData };
+
+            if (record.reportType === 'Inline' && washQtyData.isActualWashQty) {
+              const newWashQty = washQtyData.displayWashQty;
+              try {
+                const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ lotSize: newWashQty, orderNo: record.orderNo })
+                });
+                const aqlData = await aqlResponse.json();
+
+                if (aqlData.success && aqlData.aqlData) {
+                  finalRecord.aql = [aqlData.aqlData];
+                  finalRecord.checkedQty = Math.min(newWashQty, aqlData.aqlData.sampleSize);
+                  // Also update the aqlValue inside defectDetails for the full report modal
+                  if (finalRecord.defectDetails) {
+                    finalRecord.defectDetails.aqlValue = aqlData.aqlData.levelUsed;
+                  } else {
+                    finalRecord.defectDetails = { aqlValue: aqlData.aqlData.levelUsed };
+                  }
+                }
+              } catch (e) {
+                console.error("Failed to recalculate AQL for record:", record._id, e);
+              }
+            }
+            return finalRecord;
+          })
+        );
+      } else {
+        dataToProcess = submittedData.map(record => ({
+          ...record,
+          displayWashQty: record.washQty,
+          isActualWashQty: false,
+        }));
+      }
+
+      applyFilters(currentFilters || {}, false, dataToProcess);
+    };
+
+    processDataForView();
+  }, [viewMode, submittedData, currentFilters]);
+
+  const fetchRealWashQty = async (record) => {
+    try {
+      if (record.reportType && record.reportType.toLowerCase() === 'first output') {
+        return { displayWashQty: record.washQty || 0, isActualWashQty: true, isFirstOutput: true, originalWashQty: record.washQty || 0, source: 'first_output' };
+      }
+
+      if (!record.reportType || record.reportType.toLowerCase() !== 'inline') {
+        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
+      }
+
+      const factoryName = record.factoryName || '';
+
+      if (factoryName.toUpperCase() === 'YM') {
+        const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
+        const styleNo = record.orderNo || '';
+        let color = record.color || '';
+
+        if (!dateStr || !styleNo || !color) {
+          return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
+        }
+
+        const colorMatch = color.match(/\[([^\]]+)\]/);
+        if (colorMatch) {
+          color = colorMatch[1];
+        }
+
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/qc-real-washing-qty/search?` + new URLSearchParams({ inspectionDate: dateStr, styleNo: styleNo, color: color }));
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.found && data.washQty > 0) {
+              return { displayWashQty: data.washQty, isActualWashQty: true, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'qc_real_wash_qty_ym', details: data.details };
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching real wash qty from qc_real_washing_qty:', error);
+        }
+        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
+      } else {
+        if (record.editedActualWashQty !== null && record.editedActualWashQty !== undefined) {
+          return {
+            displayWashQty: record.editedActualWashQty,
+            isActualWashQty: true,
+            isFirstOutput: false,
+            originalWashQty: record.washQty || 0,
+            source: 'edited_actual_wash_qty',
+            details: { recordId: record._id, editedValue: record.editedActualWashQty, lastEditedAt: record.lastEditedAt }
+          };
+        }
+        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
+      }
+    } catch (error) {
+      console.error('Error in fetchRealWashQty:', error);
+      return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'error' };
+    }
+  };
 
 
   // Helper function to extract defect details
@@ -585,9 +621,9 @@ const processImageToBase64 = async (imagePath) => {
   }, []);
 
   // Cross-filtering function with proper cumulative filtering
-  const applyFilters = (filters, resetPage = true) => {
-    let filtered = [...submittedData];
-
+  const applyFilters = (filters, resetPage = true, dataToFilter = submittedData) => {
+    let filtered = [...dataToFilter];
+    
     // Date range filter
     if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
       filtered = filtered.filter(item => {
@@ -620,9 +656,19 @@ const processImageToBase64 = async (imagePath) => {
 
     // QC ID filter
     if (filters.qcId) {
-      filtered = filtered.filter(item => 
-        item.userId?.toLowerCase().includes(filters.qcId.toLowerCase())
-      );
+      const searchTerm = filters.qcId.toLowerCase();
+      filtered = filtered.filter(item => {
+        // Check if the search term is in the user ID
+        if (item.userId?.toLowerCase().includes(searchTerm)) {
+          return true;
+        }
+        // Check if the search term is in the user's name
+        const user = users.find(u => u.emp_id === item.userId || u.userId === item.userId);
+        if (user && user.eng_name?.toLowerCase().includes(searchTerm)) {
+          return true;
+        }
+        return false;
+      });
     }
 
     // Buyer filter
@@ -659,31 +705,43 @@ const processImageToBase64 = async (imagePath) => {
   // Handle filter changes
   const handleFilterChange = (filters) => {
     setCurrentFilters(filters);
-    applyFilters(filters);
+    // The main useEffect hook will now handle applying filters when `currentFilters` changes.
   };
 
   // Reset filters
   const handleFilterReset = () => {
-    setCurrentFilters(null);
-    setFilteredData(submittedData);
-    setCurrentPage(1); // Reset to first page when filters are reset
+    setCurrentFilters({});
+    // The main useEffect hook will handle this state change.
   };
 
-  // Update filtered data when original data changes
+  // This useEffect was causing the processed 'actual' data to be overwritten by raw 'submittedData'.
+  // The main `processDataForView` useEffect now correctly handles updates when `submittedData` changes.
   useEffect(() => {
-    if (currentFilters) {
-      applyFilters(currentFilters, false); // Don't reset page when data refreshes
-    } else {
-      setFilteredData(submittedData);
-    }
-  }, [submittedData]);
-
   // Update paginated data when filtered data or current page changes
-  useEffect(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     setPaginatedData(filteredData.slice(startIndex, endIndex));
   }, [filteredData, currentPage, itemsPerPage]);
+
+  // This useEffect ensures that if a modal is open while the view mode changes,
+  // the data inside the modal is refreshed to match the new view.
+  useEffect(() => {
+    if (viewDetailsModal.isOpen && viewDetailsModal.itemData?._id) {
+      const updatedItemData = filteredData.find(
+        (record) => record._id === viewDetailsModal.itemData._id
+      );
+      if (updatedItemData) {
+        setViewDetailsModal((prev) => ({
+          ...prev,
+          itemData: updatedItemData,
+        }));
+      }
+    }
+    if (fullReportModal.isOpen && fullReportModal.recordData?._id) {
+      const updatedRecordData = filteredData.find(record => record._id === fullReportModal.recordData._id);
+      if (updatedRecordData) setFullReportModal(prev => ({ ...prev, recordData: updatedRecordData }));
+    }
+  }, [filteredData, viewDetailsModal.isOpen, fullReportModal.isOpen]);
 
   // Pagination calculations
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
@@ -744,6 +802,8 @@ const processImageToBase64 = async (imagePath) => {
         onReset={handleFilterReset}
         isVisible={filterVisible}
         onToggle={() => setFilterVisible(!filterVisible)}
+        users={users}
+        loadingUsers={loadingUsers}
       />
 
       {/* Main Table */}
@@ -753,6 +813,24 @@ const processImageToBase64 = async (imagePath) => {
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
               Submitted QC Washing Reports
             </h2>
+             <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
+              <button
+                onClick={() => setViewMode('estimated')}
+                className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
+                  viewMode === 'estimated' ? 'bg-white dark:bg-gray-800 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50'
+                }`}
+              >
+                Estimated
+              </button>
+              <button
+                onClick={() => setViewMode('actual')}
+                className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
+                  viewMode === 'actual' ? 'bg-white dark:bg-gray-800 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50'
+                }`}
+              >
+                Actual
+              </button>
+            </div>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
@@ -949,14 +1027,27 @@ const processImageToBase64 = async (imagePath) => {
                         {record.colorOrderQty || 'N/A'}
                       </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        <span className={`${
-                          record.reportType === 'First Output' || record.washQtyFromOldCollection
-                            ? 'text-green-600 font-medium' 
-                            : 'text-gray-400'
-                        }`}>
-                          {record.washQty !== undefined && record.washQty !== null ? record.washQty : 'N/A'}
-                        </span>
+                        <div className="flex flex-col">
+                          <span className={`font-medium ${
+                            record.isActualWashQty ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
+                          }`}>
+                            {record.displayWashQty ?? 'N/A'}
+                          </span>
+                          {/* <span className="text-xs text-gray-500 dark:text-gray-400">
+                            {viewMode === 'actual' && (record.isFirstOutput
+                              ? 'Actual (First Output)'
+                              : record.isActualWashQty
+                                ? record.washQtySource === 'qc_real_wash_qty_ym'
+                                  ? 'Actual (YM Real)'
+                                  : record.washQtySource === 'edited_actual_wash_qty'
+                                  ? 'Actual'
+                                  : 'Actual'
+                                : 'Estimated')}
+                          </span> */}
+                         
+                        </div>
                       </td>
+
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.checkedQty || 'N/A'}
                       </td>
@@ -1183,7 +1274,7 @@ const processImageToBase64 = async (imagePath) => {
         isOpen={viewDetailsModal.isOpen}
         onClose={handleCloseViewDetails}
         itemData={viewDetailsModal.itemData}
-        allRecords={submittedData}
+        allRecords={filteredData}
       />
 
       {/* Full Report Modal - ADD THIS */}

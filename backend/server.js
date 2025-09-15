@@ -105,6 +105,10 @@ import { API_BASE_URL } from "./config.js";
 import { URL } from "url";
 import { Buffer } from "buffer";
 
+import { ymEcoConnection, ymProdConnection } from "./controller/MongoDB/dbConnectionController.js";
+import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
+
+
 /* ------------------------------
    SQL Query Import
 ------------------------------ */
@@ -179,26 +183,6 @@ const corsOptions = {
 
 // Enable CORS with the defined options. This handles pre-flight requests automatically.
 app.use(cors(corsOptions));
-
-const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
-);
-
-const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
-);
-
-ymProdConnection.on("connected", () =>
-  console.log("✅ Connected to ym_prod database in 192.167.1.10:29000...")
-);
-ymProdConnection.on("error", (err) => console.error("❌ unexpected error:", err));
-
-ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
-);
-ymEcoConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
 // Define model on connections
 
@@ -293,6 +277,11 @@ const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
   SQL Query routs
 ------------------------------ */
 // app.use(sqlQuery);
+
+/* ------------------------------
+  Functional routs
+------------------------------ */
+app.use(qcRealWashQty);
 /* ------------------------------
    New Endpoints for CutPanelOrders
 ------------------------------ */
@@ -25166,7 +25155,6 @@ app.post("/api/qc-washing/submit", async (req, res) => {
     }
     const latestAutoSave = await QCWashing.findOne({
       orderNo,
-      status: "processing"
     }).sort({ updatedAt: -1 });
 
     if (!latestAutoSave) {
@@ -25338,7 +25326,6 @@ app.put("/api/qc-washing/update/:recordId", async (req, res) => {
   }
 });
 
-// GET - Get overall summary for a given orderNo and color
 app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
   try {
     const { recordId } = req.params;
@@ -25501,7 +25488,6 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to save summary." });
   }
 });
-
 
 
 app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
@@ -29740,6 +29726,77 @@ app.get("/api/qc-washing/all-submitted", async (req, res) => {
     });
   }
 });
+
+// Add this route to your QC Washing routes file
+app.put('/api/qc-washing/update-edited-wash-qty/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { editedWashQty } = req.body;
+
+    // Validate the ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Invalid record ID' 
+      });
+    }
+
+    // Validate the editedWashQty
+    if (editedWashQty === undefined || editedWashQty === null) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Edited wash quantity is required' 
+      });
+    }
+
+    const parsedEditedWashQty = parseInt(editedWashQty);
+    if (isNaN(parsedEditedWashQty) || parsedEditedWashQty < 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Edited wash quantity must be a valid non-negative number' 
+      });
+    }
+
+    // Update the record with the new edited wash quantity
+    const updatedRecord = await QCWashing.findByIdAndUpdate(
+      id,
+      { 
+        $set: {
+          editedActualWashQty: parsedEditedWashQty,
+          lastEditedAt: new Date(),
+          // Optionally add who edited it if you have user context
+          // editedBy: req.user?.id || req.body.editedBy
+        }
+      },
+      { 
+        new: true, // Return the updated document
+        runValidators: true // Run schema validators
+      }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'QC Washing record not found' 
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: updatedRecord,
+      message: 'Edited wash quantity updated successfully'
+    });
+
+  } catch (error) {
+    console.error('Error updating edited wash qty:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Internal server error',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+
 
 /* ------------------------------
    AI Chatbot Proxy Route

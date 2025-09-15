@@ -96,6 +96,22 @@ const QCWashingSchema = new mongoose.Schema({
   before_after_wash: { type: String, default: 'Before Wash' },
   checkedQty: { type: Number, default: 0 },
   washQty: { type: Number, default: 0 },
+  editedActualWashQty: { 
+    type: Number, 
+    min: 0,
+    validate: {
+      validator: function(v) {
+        return v === null || v === undefined || (Number.isInteger(v) && v >= 0);
+      },
+      message: 'Edited actual wash quantity must be a non-negative integer'
+    }
+  },
+  lastEditedAt: { 
+    type: Date 
+  },
+  editedBy: { 
+    type: String 
+  },
   totalCheckedPoint: { type: Number, default: 0 },
   totalPass: { type: Number, default: 0 },
   totalFail: { type: Number, default: 0 },

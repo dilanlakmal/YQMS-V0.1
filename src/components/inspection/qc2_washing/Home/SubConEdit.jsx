@@ -25,7 +25,6 @@ const SubConEdit = () => {
         const data = await response.json();
         
         if (data.success) {
-          // Filter records where factoryName is NOT equal to 'YM' AND reportType is 'Inline'
           const filteredRecords = data.data.filter(record => 
             record.factoryName && record.factoryName.toUpperCase() !== 'YM' &&
             record.reportType === 'Inline'
@@ -47,36 +46,60 @@ const SubConEdit = () => {
 
   const handleEdit = (record) => {
     setEditingRecord(record._id);
-    setEditWashQty(record.washQty || '');
+    // Pre-fill with edited quantity if it exists, otherwise use original
+    setEditWashQty(record.editedActualWashQty || record.washQty || '');
   };
 
   const handleSave = async (record) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/update-wash-qty/${record._id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/update-edited-wash-qty/${record._id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ washQty: parseInt(editWashQty) || 0 }),
+        body: JSON.stringify({ editedWashQty: parseInt(editWashQty) || 0 }),
       });
 
       if (response.ok) {
-        // Update local state
+        const result = await response.json();
+        
+        // Update local state with the new edited quantity
         setSubmittedData(prev => 
           prev.map(item => 
             item._id === record._id 
-              ? { ...item, washQty: parseInt(editWashQty) || 0 }
+              ? { 
+                  ...item, 
+                  editedActualWashQty: parseInt(editWashQty) || 0,
+                  lastEditedAt: new Date()
+                }
               : item
           )
         );
+        
+        setFilteredData(prev => 
+          prev.map(item => 
+            item._id === record._id 
+              ? { 
+                  ...item, 
+                  editedActualWashQty: parseInt(editWashQty) || 0,
+                  lastEditedAt: new Date()
+                }
+              : item
+          )
+        );
+
         setEditingRecord(null);
         setEditWashQty('');
+        
+        // Optional: Show success message
+        alert('Edited wash quantity saved successfully!');
       } else {
-        alert('Failed to update wash qty');
+        const errorData = await response.json();
+        alert(`Failed to update edited wash qty: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
-      console.error('Error updating wash qty:', error);
-      alert('Error updating wash qty');
+      console.error('Error updating edited wash qty:', error);
+      alert('Error updating edited wash qty');
     }
   };
 
@@ -85,7 +108,7 @@ const SubConEdit = () => {
     setEditWashQty('');
   };
 
-  // Filter functions
+  // ADD THESE MISSING FILTER FUNCTIONS:
   const applyFilters = (filters) => {
     let filtered = [...submittedData];
 
@@ -210,7 +233,8 @@ const SubConEdit = () => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">MO No</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Color</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">QC/QA ID</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Wash Qty</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Original Wash Qty</th>
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Edited Wash Qty</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Checked Qty</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Before/After Wash</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
@@ -241,6 +265,11 @@ const SubConEdit = () => {
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                       {record.userId || 'N/A'}
                     </td>
+                    {/* Original Wash Qty - Always shows the original value */}
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
+                      {record.washQty || 'N/A'}
+                    </td>
+                    {/* Edited Wash Qty - Shows input when editing, otherwise shows edited value */}
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                       {editingRecord === record._id ? (
                         <input
@@ -251,7 +280,14 @@ const SubConEdit = () => {
                           autoFocus
                         />
                       ) : (
-                        <span className="text-gray-900 dark:text-gray-200">{record.washQty || 'N/A'}</span>
+                        <span className={`${record.editedActualWashQty ? 'font-semibold text-blue-600 dark:text-blue-400' : 'text-gray-500'}`}>
+                          {record.editedActualWashQty || '-'}
+                          {record.editedActualWashQty && (
+                            <span className="ml-1 text-xs text-gray-400">
+                              (edited)
+                            </span>
+                          )}
+                        </span>
                       )}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">

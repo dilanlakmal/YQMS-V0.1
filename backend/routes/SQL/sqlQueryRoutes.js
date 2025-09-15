@@ -1,4 +1,4 @@
-import express from "express";
+import express from 'express';
 import {
   getSunriseRS18Data,
   getSunriseOutputData,
@@ -7,7 +7,7 @@ import {
   getYMCESystemData,
   cutpanelOrdersSync,
   syncDtOrders
-} from "../../controller/SQL/sqlQueryController.js";
+} from '../../controller/SQL/sqlQueryController.js';
 
 const router = express.Router();
 

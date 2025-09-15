@@ -10,6 +10,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
   const [comparisonData, setComparisonData] = useState(null);
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
   const [selectedKValue, setSelectedKValue] = useState(null);
+  const [inspectorDetails, setInspectorDetails] = useState(null);
   const [availableKValues, setAvailableKValues] = useState([]);
   // New state for checkboxes
   const [showFullChart, setShowFullChart] = useState(true);
@@ -112,6 +113,7 @@ const getImageUrl = (imagePath) => {
 
   useEffect(() => {
   if (isOpen && recordData) {
+    setReportData(null); // Force re-render by clearing old data first
     // Transform the existing record data to match expected format
     const transformedData = {
       ...recordData,
@@ -147,6 +149,27 @@ const getImageUrl = (imagePath) => {
     } else {
       setComparisonData(null);
     }
+
+    // Fetch inspector details
+    if (isOpen && recordData?.userId) {
+      fetch(`${API_BASE_URL}/api/users/${recordData.userId}`)
+        .then(res => {
+          if (!res.ok) throw new Error('Inspector not found');
+          return res.json();
+        })
+        .then(data => {
+          if (!data.error) setInspectorDetails(data);
+          else {
+            console.error("Inspector not found:", data.error);
+            setInspectorDetails(null);
+          }
+        })
+        .catch(err => {
+          console.error("Error fetching inspector details:", err);
+          setInspectorDetails(null);
+        });
+    }
+
   }
 }, [isOpen, recordData]);
 
@@ -173,12 +196,28 @@ const getImageUrl = (imagePath) => {
                 <p className="text-blue-100 text-sm">Comprehensive Quality Control Analysis</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/20 rounded-full transition-colors"
-            >
-              <X size={20} />
-            </button>
+            <div className="flex items-center gap-4">
+              {inspectorDetails && (
+                <div className="flex items-center gap-3">
+                  <img
+                    src={inspectorDetails.face_photo || '/assets/img/avatars/default-profile.png'}
+                    alt={inspectorDetails.eng_name}
+                    className="w-10 h-10 rounded-full object-cover border-2 border-white/50"
+                    onError={(e) => { e.target.onerror = null; e.target.src = '/assets/img/avatars/default-profile.png'; }}
+                  />
+                  <div className="text-right">
+                    <p className="text-sm font-semibold">{inspectorDetails.eng_name}</p>
+                    <p className="text-xs text-blue-200">{inspectorDetails.emp_id}</p>
+                  </div>
+                </div>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-white/20 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -338,7 +377,12 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-cyan-600 dark:text-cyan-300 uppercase tracking-wide mb-1">Wash Qty</p>
-                        <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{reportData.washQty}</p>
+                        <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
+                          {reportData.displayWashQty ?? reportData.washQty}
+                          {reportData.isActualWashQty && (
+                            <span className="text-sm text-green-500 ml-1">(Actual)</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -1458,7 +1502,7 @@ const getImageUrl = (imagePath) => {
                                       {allSizes.map((size, sizeIndex) => {
                                         const sizeData = sizeDataMap[size];
                                         const pieceCount = sizeData.sortedPcs.length;
-                                        const colSpan = pieceCount + 1; // +1 for Spec, Tol(-), Tol(+)
+                                        const colSpan = pieceCount + 3; // +1 for Spec, Tol(-), Tol(+)
 
                                         return (
                                           <th key={size} colSpan={colSpan} className={`px-3 py-3 text-center text-xs font-bold text-white uppercase tracking-wider border-r-2 border-gray-400 dark:border-gray-500 ${
@@ -1491,12 +1535,12 @@ const getImageUrl = (imagePath) => {
                                             <th className={`px-3 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} ${textColorClass}`}>
                                               Spec
                                             </th>
-                                            {/* <th className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} text-red-700 dark:text-red-400`}>
+                                            <th className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} text-red-700 dark:text-red-400`}>
                                               Tol (-)
-                                            </th> */}
-                                            {/* <th className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} text-green-700 dark:text-green-400`}>
+                                            </th>
+                                            <th className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} text-green-700 dark:text-green-400`}>
                                               Tol (+)
-                                            </th> */}
+                                            </th>
                                             {sizeData.sortedPcs.map(pc => (
                                               <th key={`${size}-${pc.pcNumber}`} className={`px-2 py-2 text-center text-xs font-bold uppercase tracking-wider border-r border-gray-300 dark:border-gray-600 ${bgColorClass} ${textColorClass}`}>
                                                 PC-{pc.pcNumber}
@@ -1588,14 +1632,14 @@ const getImageUrl = (imagePath) => {
                                             </td>
                                             
                                             {/* Tolerance (-) for this size */}
-                                            {/* <td className={`px-2 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
+                                            <td className={`px-2 py-3 text-center text-sm font-medium text-red-800 dark:text-red-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
                                               {pointData?.toleranceMinus || '-'}
-                                            </td> */}
+                                            </td>
                                             
                                             {/* Tolerance (+) for this size */}
-                                            {/* <td className={`px-2 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
+                                            <td className={`px-2 py-3 text-center text-sm font-medium text-green-800 dark:text-green-200 border-r border-gray-300 dark:border-gray-600 ${bgColorClass}`}>
                                               {pointData?.tolerancePlus ? `+${pointData.tolerancePlus}` : '-'}
-                                            </td> */}
+                                            </td>
                                             
                                             {/* Measurement values for each piece in this size */}
                                             {sizeData.sortedPcs.map(pc => {
