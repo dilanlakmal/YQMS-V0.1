@@ -1003,13 +1003,13 @@ const processImageToBase64 = async (imagePath) => {
                         {record.buyer || 'N/A'}
                       </td> */}
                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {record.washType || 'N/A'}
+                        {(record.washType || 'N/A').replace(' Wash', '')}
                       </td>
                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.reportType || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.before_after_wash || 'N/A'}
+                        {(record.before_after_wash || 'N/A').replace(' Wash', '')}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.orderNo || 'N/A'}

@@ -34,6 +34,17 @@ const OrderDetailsSection = ({
   const isSaved = externalIsSaved || false;
   const setIsSaved = setExternalIsSaved || (() => {});
 
+  useEffect(() => {
+    // This effect runs once on component mount to set the default for new reports.
+    // If the form is not saved and the value is not already 'After Wash', it updates it.
+    // This ensures new forms correctly default to 'After Wash'.
+    if (!isSaved && formData.before_after_wash !== 'After Wash') {
+      handleInputChange('before_after_wash', 'After Wash');
+    }
+    // We only want this to run once on mount for a new form.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
    const checkMeasurementDetails = async (orderNo) => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/qc-washing/check-measurement-details/${orderNo}`, {
@@ -67,7 +78,7 @@ const OrderDetailsSection = ({
       reportType: "",
       buyer: "",
       factoryName: "YM",
-      before_after_wash: "Before Wash",
+      before_after_wash: "After Wash",
       result: "",
       aql: [{
         sampleSize: "",
@@ -680,11 +691,11 @@ const autoSaveInspectionData = async (recordId) => {
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                disabled={isSaved}
             >
-              <option value="Normal Wash">Normal Wash</option>
-              <option value="Acid Wash">Acid Wash</option>
+              <option value="Normal Wash">Normal</option>
+              <option value="Acid Wash">Acid</option>
               <option value="Garment Dye">Garment Dye</option>
-              <option value="Soft Wash">Soft Wash</option>
-              <option value="Acid Wash + Garment Dye">Acid Wash + Garment Dye</option>
+              <option value="Soft Wash">Soft</option>
+              <option value="Acid Wash + Garment Dye">Acid + Garment Dye</option>
             </select>
           </div>
           
@@ -746,13 +757,13 @@ const autoSaveInspectionData = async (recordId) => {
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Befor/After Wash:</label>
             <select
-              value={formData.before_after_wash || 'Before Wash'}
+              value={formData.before_after_wash || 'After Wash'}
               onChange={(e) => handleInputChange('before_after_wash', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
                disabled={isSaved}
             >
-              <option value="Before Wash">Before Wash</option>
-              <option value="After Wash">After Wash</option>
+              <option value="Before Wash">Before</option>
+              <option value="After Wash">After</option>
             </select>
           </div>         
           <div className="flex items-center space-x-4">
