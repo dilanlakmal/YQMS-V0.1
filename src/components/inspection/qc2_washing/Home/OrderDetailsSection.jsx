@@ -329,9 +329,11 @@ const handleSave = async () => {
      
       if (result.id && setRecordId) {
         setRecordId(result.id);
-         // Only auto-save inspection data if before_after_wash is "After Wash"
-        if (formData.before_after_wash === "After Wash") {
-          await autoSaveInspectionData(result.id);
+        // Auto-save inspection data to create the default checklist and other sections.
+        await autoSaveInspectionData(result.id);
+        // After auto-saving, reload the data to update the UI with the new checklist
+        if (onLoadSavedDataById) {
+          await onLoadSavedDataById(result.id);
         }
       }
     } else {
@@ -487,22 +489,29 @@ const autoSaveInspectionData = async (recordId) => {
         );
         
         if (standardRecord) {
+          const sWM = standardRecord.washingMachine || {};
+          const sTD = standardRecord.tumbleDry || {};
+          const toStringOrEmpty = (val) => (val === null || val === undefined ? "" : String(val));
+
           defaultStandardValues = {
             "Washing Machine": {
-              temperature: standardRecord.washingMachine?.temperature === 0 ? "0" : String(standardRecord.washingMachine?.temperature || ""),
-              time: standardRecord.washingMachine?.time === 0 ? "0" : String(standardRecord.washingMachine?.time || ""),
-              silicon: standardRecord.washingMachine?.silicon === 0 ? "0" : String(standardRecord.washingMachine?.silicon || ""),
-              softener: standardRecord.washingMachine?.softener === 0 ? "0" : String(standardRecord.washingMachine?.softener || "")
+              temperature: toStringOrEmpty(sWM.temperature),
+              time: toStringOrEmpty(sWM.time),
+              silicon: toStringOrEmpty(sWM.silicon),
+              softener: toStringOrEmpty(sWM.softener)
             },
             "Tumble Dry": {
-              temperature: standardRecord.tumbleDry?.temperature === 0 ? "0" : String(standardRecord.tumbleDry?.temperature || ""),
-              timeCool: "", // Default empty since switch is off
-              timeHot: "" // Default empty since switch is off
+              temperature: toStringOrEmpty(sTD.temperature),
+              timeCool: toStringOrEmpty(sTD.timeCool),
+              timeHot: toStringOrEmpty(sTD.timeHot)
             }
           };
           
-          // Set actual values to standard values initially
-          defaultActualValues = { ...defaultStandardValues };
+          // Set actual values. For timeCool/timeHot, they are empty because the switch is off.
+          defaultActualValues = {
+            "Washing Machine": { ...defaultStandardValues["Washing Machine"] },
+            "Tumble Dry": { ...defaultStandardValues["Tumble Dry"], timeCool: "", timeHot: "" }
+          };
         }
       }
     } catch (error) {

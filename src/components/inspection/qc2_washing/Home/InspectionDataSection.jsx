@@ -189,91 +189,25 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
   // Existing useEffects remain the same...
   useEffect(() => {
     const fetchStandardValues = async () => {
-      if (!washType) return;
+      if (!washType) return; // Exit if no washType is selected
       try {
         const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards`);
         const data = await response.json();
         if (data.success) {
           const standardRecord = data.data.find(record => record.washType === washType);
           if (standardRecord) {
-            const washingMachineDefaults = {
-              temperature: "",
-              time: "",
-              silicon: "",
-              softener: ""
-            };
-            const tumbleDryDefaults = { temperature: "", timeCool: "", timeHot: "" };
+            const washingMachineValues = { ...standardRecord.washingMachine };
+            const tumbleDryValues = { ...standardRecord.tumbleDry };
 
-            const washingMachineValues = {
-              ...washingMachineDefaults,
-              ...standardRecord.washingMachine
-            };
-            const tumbleDryValues = {
-              ...tumbleDryDefaults,
-              ...standardRecord.tumbleDry
-            };
-
-            Object.keys(washingMachineValues).forEach((key) => {
-              if (washingMachineValues[key] === null || washingMachineValues[key] === undefined) {
-                washingMachineValues[key] = "";
-              } else if (washingMachineValues[key] === 0) {
-                washingMachineValues[key] = "0";
-              } else {
-                washingMachineValues[key] = String(washingMachineValues[key]);
-              }
-            });
-
-            Object.keys(tumbleDryValues).forEach((key) => {
-              if (tumbleDryValues[key] === null || tumbleDryValues[key] === undefined) {
-                tumbleDryValues[key] = "";
-              } else if (tumbleDryValues[key] === 0) {
-                tumbleDryValues[key] = "0";
-              } else {
-                tumbleDryValues[key] = String(tumbleDryValues[key]);
-              }
-            });
-
+            // Always set the standard values for display
             setStandardValues({
               "Washing Machine": washingMachineValues,
               "Tumble Dry": tumbleDryValues
             });
-
-            setActualValues((prev) => {
-              const newActualValues = { ...prev };
-              Object.keys(washingMachineValues).forEach((key) => {
-                if (!prev["Washing Machine"] || prev["Washing Machine"][key] === "" || 
-                    prev["Washing Machine"][key] === null || prev["Washing Machine"][key] === undefined) {
-                  if (!newActualValues["Washing Machine"]) {
-                    newActualValues["Washing Machine"] = {};
-                  }
-                  newActualValues["Washing Machine"][key] = washingMachineValues[key];
-                }
-              });
-
-              Object.keys(tumbleDryValues).forEach((key) => {
-                if (!prev["Tumble Dry"] || prev["Tumble Dry"][key] === "" || 
-                    prev["Tumble Dry"][key] === null || prev["Tumble Dry"][key] === undefined) {
-                  if (!newActualValues["Tumble Dry"]) {
-                    newActualValues["Tumble Dry"] = {};
-                  }
-                  newActualValues["Tumble Dry"][key] = tumbleDryValues[key];
-                }
-              });
-
-              return newActualValues;
-            });
-
-            const hasLoadedActualValues = 
-              (actualValues["Washing Machine"] && 
-               Object.values(actualValues["Washing Machine"]).some(val => 
-                 val !== "" && val !== null && val !== undefined
-               )) ||
-              (actualValues["Tumble Dry"] && 
-               Object.values(actualValues["Tumble Dry"]).some(val => 
-                 val !== "" && val !== null && val !== undefined
-               ));
-
-            if (!hasLoadedActualValues) {
+            
+            // Only set actual values to standard if it's a new record (no recordId)
+            // This prevents overwriting loaded data for existing records.
+            if (!recordId) {
               setActualValues({
                 "Washing Machine": { ...washingMachineValues },
                 "Tumble Dry": { ...tumbleDryValues }
@@ -286,7 +220,7 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
       }
     };
     fetchStandardValues();
-  }, [washType]);
+  }, [washType, recordId, setStandardValues, setActualValues]);
 
   // Rest of existing useEffects...
   useEffect(() => {
@@ -978,6 +912,11 @@ const handleSaveInspection = async () => {
         setIsSaved(true);
         setIsEditing(false);
         if (activateNextSection) activateNextSection();
+        
+        // After saving, reload the data to ensure the UI is in sync with the database
+        if (onLoadSavedDataById && recordId) {
+          await onLoadSavedDataById(recordId);
+        }
       } else {
         Swal.fire({
           icon: "error",
@@ -1140,6 +1079,11 @@ const handleSaveInspection = async () => {
 
         setIsSaved(true);
         setIsEditing(false);
+
+        // After updating, reload the data to ensure the UI is in sync
+        if (onLoadSavedDataById && recordId) {
+          await onLoadSavedDataById(recordId);
+        }
       } else {
         Swal.fire({
           icon: "error",
@@ -1645,26 +1589,45 @@ const handleSaveInspection = async () => {
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const isEnabled = param.key === "timeCool" ? timeCoolEnabled : timeHotEnabled;
+                                    const isCurrentlyEnabled = param.key === "timeCool" ? timeCoolEnabled : timeHotEnabled;
+                                    const newEnabledState = !isCurrentlyEnabled;
                                     const standardVal = standardValues[type.value]?.[param.key] || "";
                                     
+                                    // Update the parent state for the switch itself
                                     if (param.key === "timeCool") {
-                                      setTimeCoolEnabled(!isEnabled);
+                                      setTimeCoolEnabled(newEnabledState);
+                                    } else {
+                                      setTimeHotEnabled(newEnabledState);
+                                    }
+
+                                    if (newEnabledState) { // --- Turning ON ---
+                                      // Set actual value to standard value
                                       setActualValues(prev => ({
                                         ...prev,
                                         [type.value]: {
                                           ...prev[type.value],
-                                          timeCool: !isEnabled ? String(standardVal) : ""
+                                          [param.key]: String(standardVal)
                                         }
                                       }));
+                                      // Set status to OK since actual now matches standard
+                                      setMachineStatus(prev => ({
+                                        ...prev,
+                                        [type.value]: { ...prev[type.value], [param.key]: { ok: true, no: false } }
+                                      }));
                                     } else {
-                                      setTimeHotEnabled(!isEnabled);
+                                      // --- Turning OFF ---
+                                      // Clear the actual value
                                       setActualValues(prev => ({
                                         ...prev,
                                         [type.value]: {
                                           ...prev[type.value],
-                                          timeHot: !isEnabled ? String(standardVal) : ""
+                                          [param.key]: ""
                                         }
+                                      }));
+                                      // Reset status to neutral (neither OK nor No)
+                                      setMachineStatus(prev => ({
+                                        ...prev,
+                                        [type.value]: { ...prev[type.value], [param.key]: { ok: false, no: false } }
                                       }));
                                     }
                                   }}
