@@ -1060,7 +1060,8 @@
       "defectRate": "Defect Rate",
       "measurementSummary": "Measurement Summary",
       "embFactorySummaryTitle": "Daily EMB Factory Summary",
-      "allFactories": "All Factories"
+      "allFactories": "All Factories",
+      "images": "Images"
     },
     "specs": "Std. Specs",
     "date": "Date",

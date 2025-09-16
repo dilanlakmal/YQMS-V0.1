@@ -87,6 +87,7 @@ import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
 import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
 
 import createSubConDefectsModel from "./models/sub_con_defects.js";
+import createSubconSewingQAReportModel from "./models/subconSewingQAReportSchema.js";
 import createSubconSewingFactoryModel from "./models/subcon_sewing_factory.js";
 import createSubconSewingQc1ReportModel from "./models/subcon_sewing_qc1_report.js";
 
@@ -209,13 +210,9 @@ const QC2Defects = createQC2DefectsModel(ymProdConnection);
 const QC2WorkersData = createQC2WorkersDataModel(ymProdConnection);
 const QC2BGrade = createQC2BGradeModel(ymProdConnection);
 const QC2Task = createQC2TaskModel(ymProdConnection);
-const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
-const QCWashingCheckList = createQCWashingCheckpointsModel(ymProdConnection);
-const QCWashingFirstOutput = createQCWashingFirstOutputModel(ymProdConnection);
-// const StyleWiseCheckedQty = createStyleWiseCheckedQtyModel(ymProdConnection);
-const QCWashing = createQCWashingModel(ymProdConnection);
+const IEWorkerTask = createIEWorkerTaskModel(ymProdConnection);
 
-export const InlineOrders = createInlineOrdersModel(ymProdConnection); // Define the new model
+export const InlineOrders = createInlineOrdersModel(ymProdConnection);
 const SewingDefects = createSewingDefectsModel(ymProdConnection);
 const LineSewingWorker = createLineSewingWorkerModel(ymProdConnection);
 const QCInlineRoving = createQCInlineRovingModel(ymProdConnection);
@@ -223,16 +220,20 @@ const PairingDefect = createPairingDefectModel(ymProdConnection);
 const AccessoryIssue = createAccessoryIssueModel(ymProdConnection);
 const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
 
-const CuttingInspection = createCuttingInspectionModel(ymProdConnection); // New model
+const CuttingInspection = createCuttingInspectionModel(ymProdConnection);
 const CuttingMeasurementPoint =
-  createCuttingMeasurementPointModel(ymProdConnection); 
-export const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection); 
+  createCuttingMeasurementPointModel(ymProdConnection);
+export const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection);
 const CuttingFabricDefect = createCuttingFabricDefectModel(ymProdConnection);
 const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 const AQLChart = createAQLChartModel(ymProdConnection);
 
-export const QC1Sunrise = createQC1SunriseModel(ymProdConnection); 
+export const QC1Sunrise = createQC1SunriseModel(ymProdConnection);
+
 const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
+const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
+const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
+const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
 const SCCDefect = createSCCDefectModel(ymProdConnection);
 const SCCScratchDefect = createSCCScratchDefectModel(ymProdConnection);
@@ -258,19 +259,21 @@ const BuyerSpecTemplate = createBuyerSpecTemplateModel(ymProdConnection);
 const ANFMeasurementReport = createANFMeasurementReportModel(ymProdConnection);
 const SizeCompletionStatus = createSizeCompletionStatusModel(ymProdConnection);
 
-const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnection);
+const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
+const QCWashingCheckList = createQCWashingCheckpointsModel(ymProdConnection);
+const QCWashingFirstOutput = createQCWashingFirstOutputModel(ymProdConnection);
+const QCWashing = createQCWashingModel(ymProdConnection);
 
-(ymProdConnection);
-export const QCWorkers = createQCWorkersModel(ymProdConnection);
+const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnection);
 const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
-const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
-const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
+const SubconSewingQAReport = createSubconSewingQAReportModel(ymProdConnection);
+
+const QCWashingMachineStandard =
+  createQCWashingMachineStandard(ymProdConnection);
 const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
+const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
+export const QCWorkers = createQCWorkersModel(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
-const IEWorkerTask = createIEWorkerTaskModel(ymProdConnection);
-const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
-const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);
-const DailyTestingHTFU = createDailyTestingHTFUtModel(ymProdConnection);
 
 
 /* ------------------------------
@@ -15152,17 +15155,24 @@ app.post(
     }
 
     try {
-      // Generate a unique filename (your existing logic is good)
+      // Generate a unique filename
       const { imageType, inspectionDate } = req.body;
+
+      // --- START OF MODIFICATION ---
+      // Sanitize the imageType to create a valid filename component
+      const sanitizedImageType = (imageType || "sccimage")
+        .replace(/[\/\\]/g, "-") // Replace forward and back slashes with a hyphen
+        .replace(/\s+/g, "-") // Replace one or more spaces with a single hyphen
+        .replace(/[^a-zA-Z0-9._-]/g, ""); // Remove any other non-standard filename characters
+      // --- END OF MODIFICATION ---
+
       const datePart = inspectionDate
         ? inspectionDate.replace(/\//g, "-")
         : new Date().toISOString().split("T")[0];
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
 
-      // We will save as .webp for the best compression and web performance
-      const newFilename = `${
-        imageType || "sccimage"
-      }-${datePart}-${uniqueSuffix}.webp`;
+      // Use the sanitizedImageType to build the new filename
+      const newFilename = `${sanitizedImageType}-${datePart}-${uniqueSuffix}.webp`;
       const finalDiskPath = path.join(sccUploadPath, newFilename);
 
       // Use sharp to process the image from the buffer
@@ -17595,108 +17605,108 @@ const getConsolidatedDateFormats = (dateInput) => {
   };
 };
 
+/* -------------------------------------
+End Point - Final Consolidated HT Report
+------------------------------------- */
+
 app.get("/api/scc/final-report/ht", async (req, res) => {
   try {
-    const { date, empId, moNo, machineNo } = req.query;
-    if (!date) {
-      return res.status(400).json({ message: "Date is required." });
+    const { startDate, endDate, empId, moNo, machineNo } = req.query;
+
+    if (!startDate || !endDate) {
+      return res
+        .status(400)
+        .json({ message: "Start date and end date are required." });
     }
 
-    const { stringDate, paddedStringDate, isoStartDate, isoEndDate } =
-      getConsolidatedDateFormats(date);
+    // --- Build Filters ---
+    const baseFilter = {};
+    if (empId && empId !== "All") baseFilter.emp_id = empId;
+    if (moNo && moNo !== "All") baseFilter.moNo = moNo;
+    if (machineNo && machineNo !== "All") baseFilter.machineNo = machineNo;
 
-    // --- Build Filter Queries ---
-    // These objects will be passed to the find() method for each model
-    const stringDateFilter = { inspectionDate: stringDate };
-    if (empId && empId !== "All") stringDateFilter.emp_id = empId;
-    if (moNo && moNo !== "All") stringDateFilter.moNo = moNo;
-    if (machineNo && machineNo !== "All")
-      stringDateFilter.machineNo = machineNo;
+    const startOfDay = new Date(startDate);
+    startOfDay.setHours(0, 0, 0, 0);
 
-    const paddedDateFilter = { inspectionDate: paddedStringDate };
-    if (empId && empId !== "All") paddedDateFilter.emp_id = empId;
-    if (moNo && moNo !== "All") paddedDateFilter.moNo = moNo;
-    if (machineNo && machineNo !== "All")
-      paddedDateFilter.machineNo = machineNo;
+    const endOfDay = new Date(endDate);
+    endOfDay.setHours(23, 59, 59, 999);
 
-    const isoDateFilter = {
-      inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
-    };
-    if (empId && empId !== "All") isoDateFilter.emp_id = empId;
-    if (moNo && moNo !== "All") isoDateFilter.moNo = moNo;
-    if (machineNo && machineNo !== "All") isoDateFilter.machineNo = machineNo;
+    const dateFilter = { createdAt: { $gte: startOfDay, $lte: endOfDay } };
+    const finalFilter = { ...baseFilter, ...dateFilter };
+    const dropdownOptionsFilter = { ...dateFilter };
 
-    // --- Execute All Queries Concurrently using Promise.all ---
+    // --- Execute All Queries Concurrently ---
+    // NOTE: For this to work, ensure ALL 4 schemas have `timestamps: true`
     const [
       firstOutputData,
       dailyWashingData,
       machineCalibrationData,
       htInspectionData,
-      // Queries to get unique filter options for the selected DATE only
       uniqueEmpIds_1,
       uniqueEmpIds_2,
       uniqueEmpIds_3,
+      uniqueEmpIds_4,
       uniqueMoNos_1,
       uniqueMoNos_2,
-      uniqueMoNos_3
+      uniqueMoNos_3,
+      uniqueMoNos_4
     ] = await Promise.all([
-      // Data queries with filters applied
-      HTFirstOutput.find(stringDateFilter)
+      // Data queries
+      HTFirstOutput.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
-      SCCDailyTesting.find(stringDateFilter)
+      SCCDailyTesting.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
-      DailyTestingHTFU.find(paddedDateFilter)
+      DailyTestingHTFU.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
-      HTInspectionReport.find(isoDateFilter)
+      HTInspectionReport.find(finalFilter)
         .populate({
           path: "operatorData.emp_reference_id",
           select: "emp_id eng_name face_photo",
-          model: UserProd
+          model: UserMain // MODIFICATION: Changed from UserProd
         })
         .lean(),
 
-      // Filter option queries (only filter by date to get all options for that day)
-      HTFirstOutput.distinct("emp_id", { inspectionDate: stringDate }),
-      SCCDailyTesting.distinct("emp_id", { inspectionDate: stringDate }),
-      DailyTestingHTFU.distinct("emp_id", { inspectionDate: paddedStringDate }),
-      HTFirstOutput.distinct("moNo", { inspectionDate: stringDate }),
-      SCCDailyTesting.distinct("moNo", { inspectionDate: stringDate }),
-      DailyTestingHTFU.distinct("moNo", { inspectionDate: paddedStringDate })
+      // Filter option queries
+      HTFirstOutput.distinct("emp_id", dropdownOptionsFilter),
+      SCCDailyTesting.distinct("emp_id", dropdownOptionsFilter),
+      DailyTestingHTFU.distinct("emp_id", dropdownOptionsFilter),
+      HTInspectionReport.distinct("emp_id", dropdownOptionsFilter),
+      HTFirstOutput.distinct("moNo", dropdownOptionsFilter),
+      SCCDailyTesting.distinct("moNo", dropdownOptionsFilter),
+      DailyTestingHTFU.distinct("moNo", dropdownOptionsFilter),
+      HTInspectionReport.distinct("moNo", dropdownOptionsFilter)
     ]);
 
-    // Combine and get unique filter options
     const allEmpIds = [
       ...uniqueEmpIds_1,
       ...uniqueEmpIds_2,
       ...uniqueEmpIds_3,
-      ...htInspectionData.map((d) => d.emp_id)
+      ...uniqueEmpIds_4
     ];
     const uniqueEmpIds = [...new Set(allEmpIds)].filter(Boolean).sort();
-
     const allMoNos = [
       ...uniqueMoNos_1,
       ...uniqueMoNos_2,
       ...uniqueMoNos_3,
-      ...htInspectionData.map((d) => d.moNo)
+      ...uniqueMoNos_4
     ];
     const uniqueMoNos = [...new Set(allMoNos)].filter(Boolean).sort();
 
-    // Process First Output Data
     const processedFirstOutput = firstOutputData.map((doc) => {
       const firstSpec = doc.standardSpecification.find(
         (s) => s.type === "first"
@@ -17719,16 +17729,18 @@ app.get("/api/scc/final-report/ht", async (req, res) => {
               timeSec: secondSpec.timeSec,
               pressure: secondSpec.pressure
             }
-          : null
+          : null,
+        referenceSampleImage: doc.referenceSampleImage,
+        afterWashImage: doc.afterWashImage
       };
     });
 
-    // Process and Consolidate HT Inspection Data
     const consolidatedInspections = {};
     htInspectionData.forEach((doc) => {
       const key = `${doc.machineNo}-${doc.moNo}-${doc.color}-${doc.tableNo}`;
       if (!consolidatedInspections[key]) {
         consolidatedInspections[key] = {
+          inspectionDate: doc.inspectionDate,
           machineNo: doc.machineNo,
           moNo: doc.moNo,
           buyer: doc.buyer,
@@ -17748,14 +17760,12 @@ app.get("/api/scc/final-report/ht", async (req, res) => {
       group.totalPcs += doc.totalPcs || 0;
       group.totalInspectedQty += doc.aqlData?.sampleSize || 0;
       group.totalDefectsQty += doc.defectsQty || 0;
-
       if (
         doc.defectImageUrl &&
         !group.defectImageUrls.includes(doc.defectImageUrl)
       ) {
         group.defectImageUrls.push(doc.defectImageUrl);
       }
-
       doc.defects.forEach((defect) => {
         const name = defect.defectNameEng;
         group.defectSummary[name] =
@@ -17782,19 +17792,217 @@ app.get("/api/scc/final-report/ht", async (req, res) => {
       dailyWashing: dailyWashingData,
       machineCalibration: machineCalibrationData,
       htInspection: finalInspectionArray,
-      filterOptions: {
-        empIds: uniqueEmpIds,
-        moNos: uniqueMoNos
-      }
+      filterOptions: { empIds: uniqueEmpIds, moNos: uniqueMoNos }
     });
   } catch (error) {
-    console.error("Error creating consolidated HT report:", error);
+    console.error("Error creating consolidated HT report:", error); // Check server logs for this!
     res.status(500).json({
       message: "Failed to generate consolidated report",
       error: error.message
     });
   }
 });
+
+// app.get("/api/scc/final-report/ht", async (req, res) => {
+//   try {
+//     const { date, empId, moNo, machineNo } = req.query;
+//     if (!date) {
+//       return res.status(400).json({ message: "Date is required." });
+//     }
+
+//     const { stringDate, paddedStringDate, isoStartDate, isoEndDate } =
+//       getConsolidatedDateFormats(date);
+
+//     // --- Build Filter Queries ---
+//     // These objects will be passed to the find() method for each model
+//     const stringDateFilter = { inspectionDate: stringDate };
+//     if (empId && empId !== "All") stringDateFilter.emp_id = empId;
+//     if (moNo && moNo !== "All") stringDateFilter.moNo = moNo;
+//     if (machineNo && machineNo !== "All")
+//       stringDateFilter.machineNo = machineNo;
+
+//     const paddedDateFilter = { inspectionDate: paddedStringDate };
+//     if (empId && empId !== "All") paddedDateFilter.emp_id = empId;
+//     if (moNo && moNo !== "All") paddedDateFilter.moNo = moNo;
+//     if (machineNo && machineNo !== "All")
+//       paddedDateFilter.machineNo = machineNo;
+
+//     const isoDateFilter = {
+//       inspectionDate: { $gte: isoStartDate, $lte: isoEndDate }
+//     };
+//     if (empId && empId !== "All") isoDateFilter.emp_id = empId;
+//     if (moNo && moNo !== "All") isoDateFilter.moNo = moNo;
+//     if (machineNo && machineNo !== "All") isoDateFilter.machineNo = machineNo;
+
+//     // --- Execute All Queries Concurrently using Promise.all ---
+//     const [
+//       firstOutputData,
+//       dailyWashingData,
+//       machineCalibrationData,
+//       htInspectionData,
+//       // Queries to get unique filter options for the selected DATE only
+//       uniqueEmpIds_1,
+//       uniqueEmpIds_2,
+//       uniqueEmpIds_3,
+//       uniqueMoNos_1,
+//       uniqueMoNos_2,
+//       uniqueMoNos_3
+//     ] = await Promise.all([
+//       // Data queries with filters applied
+//       HTFirstOutput.find(stringDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+//       SCCDailyTesting.find(stringDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+//       DailyTestingHTFU.find(paddedDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+//       HTInspectionReport.find(isoDateFilter)
+//         .populate({
+//           path: "operatorData.emp_reference_id",
+//           select: "emp_id eng_name face_photo",
+//           model: UserProd
+//         })
+//         .lean(),
+
+//       // Filter option queries (only filter by date to get all options for that day)
+//       HTFirstOutput.distinct("emp_id", { inspectionDate: stringDate }),
+//       SCCDailyTesting.distinct("emp_id", { inspectionDate: stringDate }),
+//       DailyTestingHTFU.distinct("emp_id", { inspectionDate: paddedStringDate }),
+//       HTFirstOutput.distinct("moNo", { inspectionDate: stringDate }),
+//       SCCDailyTesting.distinct("moNo", { inspectionDate: stringDate }),
+//       DailyTestingHTFU.distinct("moNo", { inspectionDate: paddedStringDate })
+//     ]);
+
+//     // Combine and get unique filter options
+//     const allEmpIds = [
+//       ...uniqueEmpIds_1,
+//       ...uniqueEmpIds_2,
+//       ...uniqueEmpIds_3,
+//       ...htInspectionData.map((d) => d.emp_id)
+//     ];
+//     const uniqueEmpIds = [...new Set(allEmpIds)].filter(Boolean).sort();
+
+//     const allMoNos = [
+//       ...uniqueMoNos_1,
+//       ...uniqueMoNos_2,
+//       ...uniqueMoNos_3,
+//       ...htInspectionData.map((d) => d.moNo)
+//     ];
+//     const uniqueMoNos = [...new Set(allMoNos)].filter(Boolean).sort();
+
+//     // Process First Output Data
+//     const processedFirstOutput = firstOutputData.map((doc) => {
+//       const firstSpec = doc.standardSpecification.find(
+//         (s) => s.type === "first"
+//       );
+//       const secondSpec = doc.standardSpecification.find(
+//         (s) => s.type === "2nd heat"
+//       );
+//       return {
+//         ...doc,
+//         specs: firstSpec
+//           ? {
+//               tempC: firstSpec.tempC,
+//               timeSec: firstSpec.timeSec,
+//               pressure: firstSpec.pressure
+//             }
+//           : {},
+//         secondHeatSpecs: secondSpec
+//           ? {
+//               tempC: secondSpec.tempC,
+//               timeSec: secondSpec.timeSec,
+//               pressure: secondSpec.pressure
+//             }
+//           : null
+//       };
+//     });
+
+//     // Process and Consolidate HT Inspection Data
+//     const consolidatedInspections = {};
+//     htInspectionData.forEach((doc) => {
+//       const key = `${doc.machineNo}-${doc.moNo}-${doc.color}-${doc.tableNo}`;
+//       if (!consolidatedInspections[key]) {
+//         consolidatedInspections[key] = {
+//           machineNo: doc.machineNo,
+//           moNo: doc.moNo,
+//           buyer: doc.buyer,
+//           buyerStyle: doc.buyerStyle,
+//           color: doc.color,
+//           operatorData: doc.operatorData,
+//           batchNo: doc.batchNo,
+//           tableNo: doc.tableNo,
+//           totalPcs: 0,
+//           totalInspectedQty: 0,
+//           totalDefectsQty: 0,
+//           defectSummary: {},
+//           defectImageUrls: []
+//         };
+//       }
+//       const group = consolidatedInspections[key];
+//       group.totalPcs += doc.totalPcs || 0;
+//       group.totalInspectedQty += doc.aqlData?.sampleSize || 0;
+//       group.totalDefectsQty += doc.defectsQty || 0;
+
+//       if (
+//         doc.defectImageUrl &&
+//         !group.defectImageUrls.includes(doc.defectImageUrl)
+//       ) {
+//         group.defectImageUrls.push(doc.defectImageUrl);
+//       }
+
+//       doc.defects.forEach((defect) => {
+//         const name = defect.defectNameEng;
+//         group.defectSummary[name] =
+//           (group.defectSummary[name] || 0) + defect.count;
+//       });
+//     });
+
+//     const finalInspectionArray = Object.values(consolidatedInspections).map(
+//       (group) => {
+//         const finalDefectRate =
+//           group.totalInspectedQty > 0
+//             ? group.totalDefectsQty / group.totalInspectedQty
+//             : 0;
+//         return {
+//           ...group,
+//           finalDefectRate,
+//           defectImageUrl: group.defectImageUrls[0] || null
+//         };
+//       }
+//     );
+
+//     res.json({
+//       firstOutput: processedFirstOutput,
+//       dailyWashing: dailyWashingData,
+//       machineCalibration: machineCalibrationData,
+//       htInspection: finalInspectionArray,
+//       filterOptions: {
+//         empIds: uniqueEmpIds,
+//         moNos: uniqueMoNos
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error creating consolidated HT report:", error);
+//     res.status(500).json({
+//       message: "Failed to generate consolidated report",
+//       error: error.message
+//     });
+//   }
+// });
 
 /* -------------------------------------
    End Point - Final Consolidated FU Report
@@ -24749,7 +24957,6 @@ app.get(
 
     try {
       const orders = await collection.find({ Order_No: orderNo }).toArray();
-
       if (!orders || orders.length === 0) {
         return res
           .status(404)
@@ -24762,6 +24969,7 @@ app.get(
       let measurementSpecs = [];
       
       // Check various possible locations for measurement data
+
       if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
         measurementSpecs = order.MeasurementSpecs;
       } else if (order.Specs && Array.isArray(order.Specs)) {
@@ -25596,7 +25804,6 @@ app.post("/api/qc-washing/recalculate-overall-result/:recordId", async (req, res
   try {
     const { recordId } = req.params;
     const qcRecord = await QCWashing.findById(recordId);
-
     if (!qcRecord) {
       return res
         .status(404)
@@ -25661,6 +25868,193 @@ app.post("/api/qc-washing/recalculate-overall-result/:recordId", async (req, res
     });
   }
 });
+
+app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
+  try {
+    const { recordId } = req.params;
+    const qcRecord = await QCWashing.findById(recordId);
+
+    if (!qcRecord) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No data found for this record." });
+    }
+
+    // Recalculate overall result to ensure accuracy
+    let totalMeasurementPoints = 0;
+    let totalMeasurementPass = 0;
+    let totalMeasurementFail = 0;
+
+    // Use measurementSizeSummary if available
+    if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
+      qcRecord.measurementDetails.measurementSizeSummary.forEach((sizeData) => {
+        totalMeasurementPoints += sizeData.checkedPoints || 0;
+        totalMeasurementPass += sizeData.totalPass || 0;
+        totalMeasurementFail += sizeData.totalFail || 0;
+      });
+    } else if (qcRecord.measurementDetails?.measurement?.length > 0) {
+      // Fallback calculation
+      qcRecord.measurementDetails.measurement.forEach((data) => {
+        if (data.pcs && Array.isArray(data.pcs)) {
+          data.pcs.forEach((pc) => {
+            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+              pc.measurementPoints.forEach((point) => {
+                if (point.result === "pass" || point.result === "fail") {
+                  totalMeasurementPoints++;
+                  if (point.result === "pass") {
+                    totalMeasurementPass++;
+                  } else {
+                    totalMeasurementFail++;
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    const passRate =
+      totalMeasurementPoints > 0
+        ? Number(
+            ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
+          )
+        : 100;
+
+    const measurementResult =
+      totalMeasurementPoints === 0
+        ? "Pass"
+        : totalMeasurementFail > 0
+        ? "Fail"
+        : "Pass";
+
+    const defectResult = qcRecord.defectDetails?.result || "Pass";
+
+    const overallResult =
+      measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+
+    res.json({
+      success: true,
+      summary: {
+        recordId,
+        orderNo: qcRecord.orderNo,
+        color: qcRecord.color,
+        totalCheckedPcs: qcRecord.totalCheckedPcs ?? 0,
+        checkedQty: qcRecord.checkedQty ?? "",
+        washQty: qcRecord.washQty ?? "",
+        rejectedDefectPcs: qcRecord.rejectedDefectPcs ?? 0,
+        totalDefectCount: qcRecord.totalDefectCount ?? 0,
+        defectRate: qcRecord.defectRate ?? 0,
+        defectRatio: qcRecord.defectRatio ?? 0,
+        passRate: passRate,
+        overallResult: overallResult,
+        overallFinalResult: overallResult, // Ensure consistency
+
+        // Additional debug information
+        measurementStats: {
+          totalPoints: totalMeasurementPoints,
+          totalPass: totalMeasurementPass,
+          totalFail: totalMeasurementFail,
+          measurementResult: measurementResult
+        },
+        defectStats: {
+          defectResult: defectResult
+        },
+
+        // Include the measurement details for frontend calculation
+        measurementDetails: qcRecord.measurementDetails,
+        defectDetails: qcRecord.defectDetails ?? {}
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching overall summary by id:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching overall summary."
+    });
+  }
+});
+
+app.post(
+  "/api/qc-washing/recalculate-overall-result/:recordId",
+  async (req, res) => {
+    try {
+      const { recordId } = req.params;
+      const qcRecord = await QCWashing.findById(recordId);
+
+      if (!qcRecord) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Record not found." });
+      }
+
+      // Recalculate everything from scratch
+      let totalMeasurementPoints = 0;
+      let totalMeasurementPass = 0;
+      let totalMeasurementFail = 0;
+
+      if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
+        qcRecord.measurementDetails.measurementSizeSummary.forEach(
+          (sizeData) => {
+            totalMeasurementPoints += sizeData.checkedPoints || 0;
+            totalMeasurementPass += sizeData.totalPass || 0;
+            totalMeasurementFail += sizeData.totalFail || 0;
+          }
+        );
+      }
+
+      const passRate =
+        totalMeasurementPoints > 0
+          ? Number(
+              ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
+            )
+          : 100;
+
+      const measurementResult =
+        totalMeasurementPoints === 0
+          ? "Pass"
+          : totalMeasurementFail > 0
+          ? "Fail"
+          : "Pass";
+
+      const defectResult = qcRecord.defectDetails?.result || "Pass";
+
+      const overallResult =
+        measurementResult === "Pass" && defectResult === "Pass"
+          ? "Pass"
+          : "Fail";
+
+      // Update the record
+      qcRecord.totalCheckedPoint = totalMeasurementPoints;
+      qcRecord.totalPass = totalMeasurementPass;
+      qcRecord.totalFail = totalMeasurementFail;
+      qcRecord.passRate = passRate;
+      qcRecord.overallFinalResult = overallResult;
+
+      await qcRecord.save();
+
+      res.json({
+        success: true,
+        message: "Overall result recalculated successfully",
+        result: {
+          overallResult,
+          measurementResult,
+          defectResult,
+          passRate,
+          totalMeasurementPoints,
+          totalMeasurementPass,
+          totalMeasurementFail
+        }
+      });
+    } catch (error) {
+      console.error("Error recalculating overall result:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to recalculate overall result."
+      });
+    }
+  }
+);
 
 const getAqlLevelForBuyer = (buyer) => {
   if (!buyer) return 1.0;
@@ -29927,6 +30321,9 @@ app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
   try {
     const reportData = req.body;
 
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
     // Generate a unique report ID
     const reportID = await generateSubconReportID();
 
@@ -29934,6 +30331,7 @@ app.post("/api/subcon-sewing-qc1-reports", async (req, res) => {
 
     const newReport = new SubconSewingQc1Report({
       ...reportData,
+      inspectionDate: startOfDay,
       reportID: reportID,
       buyer: buyer
     });
@@ -29963,13 +30361,15 @@ app.put("/api/subcon-sewing-qc1-reports/:id", async (req, res) => {
     const { id } = req.params;
     const reportData = req.body;
 
-    // We don't need to generate a new reportID, as we're updating.
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
     // We also re-calculate the buyer in case the MO number was somehow changed.
     const buyer = getBuyerFromMoNumber(reportData.moNo);
 
     const updatedReport = await SubconSewingQc1Report.findByIdAndUpdate(
       id,
-      { ...reportData, buyer: buyer },
+      { ...reportData, inspectionDate: startOfDay, buyer: buyer },
       { new: true, runValidators: true } // {new: true} returns the updated document
     );
 
@@ -30017,6 +30417,61 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
 
     const result = await SubconSewingQc1Report.aggregate([
       { $match: matchQuery },
+      { $sort: { inspectionDate: -1, _id: -1 } },
+      // --- NEW: Join with QA reports collection using $lookup ---
+      {
+        $lookup: {
+          from: "subcon_sewing_qa_reports", // The exact name of the QA reports collection
+          let: {
+            insp_date: "$inspectionDate",
+            insp_factory: "$factory",
+            insp_line: "$lineNo",
+            insp_mo: "$moNo",
+            insp_color: "$color"
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$factory", "$$insp_factory"] },
+                    { $eq: ["$lineNo", "$$insp_line"] },
+                    { $eq: ["$moNo", "$$insp_mo"] },
+                    { $eq: ["$color", "$$insp_color"] },
+                    // Robustly match the date part only, ignoring time
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$inspectionDate",
+                            timezone: "UTC"
+                          }
+                        },
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$$insp_date",
+                            timezone: "UTC"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $limit: 1 } // Ensure only one matching QA report is returned
+          ],
+          as: "qaData" // Store the result in a temporary array 'qaData'
+        }
+      },
+      // --- NEW: Promote the matched QA report to a top-level object ---
+      {
+        $addFields: {
+          qaReport: { $arrayElemAt: ["$qaData", 0] } // Get the first (or only) item from qaData
+        }
+      },
       // Use $facet to run multiple aggregations on the filtered data in parallel
       {
         $facet: {
@@ -30029,6 +30484,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: null,
                 totalCheckedQty: { $sum: "$checkedQty" },
                 totalDefectQty: { $sum: "$totalDefectQty" },
+                totalQASampleSize: { $sum: "$qaReport.sampleSize" },
+                totalQADefectQty: { $sum: "$qaReport.totalDefectQty" },
                 allDefects: { $push: "$defectList" }
               }
             },
@@ -30039,7 +30496,9 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: "$allDefects.defectName",
                 totalQty: { $sum: "$allDefects.qty" },
                 totalCheckedQty: { $first: "$totalCheckedQty" },
-                totalDefectQty: { $first: "$totalDefectQty" }
+                totalDefectQty: { $first: "$totalDefectQty" },
+                totalQASampleSize: { $first: "$totalQASampleSize" },
+                totalQADefectQty: { $first: "$totalQADefectQty" }
               }
             },
             { $sort: { totalQty: -1 } },
@@ -30048,6 +30507,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: null,
                 totalCheckedQty: { $first: "$totalCheckedQty" },
                 totalDefectQty: { $first: "$totalDefectQty" },
+                totalQASampleSize: { $first: "$totalQASampleSize" },
+                totalQADefectQty: { $first: "$totalQADefectQty" },
                 topDefects: { $push: { defectName: "$_id", qty: "$totalQty" } }
               }
             },
@@ -30056,6 +30517,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 _id: 0,
                 totalCheckedQty: { $ifNull: ["$totalCheckedQty", 0] },
                 totalDefectQty: { $ifNull: ["$totalDefectQty", 0] },
+                totalQASampleSize: { $ifNull: ["$totalQASampleSize", 0] },
+                totalQADefectQty: { $ifNull: ["$totalQADefectQty", 0] },
                 overallDefectRate: {
                   $cond: [
                     { $eq: [{ $ifNull: ["$totalCheckedQty", 0] }, 0] },
@@ -30148,6 +30611,25 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
   } catch (error) {
     console.error("Error fetching Sub-Con QC report data:", error);
     res.status(500).json({ error: "Failed to fetch report data" });
+  }
+});
+
+// --- NEW ENDPOINT: Get specific user info for QA ID popups ---
+app.get("/api/user-info-subcon-qa/:empId", async (req, res) => {
+  try {
+    const { empId } = req.params;
+    // --- CORRECTED: Using 'UserMain' as the model name ---
+    const user = await UserMain.findOne({ emp_id: empId }).select(
+      "emp_id eng_name face_photo job_title"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found." });
+    }
+    res.json(user);
+  } catch (error) {
+    console.error("Error fetching user info:", error);
+    res.status(500).json({ error: "Failed to fetch user details" });
   }
 });
 
@@ -30335,6 +30817,601 @@ app.delete("/api/subcon-defects-manage/:id", async (req, res) => {
   } catch (error) {
     console.error("Error deleting sub-con defect:", error);
     res.status(500).json({ error: "Failed to delete defect" });
+  }
+});
+
+/* ------------------------------------------------------------------
+   End Point - Sub-Con QC Dashboard
+------------------------------------------------------------------ */
+
+app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
+  try {
+    const { startDate, endDate, factory, buyer, lineNo, moNo, color } =
+      req.query;
+
+    const matchQuery = {};
+    if (startDate && endDate) {
+      matchQuery.inspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (factory) matchQuery.factory = factory;
+    if (buyer) matchQuery.buyer = buyer;
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (moNo) matchQuery.moNo = moNo;
+    if (color) matchQuery.color = color;
+
+    const result = await SubconSewingQc1Report.aggregate([
+      { $match: matchQuery },
+
+      // --- NEW: Join with QA reports collection using $lookup ---
+      {
+        $lookup: {
+          from: "subcon_sewing_qa_reports", // The exact name of the QA reports collection
+          let: {
+            insp_date: "$inspectionDate",
+            insp_factory: "$factory",
+            insp_line: "$lineNo",
+            insp_mo: "$moNo",
+            insp_color: "$color"
+          },
+          pipeline: [
+            {
+              $match: {
+                $expr: {
+                  $and: [
+                    { $eq: ["$factory", "$$insp_factory"] },
+                    { $eq: ["$lineNo", "$$insp_line"] },
+                    { $eq: ["$moNo", "$$insp_mo"] },
+                    { $eq: ["$color", "$$insp_color"] },
+                    {
+                      $eq: [
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$inspectionDate",
+                            timezone: "UTC"
+                          }
+                        },
+                        {
+                          $dateToString: {
+                            format: "%Y-%m-%d",
+                            date: "$$insp_date",
+                            timezone: "UTC"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $limit: 1 }
+          ],
+          as: "qaData"
+        }
+      },
+      // --- NEW: Promote the matched QA report to a top-level object ---
+      {
+        $addFields: {
+          qaReport: { $arrayElemAt: ["$qaData", 0] }
+        }
+      },
+
+      {
+        $facet: {
+          // --- 1. Main Table Data: Now includes the qaReport object ---
+          mainData: [
+            {
+              $addFields: {
+                defectRate: {
+                  $cond: [
+                    { $gt: ["$checkedQty", 0] },
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefectQty", "$checkedQty"] },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            },
+            { $sort: { inspectionDate: 1, defectRate: -1 } }
+          ],
+
+          // --- 2. Top N Defects Calculation (No Change) ---
+          topDefects: [
+            { $unwind: "$defectList" },
+            {
+              $group: {
+                _id: "$defectList.defectName",
+                totalQty: { $sum: "$defectList.qty" }
+              }
+            },
+            { $sort: { totalQty: -1 } }
+          ],
+
+          // --- 3. Defect Rate by Line Calculation (No Change) ---
+          linePerformance: [
+            {
+              $group: {
+                _id: { factory: "$factory", lineNo: "$lineNo" },
+                totalChecked: { $sum: "$checkedQty" },
+                totalDefects: { $sum: "$totalDefectQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                factory: "$_id.factory",
+                lineNo: "$_id.lineNo",
+                defectRate: {
+                  $cond: [
+                    { $eq: ["$totalChecked", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefects", "$totalChecked"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $sort: { factory: 1, lineNo: 1 } }
+          ],
+
+          // --- NEW STAGE FOR THE BUYER CHART ---
+          buyerPerformance: [
+            {
+              $group: {
+                _id: "$buyer", // Group all records by the buyer's name
+                totalChecked: { $sum: "$checkedQty" },
+                totalDefects: { $sum: "$totalDefectQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0, // Remove the default _id field
+                buyer: "$_id", // Rename _id to 'buyer' for clarity
+                defectRate: {
+                  // Calculate the defect rate, safely handling division by zero
+                  $cond: [
+                    { $eq: ["$totalChecked", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefects", "$totalChecked"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            { $sort: { defectRate: -1 } } // Sort by the highest defect rate first
+          ],
+
+          // --- NEW PIPELINE FOR THE TREND CHART ---
+          dailyTrend: [
+            {
+              // Group all documents by the day of the inspection
+              $group: {
+                _id: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$inspectionDate"
+                  }
+                },
+                totalChecked: { $sum: "$checkedQty" },
+                totalDefects: { $sum: "$totalDefectQty" }
+              }
+            },
+            {
+              // Calculate the defect rate for each day
+              $project: {
+                _id: 0, // Remove the default _id
+                date: "$_id", // Rename _id to 'date'
+                defectRate: {
+                  $cond: [
+                    { $eq: ["$totalChecked", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefects", "$totalChecked"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            },
+            // Sort the results by date in ascending order for the line chart
+            { $sort: { date: 1 } }
+          ],
+
+          // --- NEW PIPELINE FOR THE PIVOT TABLE DATA ---
+          individualDefectTrend: [
+            // First, pre-calculate the total checked qty for each day
+            {
+              $group: {
+                _id: {
+                  $dateToString: {
+                    format: "%Y-%m-%d",
+                    date: "$inspectionDate"
+                  }
+                },
+                dailyCheckedQty: { $sum: "$checkedQty" },
+                reports: { $push: "$$ROOT" } // Push the full documents for later processing
+              }
+            },
+            // Unwind the reports and then their defect lists
+            { $unwind: "$reports" },
+            { $unwind: "$reports.defectList" },
+            // Now group by date and defect name to get the total defect qty
+            {
+              $group: {
+                _id: {
+                  date: "$_id",
+                  defectName: "$reports.defectList.defectName"
+                },
+                totalQty: { $sum: "$reports.defectList.qty" },
+                dailyChecked: { $first: "$dailyCheckedQty" } // Carry over the daily total
+              }
+            },
+            // Project the final shape with the calculated defect rate
+            {
+              $project: {
+                _id: 0,
+                date: "$_id.date",
+                defectName: "$_id.defectName",
+                qty: "$totalQty",
+                defectRate: {
+                  $cond: [
+                    { $gt: ["$dailyChecked", 0] },
+                    {
+                      $multiply: [
+                        { $divide: ["$totalQty", "$dailyChecked"] },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+
+          // --- NEW PIPELINE TO GET UNIQUE DEFECT NAMES FOR THE FILTER ---
+          uniqueDefectNames: [
+            { $unwind: "$defectList" },
+            {
+              $group: {
+                _id: null,
+                names: { $addToSet: "$defectList.defectName" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                names: { $sortArray: { input: "$names", sortBy: 1 } }
+              }
+            }
+          ],
+
+          // --- 4. Overall QC Totals (No Change) ---
+          overallTotalChecked: [
+            { $group: { _id: null, total: { $sum: "$checkedQty" } } }
+          ],
+
+          // --- NEW 5. Overall QA Totals ---
+          qaSummary: [
+            {
+              $group: {
+                _id: null,
+                totalQASampleSize: { $sum: "$qaReport.sampleSize" },
+                totalQADefectQty: { $sum: "$qaReport.totalDefectQty" }
+              }
+            }
+          ],
+
+          // --- 6. Filter Options (No Change) ---
+          filterOptions: [
+            {
+              $group: {
+                _id: null,
+                factories: { $addToSet: "$factory" },
+                buyers: { $addToSet: "$buyer" },
+                lineNos: { $addToSet: "$lineNo" },
+                moNos: { $addToSet: "$moNo" },
+                colors: { $addToSet: "$color" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                factories: { $sortArray: { input: "$factories", sortBy: 1 } },
+                buyers: { $sortArray: { input: "$buyers", sortBy: 1 } },
+                lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
+                moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
+                colors: { $sortArray: { input: "$colors", sortBy: 1 } }
+              }
+            }
+          ]
+        }
+      }
+    ]);
+
+    // --- Reshape Data for Frontend ---
+    const rawData = result[0];
+    const totalChecked = rawData.overallTotalChecked[0]?.total || 0;
+
+    const topDefectsWithRate = rawData.topDefects.map((d) => ({
+      defectName: d._id,
+      defectQty: d.totalQty,
+      defectRate: totalChecked > 0 ? (d.totalQty / totalChecked) * 100 : 0
+    }));
+
+    // --- NEW: Safely get QA summary data ---
+    const qaSummaryData = rawData.qaSummary[0] || {
+      totalQASampleSize: 0,
+      totalQADefectQty: 0
+    };
+
+    // Get unique defect names, providing an empty array as a default
+    const uniqueDefectNames = rawData.uniqueDefectNames[0]?.names || [];
+
+    res.json({
+      mainData: rawData.mainData || [],
+      topDefects: topDefectsWithRate || [],
+      linePerformance: rawData.linePerformance || [],
+      buyerPerformance: rawData.buyerPerformance || [],
+      dailyTrend: rawData.dailyTrend || [],
+      individualDefectTrend: rawData.individualDefectTrend || [],
+      uniqueDefectNames: uniqueDefectNames,
+      qaSummary: qaSummaryData,
+      filterOptions: rawData.filterOptions[0] || {
+        factories: [],
+        buyers: [],
+        lineNos: [],
+        moNos: [],
+        colors: []
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching Sub-Con QC dashboard data:", error);
+    res.status(500).json({ error: "Failed to fetch dashboard data" });
+  }
+});
+
+/* ----------------------------------------------------
+   End Points - NEW for Sub-Con QA Sample Data
+---------------------------------------------------- */
+
+// 1. ENDPOINT: Search for QA Standard Defects
+app.get("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const { searchTerm } = req.query;
+    if (!searchTerm) {
+      return res.json([]);
+    }
+
+    const searchNumber = parseInt(searchTerm, 10);
+    const query = isNaN(searchNumber)
+      ? { english: { $regex: searchTerm, $options: "i" } } // Search by name (case-insensitive)
+      : { code: searchNumber }; // Search by code
+
+    const defects = await QAStandardDefectsModel.find(query)
+      .limit(20)
+      .sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA standard defects:", error);
+    res.status(500).json({ error: "Failed to fetch QA defects" });
+  }
+});
+
+// 2. ENDPOINT: Image Upload for QA Module
+const qaImageStorage = multer.memoryStorage();
+const qaImageUpload = multer({
+  storage: qaImageStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+});
+
+app.post(
+  "/api/subcon-qa/upload-image",
+  qaImageUpload.single("imageFile"),
+  async (req, res) => {
+    try {
+      const { date, factory, lineNo, moNo, defectCode } = req.body;
+      const imageFile = req.file;
+
+      if (!imageFile) {
+        return res.status(400).json({ message: "No image file provided." });
+      }
+      if (!date || !factory || !lineNo || !moNo || !defectCode) {
+        return res.status(400).json({ message: "Missing required metadata." });
+      }
+
+      const uploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "sub-con-qc1"
+      );
+      //await fsPromises.mkdir(uploadPath, { recursive: true });
+
+      const sanitizedFactory = sanitize(factory);
+      const sanitizedDate = sanitize(date);
+      const sanitizedLineNo = sanitize(lineNo);
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedDefectCode = sanitize(defectCode);
+
+      const imagePrefix = `QA_${sanitizedDate}_${sanitizedFactory}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedDefectCode}_`;
+
+      const filesInDir = await fsPromises.readdir(uploadPath);
+      const existingImageCount = filesInDir.filter((f) =>
+        f.startsWith(imagePrefix)
+      ).length;
+      const imageIndex = existingImageCount + 1;
+
+      const newFilename = `${imagePrefix}${imageIndex}.webp`;
+      const finalDiskPath = path.join(uploadPath, newFilename);
+
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
+
+      // ---Use a relative URL for the frontend ---
+      const relativeUrl = `/storage/sub-con-qc1/${newFilename}`;
+
+      res.json({ success: true, filePath: relativeUrl }); // Send the relative path
+    } catch (error) {
+      console.error("Error in QA image upload:", error);
+      res
+        .status(500)
+        .json({ message: "Server error during image processing." });
+    }
+  }
+);
+
+// Helper function to generate a unique Report ID for QA
+const generateSubconQAReportID = async () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+  let reportID = `SQA${year}${month}${day}${randomPart}`;
+
+  let existingReport = await SubconSewingQAReport.findOne({ reportID });
+  while (existingReport) {
+    const newRandomPart = Math.floor(1000 + Math.random() * 9000).toString();
+    reportID = `SQA${year}${month}${day}${newRandomPart}`;
+    existingReport = await SubconSewingQAReport.findOne({ reportID });
+  }
+  return reportID;
+};
+
+// 3. ENDPOINT: Save a new QA Sample Report
+app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
+  try {
+    const reportData = req.body;
+
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const reportID = await generateSubconQAReportID();
+    const buyer = getBuyerFromMoNumber(reportData.moNo); // Assuming you have this helper function
+
+    const newReport = new SubconSewingQAReport({
+      ...reportData,
+      inspectionDate: startOfDay,
+      reportID: reportID,
+      buyer: buyer
+    });
+
+    await newReport.save();
+
+    res.status(201).json({
+      message: "QA Report saved successfully!",
+      reportID: reportID
+    });
+  } catch (error) {
+    console.error("Error saving Sub-Con QA report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to save QA report" });
+  }
+});
+
+/* -----------------------------------------------------------
+   End Points - ADDITIONS for Sub-Con QA Sample Data (Find & Update)
+----------------------------------------------------------- */
+
+// 4. ENDPOINT: Find a specific QA report to check for existence/edit
+app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
+  try {
+    const { inspectionDate, factory, lineNo, moNo, color } = req.query;
+
+    if (!inspectionDate || !factory || !lineNo || !moNo || !color) {
+      return res
+        .status(400)
+        .json({ error: "Missing required search parameters." });
+    }
+
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const report = await SubconSewingQAReport.findOne({
+      factory,
+      lineNo,
+      moNo,
+      color,
+      inspectionDate: {
+        $gte: startOfDay,
+        $lte: endOfDay
+      }
+    });
+
+    // If a report is found, send it. Otherwise, `report` will be null.
+    res.json(report);
+  } catch (error) {
+    console.error("Error finding Sub-Con QA report:", error);
+    res.status(500).json({ error: "Failed to find QA report" });
+  }
+});
+
+// 5. ENDPOINT: Update an existing QA report by its ID
+app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reportData = req.body;
+
+    // Always normalize the inspection date to the start of the day
+    const startOfDay = new Date(reportData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const buyer = getBuyerFromMoNumber(reportData.moNo);
+
+    const updatedReport = await SubconSewingQAReport.findByIdAndUpdate(
+      id,
+      { ...reportData, inspectionDate: startOfDay, buyer: buyer },
+      { new: true, runValidators: true } // Return the updated document
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({ error: "QA Report not found." });
+    }
+
+    res.json({
+      message: "QA Report updated successfully!",
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error("Error updating Sub-Con QA report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to update QA report" });
   }
 });
 

@@ -5,8 +5,11 @@ import {
   CheckSquare,
   Download,
   FileText,
+  Image as ImageIcon,
+  Info,
   Loader2,
   Percent,
+  X,
   XCircle
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
@@ -16,23 +19,24 @@ import Select from "react-select";
 import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
 
-// --- Reusable Components ---
-const SummaryCard = ({ icon, title, value, bgColorClass }) => (
+// --- 👈 MODIFIED: SummaryCard component is now more flexible ---
+const SummaryCard = ({ icon, title, children, bgColorClass }) => (
   <div
     className={`p-4 rounded-lg shadow-md flex items-start gap-4 ${
       bgColorClass || "bg-white dark:bg-gray-800"
     }`}
   >
-    <div className="bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-lg text-indigo-500">
+    <div className="bg-indigo-100 dark:bg-indigo-900/50 p-3 rounded-lg text-indigo-500 flex-shrink-0">
       {icon}
     </div>
-    <div>
+    <div className="flex-grow">
       <p className="text-sm font-semibold text-gray-500 dark:text-gray-400">
         {title}
       </p>
-      <p className="text-2xl font-bold text-gray-800 dark:text-gray-100">
-        {value}
-      </p>
+      {/* Children prop allows for custom content like text and badges */}
+      <div className="text-2xl font-bold text-gray-800 dark:text-gray-100">
+        {children}
+      </div>
     </div>
   </div>
 );
@@ -74,6 +78,121 @@ const ToggleButton = ({ label, value, activeValue, onClick }) => (
   </button>
 );
 
+// --- Modal component for displaying QA Inspector's Information ---
+const QAUserModal = ({ user, isLoading, onClose }) => {
+  if (!user && !isLoading) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100]"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-72 text-center relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-2 right-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+        >
+          <X size={20} />
+        </button>
+        {isLoading ? (
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-indigo-500" />
+        ) : (
+          <>
+            <img
+              src={
+                user.face_photo ||
+                `https://ui-avatars.com/api/?name=${user.eng_name}&background=random`
+              }
+              alt={user.eng_name}
+              className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-indigo-400 object-cover"
+            />
+            <h3 className="text-lg font-bold text-gray-800 dark:text-gray-100">
+              {user.emp_id}
+            </h3>
+            <p className="text-md text-gray-600 dark:text-gray-300">
+              {user.eng_name}
+            </p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              {user.job_title}
+            </p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// --- Modal component for displaying defect images ---
+const QAImageModal = ({ data, onClose }) => {
+  if (!data) return null;
+
+  const defectsWithImages = data.defectList.filter(
+    (d) => d.images && d.images.length > 0
+  );
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100]"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b border-gray-200 dark:border-gray-700 pb-3 mb-4">
+          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+            Defect Images
+          </h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
+            <X size={24} />
+          </button>
+        </div>
+        <div className="space-y-4">
+          {defectsWithImages.length > 0 ? (
+            defectsWithImages.map((defect) => (
+              <div key={defect.defectCode}>
+                <h4 className="font-bold text-lg text-indigo-600 dark:text-indigo-400">
+                  {defect.defectName}
+                </h4>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                  {defect.khmerName} | {defect.chineseName}
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {defect.images.map((img, idx) => (
+                    <a
+                      key={idx}
+                      href={`${API_BASE_URL}${img}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block overflow-hidden rounded-md shadow-lg group"
+                    >
+                      <img
+                        src={`${API_BASE_URL}${img}`}
+                        alt={`Defect ${defect.defectCode} - ${idx + 1}`}
+                        className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-center text-gray-500">
+              No images found for this report.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const SubConQCReport = () => {
   const { user } = useAuth();
   const [filters, setFilters] = useState({
@@ -90,6 +209,8 @@ const SubConQCReport = () => {
     summary: {
       totalCheckedQty: 0,
       totalDefectQty: 0,
+      totalQASampleSize: 0,
+      totalQADefectQty: 0,
       overallDefectRate: 0,
       topDefects: []
     },
@@ -97,28 +218,33 @@ const SubConQCReport = () => {
   });
 
   const [allDefects, setAllDefects] = useState([]);
+  const [allFactories, setAllFactories] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState("qty"); // 'qty' or 'rate'
 
-  // === NEW LOGIC: Determine the user's factory based on their name ===
+  // --- 👈 NEW: States for managing modals ---
+  const [qaUserInfo, setQaUserInfo] = useState(null);
+  const [isUserLoading, setIsUserLoading] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+
+  const [imageModalData, setImageModalData] = useState(null);
+  const [isImageModalOpen, setIsImageModalOpen] = useState(false);
 
   const userFactory = useMemo(() => {
-    // Check if we have a user, a name, and a list of factories from the API
-    if (user && user.name && data.filterOptions.factories?.length > 0) {
-      // Find a factory name that matches the user's name (case-insensitive)
-      const matchedFactoryName = data.filterOptions.factories.find(
+    // Check if we have a user, a name, and our NEW master list of factories
+    if (user && user.name && allFactories.length > 0) {
+      // Find a factory name in our master list that matches the user's name
+      const matchedFactoryName = allFactories.find(
         (f) => f.toLowerCase() === user.name.toLowerCase()
       );
 
-      // If a match is found, return it in the format react-select expects
       if (matchedFactoryName) {
         return { value: matchedFactoryName, label: matchedFactoryName };
       }
     }
-    // If no match is found, or data is not ready, return null
     return null;
-  }, [user, data.filterOptions.factories]);
+  }, [user, allFactories]); // <-- DEPENDENCY CHANGED
 
   // Fetch the master list of all defects once on component mount
   useEffect(() => {
@@ -143,6 +269,25 @@ const SubConQCReport = () => {
       handleFilterChange("factory", userFactory);
     }
   }, [userFactory, filters.factory]);
+
+  // === NEW useEffect TO FETCH ALL FACTORIES ONCE ===
+  useEffect(() => {
+    const fetchAllFactories = async () => {
+      try {
+        // This uses the same pattern as your Inspection page
+        const res = await axios.get(
+          `${API_BASE_URL}/api/subcon-sewing-factories`
+        );
+        if (Array.isArray(res.data)) {
+          // We only need the factory names for our logic
+          setAllFactories(res.data.map((f) => f.factory));
+        }
+      } catch (err) {
+        console.error("Failed to fetch master factory list", err);
+      }
+    };
+    fetchAllFactories();
+  }, []); // Empty dependency array means it runs only once
 
   // Fetch all report data based on filters
   useEffect(() => {
@@ -225,7 +370,6 @@ const SubConQCReport = () => {
   };
 
   // === NEW LOGIC: Create a conditional options list for the factory filter ===
-
   const factoryFilterOptions = useMemo(() => {
     // If the user is a factory user, the dropdown should only contain their factory
     if (userFactory) {
@@ -264,6 +408,36 @@ const SubConQCReport = () => {
     })
   };
 
+  const handleShowQaUser = async (empId) => {
+    if (!empId) return;
+    setIsUserLoading(true);
+    setQaUserInfo(null); // Clear previous user data
+    setIsUserModalOpen(true);
+    try {
+      // --- CORRECTED: Using the new API route ---
+      const res = await axios.get(
+        `${API_BASE_URL}/api/user-info-subcon-qa/${empId}`
+      );
+      setQaUserInfo(res.data);
+    } catch (err) {
+      console.error("Failed to fetch user info", err);
+      // Close modal on error to prevent it getting stuck
+      setIsUserModalOpen(false);
+    } finally {
+      setIsUserLoading(false);
+    }
+  };
+
+  const handleShowImages = (qaReport) => {
+    if (qaReport) {
+      setImageModalData(qaReport);
+      setIsImageModalOpen(true);
+    }
+  };
+
+  const closeUserModal = () => setIsUserModalOpen(false);
+  const closeImageModal = () => setIsImageModalOpen(false);
+
   // --- FIX #1: REFINED COLOR LOGIC ---
   const getRateColorClass = (rate, isOverall = false) => {
     const highThreshold = isOverall ? 5 : 3;
@@ -277,6 +451,28 @@ const SubConQCReport = () => {
     // Return a class with default background for 0 or N/A values
     return "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300";
   };
+
+  // --- 👈 NEW: Helper function for QA Defect Rate column color ---
+  const getQARateColorClass = (rate) => {
+    if (rate >= 10)
+      return "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300";
+    if (rate >= 0)
+      return "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300";
+    return "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300";
+  };
+
+  // --- 👈 NEW: Calculate the overall QA rate from the summary data ---
+  const overallQARate = useMemo(() => {
+    if (
+      !data.summary.totalQASampleSize ||
+      data.summary.totalQASampleSize === 0
+    ) {
+      return 0;
+    }
+    return (
+      (data.summary.totalQADefectQty / data.summary.totalQASampleSize) * 100
+    );
+  }, [data.summary]);
 
   return (
     <div className="p-4 bg-gray-100 dark:bg-gray-900 min-h-screen space-y-4">
@@ -293,7 +489,7 @@ const SubConQCReport = () => {
               onChange={(date) => handleFilterChange("startDate", date)}
               maxDate={filters.endDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
-              popperClassName="z-[9999]"
+              popperClassName="react-datepicker-popper-z-50"
             />
           </div>
           <div className="flex-shrink-0">
@@ -303,7 +499,7 @@ const SubConQCReport = () => {
               onChange={(date) => handleFilterChange("endDate", date)}
               minDate={filters.startDate}
               className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
-              popperClassName="z-[9999]"
+              popperClassName="react-datepicker-popper-z-50"
             />
           </div>
           <div className="flex-1 min-w-[150px]">
@@ -379,23 +575,50 @@ const SubConQCReport = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         <SummaryCard
           icon={<CheckSquare size={24} />}
-          title="Total Checked"
-          value={data.summary.totalCheckedQty.toLocaleString()}
-        />
+          title="Checked | QA Sample"
+        >
+          <div className="flex items-end justify-between w-full">
+            <span>{(data.summary.totalCheckedQty ?? 0).toLocaleString()}</span>
+            <span className="text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
+              {(data.summary.totalQASampleSize ?? 0).toLocaleString()}
+            </span>
+          </div>
+        </SummaryCard>
+
+        {/* Card 2: Total Defects + QA Defects */}
         <SummaryCard
           icon={<AlertTriangle size={24} />}
-          title="Total Defects"
-          value={data.summary.totalDefectQty.toLocaleString()}
-        />
+          title="Defects | QA Defects"
+        >
+          <div className="flex items-end justify-between w-full">
+            <span>{(data.summary.totalDefectQty ?? 0).toLocaleString()}</span>
+            <span className="text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 px-2 py-1 rounded-md">
+              {(data.summary.totalQADefectQty ?? 0).toLocaleString()}
+            </span>
+          </div>
+        </SummaryCard>
+
+        {/* Card 3: Overall Defect Rate */}
         <SummaryCard
           icon={<Percent size={24} />}
-          title="Overall Defect Rate"
-          value={`${data.summary.overallDefectRate.toFixed(2)}%`}
+          title="QC Defect Rate"
           bgColorClass={getRateColorClass(data.summary.overallDefectRate, true)}
-        />
+        >
+          {data.summary.overallDefectRate.toFixed(2)}%
+        </SummaryCard>
+
+        {/* Card 4: NEW Overall QA Rate */}
+        <SummaryCard
+          icon={<Percent size={24} />}
+          title="QA Defect Rate"
+          bgColorClass={getQARateColorClass(overallQARate)}
+        >
+          {overallQARate.toFixed(2)}%
+        </SummaryCard>
+
         <TopDefectCard rank={1} defect={data.summary.topDefects[0]} />
         <TopDefectCard rank={2} defect={data.summary.topDefects[1]} />
         <TopDefectCard rank={3} defect={data.summary.topDefects[2]} />
@@ -447,6 +670,28 @@ const SubConQCReport = () => {
                 <th className="px-4 py-2 font-semibold sticky left-[840px] z-40 min-w-[120px] bg-gray-100 dark:bg-gray-700 text-center border-r-2 border-gray-400 dark:border-gray-500">
                   Defect Rate
                 </th>
+                <th className="px-4 py-2 font-semibold text-center border-l border-gray-300 dark:border-gray-600">
+                  QA Sample Size
+                </th>
+                <th className="px-4 py-2 font-semibold text-center border-l border-gray-300 dark:border-gray-600">
+                  QA Defect Qty
+                </th>
+                <th className="px-4 py-2 font-semibold text-center border-l border-gray-300 dark:border-gray-600">
+                  QA ID
+                </th>
+
+                <th className="px-4 py-2 font-semibold text-center border-l border-gray-300 dark:border-gray-600">
+                  QA Defect Rate
+                </th>
+
+                {/* --- 👈 NEW: Header for the QA Defect Details column --- */}
+                <th className="px-4 py-2 font-semibold text-center border-l border-gray-300 dark:border-gray-600 min-w-[200px]">
+                  QA Defect Details
+                </th>
+                <th className="px-4 py-2 font-semibold text-center border-l border-gray-300 dark:border-gray-600 border-r-2 border-gray-400 dark:border-gray-500">
+                  Images
+                </th>
+
                 {dynamicDefectHeaders.map((defect) => (
                   <th
                     key={defect.DefectCode}
@@ -498,6 +743,17 @@ const SubConQCReport = () => {
                     report.checkedQty > 0
                       ? (report.totalDefectQty / report.checkedQty) * 100
                       : 0;
+
+                  // --- 👈 NEW: Get QA data and perform calculations ---
+                  const qaReport = report.qaReport; // This object now comes directly from the backend
+                  const hasImages = qaReport?.defectList?.some(
+                    (d) => d.images && d.images.length > 0
+                  );
+                  const qaDefectRate =
+                    qaReport && qaReport.sampleSize > 0
+                      ? (qaReport.totalDefectQty / qaReport.sampleSize) * 100
+                      : 0;
+
                   return (
                     <tr
                       key={report._id}
@@ -524,6 +780,7 @@ const SubConQCReport = () => {
                       <td className="px-4 py-2 text-center sticky left-[720px] z-20 bg-white dark:bg-gray-800 border-r border-gray-300 dark:border-gray-600">
                         {report.totalDefectQty}
                       </td>
+
                       <td
                         className={`px-4 py-2 text-center font-semibold sticky left-[840px] z-20 border-r-2 border-gray-400 dark:border-gray-500 ${getRateColorClass(
                           defectRateOverall,
@@ -532,6 +789,76 @@ const SubConQCReport = () => {
                       >
                         {defectRateOverall.toFixed(2)}%
                       </td>
+
+                      {/* --- 👈 NEW: New data columns rendered here --- */}
+                      <td className="px-4 py-2 text-center border-l">
+                        {qaReport ? qaReport.sampleSize : ""}
+                      </td>
+                      <td className="px-4 py-2 text-center border-l">
+                        {qaReport ? qaReport.totalDefectQty : ""}
+                      </td>
+                      <td className="px-4 py-2 text-center border-l">
+                        {qaReport?.preparedBy?.empId && (
+                          // Use a flex container to align the text and icon side-by-side
+                          <div className="flex items-center justify-center gap-1">
+                            {/* 1. Display the QA ID with a very small font size and subtle color */}
+                            <span className="text-xxs text-gray-500 dark:text-gray-400">
+                              {qaReport.preparedBy.empId}
+                            </span>
+
+                            {/* 2. Keep the icon button as it was */}
+                            <button
+                              onClick={() =>
+                                handleShowQaUser(qaReport.preparedBy.empId)
+                              }
+                              className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+                              title={`View details for ${qaReport.preparedBy.empId}`}
+                            >
+                              <Info size={16} className="text-blue-500" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+
+                      <td
+                        className={`px-4 py-2 text-center font-semibold border-l ${getQARateColorClass(
+                          qaDefectRate
+                        )}`}
+                      >
+                        {qaReport ? `${qaDefectRate.toFixed(2)}%` : ""}
+                      </td>
+                      {/* --- 👈 NEW: Data cell for the QA Defect Details --- */}
+                      <td className="px-3 py-2 text-left border-l align-top">
+                        {
+                          qaReport?.defectList && qaReport.defectList.length > 0
+                            ? qaReport.defectList.map((defect) => (
+                                <div
+                                  key={defect.defectCode}
+                                  className="text-xs whitespace-normal break-words"
+                                >
+                                  {defect.defectName} ({defect.qty})
+                                </div>
+                              ))
+                            : "" // Render nothing if there are no defects
+                        }
+                      </td>
+                      <td className="px-4 py-2 text-center border-l border-r-2 border-gray-400 dark:border-gray-500">
+                        <button
+                          onClick={() => handleShowImages(qaReport)}
+                          disabled={!hasImages}
+                          className="p-1 rounded-full disabled:cursor-not-allowed"
+                        >
+                          <ImageIcon
+                            size={16}
+                            className={
+                              hasImages
+                                ? "text-blue-500 hover:text-blue-700"
+                                : "text-gray-400"
+                            }
+                          />
+                        </button>
+                      </td>
+
                       {dynamicDefectHeaders.map((defect) => {
                         const qty = defectMap.get(defect.DefectCode);
                         const rate =
@@ -563,6 +890,16 @@ const SubConQCReport = () => {
           </table>
         </div>
       </div>
+      {isUserModalOpen && (
+        <QAUserModal
+          user={qaUserInfo}
+          isLoading={isUserLoading}
+          onClose={closeUserModal}
+        />
+      )}
+      {isImageModalOpen && (
+        <QAImageModal data={imageModalData} onClose={closeImageModal} />
+      )}
     </div>
   );
 };
