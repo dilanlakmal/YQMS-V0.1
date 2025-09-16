@@ -17299,17 +17299,24 @@ app.post(
     }
 
     try {
-      // Generate a unique filename (your existing logic is good)
+      // Generate a unique filename
       const { imageType, inspectionDate } = req.body;
+
+      // --- START OF MODIFICATION ---
+      // Sanitize the imageType to create a valid filename component
+      const sanitizedImageType = (imageType || "sccimage")
+        .replace(/[\/\\]/g, "-") // Replace forward and back slashes with a hyphen
+        .replace(/\s+/g, "-") // Replace one or more spaces with a single hyphen
+        .replace(/[^a-zA-Z0-9._-]/g, ""); // Remove any other non-standard filename characters
+      // --- END OF MODIFICATION ---
+
       const datePart = inspectionDate
         ? inspectionDate.replace(/\//g, "-")
         : new Date().toISOString().split("T")[0];
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
 
-      // We will save as .webp for the best compression and web performance
-      const newFilename = `${
-        imageType || "sccimage"
-      }-${datePart}-${uniqueSuffix}.webp`;
+      // Use the sanitizedImageType to build the new filename
+      const newFilename = `${sanitizedImageType}-${datePart}-${uniqueSuffix}.webp`;
       const finalDiskPath = path.join(sccUploadPath, newFilename);
 
       // Use sharp to process the image from the buffer
