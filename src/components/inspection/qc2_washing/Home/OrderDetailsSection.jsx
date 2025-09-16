@@ -34,6 +34,50 @@ const OrderDetailsSection = ({
   const isSaved = externalIsSaved || false;
   const setIsSaved = setExternalIsSaved || (() => {});
 
+  const handleReportTypeChange = async (value) => {
+    // If switching to a type that needs AQL details from the 'first-output' endpoint
+    if (value === 'SOP' || value === 'First Output') {
+      if (!formData.orderNo) {
+        Swal.fire('Missing Order No', 'Please enter an Order Number before selecting this report type.', 'warning');
+        return;
+      }
+  
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing/first-output-details`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderNo: formData.orderNo }),
+        });
+        const data = await response.json();
+  
+        if (data.success) {
+          setFormData(prev => ({
+            ...prev,
+            reportType: value,
+            washQty: value === 'SOP' ? 30 : '',
+            checkedQty: data.checkedQty,
+            aql: [data.aqlData],
+            firstOutput: value === 'First Output' ? value : '',
+            inline: ''
+          }));
+        } else {
+          throw new Error(data.message || 'Failed to fetch AQL details.');
+        }
+      } catch (error) {
+        console.error('Error fetching first output details:', error);
+        Swal.fire('Error', `Could not fetch AQL details: ${error.message}`, 'error');
+      }
+    } else { // For 'Inline' or when unchecking
+      setFormData(prev => ({
+        ...prev,
+        reportType: value,
+        washQty: (prev.reportType === 'SOP' || prev.reportType === 'First Output') ? '' : prev.washQty,
+        firstOutput: '',
+        inline: value === 'Inline' ? value : ''
+      }));
+    }
+  };
+
   useEffect(() => {
     // This effect runs once on component mount to set the default for new reports.
     // If the form is not saved and the value is not already 'After Wash', it updates it.
@@ -44,6 +88,20 @@ const OrderDetailsSection = ({
     // We only want this to run once on mount for a new form.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    // If the factory is changed to something other than YM,
+    // and the current report type is SOP, reset the report type.
+    if (formData.factoryName !== 'YM' && formData.reportType === 'SOP') {
+      setFormData(prev => ({
+        ...prev,
+        reportType: '', // Reset report type
+        washQty: '',    // Clear the fixed wash quantity
+        firstOutput: '',
+        inline: ''
+      }));
+    }
+  }, [formData.factoryName, formData.reportType, setFormData]);
 
    const checkMeasurementDetails = async (orderNo) => {
   try {
@@ -708,29 +766,48 @@ const autoSaveInspectionData = async (recordId) => {
             </select>
           </div>
           
-         <div className="flex items-center space-x-4">
-            <label className="w-20 text-sm font-medium dark:text-gray-300">Inspection Report:</label>
+          <div className="flex items-center space-x-4">
+            <label className="w-20 text-sm font-medium dark:text-gray-300">Report Type:</label>
             <div className="flex space-x-4">
+              {formData.factoryName === 'YM' && (
+                <label className="flex items-center dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    name="reportType"
+                    value="SOP"
+                    checked={formData.reportType === 'SOP'}
+                    onChange={(e) => handleReportTypeChange(e.target.value)}
+                    className="mr-2 dark:bg-gray-700 checked:bg-indigo-500 dark:border-gray-600"
+                    disabled={isSaved}
+                  />
+                  SOP
+                </label>
+              )}
               <label className="flex items-center dark:text-gray-300">
                 <input
                   type="checkbox"
-                  checked={formData.firstOutput === true || formData.firstOutput === 'First Output'}
-                  onChange={(e) => handleInputChange('firstOutput', e.target.checked ? 'First Output' : '')}
-                  className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
-                   disabled={isSaved}
+                  name="reportType"
+                  value="First Output"
+                  checked={formData.reportType === 'First Output'}
+                  onChange={(e) => handleReportTypeChange(e.target.value)}
+                  className="mr-2 dark:bg-gray-700 checked:bg-indigo-500 dark:border-gray-600"
+                  disabled={isSaved}
                 />
                 First Output
               </label>
               <label className="flex items-center dark:text-gray-300">
                 <input
                   type="checkbox"
-                  checked={formData.inline === true || formData.inline === 'Inline'}
-                  onChange={(e) => handleInputChange('inline', e.target.checked ? 'Inline' : '')}
-                  className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
-                   disabled={isSaved}
+                  name="reportType"
+                  value="Inline"
+                  checked={formData.reportType === 'Inline'}
+                  onChange={(e) => handleReportTypeChange(e.target.value)}
+                  className="mr-2 dark:bg-gray-700 checked:bg-indigo-500 dark:border-gray-600"
+                  disabled={isSaved}
                 />
                 Inline
               </label>
+              
             </div>
           </div>
          <div className="flex items-center space-x-4">
@@ -783,7 +860,7 @@ const autoSaveInspectionData = async (recordId) => {
               onChange={e => handleInputChange('washQty', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               min={0}
-               disabled={isSaved}
+               disabled={isSaved || formData.reportType === 'SOP'}
             />
           </div>
         </div>

@@ -759,7 +759,7 @@ const DefectDetailsSection = ({
             </div>
            
             {/* AQL Information Display */}
-             {((formData.inline === 'Inline' || formData.reportType === 'Inline') || formData.firstOutput === "First Output") && 
+             {(['SOP', 'Inline', 'First Output'].includes(formData.reportType)) && 
                 (aql?.sampleSize || aql?.acceptedDefect || aql?.rejectedDefect) && (
                 <div className="md:col-span-2 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">

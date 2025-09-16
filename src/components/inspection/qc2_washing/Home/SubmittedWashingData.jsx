@@ -4,8 +4,6 @@ import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
 import QCWashingFullReportModal from './QCWashingFullReportModal';
-import QcWashingFullReportPDF from './qcWashingFullReportPDF';
-import { PDFDownloadLink } from '@react-pdf/renderer';
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
@@ -134,7 +132,7 @@ const fetchSubmittedData = async (showLoading = true) => {
       let dataToProcess = [...submittedData];
 
       if (viewMode === 'actual') {
-        dataToProcess = await Promise.all(
+        let actualData = await Promise.all(
           submittedData.map(async (record) => {
             const washQtyData = await fetchRealWashQty(record);
             let finalRecord = { ...record, ...washQtyData };
@@ -166,6 +164,8 @@ const fetchSubmittedData = async (showLoading = true) => {
             return finalRecord;
           })
         );
+
+        dataToProcess = actualData;
       } else {
         dataToProcess = submittedData.map(record => ({
           ...record,
@@ -178,12 +178,20 @@ const fetchSubmittedData = async (showLoading = true) => {
     };
 
     processDataForView();
-  }, [viewMode, submittedData, currentFilters]);
+  }, [viewMode, submittedData, currentFilters, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchRealWashQty = async (record) => {
     try {
-      if (record.reportType && record.reportType.toLowerCase() === 'first output') {
-        return { displayWashQty: record.washQty || 0, isActualWashQty: true, isFirstOutput: true, originalWashQty: record.washQty || 0, source: 'first_output' };
+      if (record.reportType && (record.reportType.toLowerCase() === 'first output' || record.reportType.toLowerCase() === 'sop')) {
+        const isSOP = record.reportType.toLowerCase() === 'sop';
+        return { 
+          displayWashQty: record.washQty || 0, 
+          isActualWashQty: true, 
+          isFirstOutput: !isSOP, 
+          isSOP: isSOP,
+          originalWashQty: record.washQty || 0, 
+          source: isSOP ? 'sop' : 'first_output' 
+        };
       }
 
       if (!record.reportType || record.reportType.toLowerCase() !== 'inline') {

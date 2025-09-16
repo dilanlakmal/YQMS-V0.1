@@ -12,7 +12,8 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
   const [selectedKValue, setSelectedKValue] = useState(null);
   const [inspectorDetails, setInspectorDetails] = useState(null);
   const [availableKValues, setAvailableKValues] = useState([]);
-  // New state for checkboxes
+  const [showAllPcs, setShowAllPcs] = useState(false);
+  const [processedReportData, setProcessedReportData] = useState(null);
   const [showFullChart, setShowFullChart] = useState(true);
   const [showSizeBySizeChart, setShowSizeBySizeChart] = useState(false);
 
@@ -173,6 +174,60 @@ const getImageUrl = (imagePath) => {
   }
 }, [isOpen, recordData]);
 
+  useEffect(() => {
+    if (!reportData) {
+      setProcessedReportData(null);
+      return;
+    }
+
+    // Only apply duplication if the checkbox is checked and it's an "actual" report
+    if (!showAllPcs || !reportData.isActualWashQty) {
+      setProcessedReportData(reportData);
+      return;
+    }
+
+    const duplicateData = JSON.parse(JSON.stringify(reportData));
+    const checkedQty = duplicateData.checkedQty || 0;
+    
+    if (!duplicateData.measurementDetails || !duplicateData.measurementDetails.measurement) {
+        setProcessedReportData(duplicateData);
+        return;
+    }
+
+    const totalMeasuredPcs = duplicateData.measurementDetails.measurement.reduce((sum, sizeData) => {
+      return sum + (sizeData.pcs?.length || 0);
+    }, 0);
+
+    if (checkedQty <= totalMeasuredPcs) {
+      setProcessedReportData(duplicateData);
+      return;
+    }
+
+    let pcsToAdd = checkedQty - totalMeasuredPcs;
+    const templatePcs = duplicateData.measurementDetails.measurement.flatMap(sizeData => 
+      (sizeData.pcs || []).map(pc => ({ size: sizeData.size, kvalue: sizeData.kvalue, pcData: pc }))
+    );
+
+    if (templatePcs.length === 0) {
+      setProcessedReportData(duplicateData);
+      return;
+    }
+
+    for (let i = 0; i < pcsToAdd; i++) {
+      const template = templatePcs[i % templatePcs.length];
+      const sizeData = duplicateData.measurementDetails.measurement.find(sd => sd.size === template.size && sd.kvalue === template.kvalue);
+      
+      if (sizeData) {
+        const newPc = JSON.parse(JSON.stringify(template.pcData));
+        newPc.pcNumber = (sizeData.pcs?.length || 0) + 1;
+        newPc.isDuplicated = true; // Flag for duplicated pcs
+        if (!sizeData.pcs) sizeData.pcs = [];
+        sizeData.pcs.push(newPc);
+      }
+    }
+    
+    setProcessedReportData(duplicateData);
+  }, [reportData, showAllPcs]);
 
   if (!isOpen) return null;
 
@@ -223,7 +278,7 @@ const getImageUrl = (imagePath) => {
 
         {/* Modal Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-          {!reportData ? (
+          {!processedReportData ? (
             <div className="text-center py-10 text-gray-600 dark:text-gray-300">
               No data available for this report.
             </div>
@@ -250,7 +305,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-blue-600 dark:text-blue-300 uppercase tracking-wide">Order No</p>
-                        <p className="text-lg font-bold text-blue-900 dark:text-blue-100">{reportData.orderNo}</p>
+                        <p className="text-lg font-bold text-blue-900 dark:text-blue-100">{processedReportData.orderNo}</p>
                       </div>
                     </div>
                   </div>
@@ -261,7 +316,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300 uppercase tracking-wide">Order Qty</p>
-                        <p className="text-lg font-bold text-indigo-900 dark:text-indigo-100">{reportData.orderQty}</p>
+                        <p className="text-lg font-bold text-indigo-900 dark:text-indigo-100">{processedReportData.orderQty}</p>
                       </div>
                     </div>
                   </div>
@@ -272,7 +327,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-purple-600 dark:text-purple-300 uppercase tracking-wide">Color</p>
-                        <p className="text-lg font-bold text-purple-900 dark:text-purple-100">{reportData.color}</p>
+                        <p className="text-lg font-bold text-purple-900 dark:text-purple-100">{processedReportData.color}</p>
                       </div>
                     </div>
                   </div>
@@ -283,7 +338,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-pink-600 dark:text-pink-300 uppercase tracking-wide">Color Qty</p>
-                        <p className="text-lg font-bold text-pink-900 dark:text-pink-100">{reportData.colorOrderQty}</p>
+                        <p className="text-lg font-bold text-pink-900 dark:text-pink-100">{processedReportData.colorOrderQty}</p>
                       </div>
                     </div>
                   </div>
@@ -294,7 +349,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-cyan-600 dark:text-cyan-300 uppercase tracking-wide">Wash Type</p>
-                        <p className="text-lg font-bold text-cyan-900 dark:text-cyan-100">{reportData.washType || 'N/A'}</p>
+                        <p className="text-lg font-bold text-cyan-900 dark:text-cyan-100">{processedReportData.washType || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -305,7 +360,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-teal-600 dark:text-teal-300 uppercase tracking-wide">Report Type</p>
-                        <p className="text-lg font-bold text-teal-900 dark:text-teal-100">{reportData.reportType || 'N/A'}</p>
+                        <p className="text-lg font-bold text-teal-900 dark:text-teal-100">{processedReportData.reportType || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -316,7 +371,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-orange-600 dark:text-orange-300 uppercase tracking-wide">Factory</p>
-                        <p className="text-lg font-bold text-orange-900 dark:text-orange-100">{reportData.factoryName || 'N/A'}</p>
+                        <p className="text-lg font-bold text-orange-900 dark:text-orange-100">{processedReportData.factoryName || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -327,7 +382,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="ml-3">
                         <p className="text-xs font-medium text-green-600 dark:text-green-300 uppercase tracking-wide">Buyer</p>
-                        <p className="text-lg font-bold text-green-900 dark:text-green-100">{reportData.buyer || 'N/A'}</p>
+                        <p className="text-lg font-bold text-green-900 dark:text-green-100">{processedReportData.buyer || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -355,7 +410,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-blue-600 dark:text-blue-300 uppercase tracking-wide mb-1">Checked Qty</p>
-                        <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{reportData.checkedQty}</p>
+                        <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">{processedReportData.checkedQty}</p>
                       </div>
                     </div>
                   </div>
@@ -366,7 +421,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-purple-600 dark:text-purple-300 uppercase tracking-wide mb-1">Total Pcs</p>
-                        <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{reportData.totalCheckedPcs}</p>
+                        <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">{processedReportData.totalCheckedPcs}</p>
                       </div>
                     </div>
                   </div>
@@ -378,8 +433,8 @@ const getImageUrl = (imagePath) => {
                       <div className="text-right">
                         <p className="text-xs font-medium text-cyan-600 dark:text-cyan-300 uppercase tracking-wide mb-1">Wash Qty</p>
                         <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
-                          {reportData.displayWashQty ?? reportData.washQty}
-                          {reportData.isActualWashQty && (
+                          {processedReportData.displayWashQty ?? processedReportData.washQty}
+                          {processedReportData.isActualWashQty && (
                             <span className="text-sm text-green-500 ml-1">(Actual)</span>
                           )}
                         </p>
@@ -393,7 +448,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-indigo-600 dark:text-indigo-300 uppercase tracking-wide mb-1">Check Points</p>
-                        <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">{reportData.totalCheckedPoint}</p>
+                        <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100">{processedReportData.totalCheckedPoint}</p>
                       </div>
                     </div>
                   </div>
@@ -404,7 +459,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-green-600 dark:text-green-300 uppercase tracking-wide mb-1">Total Pass</p>
-                        <p className="text-2xl font-bold text-green-900 dark:text-green-100">{reportData.totalPass}</p>
+                        <p className="text-2xl font-bold text-green-900 dark:text-green-100">{processedReportData.totalPass}</p>
                       </div>
                     </div>
                   </div>
@@ -415,7 +470,7 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-red-600 dark:text-red-300 uppercase tracking-wide mb-1">Total Fail</p>
-                        <p className="text-2xl font-bold text-red-900 dark:text-red-100">{reportData.totalFail}</p>
+                        <p className="text-2xl font-bold text-red-900 dark:text-red-100">{processedReportData.totalFail}</p>
                       </div>
                     </div>
                   </div>
@@ -426,24 +481,24 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className="text-xs font-medium text-amber-600 dark:text-amber-300 uppercase tracking-wide mb-1">Pass Rate(Measurment)</p>
-                        <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{reportData.passRate}%</p>
+                        <p className="text-2xl font-bold text-amber-900 dark:text-amber-100">{processedReportData.passRate}%</p>
                       </div>
                     </div>
                   </div>
                   <div className={`rounded-xl p-4 border hover:shadow-md transition-shadow ${
-                    reportData.overallFinalResult === 'Pass'
+                    processedReportData.overallFinalResult === 'Pass'
                       ? 'bg-gradient-to-br from-emerald-50 to-emerald-100 dark:from-emerald-900/20 dark:to-emerald-800/20 border-emerald-200 dark:border-emerald-800'
-                      : reportData.overallFinalResult === 'Fail'
+                      : processedReportData.overallFinalResult === 'Fail'
                       ? 'bg-gradient-to-br from-rose-50 to-rose-100 dark:from-rose-900/20 dark:to-rose-800/20 border-rose-200 dark:border-rose-800'
                       : 'bg-gradient-to-br from-amber-50 to-amber-100 dark:from-amber-900/20 dark:to-amber-800/20 border-amber-200 dark:border-amber-800'
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className={`p-3 rounded-xl ${
-                        reportData.overallFinalResult === 'Pass' ? 'bg-emerald-500' : reportData.overallFinalResult === 'Fail' ? 'bg-rose-500' : 'bg-amber-500'
+                        processedReportData.overallFinalResult === 'Pass' ? 'bg-emerald-500' : processedReportData.overallFinalResult === 'Fail' ? 'bg-rose-500' : 'bg-amber-500'
                       }`}>
-                        {reportData.overallFinalResult === 'Pass' ? (
+                        {processedReportData.overallFinalResult === 'Pass' ? (
                           <Award className="w-6 h-6 text-white" />
-                        ) : reportData.overallFinalResult === 'Fail' ? (
+                        ) : processedReportData.overallFinalResult === 'Fail' ? (
                           <XCircle className="w-6 h-6 text-white" />
                         ) : (
                           <Clock className="w-6 h-6 text-white" />
@@ -451,19 +506,19 @@ const getImageUrl = (imagePath) => {
                       </div>
                       <div className="text-right">
                         <p className={`text-xs font-medium uppercase tracking-wide mb-1 ${
-                          reportData.overallFinalResult === 'Pass'
+                          processedReportData.overallFinalResult === 'Pass'
                             ? 'text-emerald-600 dark:text-emerald-300'
-                            : reportData.overallFinalResult === 'Fail'
+                            : processedReportData.overallFinalResult === 'Fail'
                             ? 'text-rose-600 dark:text-rose-300'
                             : 'text-amber-600 dark:text-amber-300'
                         }`}>Final Result</p>
                         <p className={`text-2xl font-bold ${
-                          reportData.overallFinalResult === 'Pass'
+                          processedReportData.overallFinalResult === 'Pass'
                             ? 'text-emerald-900 dark:text-emerald-100'
-                            : reportData.overallFinalResult === 'Fail'
+                            : processedReportData.overallFinalResult === 'Fail'
                             ? 'text-rose-900 dark:text-rose-100'
                             : 'text-amber-900 dark:text-amber-100'
-                        }`}>{reportData.overallFinalResult || 'Pending'}</p>
+                        }`}>{processedReportData.overallFinalResult || 'Pending'}</p>
                       </div>
                     </div>
                   </div>
@@ -472,8 +527,8 @@ const getImageUrl = (imagePath) => {
 
               {/* Defect Details */}
               {(() => {
-                const defectsByPc = reportData.defectDetails?.defectsByPc || [];
-                const aqlValue = reportData.defectDetails?.aqlValue;
+                const defectsByPc = processedReportData.defectDetails?.defectsByPc || [];
+                const aqlValue = processedReportData.defectDetails?.aqlValue;
                 
                 return (
                   <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
@@ -599,11 +654,11 @@ const getImageUrl = (imagePath) => {
                         ))}
                         
                         {/* Additional Images */}
-                        {reportData.defectDetails?.additionalImages && reportData.defectDetails.additionalImages.length > 0 && (
+                        {processedReportData.defectDetails?.additionalImages && processedReportData.defectDetails.additionalImages.length > 0 && (
                             <div className="mt-4">
                               <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional Images:</h5>
                               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                                {reportData.defectDetails.additionalImages.map((img, imgIndex) => {
+                                {processedReportData.defectDetails.additionalImages.map((img, imgIndex) => {
                                   const imageUrl = getImageUrl(img);
                                   return (
                                     <div key={imgIndex} className="w-full h-32 bg-gray-100 dark:bg-gray-600 rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden">
@@ -651,7 +706,7 @@ const getImageUrl = (imagePath) => {
 
               {/* Inspection Details */}
               {(() => {
-                  const inspectionDetails = reportData.inspectionDetails || {};
+                  const inspectionDetails = processedReportData.inspectionDetails || {};
                   return (
                     <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-sm p-6">
                       <div className="flex items-center justify-between mb-6">
@@ -1427,6 +1482,17 @@ const getImageUrl = (imagePath) => {
                         />
                         <span>Size-by-Size</span>
                       </label>
+                        {reportData.isActualWashQty && (
+                          <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
+                            <input
+                              type="checkbox"
+                              checked={showAllPcs}
+                              onChange={() => setShowAllPcs(!showAllPcs)}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span>Show All PCs</span>
+                          </label>
+                        )}
                         {availableKValues.length > 1 && (
                           <div className="flex items-center space-x-2">
                             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">K-Value:</label>
@@ -1471,14 +1537,14 @@ const getImageUrl = (imagePath) => {
                               {(() => {
                                 // Get all unique sizes and sort them
                                 const allSizes = [...new Set(
-                                  reportData.measurementDetails.measurement
+                                  processedReportData.measurementDetails.measurement
                                     .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                                     .map(sizeData => sizeData.size)
                                 )].sort();
 
                                 // Get size data with pieces
                                 const sizeDataMap = {};
-                                reportData.measurementDetails.measurement
+                                processedReportData.measurementDetails.measurement
                                   .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                                   .forEach(sizeData => {
                                     sizeDataMap[sizeData.size] = {
@@ -1559,16 +1625,16 @@ const getImageUrl = (imagePath) => {
                                 // Get all unique measurement points across all sizes
                                 const allMeasurementPoints = new Set();
                                 const measurementPointsData = {};
-
+ 
                                 // Get all sizes and their data
                                 const allSizes = [...new Set(
-                                  reportData.measurementDetails.measurement
+                                  processedReportData.measurementDetails.measurement
                                     .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                                     .map(sizeData => sizeData.size)
                                 )].sort();
-
+ 
                                 const sizeDataMap = {};
-                                reportData.measurementDetails.measurement
+                                 processedReportData.measurementDetails.measurement
                                   .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                                   .forEach(sizeData => {
                                     sizeDataMap[sizeData.size] = {
@@ -1690,8 +1756,7 @@ const getImageUrl = (imagePath) => {
                             let totalPass = 0;
                             let totalFail = 0;
                             const sizeCount = new Set();
-
-                            reportData.measurementDetails.measurement
+                            processedReportData.measurementDetails.measurement
                               .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                               .forEach((sizeData) => {
                                 sizeCount.add(sizeData.size);
@@ -1771,7 +1836,7 @@ const getImageUrl = (imagePath) => {
                         </h4>
                       </div>
                       
-                      {reportData.measurementDetails.measurement
+                      {processedReportData.measurementDetails.measurement
                         .filter(sizeData => !selectedKValue || sizeData.kvalue === selectedKValue)
                         .map((sizeData, sizeIndex) => (
                         <div key={sizeIndex} className="bg-gradient-to-br from-teal-50 to-teal-100 dark:from-teal-900/20 dark:to-teal-800/20 rounded-xl p-6 border border-teal-200 dark:border-teal-800">
@@ -1879,9 +1944,9 @@ const getImageUrl = (imagePath) => {
               {(() => {
                   const shouldShowComparison = (
                     (reportData.before_after_wash === 'After Wash' || reportData.before_after_wash === 'Before Wash') && 
-                    (reportData.reportType === 'Inline' || reportData.reportType === 'First Output') &&
-                    reportData.measurementDetails?.measurement && 
-                    reportData.measurementDetails.measurement.length > 0
+                    (processedReportData.reportType === 'Inline' || processedReportData.reportType === 'First Output') &&
+                    processedReportData.measurementDetails?.measurement && 
+                    processedReportData.measurementDetails.measurement.length > 0
                   );
                 
                   return shouldShowComparison;
@@ -1911,11 +1976,11 @@ const getImageUrl = (imagePath) => {
                         let beforeData, afterData;
         
                           if (reportData.before_after_wash === 'Before Wash') {
-                            beforeData = reportData;
+                            beforeData = processedReportData;
                             afterData = comparisonData;
                           } else if (reportData.before_after_wash === 'After Wash') {
                             beforeData = comparisonData;
-                            afterData = reportData;
+                            afterData = processedReportData;
                           } else {
                             // Fallback - shouldn't happen with current conditions
                             beforeData = reportData;
@@ -1925,7 +1990,7 @@ const getImageUrl = (imagePath) => {
                           const allSizes = new Set();
                           
                           // Always include sizes from current report data first
-                          reportData.measurementDetails?.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
+                          processedReportData.measurementDetails?.measurement?.forEach(sizeData => allSizes.add(sizeData.size));
                           
                           // Add sizes from comparison data if available
                           if (comparisonData?.measurementDetails?.measurement) {
@@ -1944,7 +2009,7 @@ const getImageUrl = (imagePath) => {
                             let afterSizeData = null;
                             
                             // Determine which data source has which wash type for this size
-                            const currentSizeData = reportData.measurementDetails?.measurement?.find(s => s.size === size);
+                            const currentSizeData = processedReportData.measurementDetails?.measurement?.find(s => s.size === size);
                             const comparisonSizeData = comparisonData?.measurementDetails?.measurement?.find(s => s.size === size);
                             
                             if (reportData.before_after_wash === 'Before Wash') {
@@ -1987,7 +2052,7 @@ const getImageUrl = (imagePath) => {
                                       const allValues = new Set();
                                       
                                       // Add values from current report data
-                                      const currentSizeData = reportData.measurementDetails?.measurement?.find(s => s.size === size);
+                                      const currentSizeData = processedReportData.measurementDetails?.measurement?.find(s => s.size === size);
                                       currentSizeData?.pcs?.forEach(pc => {
                                         pc.measurementPoints?.forEach(mp => {
                                           if (mp.measured_value_fraction) {
@@ -2139,7 +2204,7 @@ const getImageUrl = (imagePath) => {
                                                     }
                                                   });
                                                 });
-                                              }
+                                              }                                              
                                               
                                               // Add values from comparison data
                                               if (comparisonSizeData) {
@@ -2150,7 +2215,7 @@ const getImageUrl = (imagePath) => {
                                                     }
                                                   });
                                                 });
-                                              }
+                                              }                                              
                                               
                                               // Add values from before wash data
                                               if (beforeSizeData) {
@@ -2161,7 +2226,7 @@ const getImageUrl = (imagePath) => {
                                                     }
                                                   });
                                                 });
-                                              }
+                                              }                                              
                                               
                                               // Add values from after wash data
                                               if (afterSizeData) {
@@ -2172,7 +2237,7 @@ const getImageUrl = (imagePath) => {
                                                     }
                                                   });
                                                 });
-                                              }
+                                              }                                              
                                               
                                               // If no values found, add some common measurement values as fallback
                                               if (allValues.size === 0) {
@@ -2180,7 +2245,7 @@ const getImageUrl = (imagePath) => {
                                                 ['-1/16', '-1/4', '-7/16', '0', '+1/16', '+1/4', '+7/16'].forEach(val => allValues.add(val));
                                               }
                                               
-                                              const sortedValues = Array.from(allValues).sort();
+                                              const sortedValues = Array.from(allValues).sort();                                              
                                               
                                               // Count values for before wash
                                               const beforeValueCount = {};
