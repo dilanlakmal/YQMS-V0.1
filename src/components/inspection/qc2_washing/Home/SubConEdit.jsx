@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../../../../../config'; 
 import { Edit, Save, X } from 'lucide-react';
+import Swal from 'sweetalert2';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 
 const SubConEdit = () => {
@@ -10,7 +11,7 @@ const SubConEdit = () => {
   const [error, setError] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [editWashQty, setEditWashQty] = useState('');
-  const [filterVisible, setFilterVisible] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(true);
 
   useEffect(() => {
     const fetchSubmittedData = async () => {
@@ -92,14 +93,41 @@ const SubConEdit = () => {
         setEditWashQty('');
         
         // Optional: Show success message
-        alert('Edited wash quantity saved successfully!');
+        Swal.fire({
+          icon: 'success',
+          title: 'Saved!',
+          text: 'Edited wash quantity saved successfully.',
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+        });
       } else {
         const errorData = await response.json();
-        alert(`Failed to update edited wash qty: ${errorData.message || 'Unknown error'}`);
+        Swal.fire({
+          icon: 'error',
+          title: 'Update Failed',
+          text: `Failed to update: ${errorData.message || 'Unknown error'}`,
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 3000,
+          timerProgressBar: true,
+        });
       }
     } catch (error) {
       console.error('Error updating edited wash qty:', error);
-      alert('Error updating edited wash qty');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'An error occurred while updating the wash quantity.',
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+      });
     }
   };
 
@@ -228,7 +256,7 @@ const SubConEdit = () => {
                 <tr>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Date</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Factory</th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Wash Type</th>
+                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Wash Type</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Report Type</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">MO No</th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Color</th>
@@ -251,7 +279,7 @@ const SubConEdit = () => {
                       {record.factoryName || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                      {record.washType || 'N/A'}
+                      {(record.washType || 'N/A').replace(' Wash', '')}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                       {record.reportType || 'N/A'}
@@ -294,7 +322,7 @@ const SubConEdit = () => {
                       {record.checkedQty || 'N/A'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                      {record.before_after_wash || 'N/A'}
+                      {(record.before_after_wash || 'N/A').replace(' Wash', '')}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
