@@ -2409,7 +2409,7 @@ export const syncDtOrders = async (req, res) => {
 //   });
 
 // Schedule to run every day at 2:00 AM
-cron.schedule("0 */2 * * *", async () => {
+cron.schedule("*/15 * * * *", async () => {
   await syncDTOrdersData()
     .then((result) => {
       console.log("✅ DT Orders Data Sync completed ", result);

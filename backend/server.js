@@ -120,6 +120,12 @@ import { Buffer } from "buffer";
 import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
 import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
+import {
+  ymEcoConnection,
+  ymProdConnection
+} from "./controller/MongoDB/dbConnectionController.js";
+import qcRealWashQty from "./route/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
+
 /* ------------------------------
    Connection String
 ------------------------------ */
@@ -215,25 +221,25 @@ app.use(
 
 app.options("*", cors());
 
-const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
-);
+// const ymProdConnection = mongoose.createConnection(
+//   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+//   //"mongodb://localhost:27017/ym_prod"
+// );
 
-const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
-);
+// const ymEcoConnection = mongoose.createConnection(
+//   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
+//   //"mongodb://localhost:27017/ym_prod"
+// );
 
-ymProdConnection.on("connected", () =>
-  console.log("Connected to ym_prod database in 192.167.1.10:29000...")
-);
-ymProdConnection.on("error", (err) => console.error("unexpected error:", err));
+// ymProdConnection.on("connected", () =>
+//   console.log("Connected to ym_prod database in 192.167.1.10:29000...")
+// );
+// ymProdConnection.on("error", (err) => console.error("unexpected error:", err));
 
-ymEcoConnection.on("connected", () =>
-  console.log("Connected to ym_eco_board database in 192.167.1.10:29000...")
-);
-ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
+// ymEcoConnection.on("connected", () =>
+//   console.log("Connected to ym_eco_board database in 192.167.1.10:29000...")
+// );
+// ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
 
 // Define model on connections
 
@@ -341,6 +347,11 @@ app.use((req, res, next) => {
   SQL Query routs start
 ------------------------------ */
 app.use(sqlQuery);
+
+/* ------------------------------
+  Functional routs
+------------------------------ */
+app.use(qcRealWashQty);
 
 // /* ------------------------------
 //    YM DataSore SQL
@@ -27097,8 +27108,12 @@ app.get(
   async (req, res) => {
     const { orderNo, color } = req.params;
     const collection = ymProdConnection.db.collection("dt_orders");
+    const buyerSpecCollection =
+      ymProdConnection.db.collection("buyerspectemplates");
+
     try {
       const orders = await collection.find({ Order_No: orderNo }).toArray();
+
       if (!orders || orders.length === 0) {
         return res
           .status(404)
@@ -27109,14 +27124,13 @@ app.get(
 
       // Extract measurement specifications from different possible locations
       let measurementSpecs = [];
-      // Check various possible locations for measurement data
 
+      // Check various possible locations for measurement data
       if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
         measurementSpecs = order.MeasurementSpecs;
       } else if (order.Specs && Array.isArray(order.Specs)) {
         measurementSpecs = order.Specs;
       } else if (order.OrderColors) {
-        // Check if measurement specs are in color-specific data
         const colorObj = order.OrderColors.find(
           (c) => c.Color.toLowerCase() === color.toLowerCase()
         );
@@ -27129,12 +27143,10 @@ app.get(
 
       const beforeWashSpecs = [];
       const afterWashSpecs = [];
-
-      // Group specs by kValue
       const beforeWashByK = {};
       const afterWashByK = {};
 
-      // Check for BeforeWashSpecs and AfterWashSpecs arrays
+      // Process BeforeWashSpecs and AfterWashSpecs arrays
       if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
         order.BeforeWashSpecs.forEach((spec) => {
           if (
@@ -27148,12 +27160,11 @@ app.get(
               beforeWashByK[kValue] = new Map();
             }
             if (!beforeWashByK[kValue].has(pointName)) {
-              // FIX: Pass all sizes instead of just color
               beforeWashByK[kValue].set(pointName, {
                 MeasurementPointEngName: pointName,
-                Specs: spec.Specs, // Pass the entire array of size-specific specs
-                ToleranceMinus: spec.TolMinus, // Pass the entire array
-                TolerancePlus: spec.TolPlus, // Pass the entire array
+                Specs: spec.Specs,
+                ToleranceMinus: spec.TolMinus,
+                TolerancePlus: spec.TolPlus,
                 kValue: kValue
               });
             }
@@ -27174,12 +27185,11 @@ app.get(
               afterWashByK[kValue] = new Map();
             }
             if (!afterWashByK[kValue].has(pointName)) {
-              // FIX: Pass all sizes instead of just color
               afterWashByK[kValue].set(pointName, {
                 MeasurementPointEngName: pointName,
-                Specs: spec.Specs, // Pass the entire array of size-specific specs
-                ToleranceMinus: spec.TolMinus, // Pass the entire array
-                TolerancePlus: spec.TolPlus, // Pass the entire array
+                Specs: spec.Specs,
+                ToleranceMinus: spec.TolMinus,
+                TolerancePlus: spec.TolPlus,
                 kValue: kValue
               });
             }
@@ -27208,6 +27218,28 @@ app.get(
         afterWashSpecs.push(...group);
       });
 
+      // FIXED: Fetch buyerspectemplate data for default measurement points
+      let buyerSpecData = null;
+      try {
+        // Use orderNo directly since moNo in buyerspectemplates corresponds to order number
+        buyerSpecData = await buyerSpecCollection.findOne({
+          moNo: orderNo // Changed from styleNo to orderNo
+        });
+
+        // If not found with orderNo, try with Style field as fallback
+        if (!buyerSpecData && order.Style) {
+          buyerSpecData = await buyerSpecCollection.findOne({
+            moNo: order.Style
+          });
+        }
+      } catch (error) {
+        console.log(
+          "Error fetching buyerspectemplate for orderNo:",
+          orderNo,
+          error
+        );
+      }
+
       // If no measurement data found, provide default specifications
       if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
         return res.json({
@@ -27216,6 +27248,7 @@ app.get(
           afterWashSpecs: [],
           beforeWashGrouped: {},
           afterWashGrouped: {},
+          buyerSpecData: buyerSpecData, // Include buyer spec data
           isDefault: true,
           message: "No measurement points available for this Mono."
         });
@@ -27226,6 +27259,7 @@ app.get(
           afterWashSpecs: afterWashSpecs,
           beforeWashGrouped: beforeWashGrouped,
           afterWashGrouped: afterWashGrouped,
+          buyerSpecData: buyerSpecData, // Include buyer spec data
           isDefault: false
         });
       }
@@ -27241,6 +27275,111 @@ app.get(
     }
   }
 );
+
+app.post("/api/qc-washing/find-saved-measurement", async (req, res) => {
+  try {
+    const { styleNo, color, reportType, washType, factory } = req.body;
+
+    const collection = ymProdConnection.db.collection("qcwashings");
+
+    // Build query to find matching records - handle undefined values
+    const query = {
+      $or: [{ orderNo: styleNo }, { style: styleNo }],
+      color: color
+    };
+
+    // Only add these fields to query if they have values
+    if (reportType && reportType !== "undefined") {
+      query.reportType = reportType;
+    }
+
+    if (factory && factory !== "undefined") {
+      query.factoryName = factory;
+    }
+
+    // For After Wash requests, specifically look for Before Wash data
+    if (washType === "Before Wash") {
+      query.before_after_wash = "Before Wash";
+    }
+
+    // Try to find all matching records first (without reportType and factory filters)
+    const basicQuery = {
+      $or: [{ orderNo: styleNo }, { style: styleNo }],
+      color: color
+    };
+
+    if (washType === "Before Wash") {
+      basicQuery.before_after_wash = "Before Wash";
+    }
+
+    const allRecords = await collection.find(basicQuery).toArray();
+
+    // Try the specific query first
+    let savedData = await collection.findOne(query, {
+      sort: { createdAt: -1 }
+    });
+
+    // If no data found with specific query, try without reportType and factory
+    if (!savedData && (reportType || factory)) {
+      savedData = await collection.findOne(basicQuery, {
+        sort: { createdAt: -1 }
+      });
+    }
+
+    if (
+      savedData &&
+      savedData.measurementDetails &&
+      savedData.measurementDetails.measurement
+    ) {
+      const measurementData = savedData.measurementDetails.measurement || [];
+
+      // Extract measurement point names from the nested structure
+      const extractedMeasurementPoints = [];
+
+      measurementData.forEach((measurement, measurementIndex) => {
+        if (measurement.pcs && measurement.pcs.length > 0) {
+          // Get measurement points from the first piece (they should be the same across all pieces)
+          const firstPc = measurement.pcs[0];
+          if (
+            firstPc.measurementPoints &&
+            firstPc.measurementPoints.length > 0
+          ) {
+            const pointNames = firstPc.measurementPoints.map(
+              (point) => point.pointName
+            );
+
+            // Create a structure that matches what the frontend expects
+            extractedMeasurementPoints.push({
+              size: measurement.size,
+              kvalue: measurement.kvalue,
+              before_after_wash: measurement.before_after_wash,
+              selectedRows: measurement.selectedRows || [],
+              measurementPointNames: pointNames,
+              // Include the original structure for compatibility
+              ...measurement
+            });
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        measurementData: extractedMeasurementPoints
+      });
+    } else {
+      res.json({
+        success: false,
+        message: "No measurement data found in record"
+      });
+    }
+  } catch (error) {
+    console.error("Error finding saved measurement data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while finding saved measurement data"
+    });
+  }
+});
 
 // Get order details by order number
 app.get("/api/qc-washing/order-details-by-order/:orderNo", async (req, res) => {
@@ -27379,8 +27518,8 @@ app.post("/api/qc-washing/submit", async (req, res) => {
         .json({ success: false, message: "orderNo is required" });
     }
     const latestAutoSave = await QCWashing.findOne({
-      orderNo,
-      status: "processing"
+      orderNo
+      // status: "processing"
     }).sort({ updatedAt: -1 });
 
     if (!latestAutoSave) {
@@ -28241,7 +28380,7 @@ app.get("/api/qc-washing/check-submitted/:orderNo", async (req, res) => {
 app.get("/api/qc-washing-checklist", async (req, res) => {
   try {
     const checkList = await QCWashingCheckList.find({})
-      .sort({ code: 1 })
+      .sort({ createdAt: -1 }) // Changed from code to createdAt since code field doesn't exist in new schema
       .lean();
     res.json(checkList);
   } catch (error) {
@@ -28253,91 +28392,368 @@ app.get("/api/qc-washing-checklist", async (req, res) => {
 // POST - Add new check list item
 app.post("/api/qc-washing-checklist", async (req, res) => {
   try {
-    const { name } = req.body;
-    if (!name) {
+    const { name, optionType, options, subPoints, failureImpact, addedBy } =
+      req.body;
+
+    // Validation
+    if (!name || !name.trim()) {
       return res.status(400).json({ message: "Name is required." });
     }
 
-    const existingByName = await QCWashingCheckList.findOne({ name });
-    if (existingByName) {
+    if (!addedBy || !addedBy.emp_id || !addedBy.eng_name) {
       return res
-        .status(409)
-        .json({ message: `Check list name '${name}' already exists.` });
+        .status(400)
+        .json({ message: "Added by information is required." });
     }
 
-    const newCheckList = new QCWashingCheckList(req.body);
-    await newCheckList.save();
+    // Check if checkpoint with same name already exists
+    const existingByName = await QCWashingCheckList.findOne({
+      name: name.trim()
+    });
+    if (existingByName) {
+      return res.status(409).json({
+        message: `Check list name '${name}' already exists.`
+      });
+    }
+
+    // Validate options structure
+    if (!options || !Array.isArray(options) || options.length === 0) {
+      return res
+        .status(400)
+        .json({ message: "At least one option is required." });
+    }
+
+    // Process main options with remark validation
+    const processedOptions = options.map((option) => {
+      if (!option.name || !String(option.name).trim()) {
+        throw new Error("All options must have names");
+      }
+
+      const processedOption = {
+        id: String(option.id || Date.now() + Math.random()),
+        name: String(option.name).trim(),
+        isDefault: Boolean(option.isDefault),
+        isFail: Boolean(option.isFail),
+        hasRemark: Boolean(option.hasRemark)
+      };
+
+      // Validate and process remark
+      if (option.hasRemark) {
+        if (
+          !option.remark ||
+          !option.remark.english ||
+          !option.remark.english.trim()
+        ) {
+          throw new Error(
+            `Option "${option.name}" has remark enabled but English remark is missing`
+          );
+        }
+        processedOption.remark = {
+          english: String(option.remark.english).trim(),
+          khmer: option.remark.khmer ? String(option.remark.khmer).trim() : "",
+          chinese: option.remark.chinese
+            ? String(option.remark.chinese).trim()
+            : ""
+        };
+      } else {
+        processedOption.remark = null;
+      }
+
+      return processedOption;
+    });
+
+    // Process subPoints with remark validation
+    let processedSubPoints = [];
+    if (subPoints && Array.isArray(subPoints) && subPoints.length > 0) {
+      processedSubPoints = subPoints
+        .filter((subPoint) => {
+          if (!subPoint) return false;
+          if (!subPoint.name || !String(subPoint.name).trim()) return false;
+          if (!subPoint.options || !Array.isArray(subPoint.options))
+            return false;
+
+          const hasValidOptions = subPoint.options.some(
+            (opt) => opt && opt.name && String(opt.name).trim().length > 0
+          );
+
+          return hasValidOptions;
+        })
+        .map((subPoint) => {
+          const processedSubPoint = {
+            id: String(subPoint.id || Date.now() + Math.random()),
+            name: String(subPoint.name).trim(),
+            optionType: subPoint.optionType || "passfail",
+            options: []
+          };
+
+          // Process subpoint options with remark validation
+          if (subPoint.options && Array.isArray(subPoint.options)) {
+            processedSubPoint.options = subPoint.options
+              .filter(
+                (option) =>
+                  option && option.name && String(option.name).trim().length > 0
+              )
+              .map((option) => {
+                const processedSubOption = {
+                  id: String(option.id || Date.now() + Math.random()),
+                  name: String(option.name).trim(),
+                  isDefault: Boolean(option.isDefault),
+                  isFail: Boolean(option.isFail),
+                  hasRemark: Boolean(option.hasRemark)
+                };
+
+                // Validate and process remark for sub point options
+                if (option.hasRemark) {
+                  if (
+                    !option.remark ||
+                    !option.remark.english ||
+                    !option.remark.english.trim()
+                  ) {
+                    throw new Error(
+                      `Option "${option.name}" in sub point "${subPoint.name}" has remark enabled but English remark is missing`
+                    );
+                  }
+                  processedSubOption.remark = {
+                    english: String(option.remark.english).trim(),
+                    khmer: option.remark.khmer
+                      ? String(option.remark.khmer).trim()
+                      : "",
+                    chinese: option.remark.chinese
+                      ? String(option.remark.chinese).trim()
+                      : ""
+                  };
+                } else {
+                  processedSubOption.remark = null;
+                }
+
+                return processedSubOption;
+              });
+          }
+          return processedSubPoint;
+        });
+    }
+
+    // Create the document according to the new schema
+    const documentToSave = {
+      name: String(name).trim(),
+      optionType: optionType || "passfail",
+      options: processedOptions,
+      subPoints: processedSubPoints, // This will be stored as nested objects
+      failureImpact: failureImpact || "customize",
+      addedBy: {
+        emp_id: String(addedBy.emp_id),
+        eng_name: String(addedBy.eng_name)
+      }
+    };
+
+    const newCheckList = new QCWashingCheckList(documentToSave);
+    const savedDocument = await newCheckList.save();
+
     res.status(201).json({
       message: "Check list item added successfully",
-      checkList: newCheckList
+      checkList: savedDocument
     });
   } catch (error) {
-    console.error("Error adding check list item:", error);
     if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({ message: "Duplicate entry. Check list code might exist." });
+      return res.status(409).json({ message: "Duplicate entry detected." });
     }
-    res
-      .status(500)
-      .json({ message: "Failed to add check list item", error: error.message });
+    res.status(500).json({
+      message: error.message || "Failed to add check list item"
+    });
   }
 });
 
-// GET - Get next available code
-app.get("/api/qc-washing-checklist/next-code", async (req, res) => {
-  try {
-    const lastItem = await QCWashingCheckList.findOne()
-      .sort({ code: -1 })
-      .lean();
-    let nextCode = 1;
-    if (lastItem && lastItem.code) {
-      nextCode = parseInt(lastItem.code, 10) + 1;
-    }
-    res.json({ success: true, nextCode });
-  } catch (error) {
-    console.error("Error fetching next check list code:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch next code" });
-  }
-});
-
-// PUT - Update check list item
-app.put("/api/qc-washing-checklist/:id", async (req, res) => {
+// GET - Get a specific check list item by ID
+app.get("/api/qc-washing-checklist/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid check list ID format." });
     }
 
-    const updatedItem = await QCWashingCheckList.findByIdAndUpdate(
-      id,
-      req.body,
-      {
-        new: true,
-        runValidators: true
-      }
-    );
+    const checkListItem = await QCWashingCheckList.findById(id).lean();
 
-    if (!updatedItem) {
+    if (!checkListItem) {
       return res.status(404).json({ message: "Check list item not found." });
     }
 
-    res.status(200).json({
+    res.json(checkListItem);
+  } catch (error) {
+    console.error("Error fetching check list item:", error);
+    res.status(500).json({ message: "Server error fetching check list item" });
+  }
+});
+
+// PUT - Update existing check list item
+app.put("/api/qc-washing-checklist/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, optionType, options, subPoints, failureImpact, updatedBy } =
+      req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: "Name is required." });
+    }
+
+    if (!updatedBy || !updatedBy.emp_id || !updatedBy.eng_name) {
+      return res
+        .status(400)
+        .json({ message: "Updated by information is required." });
+    }
+
+    // Check if another checkpoint with same name exists (excluding current one)
+    const existingByName = await QCWashingCheckList.findOne({
+      name: name.trim(),
+      _id: { $ne: id }
+    });
+    if (existingByName) {
+      return res.status(409).json({
+        message: `Check list name '${name}' already exists.`
+      });
+    }
+
+    // Process options and subPoints similar to POST endpoint
+    const processedOptions = options.map((option) => {
+      if (!option.name || !String(option.name).trim()) {
+        throw new Error("All options must have names");
+      }
+
+      const processedOption = {
+        id: String(option.id || Date.now() + Math.random()),
+        name: String(option.name).trim(),
+        isDefault: Boolean(option.isDefault),
+        isFail: Boolean(option.isFail),
+        hasRemark: Boolean(option.hasRemark)
+      };
+
+      if (option.hasRemark) {
+        if (
+          !option.remark ||
+          !option.remark.english ||
+          !option.remark.english.trim()
+        ) {
+          throw new Error(
+            `Option "${option.name}" has remark enabled but English remark is missing`
+          );
+        }
+        processedOption.remark = {
+          english: String(option.remark.english).trim(),
+          khmer: option.remark.khmer ? String(option.remark.khmer).trim() : "",
+          chinese: option.remark.chinese
+            ? String(option.remark.chinese).trim()
+            : ""
+        };
+      } else {
+        processedOption.remark = null;
+      }
+
+      return processedOption;
+    });
+
+    // Process subPoints
+    let processedSubPoints = [];
+    if (subPoints && Array.isArray(subPoints) && subPoints.length > 0) {
+      processedSubPoints = subPoints
+        .filter((subPoint) => {
+          if (!subPoint) return false;
+          if (!subPoint.name || !String(subPoint.name).trim()) return false;
+          if (!subPoint.options || !Array.isArray(subPoint.options))
+            return false;
+
+          const hasValidOptions = subPoint.options.some(
+            (opt) => opt && opt.name && String(opt.name).trim().length > 0
+          );
+
+          return hasValidOptions;
+        })
+        .map((subPoint) => {
+          const processedSubPoint = {
+            id: String(subPoint.id || Date.now() + Math.random()),
+            name: String(subPoint.name).trim(),
+            optionType: subPoint.optionType || "passfail",
+            options: []
+          };
+
+          if (subPoint.options && Array.isArray(subPoint.options)) {
+            processedSubPoint.options = subPoint.options
+              .filter(
+                (option) =>
+                  option && option.name && String(option.name).trim().length > 0
+              )
+              .map((option) => {
+                const processedSubOption = {
+                  id: String(option.id || Date.now() + Math.random()),
+                  name: String(option.name).trim(),
+                  isDefault: Boolean(option.isDefault),
+                  isFail: Boolean(option.isFail),
+                  hasRemark: Boolean(option.hasRemark)
+                };
+
+                if (option.hasRemark) {
+                  if (
+                    !option.remark ||
+                    !option.remark.english ||
+                    !option.remark.english.trim()
+                  ) {
+                    throw new Error(
+                      `Option "${option.name}" in sub point "${subPoint.name}" has remark enabled but English remark is missing`
+                    );
+                  }
+                  processedSubOption.remark = {
+                    english: String(option.remark.english).trim(),
+                    khmer: option.remark.khmer
+                      ? String(option.remark.khmer).trim()
+                      : "",
+                    chinese: option.remark.chinese
+                      ? String(option.remark.chinese).trim()
+                      : ""
+                  };
+                } else {
+                  processedSubOption.remark = null;
+                }
+
+                return processedSubOption;
+              });
+          }
+
+          return processedSubPoint;
+        });
+    }
+
+    const updateData = {
+      name: String(name).trim(),
+      optionType: optionType || "passfail",
+      options: processedOptions,
+      subPoints: processedSubPoints,
+      failureImpact: failureImpact || "customize",
+      updatedBy: {
+        emp_id: String(updatedBy.emp_id),
+        eng_name: String(updatedBy.eng_name)
+      }
+    };
+
+    const updatedCheckList = await QCWashingCheckList.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedCheckList) {
+      return res.status(404).json({ message: "Check list item not found" });
+    }
+
+    res.json({
       message: "Check list item updated successfully",
-      checkList: updatedItem
+      checkList: updatedCheckList
     });
   } catch (error) {
     console.error("Error updating check list item:", error);
     if (error.code === 11000) {
-      return res
-        .status(409)
-        .json({ message: "Update failed due to duplicate code." });
+      return res.status(409).json({ message: "Duplicate entry detected." });
     }
     res.status(500).json({
-      message: "Failed to update check list item",
-      error: error.message
+      message: error.message || "Failed to update check list item"
     });
   }
 });
@@ -28346,22 +28762,56 @@ app.put("/api/qc-washing-checklist/:id", async (req, res) => {
 app.delete("/api/qc-washing-checklist/:id", async (req, res) => {
   try {
     const { id } = req.params;
+
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({ message: "Invalid check list ID format." });
     }
 
     const deletedItem = await QCWashingCheckList.findByIdAndDelete(id);
+
     if (!deletedItem) {
       return res.status(404).json({ message: "Check list item not found." });
     }
 
-    res.status(200).json({ message: "Check list item deleted successfully" });
+    res.status(200).json({
+      message: "Check list item deleted successfully",
+      deletedItem: {
+        id: deletedItem._id,
+        name: deletedItem.name
+      }
+    });
   } catch (error) {
     console.error("Error deleting check list item:", error);
     res.status(500).json({
       message: "Failed to delete check list item",
       error: error.message
     });
+  }
+});
+
+// GET - Get checkpoints summary (for dashboard/overview)
+app.get("/api/qc-washing-checklist/summary", async (req, res) => {
+  try {
+    const totalCheckpoints = await QCWashingCheckList.countDocuments();
+    const checkpointsWithSubPoints = await QCWashingCheckList.countDocuments({
+      "subPoints.0": { $exists: true }
+    });
+
+    const recentCheckpoints = await QCWashingCheckList.find({})
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .select("name createdAt addedBy")
+      .lean();
+
+    res.json({
+      totalCheckpoints,
+      checkpointsWithSubPoints,
+      checkpointsWithoutSubPoints: totalCheckpoints - checkpointsWithSubPoints,
+      recentCheckpoints
+    });
+  } catch (error) {
+    console.error("Error fetching checkpoints summary:", error);
+    res.status(500).json({ message: "Server error fetching summary" });
   }
 });
 
@@ -29026,6 +29476,49 @@ function getServerBaseUrl(req) {
   return `${protocol}://${host}`;
 }
 
+// Helper function to group checkpoint data
+function groupCheckpointData(checkpointInspectionData) {
+  const groupedData = [];
+  const mainCheckpoints = new Map();
+
+  // First pass: collect all main checkpoints
+  checkpointInspectionData.forEach((item) => {
+    if (item.type === "main") {
+      mainCheckpoints.set(item.checkpointId, {
+        id: item.id,
+        checkpointId: item.checkpointId,
+        name: item.name,
+        optionType: item.optionType,
+        decision: item.decision,
+        remark: item.remark,
+        comparisonImages: item.comparisonImages || [],
+        subPoints: [] // Initialize empty sub-points array
+      });
+    }
+  });
+
+  // Second pass: add sub-points to their parent main checkpoints
+  checkpointInspectionData.forEach((item) => {
+    if (item.type === "sub") {
+      const mainCheckpoint = mainCheckpoints.get(item.checkpointId);
+      if (mainCheckpoint) {
+        mainCheckpoint.subPoints.push({
+          id: item.id,
+          subPointId: item.subPointId,
+          name: item.name,
+          optionType: item.optionType,
+          decision: item.decision,
+          remark: item.remark,
+          comparisonImages: item.comparisonImages || []
+        });
+      }
+    }
+  });
+
+  // Convert map to array
+  return Array.from(mainCheckpoints.values());
+}
+
 app.post(
   "/api/qc-washing/inspection-save",
   uploadInspectionImage.any(),
@@ -29039,6 +29532,11 @@ app.post(
       const inspectionData = JSON.parse(req.body.inspectionData || "[]");
       const processData = JSON.parse(req.body.processData || "{}");
       const defectData = JSON.parse(req.body.defectData || "[]");
+      const checkpointInspectionData = JSON.parse(
+        req.body.checkpointInspectionData || "[]"
+      );
+      const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
+      const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
 
       if (!recordId) {
         return res
@@ -29049,13 +29547,13 @@ app.post(
       // Get server base URL
       const serverBaseUrl = getServerBaseUrl(req);
 
-      // Handle file uploads
+      // Handle file uploads for both regular inspection and checkpoint images
       const uploadDir = path.join(
         __dirname,
         "./public/storage/qc_washing_images/inspection"
       );
-
       const fileMap = {};
+
       for (const file of req.files || []) {
         const fileExtension = path.extname(file.originalname);
         const newFilename = `inspection-${Date.now()}-${Math.round(
@@ -29063,8 +29561,6 @@ app.post(
         )}${fileExtension}`;
         const fullFilePath = path.join(uploadDir, newFilename);
         await fs.promises.writeFile(fullFilePath, file.buffer);
-
-        // Use the same format as defect images - with ./public prefix
         fileMap[
           file.fieldname
         ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
@@ -29076,22 +29572,17 @@ app.post(
         record = new QCWashing({ _id: recordId });
       }
 
-      // Build machine processes with the new structure
       const machineProcesses = [];
-
-      // Define the machine types and their parameters
       const machineTypes = {
         "Washing Machine": ["temperature", "time", "silicon", "softener"],
-        "Tumble Dry": ["temperature", "time"]
+        "Tumble Dry": ["temperature", "timeCool", "timeHot"]
       };
 
       Object.entries(machineTypes).forEach(([machineType, parameters]) => {
         const machineProcess = { machineType };
-
         parameters.forEach((param) => {
           const actualVal = actualValues[machineType]?.[param];
           const standardVal = standardValues[machineType]?.[param];
-
           machineProcess[param] = {
             actualValue:
               actualVal === null || actualVal === undefined ? "" : actualVal,
@@ -29105,7 +29596,6 @@ app.post(
             }
           };
         });
-
         machineProcesses.push(machineProcess);
       });
 
@@ -29114,44 +29604,56 @@ app.post(
         inspectionData.forEach((item, idx) => {
           if (item.comparisonImages) {
             item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-              // Return new uploaded image URL or existing URL
               const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
               if (newImageUrl) {
                 return newImageUrl;
               }
-
-              // If it's an existing image, check if it's already a full URL
               if (
                 typeof img === "string" &&
                 (img.startsWith("http://") || img.startsWith("https://"))
               ) {
-                return img; // Already a full URL
+                return img;
               }
-
-              // If it's a relative path, convert to full URL
               if (typeof img === "string" && img.startsWith("./")) {
                 return `${serverBaseUrl}${img.replace("./", "/")}`;
               }
-
-              // Handle object format
               if (typeof img === "object" && img !== null && img.name) {
                 if (
                   img.name.startsWith("http://") ||
                   img.name.startsWith("https://")
                 ) {
-                  return img.name; // Already a full URL
+                  return img.name;
                 }
                 if (img.name.startsWith("./")) {
                   return `${serverBaseUrl}${img.name.replace("./", "/")}`;
                 }
                 return img.name;
               }
-
               return img || "";
             });
           }
         });
       }
+
+      // Handle checkpoint images and group the data
+      if (checkpointInspectionData) {
+        checkpointInspectionData.forEach((item, idx) => {
+          if (item.comparisonImages) {
+            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+              const newImageUrl = fileMap[`checkpointImages_${idx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+              return normalizeInspectionImagePath(img);
+            });
+          }
+        });
+      }
+
+      // Group checkpoint data with sub-points nested under main checkpoints
+      const groupedCheckpointData = groupCheckpointData(
+        checkpointInspectionData
+      );
 
       // Build the inspection details
       record.inspectionDetails = {
@@ -29167,7 +29669,8 @@ app.post(
           }),
           remark: item.remark
         })),
-
+        // Use grouped checkpoint data instead of flat array
+        checkpointInspectionData: groupedCheckpointData,
         machineProcesses: machineProcesses,
         parameters: (defectData || []).map((item) => ({
           parameterName: item.parameter,
@@ -29176,11 +29679,15 @@ app.post(
           passRate: item.passRate,
           result: item.result,
           remark: item.remark
-        }))
+        })),
+        // Add machine settings
+        timeCoolEnabled,
+        timeHotEnabled
       };
 
       record.savedAt = new Date();
       record.status = "processing";
+
       await record.save();
 
       res.json({
@@ -29195,6 +29702,7 @@ app.post(
   }
 );
 
+// Updated inspection-update endpoint
 app.post(
   "/api/qc-washing/inspection-update",
   uploadInspectionImage.any(),
@@ -29208,6 +29716,11 @@ app.post(
       const inspectionData = JSON.parse(req.body.inspectionData || "[]");
       const processData = JSON.parse(req.body.processData || "{}");
       const defectData = JSON.parse(req.body.defectData || "[]");
+      const checkpointInspectionData = JSON.parse(
+        req.body.checkpointInspectionData || "[]"
+      );
+      const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
+      const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
 
       if (!recordId) {
         return res
@@ -29223,8 +29736,8 @@ app.post(
         __dirname,
         "./public/storage/qc_washing_images/inspection"
       );
-
       const fileMap = {};
+
       for (const file of req.files || []) {
         const fileExtension = path.extname(file.originalname);
         const newFilename = `inspection-${Date.now()}-${Math.round(
@@ -29232,8 +29745,6 @@ app.post(
         )}${fileExtension}`;
         const fullFilePath = path.join(uploadDir, newFilename);
         await fs.promises.writeFile(fullFilePath, file.buffer);
-
-        // Save complete server URL instead of relative path
         fileMap[
           file.fieldname
         ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
@@ -29249,8 +29760,6 @@ app.post(
 
       // Build machine processes with the new structure
       const machineProcesses = [];
-
-      // Define the machine types and their parameters
       const machineTypes = {
         "Washing Machine": ["temperature", "time", "silicon", "softener"],
         "Tumble Dry": ["temperature", "timeCool", "timeHot"]
@@ -29258,11 +29767,9 @@ app.post(
 
       Object.entries(machineTypes).forEach(([machineType, parameters]) => {
         const machineProcess = { machineType };
-
         parameters.forEach((param) => {
           const actualVal = actualValues[machineType]?.[param];
           const standardVal = standardValues[machineType]?.[param];
-
           machineProcess[param] = {
             actualValue:
               actualVal === null || actualVal === undefined ? "" : actualVal,
@@ -29276,7 +29783,6 @@ app.post(
             }
           };
         });
-
         machineProcesses.push(machineProcess);
       });
 
@@ -29289,13 +29795,31 @@ app.post(
               if (newImageUrl) {
                 return newImageUrl;
               }
-
-              // Keep existing images as they are (should already be full URLs from previous saves)
               return img;
             });
           }
         });
       }
+
+      // Handle checkpoint images
+      if (checkpointInspectionData) {
+        checkpointInspectionData.forEach((item, idx) => {
+          if (item.comparisonImages) {
+            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
+              const newImageUrl = fileMap[`checkpointImages_${idx}_${imgIdx}`];
+              if (newImageUrl) {
+                return newImageUrl;
+              }
+              return img;
+            });
+          }
+        });
+      }
+
+      // Group checkpoint data with sub-points nested under main checkpoints
+      const groupedCheckpointData = groupCheckpointData(
+        checkpointInspectionData
+      );
 
       // Build the inspection details
       record.inspectionDetails = {
@@ -29315,7 +29839,8 @@ app.post(
             remark: item.remark
           };
         }),
-
+        // Use grouped checkpoint data instead of flat array
+        checkpointInspectionData: groupedCheckpointData,
         machineProcesses: machineProcesses,
         parameters: (defectData || []).map((item) => ({
           parameterName: item.parameter,
@@ -29324,7 +29849,10 @@ app.post(
           passRate: item.passRate,
           result: item.result,
           remark: item.remark
-        }))
+        })),
+        // Update machine settings
+        timeCoolEnabled,
+        timeHotEnabled
       };
 
       record.savedAt = new Date();
@@ -31249,6 +31777,75 @@ app.get("/api/qc-washing/all-submitted", async (req, res) => {
       success: false,
       message: "Failed to fetch submitted data",
       error: error.message
+    });
+  }
+});
+
+// Add this route to your QC Washing routes file
+app.put("/api/qc-washing/update-edited-wash-qty/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { editedWashQty } = req.body;
+
+    // Validate the ID
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid record ID"
+      });
+    }
+
+    // Validate the editedWashQty
+    if (editedWashQty === undefined || editedWashQty === null) {
+      return res.status(400).json({
+        success: false,
+        message: "Edited wash quantity is required"
+      });
+    }
+
+    const parsedEditedWashQty = parseInt(editedWashQty);
+    if (isNaN(parsedEditedWashQty) || parsedEditedWashQty < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Edited wash quantity must be a valid non-negative number"
+      });
+    }
+
+    // Update the record with the new edited wash quantity
+    const updatedRecord = await QCWashing.findByIdAndUpdate(
+      id,
+      {
+        $set: {
+          editedActualWashQty: parsedEditedWashQty,
+          lastEditedAt: new Date()
+          // Optionally add who edited it if you have user context
+          // editedBy: req.user?.id || req.body.editedBy
+        }
+      },
+      {
+        new: true, // Return the updated document
+        runValidators: true // Run schema validators
+      }
+    );
+
+    if (!updatedRecord) {
+      return res.status(404).json({
+        success: false,
+        message: "QC Washing record not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      data: updatedRecord,
+      message: "Edited wash quantity updated successfully"
+    });
+  } catch (error) {
+    console.error("Error updating edited wash qty:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: process.env.NODE_ENV === "development" ? error.message : undefined
     });
   }
 });

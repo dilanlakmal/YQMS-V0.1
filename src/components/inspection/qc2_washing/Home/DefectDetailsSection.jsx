@@ -853,9 +853,7 @@ const DefectDetailsSection = ({
             </div>
 
             {/* AQL Information Display */}
-            {(formData.inline === "Inline" ||
-              formData.reportType === "Inline" ||
-              formData.firstOutput === "First Output") &&
+            {["SOP", "Inline", "First Output"].includes(formData.reportType) &&
               (aql?.sampleSize ||
                 aql?.acceptedDefect ||
                 aql?.rejectedDefect) && (

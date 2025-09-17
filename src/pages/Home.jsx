@@ -613,6 +613,13 @@ function Home() {
             description: "QC2 Upload Data"
           },
           {
+            path: "/qc2-washing-upload",
+            roles: ["Washing Clerk"],
+            image: "assets/Home/qc2WashingUpload.png",
+            title: t("home.qc2_washing_data"),
+            description: "QC2 Washing Data"
+          },
+          {
             path: "/qc-accuracy",
             roles: ["QA"],
             image: "assets/Home/qc-accuracy.png",

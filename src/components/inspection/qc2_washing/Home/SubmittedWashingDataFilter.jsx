@@ -21,7 +21,9 @@ const SubmittedWashingDataFilter = ({
   onFilterChange,
   onReset,
   isVisible,
-  onToggle
+  onToggle,
+  users,
+  loadingUsers
 }) => {
   const [filters, setFilters] = useState({
     dateRange: {
@@ -38,9 +40,6 @@ const SubmittedWashingDataFilter = ({
     washType: ""
   });
 
-  const [users, setUsers] = useState([]);
-  const [loadingUsers, setLoadingUsers] = useState(false);
-
   // Search states for searchable dropdowns
   const [searchStates, setSearchStates] = useState({
     orderNo: "",
@@ -54,6 +53,7 @@ const SubmittedWashingDataFilter = ({
   });
 
   const getUniqueUsersWithNames = (useFilteredData = false) => {
+    if (!users || !Array.isArray(users)) return []; // Prevent crash if users is not an array
     const dataSource = useFilteredData ? filteredData : data;
     const uniqueUserIds = [
       ...new Set(dataSource.map((item) => item.userId).filter(Boolean))
@@ -70,26 +70,6 @@ const SubmittedWashingDataFilter = ({
       })
       .sort((a, b) => a.display.localeCompare(b.display));
   };
-
-  // Fetch users on component mount
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoadingUsers(true);
-        const response = await fetch(`${API_BASE_URL}/api/users`);
-        if (response.ok) {
-          const data = await response.json();
-          setUsers(data.users || data || []);
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      } finally {
-        setLoadingUsers(false);
-      }
-    };
-
-    fetchUsers();
-  }, []);
 
   // Extract unique values for dropdown options
   const getUniqueValues = (field, useFilteredData = false) => {
@@ -162,23 +142,16 @@ const SubmittedWashingDataFilter = ({
       ...prev,
       [field]: value
     }));
-
-    // For QC ID, we need to extract the actual ID from the display value
-    if (field === "qcId") {
-      // If the value contains ' - ', extract the ID part (before the dash)
-      const actualId = value.includes(" - ") ? value.split(" - ")[0] : value;
-      handleFilterChange(field, actualId);
-    } else {
-      handleFilterChange(field, value);
-    }
+    handleFilterChange(field, value);
   };
 
   // Handle dropdown toggle
   const toggleDropdown = (field) => {
-    setDropdownStates((prev) => ({
-      ...prev,
-      [field]: !prev[field]
-    }));
+    setDropdownStates((prev) => {
+      const isOpen = !prev[field];
+      // Close all dropdowns, then open the target one if it was closed.
+      return { orderNo: false, qcId: false, [field]: isOpen };
+    });
   };
 
   // Handle option selection
@@ -363,7 +336,7 @@ const SubmittedWashingDataFilter = ({
 
                 {/* Dropdown Options */}
                 {dropdownStates.orderNo && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div
                       className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
                       onClick={() => handleOptionSelect("orderNo", "")}
@@ -426,7 +399,7 @@ const SubmittedWashingDataFilter = ({
 
                 {/* Dropdown Options */}
                 {dropdownStates.qcId && !loadingUsers && (
-                  <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div
                       className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
                       onClick={() => handleOptionSelect("qcId", "")}
@@ -493,7 +466,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Before/After Wash
+                Before/After
               </label>
               <div className="relative">
                 <select
@@ -683,19 +656,21 @@ const SubmittedWashingDataFilter = ({
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-6 mt-6 border-t border-gray-200 dark:border-gray-700 space-y-3 sm:space-y-0">
-            <div className="text-sm text-gray-500 dark:text-gray-400"></div>
-            <button
-              onClick={handleReset}
-              disabled={!hasActiveFilters()}
-              className="flex items-center space-x-2 px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all font-medium"
-            >
-              <RotateCcw size={16} />
-              <span>Clear</span>
-            </button>
+            {/* Reset Button */}
+            <div className="relative">
+              <label className="flex items-center text-sm font-medium text-transparent dark:text-transparent mb-2 select-none">
+                Action
+              </label>
+              <button
+                onClick={handleReset}
+                disabled={!hasActiveFilters()}
+                className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300 hover:bg-red-200 dark:hover:bg-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-all font-medium"
+              >
+                <RotateCcw size={16} />
+                <span>Clear</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

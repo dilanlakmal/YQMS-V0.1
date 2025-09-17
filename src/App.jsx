@@ -73,6 +73,7 @@ import QCAccuracy from "./pages/QCAccuracy.jsx";
 
 import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
+import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
@@ -443,6 +444,10 @@ function AppContent() {
               <Route path="/cutting-inline" element={<CuttingInline />} />
               <Route path="/sub-con-qc1" element={<SubConQC />} />
               <Route path="/qc2-upload-data" element={<QC2UploadData />} />
+              <Route
+                path="/qc2-washing-upload"
+                element={<QC2WashingUpload />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
