@@ -5,7 +5,7 @@ import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
 import { getToleranceAsFraction, decimalToFraction } from "../Home/fractionConverter";
 
-const QCWashingFullReportModal = ({ isOpen, onClose, recordData }) => {
+const QCWashingFullReportModal = ({ isOpen, onClose, recordData, checkpointDefinitions }) => {
   const [reportData, setReportData] = useState(null);
   const [comparisonData, setComparisonData] = useState(null);
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
@@ -657,7 +657,7 @@ const getImageUrl = (imagePath) => {
                         {processedReportData.defectDetails?.additionalImages && processedReportData.defectDetails.additionalImages.length > 0 && (
                             <div className="mt-4">
                               <h5 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional Images:</h5>
-                              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                              <div className="grid grid-cols-2 md:grid-cols- gap-3">
                                 {processedReportData.defectDetails.additionalImages.map((img, imgIndex) => {
                                   const imageUrl = getImageUrl(img);
                                   return (
@@ -726,21 +726,26 @@ const getImageUrl = (imagePath) => {
                           <div>
                             <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">Checkpoints</h4>
                             <div className="space-y-6">
-                              {inspectionDetails.checkpointInspectionData.map((mainPoint, index) => (
-                                <div key={mainPoint.id || index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
+                              {inspectionDetails.checkpointInspectionData.map((mainPoint, index) => {
+                                const mainPointDef = checkpointDefinitions?.find(def => def._id === mainPoint.checkpointId);
+                                const mainPointOption = mainPointDef?.options.find(opt => opt.name === mainPoint.decision);
+                                const isFail = mainPointOption?.isFail;
+
+                                return (
+                                  <div key={mainPoint.id || index} className="bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600 rounded-xl p-5 hover:shadow-md transition-shadow">
                                   <div className="flex items-center justify-between mb-4">
                                     <div className="flex items-center space-x-3">
                                       <div className={`p-2 rounded-lg ${
-                                        mainPoint.decision === 'Pass' ? 'bg-green-500' : 'bg-red-500'
+                                        isFail ? 'bg-red-500' : 'bg-green-500'
                                       }`}>
                                         <Target className="w-4 h-4 text-white" />
                                       </div>
                                       <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{mainPoint.name}</span>
                                     </div>
                                     <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                                      mainPoint.decision === 'Pass' 
-                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
-                                        : 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                      isFail
+                                        ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                        : 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
                                     }`}>
                                       {mainPoint.decision}
                                     </span>
@@ -778,7 +783,7 @@ const getImageUrl = (imagePath) => {
                                     </div>
                                   )}
                                   {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
-                                    <div className="mt-4 pl-4 border-l-2 border-gray-300 dark:border-gray-500 space-y-3">
+                                    <div className="mt-4 pl-4 border-l-2 border-gray-300 dark:border-gray-500 space-y-3" >
                                       <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 -ml-4 mb-2">Sub-points:</h5>
                                       {mainPoint.subPoints.map((subPoint, subIndex) => (
                                         <div key={subPoint.id || subIndex} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
@@ -790,11 +795,11 @@ const getImageUrl = (imagePath) => {
                                           {subPoint.comparisonImages && subPoint.comparisonImages.length > 0 && (
                                             <div className="mt-2">
                                               <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Images:</p>
-                                              <div className="grid grid-cols-3 gap-2">
+                                              <div className="grid grid-cols-4 gap-2">
                                                 {subPoint.comparisonImages.map((img, imgIdx) => {
                                                   const imageUrl = getImageUrl(img);
                                                   return (
-                                                    <div key={imgIdx} className="w-full h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                                    <div key={imgIdx} className="w-1/2 h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
                                                       {imageUrl ? (
                                                         <img 
                                                           src={imageUrl}
@@ -818,7 +823,8 @@ const getImageUrl = (imagePath) => {
                                     </div>
                                   )}
                                 </div>
-                              ))}
+                                )
+                              })}
                             </div>
                           </div>
                         ) : (

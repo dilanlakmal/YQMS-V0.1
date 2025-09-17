@@ -1125,7 +1125,8 @@ if (
             comparisonImages: (savedCheckpoint.comparisonImages || []).map(img => ({
               file: null,
               preview: normalizeImageSrc(img),
-              name: typeof img === 'string' ? img.split('/').pop() : 'image.jpg'
+              name: typeof img === 'string' ? img.split('/').pop() : 'image.jpg',
+              source: 'upload'
             }))
           });
           
@@ -1149,7 +1150,8 @@ if (
                   comparisonImages: (savedSubPoint.comparisonImages || []).map(img => ({
                     file: null,
                     preview: normalizeImageSrc(img),
-                    name: typeof img === 'string' ? img.split('/').pop() : 'image.jpg'
+                    name: typeof img === 'string' ? img.split('/').pop() : 'image.jpg',
+                    source: 'upload'
                   }))
                 });
               }

@@ -4,6 +4,8 @@ import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
 import QCWashingFullReportModal from './QCWashingFullReportModal';
+import QcWashingFullReportPDF from './qcWashingFullReportPDF';
+import { PDFDownloadLink} from '@react-pdf/renderer';
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
@@ -32,6 +34,7 @@ const SubmittedWashingDataPage = () => {
   recordData: null
 });
 const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
+ const [checkpointDefinitions, setCheckpointDefinitions] = useState([]);
 
   // Single handleViewDetails function (removed the duplicate)
   const handleViewDetails = (record) => {
@@ -101,6 +104,21 @@ const fetchSubmittedData = async (showLoading = true) => {
     fetchSubmittedData();
     const interval = setInterval(() => fetchSubmittedData(false), 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const fetchDefinitions = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setCheckpointDefinitions(data);
+        }
+      } catch (e) {
+        console.error("Failed to fetch checkpoint definitions", e);
+      }
+    };
+    fetchDefinitions();
   }, []);
 
   useEffect(() => {
@@ -573,6 +591,7 @@ const processImageToBase64 = async (imagePath) => {
         recordData={processedRecord} 
         comparisonData={comparisonData} 
         API_BASE_URL={API_BASE_URL}
+        checkpointDefinitions={checkpointDefinitions}
       />
     ).toBlob();
     
@@ -1289,7 +1308,8 @@ const processImageToBase64 = async (imagePath) => {
     <QCWashingFullReportModal
       isOpen={fullReportModal.isOpen}
       onClose={handleCloseFullReport}
-      recordData={fullReportModal.recordData}
+        recordData={fullReportModal.recordData}
+        checkpointDefinitions={checkpointDefinitions}
     />
     </div>
   );

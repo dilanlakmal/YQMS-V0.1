@@ -1441,14 +1441,14 @@ const handleSaveInspection = async () => {
                                   input.multiple = true;
                                   input.onchange = (e) => {
                                     if (e.target.files && e.target.files.length > 0) {
-                                      handleCheckpointImageChange(idx, e.target.files);
+                                      handleCheckpointImageChange(idx, e.target.files, 'upload');
                                     }
                                   };
                                   input.click();
                                 }}
                                 disabled={
                                   !isEditing ||
-                                  (item.comparisonImages || []).length >= 2
+                                  (item.comparisonImages || []).filter(img => img.source === 'upload').length >= 5
                                 }
                                 title="Upload"
                               >
@@ -1467,14 +1467,14 @@ const handleSaveInspection = async () => {
                                   input.capture = 'environment';
                                   input.onchange = (e) => {
                                     if (e.target.files && e.target.files.length > 0) {
-                                      handleCheckpointImageChange(idx, e.target.files);
+                                      handleCheckpointImageChange(idx, e.target.files, 'capture');
                                     }
                                   };
                                   input.click();
                                 }}
                                 disabled={
                                   !isEditing ||
-                                  (item.comparisonImages || []).length >= 2
+                                  (item.comparisonImages || []).filter(img => img.source === 'capture').length >= 5
                                 }
                                 title="Capture"
                               >

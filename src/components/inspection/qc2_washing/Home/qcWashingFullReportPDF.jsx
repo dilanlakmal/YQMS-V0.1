@@ -199,7 +199,6 @@ const SafeImage = ({ src, style, alt }) => {
   );
 };
 
-
 // --- REUSABLE PDF COMPONENTS ---
 const PdfHeader = ({ orderNo, beforeAfterWash }) => (
   <View style={styles.docHeader} fixed>
@@ -501,6 +500,309 @@ const SizewiseSummaryTable = ({ measurementSizeSummary }) => (
   </View>
 );
 
+// NEW INSPECTION DETAILS SECTION FOR UPDATED STRUCTURE
+const NewInspectionDetailsSection = ({ inspectionDetails, API_BASE_URL, checkpointDefinitions = [] }) => {
+  console.log('🔍 NewInspectionDetailsSection received:', {
+    checkpointInspectionData: inspectionDetails.checkpointInspectionData?.length || 0,
+    parameters: inspectionDetails.parameters?.length || 0,
+    machineProcesses: inspectionDetails.machineProcesses?.length || 0,
+    checkpointDefinitions: checkpointDefinitions?.length || 0,
+    fullInspectionDetails: inspectionDetails
+  });
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Inspection Details</Text>
+      
+      {/* New Checkpoint Inspection Data */}
+      {inspectionDetails.checkpointInspectionData && inspectionDetails.checkpointInspectionData.length > 0 ? (
+        <View style={{ marginBottom: 15 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Checkpoints</Text>
+          {inspectionDetails.checkpointInspectionData.map((mainPoint, index) => {
+            // Find the checkpoint definition to determine if it's a fail
+            const mainPointDef = Array.isArray(checkpointDefinitions)
+              ? checkpointDefinitions.find(def => def._id === mainPoint.checkpointId)
+              : null;
+            const mainPointOption = mainPointDef?.options?.find(opt => opt.name === mainPoint.decision) || null;
+            const isFail = mainPointOption?.isFail === true;
+
+            return (
+              <View key={mainPoint.id || index} style={{ marginBottom: 10, border: "1px solid #e5e7eb", borderRadius: 4, padding: 8 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 5 }}>
+                    {mainPoint.name || `Checkpoint ${index + 1}`}
+                  </Text>
+                  <Text style={[
+                    styles.passStatus,
+                    isFail ? styles.failRed : styles.passGreen
+                  ]}>
+                    {mainPoint.decision || 'N/A'}
+                  </Text>
+                </View>
+
+                {/* Main Point Remark */}
+                {mainPoint.remark && (
+                  <View style={{ marginTop: 4, marginBottom: 8, backgroundColor: "#f9fafb", padding: 4, borderRadius: 2 }}>
+                    <Text style={{ fontSize: 7, color: "#6b7280" }}>Remark:</Text>
+                    <Text style={{ fontSize: 8, color: "#374151" }}>{mainPoint.remark}</Text>
+                  </View>
+                )}
+
+                {/* Sub Points */}
+                {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
+                  <View style={{ marginTop: 8, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: "#e5e7eb" }}>
+                    <Text style={{ fontSize: 8, fontWeight: "bold", marginBottom: 5, color: "#6b7280" }}>Sub-points:</Text>
+                    {mainPoint.subPoints.map((subPoint, subIndex) => {
+                      // Find the sub-point definition to determine if it's a fail
+                      const subPointDef = Array.isArray(checkpointDefinitions)
+                        ? checkpointDefinitions.find(def => def._id === subPoint.checkpointId)
+                        : null;
+                      const subPointOption = subPointDef?.options?.find(opt => opt.name === subPoint.decision);
+                      const subIsFail = subPointOption?.isFail === true;
+
+                      return (
+                        <View key={subPoint.id || subIndex} style={{ marginBottom: 6, backgroundColor: "#f9fafb", padding: 4, borderRadius: 2 }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <Text style={{ fontSize: 8, color: "#374151" }}>{subPoint.name || `Sub-point ${subIndex + 1}`}:</Text>
+                            <Text style={[
+                              { fontSize: 8, fontWeight: "bold" },
+                              subIsFail ? { color: "#dc2626" } : { color: "#16a34a" }
+                            ]}>
+                              {subPoint.decision || 'N/A'}
+                            </Text>
+                          </View>
+                          {subPoint.remark && (
+                            <Text style={{ fontSize: 7, color: "#6b7280", fontStyle: "italic", marginTop: 2 }}>
+                              Remark: {subPoint.remark}
+                            </Text>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+
+              </View>
+            );
+          })}
+        </View>
+      ) : (
+        <View style={{ marginBottom: 15 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Checkpoints</Text>
+          <Text style={{ fontSize: 8, color: "#6b7280", textAlign: "center", padding: 10 }}>
+            No checkpoint inspection data available
+          </Text>
+        </View>
+      )}
+
+      {/* Parameters section - unchanged */}
+      {inspectionDetails.parameters?.length > 0 && (
+        <View style={{ marginBottom: 15 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Parameters ({inspectionDetails.parameters.length})</Text>
+          <View style={styles.table}>
+            <View style={styles.tableRow} fixed>
+              <Text style={[styles.tableColHeader, { width: "20%" }]}>Parameter Name</Text>
+              <Text style={[styles.tableColHeader, { width: "15%" }]}>Checked Qty</Text>
+                            <Text style={[styles.tableColHeader, { width: "15%" }]}>Defect Qty</Text>
+              <Text style={[styles.tableColHeader, { width: "15%" }]}>Pass Rate</Text>
+              <Text style={[styles.tableColHeader, { width: "15%" }]}>Result</Text>
+              <Text style={[styles.tableColHeader, styles.textLeft, { width: "20%" }]}>Remark</Text>
+            </View>
+            {inspectionDetails.parameters.map((param, index) => (
+              <View key={index} style={styles.tableRow}>
+                <Text style={[styles.tableCol, styles.textLeft, { width: "20%" }]}>
+                  {safeString(param.parameterName)}
+                </Text>
+                <Text style={[styles.tableCol, { width: "15%" }]}>
+                  {param.checkedQty || 0}
+                </Text>
+                <Text style={[styles.tableCol, { width: "15%" }]}>
+                  {param.defectQty || 0}
+                </Text>
+                <Text style={[styles.tableCol, { width: "15%" }]}>
+                  {param.passRate || 0}%
+                </Text>
+                <Text style={[
+                  styles.tableCol, 
+                  { width: "15%" },
+                  param.result === "Pass" ? styles.passGreen : styles.failRed
+                ]}>
+                  {safeString(param.result)}
+                </Text>
+                <Text style={[styles.tableCol, styles.textLeft, { width: "20%" }]}>
+                  {safeString(param.remark)}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+
+      {/* Machine Processes - enhanced with new fields */}
+      {inspectionDetails.machineProcesses?.length > 0 && (
+        <View style={{ marginBottom: 15 }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Machine Processes ({inspectionDetails.machineProcesses.length})</Text>
+          {inspectionDetails.machineProcesses.map((machine, index) => (
+            <View key={index} style={{ marginBottom: 10, border: "1px solid #e5e7eb", borderRadius: 4, padding: 8 }}>
+              <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 5 }}>
+                Machine Type: {safeString(machine.machineType)}
+              </Text>
+              <View style={styles.table}>
+                <View style={styles.tableRow} fixed>
+                  <Text style={[styles.tableColHeader, { width: "20%" }]}>Parameter</Text>
+                  <Text style={[styles.tableColHeader, { width: "20%" }]}>Standard</Text>
+                  <Text style={[styles.tableColHeader, { width: "20%" }]}>Actual</Text>
+                  <Text style={[styles.tableColHeader, { width: "20%" }]}>Status</Text>
+                  <Text style={[styles.tableColHeader, { width: "20%" }]}>Unit</Text>
+                </View>
+
+                {/* Temperature Row */}
+                {machine.temperature && (machine.temperature.actualValue !== undefined && machine.temperature.actualValue !== null && machine.temperature.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Temperature</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.temperature.standardValue ?? "N/A"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.temperature.actualValue ?? "N/A"}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.temperature.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.temperature.status?.ok ? "OK" : "NG"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>°C</Text>
+                  </View>
+                )}
+
+                {/* Regular Time Row */}
+                {machine.time && (machine.time.actualValue !== undefined && machine.time.actualValue !== null && machine.time.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.time.standardValue ?? "N/A"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.time.actualValue ?? "N/A"}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.time.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.time.status?.ok ? "OK" : "NG"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
+                {/* Time Hot Row (for Tumble Dry) */}
+                {machine.timeHot && (machine.timeHot.actualValue !== undefined && machine.timeHot.actualValue !== null && machine.timeHot.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time Hot</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.timeHot.standardValue ?? "N/A"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.timeHot.actualValue ?? "N/A"}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.timeHot.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.timeHot.status?.ok ? "OK" : "NG"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
+                {/* Time Cool Row (for Tumble Dry) */}
+                {machine.timeCool && (machine.timeCool.actualValue !== undefined && machine.timeCool.actualValue !== null && machine.timeCool.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time Cool</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.timeCool.standardValue ?? "N/A"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.timeCool.actualValue ?? "N/A"}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.timeCool.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.timeCool.status?.ok ? "OK" : "NG"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
+                {/* Silicon Row */}
+                {machine.silicon && (machine.silicon.actualValue !== undefined && machine.silicon.actualValue !== null && machine.silicon.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Silicon</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.silicon.standardValue ?? "N/A"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.silicon.actualValue ?? "N/A"}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.silicon.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.silicon.status?.ok ? "OK" : "NG"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
+                  </View>
+                )}
+
+                {/* Softener Row */}
+                {machine.softener && (machine.softener.actualValue !== undefined && machine.softener.actualValue !== null && machine.softener.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Softener</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.softener.standardValue ?? "N/A"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {machine.softener.actualValue ?? "N/A"}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.softener.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.softener.status?.ok ? "OK" : "NG"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
+                  </View>
+                )}
+              </View>
+              
+              {/* Machine Image */}
+              {machine.image && (
+                <View style={styles.imageContainer}>
+                  <Text style={{ fontSize: 7, color: "#6b7280", marginBottom: 3 }}>Machine Image:</Text>
+                  <SafeImage
+                    src={machine.image}
+                    style={styles.machineImage}
+                    alt={`Machine ${machine.machineType} Image`}
+                  />
+                </View>
+              )}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+};
+
+// LEGACY INSPECTION DETAILS SECTION (UNCHANGED)
 const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
   console.log('🔍 InspectionDetailsSection received:', {
     checkedPoints: inspectionDetails.checkedPoints?.length || 0,
@@ -531,7 +833,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                 comparisonImages: point.comparison?.length || 0,
                 firstImage: typeof point.comparison?.[0] === 'string' ? point.comparison[0].substring(0, 50) : 'placeholder'
               });
-
               return (
                 <View key={index} style={styles.tableRow}>
                   <Text style={[styles.tableCol, styles.textLeft, { width: "20%" }]}>
@@ -578,7 +879,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                             preview: img?.substring(0, 50)
                           });
                         }
-
                         return (
                           <View key={imgIndex} style={{ margin: 2 }}>
                             <SafeImage
@@ -658,7 +958,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
               hasImage: !!machine.image,
               imagePreview: machine.image?.substring(0, 50)
             });
-
             return (
               <View key={index} style={{ marginBottom: 10, border: "1px solid #e5e7eb", borderRadius: 4, padding: 8 }}>
                 <Text style={{ fontSize: 9, fontWeight: "bold", marginBottom: 5 }}>
@@ -672,7 +971,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                     <Text style={[styles.tableColHeader, { width: "20%" }]}>Status</Text>
                     <Text style={[styles.tableColHeader, { width: "20%" }]}>Unit</Text>
                   </View>
-
                   {/* Temperature Row */}
                   {machine.temperature && (
                     <View style={styles.tableRow}>
@@ -693,7 +991,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                       <Text style={[styles.tableCol, { width: "20%" }]}>°C</Text>
                     </View>
                   )}
-
                   {/* Time Row */}
                   {machine.time && (
                     <View style={styles.tableRow}>
@@ -714,7 +1011,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                       <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
                     </View>
                   )}
-
                   {/* Silicon Row - only show if has actual value */}
                   {machine.silicon?.actualValue && (
                     <View style={styles.tableRow}>
@@ -735,7 +1031,6 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                       <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                     </View>
                   )}
-
                   {/* Softener Row - only show if has actual value */}
                   {machine.softener?.actualValue && (
                     <View style={styles.tableRow}>
@@ -913,7 +1208,7 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData, API_BASE_URL
                       const beforeValue = beforeMeasurement?.measured_value_fraction || "N/A";
                       const afterPass = afterMeasurement?.result === 'pass';
                       const beforePass = beforeMeasurement?.result === 'pass';
-                      
+                                          
                       let differenceText = "N/A";
                       let differenceColor = "#6b7280";
                       
@@ -1057,7 +1352,7 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
 );
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
-const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL }) => {
+const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [] }) => {
   
   if (!recordData) {
     return (
@@ -1068,6 +1363,19 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
       </Document>
     );
   }
+
+  // Detect which data structure we're dealing with
+  const hasNewInspectionStructure = recordData.inspectionDetails?.checkpointInspectionData && 
+                                   recordData.inspectionDetails.checkpointInspectionData.length > 0;
+
+  console.log('🔍 PDF Structure Detection:', {
+    hasNewInspectionStructure,
+    checkpointInspectionDataLength: recordData.inspectionDetails?.checkpointInspectionData?.length || 0,
+    checkedPointsLength: recordData.inspectionDetails?.checkedPoints?.length || 0,
+    parametersLength: recordData.inspectionDetails?.parameters?.length || 0,
+    machineProcessesLength: recordData.inspectionDetails?.machineProcesses?.length || 0,
+    checkpointDefinitionsLength: checkpointDefinitions?.length || 0
+  });
 
   let measurements = [];
   if (recordData.measurementDetails) {
@@ -1092,6 +1400,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
         />
         <Text style={styles.pageHeader}>QC Washing Report Summary</Text>
         <OrderInfoSection recordData={recordData} />
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quality Summary</Text>
           <QualitySummaryCards recordData={recordData} />
@@ -1105,27 +1414,47 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
             </Text>
           </View>
         </View>
+
         <DefectAnalysisTable 
           defectsByPc={defectsByPc} 
           additionalImages={additionalImages}
           API_BASE_URL={API_BASE_URL}
         />
+
         {measurementSizeSummary.length > 0 && <SizewiseSummaryTable measurementSizeSummary={measurementSizeSummary} />}
+
         {comparisonData && <ComparisonSection recordData={recordData} comparisonData={comparisonData} />}
       </Page>
-      {(inspectionDetails.checkedPoints?.length > 0 || inspectionDetails.parameters?.length > 0 || inspectionDetails.machineProcesses?.length > 0) && (
+
+      {/* Inspection Details Page - ALWAYS SHOW IF ANY INSPECTION DATA EXISTS */}
+      {(hasNewInspectionStructure || 
+        inspectionDetails.checkedPoints?.length > 0 || 
+        inspectionDetails.parameters?.length > 0 || 
+        inspectionDetails.machineProcesses?.length > 0) && (
         <Page style={styles.page} orientation="landscape">
           <PdfHeader 
             orderNo={recordData.orderNo || "N/A"} 
             beforeAfterWash={recordData.before_after_wash || "Washing"}
           />
           <Text style={styles.pageHeader}>Inspection Details</Text>
-          <InspectionDetailsSection 
-            inspectionDetails={inspectionDetails} 
-            API_BASE_URL={API_BASE_URL}
-          />
+          
+          {/* Use new inspection component if new structure exists, otherwise use legacy */}
+          {hasNewInspectionStructure ? (
+            <NewInspectionDetailsSection 
+              inspectionDetails={inspectionDetails} 
+              API_BASE_URL={API_BASE_URL} 
+              checkpointDefinitions={checkpointDefinitions}
+            />
+          ) : (
+            <InspectionDetailsSection 
+              inspectionDetails={inspectionDetails} 
+              API_BASE_URL={API_BASE_URL} 
+            />
+          )}
         </Page>
       )}
+
+      {/* Measurement Detail Pages */}
       {measurements.map((sizeData, index) => (
         <Page key={index} style={styles.page} orientation="landscape">
           <PdfHeader 
@@ -1138,6 +1467,8 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
           <MeasurementDetailTable sizeData={sizeData} />
         </Page>
       ))}
+
+      {/* Before vs After Comparison Page */}
       {comparisonData && comparisonData.measurementDetails?.measurement && 
        recordData.measurementDetails?.measurement && (
         <Page style={styles.page} orientation="landscape">
