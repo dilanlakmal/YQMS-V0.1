@@ -751,6 +751,32 @@ const getImageUrl = (imagePath) => {
                                       <p className="text-sm text-gray-800 dark:text-gray-200">{mainPoint.remark}</p>
                                     </div>
                                   )}
+                                  {mainPoint.comparisonImages && mainPoint.comparisonImages.length > 0 && (
+                                    <div className="mt-4">
+                                      <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">Images:</p>
+                                      <div className="grid grid-cols-3 gap-2">
+                                        {mainPoint.comparisonImages.map((img, imgIdx) => {
+                                          const imageUrl = getImageUrl(img);
+                                          return (
+                                            <div key={imgIdx} className="w-full h-24 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                              {imageUrl ? (
+                                                <img 
+                                                  src={imageUrl}
+                                                  alt={`Main point image ${imgIdx + 1}`}
+                                                  className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                  onClick={() => window.open(imageUrl, '_blank')}
+                                                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                                />
+                                              ) : null}
+                                              <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                                <div className="text-xs text-gray-500 dark:text-gray-400">No Image</div>
+                                              </div>
+                                            </div>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
                                   {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
                                     <div className="mt-4 pl-4 border-l-2 border-gray-300 dark:border-gray-500 space-y-3">
                                       <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 -ml-4 mb-2">Sub-points:</h5>

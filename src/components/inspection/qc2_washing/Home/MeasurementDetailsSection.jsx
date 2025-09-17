@@ -730,6 +730,12 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
       return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
     });
 
+    // When editing, default to hiding unselected rows.
+    setHideUnselectedRowsBySize(prev => ({
+      ...prev,
+      [sizeToEdit]: true
+    }));
+
     // Set the K-value for this specific size directly without validation
     const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
     const key = `${sizeToEdit}-${tableType}`;
