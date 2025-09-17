@@ -79,17 +79,6 @@ const OrderDetailsSection = ({
   };
 
   useEffect(() => {
-    // This effect runs once on component mount to set the default for new reports.
-    // If the form is not saved and the value is not already 'After Wash', it updates it.
-    // This ensures new forms correctly default to 'After Wash'.
-    if (!isSaved && formData.before_after_wash !== 'After Wash') {
-      handleInputChange('before_after_wash', 'After Wash');
-    }
-    // We only want this to run once on mount for a new form.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
     // If the factory is changed to something other than YM,
     // and the current report type is SOP, reset the report type.
     if (formData.factoryName !== 'YM' && formData.reportType === 'SOP') {

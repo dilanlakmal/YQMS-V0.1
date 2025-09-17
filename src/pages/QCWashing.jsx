@@ -357,7 +357,7 @@ const QCWashingPage = () => {
     reportType: "",
     buyer: "",
     factoryName: "YM",
-    before_after_wash: "Before Wash",
+    before_after_wash: "After Wash",
     result: "",
     aql: [
       {
@@ -2010,7 +2010,7 @@ if (
       reportType: "",
       buyer: "",
       factoryName: subFactories.includes("YM") ? "YM" : subFactories[0] || "",
-      before_after_wash: "Before Wash",
+      before_after_wash: "After Wash",
       result: "",
       aql: [
         {

@@ -378,6 +378,12 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
   if (!selectedSizes.find(s => s.size === sizeStr)) {
     const newSize = { size: sizeStr, qty: 3 };
     setSelectedSizes(prev => [...prev, newSize]);
+
+    // Default to hiding unselected rows when a new size is added.
+    setHideUnselectedRowsBySize(prev => ({
+      ...prev,
+      [sizeStr]: true
+    }));
     
     const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
@@ -894,6 +900,12 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
     });
     
     setFullColumnsBySize(prev => {
+      const next = { ...prev };
+      delete next[size];
+      return next;
+    });
+
+    setHideUnselectedRowsBySize(prev => {
       const next = { ...prev };
       delete next[size];
       return next;
