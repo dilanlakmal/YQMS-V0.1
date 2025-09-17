@@ -18,6 +18,7 @@ import {
   Calculator
 } from "lucide-react";
 import { getToleranceAsFraction } from "./fractionConverter";
+import { API_BASE_URL } from "../../../../../config";
 
 const QCWashingViewDetailsModal = ({
   isOpen,
@@ -34,10 +35,36 @@ const QCWashingViewDetailsModal = ({
 
   const [selectedRecords, setSelectedRecords] = useState([]);
   const [showRecordsList, setShowRecordsList] = useState(false);
+  const [inspectorDetails, setInspectorDetails] = useState(null);
 
   useEffect(() => {
-    if (isOpen && itemData && allRecords.length > 0) {
+    if (isOpen && itemData) {
       calculateWashQuantities();
+
+      // Fetch inspector details
+      if (itemData.userId) {
+        fetch(`${API_BASE_URL}/api/users/${itemData.userId}`)
+          .then((res) => {
+            if (!res.ok) {
+              throw new Error("Inspector not found");
+            }
+            return res.json();
+          })
+          .then((data) => {
+            if (!data.error) {
+              setInspectorDetails(data);
+            } else {
+              console.error("Inspector not found:", data.error);
+              setInspectorDetails(null);
+            }
+          })
+          .catch((err) => {
+            console.error("Error fetching inspector details:", err);
+            setInspectorDetails(null);
+          });
+      }
+    } else {
+      setInspectorDetails(null);
     }
   }, [isOpen, itemData, allRecords]);
 
@@ -46,7 +73,8 @@ const QCWashingViewDetailsModal = ({
 
     // If no allRecords, treat current record as the only record
     if (!allRecords || allRecords.length === 0) {
-      const alreadyWashedQty = parseInt(itemData.washQty) || 0;
+      const alreadyWashedQty =
+        parseInt(itemData.displayWashQty ?? itemData.washQty) || 0;
       const remainingQty = Math.max(
         0,
         (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty
@@ -75,7 +103,8 @@ const QCWashingViewDetailsModal = ({
 
     // If no matching records found, treat current record as the only record
     if (matchingRecords.length === 0) {
-      const alreadyWashedQty = parseInt(itemData.washQty) || 0;
+      const alreadyWashedQty =
+        parseInt(itemData.displayWashQty ?? itemData.washQty) || 0;
       const remainingQty = Math.max(
         0,
         (parseInt(itemData.colorOrderQty) || 0) - alreadyWashedQty
@@ -120,7 +149,9 @@ const QCWashingViewDetailsModal = ({
     // Strategy 2: Match by washQty and approximate date if ID match fails
     if (currentRecordIndex === -1) {
       currentRecordIndex = sortedRecords.findIndex((record) => {
-        const washQtyMatch = record.washQty === itemData.washQty;
+        const washQtyMatch =
+          (record.displayWashQty ?? record.washQty) ===
+          (itemData.displayWashQty ?? itemData.washQty);
         const dateA = new Date(
           record.createdAt || record.date || record.submittedAt
         );
@@ -142,7 +173,8 @@ const QCWashingViewDetailsModal = ({
     // Calculate cumulative wash quantity up to current record (inclusive)
     const recordsUpToCurrent = sortedRecords.slice(0, currentRecordIndex + 1);
     const alreadyWashedQty = recordsUpToCurrent.reduce((sum, record) => {
-      const washQty = parseInt(record.washQty) || 0;
+      const washQty =
+        parseInt(record.displayWashQty ?? record.washQty, 10) || 0;
       return sum + washQty;
     }, 0);
 
@@ -269,7 +301,10 @@ const QCWashingViewDetailsModal = ({
                       Date
                     </th>
                     <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
-                      Wash Qty
+                      Wash Qty{" "}
+                      <span className="text-xs text-gray-400">
+                        ({itemData.isActualWashQty ? "Actual" : "Estimated"})
+                      </span>
                     </th>
                     <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
                       Inspector
@@ -322,7 +357,13 @@ const QCWashingViewDetailsModal = ({
                           ).toLocaleDateString()}
                         </td>
                         <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm font-semibold">
-                          {record.washQty}
+                          <span
+                            className={
+                              record.isActualWashQty ? "text-green-500" : ""
+                            }
+                          >
+                            {record.displayWashQty ?? record.washQty}
+                          </span>
                         </td>
                         <td className="border border-gray-300 dark:border-gray-600 px-3 py-2 dark:text-white text-sm">
                           {record.inspector?.empId || record.userId || "N/A"}
@@ -372,7 +413,10 @@ const QCWashingViewDetailsModal = ({
                   </p>
                   <p className="font-semibold text-lg dark:text-white">
                     {selectedRecords.reduce(
-                      (sum, record) => sum + (parseInt(record.washQty) || 0),
+                      (sum, record) =>
+                        sum +
+                        (parseInt(record.displayWashQty ?? record.washQty) ||
+                          0),
                       0
                     )}
                   </p>
@@ -397,16 +441,42 @@ const QCWashingViewDetailsModal = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
             QC-Washing Detail View
           </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-          >
-            <X className="w-6 h-6" />
-          </button>
+          <div className="flex items-center gap-4">
+            {inspectorDetails && (
+              <div className="flex items-center gap-3">
+                <img
+                  src={
+                    inspectorDetails.face_photo ||
+                    "/assets/img/avatars/default-profile.png"
+                  }
+                  alt={inspectorDetails.eng_name}
+                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200 dark:border-gray-600"
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = "/assets/img/avatars/default-profile.png";
+                  }}
+                />
+                <div>
+                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                    {inspectorDetails.eng_name}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {inspectorDetails.emp_id}
+                  </p>
+                </div>
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
         </div>
 
         <div className="p-6">
@@ -416,7 +486,13 @@ const QCWashingViewDetailsModal = ({
               <Calculator className="w-5 h-5 mr-2" />
               Wash Quantity Tracking
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div
+              className={`grid grid-cols-1 ${
+                itemData.reportType === "Inline"
+                  ? "md:grid-cols-4"
+                  : "md:grid-cols-3"
+              } gap-4`}
+            >
               <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
                 <div className="flex items-center">
                   <Package className="w-8 h-8 text-blue-600 dark:text-blue-400" />
@@ -459,7 +535,7 @@ const QCWashingViewDetailsModal = ({
                 </div>
               </div>
 
-              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800">
+              {itemData.reportType === "Inline" && (
                 <div
                   className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-4 border border-purple-200 dark:border-purple-800 cursor-pointer hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
                   onClick={handleRecordCardClick}
@@ -478,7 +554,7 @@ const QCWashingViewDetailsModal = ({
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {/* Progress Bar */}
@@ -697,10 +773,13 @@ const QCWashingViewDetailsModal = ({
                     <Droplets className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
                     <div className="ml-3">
                       <p className="text-sm font-medium text-cyan-600 dark:text-cyan-300">
-                        Wash Qty
+                        Wash Qty{" "}
+                        {itemData.isActualWashQty && (
+                          <span className="text-green-500">(Actual)</span>
+                        )}
                       </p>
                       <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
-                        {itemData.washQty}
+                        {itemData.displayWashQty ?? itemData.washQty}
                       </p>
                     </div>
                   </div>
@@ -857,8 +936,73 @@ const QCWashingViewDetailsModal = ({
               </h3>
               <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600">
                 <div className="space-y-4">
-                  {/* Checked Points */}
-                  {inspectionDetails.checkedPoints &&
+                  {/* NEW: Checkpoint Inspection Data */}
+                  {inspectionDetails.checkpointInspectionData &&
+                  inspectionDetails.checkpointInspectionData.length > 0 ? (
+                    <div>
+                      <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                        Checkpoints
+                      </h4>
+                      <div className="space-y-4">
+                        {inspectionDetails.checkpointInspectionData.map(
+                          (mainPoint, index) => (
+                            <div
+                              key={mainPoint.id || index}
+                              className="bg-gray-50 dark:bg-gray-600/50 p-3 rounded-lg"
+                            >
+                              <div className="flex justify-between items-center">
+                                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                  {mainPoint.name}
+                                </p>
+                                <span
+                                  className={`px-2 py-1 text-xs font-bold rounded-full ${
+                                    mainPoint.decision === "Pass"
+                                      ? "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200"
+                                      : mainPoint.decision === "Fail"
+                                      ? "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200"
+                                      : "bg-yellow-100 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-100"
+                                  }`}
+                                >
+                                  {mainPoint.decision}
+                                </span>
+                              </div>
+                              {mainPoint.remark && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
+                                  Remark: {mainPoint.remark}
+                                </p>
+                              )}
+                              {mainPoint.subPoints &&
+                                mainPoint.subPoints.length > 0 && (
+                                  <div className="mt-3 pl-4 border-l-2 border-gray-200 dark:border-gray-500 space-y-2">
+                                    {mainPoint.subPoints.map(
+                                      (subPoint, subIndex) => (
+                                        <div key={subPoint.id || subIndex}>
+                                          <div className="flex justify-between items-center">
+                                            <p className="text-sm text-gray-700 dark:text-gray-300">
+                                              {subPoint.name}:
+                                            </p>
+                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                              {subPoint.decision}
+                                            </span>
+                                          </div>
+                                          {subPoint.remark && (
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
+                                              Remark: {subPoint.remark}
+                                            </p>
+                                          )}
+                                        </div>
+                                      )
+                                    )}
+                                  </div>
+                                )}
+                            </div>
+                          )
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    // Fallback to legacy checkedPoints
+                    inspectionDetails.checkedPoints &&
                     inspectionDetails.checkedPoints.length > 0 && (
                       <div>
                         <h4 className="text-md font-semibold text-gray-800 dark:text-gray-200 mb-3">
@@ -898,7 +1042,8 @@ const QCWashingViewDetailsModal = ({
                           )}
                         </div>
                       </div>
-                    )}
+                    )
+                  )}
 
                   {/* Parameters */}
                   {inspectionDetails.parameters &&
@@ -985,6 +1130,38 @@ const QCWashingViewDetailsModal = ({
                                       </span>
                                     </div>
                                   )}
+                                  {machine.timeCool &&
+                                    machine.timeCool.actualValue && (
+                                      <div className="flex items-center">
+                                        <div
+                                          className={`w-2 h-2 rounded-full mr-2 ${
+                                            machine.timeCool.status?.ok
+                                              ? "bg-green-500"
+                                              : "bg-red-500"
+                                          }`}
+                                        ></div>
+                                        <span>
+                                          Time Cool:{" "}
+                                          {machine.timeCool.actualValue}min
+                                        </span>
+                                      </div>
+                                    )}
+                                  {machine.timeHot &&
+                                    machine.timeHot.actualValue && (
+                                      <div className="flex items-center">
+                                        <div
+                                          className={`w-2 h-2 rounded-full mr-2 ${
+                                            machine.timeHot.status?.ok
+                                              ? "bg-green-500"
+                                              : "bg-red-500"
+                                          }`}
+                                        ></div>
+                                        <span>
+                                          Time Hot:{" "}
+                                          {machine.timeHot.actualValue}min
+                                        </span>
+                                      </div>
+                                    )}
                                   {machine.silicon &&
                                     machine.silicon.actualValue && (
                                       <div className="flex items-center">

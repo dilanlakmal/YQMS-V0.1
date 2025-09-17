@@ -34,6 +34,79 @@ const OrderDetailsSection = ({
   const isSaved = externalIsSaved || false;
   const setIsSaved = setExternalIsSaved || (() => {});
 
+  const handleReportTypeChange = async (value) => {
+    // If switching to a type that needs AQL details from the 'first-output' endpoint
+    if (value === "SOP" || value === "First Output") {
+      if (!formData.orderNo) {
+        Swal.fire(
+          "Missing Order No",
+          "Please enter an Order Number before selecting this report type.",
+          "warning"
+        );
+        return;
+      }
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/first-output-details`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderNo: formData.orderNo })
+          }
+        );
+        const data = await response.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            reportType: value,
+            washQty: value === "SOP" ? 30 : "",
+            checkedQty: data.checkedQty,
+            aql: [data.aqlData],
+            firstOutput: value === "First Output" ? value : "",
+            inline: ""
+          }));
+        } else {
+          throw new Error(data.message || "Failed to fetch AQL details.");
+        }
+      } catch (error) {
+        console.error("Error fetching first output details:", error);
+        Swal.fire(
+          "Error",
+          `Could not fetch AQL details: ${error.message}`,
+          "error"
+        );
+      }
+    } else {
+      // For 'Inline' or when unchecking
+      setFormData((prev) => ({
+        ...prev,
+        reportType: value,
+        washQty:
+          prev.reportType === "SOP" || prev.reportType === "First Output"
+            ? ""
+            : prev.washQty,
+        firstOutput: "",
+        inline: value === "Inline" ? value : ""
+      }));
+    }
+  };
+
+  useEffect(() => {
+    // If the factory is changed to something other than YM,
+    // and the current report type is SOP, reset the report type.
+    if (formData.factoryName !== "YM" && formData.reportType === "SOP") {
+      setFormData((prev) => ({
+        ...prev,
+        reportType: "", // Reset report type
+        washQty: "", // Clear the fixed wash quantity
+        firstOutput: "",
+        inline: ""
+      }));
+    }
+  }, [formData.factoryName, formData.reportType, setFormData]);
+
   const checkMeasurementDetails = async (orderNo) => {
     try {
       const response = await fetch(
@@ -69,7 +142,7 @@ const OrderDetailsSection = ({
       reportType: "",
       buyer: "",
       factoryName: "YM",
-      before_after_wash: "Before Wash",
+      before_after_wash: "After Wash",
       result: "",
       aql: [
         {
@@ -331,9 +404,12 @@ const OrderDetailsSection = ({
 
         if (result.id && setRecordId) {
           setRecordId(result.id);
-
-          // Auto-save inspection data with defaults after order is saved
+          // Auto-save inspection data to create the default checklist and other sections.
           await autoSaveInspectionData(result.id);
+          // After auto-saving, reload the data to update the UI with the new checklist
+          if (onLoadSavedDataById) {
+            await onLoadSavedDataById(result.id);
+          }
         }
       } else {
         Swal.fire({
@@ -360,24 +436,91 @@ const OrderDetailsSection = ({
     }
   };
 
-  // Auto-save inspection data with default values
+  // Auto-save inspection data - get ALL data from existing collection endpoint
   const autoSaveInspectionData = async (recordId) => {
     try {
-      // Create default inspection data with "OK" decisions
-      const defaultInspectionData = [
-        { checkedList: "Shade Band", decision: "ok", remark: "" },
-        { checkedList: "Hand Feel", decision: "ok", remark: "" },
-        { checkedList: "Fiber", decision: "ok", remark: "" },
-        { checkedList: "Pilling", decision: "ok", remark: "" }
-      ];
+      // Fetch ALL checkpoint data from the existing QCWashingCheckpoints collection
+      let standardInspectionData = [];
+      let checkpointInspectionData = [];
 
-      // Create default defect data with calculated pass rate - ensure 0 values are preserved
+      try {
+        const checkpointResponse = await fetch(
+          `${API_BASE_URL}/api/qc-washing-checklist`
+        );
+        const checkpointResult = await checkpointResponse.json();
+
+        if (Array.isArray(checkpointResult)) {
+          checkpointResult.forEach((checkpoint) => {
+            // ALL data from the collection goes to checkpointInspectionData
+            // Add main checkpoint
+            const defaultOption = checkpoint.options.find(
+              (opt) => opt.isDefault
+            );
+            let defaultRemark = "";
+
+            if (defaultOption?.hasRemark && defaultOption?.remark) {
+              defaultRemark =
+                typeof defaultOption.remark === "object"
+                  ? defaultOption.remark.english || ""
+                  : defaultOption.remark || "";
+            }
+
+            checkpointInspectionData.push({
+              id: `main_${checkpoint._id}`,
+              checkpointId: checkpoint._id,
+              type: "main",
+              name: checkpoint.name,
+              optionType: checkpoint.optionType,
+              options: checkpoint.options,
+              decision: defaultOption?.name || "",
+              remark: defaultRemark,
+              comparisonImages: []
+            });
+
+            // Add subpoints
+            checkpoint.subPoints?.forEach((subPoint) => {
+              const defaultSubOption = subPoint.options.find(
+                (opt) => opt.isDefault
+              );
+              let defaultSubRemark = "";
+
+              if (defaultSubOption?.hasRemark && defaultSubOption?.remark) {
+                defaultSubRemark =
+                  typeof defaultSubOption.remark === "object"
+                    ? defaultSubOption.remark.english || ""
+                    : defaultSubOption.remark || "";
+              }
+
+              checkpointInspectionData.push({
+                id: `sub_${checkpoint._id}_${subPoint.id}`,
+                checkpointId: checkpoint._id,
+                subPointId: subPoint.id,
+                type: "sub",
+                name: subPoint.name,
+                parentName: checkpoint.name,
+                optionType: subPoint.optionType,
+                options: subPoint.options,
+                decision: defaultSubOption?.name || "",
+                remark: defaultSubRemark,
+                comparisonImages: []
+              });
+            });
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching checkpoint data:", error);
+      }
+
+      // Keep standardInspectionData empty since all inspection points are now in the checkpoint collection
+      // No separate standard inspection points endpoint needed
+
+      // Create default defect data with calculated pass rate
       const washQtyNum = Number(formData.washQty) || 0;
       const defaultDefectData = [
         {
           parameter: "Color Shade 01",
-          checkedQty: washQtyNum, // Keep 0 as 0, not null
-          failedQty: 0, // Keep 0 as 0, not null
+          checkedQty: washQtyNum,
+          failedQty: 0,
           passRate:
             washQtyNum > 0
               ? (((washQtyNum - 0) / washQtyNum) * 100).toFixed(2)
@@ -387,8 +530,8 @@ const OrderDetailsSection = ({
         },
         {
           parameter: "Appearance",
-          checkedQty: washQtyNum, // Keep 0 as 0, not null
-          failedQty: 0, // Keep 0 as 0, not null
+          checkedQty: washQtyNum,
+          failedQty: 0,
           passRate:
             washQtyNum > 0
               ? (((washQtyNum - 0) / washQtyNum) * 100).toFixed(2)
@@ -398,7 +541,7 @@ const OrderDetailsSection = ({
         }
       ];
 
-      // Create default machine status with "OK" status
+      // Create default machine status with "OK" status (timeCool and timeHot disabled by default)
       const defaultMachineStatus = {
         "Washing Machine": {
           temperature: { ok: true, no: false },
@@ -408,8 +551,8 @@ const OrderDetailsSection = ({
         },
         "Tumble Dry": {
           temperature: { ok: true, no: false },
-          timeCool: { ok: true, no: false },
-          timeHot: { ok: true, no: false }
+          timeCool: { ok: false, no: false },
+          timeHot: { ok: false, no: false }
         }
       };
 
@@ -447,43 +590,36 @@ const OrderDetailsSection = ({
           );
 
           if (standardRecord) {
+            const sWM = standardRecord.washingMachine || {};
+            const sTD = standardRecord.tumbleDry || {};
+            const toStringOrEmpty = (val) =>
+              val === null || val === undefined ? "" : String(val);
+
             defaultStandardValues = {
               "Washing Machine": {
-                temperature:
-                  standardRecord.washingMachine?.temperature === 0
-                    ? "0"
-                    : String(standardRecord.washingMachine?.temperature || ""),
-                time:
-                  standardRecord.washingMachine?.time === 0
-                    ? "0"
-                    : String(standardRecord.washingMachine?.time || ""),
-                silicon:
-                  standardRecord.washingMachine?.silicon === 0
-                    ? "0"
-                    : String(standardRecord.washingMachine?.silicon || ""),
-                softener:
-                  standardRecord.washingMachine?.softener === 0
-                    ? "0"
-                    : String(standardRecord.washingMachine?.softener || "")
+                temperature: toStringOrEmpty(sWM.temperature),
+                time: toStringOrEmpty(sWM.time),
+                silicon: toStringOrEmpty(sWM.silicon),
+                softener: toStringOrEmpty(sWM.softener)
               },
               "Tumble Dry": {
-                temperature:
-                  standardRecord.tumbleDry?.temperature === 0
-                    ? "0"
-                    : String(standardRecord.tumbleDry?.temperature || ""),
-                timeCool:
-                  standardRecord.tumbleDry?.timeCool === 0
-                    ? "0"
-                    : String(standardRecord.tumbleDry?.timeCool || ""),
-                timeHot:
-                  standardRecord.tumbleDry?.timeHot === 0
-                    ? "0"
-                    : String(standardRecord.tumbleDry?.timeHot || "")
+                temperature: toStringOrEmpty(sTD.temperature),
+                timeCool: toStringOrEmpty(sTD.timeCool),
+                timeHot: toStringOrEmpty(sTD.timeHot)
               }
             };
 
-            // Set actual values to standard values initially (current display values)
-            defaultActualValues = { ...defaultStandardValues };
+            // Set actual values. For timeCool/timeHot, they are empty because the switch is off.
+            defaultActualValues = {
+              "Washing Machine": {
+                ...defaultStandardValues["Washing Machine"]
+              },
+              "Tumble Dry": {
+                ...defaultStandardValues["Tumble Dry"],
+                timeCool: "",
+                timeHot: ""
+              }
+            };
           }
         }
       } catch (error) {
@@ -495,8 +631,8 @@ const OrderDetailsSection = ({
       formDataForInspection.append("recordId", recordId);
       formDataForInspection.append(
         "inspectionData",
-        JSON.stringify(defaultInspectionData)
-      );
+        JSON.stringify(standardInspectionData)
+      ); // Empty array
       formDataForInspection.append("processData", JSON.stringify({}));
       formDataForInspection.append(
         "defectData",
@@ -514,6 +650,12 @@ const OrderDetailsSection = ({
         "machineStatus",
         JSON.stringify(defaultMachineStatus)
       );
+      formDataForInspection.append(
+        "checkpointInspectionData",
+        JSON.stringify(checkpointInspectionData)
+      ); // All from existing endpoint
+      formDataForInspection.append("timeCoolEnabled", JSON.stringify(false));
+      formDataForInspection.append("timeHotEnabled", JSON.stringify(false));
 
       // Send to backend
       const response = await fetch(
@@ -526,7 +668,9 @@ const OrderDetailsSection = ({
 
       const result = await response.json();
       if (result.success) {
-        console.log("Inspection data auto-saved successfully");
+        console.log(
+          "Inspection data auto-saved successfully - all checkpoint data from existing collection"
+        );
       } else {
         console.error("Failed to auto-save inspection data:", result.message);
       }
@@ -702,35 +846,43 @@ const OrderDetailsSection = ({
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               disabled={isSaved}
             >
-              <option value="Normal Wash">Normal Wash</option>
-              <option value="Acid Wash">Acid Wash</option>
+              <option value="Normal Wash">Normal</option>
+              <option value="Acid Wash">Acid</option>
               <option value="Garment Dye">Garment Dye</option>
-              <option value="Soft Wash">Soft Wash</option>
+              <option value="Soft Wash">Soft</option>
               <option value="Acid Wash + Garment Dye">
-                Acid Wash + Garment Dye
+                Acid + Garment Dye
               </option>
             </select>
           </div>
 
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">
-              Inspection Report:
+              Report Type:
             </label>
             <div className="flex space-x-4">
+              {formData.factoryName === "YM" && (
+                <label className="flex items-center dark:text-gray-300">
+                  <input
+                    type="checkbox"
+                    name="reportType"
+                    value="SOP"
+                    checked={formData.reportType === "SOP"}
+                    onChange={(e) => handleReportTypeChange(e.target.value)}
+                    className="mr-2 dark:bg-gray-700 checked:bg-indigo-500 dark:border-gray-600"
+                    disabled={isSaved}
+                  />
+                  SOP
+                </label>
+              )}
               <label className="flex items-center dark:text-gray-300">
                 <input
                   type="checkbox"
-                  checked={
-                    formData.firstOutput === true ||
-                    formData.firstOutput === "First Output"
-                  }
-                  onChange={(e) =>
-                    handleInputChange(
-                      "firstOutput",
-                      e.target.checked ? "First Output" : ""
-                    )
-                  }
-                  className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
+                  name="reportType"
+                  value="First Output"
+                  checked={formData.reportType === "First Output"}
+                  onChange={(e) => handleReportTypeChange(e.target.value)}
+                  className="mr-2 dark:bg-gray-700 checked:bg-indigo-500 dark:border-gray-600"
                   disabled={isSaved}
                 />
                 First Output
@@ -738,16 +890,11 @@ const OrderDetailsSection = ({
               <label className="flex items-center dark:text-gray-300">
                 <input
                   type="checkbox"
-                  checked={
-                    formData.inline === true || formData.inline === "Inline"
-                  }
-                  onChange={(e) =>
-                    handleInputChange(
-                      "inline",
-                      e.target.checked ? "Inline" : ""
-                    )
-                  }
-                  className="mr-2 dark:bg-gray-700 dark:checked:bg-indigo-500 dark:border-gray-600 dark:text-white"
+                  name="reportType"
+                  value="Inline"
+                  checked={formData.reportType === "Inline"}
+                  onChange={(e) => handleReportTypeChange(e.target.value)}
+                  className="mr-2 dark:bg-gray-700 checked:bg-indigo-500 dark:border-gray-600"
                   disabled={isSaved}
                 />
                 Inline
@@ -796,15 +943,15 @@ const OrderDetailsSection = ({
               Befor/After Wash:
             </label>
             <select
-              value={formData.before_after_wash || "Before Wash"}
+              value={formData.before_after_wash || "After Wash"}
               onChange={(e) =>
                 handleInputChange("before_after_wash", e.target.value)
               }
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
               disabled={isSaved}
             >
-              <option value="Before Wash">Before Wash</option>
-              <option value="After Wash">After Wash</option>
+              <option value="Before Wash">Before</option>
+              <option value="After Wash">After</option>
             </select>
           </div>
           <div className="flex items-center space-x-4">
@@ -817,7 +964,7 @@ const OrderDetailsSection = ({
               onChange={(e) => handleInputChange("washQty", e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               min={0}
-              disabled={isSaved}
+              disabled={isSaved || formData.reportType === "SOP"}
             />
           </div>
         </div>

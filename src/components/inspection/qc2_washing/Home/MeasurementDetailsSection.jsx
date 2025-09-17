@@ -18,7 +18,8 @@ const MeasurementDetailsSection = ({
   showMeasurementTable = true,
   onMeasurementEdit,
   before_after_wash,
-  recordId
+  recordId,
+  formData = {}
 }) => {
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -55,11 +56,11 @@ const MeasurementDetailsSection = ({
     useState([]);
   const [sizeSpecificKValues, setSizeSpecificKValues] = useState({});
   const [editingMeasurements, setEditingMeasurements] = useState(new Set());
-
   const currentWashMeasurements =
     (before_after_wash === "Before Wash"
       ? measurementData.beforeWash
       : measurementData.afterWash) || [];
+  const [buyerSpecData, setBuyerSpecData] = useState(null);
 
   const saveMeasurementPattern = (size, selectedRows, tableType) => {
     const washType = tableType === "before" ? "beforeWash" : "afterWash";
@@ -69,7 +70,7 @@ const MeasurementDetailsSection = ({
 
     setLastSelectedPattern((prev) => ({
       ...prev,
-      [washType]: selectedRows,
+      [washType]: [...selectedRows],
       [kValueField]: currentKValue
     }));
   };
@@ -109,7 +110,7 @@ const MeasurementDetailsSection = ({
   };
 
   // Helper function to set K-value for a specific size
-  const setKValueForSize = (size, washType, kValue) => {
+  const setKValueForSize = async (size, washType, kValue) => {
     // Check if this K-value is already saved for this size (but allow editing)
     const isKValueSaved = currentWashMeasurements.some(
       (m) => m.size === size && m.kvalue === kValue
@@ -132,8 +133,6 @@ const MeasurementDetailsSection = ({
       [key]: kValue
     }));
 
-    // Don't clear measurement data when switching K-values - preserve existing data
-
     // Get the new specs for the selected K-value
     const specs =
       washType === "before"
@@ -142,29 +141,135 @@ const MeasurementDetailsSection = ({
         : measurementSpecs.afterWashGrouped[kValue] ||
           measurementSpecs.afterWash;
 
-    // Try to apply global pattern first
-    const globalWashType = washType === "before" ? "beforeWash" : "afterWash";
-    const globalPattern = lastSelectedPattern[globalWashType];
-
     let patternApplied = false;
+    let defaultSelectedRows = Array(specs.length).fill(false);
 
-    if (globalPattern && globalPattern.length === specs.length) {
+    // Apply pattern function
+    const applyPattern = async () => {
+      // Apply default measurement points based on wash type
+      if (washType === "before") {
+        // For Before Wash: Use buyerspectemplate data
+        if (buyerSpecData) {
+          const defaultMeasurementPoints = getDefaultMeasurementPoints(
+            buyerSpecData,
+            size,
+            "Before Wash"
+          );
+          if (defaultMeasurementPoints.length > 0) {
+            defaultSelectedRows = getDefaultSelectedRows(
+              defaultMeasurementPoints,
+              specs
+            );
+            patternApplied = true;
+          }
+        }
+      } else {
+        // For After Wash: Priority order - saved Before Wash > buyerspectemplate > dt_orders
+        try {
+          // 1. First priority: Check for saved Before Wash data with same criteria
+          const savedBeforeWashData = await findSavedMeasurementData(
+            formData.orderNo || orderNo,
+            formData.color || color,
+            formData.reportType || "First Output", // Use a default or get from current record
+            "Before Wash",
+            formData.factoryName || "YM" // Use a default or get from current record
+          );
+
+          if (savedBeforeWashData && savedBeforeWashData.length > 0) {
+            // Use the new helper function to get selected rows from saved data
+            const savedSelectedRows = getSelectedRowsFromSavedData(
+              savedBeforeWashData,
+              size,
+              specs
+            );
+
+            if (
+              savedSelectedRows.length === specs.length &&
+              savedSelectedRows.some((row) => row)
+            ) {
+              defaultSelectedRows = savedSelectedRows;
+              patternApplied = true;
+            }
+          }
+
+          // 2. Second priority: If no saved Before Wash data, use buyerspectemplate
+          if (!patternApplied && buyerSpecData) {
+            const defaultMeasurementPoints = getDefaultMeasurementPoints(
+              buyerSpecData,
+              size,
+              "After Wash"
+            );
+            if (defaultMeasurementPoints.length > 0) {
+              defaultSelectedRows = getDefaultSelectedRows(
+                defaultMeasurementPoints,
+                specs
+              );
+              patternApplied = true;
+            }
+          }
+
+          // 3. Third priority: If no buyerspectemplate, use all dt_orders measurement points
+          if (!patternApplied && specs && specs.length > 0) {
+            defaultSelectedRows = Array(specs.length).fill(true); // Select all available measurement points
+            patternApplied = true;
+          }
+        } catch (error) {
+          console.error("Error loading saved measurement data:", error);
+          // Fallback to all measurement points if there's an error
+          if (specs && specs.length > 0) {
+            defaultSelectedRows = Array(specs.length).fill(true);
+            patternApplied = true;
+          }
+        }
+      }
+
+      // Try to apply global pattern if no specific pattern found
+      if (!patternApplied) {
+        const globalWashType =
+          washType === "before" ? "beforeWash" : "afterWash";
+        const globalPattern = lastSelectedPattern[globalWashType];
+
+        if (globalPattern && globalPattern.length === specs.length) {
+          defaultSelectedRows = [...globalPattern];
+          patternApplied = true;
+        }
+      }
+
+      // If no global pattern, try to apply pattern from saved data for this size
+      if (!patternApplied) {
+        const savedDataForThisSize = currentWashMeasurements.filter(
+          (m) => m.size === size
+        );
+
+        if (savedDataForThisSize.length > 0) {
+          // Use the pattern from the most recent saved K-value for this size
+          const mostRecentSaved =
+            savedDataForThisSize[savedDataForThisSize.length - 1];
+          if (
+            mostRecentSaved.selectedRows &&
+            mostRecentSaved.selectedRows.length === specs.length
+          ) {
+            defaultSelectedRows = [...mostRecentSaved.selectedRows];
+            patternApplied = true;
+          }
+        }
+      }
+
+      // Apply the selected rows
       setSelectedRowsBySize((prev) => ({
         ...prev,
-        [size]: [...globalPattern]
+        [size]: defaultSelectedRows
       }));
-      patternApplied = true;
 
-      // Initialize measurement values for selected rows only if they don't exist
-      const tableType = washType;
+      // Initialize measurement values for selected rows - KEEP EXISTING VALUES
       setMeasurementValues((prevValues) => {
         const newValues = { ...prevValues };
 
-        globalPattern.forEach((isSelected, rowIndex) => {
+        defaultSelectedRows.forEach((isSelected, rowIndex) => {
           if (isSelected) {
             for (let colIndex = 0; colIndex < 3; colIndex++) {
-              const cellKey = `${size}-${tableType}-${kValue}-${rowIndex}-${colIndex}`;
-              // Only initialize if not already set
+              const cellKey = `${size}-${washType}-${kValue}-${rowIndex}-${colIndex}`;
+              // Only initialize if not already set - this preserves existing values
               if (!newValues[cellKey]) {
                 newValues[cellKey] = { decimal: 0, fraction: "0" };
               }
@@ -174,58 +279,133 @@ const MeasurementDetailsSection = ({
 
         return newValues;
       });
+
+      // If no pattern was applied, reset to default
+      if (!patternApplied) {
+        setSelectedRowsBySize((prev) => ({
+          ...prev,
+          [size]: Array(specs.length).fill(false)
+        }));
+      }
+    };
+
+    // Execute the pattern application
+    await applyPattern();
+  };
+
+  // Helper function to get default measurement points from saved Before Wash data
+  const getDefaultMeasurementPointsFromSavedData = (
+    savedMeasurementData,
+    size
+  ) => {
+    if (!savedMeasurementData || savedMeasurementData.length === 0) return [];
+
+    // Find measurement data for the specific size
+    const sizeData = savedMeasurementData.find((data) => data.size === size);
+    if (!sizeData) return [];
+
+    // Return the measurement point names extracted from the nested structure
+    return sizeData.measurementPointNames || [];
+  };
+
+  // Helper function to get selected rows from saved Before Wash data
+  const getSelectedRowsFromSavedData = (
+    savedMeasurementData,
+    size,
+    currentSpecs
+  ) => {
+    if (!savedMeasurementData || savedMeasurementData.length === 0) return [];
+
+    // Find measurement data for the specific size
+    const sizeData = savedMeasurementData.find((data) => data.size === size);
+    if (!sizeData) return [];
+
+    // If we have the selectedRows directly, use them
+    if (
+      sizeData.selectedRows &&
+      sizeData.selectedRows.length === currentSpecs.length
+    ) {
+      return [...sizeData.selectedRows];
     }
 
-    // If no global pattern, try to apply pattern from saved data for this size
-    if (!patternApplied) {
-      const savedDataForThisSize = currentWashMeasurements.filter(
-        (m) => m.size === size
+    // If we have measurementPointNames, map them to current specs
+    if (
+      sizeData.measurementPointNames &&
+      sizeData.measurementPointNames.length > 0
+    ) {
+      return currentSpecs.map((spec) => {
+        const specName = spec.MeasurementPointEngName || "";
+        return sizeData.measurementPointNames.includes(specName);
+      });
+    }
+
+    return [];
+  };
+
+  // Helper function to get default measurement points from buyerspectemplate
+  const getDefaultMeasurementPoints = (buyerSpecData, size, washType) => {
+    if (!buyerSpecData || !buyerSpecData.specData) return [];
+
+    // Find spec data for the specific size
+    const sizeSpecData = buyerSpecData.specData.find(
+      (spec) => spec.size === size
+    );
+    if (!sizeSpecData || !sizeSpecData.specDetails) return [];
+
+    // Extract measurement point names from buyerspectemplate
+    return sizeSpecData.specDetails.map((detail) => detail.specName);
+  };
+
+  // Helper function to match measurement points with current specs
+  const getDefaultSelectedRows = (defaultMeasurementPoints, currentSpecs) => {
+    if (!defaultMeasurementPoints || !currentSpecs) return [];
+
+    return currentSpecs.map((spec) => {
+      const specName = spec.MeasurementPointEngName || "";
+      return defaultMeasurementPoints.includes(specName);
+    });
+  };
+
+  // Helper function to find saved measurement data for reference
+  const findSavedMeasurementData = async (
+    styleNo,
+    color,
+    reportType,
+    washType,
+    factory
+  ) => {
+    try {
+      const requestBody = {
+        styleNo,
+        color,
+        reportType: reportType || undefined, // Ensure it's undefined if empty
+        washType,
+        factory: factory || undefined // Ensure it's undefined if empty
+      };
+
+      const response = await fetch(
+        `${API_BASE_URL}/api/qc-washing/find-saved-measurement`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        }
       );
 
-      if (savedDataForThisSize.length > 0) {
-        // Use the pattern from the most recent saved K-value for this size
-        const mostRecentSaved =
-          savedDataForThisSize[savedDataForThisSize.length - 1];
-        if (
-          mostRecentSaved.selectedRows &&
-          mostRecentSaved.selectedRows.length === specs.length
-        ) {
-          setSelectedRowsBySize((prev) => ({
-            ...prev,
-            [size]: [...mostRecentSaved.selectedRows]
-          }));
-          patternApplied = true;
-
-          // Initialize measurement values for selected rows only if they don't exist
-          const tableType = washType;
-          setMeasurementValues((prevValues) => {
-            const newValues = { ...prevValues };
-
-            mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
-              if (isSelected) {
-                for (let colIndex = 0; colIndex < 3; colIndex++) {
-                  const cellKey = `${size}-${tableType}-${kValue}-${rowIndex}-${colIndex}`;
-                  // Only initialize if not already set
-                  if (!newValues[cellKey]) {
-                    newValues[cellKey] = { decimal: 0, fraction: "0" };
-                  }
-                }
-              }
-            });
-
-            return newValues;
-          });
-        }
+      if (response.ok) {
+        const data = await response.json();
+        return data.success ? data.measurementData : null;
+      } else {
+        console.error(
+          "API Response not OK:",
+          response.status,
+          response.statusText
+        );
       }
+    } catch (error) {
+      console.error("Error finding saved measurement data:", error);
     }
-
-    // If no pattern was applied, reset to default
-    if (!patternApplied) {
-      setSelectedRowsBySize((prev) => ({
-        ...prev,
-        [size]: Array(specs.length).fill(false)
-      }));
-    }
+    return null;
   };
 
   const getSavedKValuesForSize = (size) => {
@@ -268,6 +448,189 @@ const MeasurementDetailsSection = ({
     );
   };
 
+  const addSize = async (size) => {
+    const sizeStr = String(size);
+
+    if (!selectedSizes.find((s) => s.size === sizeStr)) {
+      const newSize = { size: sizeStr, qty: 3 };
+      setSelectedSizes((prev) => [...prev, newSize]);
+
+      // Default to hiding unselected rows when a new size is added.
+      setHideUnselectedRowsBySize((prev) => ({
+        ...prev,
+        [sizeStr]: true
+      }));
+
+      const washType =
+        before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+      const tableType =
+        before_after_wash === "Before Wash" ? "before" : "after";
+
+      const currentKValue = getKValueForSize(sizeStr, tableType);
+
+      const key = `${sizeStr}-${tableType}`;
+      setSizeSpecificKValues((prev) => ({
+        ...prev,
+        [key]: currentKValue
+      }));
+
+      const specs =
+        before_after_wash === "Before Wash"
+          ? measurementSpecs.beforeWashGrouped[currentKValue] ||
+            measurementSpecs.beforeWash ||
+            []
+          : measurementSpecs.afterWashGrouped[currentKValue] ||
+            measurementSpecs.afterWash ||
+            [];
+
+      let patternApplied = false;
+      let defaultSelectedRows = Array(specs.length).fill(false);
+
+      // Pattern application with priority order
+      const applyPatternAndValues = async () => {
+        // Priority 1: Apply previous user selection pattern (most recent)
+        const globalPattern = lastSelectedPattern[washType];
+        if (globalPattern && globalPattern.length === specs.length) {
+          defaultSelectedRows = [...globalPattern];
+          patternApplied = true;
+        }
+
+        // Priority 2: For After Wash - check saved Before Wash data
+        if (!patternApplied && before_after_wash === "After Wash") {
+          try {
+            const savedBeforeWashData = await findSavedMeasurementData(
+              formData.orderNo || orderNo,
+              formData.color || color,
+              formData.reportType || "First Output",
+              "Before Wash",
+              formData.factoryName || "YM"
+            );
+
+            if (savedBeforeWashData && savedBeforeWashData.length > 0) {
+              const savedSelectedRows = getSelectedRowsFromSavedData(
+                savedBeforeWashData,
+                sizeStr,
+                specs
+              );
+              if (
+                savedSelectedRows.length === specs.length &&
+                savedSelectedRows.some((row) => row)
+              ) {
+                defaultSelectedRows = savedSelectedRows;
+                patternApplied = true;
+              }
+            }
+          } catch (error) {
+            console.error("Error loading saved measurement data:", error);
+          }
+        }
+
+        // Priority 3: For Before Wash - use buyerspectemplate
+        if (
+          !patternApplied &&
+          before_after_wash === "Before Wash" &&
+          buyerSpecData
+        ) {
+          const defaultMeasurementPoints = getDefaultMeasurementPoints(
+            buyerSpecData,
+            sizeStr,
+            "Before Wash"
+          );
+          if (defaultMeasurementPoints.length > 0) {
+            defaultSelectedRows = getDefaultSelectedRows(
+              defaultMeasurementPoints,
+              specs
+            );
+            patternApplied = true;
+          }
+        }
+
+        // Priority 4: For After Wash - use buyerspectemplate if no saved Before Wash
+        if (
+          !patternApplied &&
+          before_after_wash === "After Wash" &&
+          buyerSpecData
+        ) {
+          const defaultMeasurementPoints = getDefaultMeasurementPoints(
+            buyerSpecData,
+            sizeStr,
+            "After Wash"
+          );
+          if (defaultMeasurementPoints.length > 0) {
+            defaultSelectedRows = getDefaultSelectedRows(
+              defaultMeasurementPoints,
+              specs
+            );
+            patternApplied = true;
+          }
+        }
+
+        // Priority 5: Check saved data for this specific size
+        if (!patternApplied) {
+          const savedDataForThisSize = currentWashMeasurements.filter(
+            (m) => m.size === sizeStr
+          );
+          if (savedDataForThisSize.length > 0) {
+            const mostRecentSaved =
+              savedDataForThisSize[savedDataForThisSize.length - 1];
+            if (
+              mostRecentSaved.selectedRows &&
+              mostRecentSaved.selectedRows.length === specs.length
+            ) {
+              defaultSelectedRows = [...mostRecentSaved.selectedRows];
+              patternApplied = true;
+            }
+          }
+        }
+
+        // Priority 6: Fallback - select all for After Wash, none for Before Wash
+        if (!patternApplied) {
+          if (before_after_wash === "After Wash" && specs && specs.length > 0) {
+            defaultSelectedRows = Array(specs.length).fill(true);
+            patternApplied = true;
+          } else {
+            defaultSelectedRows = Array(specs.length).fill(false);
+          }
+        }
+
+        // Apply the selected rows
+        setSelectedRowsBySize((prev) => ({
+          ...prev,
+          [sizeStr]: defaultSelectedRows
+        }));
+
+        // Initialize measurement values for selected rows
+        if (patternApplied || defaultSelectedRows.some((row) => row)) {
+          setMeasurementValues((prevValues) => {
+            const newValues = { ...prevValues };
+
+            defaultSelectedRows.forEach((isSelected, rowIndex) => {
+              if (isSelected) {
+                for (let colIndex = 0; colIndex < 3; colIndex++) {
+                  const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
+                  if (!newValues[cellKey]) {
+                    newValues[cellKey] = { decimal: 0, fraction: "0" };
+                  }
+                }
+              }
+            });
+
+            return newValues;
+          });
+        }
+      };
+
+      // Execute pattern application
+      if (before_after_wash === "Before Wash") {
+        applyPatternAndValues();
+      } else {
+        // For After Wash, handle async operations
+        applyPatternAndValues();
+      }
+    }
+  };
+
+  // Rest of your functions remain the same...
   const transformMeasurementData = (
     size,
     qty,
@@ -280,11 +643,11 @@ const MeasurementDetailsSection = ({
     before_after_wash,
     isEdit = false
   ) => {
+    // ... your existing transformMeasurementData implementation
     const pcs = [];
     for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
       const measurementPoints = [];
       const isFullColumn = fullColumns?.[pcIndex] || false;
-
       measurementSpecs.forEach((spec, specIndex) => {
         // Only include if full, or row is selected
         const isRowIndividuallySelected = selectedRows?.[specIndex] ?? false;
@@ -292,8 +655,8 @@ const MeasurementDetailsSection = ({
 
         const cellKey = `${size}-${tableType}-${kvalue}-${specIndex}-${pcIndex}`;
         const measurementValue = measurements?.[cellKey];
-
         let result = "pending"; // Default to pending
+
         if (
           measurementValue &&
           (typeof measurementValue.decimal === "number" ||
@@ -339,7 +702,6 @@ const MeasurementDetailsSection = ({
                 "0"
             );
           }
-
           // Always calculate result if we have a measurement value
           if (
             measuredDeviation >= tolMinusValue &&
@@ -462,7 +824,6 @@ const MeasurementDetailsSection = ({
 
     const washType =
       before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
-
     return {
       size: size,
       qty: qty,
@@ -489,6 +850,7 @@ const MeasurementDetailsSection = ({
 
   const fractionToDecimal = (frac) => {
     if (typeof frac !== "string" || !frac || frac.trim() === "-") return 0; // Return 0 instead of NaN
+
     frac = frac
       .replace("⁄", "/")
       .replace("½", "1/2")
@@ -542,7 +904,6 @@ const MeasurementDetailsSection = ({
     const dataToEdit = (measurementData[before_after_wash_Key] || []).find(
       (item) => item.size === sizeToEdit && item.kvalue === kvalue
     );
-
     if (!dataToEdit) return;
 
     // Remove from saved combinations
@@ -567,6 +928,12 @@ const MeasurementDetailsSection = ({
       return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
     });
 
+    // When editing, default to hiding unselected rows.
+    setHideUnselectedRowsBySize((prev) => ({
+      ...prev,
+      [sizeToEdit]: true
+    }));
+
     // Set the K-value for this specific size directly without validation
     const tableType = before_after_wash === "Before Wash" ? "before" : "after";
     const key = `${sizeToEdit}-${tableType}`;
@@ -585,7 +952,6 @@ const MeasurementDetailsSection = ({
     // Hydrate from the saved record BEFORE clearing state
     // This ensures the data is properly restored
     hydrateMeasurementUIFromSavedData([dataToEdit], tableType);
-
     if (onMeasurementEdit) onMeasurementEdit(sizeToEdit, kvalue);
   };
 
@@ -698,6 +1064,11 @@ const MeasurementDetailsSection = ({
         const afterKeys = Object.keys(afterWashGrouped);
         if (beforeKeys.length > 0) setActiveBeforeTab(beforeKeys[0]);
         if (afterKeys.length > 0) setActiveAfterTab(afterKeys[0]);
+
+        // NEW: Store buyer spec data for default measurement point selection
+        if (data.buyerSpecData) {
+          setBuyerSpecData(data.buyerSpecData);
+        }
       } else {
         setNoMeasurementData(false);
         setMeasurementSpecs({
@@ -745,182 +1116,6 @@ const MeasurementDetailsSection = ({
     return num.toString();
   };
 
-  const addSize = (size) => {
-    const sizeStr = String(size);
-
-    // If size is not in selectedSizes, add it
-    if (!selectedSizes.find((s) => s.size === sizeStr)) {
-      const newSize = { size: sizeStr, qty: 3 };
-      setSelectedSizes((prev) => [...prev, newSize]);
-
-      // Get current wash type and automatically select next available K-value
-      const washType =
-        before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
-      const kValueField =
-        before_after_wash === "Before Wash"
-          ? "beforeWashKValue"
-          : "afterWashKValue";
-      const tableType =
-        before_after_wash === "Before Wash" ? "before" : "after";
-
-      // Get next available K-value for this size (first unsaved one)
-      const currentKValue = getKValueForSize(sizeStr, tableType);
-
-      // Set the K-value for this size
-      const key = `${sizeStr}-${tableType}`;
-      setSizeSpecificKValues((prev) => ({
-        ...prev,
-        [key]: currentKValue
-      }));
-
-      // Get the specs for current K-value
-      const specs =
-        before_after_wash === "Before Wash"
-          ? measurementSpecs.beforeWashGrouped[currentKValue] ||
-            measurementSpecs.beforeWash
-          : measurementSpecs.afterWashGrouped[currentKValue] ||
-            measurementSpecs.afterWash;
-
-      // Try to apply pattern from global last selected pattern first
-      const globalPattern = lastSelectedPattern[washType];
-      const globalKValue = lastSelectedPattern[kValueField];
-
-      let patternApplied = false;
-
-      // Apply global pattern if available and specs length matches
-      if (globalPattern && globalPattern.length === specs.length) {
-        setSelectedRowsBySize((prev) => ({
-          ...prev,
-          [sizeStr]: [...globalPattern]
-        }));
-        patternApplied = true;
-
-        // Initialize measurement values for selected rows only if they don't exist
-        setMeasurementValues((prevValues) => {
-          const newValues = { ...prevValues };
-
-          globalPattern.forEach((isSelected, rowIndex) => {
-            if (isSelected) {
-              for (let colIndex = 0; colIndex < 3; colIndex++) {
-                const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-                // Only initialize if not already set
-                if (!newValues[cellKey]) {
-                  newValues[cellKey] = { decimal: 0, fraction: "0" };
-                }
-              }
-            }
-          });
-
-          return newValues;
-        });
-      }
-
-      // If no global pattern, try to apply pattern from saved data for this size
-      if (!patternApplied) {
-        const savedDataForThisSize = currentWashMeasurements.filter(
-          (m) => m.size === sizeStr
-        );
-
-        if (savedDataForThisSize.length > 0) {
-          // Use the pattern from the most recent saved K-value for this size
-          const mostRecentSaved =
-            savedDataForThisSize[savedDataForThisSize.length - 1];
-
-          // Apply pattern if the specs length matches
-          if (
-            mostRecentSaved.selectedRows &&
-            mostRecentSaved.selectedRows.length === specs.length
-          ) {
-            setSelectedRowsBySize((prev) => ({
-              ...prev,
-              [sizeStr]: [...mostRecentSaved.selectedRows]
-            }));
-            patternApplied = true;
-
-            // Initialize measurement values for selected rows only if they don't exist
-            setMeasurementValues((prevValues) => {
-              const newValues = { ...prevValues };
-
-              mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
-                if (isSelected) {
-                  for (let colIndex = 0; colIndex < 3; colIndex++) {
-                    const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-                    // Only initialize if not already set
-                    if (!newValues[cellKey]) {
-                      newValues[cellKey] = { decimal: 0, fraction: "0" };
-                    }
-                  }
-                }
-              });
-
-              return newValues;
-            });
-          }
-        }
-
-        // If no global pattern, try to apply pattern from saved data for this size
-        if (!patternApplied) {
-          const savedDataForThisSize = currentWashMeasurements.filter(
-            (m) => m.size === sizeStr
-          );
-
-          if (savedDataForThisSize.length > 0) {
-            // Use the pattern from the most recent saved K-value for this size
-            const mostRecentSaved =
-              savedDataForThisSize[savedDataForThisSize.length - 1];
-
-            // Apply pattern if the specs length matches
-            if (
-              mostRecentSaved.selectedRows &&
-              mostRecentSaved.selectedRows.length === specs.length
-            ) {
-              setSelectedRowsBySize((prev) => ({
-                ...prev,
-                [sizeStr]: [...mostRecentSaved.selectedRows]
-              }));
-              patternApplied = true;
-
-              // Initialize measurement values for selected rows only if they don't exist
-              setMeasurementValues((prevValues) => {
-                const newValues = { ...prevValues };
-
-                mostRecentSaved.selectedRows.forEach((isSelected, rowIndex) => {
-                  if (isSelected) {
-                    for (let colIndex = 0; colIndex < 3; colIndex++) {
-                      const cellKey = `${sizeStr}-${tableType}-${currentKValue}-${rowIndex}-${colIndex}`;
-                      // Only initialize if not already set
-                      if (!newValues[cellKey]) {
-                        newValues[cellKey] = { decimal: 0, fraction: "0" };
-                      }
-                    }
-                  }
-                });
-
-                return newValues;
-              });
-            }
-          }
-        }
-
-        // If no pattern was applied, reset to default
-        if (!patternApplied) {
-          setSelectedRowsBySize((prev) => ({
-            ...prev,
-            [sizeStr]: Array(specs.length).fill(false)
-          }));
-        }
-      }
-
-      // If no pattern was applied, reset to default
-      if (!patternApplied) {
-        setSelectedRowsBySize((prev) => ({
-          ...prev,
-          [sizeStr]: Array(specs.length).fill(false)
-        }));
-      }
-    }
-  };
-
   const removeSize = (size) => {
     setSelectedSizes((prev) => prev.filter((s) => s.size !== size));
 
@@ -932,6 +1127,12 @@ const MeasurementDetailsSection = ({
     });
 
     setFullColumnsBySize((prev) => {
+      const next = { ...prev };
+      delete next[size];
+      return next;
+    });
+
+    setHideUnselectedRowsBySize((prev) => {
       const next = { ...prev };
       delete next[size];
       return next;
@@ -949,11 +1150,66 @@ const MeasurementDetailsSection = ({
   };
 
   const updateQty = (size, change) => {
-    setSelectedSizes((prev) =>
-      prev.map((s) =>
-        s.size === size ? { ...s, qty: Math.max(1, s.qty + change) } : s
-      )
-    );
+    setSelectedSizes((prevSelectedSizes) => {
+      const newSelectedSizes = prevSelectedSizes.map((s) => {
+        if (s.size === size) {
+          const newQty = Math.max(1, s.qty + change);
+
+          // If a PC is being added, automatically apply the selection pattern of the first PC.
+          if (change > 0 && newQty > s.qty) {
+            const newPcIndex = s.qty; // The index of the new PC is the old quantity
+
+            // Determine if the first PC is marked as "Full"
+            const isFirstPcFull =
+              (fullColumnsBySize[size] && fullColumnsBySize[size][0]) || false;
+
+            // Update the "Full" status for the new column
+            setFullColumnsBySize((prevFullCols) => {
+              const sizeFullCols = prevFullCols[size] || [];
+              const newSizeFullCols = [...sizeFullCols];
+              newSizeFullCols[newPcIndex] = isFirstPcFull;
+              return {
+                ...prevFullCols,
+                [size]: newSizeFullCols
+              };
+            });
+
+            // Initialize measurement values for the new PC based on the first PC's pattern
+            const sizeSelectedRows = selectedRowsBySize[size] || [];
+            if (isFirstPcFull || sizeSelectedRows.some(Boolean)) {
+              const tableType =
+                before_after_wash === "Before Wash" ? "before" : "after";
+              const currentKValue = getKValueForSize(size, tableType);
+              const specs =
+                before_after_wash === "Before Wash"
+                  ? measurementSpecs.beforeWashGrouped[currentKValue] ||
+                    measurementSpecs.beforeWash
+                  : measurementSpecs.afterWashGrouped[currentKValue] ||
+                    measurementSpecs.afterWash;
+
+              setMeasurementValues((prevValues) => {
+                const newValues = { ...prevValues };
+                specs.forEach((spec, specIndex) => {
+                  const shouldInitializeCell =
+                    isFirstPcFull || sizeSelectedRows[specIndex] || false;
+                  if (shouldInitializeCell) {
+                    const cellKey = `${size}-${tableType}-${currentKValue}-${specIndex}-${newPcIndex}`;
+                    if (!newValues[cellKey]) {
+                      newValues[cellKey] = { decimal: 0, fraction: "0" };
+                    }
+                  }
+                });
+                return newValues;
+              });
+            }
+          }
+
+          return { ...s, qty: newQty };
+        }
+        return s;
+      });
+      return newSelectedSizes;
+    });
   };
 
   const toggleFullColumn = (size, columnIndex) => {
@@ -961,7 +1217,6 @@ const MeasurementDetailsSection = ({
       const prevForSize = prev[size] || [];
       const updated = [...prevForSize];
       updated[columnIndex] = !updated[columnIndex];
-
       if (updated[columnIndex]) {
         const tableType =
           before_after_wash === "Before Wash" ? "before" : "after";
@@ -972,7 +1227,6 @@ const MeasurementDetailsSection = ({
               measurementSpecs.beforeWash
             : measurementSpecs.afterWashGrouped[currentKValue] ||
               measurementSpecs.afterWash;
-
         setMeasurementValues((prevValues) => {
           const newValues = { ...prevValues };
           specs.forEach((spec, specIndex) => {
@@ -985,7 +1239,6 @@ const MeasurementDetailsSection = ({
           return newValues;
         });
       }
-
       return {
         ...prev,
         [size]: updated
@@ -1038,7 +1291,6 @@ const MeasurementDetailsSection = ({
           return newValues;
         });
       }
-
       // Update selectAll state based on row selections
       const allSelected = updatedSelections.every(Boolean);
       setSelectAllBySize((prevSelectAll) => ({
@@ -1059,7 +1311,6 @@ const MeasurementDetailsSection = ({
         : measurementSpecs.afterWashGrouped[currentKValue] ||
           measurementSpecs.afterWash;
     const newSelections = specs.map(() => checked);
-
     setSelectedRowsBySize((prev) => ({
       ...prev,
       [size]: newSelections
@@ -1167,6 +1418,7 @@ const MeasurementDetailsSection = ({
                 )}
               </div>
             )}
+
             <div className="flex justify-end mb-2">
               <button
                 onClick={() =>
@@ -1401,9 +1653,8 @@ const MeasurementDetailsSection = ({
                   : "Hide Unselected"}
               </button>
             </div>
-
             <div className="bg-green-50 p-4 rounded-lg mb-4 dark:bg-gray-800 dark:text-white">
-              <h5 className="text-sm font-medium mb-3">After Wash</h5>
+              <h5 className="text-sm font-medium mb-3">After</h5>
 
               {Object.keys(measurementSpecs.afterWashGrouped).length > 1 && (
                 <div className="mb-3">
@@ -1633,7 +1884,6 @@ const MeasurementDetailsSection = ({
                                 ? "bg-green-200 dark:bg-green-700"
                                 : "bg-red-200 dark:bg-red-700"
                               : "bg-transparent";
-
                             return (
                               <td
                                 key={`measurement-input-${index}-${i}`}
@@ -2266,7 +2516,8 @@ MeasurementDetailsSection.propTypes = {
   showMeasurementTable: PropTypes.bool,
   onMeasurementEdit: PropTypes.func,
   before_after_wash: PropTypes.string,
-  recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number])
+  recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  formData: PropTypes.object
 };
 
 export default MeasurementDetailsSection;
