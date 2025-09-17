@@ -911,11 +911,60 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
   };
 
   const updateQty = (size, change) => {
-    setSelectedSizes(prev => prev.map(s => 
-      s.size === size 
-        ? { ...s, qty: Math.max(1, s.qty + change) }
-        : s
-    ));
+    setSelectedSizes(prevSelectedSizes => {
+      const newSelectedSizes = prevSelectedSizes.map(s => {
+        if (s.size === size) {
+          const newQty = Math.max(1, s.qty + change);
+
+          // If a PC is being added, automatically apply the selection pattern of the first PC.
+          if (change > 0 && newQty > s.qty) {
+            const newPcIndex = s.qty; // The index of the new PC is the old quantity
+
+            // Determine if the first PC is marked as "Full"
+            const isFirstPcFull = (fullColumnsBySize[size] && fullColumnsBySize[size][0]) || false;
+
+            // Update the "Full" status for the new column
+            setFullColumnsBySize(prevFullCols => {
+              const sizeFullCols = prevFullCols[size] || [];
+              const newSizeFullCols = [...sizeFullCols];
+              newSizeFullCols[newPcIndex] = isFirstPcFull;
+              return {
+                ...prevFullCols,
+                [size]: newSizeFullCols,
+              };
+            });
+
+            // Initialize measurement values for the new PC based on the first PC's pattern
+            const sizeSelectedRows = selectedRowsBySize[size] || [];
+            if (isFirstPcFull || sizeSelectedRows.some(Boolean)) {
+              const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+              const currentKValue = getKValueForSize(size, tableType);
+              const specs = before_after_wash === 'Before Wash'
+                ? (measurementSpecs.beforeWashGrouped[currentKValue] || measurementSpecs.beforeWash)
+                : (measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash);
+
+              setMeasurementValues(prevValues => {
+                const newValues = { ...prevValues };
+                specs.forEach((spec, specIndex) => {
+                  const shouldInitializeCell = isFirstPcFull || (sizeSelectedRows[specIndex] || false);
+                  if (shouldInitializeCell) {
+                    const cellKey = `${size}-${tableType}-${currentKValue}-${specIndex}-${newPcIndex}`;
+                    if (!newValues[cellKey]) {
+                      newValues[cellKey] = { decimal: 0, fraction: '0' };
+                    }
+                  }
+                });
+                return newValues;
+              });
+            }
+          }
+
+          return { ...s, qty: newQty };
+        }
+        return s;
+      });
+      return newSelectedSizes;
+    });
   };
 
   const toggleFullColumn = (size, columnIndex) => {

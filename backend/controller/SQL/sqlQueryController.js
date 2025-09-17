@@ -2290,8 +2290,8 @@ export const syncDtOrders = async (req, res) => {
 //     console.error("❌ Initial DT Orders Data Sync failed:", err);
 //   });
 
-// Schedule to run every day at 2:00 AM
-  cron.schedule("0 */1 * * *", async () => {
+// Schedule to run every 15 minutes
+  cron.schedule("*/15 * * * *", async () => {
    await syncDTOrdersData()
     .then((result) => {
       console.log("✅ DT Orders Data Sync completed ", result);
