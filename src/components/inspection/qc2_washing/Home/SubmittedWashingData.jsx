@@ -10,7 +10,7 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('estimated'); // 'estimated' or 'actual'
+  const [viewMode, setViewMode] = useState('actual'); // 'estimated' or 'actual'
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
