@@ -785,41 +785,59 @@ const getImageUrl = (imagePath) => {
                                   {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
                                     <div className="mt-4 pl-4 border-l-2 border-gray-300 dark:border-gray-500 space-y-3" >
                                       <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 -ml-4 mb-2">Sub-points:</h5>
-                                      {mainPoint.subPoints.map((subPoint, subIndex) => (
-                                        <div key={subPoint.id || subIndex} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
-                                          <div className="flex justify-between items-center">
-                                            <p className="text-sm text-gray-700 dark:text-gray-300">{subPoint.name}:</p>
-                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{subPoint.decision}</span>
-                                          </div>
-                                          {subPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">Remark: {subPoint.remark}</p>}
-                                          {subPoint.comparisonImages && subPoint.comparisonImages.length > 0 && (
-                                            <div className="mt-2">
-                                              <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Images:</p>
-                                              <div className="grid grid-cols-4 gap-2">
-                                                {subPoint.comparisonImages.map((img, imgIdx) => {
-                                                  const imageUrl = getImageUrl(img);
-                                                  return (
-                                                    <div key={imgIdx} className="w-1/2 h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
-                                                      {imageUrl ? (
-                                                        <img 
-                                                          src={imageUrl}
-                                                          alt={`Sub-point image ${imgIdx + 1}`}
-                                                          className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
-                                                          onClick={() => window.open(imageUrl, '_blank')}
-                                                          onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                                        />
-                                                      ) : null}
-                                                      <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
-                                                        <div className="text-xs text-gray-500 dark:text-gray-400">No Image</div>
-                                                      </div>
-                                                    </div>
-                                                  );
-                                                })}
+                                      {mainPoint.subPoints.map((subPoint, subIndex) => {
+                                        const mainPointDef = checkpointDefinitions?.find(def => def._id === mainPoint.checkpointId);
+                                        const subPointDefinition = mainPointDef?.subPoints?.find(sp => sp.id === subPoint.subPointId);
+                                        const subPointOption = subPointDefinition?.options?.find(opt => opt.name === subPoint.decision);
+                                        const isFail = subPointOption?.isFail === true;
+
+                                        return (
+                                          <div key={subPoint.id || subIndex} className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600">
+                                            <div className="flex justify-between items-center">
+                                              <p className="text-sm text-gray-700 dark:text-gray-300">{subPoint.name}:</p>
+                                              <div className="flex items-center space-x-2">
+                                                <span className={`font-medium ${isFail ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                  {subPoint.decision}
+                                                </span>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                                                  isFail 
+                                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/50 dark:text-red-300'
+                                                    : 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300'
+                                                }`}>
+                                                  {isFail ? 'No' : 'OK'}
+                                                </span>
                                               </div>
                                             </div>
-                                          )}
-                                        </div>
-                                      ))}
+                                            {subPoint.remark && <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">Remark: {subPoint.remark}</p>}
+                                            {subPoint.comparisonImages && subPoint.comparisonImages.length > 0 && (
+                                              <div className="mt-2">
+                                                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Images:</p>
+                                                <div className="grid grid-cols-4 gap-2">
+                                                  {subPoint.comparisonImages.map((img, imgIdx) => {
+                                                    const imageUrl = getImageUrl(img);
+                                                    return (
+                                                      <div key={imgIdx} className="w-1/2 h-20 bg-gray-100 dark:bg-gray-600 rounded border border-gray-200 dark:border-gray-600 overflow-hidden">
+                                                        {imageUrl ? (
+                                                          <img 
+                                                            src={imageUrl}
+                                                            alt={`Sub-point image ${imgIdx + 1}`}
+                                                            className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
+                                                            onClick={() => window.open(imageUrl, '_blank')}
+                                                            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                                          />
+                                                        ) : null}
+                                                        <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
+                                                          <div className="text-xs text-gray-500 dark:text-gray-400">No Image</div>
+                                                        </div>
+                                                      </div>
+                                                    );
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
                                     </div>
                                   )}
                                 </div>
