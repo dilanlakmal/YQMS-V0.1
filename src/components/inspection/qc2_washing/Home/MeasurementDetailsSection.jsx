@@ -165,20 +165,8 @@ const setKValueForSize = async (size, washType, kValue) => {
             patternApplied = true;
           }
         }
-        
-        // 3. Third priority: If no buyerspectemplate, use all dt_orders measurement points
-        if (!patternApplied && specs && specs.length > 0) {
-          defaultSelectedRows = Array(specs.length).fill(false); // Do not select all by default
-          patternApplied = true;
-        }
-        
       } catch (error) {
         console.error('Error loading saved measurement data:', error);
-        // Fallback to no measurement points if there's an error
-        if (specs && specs.length > 0) {
-          defaultSelectedRows = Array(specs.length).fill(false);
-          patternApplied = true;
-        }
       }
     }
     
@@ -206,7 +194,18 @@ const setKValueForSize = async (size, washType, kValue) => {
         }
       }
     }
-    
+
+    // If a pattern was found, default to hiding unselected rows. Otherwise, show all.
+    setHideUnselectedRowsBySize(prev => ({
+      ...prev,
+      [size]: patternApplied
+    }));
+
+    // Fallback: If no pattern was applied, ensure all rows are unselected.
+    if (!patternApplied) {
+      defaultSelectedRows = Array(specs.length).fill(false);
+    }
+
     // Apply the selected rows
     setSelectedRowsBySize(prev => ({
       ...prev,
@@ -231,14 +230,6 @@ const setKValueForSize = async (size, washType, kValue) => {
       
       return newValues;
     });
-    
-    // If no pattern was applied, reset to default
-    if (!patternApplied) {
-      setSelectedRowsBySize(prev => ({
-        ...prev,
-        [size]: Array(specs.length).fill(false)
-      }));
-    }
   };
   
   // Execute the pattern application
@@ -378,12 +369,6 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
   if (!selectedSizes.find(s => s.size === sizeStr)) {
     const newSize = { size: sizeStr, qty: 3 };
     setSelectedSizes(prev => [...prev, newSize]);
-
-    // Default to hiding unselected rows when a new size is added.
-    setHideUnselectedRowsBySize(prev => ({
-      ...prev,
-      [sizeStr]: true
-    }));
     
     const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
@@ -465,13 +450,15 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
         }
       }
       
-      // Priority 6: Fallback - select all for After Wash, none for Before Wash
+      // If a pattern was found, default to hiding unselected rows. Otherwise, show all.
+      setHideUnselectedRowsBySize(prev => ({
+        ...prev,
+        [sizeStr]: patternApplied
+      }));
+
+      // Fallback: If no pattern was applied, ensure all rows are unselected.
       if (!patternApplied) {
-        // Fallback: select none for both wash types if no pattern is found.
         defaultSelectedRows = Array(specs.length).fill(false);
-        if (before_after_wash === 'After Wash' && specs && specs.length > 0) {
-          patternApplied = true;
-        }
       }
       
       // Apply the selected rows
