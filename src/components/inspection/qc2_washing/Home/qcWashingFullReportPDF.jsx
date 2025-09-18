@@ -886,7 +886,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                           : styles.failRed
                       ]}
                     >
-                      {machine.time.status?.ok ? "OK" : "NG"}
+                      {machine.time.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
                   </View>
@@ -913,7 +913,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                           : styles.failRed
                       ]}
                     >
-                      {machine.silicon.status?.ok ? "OK" : "NG"}
+                      {machine.silicon.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                   </View>
@@ -940,7 +940,7 @@ const InspectionDetailsSection = ({ inspectionDetails, API_BASE_URL }) => {
                           : styles.failRed
                       ]}
                     >
-                      {machine.softener.status?.ok ? "OK" : "NG"}
+                      {machine.softener.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                   </View>
@@ -1380,7 +1380,7 @@ const NewInspectionDetailsSection = ({
                           : styles.failRed
                       ]}
                     >
-                      {machine.time.status?.ok ? "OK" : "NG"}
+                      {machine.time.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
                   </View>
@@ -1407,7 +1407,7 @@ const NewInspectionDetailsSection = ({
                           : styles.failRed
                       ]}
                     >
-                      {machine.silicon.status?.ok ? "OK" : "NG"}
+                      {machine.silicon.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                   </View>
@@ -1434,7 +1434,7 @@ const NewInspectionDetailsSection = ({
                           : styles.failRed
                       ]}
                     >
-                      {machine.softener.status?.ok ? "OK" : "NG"}
+                      {machine.softener.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
                   </View>
