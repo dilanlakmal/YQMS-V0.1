@@ -210,14 +210,14 @@ const MeasurementDetailsSection = ({
 
           // 3. Third priority: If no buyerspectemplate, use all dt_orders measurement points
           if (!patternApplied && specs && specs.length > 0) {
-            defaultSelectedRows = Array(specs.length).fill(true); // Select all available measurement points
+            defaultSelectedRows = Array(specs.length).fill(false); // Do not select all by default
             patternApplied = true;
           }
         } catch (error) {
           console.error("Error loading saved measurement data:", error);
-          // Fallback to all measurement points if there's an error
+          // Fallback to no measurement points if there's an error
           if (specs && specs.length > 0) {
-            defaultSelectedRows = Array(specs.length).fill(true);
+            defaultSelectedRows = Array(specs.length).fill(false);
             patternApplied = true;
           }
         }
@@ -585,11 +585,10 @@ const MeasurementDetailsSection = ({
 
         // Priority 6: Fallback - select all for After Wash, none for Before Wash
         if (!patternApplied) {
+          // Fallback: select none for both wash types if no pattern is found.
+          defaultSelectedRows = Array(specs.length).fill(false);
           if (before_after_wash === "After Wash" && specs && specs.length > 0) {
-            defaultSelectedRows = Array(specs.length).fill(true);
             patternApplied = true;
-          } else {
-            defaultSelectedRows = Array(specs.length).fill(false);
           }
         }
 
