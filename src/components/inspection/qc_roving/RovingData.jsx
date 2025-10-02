@@ -24,6 +24,9 @@ const REPETITION_KEYS = [
 const RovingData = ({ refreshTrigger }) => {
   const { user } = useAuth();
   const authUserEmpId = user?.emp_id;
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+  const [defectDefinitions, setDefectDefinitions] = useState([]);
+  const [isLoadingDefects, setIsLoadingDefects] = useState(false);
   const [reports, setReports] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState({
@@ -241,17 +244,142 @@ const RovingData = ({ refreshTrigger }) => {
     });
   }, [authUserEmpId]);
 
+  const fetchDefectDefinitions = async () => {
+    try {
+      setIsLoadingDefects(true);
+      const response = await axios.get(
+        `${API_BASE_URL}/api/defect-definitions`
+      ); // Adjust endpoint as needed
+
+      if (response.data && Array.isArray(response.data)) {
+        setDefectDefinitions(response.data);
+      } else {
+        console.warn(
+          "Defect definitions response is not an array:",
+          response.data
+        );
+        setDefectDefinitions([]);
+      }
+    } catch (error) {
+      console.error("Error fetching defect definitions:", error);
+      setDefectDefinitions([]);
+      // Optionally show user-friendly error
+      Swal.fire({
+        icon: "warning",
+        title: "Warning",
+        text: "Could not load defect definitions. Defect names will be shown in original language.",
+        timer: 3000,
+        showConfirmButton: false
+      });
+    } finally {
+      setIsLoadingDefects(false);
+    }
+  };
+
+  const getDefectNameByLanguage = (
+    defectName,
+    language = "en",
+    defectDefinitions = []
+  ) => {
+    if (!defectName || !defectDefinitions.length) {
+      return defectName;
+    }
+
+    // Try to find the defect in the definitions
+    const defectDef = defectDefinitions.find(
+      (def) =>
+        def.english?.toLowerCase() === defectName.toLowerCase() ||
+        def.shortEng?.toLowerCase() === defectName.toLowerCase() ||
+        def.khmer === defectName ||
+        def.chinese === defectName
+    );
+
+    if (defectDef) {
+      switch (language) {
+        case "kh":
+        case "khmer":
+          return defectDef.khmer || defectDef.english || defectName;
+        case "ch":
+        case "chinese":
+          return defectDef.chinese || defectDef.english || defectName;
+        case "en":
+        case "english":
+        default:
+          return defectDef.english || defectName;
+      }
+    }
+
+    // If no definition found, return original name
+    return defectName;
+  };
+
+  useEffect(() => {
+    fetchDefectDefinitions();
+  }, []);
+
+  // Update language detection useEffect
+  useEffect(() => {
+    const userLanguage =
+      user?.language || localStorage.getItem("preferredLanguage") || "en";
+    setCurrentLanguage(userLanguage);
+  }, [user]);
+
+  // Listen for language changes
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "preferredLanguage") {
+        setCurrentLanguage(e.newValue || "en");
+      }
+    };
+
+    const handleCustomLanguageChange = (e) => {
+      setCurrentLanguage(e.detail.language);
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("languageChanged", handleCustomLanguageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("languageChanged", handleCustomLanguageChange);
+    };
+  }, []);
+
   const handleFilterChange = useCallback((newFilters) => {
     setFilters(newFilters);
   }, []);
 
-  const showDetailsOnTap = (tooltipText) => {
+  const showImagePopup = (imageUrl) => {
     Swal.fire({
-      title: "Inspection Details",
-      html: `<pre style="text-align: left; white-space: pre-wrap; font-size: 0.8rem;">${tooltipText}</pre>`,
+      html: `<img src="${imageUrl}" style="max-width: 100%; max-height: 80vh; object-fit: contain;" />`,
+      showConfirmButton: false,
+      showCloseButton: true,
+      background: "transparent",
+      backdrop: "rgba(0,0,0,0.8)",
+      customClass: {
+        popup: "swal2-image-popup"
+      }
+    });
+  };
+
+  const showDetailsOnTap = (tooltipContent) => {
+    Swal.fire({
+      html: tooltipContent.html,
       confirmButtonText: "Close",
+      width: "800px",
+      showCloseButton: true,
       customClass: {
         popup: "roving-data-swal-popup"
+      },
+      didOpen: () => {
+        // Add click handlers to images after modal opens
+        const images = document.querySelectorAll(".defect-image-clickable");
+        images.forEach((img) => {
+          img.addEventListener("click", (e) => {
+            e.preventDefault();
+            showImagePopup(img.src);
+          });
+        });
       }
     });
   };
@@ -539,14 +667,17 @@ const RovingData = ({ refreshTrigger }) => {
                         return <span className="text-gray-500">N/A</span>;
                       };
 
-                      const constructTooltipText = (
+                      const constructTooltipContent = (
                         currentReportDetails,
                         currentRepItemDetails,
                         currentOperatorInspectionData,
                         currentTotalDefectsForOp
                       ) => {
-                        let defectsString = "Defects Found: None";
+                        let defectsTextList = [];
+                        let defectsHtml =
+                          "<strong>Defects Found:</strong> None";
                         const defectsList = [];
+
                         if (
                           currentOperatorInspectionData.rejectGarments &&
                           currentOperatorInspectionData.rejectGarments.length >
@@ -557,19 +688,65 @@ const RovingData = ({ refreshTrigger }) => {
                           currentOperatorInspectionData.rejectGarments[0].garments.forEach(
                             (garment, garmentIndex) => {
                               garment.defects.forEach((defect, defectIndex) => {
-                                defectsList.push(
+                                const localizedDefectName =
+                                  getDefectNameByLanguage(
+                                    defect.name,
+                                    currentLanguage,
+                                    defectDefinitions
+                                  );
+
+                                // For hover tooltip (text only)
+                                defectsTextList.push(
                                   `  Garment ${garmentIndex + 1}, Defect ${
                                     defectIndex + 1
-                                  }: ${defect.name} (Qty: ${defect.count})`
+                                  }: ${localizedDefectName} (Qty: ${
+                                    defect.count
+                                  })`
                                 );
+
+                                // For popup modal (with images)
+                                let defectHtml = `<div style="margin: 8px 0; padding: 8px; border-left: 3px solid #dc2626; background-color: #fef2f2;">`;
+                                defectHtml += `<strong>Garment ${
+                                  garmentIndex + 1
+                                }, Defect ${
+                                  defectIndex + 1
+                                }:</strong> ${localizedDefectName} (Qty: ${
+                                  defect.count
+                                })`;
+                                defectHtml += `</div>`;
+                                defectsList.push(defectHtml);
                               });
                             }
                           );
                         }
+
+                        const defectsText =
+                          defectsTextList.length > 0
+                            ? "Defects Found:\n" + defectsTextList.join("\n")
+                            : "Defects Found: None";
                         if (defectsList.length > 0) {
-                          defectsString =
-                            "Defects Found:\n" + defectsList.join("\n");
+                          defectsHtml = `<strong>Defects Found:</strong><div style="margin-top: 8px;">${defectsList.join(
+                            ""
+                          )}</div>`;
+
+                          // Add defect images if available at operator level
+                          if (
+                            currentOperatorInspectionData.defectImages &&
+                            currentOperatorInspectionData.defectImages.length >
+                              0
+                          ) {
+                            defectsHtml += `<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;"><strong>Defect Images:</strong><div style="margin-top: 8px;">`;
+                            currentOperatorInspectionData.defectImages.forEach(
+                              (image, imgIndex) => {
+                                defectsHtml += `<img src="${image}" alt="Defect Image ${
+                                  imgIndex + 1
+                                }" class="defect-image-clickable" style="max-width: 200px; max-height: 200px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; transition: transform 0.2s; hover: transform: scale(1.05);" />`;
+                              }
+                            );
+                            defectsHtml += `</div></div>`;
+                          }
                         }
+
                         const qcId =
                           currentRepItemDetails?.emp_id ||
                           currentReportDetails?.emp_id ||
@@ -577,52 +754,108 @@ const RovingData = ({ refreshTrigger }) => {
                         const qcRepName =
                           currentRepItemDetails?.inspection_rep_name || "N/A";
 
-                        return `Inspection Details:
-                        Date: ${currentReportDetails.inspection_date || "N/A"}
-                        QC ID: ${qcId}
-                        Inspection Rep: ${qcRepName}
-                        Line No: ${currentReportDetails.line_no || "N/A"}
-                        MO No: ${currentReportDetails.mo_no || "N/A"}
-                        ------------------------------
-                        Operator ID: ${
-                          currentOperatorInspectionData.operator_emp_id || "N/A"
-                        }
-                        Operator Name: ${
-                          currentOperatorInspectionData.operator_kh_name ||
-                          currentOperatorInspectionData.operator_eng_name ||
-                          "N/A"
-                        }
-                        Operation: ${
-                          currentOperatorInspectionData.operation_kh_name ||
-                          currentOperatorInspectionData.operation_ch_name ||
-                          "N/A"
-                        }
-                        Machine Code: ${
-                          currentOperatorInspectionData.ma_code || "N/A"
-                        }
-                        ------------------------------
-                        Type: ${currentOperatorInspectionData.type || "N/A"} 
-                        Checked Qty: ${
-                          currentOperatorInspectionData.checked_quantity ||
-                          "N/A"
-                        }
-                        SPI: ${currentOperatorInspectionData.spi || "N/A"} 
-                        Meas: ${
-                          currentOperatorInspectionData.measurement || "N/A"
-                        } 
-                        Total Defects (Op): ${currentTotalDefectsForOp}
-                        Overall Result (Op): ${
-                          currentOperatorInspectionData.qualityStatus || "N/A"
-                        }
-                        Overall Roving Status: ${
-                          currentOperatorInspectionData.overall_roving_status ||
-                          "N/A"
-                        }
-                        ------------------------------
-                        ${defectsString}`;
+                        return {
+                          text: `Inspection Details:
+Date: ${currentReportDetails.inspection_date || "N/A"}
+QC ID: ${qcId}
+Inspection Rep: ${qcRepName}
+Line No: ${currentReportDetails.line_no || "N/A"}
+MO No: ${currentReportDetails.mo_no || "N/A"}
+------------------------------
+Operator ID: ${currentOperatorInspectionData.operator_emp_id || "N/A"}
+Operator Name: ${
+                            currentOperatorInspectionData.operator_kh_name ||
+                            currentOperatorInspectionData.operator_eng_name ||
+                            "N/A"
+                          }
+Operation: ${
+                            currentOperatorInspectionData.operation_kh_name ||
+                            currentOperatorInspectionData.operation_ch_name ||
+                            "N/A"
+                          }
+Machine Code: ${currentOperatorInspectionData.ma_code || "N/A"}
+------------------------------
+Type: ${currentOperatorInspectionData.type || "N/A"}
+Checked Qty: ${currentOperatorInspectionData.checked_quantity || "N/A"}
+SPI: ${currentOperatorInspectionData.spi || "N/A"}
+Meas: ${currentOperatorInspectionData.measurement || "N/A"}
+Total Defects (Op): ${currentTotalDefectsForOp}
+Overall Result (Op): ${currentOperatorInspectionData.qualityStatus || "N/A"}
+Overall Roving Status: ${
+                            currentOperatorInspectionData.overall_roving_status ||
+                            "N/A"
+                          }
+------------------------------
+${defectsText}`,
+                          html: `
+                            <div style="text-align: left; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
+                              <h3 style="margin: 0 0 12px 0; color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 4px;">Inspection Details</h3>
+                              <div style="margin-bottom: 12px;">
+                                <strong>Date:</strong> ${
+                                  currentReportDetails.inspection_date || "N/A"
+                                }<br>
+                                <strong>QC ID:</strong> ${qcId}<br>
+                                <strong>Inspection Rep:</strong> ${qcRepName}<br>
+                                <strong>Line No:</strong> ${
+                                  currentReportDetails.line_no || "N/A"
+                                }<br>
+                                <strong>MO No:</strong> ${
+                                  currentReportDetails.mo_no || "N/A"
+                                }
+                              </div>
+                              <div style="margin-bottom: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                                <strong>Operator ID:</strong> ${
+                                  currentOperatorInspectionData.operator_emp_id ||
+                                  "N/A"
+                                }<br>
+                                <strong>Operator Name:</strong> ${
+                                  currentOperatorInspectionData.operator_kh_name ||
+                                  currentOperatorInspectionData.operator_eng_name ||
+                                  "N/A"
+                                }<br>
+                                <strong>Operation:</strong> ${
+                                  currentOperatorInspectionData.operation_kh_name ||
+                                  currentOperatorInspectionData.operation_ch_name ||
+                                  "N/A"
+                                }<br>
+                                <strong>Machine Code:</strong> ${
+                                  currentOperatorInspectionData.ma_code || "N/A"
+                                }
+                              </div>
+                              <div style="margin-bottom: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                                <strong>Type:</strong> ${
+                                  currentOperatorInspectionData.type || "N/A"
+                                }<br>
+                                <strong>Checked Qty:</strong> ${
+                                  currentOperatorInspectionData.checked_quantity ||
+                                  "N/A"
+                                }<br>
+                                <strong>SPI:</strong> ${
+                                  currentOperatorInspectionData.spi || "N/A"
+                                }<br>
+                                <strong>Meas:</strong> ${
+                                  currentOperatorInspectionData.measurement ||
+                                  "N/A"
+                                }<br>
+                                <strong>Total Defects (Op):</strong> ${currentTotalDefectsForOp}<br>
+                                <strong>Overall Result (Op):</strong> ${
+                                  currentOperatorInspectionData.qualityStatus ||
+                                  "N/A"
+                                }<br>
+                                <strong>Overall Roving Status:</strong> ${
+                                  currentOperatorInspectionData.overall_roving_status ||
+                                  "N/A"
+                                }
+                              </div>
+                              <div style="padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                                ${defectsHtml}
+                              </div>
+                            </div>
+                          `
+                        };
                       };
 
-                      const tooltipTitle = constructTooltipText(
+                      const tooltipContent = constructTooltipContent(
                         operatorSummary.reportTopLevel,
                         repLevelData,
                         operatorLevelData,
@@ -640,8 +873,8 @@ const RovingData = ({ refreshTrigger }) => {
                         allRepInspectionCells.push(
                           <td
                             key={`spi-${repKey}`}
-                            title={tooltipTitle}
-                            onClick={() => showDetailsOnTap(tooltipTitle)}
+                            title={tooltipContent.text}
+                            onClick={() => showDetailsOnTap(tooltipContent)}
                             className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
                           >
                             {renderResultSymbol(spiDisplay)}
@@ -652,8 +885,8 @@ const RovingData = ({ refreshTrigger }) => {
                         allRepInspectionCells.push(
                           <td
                             key={`meas-${repKey}`}
-                            title={tooltipTitle}
-                            onClick={() => showDetailsOnTap(tooltipTitle)}
+                            title={tooltipContent.text}
+                            onClick={() => showDetailsOnTap(tooltipContent)}
                             className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 text-center cursor-pointer`}
                           >
                             {renderResultSymbol(measDisplay)}
@@ -664,8 +897,8 @@ const RovingData = ({ refreshTrigger }) => {
                         allRepInspectionCells.push(
                           <td
                             key={`chkdef-${repKey}`}
-                            title={tooltipTitle}
-                            onClick={() => showDetailsOnTap(tooltipTitle)}
+                            title={tooltipContent.text}
+                            onClick={() => showDetailsOnTap(tooltipContent)}
                             className={`px-1 py-1 text-xs text-gray-700 border border-gray-300 ${repetitionCellBgClass} transition-colors duration-150 cursor-pointer text-center`}
                           >
                             {chkdDefDisplay}

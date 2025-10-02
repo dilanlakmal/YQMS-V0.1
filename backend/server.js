@@ -2984,6 +2984,16 @@ app.get("/api/sewing-defects", async (req, res) => {
   }
 });
 
+//Inspection Detail Defect name
+app.get("/api/defect-definitions", async (req, res) => {
+  try {
+    const defects = await SewingDefects.find({}).sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch defect definitions" });
+  }
+});
+
 // Endpoint to search users by emp_id or name (partial match)
 app.get("/api/users/search-by-empid", async (req, res) => {
   try {

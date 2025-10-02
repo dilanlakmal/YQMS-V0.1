@@ -624,42 +624,29 @@ const CuttingReportQCView = ({
   }, [report, inspectionSummaryData, t]);
 
   const handleGeneratePDF = async () => {
-    if (report) {
-      // Show a loading indicator if it takes time
+    if (!report) {
+      Swal.fire(t("common.noDataToGeneratePdf"), "", "warning");
+      return;
+    }
+
+    Swal.fire({
+      title: t("common.generatingPdf"),
+      text: t("common.pleaseWait"),
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+
+    try {
+      // Call the newly imported generator function with all required data
+      await generateCuttingReportPDF(report, qcUser, fabricDefectsMaster, i18n);
+      Swal.close();
+    } catch (pdfError) {
+      console.error("PDF Generation Error:", pdfError);
       Swal.fire({
-        title: t("common.generatingPdf", "Generating PDF..."),
-        text: t("common.pleaseWait", "Please wait a moment."),
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        }
+        icon: "error",
+        title: t("common.pdfError"),
+        text: pdfError.message || t("common.failedToGeneratePdf")
       });
-      try {
-        await generateCuttingReportPDF(
-          report,
-          qcUser,
-          fabricDefectsMaster,
-          i18n
-        ); // Pass i18n instance
-        Swal.close();
-      } catch (pdfError) {
-        Swal.fire({
-          icon: "error",
-          title: t("common.pdfError", "PDF Generation Error"),
-          text:
-            pdfError.message ||
-            t("common.failedToGeneratePdf", "Failed to generate PDF.")
-        });
-      }
-    } else {
-      Swal.fire(
-        t(
-          "common.noDataToGeneratePdf",
-          "No report data available to generate PDF."
-        ),
-        "",
-        "warning"
-      );
     }
   };
 
