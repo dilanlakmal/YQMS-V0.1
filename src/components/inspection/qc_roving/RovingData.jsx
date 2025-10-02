@@ -357,7 +357,7 @@ useEffect(() => {
     Swal.fire({
       html: tooltipContent.html,
       confirmButtonText: "Close",
-      width: '800px',
+      width: '600px',
       showCloseButton: true,
       customClass: {
         popup: "roving-data-swal-popup"
@@ -716,26 +716,26 @@ useEffect(() => {
 
                         return {
                           text: `Inspection Details:
-Date: ${currentReportDetails.inspection_date || "N/A"}
-QC ID: ${qcId}
-Inspection Rep: ${qcRepName}
-Line No: ${currentReportDetails.line_no || "N/A"}
-MO No: ${currentReportDetails.mo_no || "N/A"}
-------------------------------
-Operator ID: ${currentOperatorInspectionData.operator_emp_id || "N/A"}
-Operator Name: ${currentOperatorInspectionData.operator_kh_name || currentOperatorInspectionData.operator_eng_name || "N/A"}
-Operation: ${currentOperatorInspectionData.operation_kh_name || currentOperatorInspectionData.operation_ch_name || "N/A"}
-Machine Code: ${currentOperatorInspectionData.ma_code || "N/A"}
-------------------------------
-Type: ${currentOperatorInspectionData.type || "N/A"}
-Checked Qty: ${currentOperatorInspectionData.checked_quantity || "N/A"}
-SPI: ${currentOperatorInspectionData.spi || "N/A"}
-Meas: ${currentOperatorInspectionData.measurement || "N/A"}
-Total Defects (Op): ${currentTotalDefectsForOp}
-Overall Result (Op): ${currentOperatorInspectionData.qualityStatus || "N/A"}
-Overall Roving Status: ${currentOperatorInspectionData.overall_roving_status || "N/A"}
-------------------------------
-${defectsText}`,
+                          Date: ${currentReportDetails.inspection_date || "N/A"}
+                          QC ID: ${qcId}
+                          Inspection Rep: ${qcRepName}
+                          Line No: ${currentReportDetails.line_no || "N/A"}
+                            MO No: ${currentReportDetails.mo_no || "N/A"}
+                            ------------------------------
+                            Operator ID: ${currentOperatorInspectionData.operator_emp_id || "N/A"}
+                            Operator Name: ${currentOperatorInspectionData.operator_kh_name || currentOperatorInspectionData.operator_eng_name || "N/A"}
+                            Operation: ${currentOperatorInspectionData.operation_kh_name || currentOperatorInspectionData.operation_ch_name || "N/A"}
+                            Machine Code: ${currentOperatorInspectionData.ma_code || "N/A"}
+                            ------------------------------
+                            Type: ${currentOperatorInspectionData.type || "N/A"}
+                            Checked Qty: ${currentOperatorInspectionData.checked_quantity || "N/A"}
+                            SPI: ${currentOperatorInspectionData.spi || "N/A"}
+                            Meas: ${currentOperatorInspectionData.measurement || "N/A"}
+                            Total Defects (Op): ${currentTotalDefectsForOp}
+                            Overall Result (Op): ${currentOperatorInspectionData.qualityStatus || "N/A"}
+                            Overall Roving Status: ${currentOperatorInspectionData.overall_roving_status || "N/A"}
+                            ------------------------------
+                            ${defectsText}`,
                           html: `
                             <div style="text-align: left; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
                               <h3 style="margin: 0 0 12px 0; color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 4px;">Inspection Details</h3>

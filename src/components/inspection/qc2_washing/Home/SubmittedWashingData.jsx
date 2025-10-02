@@ -1,10 +1,9 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../../../../../config'; 
 import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
 import QCWashingFullReportModal from './QCWashingFullReportModal';
-import QcWashingFullReportPDF from './qcWashingFullReportPDF';
 import { PDFDownloadLink} from '@react-pdf/renderer';
 
 const SubmittedWashingDataPage = () => {
@@ -547,13 +546,11 @@ const processImageToBase64 = async (imagePath) => {
   try {
     setIsQcWashingPDF(true);
     
+    console.log('🚀 Starting PDF generation with image loading...');
+    
     if (!API_BASE_URL) {
       throw new Error('API_BASE_URL is not defined');
     }
-    
-    
-    // Process images to base64 using the centralized function
-    const processedRecord = await processImagesInRecord(record, API_BASE_URL);
     
     // Fetch comparison data
     let comparisonData = null;
@@ -584,16 +581,27 @@ const processImageToBase64 = async (imagePath) => {
       }
     }
     
-    // Generate PDF with base64 images
+    // FIXED: Preload images before generating PDF
+    const preloadedImages = await preloadImagesForRecord(record, API_BASE_URL);
+    console.log('✅ Preloaded images:', Object.keys(preloadedImages).length);
+    
+    // Import the PDF renderer
     const { pdf } = await import('@react-pdf/renderer');
+    const { QcWashingFullReportPDF } = await import('./qcWashingFullReportPDF');
+    
+    // Generate PDF with preloaded images
     const blob = await pdf(
-      <QcWashingFullReportPDF 
-        recordData={processedRecord} 
-        comparisonData={comparisonData} 
-        API_BASE_URL={API_BASE_URL}
-        checkpointDefinitions={checkpointDefinitions}
-      />
+      React.createElement(QcWashingFullReportPDF, {
+        recordData: record,
+        comparisonData: comparisonData,
+        API_BASE_URL: API_BASE_URL,
+        checkpointDefinitions: checkpointDefinitions,
+        preloadedImages: preloadedImages,
+        skipImageLoading: false
+      })
     ).toBlob();
+    
+    console.log('✅ PDF generated successfully');
     
     // Download
     const url = URL.createObjectURL(blob);
@@ -606,12 +614,244 @@ const processImageToBase64 = async (imagePath) => {
     URL.revokeObjectURL(url);
     
   } catch (error) {
-    console.error('Error generating PDF:', error);
+    console.error('❌ Error generating PDF:', error);
     alert(`Failed to generate PDF: ${error.message}`);
   } finally {
     setIsQcWashingPDF(false);
   }
 };
+
+// FIXED: Add this helper function to preload images
+const preloadImagesForRecord = async (record, API_BASE_URL) => {
+  const imageCollection = new Map();
+  const imageMap = {};
+  
+  // Helper function to normalize image keys (same as in PDF component)
+  const normalizeImageKey = (src) => {
+    if (typeof src === 'string') {
+      return src.trim();
+    } else if (typeof src === 'object' && src !== null) {
+      return src.originalUrl || src.url || src.src || src.path || JSON.stringify(src);
+    }
+    return JSON.stringify(src);
+  };
+  
+  // Helper function to add images to collection
+  const addImageToCollection = (img, context = '') => {
+    if (!img) return;
+    
+    console.log(`📝 Processing image from ${context}:`, img);
+    
+    let storageKey = normalizeImageKey(img);
+    
+    if (storageKey) {
+      imageCollection.set(storageKey, storageKey);
+      console.log(`📝 Added to collection - Key: "${storageKey}"`);
+    } else {
+      console.warn('⚠️ Could not extract key from image:', img);
+    }
+  };
+
+  // Collect defect images
+  if (record.defectDetails?.defectsByPc) {
+    record.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
+      if (pc.pcDefects) {
+        pc.pcDefects.forEach((defect, defectIndex) => {
+          if (defect.defectImages && Array.isArray(defect.defectImages)) {
+            defect.defectImages.forEach((img, imgIndex) => {
+              addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-img${imgIndex}`);
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // Collect additional images
+  if (record.defectDetails?.additionalImages && Array.isArray(record.defectDetails.additionalImages)) {
+    record.defectDetails.additionalImages.forEach((img, index) => {
+      addImageToCollection(img, `additional-${index}`);
+    });
+  }
+
+  // Collect new inspection images
+  if (record.inspectionDetails?.checkpointInspectionData) {
+    record.inspectionDetails.checkpointInspectionData.forEach((checkpoint, checkIndex) => {
+      if (checkpoint.comparisonImages && Array.isArray(checkpoint.comparisonImages)) {
+        checkpoint.comparisonImages.forEach((img, imgIndex) => {
+          addImageToCollection(img, `checkpoint${checkIndex}-main-img${imgIndex}`);
+        });
+      }
+      if (checkpoint.subPoints) {
+        checkpoint.subPoints.forEach((subPoint, subIndex) => {
+          if (subPoint.comparisonImages && Array.isArray(subPoint.comparisonImages)) {
+            subPoint.comparisonImages.forEach((img, imgIndex) => {
+              addImageToCollection(img, `checkpoint${checkIndex}-sub${subIndex}-img${imgIndex}`);
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // Collect legacy inspection images
+  if (record.inspectionDetails?.checkedPoints) {
+    record.inspectionDetails.checkedPoints.forEach((point, pointIndex) => {
+      if (point.comparison && Array.isArray(point.comparison)) {
+        point.comparison.forEach((img, imgIndex) => {
+          addImageToCollection(img, `legacy-point${pointIndex}-img${imgIndex}`);
+        });
+      }
+    });
+  }
+
+  // Collect machine images
+  if (record.inspectionDetails?.machineProcesses) {
+    record.inspectionDetails.machineProcesses.forEach((machine, machineIndex) => {
+      if (machine.image) {
+        addImageToCollection(machine.image, `machine${machineIndex}`);
+      }
+    });
+  }
+
+  console.log(`🖼️ Total unique images to load: ${imageCollection.size}`);
+  
+  if (imageCollection.size === 0) {
+    console.log('No images found, proceeding without loading');
+    return {};
+  }
+
+  // Load images with the same logic as the wrapper component
+  const loadImageAsBase64 = async (src, API_BASE_URL) => {
+    let imageUrl = src;
+    
+    // Handle different image data formats
+    if (typeof src === 'object' && src !== null) {
+      if (src.originalUrl) {
+        imageUrl = src.originalUrl;
+      } else {
+        imageUrl = src.url || src.src || src.path || JSON.stringify(src);
+      }
+    }
+    
+    if (typeof src === 'string' && src.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(src);
+        if (parsed.originalUrl) {
+          imageUrl = parsed.originalUrl;
+        } else {
+          imageUrl = parsed.url || parsed.src || parsed.path || src;
+        }
+      } catch (e) {
+        imageUrl = src;
+      }
+    }
+
+    if (!imageUrl || typeof imageUrl !== 'string') {
+      console.warn('Invalid image URL:', src);
+      return null;
+    }
+
+    // If already base64, return as-is
+    if (imageUrl.startsWith('data:')) {
+      return imageUrl;
+    }
+
+    try {
+      // Clean and normalize the URL
+      let cleanUrl = imageUrl.trim();
+      
+      // Handle relative URLs
+      if (cleanUrl.startsWith('/storage/') || cleanUrl.startsWith('/public/')) {
+        cleanUrl = `${API_BASE_URL}${cleanUrl}`;
+      }
+      
+      // Ensure proper URL encoding
+      const urlParts = cleanUrl.split('/');
+      const encodedParts = urlParts.map((part, index) => {
+        if (index < 3) return part; // Don't encode protocol and domain
+        return encodeURIComponent(decodeURIComponent(part));
+      });
+      cleanUrl = encodedParts.join('/');
+      
+      console.log('🖼️ Loading image:', cleanUrl);
+      
+      // Use the image proxy API with better error handling
+      const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
+      
+      const response = await fetch(proxyUrl, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
+        timeout: 10000 // 10 second timeout
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.dataUrl && data.dataUrl.startsWith('data:')) {
+          console.log('✅ Image loaded successfully:', cleanUrl);
+          return data.dataUrl;
+        } else {
+          console.warn('❌ Invalid response format:', data);
+          return null;
+        }
+      } else {
+        console.warn('❌ HTTP error loading image:', cleanUrl, response.status, response.statusText);
+        return null;
+      }
+      
+    } catch (error) {
+      console.warn('❌ Error loading image:', imageUrl, error.message);
+      return null;
+    }
+  };
+
+  // Load all images
+  const loadPromises = Array.from(imageCollection.entries()).map(async ([key, url], index) => {
+    try {
+      // Add progressive delay to avoid overwhelming server
+      await new Promise(resolve => setTimeout(resolve, index * 100));
+      
+      console.log(`🔄 Loading image ${index + 1}/${imageCollection.size}: ${key}`);
+      
+      const base64 = await loadImageAsBase64(url, API_BASE_URL);
+      
+      if (base64 && base64.startsWith('data:')) {
+        imageMap[key] = base64;
+        console.log(`✅ Successfully loaded: ${key}`);
+        return { success: true, key };
+      } else {
+        console.warn(`❌ Invalid base64 data for: ${key}`);
+        return { success: false, key, error: 'Invalid base64 data' };
+      }
+    } catch (error) {
+      console.error(`❌ Failed to load ${key}:`, error.message);
+      return { success: false, key, error: error.message };
+    }
+  });
+
+  const results = await Promise.allSettled(loadPromises);
+  
+  let successCount = 0;
+  let failCount = 0;
+  
+  results.forEach((result) => {
+    if (result.status === 'fulfilled' && result.value.success) {
+      successCount++;
+    } else {
+      failCount++;
+    }
+  });
+
+  console.log(`🖼️ Image loading complete: ${successCount} success, ${failCount} failed`);
+  console.log('🔍 Final imageMap keys:', Object.keys(imageMap));
+
+  return imageMap;
+};
+
+
   // const handleDelete = async (record) => {
   //   console.log('Delete record:', record);
   //   if (window.confirm('Are you sure you want to delete this record?')) {

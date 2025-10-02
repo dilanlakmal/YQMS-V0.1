@@ -153,7 +153,7 @@ function Login({ onLogin }) {
           
           <div className="flex justify-center items-center mb-8">
             <img
-              src={`/assets/Home/YQMSLogo.png`}
+              src={`/assets/Home/YQMSLogoEdit.png`}
               alt="Loading"
               className="h-32 w-32 rounded-full"
             />

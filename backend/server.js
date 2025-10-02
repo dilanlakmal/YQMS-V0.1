@@ -7,6 +7,9 @@ import gracefulFs from 'graceful-fs';
 gracefulFs.gracefulify(fs);
 import https from "https"; 
 import axios from "axios";
+
+// Note: SSL certificate verification is handled per-request in the image proxy
+// to avoid global security implications
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
@@ -43,6 +46,8 @@ import createQCWashingModel from "./models/QCWashing.js";
 import createQCWashingDefectsModel from "./models/QCWashingDefectsModel.js";
 import createQCWashingCheckpointsModel from "./models/QCWashingCheckpointsModel.js";
 import createQCWashingFirstOutputModel from "./models/QCWashingFirstOutputModel.js";
+import React from "react";
+import { renderToBuffer } from "@react-pdf/renderer";
 import createIEWorkerTaskModel from "./models/IEWorkerTask.js";
 
 import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
@@ -151,6 +156,163 @@ export const io = new SocketIO(server, {
 app.use("/storage", express.static(path.join(__dirname, "public/storage")));
 app.use("/public", express.static(path.join(__dirname, "../public")));
 
+// Fallback for missing images - serve a default placeholder
+app.get('/storage/qc2_images/default-placeholder.png', (req, res) => {
+  // Create a simple 1x1 transparent PNG as fallback
+  const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg==', 'base64');
+  res.set('Content-Type', 'image/png');
+  res.send(transparentPng);
+});
+
+// Image proxy endpoint for PDF generation
+app.get("/api/image-proxy", async (req, res) => {
+  // Set CORS headers based on the request origin
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://192.167.12.85:3001",
+    "http://localhost:3001",
+    "https://localhost:3001",
+    "https://yqms.yaikh.com",
+    "https://192.167.12.162:3001"
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  } else {
+    res.header("Access-Control-Allow-Origin", "*");
+  }
+  
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
+  res.header("Access-Control-Max-Age", "86400");
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  try {
+    const { url } = req.query;
+    if (!url) {
+      console.log('Image proxy: No URL parameter provided');
+      return res.status(400).json({ error: "URL parameter is required" });
+    }
+
+    console.log('🖼️ Image proxy: Processing URL:', url);
+
+    let imageUrl = url;
+    
+    // Handle relative URLs
+    if (url.startsWith('/storage/') || url.startsWith('/public/')) {
+      const baseUrl = process.env.API_BASE_URL || 'https://192.167.12.85:5000';
+      imageUrl = `${baseUrl}${url}`;
+      console.log('🔗 Converted relative URL to:', imageUrl);
+    }
+
+    // Validate URL format
+    try {
+      new URL(imageUrl);
+    } catch (urlError) {
+      console.log('❌ Invalid URL format:', imageUrl);
+      return res.status(400).json({ error: 'Invalid URL format' });
+    }
+
+    const response = await axios.get(imageUrl, {
+      responseType: 'arraybuffer',
+      timeout: 20000,
+      maxRedirects: 5,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept': 'image/*,*/*;q=0.8',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Connection': 'keep-alive',
+        'Cache-Control': 'no-cache'
+      },
+      httpsAgent: new https.Agent({
+        rejectUnauthorized: process.env.NODE_ENV === 'production',
+        keepAlive: true,
+        timeout: 20000
+      }),
+      validateStatus: function (status) {
+        return status < 500;
+      }
+    });
+
+    if (response.status === 404) {
+      console.log('❌ Image not found (404):', imageUrl);
+      return res.status(404).json({ error: 'Image not found', url: imageUrl });
+    }
+
+    if (response.status >= 400) {
+      console.log(`❌ HTTP ${response.status} error for URL:`, imageUrl);
+      return res.status(response.status).json({ 
+        error: `HTTP ${response.status}: ${response.statusText}`,
+        url: imageUrl
+      });
+    }
+
+    // Validate content type
+    const contentType = response.headers['content-type'] || 'image/jpeg';
+    if (!contentType.startsWith('image/')) {
+      console.log('❌ Invalid content type:', contentType, 'for URL:', imageUrl);
+      return res.status(400).json({ error: 'URL does not point to an image', contentType });
+    }
+
+    const buffer = Buffer.from(response.data);
+    const base64 = buffer.toString('base64');
+    const dataUrl = `data:${contentType};base64,${base64}`;
+
+    console.log('✅ Successfully fetched image:', imageUrl, 'Size:', buffer.length, 'bytes');
+    
+    // Set cache headers
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.json({ dataUrl });
+
+  } catch (error) {
+    console.error('❌ Image proxy error:', {
+      message: error.message,
+      code: error.code,
+      url: url
+    });
+
+    // Return appropriate error responses
+    if (error.code === 'ENOTFOUND') {
+      return res.status(404).json({ error: 'Host not found', url });
+    }
+    if (error.code === 'ECONNREFUSED') {
+      return res.status(503).json({ error: 'Connection refused', url });
+    }
+    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+      return res.status(408).json({ error: 'Request timeout', url });
+    }
+
+    res.status(500).json({ error: 'Failed to fetch image', details: error.message, url });
+  }
+});
+
+// Add OPTIONS handler for the image proxy endpoint specifically
+app.options("/api/image-proxy", (req, res) => {
+  const origin = req.headers.origin;
+  const allowedOrigins = [
+    "https://192.167.12.85:3001",
+    "http://localhost:3001",
+    "https://localhost:3001",
+    "https://yqms.yaikh.com",
+    "https://192.167.12.162:3001"
+  ];
+
+  if (allowedOrigins.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+  } else {
+    res.header("Access-Control-Allow-Origin", "*");
+  }
+  
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
+  res.header("Access-Control-Max-Age", "86400");
+  res.status(200).end();
+});
+
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
 
@@ -168,18 +330,18 @@ const allowedOrigins = [
 
 const corsOptions = {
   origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests) or from whitelisted domains.
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.log('CORS blocked origin:', origin);
       callback(new Error("Not allowed by CORS"));
     }
   },
   methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
   allowedHeaders: "Content-Type,Authorization,Cache-Control,Origin,X-Requested-With,Accept,Pragma,Expires,Last-Modified,If-Modified-Since,If-None-Match,ETag",
   exposedHeaders: "Content-Length,Content-Type,Cache-Control,Last-Modified,ETag",
-  credentials: true,
-  optionsSuccessStatus: 204 // Use 204 No Content for preflight success, which is a common practice.
+  credentials: false, // Change this to false for image proxy requests
+  optionsSuccessStatus: 204
 };
 
 // Enable CORS with the defined options. This handles pre-flight requests automatically.
@@ -274,6 +436,244 @@ const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
+/* ------------------------------
+   QC Washing PDF Generation
+------------------------------ */
+
+// QC Washing PDF generation endpoint
+// app.get("/api/qc-washing/pdf/:id", async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { skipImages } = req.query; // Add query parameter to optionally skip images
+    
+//     // Fetch the QC washing record
+//     const record = await QCWashing.findById(id);
+//     if (!record) {
+//       return res.status(404).json({ error: "QC Washing record not found" });
+//     }
+
+//     // Fetch checkpoint definitions if needed
+//     const checkpointDefinitions = await QCWashingCheckList.find({});
+
+//     // Import the PDF component dynamically
+//     const { QcWashingFullReportPDFWrapper } = await import("../src/components/inspection/qc2_washing/Home/qcWashingFullReportPDF.jsx");
+    
+//     // Generate PDF with or without images based on query parameter
+//     const pdfBuffer = await renderToBuffer(
+//       React.createElement(QcWashingFullReportPDFWrapper, {
+//         recordData: record,
+//         comparisonData: null,
+//         API_BASE_URL: API_BASE_URL,
+//         checkpointDefinitions: checkpointDefinitions,
+//         skipImageLoading: skipImages === 'true' // Allow images unless explicitly skipped
+//       })
+//     );
+
+//     // Set response headers for PDF download
+//     res.setHeader('Content-Type', 'application/pdf');
+//     res.setHeader('Content-Disposition', `attachment; filename="QC_Washing_Report_${record.orderNo}_${record.color}.pdf"`);
+//     res.setHeader('Content-Length', pdfBuffer.length);
+    
+//     // Send the PDF buffer
+//     res.send(pdfBuffer);
+//   } catch (error) {
+//     console.error('Error generating QC Washing PDF:', error);
+//     res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
+//   }
+// });
+
+app.get("/api/qc-washing/pdf/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Fetch the QC washing record
+    const record = await QCWashing.findById(id);
+    if (!record) {
+      return res.status(404).json({ error: "QC Washing record not found" });
+    }
+
+    // Fetch checkpoint definitions
+    const checkpointDefinitions = await QCWashingCheckList.find({});
+
+    // Server-side image loading function
+    const loadImageServerSide = async (imageUrl) => {
+      try {
+        if (!imageUrl || typeof imageUrl !== 'string') return null;
+        
+        let cleanUrl = imageUrl;
+        if (imageUrl.startsWith('/storage/') || imageUrl.startsWith('/public/')) {
+          cleanUrl = `${process.env.API_BASE_URL || 'https://192.167.12.85:5000'}${imageUrl}`;
+        }
+
+        const response = await axios.get(cleanUrl, {
+          responseType: 'arraybuffer',
+          timeout: 10000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          },
+          httpsAgent: new https.Agent({
+            rejectUnauthorized: process.env.NODE_ENV === 'production'
+          })
+        });
+
+        if (response.status === 200) {
+          const buffer = Buffer.from(response.data);
+          const contentType = response.headers['content-type'] || 'image/jpeg';
+          return `data:${contentType};base64,${buffer.toString('base64')}`;
+        }
+        return null;
+      } catch (error) {
+        console.warn('Failed to load image server-side:', imageUrl, error.message);
+        return null;
+      }
+    };
+
+    // Collect and load all images server-side
+    const imageUrls = new Set();
+    const preloadedImages = {};
+
+    // Helper to collect image URLs
+    const addImageUrl = (img) => {
+      if (!img) return;
+      let url = typeof img === 'string' ? img : (img.originalUrl || img.url || img.src);
+      if (url) imageUrls.add(url);
+    };
+
+    // Collect images from defects
+    if (record.defectDetails?.defectsByPc) {
+      record.defectDetails.defectsByPc.forEach(pc => {
+        if (pc.pcDefects) {
+          pc.pcDefects.forEach(defect => {
+            if (defect.defectImages) {
+              defect.defectImages.forEach(addImageUrl);
+            }
+          });
+        }
+      });
+    }
+
+    // Collect additional images
+    if (record.defectDetails?.additionalImages) {
+      record.defectDetails.additionalImages.forEach(addImageUrl);
+    }
+
+    // Collect inspection images
+    if (record.inspectionDetails?.checkpointInspectionData) {
+      record.inspectionDetails.checkpointInspectionData.forEach(checkpoint => {
+        if (checkpoint.comparisonImages) {
+          checkpoint.comparisonImages.forEach(addImageUrl);
+        }
+        if (checkpoint.subPoints) {
+          checkpoint.subPoints.forEach(subPoint => {
+            if (subPoint.comparisonImages) {
+              subPoint.comparisonImages.forEach(addImageUrl);
+            }
+          });
+        }
+      });
+    }
+
+    // Load all images
+    console.log(`Loading ${imageUrls.size} images server-side...`);
+    const imagePromises = Array.from(imageUrls).map(async (url) => {
+      const base64 = await loadImageServerSide(url);
+      return { url, base64 };
+    });
+
+    const imageResults = await Promise.all(imagePromises);
+    imageResults.forEach(({ url, base64 }) => {
+      if (base64) preloadedImages[url] = base64;
+    });
+
+    console.log(`Successfully loaded ${Object.keys(preloadedImages).length}/${imageUrls.size} images`);
+
+    // Import the PDF component
+    const { QcWashingFullReportPDF } = await import("../src/components/inspection/qc2_washing/Home/qcWashingFullReportPDF.jsx");
+    
+    // Generate PDF with preloaded images
+    const pdfBuffer = await renderToBuffer(
+      React.createElement(QcWashingFullReportPDF, {
+        recordData: record,
+        comparisonData: null,
+        API_BASE_URL: process.env.API_BASE_URL || 'https://192.167.12.85:5000',
+        checkpointDefinitions: checkpointDefinitions,
+        preloadedImages: preloadedImages,
+        skipImageLoading: false
+      })
+    );
+
+    // Set response headers
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="QC_Washing_Report_${record.orderNo}_${record.color}_with_images.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    
+    res.send(pdfBuffer);
+  } catch (error) {
+    console.error('Error generating QC Washing PDF with images:', error);
+    res.status(500).json({ error: 'Failed to generate PDF', details: error.message });
+  }
+});
+
+// QC Washing results endpoint
+app.get("/api/qc-washing/results", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      buyer,
+      moNo,
+      color,
+      qcID
+    } = req.query;
+
+    let matchQuery = {};
+
+    // Date filtering
+    if (startDate || endDate) {
+      matchQuery.createdAt = {};
+      if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
+      if (endDate) matchQuery.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
+    }
+
+    // Other filters
+    if (buyer) matchQuery.buyer = { $regex: new RegExp(buyer, 'i') };
+    if (moNo) matchQuery.orderNo = { $regex: new RegExp(moNo, 'i') };
+    if (color) matchQuery.color = { $regex: new RegExp(color, 'i') };
+    if (qcID) matchQuery.userId = qcID;
+
+    const results = await QCWashing.find(matchQuery)
+      .sort({ createdAt: -1 })
+      .limit(1000); // Limit to prevent performance issues
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching QC Washing results:', error);
+    res.status(500).json({ error: 'Failed to fetch QC Washing results' });
+  }
+});
+
+// QC Washing filter options endpoint
+app.get("/api/qc-washing/results/filters", async (req, res) => {
+  try {
+    const [buyerOptions, moOptions, colorOptions, qcOptions] = await Promise.all([
+      QCWashing.distinct('buyer'),
+      QCWashing.distinct('orderNo'),
+      QCWashing.distinct('color'),
+      QCWashing.distinct('userId')
+    ]);
+
+    res.json({
+      buyerOptions: buyerOptions.filter(Boolean).sort(),
+      moOptions: moOptions.filter(Boolean).sort(),
+      colorOptions: colorOptions.filter(Boolean).sort(),
+      qcOptions: qcOptions.filter(Boolean).sort()
+    });
+  } catch (error) {
+    console.error('Error fetching QC Washing filter options:', error);
+    res.status(500).json({ error: 'Failed to fetch filter options' });
+  }
+});
 
 
 /* ------------------------------
