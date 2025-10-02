@@ -1,16 +1,36 @@
 // src/components/LanguageSwitcher.jsx
 
 import { Menu } from "@headlessui/react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
+import { useAuth } from "../authentication/AuthContext";
 
 const LanguageSwitcher = () => {
   const { i18n, t } = useTranslation();
+  const { user, updateUser } = useAuth();
   const [selectedLanguage, setSelectedLanguage] = useState("en"); // Default language is English
+
+  useEffect(() => {
+    // Initialize language from user preference or localStorage
+    const savedLanguage = user?.language || localStorage.getItem('preferredLanguage') || 'en';
+    setSelectedLanguage(savedLanguage);
+    i18n.changeLanguage(savedLanguage);
+  }, [user, i18n]);
 
   const changeLanguage = (lng) => {
     i18n.changeLanguage(lng);
     setSelectedLanguage(lng);
+    
+    // Update localStorage
+    localStorage.setItem('preferredLanguage', lng);
+    
+    // Update user object if available
+    if (user) {
+      updateUser({ ...user, language: lng });
+    }
+    
+    // Dispatch custom event for same-tab language changes
+    window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lng } }));
   };
 
   const languageOptions = {

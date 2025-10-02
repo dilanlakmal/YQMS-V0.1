@@ -113,7 +113,7 @@ import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 /* ------------------------------
    SQL Query Import
 ------------------------------ */
-// import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
 // import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
@@ -517,6 +517,21 @@ app.get("/api/inline-orders-details", async (req, res) => {
   }
 });
 
+/* ------------------------------
+   Graceful Shutdown
+------------------------------ */
+
+process.on("SIGINT", async () => {
+  try {
+    await closeSQLPools();
+    console.log("SQL connection pools closed.");
+  } catch (err) {
+    console.error("Error closing SQL connection pools:", err);
+  } finally {
+    process.exit(0);
+  }
+});
+
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -572,6 +587,15 @@ app.get("/api/sewing-defects", async (req, res) => {
   } catch (error) {
     // Handle errors
     res.status(500).json({ message: error.message });
+  }
+});
+
+app.get('/api/defect-definitions', async (req, res) => {
+  try {
+    const defects = await SewingDefects.find({}).sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch defect definitions' });
   }
 });
 
