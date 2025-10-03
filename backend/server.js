@@ -11747,10 +11747,52 @@ app.get("/api/cutting-inspection-progress", async (req, res) => {
 // GET unique MO Numbers from cuttinginspections
 app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
   try {
-    const { search } = req.query;
-    const query = search ? { moNo: { $regex: search, $options: "i" } } : {};
-    const moNumbers = await CuttingInspection.distinct("moNo", query);
-    res.json(moNumbers.sort());
+    const { search, startDate, endDate } = req.query;
+
+    const pipeline = [];
+
+    // ---  DATE FILTERING LOGIC ---
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+
+      pipeline.push({
+        $addFields: {
+          // Convert the 'MM/DD/YYYY' string to a real date object
+          inspectionDateAsDate: {
+            $dateFromString: {
+              dateString: "$inspectionDate",
+              format: "%m/%d/%Y"
+            }
+          }
+        }
+      });
+      pipeline.push({
+        $match: {
+          inspectionDateAsDate: {
+            $gte: start,
+            $lte: end
+          }
+        }
+      });
+    }
+
+    // --- Existing Search Logic ---
+    if (search) {
+      pipeline.push({ $match: { moNo: { $regex: search, $options: "i" } } });
+    }
+
+    // --- Final Aggregation Stages ---
+    pipeline.push({ $group: { _id: "$moNo" } });
+    pipeline.push({ $sort: { _id: 1 } });
+
+    const results = await CuttingInspection.aggregate(pipeline);
+    const moNumbers = results.map((item) => item._id);
+
+    res.json(moNumbers);
   } catch (error) {
     console.error("Error fetching MO numbers from cutting inspections:", error);
     res
@@ -11758,20 +11800,74 @@ app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
       .json({ message: "Failed to fetch MO numbers", error: error.message });
   }
 });
+// app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
+//   try {
+//     const { search } = req.query;
+//     const query = search ? { moNo: { $regex: search, $options: "i" } } : {};
+//     const moNumbers = await CuttingInspection.distinct("moNo", query);
+//     res.json(moNumbers.sort());
+//   } catch (error) {
+//     console.error("Error fetching MO numbers from cutting inspections:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch MO numbers", error: error.message });
+//   }
+// });
 
 // GET unique Table Numbers for a given MO from cuttinginspections
 app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
   try {
-    const { moNo, search } = req.query;
+    const { moNo, search, startDate, endDate } = req.query;
     if (!moNo) {
       return res.status(400).json({ message: "MO Number is required" });
     }
-    const query = { moNo };
-    if (search) {
-      query.tableNo = { $regex: search, $options: "i" };
+
+    const pipeline = [];
+
+    // --- Match by MO Number first ---
+    pipeline.push({ $match: { moNo } });
+
+    // --- FIX: DATE FILTERING LOGIC ---
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+
+      pipeline.push({
+        $addFields: {
+          inspectionDateAsDate: {
+            $dateFromString: {
+              dateString: "$inspectionDate",
+              format: "%m/%d/%Y"
+            }
+          }
+        }
+      });
+      pipeline.push({
+        $match: {
+          inspectionDateAsDate: {
+            $gte: start,
+            $lte: end
+          }
+        }
+      });
     }
-    const tableNumbers = await CuttingInspection.distinct("tableNo", query);
-    res.json(tableNumbers.sort());
+
+    // --- Existing Search Logic ---
+    if (search) {
+      pipeline.push({ $match: { tableNo: { $regex: search, $options: "i" } } });
+    }
+
+    // --- Final Aggregation Stages ---
+    pipeline.push({ $group: { _id: "$tableNo" } });
+    pipeline.push({ $sort: { _id: 1 } });
+
+    const results = await CuttingInspection.aggregate(pipeline);
+    const tableNumbers = results.map((item) => item._id);
+
+    res.json(tableNumbers);
   } catch (error) {
     console.error(
       "Error fetching Table numbers from cutting inspections:",
@@ -11782,6 +11878,28 @@ app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
       .json({ message: "Failed to fetch Table numbers", error: error.message });
   }
 });
+// app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
+//   try {
+//     const { moNo, search } = req.query;
+//     if (!moNo) {
+//       return res.status(400).json({ message: "MO Number is required" });
+//     }
+//     const query = { moNo };
+//     if (search) {
+//       query.tableNo = { $regex: search, $options: "i" };
+//     }
+//     const tableNumbers = await CuttingInspection.distinct("tableNo", query);
+//     res.json(tableNumbers.sort());
+//   } catch (error) {
+//     console.error(
+//       "Error fetching Table numbers from cutting inspections:",
+//       error
+//     );
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch Table numbers", error: error.message });
+//   }
+// });
 
 // GET full cutting inspection document for modification
 app.get("/api/cutting-inspection-details-for-modify", async (req, res) => {
@@ -12795,6 +12913,69 @@ app.get("/api/cutting-inspection-report-detail/:id", async (req, res) => {
     console.error("Error fetching cutting inspection report detail:", error);
     res.status(500).json({
       message: "Failed to fetch report detail",
+      error: error.message
+    });
+  }
+});
+
+app.get("/api/cutting-inspections/query", async (req, res) => {
+  try {
+    const { moNo, tableNo, startDate, endDate, qcId } = req.query;
+
+    if (!moNo) {
+      return res.status(400).json({ message: "MO Number is required" });
+    }
+
+    const matchQuery = { moNo };
+
+    // Add optional filters if they are provided
+    if (tableNo) {
+      matchQuery.tableNo = tableNo;
+    }
+    if (qcId) {
+      matchQuery.cutting_emp_id = qcId;
+    }
+
+    // If dates are provided, we must use an aggregation pipeline for proper date conversion
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+
+      const pipeline = [
+        { $match: matchQuery }, // Apply non-date filters first
+        {
+          $addFields: {
+            inspectionDateAsDate: {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y"
+              }
+            }
+          }
+        },
+        {
+          $match: {
+            inspectionDateAsDate: { $gte: start, $lte: end }
+          }
+        },
+        { $sort: { tableNo: 1 } }
+      ];
+
+      const reports = await CuttingInspection.aggregate(pipeline);
+      res.json(reports);
+    } else {
+      // If no dates, a simpler 'find' query is sufficient
+      const reports = await CuttingInspection.find(matchQuery).sort({
+        tableNo: 1
+      });
+      res.json(reports);
+    }
+  } catch (error) {
+    console.error("Error querying cutting inspection reports:", error);
+    res.status(500).json({
+      message: "Failed to fetch inspection reports",
       error: error.message
     });
   }

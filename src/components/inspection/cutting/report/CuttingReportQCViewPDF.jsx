@@ -139,7 +139,7 @@ const styles = StyleSheet.create({
   }
 });
 
-const getResultStatus = (
+export const getResultStatus = (
   totalInspectionQty,
   sumTotalReject,
   sumTotalPcs,
@@ -183,7 +183,7 @@ const getResultStatus = (
 };
 
 // --- HELPER FUNCTIONS ---
-const getLocalizedText = (eng, khmer, chinese, i18n) => {
+export const getLocalizedText = (eng, khmer, chinese, i18n) => {
   const lang = i18n.language;
   if (lang === "km" && khmer) return khmer;
   if (lang === "zh" && chinese) return chinese;
@@ -235,7 +235,7 @@ const decimalToFraction = (dec) => {
 
 // --- PDF COMPONENTS ---
 
-const PDFHeader = ({ report, t, resultStatus }) => (
+export const PDFHeader = ({ report, t, resultStatus }) => (
   <View style={styles.docHeader} fixed>
     <Text style={styles.companyName}>
       YORKMARS (CAMBODIA) GARMENT MFG CO., LTD
@@ -244,6 +244,9 @@ const PDFHeader = ({ report, t, resultStatus }) => (
       {t("cutting.cutPanelInspectionReportTitle")}
     </Text>
     <View style={styles.reportSubInfo}>
+      <Text>
+        {t("cutting.garmentType")}: {report.garmentType}
+      </Text>
       <Text>
         {t("cutting.moNo")}: {report.moNo}
       </Text>
@@ -265,7 +268,7 @@ const PDFHeader = ({ report, t, resultStatus }) => (
   </View>
 );
 
-const PDFFooter = () => (
+export const PDFFooter = () => (
   <Text
     style={styles.pageFooter}
     fixed
@@ -275,7 +278,7 @@ const PDFFooter = () => (
   />
 );
 
-const CutPanelDetails = ({ report, t, qcUser, i18n }) => {
+export const CutPanelDetails = ({ report, t, qcUser, i18n }) => {
   const markerRatioString =
     report.mackerRatio
       ?.map((mr) => `${mr.markerSize}: ${mr.ratio}`)
@@ -356,7 +359,7 @@ const CutPanelDetails = ({ report, t, qcUser, i18n }) => {
   );
 };
 
-const InspectionSummary = ({ data, t }) => (
+export const InspectionSummary = ({ data, t }) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>
       {t("cutting.inspectionSummaryOverall")}
@@ -422,7 +425,7 @@ const InspectionSummary = ({ data, t }) => (
   </View>
 );
 
-const MeasurementTableHeader = ({ data, t, fixed = false }) => (
+export const MeasurementTableHeader = ({ data, t, fixed = false }) => (
   <View style={[styles.tableRow, styles.tableHeader]} fixed={fixed}>
     <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "8%" }]}>
       {t("cutting.size")}
@@ -450,7 +453,7 @@ const MeasurementTableHeader = ({ data, t, fixed = false }) => (
   </View>
 );
 
-const MeasurementDetails = ({ data, t }) => {
+export const MeasurementDetails = ({ data, t }) => {
   // Define the height of the header row to use as a margin.
   const headerHeight = 1;
 
@@ -511,7 +514,7 @@ const MeasurementDetails = ({ data, t }) => {
   );
 };
 
-const FabricDefectsPDF = ({ data, t }) => (
+export const FabricDefectsPDF = ({ data, t }) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>{t("cutting.fabricDefectsTitle")}</Text>
     <View style={styles.table}>
@@ -577,7 +580,7 @@ const FabricDefectsPDF = ({ data, t }) => (
   </View>
 );
 
-const CuttingIssuesPDF = ({ report, t, i18n }) => (
+export const CuttingIssuesPDF = ({ report, t, i18n }) => (
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>{t("cutting.cuttingIssuesTitle")}</Text>
     <View style={styles.table}>

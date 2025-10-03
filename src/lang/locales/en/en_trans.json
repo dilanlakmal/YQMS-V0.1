@@ -1013,7 +1013,9 @@
     "actionsComments": "Actions",
     "featureComingSoon": "This Feature Coming Soon..",
     "actionRequired": "Action Require",
-    "noActionRequired": "No Action Require"
+    "noActionRequired": "No Action Require",
+    "pdf": "PDF",
+    "generatingPDF": "Generating PDF..."
   },
 
   "editGar": {
