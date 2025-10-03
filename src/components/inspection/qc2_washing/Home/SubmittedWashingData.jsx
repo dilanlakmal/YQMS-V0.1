@@ -638,19 +638,34 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
   
   // Helper function to add images to collection
   const addImageToCollection = (img, context = '') => {
-    if (!img) return;
-    
-    console.log(`📝 Processing image from ${context}:`, img);
-    
-    let storageKey = normalizeImageKey(img);
-    
-    if (storageKey) {
-      imageCollection.set(storageKey, storageKey);
-      console.log(`📝 Added to collection - Key: "${storageKey}"`);
-    } else {
-      console.warn('⚠️ Could not extract key from image:', img);
+  if (!img) return;
+  
+  console.log(`📝 Processing image from ${context}:`, img);
+  
+  // Generate multiple possible keys for the same image
+  const possibleKeys = [];
+  
+  if (typeof img === 'string') {
+    possibleKeys.push(img.trim());
+    // Also try without leading slash if present
+    if (img.startsWith('/')) {
+      possibleKeys.push(img.substring(1));
     }
-  };
+  } else if (typeof img === 'object' && img !== null) {
+    if (img.originalUrl) possibleKeys.push(img.originalUrl);
+    if (img.url) possibleKeys.push(img.url);
+    if (img.src) possibleKeys.push(img.src);
+    if (img.path) possibleKeys.push(img.path);
+    possibleKeys.push(JSON.stringify(img));
+  }
+  
+  // Store all possible keys pointing to the same image
+  possibleKeys.forEach(key => {
+    if (key && key.trim()) {
+      imageCollection.set(key.trim(), img);
+    }
+  });
+};
 
   // Collect defect images
   if (record.defectDetails?.defectsByPc) {
@@ -723,90 +738,129 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
 
   // Load images with the same logic as the wrapper component
   const loadImageAsBase64 = async (src, API_BASE_URL) => {
-    let imageUrl = src;
-    
-    // Handle different image data formats
-    if (typeof src === 'object' && src !== null) {
-      if (src.originalUrl) {
-        imageUrl = src.originalUrl;
-      } else {
-        imageUrl = src.url || src.src || src.path || JSON.stringify(src);
-      }
+  let imageUrl = src;
+  
+  // Handle different image data formats
+  if (typeof src === 'object' && src !== null) {
+    if (src.originalUrl) {
+      imageUrl = src.originalUrl;
+    } else {
+      imageUrl = src.url || src.src || src.path || JSON.stringify(src);
     }
-    
-    if (typeof src === 'string' && src.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(src);
-        if (parsed.originalUrl) {
-          imageUrl = parsed.originalUrl;
-        } else {
-          imageUrl = parsed.url || parsed.src || parsed.path || src;
-        }
-      } catch (e) {
-        imageUrl = src;
-      }
-    }
-
-    if (!imageUrl || typeof imageUrl !== 'string') {
-      console.warn('Invalid image URL:', src);
-      return null;
-    }
-
-    // If already base64, return as-is
-    if (imageUrl.startsWith('data:')) {
-      return imageUrl;
-    }
-
+  }
+  
+  if (typeof src === 'string' && src.startsWith('{')) {
     try {
-      // Clean and normalize the URL
-      let cleanUrl = imageUrl.trim();
-      
-      // Handle relative URLs
-      if (cleanUrl.startsWith('/storage/') || cleanUrl.startsWith('/public/')) {
-        cleanUrl = `${API_BASE_URL}${cleanUrl}`;
-      }
-      
-      // Ensure proper URL encoding
-      const urlParts = cleanUrl.split('/');
-      const encodedParts = urlParts.map((part, index) => {
-        if (index < 3) return part; // Don't encode protocol and domain
-        return encodeURIComponent(decodeURIComponent(part));
-      });
-      cleanUrl = encodedParts.join('/');
-      
-      console.log('🖼️ Loading image:', cleanUrl);
-      
-      // Use the image proxy API with better error handling
-      const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
-      
-      const response = await fetch(proxyUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Cache-Control': 'no-cache'
-        },
-        timeout: 10000 // 10 second timeout
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-          console.log('✅ Image loaded successfully:', cleanUrl);
-          return data.dataUrl;
-        } else {
-          console.warn('❌ Invalid response format:', data);
-          return null;
-        }
+      const parsed = JSON.parse(src);
+      if (parsed.originalUrl) {
+        imageUrl = parsed.originalUrl;
       } else {
-        console.warn('❌ HTTP error loading image:', cleanUrl, response.status, response.statusText);
+        imageUrl = parsed.url || parsed.src || parsed.path || src;
+      }
+    } catch (e) {
+      imageUrl = src;
+    }
+  }
+
+  if (!imageUrl || typeof imageUrl !== 'string') {
+    console.warn('Invalid image URL:', src);
+    return null;
+  }
+
+  // If already base64, return as-is
+  if (imageUrl.startsWith('data:')) {
+    return imageUrl;
+  }
+
+  try {
+    // Clean and normalize the URL
+    let cleanUrl = imageUrl.trim();
+    
+    // Handle relative URLs
+    if (cleanUrl.startsWith('/storage/') || cleanUrl.startsWith('/public/')) {
+      cleanUrl = `${API_BASE_URL}${cleanUrl}`;
+    }
+    
+    // FIXED: Try direct loading for static files first
+    if (cleanUrl.startsWith('https://192.167.12.85:5000/storage/') || 
+        cleanUrl.startsWith('https://192.167.12.85:5000/public/')) {
+      console.log('🖼️ Attempting direct load for static file:', cleanUrl);
+      
+      try {
+        const directResponse = await fetch(cleanUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*,*/*;q=0.8',
+            'Cache-Control': 'no-cache'
+          },
+          timeout: 10000
+        });
+
+        if (directResponse.ok) {
+          const arrayBuffer = await directResponse.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          
+          // Convert to base64
+          let binary = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, chunk);
+          }
+          
+          const base64 = btoa(binary);
+          const contentType = directResponse.headers.get('content-type') || 'image/jpeg';
+          const dataUrl = `data:${contentType};base64,${base64}`;
+          
+          console.log('✅ Direct load successful:', cleanUrl);
+          return dataUrl;
+        }
+      } catch (directError) {
+        console.log('⚠️ Direct load failed, falling back to proxy:', directError.message);
+      }
+    }
+    
+    // Ensure proper URL encoding for proxy fallback
+    const urlParts = cleanUrl.split('/');
+    const encodedParts = urlParts.map((part, index) => {
+      if (index < 3) return part; // Don't encode protocol and domain
+      return encodeURIComponent(decodeURIComponent(part));
+    });
+    cleanUrl = encodedParts.join('/');
+    
+    console.log('🖼️ Loading image via proxy:', cleanUrl);
+    
+    // Use the image proxy API with better error handling
+    const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
+    
+    const response = await fetch(proxyUrl, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json',
+        'Cache-Control': 'no-cache'
+      },
+      timeout: 10000 // 10 second timeout
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.dataUrl && data.dataUrl.startsWith('data:')) {
+        console.log('✅ Image loaded successfully via proxy:', cleanUrl);
+        return data.dataUrl;
+      } else {
+        console.warn('❌ Invalid response format:', data);
         return null;
       }
-      
-    } catch (error) {
-      console.warn('❌ Error loading image:', imageUrl, error.message);
+    } else {
+      console.warn('❌ HTTP error loading image:', cleanUrl, response.status, response.statusText);
       return null;
     }
-  };
+    
+  } catch (error) {
+    console.warn('❌ Error loading image:', imageUrl, error.message);
+    return null;
+  }
+};
 
   // Load all images
   const loadPromises = Array.from(imageCollection.entries()).map(async ([key, url], index) => {

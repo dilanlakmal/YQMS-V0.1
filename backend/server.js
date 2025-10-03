@@ -153,8 +153,37 @@ export const io = new SocketIO(server, {
   },
 });
 
-app.use("/storage", express.static(path.join(__dirname, "public/storage")));
-app.use("/public", express.static(path.join(__dirname, "../public")));
+// app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+// app.use("/public", express.static(path.join(__dirname, "../public")));
+
+app.use("/storage", (req, res, next) => {
+  // Set CORS headers for all origins for static files
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
+  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Type");
+  
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+}, express.static(path.join(__dirname, "public/storage")));
+
+app.use("/public", (req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
+  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Type");
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+}, express.static(path.join(__dirname, "../public")));
+
 
 // Fallback for missing images - serve a default placeholder
 app.get('/storage/qc2_images/default-placeholder.png', (req, res) => {
@@ -194,19 +223,20 @@ app.get("/api/image-proxy", async (req, res) => {
   try {
     const { url } = req.query;
     if (!url) {
-      console.log('Image proxy: No URL parameter provided');
       return res.status(400).json({ error: "URL parameter is required" });
     }
 
     console.log('🖼️ Image proxy: Processing URL:', url);
-
     let imageUrl = url;
     
-    // Handle relative URLs
+    // Handle relative URLs with more flexibility
     if (url.startsWith('/storage/') || url.startsWith('/public/')) {
       const baseUrl = process.env.API_BASE_URL || 'https://192.167.12.85:5000';
       imageUrl = `${baseUrl}${url}`;
-      console.log('🔗 Converted relative URL to:', imageUrl);
+    } else if (url.startsWith('storage/') || url.startsWith('public/')) {
+      // Handle URLs without leading slash
+      const baseUrl = process.env.API_BASE_URL || 'https://192.167.12.85:5000';
+      imageUrl = `${baseUrl}/${url}`;
     }
 
     // Validate URL format

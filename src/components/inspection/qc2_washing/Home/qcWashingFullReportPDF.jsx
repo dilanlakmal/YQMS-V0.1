@@ -212,17 +212,57 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
     
-    // Ensure proper URL encoding
-    const urlParts = cleanUrl.split('/');
-    const encodedParts = urlParts.map((part, index) => {
-      if (index < 3) return part; // Don't encode protocol and domain
-      return encodeURIComponent(decodeURIComponent(part));
-    });
-    cleanUrl = encodedParts.join('/');
+    // FIXED: Handle ALL URL types - both capture and upload images
+    // Try direct fetch first for all URLs (both local server and external)
+    if (cleanUrl.includes('192.167.12.85:5000') || cleanUrl.includes('yqms.yaikh.com') || cleanUrl.startsWith('http')) {
+      console.log('🖼️ Attempting direct load for URL:', cleanUrl);
+      
+      try {
+        const directResponse = await fetch(cleanUrl, {
+          method: 'GET',
+          headers: {
+            'Accept': 'image/*,*/*;q=0.8',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache'
+          },
+          mode: 'cors',
+          timeout: 15000
+        });
+        
+        if (directResponse.ok) {
+          const blob = await directResponse.blob();
+          
+          // Use FileReader for more reliable base64 conversion
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+              setTimeout(() => {
+                const dataUrl = reader.result;
+                if (dataUrl && dataUrl.length > 1000 && dataUrl.startsWith('data:image/')) {
+                  console.log('✅ Direct load successful:', cleanUrl);
+                  resolve(dataUrl);
+                } else {
+                  console.warn('⚠️ Invalid base64 data:', cleanUrl);
+                  resolve(null);
+                }
+              }, 10);
+            };
+            reader.onerror = () => {
+              console.warn('⚠️ FileReader error:', cleanUrl);
+              resolve(null);
+            };
+            reader.readAsDataURL(blob);
+          });
+        } else {
+          console.log('⚠️ Direct load failed with status:', directResponse.status);
+        }
+      } catch (directError) {
+        console.log('⚠️ Direct load failed:', directError.message);
+      }
+    }
     
-    console.log('🖼️ Loading image:', cleanUrl);
-    
-    // Use the image proxy API with better error handling
+    // Fallback to proxy for all URLs
+    console.log('🖼️ Loading via proxy:', cleanUrl);
     const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
     
     const response = await fetch(proxyUrl, {
@@ -231,28 +271,46 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
         'Accept': 'application/json',
         'Cache-Control': 'no-cache'
       },
-      timeout: 10000 // 10 second timeout
+      timeout: 15000
     });
 
     if (response.ok) {
       const data = await response.json();
       if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-        console.log('✅ Image loaded successfully:', cleanUrl);
-        return data.dataUrl;
+        // Validate proxy base64 data
+        const base64Part = data.dataUrl.split(',')[1];
+        if (base64Part && base64Part.length > 100) {
+          console.log('✅ Proxy load successful:', cleanUrl);
+          return data.dataUrl;
+        } else {
+          console.warn('⚠️ Proxy base64 data invalid:', cleanUrl);
+          return null;
+        }
+      } else if (data.base64 && data.contentType) {
+        // Handle alternative response format
+        if (data.base64.length > 100) {
+          const dataUrl = `data:${data.contentType};base64,${data.base64}`;
+          console.log('✅ Proxy load successful (alt format):', cleanUrl);
+          return dataUrl;
+        } else {
+          console.warn('⚠️ Alt format base64 data invalid:', cleanUrl);
+          return null;
+        }
       } else {
-        console.warn('❌ Invalid response format:', data);
-        return null;
+        console.warn('❌ Invalid proxy response format:', data);
       }
     } else {
-      console.warn('❌ HTTP error loading image:', cleanUrl, response.status, response.statusText);
-      return null;
+      console.warn('❌ Proxy load failed:', response.status, response.statusText);
     }
+    
+    return null;
     
   } catch (error) {
     console.warn('❌ Error loading image:', imageUrl, error.message);
     return null;
   }
 };
+
 
 // --- FIXED HELPER FUNCTION TO NORMALIZE IMAGE KEYS ---
 const normalizeImageKey = (src) => {
@@ -741,6 +799,48 @@ const InspectionDetailsSection = ({ inspectionDetails, SafeImage }) => {
                   </View>
                 )}
 
+                {/* Time Hot Row */}
+                {machine.timeHot && (machine.timeHot.actualValue !== undefined && machine.timeHot.actualValue !== null && machine.timeHot.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time Hot</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeHot.standardValue)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeHot.actualValue)}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.timeHot.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.timeHot.status?.ok ? "OK" : "NO"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
+                {/* Time Cool Row */}
+                {machine.timeCool && (machine.timeCool.actualValue !== undefined && machine.timeCool.actualValue !== null && machine.timeCool.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time Cool</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeCool.standardValue)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeCool.actualValue)}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.timeCool.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.timeCool.status?.ok ? "OK" : "NO"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
                 {/* Silicon Row */}
                 {machine.silicon?.actualValue && (
                   <View style={styles.tableRow}>
@@ -1087,6 +1187,48 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                       machine.time.status?.ok ? styles.passGreen : styles.failRed
                     ]}>
                       {machine.time.status?.ok ? "OK" : "NO"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
+                {/* Time Hot Row */}
+                {machine.timeHot && (machine.timeHot.actualValue !== undefined && machine.timeHot.actualValue !== null && machine.timeHot.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time Hot</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeHot.standardValue)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeHot.actualValue)}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.timeHot.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.timeHot.status?.ok ? "OK" : "NO"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
+                  </View>
+                )}
+
+                {/* Time Cool Row */}
+                {machine.timeCool && (machine.timeCool.actualValue !== undefined && machine.timeCool.actualValue !== null && machine.timeCool.actualValue !== "") && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>Time Cool</Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeCool.standardValue)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.timeCool.actualValue)}
+                    </Text>
+                    <Text style={[
+                      styles.tableCol, 
+                      { width: "20%" },
+                      machine.timeCool.status?.ok ? styles.passGreen : styles.failRed
+                    ]}>
+                      {machine.timeCool.status?.ok ? "OK" : "NO"}
                     </Text>
                     <Text style={[styles.tableCol, { width: "20%" }]}>min</Text>
                   </View>
@@ -1449,65 +1591,149 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
 
   // FIXED SafeImage component with better key matching
   const SafeImage = ({ src, style, alt }) => {
-    console.log('🔍 SafeImage called with src:', src);
+  console.log('🔍 SafeImage called with src:', src);
+  
+  // Enhanced key generation to handle all possible URL formats
+  const generateAllPossibleKeys = (src) => {
+    const keys = new Set();
     
-    // Generate consistent keys for lookup using the same logic as storage
-    const generateImageKeys = (src) => {
-      const keys = [];
-      
-      if (typeof src === 'string') {
-        keys.push(src.trim());
-        keys.push(src); // Also try untrimmed version
-      } else if (typeof src === 'object' && src !== null) {
-        // Try all possible properties in the same order as storage
-        if (src.originalUrl) keys.push(src.originalUrl);
-        if (src.url) keys.push(src.url);
-        if (src.src) keys.push(src.src);
-        if (src.path) keys.push(src.path);
-        // Also add the stringified version
-        keys.push(JSON.stringify(src));
+    if (typeof src === 'string') {
+      const cleanSrc = src.trim();
+      if (cleanSrc) { // Only add non-empty strings
+        keys.add(cleanSrc);
+        keys.add(src); // untrimmed version
+        
+        // Handle different URL formats
+        if (cleanSrc.startsWith('/')) {
+          keys.add(cleanSrc.substring(1)); // without leading slash
+        } else {
+          keys.add('/' + cleanSrc); // with leading slash
+        }
+        
+        // Handle full URLs for 192.167.12.85:5000
+        if (cleanSrc.includes('192.167.12.85:5000')) {
+          const urlParts = cleanSrc.split('192.167.12.85:5000');
+          if (urlParts.length > 1) {
+            const path = urlParts[1];
+            if (path) {
+              keys.add(path);
+              keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
+            }
+          }
+        }
+        
+        // Handle yqms.yaikh.com URLs
+        if (cleanSrc.includes('yqms.yaikh.com')) {
+          const urlParts = cleanSrc.split('yqms.yaikh.com');
+          if (urlParts.length > 1) {
+            const path = urlParts[1];
+            if (path) {
+              keys.add(path);
+              keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
+            }
+          }
+        }
+        
+        // Handle storage and public paths specifically
+        if (cleanSrc.includes('/storage/') || cleanSrc.includes('/public/')) {
+          const pathMatch = cleanSrc.match(/(\/(?:storage|public)\/.+)/);
+          if (pathMatch && pathMatch[1]) {
+            keys.add(pathMatch[1]); // with leading slash
+            keys.add(pathMatch[1].substring(1)); // without leading slash
+          }
+        }
       }
+    } else if (typeof src === 'object' && src !== null) {
+      // Handle object formats
+      const possibleUrls = [
+        src.originalUrl,
+        src.url,
+        src.src,
+        src.path
+      ].filter(url => url && typeof url === 'string' && url.trim());
       
-      return [...new Set(keys)]; // Remove duplicates
-    };
-
-    const possibleKeys = generateImageKeys(src);
-    console.log('🔍 Trying keys:', possibleKeys);
-    console.log('🔍 Available preloaded keys:', Object.keys(preloadedImages));
-
-    // Try to find image with any of the possible keys
-    let imageSrc = null;
-    let matchedKey = null;
-    
-    for (const key of possibleKeys) {
-      if (preloadedImages[key]) {
-        imageSrc = preloadedImages[key];
-        matchedKey = key;
-        break;
+      possibleUrls.forEach(url => {
+        const subKeys = generateAllPossibleKeys(url);
+        subKeys.forEach(key => keys.add(key));
+      });
+      
+      // Only add JSON string if it's meaningful
+      try {
+        const jsonStr = JSON.stringify(src);
+        if (jsonStr && jsonStr !== '{}' && jsonStr !== 'null') {
+          keys.add(jsonStr);
+        }
+      } catch (e) {
+        // Ignore JSON stringify errors
       }
     }
-
-    if (!imageSrc) {
-      console.warn('🔍 Image not found in preloadedImages. Tried keys:', possibleKeys);
-      const filename = possibleKeys[0] ? possibleKeys[0].split('/').pop() || 'Image' : 'Image';
-      return <ImagePlaceholder style={style} text={filename} subtext="Not Found" />;
-    }
-
-    console.log('✅ Found image for key:', matchedKey);
     
-    // Validate base64 format
-    if (!imageSrc.startsWith('data:')) {
-      console.warn('⚠️ Invalid image format, expected base64 data URL');
-      return <ImagePlaceholder style={style} text="Invalid Format" subtext="Bad Data" />;
-    }
-
-    try {
-      return <Image src={imageSrc} style={style} />;
-    } catch (error) {
-      console.error('❌ Error rendering image:', error);
-      return <ImagePlaceholder style={style} text="Render Error" subtext={error.message} />;
-    }
+    return Array.from(keys).filter(key => key && key.trim()); // Filter out empty keys
   };
+
+  const possibleKeys = generateAllPossibleKeys(src);
+  console.log('🔍 Trying keys:', possibleKeys);
+  console.log('🔍 Available preloaded keys:', Object.keys(preloadedImages));
+
+  // Try to find image with any of the possible keys
+  let imageSrc = null;
+  let matchedKey = null;
+  
+  for (const key of possibleKeys) {
+    if (preloadedImages[key]) {
+      imageSrc = preloadedImages[key];
+      matchedKey = key;
+      break;
+    }
+  }
+
+  if (!imageSrc) {
+    console.warn('🔍 Image not found in preloadedImages. Tried keys:', possibleKeys);
+    console.warn('🔍 Sample available keys:', Object.keys(preloadedImages).slice(0, 5));
+    const filename = possibleKeys[0] ? possibleKeys[0].split('/').pop() || 'Image' : 'Image';
+    return <ImagePlaceholder style={style} text={filename} subtext="Not Found" />;
+  }
+
+  console.log('✅ Found image for key:', matchedKey);
+  
+  // Enhanced validation for base64 format
+  if (!imageSrc || typeof imageSrc !== 'string' || !imageSrc.startsWith('data:')) {
+    console.warn('⚠️ Invalid image format, expected base64 data URL');
+    return <ImagePlaceholder style={style} text="Invalid Format" subtext="Bad Data" />;
+  }
+
+  // Additional validation for base64 data
+  const base64Parts = imageSrc.split(',');
+  if (base64Parts.length !== 2) {
+    console.warn('⚠️ Malformed base64 data URL');
+    return <ImagePlaceholder style={style} text="Malformed Data" subtext="Invalid Structure" />;
+  }
+
+  const base64Part = base64Parts[1];
+  if (!base64Part || base64Part.length < 100) {
+    console.warn('⚠️ Base64 data too short or missing');
+    return <ImagePlaceholder style={style} text="Corrupted Data" subtext="Invalid Base64" />;
+  }
+
+  // Validate base64 string
+  try {
+    // Test if base64 is valid
+    const testDecode = atob(base64Part.substring(0, 100));
+    if (!testDecode) {
+      throw new Error('Invalid base64');
+    }
+  } catch (e) {
+    console.warn('⚠️ Base64 validation failed:', e.message);
+    return <ImagePlaceholder style={style} text="Invalid Base64" subtext="Decode Error" />;
+  }
+
+  try {
+    return <Image src={imageSrc} style={style} />;
+  } catch (error) {
+    console.error('❌ Error rendering image:', error);
+    return <ImagePlaceholder style={style} text="Render Error" subtext={error.message} />;
+  }
+};
 
   const getCheckpointStatus = (checkpointId, decision, checkpointDefinitions) => {
     if (!Array.isArray(checkpointDefinitions) || !checkpointId || !decision) {
@@ -1680,20 +1906,87 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
         
         // FIXED: Consistent helper function to add images using the same key logic
         const addImageToCollection = (img, context = '') => {
-          if (!img) return;
-          
-          console.log(`📝 Processing image from ${context}:`, img);
-          
-          // Use the same key normalization logic as SafeImage
-          let storageKey = normalizeImageKey(img);
-          
-          if (storageKey) {
-            imageCollection.set(storageKey, storageKey); // Store the key as both key and value for now
-            console.log(`📝 Added to collection - Key: "${storageKey}"`);
-          } else {
-            console.warn('⚠️ Could not extract key from image:', img);
-          }
-        };
+  if (!img) return;
+  
+  console.log(`📝 Processing image from ${context}:`, img);
+  
+  // Generate all possible keys for this image
+  const generateStorageKeys = (img) => {
+    const keys = new Set();
+    
+    if (typeof img === 'string') {
+      const cleanImg = img.trim();
+      keys.add(cleanImg);
+      keys.add(img); // untrimmed
+      
+      // Handle different URL formats
+      if (cleanImg.startsWith('/')) {
+        keys.add(cleanImg.substring(1));
+      } else {
+        keys.add('/' + cleanImg);
+      }
+      
+      // Handle full URLs - extract path for 192.167.12.85:5000
+      if (cleanImg.includes('192.167.12.85:5000')) {
+        const urlParts = cleanImg.split('192.167.12.85:5000');
+        if (urlParts.length > 1) {
+          const path = urlParts[1];
+          keys.add(path);
+          keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
+        }
+      }
+      
+      // FIXED: Handle yqms.yaikh.com URLs - extract path
+      if (cleanImg.includes('yqms.yaikh.com')) {
+        const urlParts = cleanImg.split('yqms.yaikh.com');
+        if (urlParts.length > 1) {
+          const path = urlParts[1];
+          keys.add(path);
+          keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
+        }
+      }
+      
+      // Handle storage/public paths
+      if (cleanImg.includes('/storage/') || cleanImg.includes('/public/')) {
+        const pathMatch = cleanImg.match(/(\/(?:storage|public)\/.+)/);
+        if (pathMatch) {
+          keys.add(pathMatch[1]);
+          keys.add(pathMatch[1].substring(1));
+        }
+      }
+      
+    } else if (typeof img === 'object' && img !== null) {
+      const possibleUrls = [
+        img.originalUrl,
+        img.url,
+        img.src,
+        img.path
+      ].filter(Boolean);
+      
+      possibleUrls.forEach(url => {
+        if (typeof url === 'string') {
+          const subKeys = generateStorageKeys(url);
+          subKeys.forEach(key => keys.add(key));
+        }
+      });
+      
+      keys.add(JSON.stringify(img));
+    }
+    
+    return Array.from(keys);
+  };
+
+  const possibleKeys = generateStorageKeys(img);
+  
+  // Store all possible keys pointing to the same image source
+  possibleKeys.forEach(key => {
+    if (key && key.trim()) {
+      imageCollection.set(key.trim(), img);
+      console.log(`📝 Added to collection - Key: "${key.trim()}"`);
+    }
+  });
+};
+
 
         // Collect defect images
         if (recordData.defectDetails?.defectsByPc) {
