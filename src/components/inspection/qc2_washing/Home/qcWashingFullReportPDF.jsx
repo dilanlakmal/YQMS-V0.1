@@ -156,15 +156,34 @@ const styles = StyleSheet.create({
 // --- HELPER FUNCTIONS ---
 const safeString = (value) => {
   if (value === null || value === undefined) return "N/A";
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed === '' ? "N/A" : trimmed;
+  }
+  if (typeof value === 'number') return value.toString();
   const stringValue = String(value).trim();
-  return stringValue || "N/A";
+  return stringValue === '' ? "N/A" : stringValue;
 };
 
 // Safe Text Component to prevent empty string errors
 const SafeText = ({ children, style, ...props }) => {
-  const content = children || 'N/A';
-  const safeContent = typeof content === 'string' ? content.trim() || 'N/A' : content;
-  return <Text style={style} {...props}>{safeContent}</Text>;
+  // Handle all falsy values and empty strings
+  let content = children;
+  
+  if (content === null || content === undefined || content === '') {
+    content = 'N/A';
+  } else if (typeof content === 'string') {
+    content = content.trim();
+    if (content === '') {
+      content = 'N/A';
+    }
+  } else if (typeof content === 'number') {
+    content = content.toString();
+  } else {
+    content = String(content);
+  }
+  
+  return <Text style={style} {...props}>{content}</Text>;
 };
 
 // --- FIXED IMAGE LOADING UTILITY ---
@@ -223,93 +242,81 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
     }
     
     // ENHANCED: Better handling for different image sources
-    // Try direct fetch first for external URLs
-    if (cleanUrl.includes('192.167.12.85:5000') || cleanUrl.includes('yqms.yaikh.com') || cleanUrl.startsWith('http')) {
-      console.log('🖼️ Attempting direct load for URL:', cleanUrl);
-      
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
-        const directResponse = await fetch(cleanUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'image/*,*/*;q=0.8',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          },
-          mode: 'cors',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (directResponse.ok) {
-          const contentType = directResponse.headers.get('content-type');
-          
-          // Validate content type
-          if (!contentType || !contentType.startsWith('image/')) {
-            console.warn('⚠️ Invalid content type:', contentType);
-            throw new Error('Invalid content type');
-          }
-          
-          const blob = await directResponse.blob();
-          
-          // Validate blob size
-          if (blob.size < 100) {
-            console.warn('⚠️ Image too small:', blob.size, 'bytes');
-            throw new Error('Image too small');
-          }
-          
-          // Use FileReader for more reliable base64 conversion
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => {
-              const dataUrl = reader.result;
-              if (dataUrl && dataUrl.length > 1000 && dataUrl.startsWith('data:image/')) {
-                // Additional validation - try to decode base64
-                try {
-                  const base64Part = dataUrl.split(',')[1];
-                  atob(base64Part.substring(0, 100)); // Test decode
-                  console.log('✅ Direct load successful:', cleanUrl);
-                  resolve(dataUrl);
-                } catch (decodeError) {
-                  console.warn('⚠️ Base64 decode failed:', decodeError.message);
-                  resolve(null);
+    // Try direct fetch first for external URLs if they look like valid image URLs
+    if (cleanUrl.startsWith('http')) {
+        console.log('🖼️ Attempting direct load for URL:', cleanUrl);
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
+
+            const directResponse = await fetch(cleanUrl, {
+                method: 'GET',
+                headers: { 'Accept': 'image/*,*/*;q=0.8' },
+                mode: 'cors',
+                signal: controller.signal
+            });
+
+            clearTimeout(timeoutId);
+
+            if (directResponse.ok) {
+                const contentType = directResponse.headers.get('content-type');
+                if (!contentType || !contentType.startsWith('image/')) {
+                    console.warn(`⚠️ Invalid content type for direct fetch: ${contentType}`);
+                    throw new Error('Invalid content type');
                 }
-              } else {
-                console.warn('⚠️ Invalid base64 data format');
-                resolve(null);
-              }
-            };
-            reader.onerror = (error) => {
-              console.warn('⚠️ FileReader error:', error);
-              resolve(null);
-            };
-            reader.readAsDataURL(blob);
-          });
-        } else {
-          console.log('⚠️ Direct load failed with status:', directResponse.status);
-          throw new Error(`HTTP ${directResponse.status}`);
+
+                const arrayBuffer = await directResponse.arrayBuffer();
+                const uint8Array = new Uint8Array(arrayBuffer);
+
+                // CRITICAL FIX: Validate image headers to prevent "SOI not found"
+                const isValidJPEG = uint8Array.length >= 2 && uint8Array[0] === 0xFF && uint8Array[1] === 0xD8;
+                const isValidPNG = uint8Array.length >= 4 && uint8Array[0] === 0x89 && uint8Array[1] === 0x50 && uint8Array[2] === 0x4E && uint8Array[3] === 0x47;
+                const isValidWebP = uint8Array.length >= 12 && uint8Array[8] === 0x57 && uint8Array[9] === 0x45 && uint8Array[10] === 0x42 && uint8Array[11] === 0x50;
+
+                if (!isValidJPEG && !isValidPNG && !isValidWebP) {
+                  console.warn('⚠️ Invalid image format - no valid header found');
+                  return null; // Return null instead of throwing error
+                }
+
+                // Convert to base64 using chunks to avoid call stack issues with large images
+                let binary = '';
+                const chunkSize = 8192;
+                for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                    binary += String.fromCharCode.apply(null, uint8Array.subarray(i, i + chunkSize));
+                }
+                const base64 = btoa(binary);
+                const dataUrl = `data:${contentType};base64,${base64}`;
+
+                // Final validation
+                if (dataUrl.length > 1000) {
+                    console.log('✅ Direct load successful:', cleanUrl);
+                    return dataUrl;
+                } else {
+                    console.warn('⚠️ Generated base64 data is too short.');
+                    throw new Error('Generated base64 data too short');
+                }
+            } else {
+                console.log('⚠️ Direct load failed with status:', directResponse.status);
+                throw new Error(`HTTP ${directResponse.status}`);
+            }
+        } catch (directError) {
+            console.log('⚠️ Direct load failed, falling back to proxy:', directError.message);
+            // Fallback to proxy will happen below
         }
-      } catch (directError) {
-        console.log('⚠️ Direct load failed:', directError.message);
-        // Continue to proxy fallback
-      }
     }
+
     
     // Fallback to proxy for all URLs
     console.log('🖼️ Loading via proxy:', cleanUrl);
     const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
     
     const response = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache'
+        'Accept': 'application/json'
       },
       signal: controller.signal
     });
@@ -401,7 +408,7 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
       <Text style={styles.sectionTitle}>Order Information</Text>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         {/* Left side - Order Information */}
-        <View style={{ width: "75%" }}>
+        <View style={{ width: "80%" }}>
           <View style={styles.infoGrid}>
             <View style={styles.infoBlock}>
               <Text style={styles.infoLabel}>Order No:</Text>
@@ -442,23 +449,23 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
           </View>
         </View>
         
-        {/* Right side - Inspector Details - FIXED */}
-        <View style={{ width: "23%", padding: 8, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#f9fafb" }}>
-          <Text style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8, textAlign: "center" }]}>Inspector Details</Text>
+        {/* Right side - Inspector Details - SMALLER */}
+        <View style={{ width: "15%", padding: 4, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#f9fafb" }}>
+          <Text style={[styles.sectionTitle, { fontSize: 8, marginBottom: 4, textAlign: "center" }]}>Inspector</Text>
           
           {/* FIXED: Improved conditional rendering */}
           {inspectorDetails && Object.keys(inspectorDetails).length > 0 ? (
             <View style={{ alignItems: "center" }}>
               {/* Inspector Photo */}
               {inspectorDetails.face_photo ? (
-                <View style={{ marginBottom: 8, alignItems: "center" }}>
+                <View style={{ marginBottom: 4, alignItems: "center" }}>
                   <SafeImage
                     src={inspectorDetails.face_photo}
                     style={{
-                      width: 60,
-                      height: 60,
-                      borderRadius: 30,
-                      borderWidth: 2,
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      borderWidth: 1,
                       borderColor: "#3b82f6"
                     }}
                     alt="Inspector Photo"
@@ -466,25 +473,24 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
                 </View>
               ) : (
                 <View style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 30,
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
                   backgroundColor: "#e5e7eb",
                   justifyContent: "center",
                   alignItems: "center",
-                  marginBottom: 8,
-                  borderWidth: 2,
+                  marginBottom: 4,
+                  borderWidth: 1,
                   borderColor: "#9ca3af"
                 }}>
-                  <Text style={{ fontSize: 20, color: "#6b7280" }}>👤</Text>
+                  <Text style={{ fontSize: 14, color: "#6b7280" }}>👤</Text>
                 </View>
               )}
               
-              {/* FIXED: Improved field mapping */}
               {/* Inspector ID */}
-              <View style={{ marginBottom: 4, alignItems: "center" }}>
-                <Text style={{ fontSize: 7, color: "#6b7280", textAlign: "center" }}>Inspector ID:</Text>
-                <Text style={{ fontSize: 9, fontWeight: "bold", textAlign: "center" }}>
+              <View style={{ marginBottom: 2, alignItems: "center" }}>
+                <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>ID:</Text>
+                <SafeText style={{ fontSize: 7, fontWeight: "bold", textAlign: "center" }}>
                   {safeString(
                     inspectorDetails.emp_id || 
                     inspectorDetails.id || 
@@ -492,30 +498,27 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
                     inspectorDetails.userId ||
                     inspectorDetails._id
                   )}
-                </Text>
+                </SafeText>
               </View>
               
               {/* Inspector Name */}
               <View style={{ alignItems: "center" }}>
-                <Text style={{ fontSize: 7, color: "#6b7280", textAlign: "center" }}>Inspector Name:</Text>
-                <Text style={{ fontSize: 9, fontWeight: "bold", textAlign: "center" }}>
-                  {safeString(
-                    inspectorDetails.eng_name || 
-                    inspectorDetails.name || 
-                    inspectorDetails.inspector_name ||
-                    inspectorDetails.fullName ||
-                    inspectorDetails.username
-                  )}
-                </Text>
+                <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>Name:</Text>
+                  <SafeText style={{ fontSize: 7, fontWeight: "bold", textAlign: "center" }}>
+                    {safeString(
+                      inspectorDetails.eng_name || 
+                      inspectorDetails.name || 
+                      inspectorDetails.inspector_name ||
+                      inspectorDetails.fullName ||
+                      inspectorDetails.username
+                    )}
+                  </SafeText>
               </View>
             </View>
           ) : (
-            <View style={{ alignItems: "center", justifyContent: "center", height: 100 }}>
-              <Text style={{ fontSize: 8, color: "#6b7280", textAlign: "center" }}>
-                Inspector information not available
-              </Text>
-              <Text style={{ fontSize: 6, color: "#9ca3af", textAlign: "center", marginTop: 2 }}>
-                (Data: {JSON.stringify(inspectorDetails)})
+            <View style={{ alignItems: "center", justifyContent: "center", height: 60 }}>
+              <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}>
+                No inspector data
               </Text>
             </View>
           )}
@@ -602,38 +605,51 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImag
                   </Text>
                   <View style={[styles.tableCol, { width: "70%", flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", minHeight: 80 }]}>
                     {(() => {
-                      const capturedImages = defect.defectImages || [];
-                      const uploadedImages = defect.uploadedImages || [];
+                      // FIXED: Check multiple possible property names for images
+                      const capturedImages = defect.defectImages || defect.capturedImages || [];
+                      const uploadedImages = defect.uploadedImages || defect.uploaded_images || defect.images || [];
+                      
+                      // FIXED: Also check if defectImages contains both types
                       const allImages = [...capturedImages, ...uploadedImages];
                       
                       console.log(`🖼️ Defect ${defect.defectName} images:`, {
                         captured: capturedImages.length,
                         uploaded: uploadedImages.length,
                         total: allImages.length,
-                        capturedSample: capturedImages[0],
-                        uploadedSample: uploadedImages[0]
+                        defectObject: defect
                       });
                       
-                      return allImages.length > 0 ? (
-                        allImages.map((img, imgIndex) => {
-                          const isCaptured = imgIndex < capturedImages.length;
-                          const actualIndex = isCaptured ? imgIndex : imgIndex - capturedImages.length;
-                          
-                          return (
-                            <View key={`${isCaptured ? 'c' : 'u'}-${actualIndex}`} style={{ margin: 3, alignItems: "center" }}>
-                              <SafeImage
-                                src={img}
-                                style={styles.defectImage}
-                                alt={`Defect ${defect.defectName} - ${isCaptured ? 'Captured' : 'Uploaded'} Image ${actualIndex + 1}`}
-                              />
-                              <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center", marginTop: 2 }}>
-                                {isCaptured ? 'C' : 'U'}{actualIndex + 1}
-                              </Text>
-                            </View>
-                          );
-                        })
-                      ) : (
-                        <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
+                      if (allImages.length === 0) {
+                        return <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>;
+                      }
+                      
+                      return (
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" }}>
+                          {/* All Images */}
+                          {allImages.map((img, imgIndex) => {
+                            const isCaptured = imgIndex < capturedImages.length;
+                            const displayIndex = isCaptured ? imgIndex + 1 : imgIndex - capturedImages.length + 1;
+                            
+                            return (
+                              <View key={`image-${imgIndex}`} style={{ margin: 3, alignItems: "center" }}>
+                                <SafeImage
+                                  src={img}
+                                  style={styles.defectImage}
+                                  alt={`Defect ${defect.defectName} - ${isCaptured ? 'Captured' : 'Uploaded'} Image ${displayIndex}`}
+                                />
+                                <Text style={{ 
+                                  fontSize: 6, 
+                                  color: isCaptured ? "#16a34a" : "#2563eb", 
+                                  textAlign: "center", 
+                                  marginTop: 2, 
+                                  fontWeight: "bold" 
+                                }}>
+                                  {isCaptured ? `C${displayIndex}` : `U${displayIndex}`}
+                                </Text>
+                              </View>
+                            );
+                          })}
+                        </View>
                       );
                     })()}
                   </View>
@@ -658,6 +674,7 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImag
           <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" }}>
             {additionalImages.map((img, imgIndex) => {
               console.log(`🖼️ Processing additional image ${imgIndex + 1}:`, img);
+              console.log(`🖼️ Additional image type:`, typeof img);
               
               return (
                 <View key={imgIndex} style={{ margin: 4, alignItems: "center" }}>
@@ -833,22 +850,46 @@ const InspectionDetailsSection = ({ inspectionDetails, SafeImage }) => {
                   {safeString(point.remark)}
                 </Text>
                 <View style={[styles.tableCol, { width: "15%", flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", minHeight: 100 }]}>
-                  {point.comparison && point.comparison.length > 0 ? (
-                    point.comparison.map((img, imgIndex) => (
-                      <View key={imgIndex} style={{ margin: 2, alignItems: "center" }}>
-                        <SafeImage
-                          src={img}
-                          style={styles.inspectionImage}
-                          alt={`${point.pointName} - Comparison Image ${imgIndex + 1}`}
-                        />
-                        <Text style={{ fontSize: 4, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
-                          {imgIndex + 1}
-                        </Text>
+                  {(() => {
+                    const capturedImages = point.comparison || [];
+                    const uploadedImages = point.uploadedImages || [];
+                    const hasImages = capturedImages.length > 0 || uploadedImages.length > 0;
+                    
+                    if (!hasImages) {
+                      return <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>;
+                    }
+                    
+                    return (
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" }}>
+                        {/* Captured Images */}
+                        {capturedImages.map((img, imgIndex) => (
+                          <View key={`captured-${imgIndex}`} style={{ margin: 2, alignItems: "center" }}>
+                            <SafeImage
+                              src={img}
+                              style={styles.inspectionImage}
+                              alt={`${point.pointName} - Captured Image ${imgIndex + 1}`}
+                            />
+                            <Text style={{ fontSize: 4, color: "#16a34a", textAlign: "center", marginTop: 1, fontWeight: "bold" }}>
+                              C{imgIndex + 1}
+                            </Text>
+                          </View>
+                        ))}
+                        {/* Uploaded Images */}
+                        {uploadedImages.map((img, imgIndex) => (
+                          <View key={`uploaded-${imgIndex}`} style={{ margin: 2, alignItems: "center" }}>
+                            <SafeImage
+                              src={img}
+                              style={styles.inspectionImage}
+                              alt={`${point.pointName} - Uploaded Image ${imgIndex + 1}`}
+                            />
+                            <Text style={{ fontSize: 4, color: "#2563eb", textAlign: "center", marginTop: 1, fontWeight: "bold" }}>
+                              U{imgIndex + 1}
+                            </Text>
+                          </View>
+                        ))}
                       </View>
-                    ))
-                  ) : (
-                    <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
-                  )}
+                    );
+                  })()}
                 </View>
               </View>
             ))}
@@ -1204,7 +1245,7 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                               <Text style={{ fontSize: 8, color: "#374151", fontWeight: "500", marginRight: 4 }}>
                                 {subIndex + 1}.
                               </Text>
-                              <Text style={[
+                             <SafeText style={[
                                 styles.passStatus,
                                 { 
                                   backgroundColor: isFail ? '#fee2e2' : '#dcfce7',
@@ -1213,7 +1254,7 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                                 }
                               ]}>
                                 {displayName} - {displayOption}
-                              </Text>
+                              </SafeText>
                             </View>
                             
                             {/* Right side: Status */}
@@ -1857,6 +1898,28 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
             keys.add(pathMatch[1].substring(1));
           }
         }
+        
+        // CRITICAL FIX: Handle JSON string format that might contain image URLs
+        if (cleanSrc.startsWith('{') && cleanSrc.endsWith('}')) {
+          try {
+            const parsed = JSON.parse(cleanSrc);
+            if (parsed && typeof parsed === 'object') {
+              const possibleUrls = [
+                parsed.originalUrl,
+                parsed.url,
+                parsed.src,
+                parsed.path
+              ].filter(url => url && typeof url === 'string' && url.trim());
+              
+              possibleUrls.forEach(url => {
+                const subKeys = generateAllPossibleKeys(url);
+                subKeys.forEach(key => keys.add(key));
+              });
+            }
+          } catch (e) {
+            // If JSON parsing fails, treat as regular string
+          }
+        }
       }
     } else if (typeof src === 'object' && src !== null) {
       const possibleUrls = [
@@ -1885,15 +1948,31 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
   };
 
   const possibleKeys = generateAllPossibleKeys(src);
+  
+  // Debug logging for defect images
+  if (alt && alt.includes('Defect')) {
+    console.log(`🔍 SafeImage Debug for ${alt}:`);
+    console.log(`  Original src:`, src);
+    console.log(`  Generated keys:`, possibleKeys);
+    console.log(`  Available preloaded keys:`, Object.keys(preloadedImages).slice(0, 5), '... (showing first 5)');
+  }
 
   // Try to find image with any of the possible keys
   let imageSrc = null;
+  let matchedKey = null;
   
   for (const key of possibleKeys) {
     if (preloadedImages[key]) {
       imageSrc = preloadedImages[key];
+      matchedKey = key;
       break;
     }
+  }
+  
+  // Debug logging for defect images
+  if (alt && alt.includes('Defect')) {
+    console.log(`  Matched key:`, matchedKey);
+    console.log(`  Found image:`, imageSrc ? 'YES' : 'NO');
   }
 
   if (!imageSrc) {
@@ -1946,7 +2025,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
 
   // Detect which data structure we're dealing with
   const hasNewInspectionStructure = recordData.inspectionDetails?.checkpointInspectionData && 
-                                   recordData.inspectionDetails.checkpointInspectionData.length > 0;
+  recordData.inspectionDetails.checkpointInspectionData.length > 0;
 
   console.log('🔍 PDF Structure Detection:', {
     hasNewInspectionStructure,
@@ -2187,6 +2266,29 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
         }
       }
       
+      // CRITICAL FIX: Handle JSON string format that might contain image URLs
+      if (cleanImg.startsWith('{') && cleanImg.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(cleanImg);
+          if (parsed && typeof parsed === 'object') {
+            const possibleUrls = [
+              parsed.originalUrl,
+              parsed.url,
+              parsed.src,
+              parsed.path
+            ].filter(url => url && typeof url === 'string' && url.trim());
+            
+            possibleUrls.forEach(url => {
+              const subKeys = generateStorageKeys(url);
+              subKeys.forEach(key => keys.add(key));
+            });
+          }
+        } catch (e) {
+          // If JSON parsing fails, treat as regular string
+          console.log(`⚠️ Failed to parse JSON string: ${cleanImg}`);
+        }
+      }
+      
     } else if (typeof img === 'object' && img !== null) {
       const possibleUrls = [
         img.originalUrl,
@@ -2225,15 +2327,19 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           recordData.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
             if (pc.pcDefects) {
               pc.pcDefects.forEach((defect, defectIndex) => {
+                // FIXED: Check multiple possible property names
+                const capturedImages = defect.defectImages || defect.capturedImages || [];
+                const uploadedImages = defect.uploadedImages || defect.uploaded_images || defect.images || [];
+                
                 // Collect captured defect images
-                if (defect.defectImages && Array.isArray(defect.defectImages)) {
-                  defect.defectImages.forEach((img, imgIndex) => {
-                    addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-img${imgIndex}`);
+                if (Array.isArray(capturedImages)) {
+                  capturedImages.forEach((img, imgIndex) => {
+                    addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-captured${imgIndex}`);
                   });
                 }
                 // Collect uploaded defect images
-                if (defect.uploadedImages && Array.isArray(defect.uploadedImages)) {
-                  defect.uploadedImages.forEach((img, imgIndex) => {
+                if (Array.isArray(uploadedImages)) {
+                  uploadedImages.forEach((img, imgIndex) => {
                     addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-uploaded${imgIndex}`);
                   });
                 }
@@ -2549,5 +2655,3 @@ const QcWashingSimplePDF = ({ recordData, comparisonData = null, API_BASE_URL, c
 // Export both components for different use cases
 export default QcWashingFullReportPDFWrapper;
 export { QcWashingFullReportPDF, QcWashingFullReportPDFWrapper, QcWashingSimplePDF };
-
-

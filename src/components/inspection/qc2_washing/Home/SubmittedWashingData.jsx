@@ -1,10 +1,14 @@
 import React, { useEffect, useState } from 'react';
+import { Buffer } from 'buffer';
 import { API_BASE_URL } from '../../../../../config'; 
 import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
 import QCWashingFullReportModal from './QCWashingFullReportModal';
 import { PDFDownloadLink} from '@react-pdf/renderer';
+
+// Polyfill Buffer for client-side PDF generation
+window.Buffer = window.Buffer || Buffer;
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
@@ -665,6 +669,9 @@ const processImageToBase64 = async (imagePath) => {
     const { pdf } = await import('@react-pdf/renderer');
     const { QcWashingFullReportPDF } = await import('./qcWashingFullReportPDF');
     
+    if (!record || !record._id) {
+      throw new Error('Invalid record data');
+    }
     // Generate PDF with preloaded images and inspector details
     const blob = await pdf(
       React.createElement(QcWashingFullReportPDF, {
@@ -692,7 +699,17 @@ const processImageToBase64 = async (imagePath) => {
     
   } catch (error) {
     console.error('❌ Error generating PDF:', error);
-    alert(`Failed to generate PDF: ${error.message}`);
+    // Provide more specific error messages
+    let errorMessage = 'Failed to generate PDF';
+    if (error.message.includes('SOI not found')) {
+      errorMessage = 'Image format error. Some images may be corrupted.';
+    } else if (error.message.includes('string child')) {
+      errorMessage = 'Data formatting error. Please try again.';
+    } else if (error.message.includes('CORS')) {
+      errorMessage = 'Network access error. Please check your connection.';
+    }
+    
+    alert(`${errorMessage}: ${error.message}`);
   } finally {
     setIsQcWashingPDF(false);
   }
