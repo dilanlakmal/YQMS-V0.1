@@ -232,7 +232,23 @@ const QCWashingResults = () => {
 
   const handleDownloadPDF = async (item) => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/qc-washing/pdf/${item._id}`, {
+      // First fetch inspector details if userId exists
+      let inspectorDetails = null;
+      if (item.userId) {
+        try {
+          const inspectorResponse = await axios.get(`${API_BASE_URL}/api/users/${item.userId}`);
+          if (inspectorResponse.data && !inspectorResponse.data.error) {
+            inspectorDetails = inspectorResponse.data;
+          }
+        } catch (inspectorError) {
+          console.warn('Could not fetch inspector details:', inspectorError);
+        }
+      }
+
+      // Call PDF generation endpoint with inspector details
+      const response = await axios.post(`${API_BASE_URL}/api/qc-washing/pdf/${item._id}`, {
+        inspectorDetails: inspectorDetails
+      }, {
         responseType: 'blob'
       });
       
@@ -570,7 +586,7 @@ const QCWashingResults = () => {
           <QCWashingFullReportModal
             isOpen={isFullReportModalOpen}
             onClose={() => setIsFullReportModalOpen(false)}
-            itemData={selectedItem}
+            recordData={selectedItem}
           />
         </>
       )}

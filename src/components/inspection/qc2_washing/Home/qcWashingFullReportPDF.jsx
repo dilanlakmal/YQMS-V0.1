@@ -198,9 +198,19 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
     return null;
   }
 
-  // If already base64, return as-is
+  // If already base64, validate and return
   if (imageUrl.startsWith('data:')) {
-    return imageUrl;
+    try {
+      const base64Parts = imageUrl.split(',');
+      if (base64Parts.length === 2 && base64Parts[1].length > 100) {
+        // Test decode to ensure validity
+        atob(base64Parts[1].substring(0, 100));
+        return imageUrl;
+      }
+    } catch (e) {
+      console.warn('Invalid base64 data:', e.message);
+      return null;
+    }
   }
 
   try {
@@ -212,12 +222,15 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
     
-    // FIXED: Handle ALL URL types - both capture and upload images
-    // Try direct fetch first for all URLs (both local server and external)
+    // ENHANCED: Better handling for different image sources
+    // Try direct fetch first for external URLs
     if (cleanUrl.includes('192.167.12.85:5000') || cleanUrl.includes('yqms.yaikh.com') || cleanUrl.startsWith('http')) {
       console.log('🖼️ Attempting direct load for URL:', cleanUrl);
       
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        
         const directResponse = await fetch(cleanUrl, {
           method: 'GET',
           headers: {
@@ -226,38 +239,62 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
             'Pragma': 'no-cache'
           },
           mode: 'cors',
-          timeout: 15000
+          signal: controller.signal
         });
         
+        clearTimeout(timeoutId);
+        
         if (directResponse.ok) {
+          const contentType = directResponse.headers.get('content-type');
+          
+          // Validate content type
+          if (!contentType || !contentType.startsWith('image/')) {
+            console.warn('⚠️ Invalid content type:', contentType);
+            throw new Error('Invalid content type');
+          }
+          
           const blob = await directResponse.blob();
+          
+          // Validate blob size
+          if (blob.size < 100) {
+            console.warn('⚠️ Image too small:', blob.size, 'bytes');
+            throw new Error('Image too small');
+          }
           
           // Use FileReader for more reliable base64 conversion
           return new Promise((resolve) => {
             const reader = new FileReader();
             reader.onload = () => {
-              setTimeout(() => {
-                const dataUrl = reader.result;
-                if (dataUrl && dataUrl.length > 1000 && dataUrl.startsWith('data:image/')) {
+              const dataUrl = reader.result;
+              if (dataUrl && dataUrl.length > 1000 && dataUrl.startsWith('data:image/')) {
+                // Additional validation - try to decode base64
+                try {
+                  const base64Part = dataUrl.split(',')[1];
+                  atob(base64Part.substring(0, 100)); // Test decode
                   console.log('✅ Direct load successful:', cleanUrl);
                   resolve(dataUrl);
-                } else {
-                  console.warn('⚠️ Invalid base64 data:', cleanUrl);
+                } catch (decodeError) {
+                  console.warn('⚠️ Base64 decode failed:', decodeError.message);
                   resolve(null);
                 }
-              }, 10);
+              } else {
+                console.warn('⚠️ Invalid base64 data format');
+                resolve(null);
+              }
             };
-            reader.onerror = () => {
-              console.warn('⚠️ FileReader error:', cleanUrl);
+            reader.onerror = (error) => {
+              console.warn('⚠️ FileReader error:', error);
               resolve(null);
             };
             reader.readAsDataURL(blob);
           });
         } else {
           console.log('⚠️ Direct load failed with status:', directResponse.status);
+          throw new Error(`HTTP ${directResponse.status}`);
         }
       } catch (directError) {
         console.log('⚠️ Direct load failed:', directError.message);
+        // Continue to proxy fallback
       }
     }
     
@@ -265,35 +302,53 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
     console.log('🖼️ Loading via proxy:', cleanUrl);
     const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
     
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    
     const response = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
         'Accept': 'application/json',
         'Cache-Control': 'no-cache'
       },
-      timeout: 15000
+      signal: controller.signal
     });
+    
+    clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
+      
       if (data.dataUrl && data.dataUrl.startsWith('data:')) {
         // Validate proxy base64 data
-        const base64Part = data.dataUrl.split(',')[1];
-        if (base64Part && base64Part.length > 100) {
-          console.log('✅ Proxy load successful:', cleanUrl);
-          return data.dataUrl;
-        } else {
-          console.warn('⚠️ Proxy base64 data invalid:', cleanUrl);
+        try {
+          const base64Part = data.dataUrl.split(',')[1];
+          if (base64Part && base64Part.length > 100) {
+            atob(base64Part.substring(0, 100)); // Test decode
+            console.log('✅ Proxy load successful:', cleanUrl);
+            return data.dataUrl;
+          } else {
+            console.warn('⚠️ Proxy base64 data too short');
+            return null;
+          }
+        } catch (decodeError) {
+          console.warn('⚠️ Proxy base64 decode failed:', decodeError.message);
           return null;
         }
       } else if (data.base64 && data.contentType) {
         // Handle alternative response format
-        if (data.base64.length > 100) {
-          const dataUrl = `data:${data.contentType};base64,${data.base64}`;
-          console.log('✅ Proxy load successful (alt format):', cleanUrl);
-          return dataUrl;
-        } else {
-          console.warn('⚠️ Alt format base64 data invalid:', cleanUrl);
+        try {
+          if (data.base64.length > 100) {
+            atob(data.base64.substring(0, 100)); // Test decode
+            const dataUrl = `data:${data.contentType};base64,${data.base64}`;
+            console.log('✅ Proxy load successful (alt format):', cleanUrl);
+            return dataUrl;
+          } else {
+            console.warn('⚠️ Alt format base64 data too short');
+            return null;
+          }
+        } catch (decodeError) {
+          console.warn('⚠️ Alt format base64 decode failed:', decodeError.message);
           return null;
         }
       } else {
@@ -337,49 +392,139 @@ const PdfHeader = ({ orderNo, beforeAfterWash }) => (
   </View>
 );
 
-const OrderInfoSection = ({ recordData }) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Order Information</Text>
-    <View style={styles.infoGrid}>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Order No:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.orderNo)}</Text>
+const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
+  // Debug logging to see what data we're receiving
+  console.log('🔍 OrderInfoSection received inspectorDetails:', inspectorDetails);
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>Order Information</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        {/* Left side - Order Information */}
+        <View style={{ width: "75%" }}>
+          <View style={styles.infoGrid}>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Order No:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.orderNo)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Order Qty:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.orderQty)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Color:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.color)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Color Qty:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.colorOrderQty)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Wash Type:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.washType)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Report Type:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.reportType)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Factory:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.factoryName)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Buyer:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.buyer)}</Text>
+            </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Wash Qty:</Text>
+              <Text style={styles.infoValue}>{safeString(recordData.washQty)}</Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Right side - Inspector Details - FIXED */}
+        <View style={{ width: "23%", padding: 8, borderWidth: 1, borderColor: "#e5e7eb", backgroundColor: "#f9fafb" }}>
+          <Text style={[styles.sectionTitle, { fontSize: 10, marginBottom: 8, textAlign: "center" }]}>Inspector Details</Text>
+          
+          {/* FIXED: Improved conditional rendering */}
+          {inspectorDetails && Object.keys(inspectorDetails).length > 0 ? (
+            <View style={{ alignItems: "center" }}>
+              {/* Inspector Photo */}
+              {inspectorDetails.face_photo ? (
+                <View style={{ marginBottom: 8, alignItems: "center" }}>
+                  <SafeImage
+                    src={inspectorDetails.face_photo}
+                    style={{
+                      width: 60,
+                      height: 60,
+                      borderRadius: 30,
+                      borderWidth: 2,
+                      borderColor: "#3b82f6"
+                    }}
+                    alt="Inspector Photo"
+                  />
+                </View>
+              ) : (
+                <View style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: "#e5e7eb",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginBottom: 8,
+                  borderWidth: 2,
+                  borderColor: "#9ca3af"
+                }}>
+                  <Text style={{ fontSize: 20, color: "#6b7280" }}>👤</Text>
+                </View>
+              )}
+              
+              {/* FIXED: Improved field mapping */}
+              {/* Inspector ID */}
+              <View style={{ marginBottom: 4, alignItems: "center" }}>
+                <Text style={{ fontSize: 7, color: "#6b7280", textAlign: "center" }}>Inspector ID:</Text>
+                <Text style={{ fontSize: 9, fontWeight: "bold", textAlign: "center" }}>
+                  {safeString(
+                    inspectorDetails.emp_id || 
+                    inspectorDetails.id || 
+                    inspectorDetails.inspector_id ||
+                    inspectorDetails.userId ||
+                    inspectorDetails._id
+                  )}
+                </Text>
+              </View>
+              
+              {/* Inspector Name */}
+              <View style={{ alignItems: "center" }}>
+                <Text style={{ fontSize: 7, color: "#6b7280", textAlign: "center" }}>Inspector Name:</Text>
+                <Text style={{ fontSize: 9, fontWeight: "bold", textAlign: "center" }}>
+                  {safeString(
+                    inspectorDetails.eng_name || 
+                    inspectorDetails.name || 
+                    inspectorDetails.inspector_name ||
+                    inspectorDetails.fullName ||
+                    inspectorDetails.username
+                  )}
+                </Text>
+              </View>
+            </View>
+          ) : (
+            <View style={{ alignItems: "center", justifyContent: "center", height: 100 }}>
+              <Text style={{ fontSize: 8, color: "#6b7280", textAlign: "center" }}>
+                Inspector information not available
+              </Text>
+              <Text style={{ fontSize: 6, color: "#9ca3af", textAlign: "center", marginTop: 2 }}>
+                (Data: {JSON.stringify(inspectorDetails)})
+              </Text>
+            </View>
+          )}
+        </View>
       </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Order Qty:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.orderQty)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Color:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.color)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Color Qty:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.colorOrderQty)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Wash Type:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.washType)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Report Type:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.reportType)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Factory:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.factoryName)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Buyer:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.buyer)}</Text>
-      </View>
-      <View style={styles.infoBlock}>
-        <Text style={styles.infoLabel}>Wash Qty:</Text>
-        <Text style={styles.infoValue}>{safeString(recordData.washQty)}</Text>
-      </View>
+      
     </View>
-  </View>
-);
+  );
+};
 
 const QualitySummaryCards = ({ recordData }) => (
   <View style={styles.summaryCardGrid}>
@@ -456,26 +601,41 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImag
                     {defect.defectQty || defect.defectCount || 1}
                   </Text>
                   <View style={[styles.tableCol, { width: "70%", flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start", minHeight: 80 }]}>
-                    {defect.defectImages && defect.defectImages.length > 0 ? (
-                      defect.defectImages.map((img, imgIndex) => {
-                        console.log(`🖼️ Processing defect image ${imgIndex + 1}:`, img);
-                        
-                        return (
-                          <View key={imgIndex} style={{ margin: 3, alignItems: "center" }}>
-                            <SafeImage
-                              src={img}
-                              style={styles.defectImage}
-                              alt={`Defect ${defect.defectName} - Image ${imgIndex + 1}`}
-                            />
-                            <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center", marginTop: 2 }}>
-                              {imgIndex + 1}
-                            </Text>
-                          </View>
-                        );
-                      })
-                    ) : (
-                      <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
-                    )}
+                    {(() => {
+                      const capturedImages = defect.defectImages || [];
+                      const uploadedImages = defect.uploadedImages || [];
+                      const allImages = [...capturedImages, ...uploadedImages];
+                      
+                      console.log(`🖼️ Defect ${defect.defectName} images:`, {
+                        captured: capturedImages.length,
+                        uploaded: uploadedImages.length,
+                        total: allImages.length,
+                        capturedSample: capturedImages[0],
+                        uploadedSample: uploadedImages[0]
+                      });
+                      
+                      return allImages.length > 0 ? (
+                        allImages.map((img, imgIndex) => {
+                          const isCaptured = imgIndex < capturedImages.length;
+                          const actualIndex = isCaptured ? imgIndex : imgIndex - capturedImages.length;
+                          
+                          return (
+                            <View key={`${isCaptured ? 'c' : 'u'}-${actualIndex}`} style={{ margin: 3, alignItems: "center" }}>
+                              <SafeImage
+                                src={img}
+                                style={styles.defectImage}
+                                alt={`Defect ${defect.defectName} - ${isCaptured ? 'Captured' : 'Uploaded'} Image ${actualIndex + 1}`}
+                              />
+                              <Text style={{ fontSize: 6, color: "#6b7280", textAlign: "center", marginTop: 2 }}>
+                                {isCaptured ? 'C' : 'U'}{actualIndex + 1}
+                              </Text>
+                            </View>
+                          );
+                        })
+                      ) : (
+                        <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>
+                      );
+                    })()}
                   </View>
                 </View>
               ))}
@@ -954,33 +1114,58 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                 </View>
 
                 {/* Main Point Remark and Images */}
-                {(mainPoint.remark || (mainPoint.comparisonImages && mainPoint.comparisonImages.length > 0)) && (
-                   <View style={{ marginTop: 4, marginBottom: 8, backgroundColor: "#f9fafb", padding: 4 }}>
-                    {mainPoint.remark && mainPoint.remark.trim() && (
-                      <View style={{ marginBottom: mainPoint.comparisonImages && mainPoint.comparisonImages.length > 0 ? 4 : 0 }}>
-                        <Text style={{ fontSize: 7, color: "#6b7280" }}>Remark:</Text>
-                        <Text style={{ fontSize: 8, color: "#374151" }}>{safeString(mainPoint.remark)}</Text>
-                      </View>
-                    )}
-                    {mainPoint.comparisonImages && mainPoint.comparisonImages.length > 0 && (
-                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                        <Text style={{ fontSize: 6, color: "#6b7280", marginBottom: 2, width: "100%" }}>Images:</Text>
-                        {mainPoint.comparisonImages.map((img, imgIndex) => (
-                          <View key={imgIndex} style={{ margin: 3, alignItems: "center" }}>
-                            <SafeImage
-                              src={img}
-                              style={styles.inspectionImage}
-                              alt={`${mainPoint.name} - Image ${imgIndex + 1}`}
-                            />
-                            <Text style={{ fontSize: 5, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
-                              {imgIndex + 1}
-                            </Text>
-                          </View>
-                        ))}
-                      </View>
-                    )}
-                  </View>
-                )}
+                {(() => {
+                  const capturedImages = mainPoint.comparisonImages || [];
+                  const uploadedImages = mainPoint.uploadedImages || [];
+                  const hasImages = capturedImages.length > 0 || uploadedImages.length > 0;
+                  
+                  console.log(`🖼️ MainPoint ${mainPoint.name} images:`, {
+                    captured: capturedImages.length,
+                    uploaded: uploadedImages.length,
+                    capturedSample: capturedImages[0],
+                    uploadedSample: uploadedImages[0]
+                  });
+                  
+                  return (mainPoint.remark || hasImages) && (
+                    <View style={{ marginTop: 4, marginBottom: 8, backgroundColor: "#f9fafb", padding: 4 }}>
+                      {mainPoint.remark && mainPoint.remark.trim() && (
+                        <View style={{ marginBottom: hasImages ? 4 : 0 }}>
+                          <Text style={{ fontSize: 7, color: "#6b7280" }}>Remark:</Text>
+                          <Text style={{ fontSize: 8, color: "#374151" }}>{safeString(mainPoint.remark)}</Text>
+                        </View>
+                      )}
+                      {hasImages && (
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                          <Text style={{ fontSize: 6, color: "#6b7280", marginBottom: 2, width: "100%" }}>Images:</Text>
+                          {capturedImages.map((img, imgIndex) => (
+                            <View key={`captured-${imgIndex}`} style={{ margin: 3, alignItems: "center" }}>
+                              <SafeImage
+                                src={img}
+                                style={styles.inspectionImage}
+                                alt={`${mainPoint.name} - Captured Image ${imgIndex + 1}`}
+                              />
+                              <Text style={{ fontSize: 5, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
+                                C{imgIndex + 1}
+                              </Text>
+                            </View>
+                          ))}
+                          {uploadedImages.map((img, imgIndex) => (
+                            <View key={`uploaded-${imgIndex}`} style={{ margin: 3, alignItems: "center" }}>
+                              <SafeImage
+                                src={img}
+                                style={styles.inspectionImage}
+                                alt={`${mainPoint.name} - Uploaded Image ${imgIndex + 1}`}
+                              />
+                              <Text style={{ fontSize: 5, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
+                                U{imgIndex + 1}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
 
                 {/* Sub Points - FIXED */}
                 {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
@@ -1053,22 +1238,47 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                                   Remark: {safeString(subPoint.remark)}
                                 </Text>
                               )}
-                              {subPoint.comparisonImages && subPoint.comparisonImages.length > 0 && (
-                                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2, alignItems: 'flex-start' }}>
-                                  {subPoint.comparisonImages.map((img, imgIndex) => (
-                                    <View key={`img-${imgIndex}`} style={{ margin: 2, alignItems: "center" }}>
-                                      <SafeImage
-                                        src={img}
-                                        style={[styles.inspectionImage, { width: 80, height: 60 }]}
-                                        alt={`${displayName} - Image ${imgIndex + 1}`}
-                                      />
-                                      <Text style={{ fontSize: 4, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
-                                        {imgIndex + 1}
-                                      </Text>
-                                    </View>
-                                  ))}
-                                </View>
-                              )}
+                              {(() => {
+                                const capturedImages = subPoint.comparisonImages || [];
+                                const uploadedImages = subPoint.uploadedImages || [];
+                                const hasImages = capturedImages.length > 0 || uploadedImages.length > 0;
+                                
+                                console.log(`🖼️ SubPoint ${displayName} images:`, {
+                                  captured: capturedImages.length,
+                                  uploaded: uploadedImages.length,
+                                  capturedSample: capturedImages[0],
+                                  uploadedSample: uploadedImages[0]
+                                });
+                                
+                                return hasImages && (
+                                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2, alignItems: 'flex-start' }}>
+                                    {capturedImages.map((img, imgIndex) => (
+                                      <View key={`captured-${imgIndex}`} style={{ margin: 2, alignItems: "center" }}>
+                                        <SafeImage
+                                          src={img}
+                                          style={[styles.inspectionImage, { width: 80, height: 60 }]}
+                                          alt={`${displayName} - Captured Image ${imgIndex + 1}`}
+                                        />
+                                        <Text style={{ fontSize: 4, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
+                                          C{imgIndex + 1}
+                                        </Text>
+                                      </View>
+                                    ))}
+                                    {uploadedImages.map((img, imgIndex) => (
+                                      <View key={`uploaded-${imgIndex}`} style={{ margin: 2, alignItems: "center" }}>
+                                        <SafeImage
+                                          src={img}
+                                          style={[styles.inspectionImage, { width: 80, height: 60 }]}
+                                          alt={`${displayName} - Uploaded Image ${imgIndex + 1}`}
+                                        />
+                                        <Text style={{ fontSize: 4, color: "#6b7280", textAlign: "center", marginTop: 1 }}>
+                                          U{imgIndex + 1}
+                                        </Text>
+                                      </View>
+                                    ))}
+                                  </View>
+                                );
+                              })()}
                             </View>
                           )}
                         </View>
@@ -1578,7 +1788,10 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
 );
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
-const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], preloadedImages = {}, skipImageLoading = false }) => {
+const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], preloadedImages = {}, skipImageLoading = false, inspectorDetails = null }) => {
+  
+  // Use passed inspector details or fetch if not provided
+  const finalInspectorDetails = inspectorDetails;
   
   // Helper for placeholder images
   const ImagePlaceholder = ({ style, text, subtext }) => (
@@ -1589,9 +1802,11 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
     </View>
   );
 
-  // FIXED SafeImage component with better key matching
+  // FIXED SafeImage component - ONLY use preloaded images
   const SafeImage = ({ src, style, alt }) => {
-  console.log('🔍 SafeImage called with src:', src);
+  if (!src) {
+    return <ImagePlaceholder style={style} text="No Source" subtext="Missing URL" />;
+  }
   
   // Enhanced key generation to handle all possible URL formats
   const generateAllPossibleKeys = (src) => {
@@ -1599,15 +1814,15 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
     
     if (typeof src === 'string') {
       const cleanSrc = src.trim();
-      if (cleanSrc) { // Only add non-empty strings
+      if (cleanSrc) {
         keys.add(cleanSrc);
         keys.add(src); // untrimmed version
         
         // Handle different URL formats
         if (cleanSrc.startsWith('/')) {
-          keys.add(cleanSrc.substring(1)); // without leading slash
+          keys.add(cleanSrc.substring(1));
         } else {
-          keys.add('/' + cleanSrc); // with leading slash
+          keys.add('/' + cleanSrc);
         }
         
         // Handle full URLs for 192.167.12.85:5000
@@ -1634,17 +1849,16 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
           }
         }
         
-        // Handle storage and public paths specifically
+        // Handle storage and public paths
         if (cleanSrc.includes('/storage/') || cleanSrc.includes('/public/')) {
           const pathMatch = cleanSrc.match(/(\/(?:storage|public)\/.+)/);
           if (pathMatch && pathMatch[1]) {
-            keys.add(pathMatch[1]); // with leading slash
-            keys.add(pathMatch[1].substring(1)); // without leading slash
+            keys.add(pathMatch[1]);
+            keys.add(pathMatch[1].substring(1));
           }
         }
       }
     } else if (typeof src === 'object' && src !== null) {
-      // Handle object formats
       const possibleUrls = [
         src.originalUrl,
         src.url,
@@ -1657,7 +1871,6 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
         subKeys.forEach(key => keys.add(key));
       });
       
-      // Only add JSON string if it's meaningful
       try {
         const jsonStr = JSON.stringify(src);
         if (jsonStr && jsonStr !== '{}' && jsonStr !== 'null') {
@@ -1668,69 +1881,39 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
       }
     }
     
-    return Array.from(keys).filter(key => key && key.trim()); // Filter out empty keys
+    return Array.from(keys).filter(key => key && key.trim());
   };
 
   const possibleKeys = generateAllPossibleKeys(src);
-  console.log('🔍 Trying keys:', possibleKeys);
-  console.log('🔍 Available preloaded keys:', Object.keys(preloadedImages));
 
   // Try to find image with any of the possible keys
   let imageSrc = null;
-  let matchedKey = null;
   
   for (const key of possibleKeys) {
     if (preloadedImages[key]) {
       imageSrc = preloadedImages[key];
-      matchedKey = key;
       break;
     }
   }
 
   if (!imageSrc) {
-    console.warn('🔍 Image not found in preloadedImages. Tried keys:', possibleKeys);
-    console.warn('🔍 Sample available keys:', Object.keys(preloadedImages).slice(0, 5));
     const filename = possibleKeys[0] ? possibleKeys[0].split('/').pop() || 'Image' : 'Image';
-    return <ImagePlaceholder style={style} text={filename} subtext="Not Found" />;
+    return <ImagePlaceholder style={style} text={filename} subtext="Not Preloaded" />;
   }
 
-  console.log('✅ Found image for key:', matchedKey);
-  
-  // Enhanced validation for base64 format
+  // Validate base64 format
   if (!imageSrc || typeof imageSrc !== 'string' || !imageSrc.startsWith('data:')) {
-    console.warn('⚠️ Invalid image format, expected base64 data URL');
     return <ImagePlaceholder style={style} text="Invalid Format" subtext="Bad Data" />;
   }
 
-  // Additional validation for base64 data
   const base64Parts = imageSrc.split(',');
-  if (base64Parts.length !== 2) {
-    console.warn('⚠️ Malformed base64 data URL');
-    return <ImagePlaceholder style={style} text="Malformed Data" subtext="Invalid Structure" />;
-  }
-
-  const base64Part = base64Parts[1];
-  if (!base64Part || base64Part.length < 100) {
-    console.warn('⚠️ Base64 data too short or missing');
+  if (base64Parts.length !== 2 || !base64Parts[1] || base64Parts[1].length < 100) {
     return <ImagePlaceholder style={style} text="Corrupted Data" subtext="Invalid Base64" />;
-  }
-
-  // Validate base64 string
-  try {
-    // Test if base64 is valid
-    const testDecode = atob(base64Part.substring(0, 100));
-    if (!testDecode) {
-      throw new Error('Invalid base64');
-    }
-  } catch (e) {
-    console.warn('⚠️ Base64 validation failed:', e.message);
-    return <ImagePlaceholder style={style} text="Invalid Base64" subtext="Decode Error" />;
   }
 
   try {
     return <Image src={imageSrc} style={style} />;
   } catch (error) {
-    console.error('❌ Error rendering image:', error);
     return <ImagePlaceholder style={style} text="Render Error" subtext={error.message} />;
   }
 };
@@ -1796,7 +1979,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
           beforeAfterWash={recordData.before_after_wash || "Washing"}
         />
         <Text style={styles.pageHeader}>QC Washing Report Summary</Text>
-        <OrderInfoSection recordData={recordData} />
+        <OrderInfoSection recordData={recordData} inspectorDetails={finalInspectorDetails} SafeImage={SafeImage} />
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quality Summary</Text>
           <QualitySummaryCards recordData={recordData} />
@@ -1878,7 +2061,54 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
 };
 
 // Wrapper component that optionally preloads images
-const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], skipImageLoading = false }) => {
+const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], skipImageLoading = false, inspectorDetails = null }) => {
+  console.log('🔍 Full recordData structure:', {
+  userId: recordData?.userId,
+  inspectorId: recordData?.inspectorId,
+  createdBy: recordData?.createdBy,
+});
+  const [preloadedImages, setPreloadedImages] = React.useState({});
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState(null);
+  const [fetchedInspectorDetails, setFetchedInspectorDetails] = React.useState(null);
+
+  // Fetch inspector details from users collection
+  React.useEffect(() => {
+  const fetchInspectorDetails = async () => {
+    console.log('🔍 Fetching inspector for userId:', recordData?.userId);
+    
+    if (!recordData?.userId) {
+      console.log('❌ No userId found in recordData');
+      setFetchedInspectorDetails(null);
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/users/${recordData.userId}`);
+      console.log('🔍 API Response status:', response.status);
+      
+      if (response.ok) {
+        const userData = await response.json();
+        console.log('✅ Inspector details fetched successfully:', userData);
+        setFetchedInspectorDetails(userData);
+      } else {
+        console.warn('⚠️ Failed to fetch inspector details:', response.status);
+        const errorText = await response.text();
+        console.warn('Error details:', errorText);
+        setFetchedInspectorDetails(null);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching inspector details:', error);
+      setFetchedInspectorDetails(null);
+    }
+  };
+
+  fetchInspectorDetails();
+}, [recordData?.userId, API_BASE_URL]);
+
+  // Use passed inspector details first, then fallback to fetched details
+  const finalInspectorDetails = inspectorDetails || fetchedInspectorDetails;
+
   // If skipImageLoading is true, render PDF directly without wrapper
   if (skipImageLoading) {
     return (
@@ -1889,18 +2119,20 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
         checkpointDefinitions={checkpointDefinitions}
         preloadedImages={{}}
         skipImageLoading={true}
+        inspectorDetails={finalInspectorDetails}
       />
     );
   }
-
-  const [preloadedImages, setPreloadedImages] = React.useState({});
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
 
   React.useEffect(() => {
     let isMounted = true;
 
     const preloadAllImages = async () => {
+      // Wait for inspector details to be fetched first
+      if (!finalInspectorDetails && recordData?.userId) {
+        console.log('⏳ Waiting for inspector details...');
+        return;
+      }
       try {
         const imageCollection = new Map();
         
@@ -1988,14 +2220,21 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
 };
 
 
-        // Collect defect images
+        // Collect defect images (both captured and uploaded)
         if (recordData.defectDetails?.defectsByPc) {
           recordData.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
             if (pc.pcDefects) {
               pc.pcDefects.forEach((defect, defectIndex) => {
+                // Collect captured defect images
                 if (defect.defectImages && Array.isArray(defect.defectImages)) {
                   defect.defectImages.forEach((img, imgIndex) => {
                     addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-img${imgIndex}`);
+                  });
+                }
+                // Collect uploaded defect images
+                if (defect.uploadedImages && Array.isArray(defect.uploadedImages)) {
+                  defect.uploadedImages.forEach((img, imgIndex) => {
+                    addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-uploaded${imgIndex}`);
                   });
                 }
               });
@@ -2010,19 +2249,33 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           });
         }
 
-        // Collect new inspection images
+        // Collect new inspection images (both captured and uploaded)
         if (recordData.inspectionDetails?.checkpointInspectionData) {
           recordData.inspectionDetails.checkpointInspectionData.forEach((checkpoint, checkIndex) => {
+            // Collect captured comparison images
             if (checkpoint.comparisonImages && Array.isArray(checkpoint.comparisonImages)) {
               checkpoint.comparisonImages.forEach((img, imgIndex) => {
                 addImageToCollection(img, `checkpoint${checkIndex}-main-img${imgIndex}`);
               });
             }
+            // Collect uploaded comparison images
+            if (checkpoint.uploadedImages && Array.isArray(checkpoint.uploadedImages)) {
+              checkpoint.uploadedImages.forEach((img, imgIndex) => {
+                addImageToCollection(img, `checkpoint${checkIndex}-main-uploaded${imgIndex}`);
+              });
+            }
             if (checkpoint.subPoints) {
               checkpoint.subPoints.forEach((subPoint, subIndex) => {
+                // Collect captured sub-point images
                 if (subPoint.comparisonImages && Array.isArray(subPoint.comparisonImages)) {
                   subPoint.comparisonImages.forEach((img, imgIndex) => {
                     addImageToCollection(img, `checkpoint${checkIndex}-sub${subIndex}-img${imgIndex}`);
+                  });
+                }
+                // Collect uploaded sub-point images
+                if (subPoint.uploadedImages && Array.isArray(subPoint.uploadedImages)) {
+                  subPoint.uploadedImages.forEach((img, imgIndex) => {
+                    addImageToCollection(img, `checkpoint${checkIndex}-sub${subIndex}-uploaded${imgIndex}`);
                   });
                 }
               });
@@ -2030,12 +2283,19 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           });
         }
 
-        // Collect legacy inspection images
+        // Collect legacy inspection images (both captured and uploaded)
         if (recordData.inspectionDetails?.checkedPoints) {
           recordData.inspectionDetails.checkedPoints.forEach((point, pointIndex) => {
+            // Collect captured comparison images
             if (point.comparison && Array.isArray(point.comparison)) {
               point.comparison.forEach((img, imgIndex) => {
                 addImageToCollection(img, `legacy-point${pointIndex}-img${imgIndex}`);
+              });
+            }
+            // Collect uploaded comparison images
+            if (point.uploadedImages && Array.isArray(point.uploadedImages)) {
+              point.uploadedImages.forEach((img, imgIndex) => {
+                addImageToCollection(img, `legacy-point${pointIndex}-uploaded${imgIndex}`);
               });
             }
           });
@@ -2048,6 +2308,11 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
               addImageToCollection(machine.image, `machine${machineIndex}`);
             }
           });
+        }
+
+        // Collect inspector photo
+        if (finalInspectorDetails?.face_photo) {
+          addImageToCollection(finalInspectorDetails.face_photo, 'inspector-photo');
         }
 
         console.log(`🖼️ Total unique images to load: ${imageCollection.size}`);
@@ -2126,18 +2391,20 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
       }
     }, 15000);
 
-    // Start loading images
-    preloadAllImages();
+    // Only start loading images after inspector details are available
+    if (finalInspectorDetails || !recordData?.userId) {
+      preloadAllImages();
+    }
 
     // Cleanup function
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [recordData, API_BASE_URL]);
+  }, [recordData, API_BASE_URL, finalInspectorDetails]);
 
   // FIXED LOADING SCREEN - Ensure no empty strings
-  if (loading) {
+  if (loading || (recordData?.userId && !fetchedInspectorDetails)) {
     return (
       <Document>
         <Page style={styles.page}>
@@ -2153,14 +2420,14 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
               marginBottom: 10,
               textAlign: 'center'
             }}>
-              Loading images...
+              Preparing your report...
             </Text>
             <Text style={{ 
               fontSize: 12, 
               textAlign: 'center',
               color: '#6b7280'
             }}>
-              Please wait while we prepare your report
+              Loading inspector details and images. This will take a few seconds.
             </Text>
           </View>
         </Page>
@@ -2179,6 +2446,7 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
         checkpointDefinitions={checkpointDefinitions}
         preloadedImages={{}}
         skipImageLoading={true}
+        inspectorDetails={finalInspectorDetails}
       />
     );
   }
@@ -2194,12 +2462,77 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
       checkpointDefinitions={checkpointDefinitions}
       preloadedImages={preloadedImages}
       skipImageLoading={false}
+      inspectorDetails={finalInspectorDetails}
     />
   );
 };
 
 // SIMPLE PDF COMPONENT WITHOUT IMAGE LOADING (for your download function)
-const QcWashingSimplePDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [] }) => {
+const QcWashingSimplePDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], inspectorDetails = null }) => {
+  const [fetchedInspectorDetails, setFetchedInspectorDetails] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  // Fetch inspector details
+  React.useEffect(() => {
+    const fetchInspectorDetails = async () => {
+      if (!recordData?.userId) {
+        setFetchedInspectorDetails(null);
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users/${recordData.userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          setFetchedInspectorDetails(userData);
+        } else {
+          setFetchedInspectorDetails(null);
+        }
+      } catch (error) {
+        console.error('Error fetching inspector details:', error);
+        setFetchedInspectorDetails(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInspectorDetails();
+  }, [recordData?.userId, API_BASE_URL]);
+
+  const finalInspectorDetails = fetchedInspectorDetails || inspectorDetails;
+
+  if (loading) {
+    return (
+      <Document>
+        <Page style={styles.page}>
+          <View style={{ 
+            flex: 1, 
+            justifyContent: 'center', 
+            alignItems: 'center',
+            padding: 20
+          }}>
+            <Text style={{ 
+              fontSize: 16, 
+              fontWeight: 'bold',
+              marginBottom: 10,
+              textAlign: 'center'
+            }}>
+              Preparing your download...
+            </Text>
+            <Text style={{ 
+              fontSize: 12, 
+              textAlign: 'center',
+              color: '#6b7280'
+            }}>
+              Fetching inspector details. Please wait.
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
+
   return (
     <QcWashingFullReportPDF 
       recordData={recordData}
@@ -2208,6 +2541,7 @@ const QcWashingSimplePDF = ({ recordData, comparisonData = null, API_BASE_URL, c
       checkpointDefinitions={checkpointDefinitions}
       preloadedImages={{}}
       skipImageLoading={true}
+      inspectorDetails={finalInspectorDetails}
     />
   );
 };
