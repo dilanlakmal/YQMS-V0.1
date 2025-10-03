@@ -14,6 +14,7 @@ export default function RoleManagement() {
   const [selectedJobTitles, setSelectedJobTitles] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [matchingUsers, setMatchingUsers] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [error, setError] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [isEditing, setIsEditing] = useState(false);
@@ -102,10 +103,12 @@ export default function RoleManagement() {
         }
       }
       setMatchingUsers(users);
+      setSelectedUsers(existingRole.users.map(u => u.emp_id));
       setIsEditing(true);
     } else {
       setSelectedJobTitles([]);
       setMatchingUsers([]);
+      setSelectedUsers([]);
       setIsEditing(false);
     }
   };
@@ -137,12 +140,27 @@ export default function RoleManagement() {
 
   const handleJobTitleRemove = (title) => {
     setSelectedJobTitles((prev) => prev.filter((t) => t !== title));
+    const removedUsers = matchingUsers.filter((user) => user.job_title === title);
     setMatchingUsers((prev) => prev.filter((user) => user.job_title !== title));
+    setSelectedUsers((prev) => prev.filter((empId) => !removedUsers.some(u => u.emp_id === empId)));
+  };
+
+  const handleUserSelect = (empId) => {
+    setSelectedUsers((prev) => 
+      prev.includes(empId) 
+        ? prev.filter((id) => id !== empId)
+        : [...prev, empId]
+    );
   };
 
   const handleSubmit = async () => {
     if (!selectedRole || selectedJobTitles.length === 0) {
       setError("Please select both role and job titles");
+      return;
+    }
+
+    if (selectedUsers.length === 0) {
+      setError("Please select at least one user");
       return;
     }
 
@@ -154,7 +172,8 @@ export default function RoleManagement() {
     try {
       await axios.post(`${API_BASE_URL}/api/role-management`, {
         role: selectedRole,
-        jobTitles: selectedJobTitles
+        jobTitles: selectedJobTitles,
+        selectedUsers: selectedUsers
       });
 
       setSuccessMessage(
@@ -165,6 +184,7 @@ export default function RoleManagement() {
         setSelectedRole("");
         setSelectedJobTitles([]);
         setMatchingUsers([]);
+        setSelectedUsers([]);
       }
       setTimeout(() => setSuccessMessage(""), 3000);
     } catch (error) {
@@ -442,12 +462,17 @@ export default function RoleManagement() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700">
-                Users
+                Users ({selectedUsers.length} selected)
               </label>
               <div className="mt-1 border rounded-md p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
                 <div className="flex flex-wrap gap-4">
                   {matchingUsers.map((user) => (
-                    <UserCard key={user.emp_id} user={user} />
+                    <SelectableUserCard 
+                      key={user.emp_id} 
+                      user={user} 
+                      isSelected={selectedUsers.includes(user.emp_id)}
+                      onSelect={() => handleUserSelect(user.emp_id)}
+                    />
                   ))}
                 </div>
               </div>
@@ -624,6 +649,29 @@ const UserCard = ({ user }) => (
       alt={user.name}
       className="w-12 h-12 mx-auto rounded-full"
     />
+    <div className="text-xs mt-1">{user.emp_id}</div>
+    <div className="text-xs truncate">{user.name}</div>
+  </div>
+);
+
+const SelectableUserCard = ({ user, isSelected, onSelect }) => (
+  <div className="flex-shrink-0 w-24 text-center relative">
+    <div className="relative">
+      <img
+        src={user.face_photo || "/default-avatar.png"}
+        alt={user.name}
+        className={`w-12 h-12 mx-auto rounded-full cursor-pointer transition-all ${
+          isSelected ? 'ring-2 ring-blue-500 opacity-100' : 'opacity-70 hover:opacity-100'
+        }`}
+        onClick={onSelect}
+      />
+      <input
+        type="checkbox"
+        checked={isSelected}
+        onChange={onSelect}
+        className="absolute -top-1 -right-1 w-4 h-4 text-blue-600 bg-white border-2 border-gray-300 rounded focus:ring-blue-500"
+      />
+    </div>
     <div className="text-xs mt-1">{user.emp_id}</div>
     <div className="text-xs truncate">{user.name}</div>
   </div>
