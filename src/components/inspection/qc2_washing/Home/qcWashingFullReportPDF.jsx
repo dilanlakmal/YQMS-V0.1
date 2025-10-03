@@ -244,7 +244,6 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
     // ENHANCED: Better handling for different image sources
     // Try direct fetch first for external URLs if they look like valid image URLs
     if (cleanUrl.startsWith('http')) {
-        console.log('🖼️ Attempting direct load for URL:', cleanUrl);
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
@@ -289,14 +288,12 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
 
                 // Final validation
                 if (dataUrl.length > 1000) {
-                    console.log('✅ Direct load successful:', cleanUrl);
                     return dataUrl;
                 } else {
                     console.warn('⚠️ Generated base64 data is too short.');
                     throw new Error('Generated base64 data too short');
                 }
             } else {
-                console.log('⚠️ Direct load failed with status:', directResponse.status);
                 throw new Error(`HTTP ${directResponse.status}`);
             }
         } catch (directError) {
@@ -307,8 +304,7 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
 
     
     // Fallback to proxy for all URLs
-    console.log('🖼️ Loading via proxy:', cleanUrl);
-    const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
+    const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
@@ -331,8 +327,7 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
         try {
           const base64Part = data.dataUrl.split(',')[1];
           if (base64Part && base64Part.length > 100) {
-            atob(base64Part.substring(0, 100)); // Test decode
-            console.log('✅ Proxy load successful:', cleanUrl);
+            atob(base64Part.substring(0, 100)); 
             return data.dataUrl;
           } else {
             console.warn('⚠️ Proxy base64 data too short');
@@ -348,7 +343,6 @@ const loadImageAsBase64 = async (src, API_BASE_URL) => {
           if (data.base64.length > 100) {
             atob(data.base64.substring(0, 100)); // Test decode
             const dataUrl = `data:${data.contentType};base64,${data.base64}`;
-            console.log('✅ Proxy load successful (alt format):', cleanUrl);
             return dataUrl;
           } else {
             console.warn('⚠️ Alt format base64 data too short');
@@ -400,8 +394,7 @@ const PdfHeader = ({ orderNo, beforeAfterWash }) => (
 );
 
 const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
-  // Debug logging to see what data we're receiving
-  console.log('🔍 OrderInfoSection received inspectorDetails:', inspectorDetails);
+  // Debug logging to see what data we're receiving;
 
   return (
     <View style={styles.section}>
@@ -559,13 +552,7 @@ const QualitySummaryCards = ({ recordData }) => (
 );
 
 const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImage }) => {
-  console.log('📝 DefectAnalysisTable received:', {
-    defectsByPc: defectsByPc.length,
-    additionalImages: additionalImages.length,
-    firstDefectImages: defectsByPc[0]?.pcDefects?.[0]?.defectImages?.length || 0,
-    sampleDefectImage: defectsByPc[0]?.pcDefects?.[0]?.defectImages?.[0],
-    sampleAdditionalImage: additionalImages[0]
-  });
+  
 
   if (defectsByPc.length === 0 && (!additionalImages || additionalImages.length === 0)) {
     return (
@@ -612,12 +599,7 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImag
                       // FIXED: Also check if defectImages contains both types
                       const allImages = [...capturedImages, ...uploadedImages];
                       
-                      console.log(`🖼️ Defect ${defect.defectName} images:`, {
-                        captured: capturedImages.length,
-                        uploaded: uploadedImages.length,
-                        total: allImages.length,
-                        defectObject: defect
-                      });
+                     
                       
                       if (allImages.length === 0) {
                         return <Text style={{ fontSize: 6, color: "#6b7280" }}>No images</Text>;
@@ -673,8 +655,7 @@ const DefectAnalysisTable = ({ defectsByPc = [], additionalImages = [], SafeImag
           </Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "flex-start" }}>
             {additionalImages.map((img, imgIndex) => {
-              console.log(`🖼️ Processing additional image ${imgIndex + 1}:`, img);
-              console.log(`🖼️ Additional image type:`, typeof img);
+             
               
               return (
                 <View key={imgIndex} style={{ margin: 4, alignItems: "center" }}>
@@ -1108,14 +1089,7 @@ const InspectionDetailsSection = ({ inspectionDetails, SafeImage }) => {
 
 // NEW INSPECTION DETAILS SECTION - FIXED
 const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions = [], SafeImage }) => {
-  console.log('🔍 NewInspectionDetailsSection received:', {
-    checkpointInspectionData: inspectionDetails.checkpointInspectionData?.length || 0,
-    parameters: inspectionDetails.parameters?.length || 0,
-    machineProcesses: inspectionDetails.machineProcesses?.length || 0,
-    checkpointDefinitions: checkpointDefinitions?.length || 0,
-    sampleCheckpointImages: inspectionDetails.checkpointInspectionData?.[0]?.comparisonImages?.length || 0,
-    sampleSubPointImages: inspectionDetails.checkpointInspectionData?.[0]?.subPoints?.[0]?.comparisonImages?.length || 0
-  });
+  
 
   return (
     <View style={styles.section}>
@@ -1160,12 +1134,7 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                   const uploadedImages = mainPoint.uploadedImages || [];
                   const hasImages = capturedImages.length > 0 || uploadedImages.length > 0;
                   
-                  console.log(`🖼️ MainPoint ${mainPoint.name} images:`, {
-                    captured: capturedImages.length,
-                    uploaded: uploadedImages.length,
-                    capturedSample: capturedImages[0],
-                    uploadedSample: uploadedImages[0]
-                  });
+                  
                   
                   return (mainPoint.remark || hasImages) && (
                     <View style={{ marginTop: 4, marginBottom: 8, backgroundColor: "#f9fafb", padding: 4 }}>
@@ -1284,12 +1253,7 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                                 const uploadedImages = subPoint.uploadedImages || [];
                                 const hasImages = capturedImages.length > 0 || uploadedImages.length > 0;
                                 
-                                console.log(`🖼️ SubPoint ${displayName} images:`, {
-                                  captured: capturedImages.length,
-                                  uploaded: uploadedImages.length,
-                                  capturedSample: capturedImages[0],
-                                  uploadedSample: uploadedImages[0]
-                                });
+                                
                                 
                                 return hasImages && (
                                   <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2, alignItems: 'flex-start' }}>
@@ -1949,13 +1913,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
 
   const possibleKeys = generateAllPossibleKeys(src);
   
-  // Debug logging for defect images
-  if (alt && alt.includes('Defect')) {
-    console.log(`🔍 SafeImage Debug for ${alt}:`);
-    console.log(`  Original src:`, src);
-    console.log(`  Generated keys:`, possibleKeys);
-    console.log(`  Available preloaded keys:`, Object.keys(preloadedImages).slice(0, 5), '... (showing first 5)');
-  }
+ 
 
   // Try to find image with any of the possible keys
   let imageSrc = null;
@@ -1969,11 +1927,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
     }
   }
   
-  // Debug logging for defect images
-  if (alt && alt.includes('Defect')) {
-    console.log(`  Matched key:`, matchedKey);
-    console.log(`  Found image:`, imageSrc ? 'YES' : 'NO');
-  }
+  
 
   if (!imageSrc) {
     const filename = possibleKeys[0] ? possibleKeys[0].split('/').pop() || 'Image' : 'Image';
@@ -2027,14 +1981,6 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
   const hasNewInspectionStructure = recordData.inspectionDetails?.checkpointInspectionData && 
   recordData.inspectionDetails.checkpointInspectionData.length > 0;
 
-  console.log('🔍 PDF Structure Detection:', {
-    hasNewInspectionStructure,
-    checkpointInspectionDataLength: recordData.inspectionDetails?.checkpointInspectionData?.length || 0,
-    checkedPointsLength: recordData.inspectionDetails?.checkedPoints?.length || 0,
-    parametersLength: recordData.inspectionDetails?.parameters?.length || 0,
-    machineProcessesLength: recordData.inspectionDetails?.machineProcesses?.length || 0,
-    checkpointDefinitionsLength: checkpointDefinitions?.length || 0
-  });
 
   let measurements = [];
   if (recordData.measurementDetails) {
@@ -2141,11 +2087,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
 
 // Wrapper component that optionally preloads images
 const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], skipImageLoading = false, inspectorDetails = null }) => {
-  console.log('🔍 Full recordData structure:', {
-  userId: recordData?.userId,
-  inspectorId: recordData?.inspectorId,
-  createdBy: recordData?.createdBy,
-});
+  
   const [preloadedImages, setPreloadedImages] = React.useState({});
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState(null);
@@ -2154,7 +2096,7 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
   // Fetch inspector details from users collection
   React.useEffect(() => {
   const fetchInspectorDetails = async () => {
-    console.log('🔍 Fetching inspector for userId:', recordData?.userId);
+    
     
     if (!recordData?.userId) {
       console.log('❌ No userId found in recordData');
@@ -2164,14 +2106,11 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
     
     try {
       const response = await fetch(`${API_BASE_URL}/api/users/${recordData.userId}`);
-      console.log('🔍 API Response status:', response.status);
       
       if (response.ok) {
         const userData = await response.json();
-        console.log('✅ Inspector details fetched successfully:', userData);
         setFetchedInspectorDetails(userData);
       } else {
-        console.warn('⚠️ Failed to fetch inspector details:', response.status);
         const errorText = await response.text();
         console.warn('Error details:', errorText);
         setFetchedInspectorDetails(null);
@@ -2219,7 +2158,6 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
         const addImageToCollection = (img, context = '') => {
   if (!img) return;
   
-  console.log(`📝 Processing image from ${context}:`, img);
   
   // Generate all possible keys for this image
   const generateStorageKeys = (img) => {
@@ -2316,7 +2254,6 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
   possibleKeys.forEach(key => {
     if (key && key.trim()) {
       imageCollection.set(key.trim(), img);
-      console.log(`📝 Added to collection - Key: "${key.trim()}"`);
     }
   });
 };
@@ -2421,10 +2358,8 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           addImageToCollection(finalInspectorDetails.face_photo, 'inspector-photo');
         }
 
-        console.log(`🖼️ Total unique images to load: ${imageCollection.size}`);
         
         if (imageCollection.size === 0) {
-          console.log('No images found, proceeding without loading');
           if (isMounted) {
             setPreloadedImages({});
             setLoading(false);
@@ -2439,13 +2374,11 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
             // Add progressive delay to avoid overwhelming server
             await new Promise(resolve => setTimeout(resolve, index * 100));
             
-            console.log(`🔄 Loading image ${index + 1}/${imageCollection.size}: ${key}`);
             
             const base64 = await loadImageAsBase64(url, API_BASE_URL);
             
             if (base64 && base64.startsWith('data:')) {
               imageMap[key] = base64;
-              console.log(`✅ Successfully loaded: ${key}`);
               return { success: true, key };
             } else {
               console.warn(`❌ Invalid base64 data for: ${key}`);
@@ -2470,13 +2403,10 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           }
         });
 
-        console.log(`🖼️ Image loading complete: ${successCount} success, ${failCount} failed`);
-        console.log('🔍 Final imageMap keys:', Object.keys(imageMap));
 
         if (isMounted) {
           setPreloadedImages(imageMap);
           setLoading(false);
-          console.log('✅ Images stored in state, rendering PDF');
         }
 
       } catch (error) {
@@ -2491,7 +2421,6 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
 
     // Set up timeout with cleanup
     const timeoutId = setTimeout(() => {
-      console.warn('Image loading timed out after 15 seconds, proceeding without images');
       if (isMounted) {
         setLoading(false);
       }
@@ -2557,8 +2486,6 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
     );
   }
 
-  // CRITICAL: Log the transition
-  console.log('🎉 Rendering final PDF with preloaded images:', Object.keys(preloadedImages).length);
 
   return (
     <QcWashingFullReportPDF 

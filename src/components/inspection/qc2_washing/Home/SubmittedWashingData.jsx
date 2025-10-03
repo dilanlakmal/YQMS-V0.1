@@ -550,8 +550,6 @@ const processImageToBase64 = async (imagePath) => {
   try {
     setIsQcWashingPDF(true);
     
-    console.log('🚀 Starting PDF generation with image loading...');
-    
     if (!API_BASE_URL) {
       throw new Error('API_BASE_URL is not defined');
     }
@@ -560,13 +558,11 @@ const processImageToBase64 = async (imagePath) => {
     let inspectorDetails = null;
     if (record.userId) {
       try {
-        console.log('🔍 Fetching inspector details for userId:', record.userId);
         const inspectorResponse = await fetch(`${API_BASE_URL}/api/users/${record.userId}`);
         if (inspectorResponse.ok) {
           const userData = await inspectorResponse.json();
           if (userData && !userData.error) {
             inspectorDetails = userData;
-            console.log('✅ Inspector details fetched successfully:', userData);
           }
         } else {
           console.warn('⚠️ Failed to fetch inspector details:', inspectorResponse.status);
@@ -611,7 +607,6 @@ const processImageToBase64 = async (imagePath) => {
     // Add inspector photo to preloaded images if available
     if (inspectorDetails?.face_photo) {
       try {
-        console.log('🔍 Loading inspector photo:', inspectorDetails.face_photo);
         const loadImageAsBase64 = async (src, API_BASE_URL) => {
           let imageUrl = src;
           
@@ -633,7 +628,7 @@ const processImageToBase64 = async (imagePath) => {
               cleanUrl = `${API_BASE_URL}${cleanUrl}`;
             }
             
-            const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
+            const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
             const response = await fetch(proxyUrl, {
               method: 'GET',
               headers: { 'Accept': 'application/json' },
@@ -656,14 +651,12 @@ const processImageToBase64 = async (imagePath) => {
         const inspectorPhotoBase64 = await loadImageAsBase64(inspectorDetails.face_photo, API_BASE_URL);
         if (inspectorPhotoBase64) {
           preloadedImages[inspectorDetails.face_photo] = inspectorPhotoBase64;
-          console.log('✅ Inspector photo loaded successfully');
         }
       } catch (error) {
         console.warn('⚠️ Failed to load inspector photo:', error);
       }
     }
     
-    console.log('✅ Preloaded images:', Object.keys(preloadedImages).length);
     
     // Import the PDF renderer
     const { pdf } = await import('@react-pdf/renderer');
@@ -685,7 +678,6 @@ const processImageToBase64 = async (imagePath) => {
       })
     ).toBlob();
     
-    console.log('✅ PDF generated successfully');
     
     // Download
     const url = URL.createObjectURL(blob);
@@ -698,7 +690,6 @@ const processImageToBase64 = async (imagePath) => {
     URL.revokeObjectURL(url);
     
   } catch (error) {
-    console.error('❌ Error generating PDF:', error);
     // Provide more specific error messages
     let errorMessage = 'Failed to generate PDF';
     if (error.message.includes('SOI not found')) {
@@ -717,15 +708,7 @@ const processImageToBase64 = async (imagePath) => {
 
 // FIXED: Add this helper function to preload images
 const preloadImagesForRecord = async (record, API_BASE_URL) => {
-  console.log('🔍 Full record structure for image collection:', {
-    defectsByPc: record.defectDetails?.defectsByPc?.length || 0,
-    additionalImages: record.defectDetails?.additionalImages?.length || 0,
-    checkpointInspectionData: record.inspectionDetails?.checkpointInspectionData?.length || 0,
-    checkedPoints: record.inspectionDetails?.checkedPoints?.length || 0,
-    machineProcesses: record.inspectionDetails?.machineProcesses?.length || 0,
-    sampleDefect: record.defectDetails?.defectsByPc?.[0]?.pcDefects?.[0],
-    sampleCheckpoint: record.inspectionDetails?.checkpointInspectionData?.[0]
-  });
+  
   
   const imageCollection = new Map();
   const imageMap = {};
@@ -744,7 +727,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
   const addImageToCollection = (img, context = '') => {
   if (!img) return;
   
-  console.log(`📝 Processing image from ${context}:`, img);
   
   // Generate all possible keys for this image (same logic as PDF component)
   const generateStorageKeys = (img) => {
@@ -818,7 +800,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
   possibleKeys.forEach(key => {
     if (key && key.trim()) {
       imageCollection.set(key.trim(), img);
-      console.log(`📝 Added to collection - Key: "${key.trim()}"`);
     }
   });
 };
@@ -845,7 +826,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
     });
   }
   
-  console.log('🔍 Defect images collected:', record.defectDetails?.defectsByPc?.length || 0, 'PCs');
 
   // Collect additional images
   if (record.defectDetails?.additionalImages && Array.isArray(record.defectDetails.additionalImages)) {
@@ -857,11 +837,7 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
   // Collect new inspection images (both captured and uploaded)
   if (record.inspectionDetails?.checkpointInspectionData) {
     record.inspectionDetails.checkpointInspectionData.forEach((checkpoint, checkIndex) => {
-      console.log(`🔍 Processing checkpoint ${checkIndex}:`, {
-        comparisonImages: checkpoint.comparisonImages?.length || 0,
-        uploadedImages: checkpoint.uploadedImages?.length || 0,
-        subPoints: checkpoint.subPoints?.length || 0
-      });
+      
       
       // Collect captured comparison images
       if (checkpoint.comparisonImages && Array.isArray(checkpoint.comparisonImages)) {
@@ -877,10 +853,7 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
       }
       if (checkpoint.subPoints) {
         checkpoint.subPoints.forEach((subPoint, subIndex) => {
-          console.log(`🔍 Processing subpoint ${checkIndex}-${subIndex}:`, {
-            comparisonImages: subPoint.comparisonImages?.length || 0,
-            uploadedImages: subPoint.uploadedImages?.length || 0
-          });
+          
           
           // Collect captured sub-point images
           if (subPoint.comparisonImages && Array.isArray(subPoint.comparisonImages)) {
@@ -926,7 +899,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
     });
   }
 
-  console.log(`🖼️ Total unique images to load: ${imageCollection.size}`);
   
   // Note: Inspector photo will be handled separately in the main function
   
@@ -993,7 +965,7 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
     // ENHANCED: Better handling for different image sources
     // Try direct fetch first for external URLs
     if (cleanUrl.includes('192.167.12.85:5000') || cleanUrl.includes('yqms.yaikh.com') || cleanUrl.startsWith('http')) {
-      console.log('🖼️ Attempting direct load for URL:', cleanUrl);
+  
       
       try {
         const controller = new AbortController();
@@ -1017,7 +989,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
           
           // Validate content type
           if (!contentType || !contentType.startsWith('image/')) {
-            console.warn('⚠️ Invalid content type:', contentType);
             throw new Error('Invalid content type');
           }
           
@@ -1026,7 +997,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
           
           // Validate minimum size
           if (uint8Array.length < 100) {
-            console.warn('⚠️ Image too small:', uint8Array.length, 'bytes');
             throw new Error('Image too small');
           }
           
@@ -1036,7 +1006,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
           const isValidWebP = uint8Array[8] === 0x57 && uint8Array[9] === 0x45 && uint8Array[10] === 0x42 && uint8Array[11] === 0x50;
           
           if (!isValidJPEG && !isValidPNG && !isValidWebP) {
-            console.warn('⚠️ Invalid image format - no valid header found');
             throw new Error('Invalid image format');
           }
           
@@ -1054,10 +1023,8 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
           // Final validation - test decode
           try {
             atob(base64.substring(0, 100));
-            console.log('✅ Direct load successful:', cleanUrl);
             return dataUrl;
           } catch (decodeError) {
-            console.warn('⚠️ Base64 decode validation failed:', decodeError.message);
             throw new Error('Base64 validation failed');
           }
         } else {
@@ -1071,8 +1038,7 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
     }
     
     // Fallback to proxy for all URLs
-    console.log('🖼️ Loading via proxy:', cleanUrl);
-    const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(cleanUrl)}`;
+    const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
     
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 8000);
@@ -1096,15 +1062,12 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
         try {
           const base64Part = data.dataUrl.split(',')[1];
           if (base64Part && base64Part.length > 100) {
-            atob(base64Part.substring(0, 100)); // Test decode
-            console.log('✅ Proxy load successful:', cleanUrl);
+            atob(base64Part.substring(0, 100)); 
             return data.dataUrl;
           } else {
-            console.warn('⚠️ Proxy base64 data too short');
             return null;
           }
         } catch (decodeError) {
-          console.warn('⚠️ Proxy base64 decode failed:', decodeError.message);
           return null;
         }
       } else if (data.base64 && data.contentType) {
@@ -1113,10 +1076,8 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
           if (data.base64.length > 100) {
             atob(data.base64.substring(0, 100)); // Test decode
             const dataUrl = `data:${data.contentType};base64,${data.base64}`;
-            console.log('✅ Proxy load successful (alt format):', cleanUrl);
             return dataUrl;
           } else {
-            console.warn('⚠️ Alt format base64 data too short');
             return null;
           }
         } catch (decodeError) {
@@ -1144,7 +1105,6 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
       // Add progressive delay to avoid overwhelming server
       await new Promise(resolve => setTimeout(resolve, index * 50));
       
-      console.log(`🔄 Loading image ${index + 1}/${imageCollection.size}: ${key}`);
       
       const base64 = await loadImageAsBase64(url, API_BASE_URL);
       
@@ -1156,22 +1116,17 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
             // Test decode to ensure validity
             atob(base64Parts[1].substring(0, 100));
             imageMap[key] = base64;
-            console.log(`✅ Successfully loaded and validated: ${key}`);
             return { success: true, key };
           } catch (decodeError) {
-            console.warn(`❌ Base64 validation failed for: ${key}`, decodeError.message);
             return { success: false, key, error: 'Base64 validation failed' };
           }
         } else {
-          console.warn(`❌ Invalid base64 format for: ${key}`);
           return { success: false, key, error: 'Invalid base64 format' };
         }
       } else {
-        console.warn(`❌ No valid base64 data for: ${key}`);
         return { success: false, key, error: 'No valid base64 data' };
       }
     } catch (error) {
-      console.error(`❌ Failed to load ${key}:`, error.message);
       return { success: false, key, error: error.message };
     }
   });
@@ -1194,11 +1149,9 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
     }
   });
 
-  console.log(`🖼️ Image loading complete: ${successCount} success, ${failCount} failed`);
   if (failedImages.length > 0) {
     console.log('❌ Failed images:', failedImages.slice(0, 5)); // Show first 5 failed
   }
-  console.log('🔍 Final imageMap keys:', Object.keys(imageMap).length);
 
   return imageMap;
 };

@@ -194,7 +194,7 @@ app.get('/storage/qc2_images/default-placeholder.png', (req, res) => {
 });
 
 // Image proxy endpoint for PDF generation
-app.get("/api/image-proxy", async (req, res) => {
+app.get("/api/image-proxy-all", async (req, res) => {
   // Set CORS headers based on the request origin
   const origin = req.headers.origin;
   const allowedOrigins = [
@@ -226,7 +226,6 @@ app.get("/api/image-proxy", async (req, res) => {
       return res.status(400).json({ error: "URL parameter is required" });
     }
 
-    console.log('🖼️ Image proxy: Processing URL:', url);
     let imageUrl = url;
     
     // Handle relative URLs with more flexibility
@@ -274,7 +273,6 @@ app.get("/api/image-proxy", async (req, res) => {
     }
 
     if (response.status >= 400) {
-      console.log(`❌ HTTP ${response.status} error for URL:`, imageUrl);
       return res.status(response.status).json({ 
         error: `HTTP ${response.status}: ${response.statusText}`,
         url: imageUrl
@@ -292,7 +290,6 @@ app.get("/api/image-proxy", async (req, res) => {
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${contentType};base64,${base64}`;
 
-    console.log('✅ Successfully fetched image:', imageUrl, 'Size:', buffer.length, 'bytes');
     
     // Set cache headers
     res.setHeader('Cache-Control', 'public, max-age=3600');
@@ -321,7 +318,7 @@ app.get("/api/image-proxy", async (req, res) => {
 });
 
 // Add OPTIONS handler for the image proxy endpoint specifically
-app.options("/api/image-proxy", (req, res) => {
+app.options("/api/image-proxy-all", (req, res) => {
   const origin = req.headers.origin;
   const allowedOrigins = [
     "https://192.167.12.85:3001",
@@ -605,7 +602,6 @@ app.get("/api/qc-washing/pdf/:id", async (req, res) => {
     }
 
     // Load all images
-    console.log(`Loading ${imageUrls.size} images server-side...`);
     const imagePromises = Array.from(imageUrls).map(async (url) => {
       const base64 = await loadImageServerSide(url);
       return { url, base64 };
@@ -616,7 +612,6 @@ app.get("/api/qc-washing/pdf/:id", async (req, res) => {
       if (base64) preloadedImages[url] = base64;
     });
 
-    console.log(`Successfully loaded ${Object.keys(preloadedImages).length}/${imageUrls.size} images`);
 
     // Import the PDF component
     const { QcWashingFullReportPDF } = await import("../src/components/inspection/qc2_washing/Home/qcWashingFullReportPDF.jsx");
