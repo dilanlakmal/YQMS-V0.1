@@ -138,11 +138,12 @@ const PORT = 5000;
 ------------------------------ */
 
 const options = {
-   key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.12.85-key.pem')),
+  key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.12.85-key.pem')),
   cert: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.12.85.pem'))
 };
 
 export const server = https.createServer(options, app);
+
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
@@ -153,69 +154,84 @@ export const io = new SocketIO(server, {
   },
 });
 
-// app.use("/storage", express.static(path.join(__dirname, "public/storage")));
-// app.use("/public", express.static(path.join(__dirname, "../public")));
+// Define allowed origins once
+const allowedOrigins = [
+  "https://192.167.12.85:3001",
+  "http://localhost:3001", 
+  "https://localhost:3001",
+  "https://yqms.yaikh.com",
+  "https://192.167.12.162:3001"
+];
 
-app.use("/storage", (req, res, next) => {
-  // Set CORS headers for all origins for static files
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
-  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Type");
-  
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+// CORS configuration
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(null, true); // Allow all origins for image proxy
+    }
+  },
+  methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization", 
+    "Cache-Control",
+    "Origin",
+    "X-Requested-With",
+    "Accept",
+    "Pragma",
+    "Expires",
+    "Last-Modified",
+    "If-Modified-Since",
+    "If-None-Match",
+    "ETag"
+  ],
+  exposedHeaders: ["Content-Length", "Content-Type", "Cache-Control", "Last-Modified", "ETag"],
+  credentials: false, // Set to false for broader compatibility
+  optionsSuccessStatus: 204
+};
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
+// Body parser configuration
+app.use(bodyParser.json({ limit: "50mb" }));
+app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use(express.json());
+
+// Static file serving with simplified CORS
+app.use("/storage", express.static(path.join(__dirname, "public/storage"), {
+  setHeaders: (res, path) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Cache-Control", "public, max-age=3600");
   }
-  
-  next();
-}, express.static(path.join(__dirname, "public/storage")));
+}));
 
-app.use("/public", (req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
-  res.header("Access-Control-Expose-Headers", "Content-Length, Content-Type");
-  
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
+app.use("/public", express.static(path.join(__dirname, "../public"), {
+  setHeaders: (res, path) => {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Cache-Control", "public, max-age=3600");
   }
-  
-  next();
-}, express.static(path.join(__dirname, "../public")));
+}));
 
-
-// Fallback for missing images - serve a default placeholder
+// Fallback for missing images
 app.get('/storage/qc2_images/default-placeholder.png', (req, res) => {
-  // Create a simple 1x1 transparent PNG as fallback
   const transparentPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg==', 'base64');
   res.set('Content-Type', 'image/png');
+  res.set('Cache-Control', 'public, max-age=3600');
   res.send(transparentPng);
 });
 
-// Image proxy endpoint for PDF generation
+// Simplified image proxy endpoint
 app.get("/api/image-proxy-all", async (req, res) => {
-  // Set CORS headers based on the request origin
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    "https://192.167.12.85:3001",
-    "http://localhost:3001",
-    "https://localhost:3001",
-    "https://yqms.yaikh.com",
-    "https://192.167.12.162:3001"
-  ];
-
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  } else {
-    res.header("Access-Control-Allow-Origin", "*");
-  }
+  // Set permissive CORS headers for image proxy
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+  res.header("Access-Control-Allow-Headers", "*");
   
-  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
-  res.header("Access-Control-Max-Age", "86400");
-
-  // Handle preflight requests
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -228,53 +244,41 @@ app.get("/api/image-proxy-all", async (req, res) => {
 
     let imageUrl = url;
     
-    // Handle relative URLs with more flexibility
+    // Handle relative URLs
     if (url.startsWith('/storage/') || url.startsWith('/public/')) {
       const baseUrl = process.env.API_BASE_URL || 'https://192.167.12.85:5000';
       imageUrl = `${baseUrl}${url}`;
     } else if (url.startsWith('storage/') || url.startsWith('public/')) {
-      // Handle URLs without leading slash
       const baseUrl = process.env.API_BASE_URL || 'https://192.167.12.85:5000';
       imageUrl = `${baseUrl}/${url}`;
     }
 
-    // Validate URL format
+    // Validate URL
     try {
       new URL(imageUrl);
     } catch (urlError) {
-      console.log('❌ Invalid URL format:', imageUrl);
       return res.status(400).json({ error: 'Invalid URL format' });
     }
 
     const response = await axios.get(imageUrl, {
       responseType: 'arraybuffer',
-      timeout: 20000,
-      maxRedirects: 5,
+      timeout: 15000,
+      maxRedirects: 3,
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'image/*,*/*;q=0.8',
-        'Accept-Encoding': 'gzip, deflate, br',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'no-cache'
+        'User-Agent': 'Mozilla/5.0 (compatible; ImageProxy/1.0)',
+        'Accept': 'image/*,*/*;q=0.8'
       },
       httpsAgent: new https.Agent({
-        rejectUnauthorized: process.env.NODE_ENV === 'production',
+        rejectUnauthorized: false, // Allow self-signed certificates
         keepAlive: true,
-        timeout: 20000
+        timeout: 15000
       }),
-      validateStatus: function (status) {
-        return status < 500;
-      }
+      validateStatus: (status) => status < 500
     });
-
-    if (response.status === 404) {
-      console.log('❌ Image not found (404):', imageUrl);
-      return res.status(404).json({ error: 'Image not found', url: imageUrl });
-    }
 
     if (response.status >= 400) {
       return res.status(response.status).json({ 
-        error: `HTTP ${response.status}: ${response.statusText}`,
+        error: `HTTP ${response.status}`,
         url: imageUrl
       });
     }
@@ -282,97 +286,39 @@ app.get("/api/image-proxy-all", async (req, res) => {
     // Validate content type
     const contentType = response.headers['content-type'] || 'image/jpeg';
     if (!contentType.startsWith('image/')) {
-      console.log('❌ Invalid content type:', contentType, 'for URL:', imageUrl);
-      return res.status(400).json({ error: 'URL does not point to an image', contentType });
+      return res.status(400).json({ error: 'Not an image', contentType });
     }
 
     const buffer = Buffer.from(response.data);
+    
+    // Validate image data
+    if (buffer.length < 100) {
+      return res.status(400).json({ error: 'Image data too small' });
+    }
+
     const base64 = buffer.toString('base64');
     const dataUrl = `data:${contentType};base64,${base64}`;
-
     
     // Set cache headers
     res.setHeader('Cache-Control', 'public, max-age=3600');
     res.json({ dataUrl });
 
   } catch (error) {
-    console.error('❌ Image proxy error:', {
-      message: error.message,
-      code: error.code,
-      url: url
-    });
-
-    // Return appropriate error responses
+    console.error('Image proxy error:', error.message);
+    
     if (error.code === 'ENOTFOUND') {
-      return res.status(404).json({ error: 'Host not found', url });
+      return res.status(404).json({ error: 'Host not found' });
     }
     if (error.code === 'ECONNREFUSED') {
-      return res.status(503).json({ error: 'Connection refused', url });
+      return res.status(503).json({ error: 'Connection refused' });
     }
-    if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
-      return res.status(408).json({ error: 'Request timeout', url });
+    if (error.code === 'ETIMEDOUT') {
+      return res.status(408).json({ error: 'Request timeout' });
     }
-
-    res.status(500).json({ error: 'Failed to fetch image', details: error.message, url });
+    
+    res.status(500).json({ error: 'Failed to fetch image' });
   }
 });
-
-// Add OPTIONS handler for the image proxy endpoint specifically
-app.options("/api/image-proxy-all", (req, res) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    "https://192.167.12.85:3001",
-    "http://localhost:3001",
-    "https://localhost:3001",
-    "https://yqms.yaikh.com",
-    "https://192.167.12.162:3001"
-  ];
-
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  } else {
-    res.header("Access-Control-Allow-Origin", "*");
-  }
-  
-  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control");
-  res.header("Access-Control-Max-Age", "86400");
-  res.status(200).end();
-});
-
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
-
-//app.use(cors());
-app.use(bodyParser.json());
-app.use(express.json());
-
-const allowedOrigins = [
-  "https://192.167.12.85:3001",
-  "http://localhost:3001",
-  "https://localhost:3001",
-  "https://yqms.yaikh.com",
-  "https://192.167.12.162:3001"
-];
-
-const corsOptions = {
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked origin:', origin);
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-  allowedHeaders: "Content-Type,Authorization,Cache-Control,Origin,X-Requested-With,Accept,Pragma,Expires,Last-Modified,If-Modified-Since,If-None-Match,ETag",
-  exposedHeaders: "Content-Length,Content-Type,Cache-Control,Last-Modified,ETag",
-  credentials: false, // Change this to false for image proxy requests
-  optionsSuccessStatus: 204
-};
-
-// Enable CORS with the defined options. This handles pre-flight requests automatically.
-app.use(cors(corsOptions));
 
 // Define model on connections
 
