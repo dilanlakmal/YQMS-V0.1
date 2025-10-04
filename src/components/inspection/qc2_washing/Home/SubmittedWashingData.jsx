@@ -962,133 +962,22 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
     
-    // ENHANCED: Better handling for different image sources
-    // Try direct fetch first for external URLs
-    if (cleanUrl.includes('192.167.12.85:5000') || cleanUrl.includes('yqms.yaikh.com') || cleanUrl.startsWith('http')) {
-  
-      
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        
-        const directResponse = await fetch(cleanUrl, {
-          method: 'GET',
-          headers: {
-            'Accept': 'image/*,*/*;q=0.8',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache'
-          },
-          mode: 'cors',
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (directResponse.ok) {
-          const contentType = directResponse.headers.get('content-type');
-          
-          // Validate content type
-          if (!contentType || !contentType.startsWith('image/')) {
-            throw new Error('Invalid content type');
-          }
-          
-          const arrayBuffer = await directResponse.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          
-          // Validate minimum size
-          if (uint8Array.length < 100) {
-            throw new Error('Image too small');
-          }
-          
-          // CRITICAL: Validate JPEG/PNG headers to prevent "SOI not found" errors
-          const isValidJPEG = uint8Array[0] === 0xFF && uint8Array[1] === 0xD8;
-          const isValidPNG = uint8Array[0] === 0x89 && uint8Array[1] === 0x50 && uint8Array[2] === 0x4E && uint8Array[3] === 0x47;
-          const isValidWebP = uint8Array[8] === 0x57 && uint8Array[9] === 0x45 && uint8Array[10] === 0x42 && uint8Array[11] === 0x50;
-          
-          if (!isValidJPEG && !isValidPNG && !isValidWebP) {
-            throw new Error('Invalid image format');
-          }
-          
-          // Convert to base64 using chunks to avoid call stack issues
-          let binary = '';
-          const chunkSize = 8192;
-          for (let i = 0; i < uint8Array.length; i += chunkSize) {
-            const chunk = uint8Array.subarray(i, i + chunkSize);
-            binary += String.fromCharCode.apply(null, chunk);
-          }
-          
-          const base64 = btoa(binary);
-          const dataUrl = `data:${contentType};base64,${base64}`;
-          
-          // Final validation - test decode
-          try {
-            atob(base64.substring(0, 100));
-            return dataUrl;
-          } catch (decodeError) {
-            throw new Error('Base64 validation failed');
-          }
-        } else {
-          console.log('⚠️ Direct load failed with status:', directResponse.status);
-          throw new Error(`HTTP ${directResponse.status}`);
-        }
-      } catch (directError) {
-        console.log('⚠️ Direct load failed:', directError.message);
-        // Continue to proxy fallback
-      }
-    }
-    
-    // Fallback to proxy for all URLs
+    // ALWAYS use proxy to avoid CORS issues
     const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000);
     
     const response = await fetch(proxyUrl, {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
-        'Cache-Control': 'no-cache'
-      },
-      signal: controller.signal
+        'Accept': 'application/json'
+      }
     });
-    
-    clearTimeout(timeoutId);
 
     if (response.ok) {
       const data = await response.json();
       
       if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-        // Validate proxy base64 data
-        try {
-          const base64Part = data.dataUrl.split(',')[1];
-          if (base64Part && base64Part.length > 100) {
-            atob(base64Part.substring(0, 100)); 
-            return data.dataUrl;
-          } else {
-            return null;
-          }
-        } catch (decodeError) {
-          return null;
-        }
-      } else if (data.base64 && data.contentType) {
-        // Handle alternative response format
-        try {
-          if (data.base64.length > 100) {
-            atob(data.base64.substring(0, 100)); // Test decode
-            const dataUrl = `data:${data.contentType};base64,${data.base64}`;
-            return dataUrl;
-          } else {
-            return null;
-          }
-        } catch (decodeError) {
-          console.warn('⚠️ Alt format base64 decode failed:', decodeError.message);
-          return null;
-        }
-      } else {
-        console.warn('❌ Invalid proxy response format:', data);
+        return data.dataUrl;
       }
-    } else {
-      console.warn('❌ Proxy load failed:', response.status, response.statusText);
     }
     
     return null;
