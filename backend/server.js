@@ -13971,11 +13971,12 @@ app.get("/api/users-by-job-title", async (req, res) => {
 
 app.post("/api/role-management", async (req, res) => {
   try {
-    const { role, jobTitles } = req.body;
+    const { role, jobTitles, selectedUsers } = req.body;
 
+    // Get only the selected users' data
     const users = await UserMain.find(
       {
-        job_title: { $in: jobTitles },
+        emp_id: { $in: selectedUsers },
         working_status: "Working"
       },
       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
@@ -14017,7 +14018,7 @@ app.post("/api/role-management", async (req, res) => {
     }
 
     await roleDoc.save();
-    res.json({ message: `Role ${roleDoc ? "updated" : "added"} successfully` });
+    res.json({ message: `Role ${roleDoc._id ? "updated" : "added"} successfully` });
   } catch (error) {
     console.error("Error saving role:", error);
     res.status(500).json({ message: "Failed to save role" });
