@@ -1,11 +1,14 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { Buffer } from "buffer";
 import { API_BASE_URL } from "../../../../../config";
 import { MoreVertical, Eye, FileText, Download, Trash2 } from "lucide-react";
 import SubmittedWashingDataFilter from "./SubmittedWashingDataFilter";
 import QCWashingViewDetailsModal from "./QCWashingViewDetailsModal";
 import QCWashingFullReportModal from "./QCWashingFullReportModal";
-import QcWashingFullReportPDF from "./qcWashingFullReportPDF";
 import { PDFDownloadLink } from "@react-pdf/renderer";
+
+// Polyfill Buffer for client-side PDF generation
+window.Buffer = window.Buffer || Buffer;
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
@@ -563,7 +566,9 @@ const SubmittedWashingDataPage = () => {
               if (imagePath.startsWith("data:image/")) {
                 processedComparisonImages.push(imagePath);
               } else {
-                
+                console.log(
+                  `🖼️ Adding comparison image placeholder for: ${imagePath}`
+                );
                 processedComparisonImages.push({
                   isPlaceholder: true,
                   originalUrl: imagePath,
@@ -690,8 +695,28 @@ const SubmittedWashingDataPage = () => {
         throw new Error("API_BASE_URL is not defined");
       }
 
-      // Process images to base64 using the centralized function
-      const processedRecord = await processImagesInRecord(record, API_BASE_URL);
+      // Fetch inspector details if userId exists
+      let inspectorDetails = null;
+      if (record.userId) {
+        try {
+          const inspectorResponse = await fetch(
+            `${API_BASE_URL}/api/users/${record.userId}`
+          );
+          if (inspectorResponse.ok) {
+            const userData = await inspectorResponse.json();
+            if (userData && !userData.error) {
+              inspectorDetails = userData;
+            }
+          } else {
+            console.warn(
+              "⚠️ Failed to fetch inspector details:",
+              inspectorResponse.status
+            );
+          }
+        } catch (inspectorError) {
+          console.warn("❌ Could not fetch inspector details:", inspectorError);
+        }
+      }
 
       // Fetch comparison data
       let comparisonData = null;
@@ -729,15 +754,98 @@ const SubmittedWashingDataPage = () => {
         }
       }
 
-      // Generate PDF with base64 images
+      // FIXED: Preload images before generating PDF
+      const preloadedImages = await preloadImagesForRecord(
+        record,
+        API_BASE_URL
+      );
+
+      // Add inspector photo to preloaded images if available
+      if (inspectorDetails?.face_photo) {
+        try {
+          const loadImageAsBase64 = async (src, API_BASE_URL) => {
+            let imageUrl = src;
+
+            if (typeof src === "object" && src !== null) {
+              imageUrl =
+                src.originalUrl ||
+                src.url ||
+                src.src ||
+                src.path ||
+                JSON.stringify(src);
+            }
+
+            if (!imageUrl || typeof imageUrl !== "string") {
+              return null;
+            }
+
+            if (imageUrl.startsWith("data:")) {
+              return imageUrl;
+            }
+
+            try {
+              let cleanUrl = imageUrl.trim();
+              if (
+                cleanUrl.startsWith("/storage/") ||
+                cleanUrl.startsWith("/public/")
+              ) {
+                cleanUrl = `${API_BASE_URL}${cleanUrl}`;
+              }
+
+              const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(
+                cleanUrl
+              )}`;
+              const response = await fetch(proxyUrl, {
+                method: "GET",
+                headers: { Accept: "application/json" },
+                timeout: 10000
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                if (data.dataUrl && data.dataUrl.startsWith("data:")) {
+                  return data.dataUrl;
+                }
+              }
+              return null;
+            } catch (error) {
+              console.warn("Error loading inspector photo:", error);
+              return null;
+            }
+          };
+
+          const inspectorPhotoBase64 = await loadImageAsBase64(
+            inspectorDetails.face_photo,
+            API_BASE_URL
+          );
+          if (inspectorPhotoBase64) {
+            preloadedImages[inspectorDetails.face_photo] = inspectorPhotoBase64;
+          }
+        } catch (error) {
+          console.warn("⚠️ Failed to load inspector photo:", error);
+        }
+      }
+
+      // Import the PDF renderer
       const { pdf } = await import("@react-pdf/renderer");
+      const { QcWashingFullReportPDF } = await import(
+        "./qcWashingFullReportPDF"
+      );
+
+      if (!record || !record._id) {
+        throw new Error("Invalid record data");
+      }
+      // Generate PDF with preloaded images and inspector details
       const blob = await pdf(
-        <QcWashingFullReportPDF
-          recordData={processedRecord}
-          comparisonData={comparisonData}
-          API_BASE_URL={API_BASE_URL}
-          checkpointDefinitions={checkpointDefinitions}
-        />
+        React.createElement(QcWashingFullReportPDF, {
+          recordData: record,
+          comparisonData: comparisonData,
+          API_BASE_URL: API_BASE_URL,
+          checkpointDefinitions: checkpointDefinitions,
+          preloadedImages: preloadedImages,
+          skipImageLoading: false,
+          inspectorDetails: inspectorDetails
+        })
       ).toBlob();
 
       // Download
@@ -754,12 +862,409 @@ const SubmittedWashingDataPage = () => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Error generating PDF:", error);
-      alert(`Failed to generate PDF: ${error.message}`);
+      // Provide more specific error messages
+      let errorMessage = "Failed to generate PDF";
+      if (error.message.includes("SOI not found")) {
+        errorMessage = "Image format error. Some images may be corrupted.";
+      } else if (error.message.includes("string child")) {
+        errorMessage = "Data formatting error. Please try again.";
+      } else if (error.message.includes("CORS")) {
+        errorMessage = "Network access error. Please check your connection.";
+      }
+
+      alert(`${errorMessage}: ${error.message}`);
     } finally {
       setIsQcWashingPDF(false);
     }
   };
+
+  // FIXED: Add this helper function to preload images
+  const preloadImagesForRecord = async (record, API_BASE_URL) => {
+    const imageCollection = new Map();
+    const imageMap = {};
+
+    // Helper function to normalize image keys (same as in PDF component)
+    const normalizeImageKey = (src) => {
+      if (typeof src === "string") {
+        return src.trim();
+      } else if (typeof src === "object" && src !== null) {
+        return (
+          src.originalUrl ||
+          src.url ||
+          src.src ||
+          src.path ||
+          JSON.stringify(src)
+        );
+      }
+      return JSON.stringify(src);
+    };
+
+    // Helper function to add images to collection
+    const addImageToCollection = (img, context = "") => {
+      if (!img) return;
+
+      // Generate all possible keys for this image (same logic as PDF component)
+      const generateStorageKeys = (img) => {
+        const keys = new Set();
+
+        if (typeof img === "string") {
+          const cleanImg = img.trim();
+          keys.add(cleanImg);
+          keys.add(img); // untrimmed
+
+          // Handle different URL formats
+          if (cleanImg.startsWith("/")) {
+            keys.add(cleanImg.substring(1));
+          } else {
+            keys.add("/" + cleanImg);
+          }
+
+          // Handle full URLs - extract path for 192.167.12.85:5000
+          if (cleanImg.includes("192.167.12.85:5000")) {
+            const urlParts = cleanImg.split("192.167.12.85:5000");
+            if (urlParts.length > 1) {
+              const path = urlParts[1];
+              keys.add(path);
+              keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
+            }
+          }
+
+          // Handle yqms.yaikh.com URLs - extract path
+          if (cleanImg.includes("yqms.yaikh.com")) {
+            const urlParts = cleanImg.split("yqms.yaikh.com");
+            if (urlParts.length > 1) {
+              const path = urlParts[1];
+              keys.add(path);
+              keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
+            }
+          }
+
+          // Handle storage/public paths
+          if (cleanImg.includes("/storage/") || cleanImg.includes("/public/")) {
+            const pathMatch = cleanImg.match(/(\/(?:storage|public)\/.+)/);
+            if (pathMatch) {
+              keys.add(pathMatch[1]);
+              keys.add(pathMatch[1].substring(1));
+            }
+          }
+        } else if (typeof img === "object" && img !== null) {
+          const possibleUrls = [
+            img.originalUrl,
+            img.url,
+            img.src,
+            img.path
+          ].filter(Boolean);
+
+          possibleUrls.forEach((url) => {
+            if (typeof url === "string") {
+              const subKeys = generateStorageKeys(url);
+              subKeys.forEach((key) => keys.add(key));
+            }
+          });
+
+          keys.add(JSON.stringify(img));
+        }
+
+        return Array.from(keys);
+      };
+
+      const possibleKeys = generateStorageKeys(img);
+
+      // Store all possible keys pointing to the same image source
+      possibleKeys.forEach((key) => {
+        if (key && key.trim()) {
+          imageCollection.set(key.trim(), img);
+        }
+      });
+    };
+
+    // Collect defect images (both captured and uploaded)
+    if (record.defectDetails?.defectsByPc) {
+      record.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
+        if (pc.pcDefects) {
+          pc.pcDefects.forEach((defect, defectIndex) => {
+            // Collect captured defect images
+            if (defect.defectImages && Array.isArray(defect.defectImages)) {
+              defect.defectImages.forEach((img, imgIndex) => {
+                addImageToCollection(
+                  img,
+                  `defect-pc${pcIndex}-defect${defectIndex}-captured${imgIndex}`
+                );
+              });
+            }
+            // Collect uploaded defect images
+            if (defect.uploadedImages && Array.isArray(defect.uploadedImages)) {
+              defect.uploadedImages.forEach((img, imgIndex) => {
+                addImageToCollection(
+                  img,
+                  `defect-pc${pcIndex}-defect${defectIndex}-uploaded${imgIndex}`
+                );
+              });
+            }
+          });
+        }
+      });
+    }
+
+    // Collect additional images
+    if (
+      record.defectDetails?.additionalImages &&
+      Array.isArray(record.defectDetails.additionalImages)
+    ) {
+      record.defectDetails.additionalImages.forEach((img, index) => {
+        addImageToCollection(img, `additional-${index}`);
+      });
+    }
+
+    // Collect new inspection images (both captured and uploaded)
+    if (record.inspectionDetails?.checkpointInspectionData) {
+      record.inspectionDetails.checkpointInspectionData.forEach(
+        (checkpoint, checkIndex) => {
+          // Collect captured comparison images
+          if (
+            checkpoint.comparisonImages &&
+            Array.isArray(checkpoint.comparisonImages)
+          ) {
+            checkpoint.comparisonImages.forEach((img, imgIndex) => {
+              addImageToCollection(
+                img,
+                `checkpoint${checkIndex}-main-captured${imgIndex}`
+              );
+            });
+          }
+          // Collect uploaded comparison images
+          if (
+            checkpoint.uploadedImages &&
+            Array.isArray(checkpoint.uploadedImages)
+          ) {
+            checkpoint.uploadedImages.forEach((img, imgIndex) => {
+              addImageToCollection(
+                img,
+                `checkpoint${checkIndex}-main-uploaded${imgIndex}`
+              );
+            });
+          }
+          if (checkpoint.subPoints) {
+            checkpoint.subPoints.forEach((subPoint, subIndex) => {
+              // Collect captured sub-point images
+              if (
+                subPoint.comparisonImages &&
+                Array.isArray(subPoint.comparisonImages)
+              ) {
+                subPoint.comparisonImages.forEach((img, imgIndex) => {
+                  addImageToCollection(
+                    img,
+                    `checkpoint${checkIndex}-sub${subIndex}-captured${imgIndex}`
+                  );
+                });
+              }
+              // Collect uploaded sub-point images
+              if (
+                subPoint.uploadedImages &&
+                Array.isArray(subPoint.uploadedImages)
+              ) {
+                subPoint.uploadedImages.forEach((img, imgIndex) => {
+                  addImageToCollection(
+                    img,
+                    `checkpoint${checkIndex}-sub${subIndex}-uploaded${imgIndex}`
+                  );
+                });
+              }
+            });
+          }
+        }
+      );
+    }
+
+    // Collect legacy inspection images (both captured and uploaded)
+    if (record.inspectionDetails?.checkedPoints) {
+      record.inspectionDetails.checkedPoints.forEach((point, pointIndex) => {
+        // Collect captured comparison images
+        if (point.comparison && Array.isArray(point.comparison)) {
+          point.comparison.forEach((img, imgIndex) => {
+            addImageToCollection(
+              img,
+              `legacy-point${pointIndex}-captured${imgIndex}`
+            );
+          });
+        }
+        // Collect uploaded comparison images
+        if (point.uploadedImages && Array.isArray(point.uploadedImages)) {
+          point.uploadedImages.forEach((img, imgIndex) => {
+            addImageToCollection(
+              img,
+              `legacy-point${pointIndex}-uploaded${imgIndex}`
+            );
+          });
+        }
+      });
+    }
+
+    // Collect machine images
+    if (record.inspectionDetails?.machineProcesses) {
+      record.inspectionDetails.machineProcesses.forEach(
+        (machine, machineIndex) => {
+          if (machine.image) {
+            addImageToCollection(machine.image, `machine${machineIndex}`);
+          }
+        }
+      );
+    }
+
+    // Note: Inspector photo will be handled separately in the main function
+
+    if (imageCollection.size === 0) {
+      console.log("No images found, proceeding without loading");
+      return {};
+    }
+
+    // ENHANCED: Load images with better error handling and validation
+    const loadImageAsBase64 = async (src, API_BASE_URL) => {
+      let imageUrl = src;
+
+      // Handle different image data formats
+      if (typeof src === "object" && src !== null) {
+        if (src.originalUrl) {
+          imageUrl = src.originalUrl;
+        } else {
+          imageUrl = src.url || src.src || src.path || JSON.stringify(src);
+        }
+      }
+
+      if (typeof src === "string" && src.startsWith("{")) {
+        try {
+          const parsed = JSON.parse(src);
+          if (parsed.originalUrl) {
+            imageUrl = parsed.originalUrl;
+          } else {
+            imageUrl = parsed.url || parsed.src || parsed.path || src;
+          }
+        } catch (e) {
+          imageUrl = src;
+        }
+      }
+
+      if (!imageUrl || typeof imageUrl !== "string") {
+        console.warn("Invalid image URL:", src);
+        return null;
+      }
+
+      // If already base64, validate and return
+      if (imageUrl.startsWith("data:")) {
+        try {
+          const base64Parts = imageUrl.split(",");
+          if (base64Parts.length === 2 && base64Parts[1].length > 100) {
+            // Test decode to ensure validity
+            atob(base64Parts[1].substring(0, 100));
+            return imageUrl;
+          }
+        } catch (e) {
+          console.warn("Invalid base64 data:", e.message);
+          return null;
+        }
+      }
+
+      try {
+        // Clean and normalize the URL
+        let cleanUrl = imageUrl.trim();
+
+        // Handle relative URLs
+        if (
+          cleanUrl.startsWith("/storage/") ||
+          cleanUrl.startsWith("/public/")
+        ) {
+          cleanUrl = `${API_BASE_URL}${cleanUrl}`;
+        }
+
+        // ALWAYS use proxy to avoid CORS issues
+        const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(
+          cleanUrl
+        )}`;
+
+        const response = await fetch(proxyUrl, {
+          method: "GET",
+          headers: {
+            Accept: "application/json"
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+
+          if (data.dataUrl && data.dataUrl.startsWith("data:")) {
+            return data.dataUrl;
+          }
+        }
+
+        return null;
+      } catch (error) {
+        console.warn("❌ Error loading image:", imageUrl, error.message);
+        return null;
+      }
+    };
+
+    // Load all images with enhanced error handling
+    const loadPromises = Array.from(imageCollection.entries()).map(
+      async ([key, url], index) => {
+        try {
+          // Add progressive delay to avoid overwhelming server
+          await new Promise((resolve) => setTimeout(resolve, index * 50));
+
+          const base64 = await loadImageAsBase64(url, API_BASE_URL);
+
+          if (base64 && base64.startsWith("data:")) {
+            // Additional validation for base64 data
+            const base64Parts = base64.split(",");
+            if (base64Parts.length === 2 && base64Parts[1].length > 100) {
+              try {
+                // Test decode to ensure validity
+                atob(base64Parts[1].substring(0, 100));
+                imageMap[key] = base64;
+                return { success: true, key };
+              } catch (decodeError) {
+                return {
+                  success: false,
+                  key,
+                  error: "Base64 validation failed"
+                };
+              }
+            } else {
+              return { success: false, key, error: "Invalid base64 format" };
+            }
+          } else {
+            return { success: false, key, error: "No valid base64 data" };
+          }
+        } catch (error) {
+          return { success: false, key, error: error.message };
+        }
+      }
+    );
+
+    // Wait for all images to load with timeout
+    const results = await Promise.allSettled(loadPromises);
+
+    let successCount = 0;
+    let failCount = 0;
+    const failedImages = [];
+
+    results.forEach((result) => {
+      if (result.status === "fulfilled" && result.value.success) {
+        successCount++;
+      } else {
+        failCount++;
+        if (result.status === "fulfilled") {
+          failedImages.push(result.value.key);
+        }
+      }
+    });
+
+    if (failedImages.length > 0) {
+      console.log("❌ Failed images:", failedImages.slice(0, 5)); // Show first 5 failed
+    }
+
+    return imageMap;
+  };
+
   // const handleDelete = async (record) => {
   //   console.log('Delete record:', record);
   //   if (window.confirm('Are you sure you want to delete this record?')) {

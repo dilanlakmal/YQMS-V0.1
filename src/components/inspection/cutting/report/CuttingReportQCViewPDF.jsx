@@ -1,6 +1,7 @@
 import {
   Document,
   Font,
+  Image,
   Page,
   StyleSheet,
   Text,
@@ -9,6 +10,7 @@ import {
 } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
 import React from "react";
+import { API_BASE_URL } from "../../../../../config";
 
 // --- FONT REGISTRATION ---
 Font.register({
@@ -136,6 +138,19 @@ const styles = StyleSheet.create({
   resultPending: {
     color: "#6b7280", // Gray
     fontWeight: "bold"
+  },
+  imageContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 5,
+    gap: 5
+  },
+  image: {
+    width: 120,
+    height: 120,
+    objectFit: "contain",
+    borderWidth: 1,
+    borderColor: "#e0e0e0"
   }
 });
 
@@ -640,6 +655,47 @@ export const CuttingIssuesPDF = ({ report, t, i18n }) => (
   </View>
 );
 
+export const AdditionalImagesPDF = ({ report, t }) => {
+  // Check if there are any additional images across all sizes
+  const allImages = report.inspectionData.flatMap(
+    (sizeEntry) => sizeEntry.cuttingDefects?.additionalImages || []
+  );
+
+  if (allImages.length === 0) {
+    return null; // Don't render anything if there are no images
+  }
+
+  return (
+    <View style={styles.section} break>
+      <Text style={styles.sectionTitle}>{t("cutting.additionalImages")}</Text>
+      {report.inspectionData.map((sizeEntry, index) => {
+        const images = sizeEntry.cuttingDefects?.additionalImages;
+        if (!images || images.length === 0) {
+          return null;
+        }
+        return (
+          <View key={`img-section-${index}`} style={{ marginBottom: 10 }}>
+            <Text style={{ fontSize: 8, fontWeight: "bold", marginBottom: 5 }}>
+              {t("cutting.size")}: {sizeEntry.inspectedSize}
+            </Text>
+            <View style={styles.imageContainer}>
+              {images.map((img, imgIdx) =>
+                img.data ? ( // We will render based on the pre-loaded 'data' property
+                  <Image
+                    key={imgIdx}
+                    style={styles.image}
+                    src={img.data} // Use the base64 data URI
+                  />
+                ) : null
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
 // --- MAIN DOCUMENT COMPONENT ---
 const CuttingReportPDFDoc = ({
   report,
@@ -671,6 +727,7 @@ const CuttingReportPDFDoc = ({
         {hasCuttingIssues && (
           <CuttingIssuesPDF report={report} t={t} i18n={i18n} />
         )}
+        <AdditionalImagesPDF report={report} t={t} />
         <PDFFooter />
       </Page>
     </Document>
@@ -686,6 +743,60 @@ export const generateCuttingReportPDF = async (
 ) => {
   // --- FULL DATA PROCESSING LOGIC ---
   const { t } = i18n;
+
+  // --- ADD THIS HELPER FUNCTION TO FETCH AND CONVERT IMAGES ---
+  const imageToDataUri = async (url) => {
+    try {
+      // Construct the proxy URL
+      const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(
+        url
+      )}`;
+
+      // Fetch from your OWN backend. The browser will allow this.
+      const response = await fetch(proxyUrl);
+
+      if (!response.ok) {
+        throw new Error(`Proxy fetch failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(
+        `Failed to fetch and convert image via proxy: ${url}`,
+        error
+      );
+      return null; // Return null if fetching fails
+    }
+  };
+
+  // --- PRE-LOAD AND PREPARE IMAGES ---
+  // We create a deep copy of the report to avoid mutating the original state.
+  const reportWithImageData = JSON.parse(JSON.stringify(report));
+
+  // Create an array of all image-fetching promises
+  const imagePromises = [];
+  reportWithImageData.inspectionData.forEach((sizeEntry) => {
+    const images = sizeEntry.cuttingDefects?.additionalImages;
+    if (images) {
+      images.forEach((img) => {
+        if (img.path) {
+          const promise = imageToDataUri(img.path).then((dataUri) => {
+            img.data = dataUri; // Attach the base64 data to the image object
+          });
+          imagePromises.push(promise);
+        }
+      });
+    }
+  });
+
+  // Wait for all images to be fetched and converted
+  await Promise.all(imagePromises);
 
   const getDefectDisplayName = (defectNameFromInspection) => {
     const masterDefect = fabricDefectsMaster.find(
@@ -886,7 +997,8 @@ export const generateCuttingReportPDF = async (
 
   const blob = await pdf(
     <CuttingReportPDFDoc
-      report={report}
+      report={reportWithImageData}
+      //report={report}
       processedData={processedData}
       i18n={i18n}
       resultStatus={resultStatus}

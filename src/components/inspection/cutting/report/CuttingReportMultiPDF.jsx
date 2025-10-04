@@ -1,7 +1,9 @@
 import { Document, Page, StyleSheet, pdf } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
 import React from "react";
+import { API_BASE_URL } from "../../../../../config";
 import {
+  AdditionalImagesPDF,
   CutPanelDetails,
   CuttingIssuesPDF,
   FabricDefectsPDF,
@@ -134,6 +136,7 @@ const ReportPage = ({ report, qcUser, processedData, i18n }) => {
       {hasCuttingIssues && (
         <CuttingIssuesPDF report={report} t={t} i18n={i18n} />
       )}
+      <AdditionalImagesPDF report={report} t={t} />
       <PDFFooter />
     </Page>
   );
@@ -147,6 +150,56 @@ export const generateMultiReportPDF = async (
   i18n,
   tableNoFilter
 ) => {
+  const imageToDataUri = async (url) => {
+    try {
+      // Construct the proxy URL
+      const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(
+        url
+      )}`;
+
+      // Fetch from your OWN backend. The browser will allow this.
+      const response = await fetch(proxyUrl);
+
+      if (!response.ok) {
+        throw new Error(`Proxy fetch failed with status ${response.status}`);
+      }
+
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(
+        `Failed to fetch and convert image via proxy: ${url}`,
+        error
+      );
+      return null; // Return null if fetching fails
+    }
+  };
+  // --- PRE-LOAD ALL IMAGES FOR ALL REPORTS ---
+  const reportsWithImageData = JSON.parse(JSON.stringify(reports));
+  const allImagePromises = [];
+  reportsWithImageData.forEach((report) => {
+    report.inspectionData.forEach((sizeEntry) => {
+      const images = sizeEntry.cuttingDefects?.additionalImages;
+      if (images) {
+        images.forEach((img) => {
+          if (img.path) {
+            const promise = imageToDataUri(img.path).then((dataUri) => {
+              img.data = dataUri;
+            });
+            allImagePromises.push(promise);
+          }
+        });
+      }
+    });
+  });
+
+  await Promise.all(allImagePromises);
+
   // --- FULL DATA PROCESSING LOGIC FOR A SINGLE REPORT ---
   const processReportData = (report) => {
     const { t } = i18n;
@@ -374,7 +427,7 @@ export const generateMultiReportPDF = async (
 
   const blob = await pdf(
     <Document>
-      {reports.map((report) => {
+      {reportsWithImageData.map((report) => {
         const processedData = processReportData(report);
         const qcUser = qcUsers.find((u) => u?.emp_id === report.cutting_emp_id);
         return (
