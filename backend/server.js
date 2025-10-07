@@ -122,6 +122,7 @@ import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 // import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
 // import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
+
 /* ------------------------------
    Connection String
 ------------------------------ */
@@ -936,177 +937,6 @@ const normalizeDateString = (dateStr) => {
     return dateStr; // Fallback
   }
 };
-
-/* ------------------------------
-   QC Roving Pairing Image Upload Endpoints
------------------------------- */
-
-// Configure multer for roving pairing images
-const rovingImageStorage = multer.memoryStorage();
-const uploadRovingImage = multer({
-  storage: rovingImageStorage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
-  fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (allowedTypes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
-    }
-  }
-});
-
-// Upload images for defects
-app.post('/api/roving-pairing/upload-defect-images', uploadRovingImage.array('images', 5), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images provided' });
-    }
-
-    const uploadedImages = [];
-    
-    for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'defect');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'defect');
-      uploadedImages.push(imagePath);
-    }
-
-    res.json({ success: true, images: uploadedImages });
-  } catch (error) {
-    console.error('Error uploading defect images:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload images' });
-  }
-});
-
-// Upload images for measurements
-app.post('/api/roving-pairing/upload-measurement-images', uploadRovingImage.array('images', 5), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images provided' });
-    }
-
-    const uploadedImages = [];
-    
-    for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'measurement');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'measurement');
-      uploadedImages.push(imagePath);
-    }
-
-    res.json({ success: true, images: uploadedImages });
-  } catch (error) {
-    console.error('Error uploading measurement images:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload images' });
-  }
-});
-
-// Upload images for accessories
-app.post('/api/roving-pairing/upload-accessory-images', uploadRovingImage.array('images', 5), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images provided' });
-    }
-
-    const uploadedImages = [];
-    
-    for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'accessory');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'accessory');
-      uploadedImages.push(imagePath);
-    }
-
-    res.json({ success: true, images: uploadedImages });
-  } catch (error) {
-    console.error('Error uploading accessory images:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload images' });
-  }
-});
-
-// Delete image endpoint
-app.delete('/api/roving-pairing/delete-image', async (req, res) => {
-  try {
-    const { imagePath } = req.body;
-    
-    if (!imagePath) {
-      return res.status(400).json({ success: false, message: 'Image path is required' });
-    }
-
-    deleteImage(imagePath);
-    res.json({ success: true, message: 'Image deleted successfully' });
-  } catch (error) {
-    console.error('Error deleting image:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete image' });
-  }
-});
-
-// Get roving pairing data with images
-app.get('/api/roving-pairing/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const record = await QCRovingPairing.findById(id);
-    
-    if (!record) {
-      return res.status(404).json({ message: 'Record not found' });
-    }
-
-    res.json(record);
-  } catch (error) {
-    console.error('Error fetching roving pairing data:', error);
-    res.status(500).json({ message: 'Failed to fetch data' });
-  }
-});
-
-// Save roving pairing data with images
-app.post('/api/roving-pairing/save', async (req, res) => {
-  try {
-    const pairingData = new QCRovingPairing(req.body);
-    const savedData = await pairingData.save();
-    
-    res.status(201).json({ 
-      success: true, 
-      message: 'Roving pairing data saved successfully',
-      data: savedData 
-    });
-  } catch (error) {
-    console.error('Error saving roving pairing data:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to save data',
-      error: error.message 
-    });
-  }
-});
-
-// Save QC Roving Pairing data (existing endpoint)
-app.post('/api/save-qc-roving-pairing', async (req, res) => {
-  try {
-    // Generate unique pairing_id
-    const lastRecord = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
-    const newPairingId = lastRecord ? lastRecord.pairing_id + 1 : 1;
-    
-    const pairingData = {
-      ...req.body,
-      pairing_id: newPairingId,
-      pairingData: [req.body.pairingDataItem] // Wrap single item in array
-    };
-    
-    const newRecord = new QCRovingPairing(pairingData);
-    const savedData = await newRecord.save();
-    
-    res.status(201).json({ 
-      success: true, 
-      message: 'QC Roving Pairing data saved successfully',
-      data: savedData 
-    });
-  } catch (error) {
-    console.error('Error saving QC Roving Pairing data:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to save QC Roving Pairing data',
-      error: error.message 
-    });
-  }
-});
 
 /* ------------------------------
    End Points - Pairing Defects
@@ -10174,10 +10004,52 @@ app.get("/api/cutting-inspection-progress", async (req, res) => {
 // GET unique MO Numbers from cuttinginspections
 app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
   try {
-    const { search } = req.query;
-    const query = search ? { moNo: { $regex: search, $options: "i" } } : {};
-    const moNumbers = await CuttingInspection.distinct("moNo", query);
-    res.json(moNumbers.sort());
+    const { search, startDate, endDate } = req.query;
+
+    const pipeline = [];
+
+    // ---  DATE FILTERING LOGIC ---
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+
+      pipeline.push({
+        $addFields: {
+          // Convert the 'MM/DD/YYYY' string to a real date object
+          inspectionDateAsDate: {
+            $dateFromString: {
+              dateString: "$inspectionDate",
+              format: "%m/%d/%Y"
+            }
+          }
+        }
+      });
+      pipeline.push({
+        $match: {
+          inspectionDateAsDate: {
+            $gte: start,
+            $lte: end
+          }
+        }
+      });
+    }
+
+    // --- Existing Search Logic ---
+    if (search) {
+      pipeline.push({ $match: { moNo: { $regex: search, $options: "i" } } });
+    }
+
+    // --- Final Aggregation Stages ---
+    pipeline.push({ $group: { _id: "$moNo" } });
+    pipeline.push({ $sort: { _id: 1 } });
+
+    const results = await CuttingInspection.aggregate(pipeline);
+    const moNumbers = results.map((item) => item._id);
+
+    res.json(moNumbers);
   } catch (error) {
     console.error("Error fetching MO numbers from cutting inspections:", error);
     res
@@ -10185,20 +10057,74 @@ app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
       .json({ message: "Failed to fetch MO numbers", error: error.message });
   }
 });
+// app.get("/api/cutting-inspections/mo-numbers", async (req, res) => {
+//   try {
+//     const { search } = req.query;
+//     const query = search ? { moNo: { $regex: search, $options: "i" } } : {};
+//     const moNumbers = await CuttingInspection.distinct("moNo", query);
+//     res.json(moNumbers.sort());
+//   } catch (error) {
+//     console.error("Error fetching MO numbers from cutting inspections:", error);
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch MO numbers", error: error.message });
+//   }
+// });
 
 // GET unique Table Numbers for a given MO from cuttinginspections
 app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
   try {
-    const { moNo, search } = req.query;
+    const { moNo, search, startDate, endDate } = req.query;
     if (!moNo) {
       return res.status(400).json({ message: "MO Number is required" });
     }
-    const query = { moNo };
-    if (search) {
-      query.tableNo = { $regex: search, $options: "i" };
+
+    const pipeline = [];
+
+    // --- Match by MO Number first ---
+    pipeline.push({ $match: { moNo } });
+
+    // --- FIX: DATE FILTERING LOGIC ---
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+
+      pipeline.push({
+        $addFields: {
+          inspectionDateAsDate: {
+            $dateFromString: {
+              dateString: "$inspectionDate",
+              format: "%m/%d/%Y"
+            }
+          }
+        }
+      });
+      pipeline.push({
+        $match: {
+          inspectionDateAsDate: {
+            $gte: start,
+            $lte: end
+          }
+        }
+      });
     }
-    const tableNumbers = await CuttingInspection.distinct("tableNo", query);
-    res.json(tableNumbers.sort());
+
+    // --- Existing Search Logic ---
+    if (search) {
+      pipeline.push({ $match: { tableNo: { $regex: search, $options: "i" } } });
+    }
+
+    // --- Final Aggregation Stages ---
+    pipeline.push({ $group: { _id: "$tableNo" } });
+    pipeline.push({ $sort: { _id: 1 } });
+
+    const results = await CuttingInspection.aggregate(pipeline);
+    const tableNumbers = results.map((item) => item._id);
+
+    res.json(tableNumbers);
   } catch (error) {
     console.error(
       "Error fetching Table numbers from cutting inspections:",
@@ -10209,6 +10135,28 @@ app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
       .json({ message: "Failed to fetch Table numbers", error: error.message });
   }
 });
+// app.get("/api/cutting-inspections/table-numbers", async (req, res) => {
+//   try {
+//     const { moNo, search } = req.query;
+//     if (!moNo) {
+//       return res.status(400).json({ message: "MO Number is required" });
+//     }
+//     const query = { moNo };
+//     if (search) {
+//       query.tableNo = { $regex: search, $options: "i" };
+//     }
+//     const tableNumbers = await CuttingInspection.distinct("tableNo", query);
+//     res.json(tableNumbers.sort());
+//   } catch (error) {
+//     console.error(
+//       "Error fetching Table numbers from cutting inspections:",
+//       error
+//     );
+//     res
+//       .status(500)
+//       .json({ message: "Failed to fetch Table numbers", error: error.message });
+//   }
+// });
 
 // GET full cutting inspection document for modification
 app.get("/api/cutting-inspection-details-for-modify", async (req, res) => {
@@ -10689,6 +10637,204 @@ app.delete("/api/accessory-issues/:id", async (req, res) => {
 /* ------------------------------
    QC Roving Pairing Endpoint
 ------------------------------ */
+
+
+/* ------------------------------
+   QC Roving Pairing Image Upload Endpoints
+------------------------------ */
+
+// Configure multer for roving pairing images
+const rovingImageStorage = multer.memoryStorage();
+const uploadRovingImage = multer({
+  storage: rovingImageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
+    }
+  }
+});
+
+// Upload images for defects
+app.post('/api/roving-pairing/upload-defect-images', uploadRovingImage.array('images', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No images provided' });
+    }
+
+    const uploadedImages = [];
+    
+    for (const file of req.files) {
+      const filename = generateUniqueFilename(file.originalname, 'defect');
+      const imagePath = await saveCompressedImage(file.buffer, filename, 'defect');
+      uploadedImages.push(imagePath);
+    }
+
+    res.json({ success: true, images: uploadedImages });
+  } catch (error) {
+    console.error('Error uploading defect images:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload images' });
+  }
+});
+
+// Upload images for measurements
+app.post('/api/roving-pairing/upload-measurement-images', uploadRovingImage.array('images', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No images provided' });
+    }
+
+    const uploadedImages = [];
+    
+    for (const file of req.files) {
+      const filename = generateUniqueFilename(file.originalname, 'measurement');
+      const imagePath = await saveCompressedImage(file.buffer, filename, 'measurement');
+      uploadedImages.push(imagePath);
+    }
+
+    res.json({ success: true, images: uploadedImages });
+  } catch (error) {
+    console.error('Error uploading measurement images:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload images' });
+  }
+});
+
+// Upload images for accessories
+app.post('/api/roving-pairing/upload-accessory-images', uploadRovingImage.array('images', 5), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ success: false, message: 'No images provided' });
+    }
+
+    const uploadedImages = [];
+    
+    for (const file of req.files) {
+      const filename = generateUniqueFilename(file.originalname, 'accessory');
+      const imagePath = await saveCompressedImage(file.buffer, filename, 'accessory');
+      uploadedImages.push(imagePath);
+    }
+
+    res.json({ success: true, images: uploadedImages });
+  } catch (error) {
+    console.error('Error uploading accessory images:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload images' });
+  }
+});
+
+// Delete image endpoint
+app.delete('/api/roving-pairing/delete-image', async (req, res) => {
+  try {
+    const { imagePath } = req.body;
+    
+    if (!imagePath) {
+      return res.status(400).json({ success: false, message: 'Image path is required' });
+    }
+
+    deleteImage(imagePath);
+    res.json({ success: true, message: 'Image deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting image:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete image' });
+  }
+});
+
+// Get roving pairing data with images
+app.get('/api/roving-pairing/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const record = await QCRovingPairing.findById(id);
+    
+    if (!record) {
+      return res.status(404).json({ message: 'Record not found' });
+    }
+
+    res.json(record);
+  } catch (error) {
+    console.error('Error fetching roving pairing data:', error);
+    res.status(500).json({ message: 'Failed to fetch data' });
+  }
+});
+
+// Save roving pairing data with images
+app.post('/api/roving-pairing/save', async (req, res) => {
+  try {
+    const pairingData = new QCRovingPairing(req.body);
+    const savedData = await pairingData.save();
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'Roving pairing data saved successfully',
+      data: savedData 
+    });
+  } catch (error) {
+    console.error('Error saving roving pairing data:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to save data',
+      error: error.message 
+    });
+  }
+});
+
+// Save QC Roving Pairing data (existing endpoint)
+app.post('/api/save-qc-roving-pairing', async (req, res) => {
+  try {
+    // Generate unique pairing_id
+    const lastRecord = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
+    const newPairingId = lastRecord ? lastRecord.pairing_id + 1 : 1;
+    
+    const pairingData = {
+      ...req.body,
+      pairing_id: newPairingId,
+      pairingData: [req.body.pairingDataItem] // Wrap single item in array
+    };
+    
+    const newRecord = new QCRovingPairing(pairingData);
+    const savedData = await newRecord.save();
+    
+    res.status(201).json({ 
+      success: true, 
+      message: 'QC Roving Pairing data saved successfully',
+      data: savedData 
+    });
+  } catch (error) {
+    console.error('Error saving QC Roving Pairing data:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to save QC Roving Pairing data',
+      error: error.message 
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - Pairing Defects
+------------------------------ */
+app.get('/api/pairing-defects', async (req, res) => {
+  try {
+    const defects = await PairingDefect.find({}).sort({ no: 1 }).lean();
+    res.json(defects);
+  } catch (error) {
+    console.error('Error fetching pairing defects:', error);
+    res.status(500).json({ message: 'Server error fetching pairing defects' });
+  }
+});
+
+/* ------------------------------
+   End Points - Accessory Issues
+------------------------------ */
+app.get('/api/accessory-issues', async (req, res) => {
+  try {
+    const issues = await AccessoryIssue.find({}).sort({ no: 1 }).lean();
+    res.json(issues);
+  } catch (error) {
+    console.error('Error fetching accessory issues:', error);
+    res.status(500).json({ message: 'Server error fetching accessory issues' });
+  }
+});
 
 app.post("/api/save-qc-roving-pairing", async (req, res) => {
   try {
@@ -11222,6 +11368,69 @@ app.get("/api/cutting-inspection-report-detail/:id", async (req, res) => {
     console.error("Error fetching cutting inspection report detail:", error);
     res.status(500).json({
       message: "Failed to fetch report detail",
+      error: error.message
+    });
+  }
+});
+
+app.get("/api/cutting-inspections/query", async (req, res) => {
+  try {
+    const { moNo, tableNo, startDate, endDate, qcId } = req.query;
+
+    if (!moNo) {
+      return res.status(400).json({ message: "MO Number is required" });
+    }
+
+    const matchQuery = { moNo };
+
+    // Add optional filters if they are provided
+    if (tableNo) {
+      matchQuery.tableNo = tableNo;
+    }
+    if (qcId) {
+      matchQuery.cutting_emp_id = qcId;
+    }
+
+    // If dates are provided, we must use an aggregation pipeline for proper date conversion
+    if (startDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = endDate ? new Date(endDate) : new Date(startDate);
+      end.setHours(23, 59, 59, 999);
+
+      const pipeline = [
+        { $match: matchQuery }, // Apply non-date filters first
+        {
+          $addFields: {
+            inspectionDateAsDate: {
+              $dateFromString: {
+                dateString: "$inspectionDate",
+                format: "%m/%d/%Y"
+              }
+            }
+          }
+        },
+        {
+          $match: {
+            inspectionDateAsDate: { $gte: start, $lte: end }
+          }
+        },
+        { $sort: { tableNo: 1 } }
+      ];
+
+      const reports = await CuttingInspection.aggregate(pipeline);
+      res.json(reports);
+    } else {
+      // If no dates, a simpler 'find' query is sufficient
+      const reports = await CuttingInspection.find(matchQuery).sort({
+        tableNo: 1
+      });
+      res.json(reports);
+    }
+  } catch (error) {
+    console.error("Error querying cutting inspection reports:", error);
+    res.status(500).json({
+      message: "Failed to fetch inspection reports",
       error: error.message
     });
   }
@@ -25551,6 +25760,7 @@ app.get(
 
     try {
       const orders = await collection.find({ Order_No: orderNo }).toArray();
+
       if (!orders || orders.length === 0) {
         return res
           .status(404)
@@ -25564,6 +25774,7 @@ app.get(
       
       // Check various possible locations for measurement data
 
+      // Check various possible locations for measurement data
       if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
         measurementSpecs = order.MeasurementSpecs;
       } else if (order.Specs && Array.isArray(order.Specs)) {
@@ -25817,7 +26028,6 @@ app.post("/api/qc-washing/find-saved-measurement", async (req, res) => {
     });
   }
 });
-
 
 // Get order details by order number
 app.get("/api/qc-washing/order-details-by-order/:orderNo", async (req, res) => {
@@ -27040,7 +27250,6 @@ app.post("/api/qc-washing-checklist", async (req, res) => {
       return processedOption;
     });
 
-
     // Process subPoints with remark validation
     let processedSubPoints = [];
     if (subPoints && Array.isArray(subPoints) && subPoints.length > 0) {
@@ -27113,7 +27322,6 @@ app.post("/api/qc-washing-checklist", async (req, res) => {
 
     const newCheckList = new QCWashingCheckList(documentToSave);
     const savedDocument = await newCheckList.save();
-
 
     res.status(201).json({
       message: "Check list item added successfully",
@@ -28915,24 +29123,23 @@ app.get("/api/qc-washing/results", async (req, res) => {
     if (reportType) query.reportType = reportType;
     if (factory) query.factoryName = factory;
 
-    const results = await QCWashing.find(query);
     res.json(results);
   } catch (error) {
-    res.status(500).json({ error: error.message });
+    console.error("Error fetching QC Washing results:", error);
+    res.status(500).json({ error: "Failed to fetch QC Washing results" });
   }
 });
 
-app.get("/api/pdf-image-base64/:type/:filename", async (req, res) => {
-  const { type, filename } = req.params;
-  const localPath = path.join(
-    __dirname,
-    "public/storage/qc_washing_images",
-    type,
-    filename
-  );
-
+// QC Washing filter options endpoint
+app.get("/api/qc-washing/results/filters", async (req, res) => {
   try {
-    let imageData;
+    const [buyerOptions, moOptions, colorOptions, qcOptions] =
+      await Promise.all([
+        QCWashing.distinct("buyer"),
+        QCWashing.distinct("orderNo"),
+        QCWashing.distinct("color"),
+        QCWashing.distinct("userId")
+      ]);
 
     if (fs.existsSync(localPath)) {
       imageData = fs.readFileSync(localPath);
@@ -29084,32 +29291,8 @@ app.get("/storage/qc_washing_images/:type/:filename", async (req, res) => {
 
     // proxyReq.end();
   } catch (error) {
-    // Return a colored placeholder SVG
-    const createPlaceholder = (color, text) => {
-      const svg = `<svg width="100" height="60" xmlns="http://www.w3.org/2000/svg">
-        <rect width="100%" height="100%" fill="${color}"/>
-        <text x="50%" y="50%" text-anchor="middle" dy=".3em" font-family="Arial" font-size="10" fill="#666">
-          ${text}
-        </text>
-      </svg>`;
-      return Buffer.from(svg);
-    };
-
-    let placeholderColor = "#f3f4f6";
-    let placeholderText = "Image Error";
-
-    if (type === "defect") {
-      placeholderColor = "#fee2e2";
-      placeholderText = "Defect Image";
-    } else if (type === "inspection") {
-      placeholderColor = "#dbeafe";
-      placeholderText = "Inspection Image";
-    }
-
-    const placeholder = createPlaceholder(placeholderColor, placeholderText);
-    res.setHeader("Content-Type", "image/svg+xml");
-    res.setHeader("Content-Length", placeholder.length);
-    res.send(placeholder);
+    console.error("Error fetching QC Washing filter options:", error);
+    res.status(500).json({ error: "Failed to fetch filter options" });
   }
 });
 
@@ -30785,7 +30968,6 @@ app.put('/api/qc-washing/update-edited-wash-qty/:id', async (req, res) => {
   }
 });
 
-
 /* ------------------------------
    AI Chatbot Proxy Route
 ------------------------------ */
@@ -32006,6 +32188,157 @@ app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
         .json({ error: "Validation failed", details: error.message });
     }
     res.status(500).json({ error: "Failed to update QA report" });
+  }
+});
+
+/* -------------------------------------
+// Improved Image Proxy for PDF CORS Issue
+// This endpoint acts as a middleman to bypass browser CORS restrictions.
+------------------------------------- */
+
+app.get("/api/image-proxy", async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    console.error("Image Proxy: No URL provided");
+    return res.status(400).json({ error: "An image URL is required." });
+  }
+
+  try {
+    // If it's a local file on the same server
+    if (url.includes(`${API_BASE_URL}/storage/`)) {
+      const localPath = url.replace(`${API_BASE_URL}/storage/`, "");
+      const fullPath = path.join(__dirname, "public/storage", localPath);
+
+      if (fs.existsSync(fullPath)) {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.header(
+          "Access-Control-Allow-Headers",
+          "Origin, X-Requested-With, Content-Type, Accept"
+        );
+
+        const ext = path.extname(fullPath).toLowerCase();
+
+        // If it's a WebP image, convert it to JPEG
+        if (ext === ".webp") {
+          try {
+            console.log("Converting WebP to JPEG:", fullPath);
+
+            // Use Sharp to convert WebP to JPEG
+            const convertedBuffer = await sharp(fullPath)
+              .jpeg({ quality: 90 })
+              .toBuffer();
+
+            res.setHeader("Content-Type", "image/jpeg");
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.send(convertedBuffer);
+
+            return;
+          } catch (conversionError) {
+            console.error("Error converting WebP:", conversionError);
+            return res
+              .status(500)
+              .json({ error: "Failed to convert WebP image." });
+          }
+        } else {
+          // For non-WebP images, serve as normal
+          let contentType = "application/octet-stream";
+
+          switch (ext) {
+            case ".jpg":
+            case ".jpeg":
+              contentType = "image/jpeg";
+              break;
+            case ".png":
+              contentType = "image/png";
+              break;
+            case ".gif":
+              contentType = "image/gif";
+              break;
+            case ".svg":
+              contentType = "image/svg+xml";
+              break;
+          }
+
+          res.setHeader("Content-Type", contentType);
+          res.setHeader("Cache-Control", "public, max-age=3600");
+
+          const fileStream = fs.createReadStream(fullPath);
+          fileStream.pipe(res);
+          return;
+        }
+      } else {
+        console.error("Image Proxy: Local file not found:", fullPath);
+        return res.status(404).json({ error: "Image file not found." });
+      }
+    }
+
+    // For external URLs, fetch and convert if needed
+    const response = await axios({
+      method: "get",
+      url: url,
+      responseType: "arraybuffer",
+      timeout: 100000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ImageProxy/1.0)"
+      }
+    });
+
+    const contentType = response.headers["content-type"];
+
+    if (!contentType || !contentType.startsWith("image/")) {
+      console.error(
+        "Image Proxy: Not a valid image content type:",
+        contentType
+      );
+      return res
+        .status(400)
+        .json({ error: "URL does not point to a valid image." });
+    }
+
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept"
+    );
+
+    // If it's WebP, convert to JPEG
+    if (contentType === "image/webp") {
+      try {
+        console.log("Converting external WebP to JPEG");
+
+        const convertedBuffer = await sharp(Buffer.from(response.data))
+          .jpeg({ quality: 90 })
+          .toBuffer();
+
+        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.send(convertedBuffer);
+
+        return;
+      } catch (conversionError) {
+        console.error("Error converting external WebP:", conversionError);
+        return res.status(500).json({ error: "Failed to convert WebP image." });
+      }
+    } else {
+      // For non-WebP images, serve as normal
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(Buffer.from(response.data));
+    }
+  } catch (error) {
+    console.error("Image Proxy Error:", {
+      url: url,
+      message: error.message,
+      code: error.code
+    });
+
+    res.status(500).json({
+      error: "Failed to retrieve image.",
+      details: error.message
+    });
   }
 });
 

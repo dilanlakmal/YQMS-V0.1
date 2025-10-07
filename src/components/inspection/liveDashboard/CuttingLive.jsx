@@ -70,14 +70,14 @@ const formatDisplayDate_Packing = (dateString) => {
     return String(dateString);
   }
 };
-const LoadingSpinner_Packing = () => (
+const LoadingSpinner_Cutting = () => (
   <div className="flex justify-center items-center h-32">
     {" "}
     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>{" "}
   </div>
-); // Green for Packing
+); // Green for Cutting
 
-const SummaryStatCard_Packing = ({
+const SummaryStatCard_Cutting = ({
   title,
   value1,
   label1,
@@ -198,7 +198,7 @@ const InspectorColumnToggleButton_Packing = ({ label, isActive, onClick }) => (
   </button>
 );
 
-const PackingLive = () => {
+const CuttingLive = () => {
   const [isFilterVisible, setIsFilterVisible] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
@@ -651,7 +651,7 @@ const PackingLive = () => {
           dataKey: "totalDefectCards",
           changeKey: "defectCardsChange"
         };
-      case "defectQty":
+      case "defectQty":   
         return {
           title: "Total Defect Card Qty",
           dataKey: "totalDefectCardQty",
@@ -671,10 +671,10 @@ const PackingLive = () => {
   if (isLoading && !detailedRecords.length) {
     return (
       <div className="flex justify-center items-center min-h-screen">
-        <LoadingSpinner_Packing />
+        <LoadingSpinner_Cutting />
       </div>
     );
   }
 };
 
-export default PackingLive;
+export default CuttingLive;

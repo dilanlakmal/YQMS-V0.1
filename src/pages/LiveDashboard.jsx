@@ -523,10 +523,14 @@ const LiveDashboard = () => {
         )}
 
         {activeSection === "Roving Report" && <RovingReport />}
-        {activeSection === "Cutting Dashboard" && <CuttingDashboard />}
-        {activeSection === "Cutting Reports" && <CuttingReport />}
+        {activeSection === "Cutting Dashboard" && (
+          <CuttingDashboard onBackToCuttingLive={() => setActiveSection("Cutting")} />
+        )}
+        {activeSection === "Cutting Reports" && (
+          <CuttingReport onBackToCuttingLive={() => setActiveSection("Cutting")} />
+        )}
         {activeSection === "Cutting Trend" && (
-          <CuttingGarmentTypeTrendAnalysis />
+          <CuttingGarmentTypeTrendAnalysis onBackToCuttingLive={() => setActiveSection("Cutting")} />
         )}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}

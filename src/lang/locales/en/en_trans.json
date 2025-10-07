@@ -864,7 +864,13 @@
     "selectSpreadTable": "Spread Table",
     "selectMaterial": "Material",
     "selectGarmentType": "Garment Type",
-    "selectQcId": "QC ID"
+    "selectQcId": "QC ID",
+    "cutPanelInspectionReportTitle": "Cut Panel Inspection Report",
+    "inspectionSummaryOverall": "Inspection Overall Summary",
+    "inspectionQty": "Inspection Qty",
+    "cutPanelDetailsTitle": "Cut Panel Details",
+    "fabricDefectsTitle": "Fabric Defects",
+    "defectDetails": "Defect Details"
   },
 
   "cuttingReport": {
@@ -1007,7 +1013,9 @@
     "actionsComments": "Actions",
     "featureComingSoon": "This Feature Coming Soon..",
     "actionRequired": "Action Require",
-    "noActionRequired": "No Action Require"
+    "noActionRequired": "No Action Require",
+    "pdf": "PDF",
+    "generatingPDF": "Generating PDF..."
   },
 
   "editGar": {

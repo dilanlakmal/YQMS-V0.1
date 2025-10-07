@@ -1,825 +1,1010 @@
-import autoTable from "jspdf-autotable";
-import { decimalToFraction } from "../../../../utils/fractionUtils";
+import {
+  Document,
+  Font,
+  Image,
+  Page,
+  StyleSheet,
+  Text,
+  View,
+  pdf
+} from "@react-pdf/renderer";
+import { saveAs } from "file-saver";
+import React from "react";
+import { API_BASE_URL } from "../../../../../config";
 
-const getPdfLocalizedText = (eng, khmer, chinese, currentLang) => {
-  if (currentLang === "km" && khmer) return khmer;
-  if (currentLang === "zh" && chinese) return chinese;
+// --- FONT REGISTRATION ---
+Font.register({
+  family: "Roboto",
+  fonts: [
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-regular-webfont.ttf",
+      fontWeight: "normal"
+    },
+    {
+      src: "https://cdnjs.cloudflare.com/ajax/libs/ink/3.1.10/fonts/Roboto/roboto-bold-webfont.ttf",
+      fontWeight: "bold"
+    }
+  ]
+});
+
+// --- REGISTER LOCAL KHMER FONT ---
+Font.register({
+  family: "KhmerOS",
+  src: "/fonts/Khmer-Regular.ttf"
+});
+
+// --- STYLESHEET ---
+const styles = StyleSheet.create({
+  page: {
+    fontFamily: "Roboto",
+    fontSize: 7,
+    backgroundColor: "#ffffff",
+    paddingTop: 80,
+    paddingBottom: 40,
+    paddingHorizontal: 30,
+    color: "#333"
+  },
+  docHeader: {
+    position: "absolute",
+    top: 25,
+    left: 30,
+    right: 30,
+    textAlign: "center",
+    borderBottomWidth: 1,
+    borderColor: "#e5e7eb",
+    paddingBottom: 5
+  },
+  companyName: { fontSize: 13, fontWeight: "bold", color: "#111827" },
+  reportTitle: { fontSize: 11, color: "#374151", marginTop: 2 },
+  reportSubInfo: {
+    fontSize: 8,
+    color: "#6b7280",
+    marginTop: 4,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 12
+  },
+  pageFooter: {
+    position: "absolute",
+    bottom: 20,
+    left: 30,
+    right: 30,
+    textAlign: "center",
+    fontSize: 7,
+    color: "#aaa"
+  },
+  section: {
+    marginBottom: 12,
+    breakInside: "avoid"
+  },
+  sectionTitle: {
+    fontSize: 9,
+    fontWeight: "bold",
+    marginBottom: 6,
+    paddingBottom: 3,
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#e0e0e0",
+    color: "#111827"
+  },
+  gridContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    rowGap: 4,
+    columnGap: 10
+  },
+  gridItem: { width: "31%", flexDirection: "row" },
+  gridItemFull: { width: "100%", flexDirection: "row", flexWrap: "wrap" },
+  gridLabel: { fontWeight: "bold", marginRight: 3 },
+  table: {
+    display: "table",
+    width: "100%",
+    borderStyle: "solid",
+    borderWidth: 0.5,
+    borderColor: "#e5e7eb"
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderTopWidth: 0.5,
+    borderColor: "#e5e7eb"
+  },
+  tableHeader: {
+    backgroundColor: "#f3f4f6",
+    fontWeight: "bold",
+    fontSize: 6.5
+  },
+  tableCell: {
+    padding: 3,
+    textAlign: "center",
+    borderRightWidth: 0.5,
+    borderColor: "#e5e7eb",
+    flexGrow: 1,
+    flexBasis: 0
+  },
+  tableCellLast: { borderRightWidth: 0 },
+  textLeft: { textAlign: "left" },
+
+  // Specific styling
+  passColor: { backgroundColor: "#dcfce7" }, // Light green
+  failColor: { backgroundColor: "#fee2e2" }, // Light red
+
+  resultPass: {
+    color: "#166534", // Dark Green
+    fontWeight: "bold"
+  },
+  resultFail: {
+    color: "#b91c1c", // Dark Red
+    fontWeight: "bold"
+  },
+  resultPending: {
+    color: "#6b7280", // Gray
+    fontWeight: "bold"
+  },
+  imageContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginTop: 5,
+    gap: 5
+  },
+  image: {
+    width: 120,
+    height: 120,
+    objectFit: "contain",
+    borderWidth: 1,
+    borderColor: "#e0e0e0"
+  }
+});
+
+export const getResultStatus = (
+  totalInspectionQty,
+  sumTotalReject,
+  sumTotalPcs,
+  t
+) => {
+  if (sumTotalPcs < totalInspectionQty) {
+    return { status: t("common.pending"), style: styles.resultPending };
+  }
+
+  if (totalInspectionQty >= 30 && totalInspectionQty < 45) {
+    if (sumTotalReject > 0)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  } else if (totalInspectionQty >= 45 && totalInspectionQty < 60) {
+    if (sumTotalReject > 0)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  } else if (totalInspectionQty >= 60 && totalInspectionQty < 90) {
+    if (sumTotalReject > 1)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  } else if (totalInspectionQty >= 90 && totalInspectionQty < 135) {
+    if (sumTotalReject > 2)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  } else if (totalInspectionQty >= 135 && totalInspectionQty < 210) {
+    if (sumTotalReject > 3)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  } else if (totalInspectionQty >= 210 && totalInspectionQty < 315) {
+    if (sumTotalReject > 5)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  } else if (totalInspectionQty >= 315) {
+    if (sumTotalReject > 7)
+      return { status: t("common.fail"), style: styles.resultFail };
+    return { status: t("common.pass"), style: styles.resultPass };
+  }
+
+  return { status: t("common.pending"), style: styles.resultPending };
+};
+
+// --- HELPER FUNCTIONS ---
+export const getLocalizedText = (eng, khmer, chinese, i18n) => {
+  const lang = i18n.language;
+  if (lang === "km" && khmer) return khmer;
+  if (lang === "zh" && chinese) return chinese;
   return eng || "";
 };
 
-const getDefectDisplayNamePDF = (
-  defectNameFromInspection,
-  fabricDefectsMaster,
-  currentLang
-) => {
-  const masterDefect = fabricDefectsMaster.find(
-    (m) =>
-      m.defectName === defectNameFromInspection ||
-      m.defectNameEng === defectNameFromInspection
-  );
-  if (masterDefect) {
-    return getPdfLocalizedText(
-      masterDefect.defectNameEng,
-      masterDefect.defectNameKhmer,
-      masterDefect.defectNameChinese,
-      currentLang
-    );
+const decimalToFraction = (dec) => {
+  if (typeof dec !== "number" || isNaN(dec)) return "-";
+  if (dec === 0) return "0";
+
+  // 1. Handle the sign separately
+  const sign = dec < 0 ? "-" : "";
+  const absDec = Math.abs(dec);
+
+  // 2. Perform calculations on the absolute value
+  const whole = Math.floor(absDec);
+  const frac = absDec - whole;
+
+  if (frac < 0.0001) {
+    return `${sign}${whole}`;
   }
-  return defectNameFromInspection;
+
+  const tolerance = 1.0e-6;
+  let h1 = 1,
+    h2 = 0,
+    k1 = 0,
+    k2 = 1;
+  let b = frac;
+  do {
+    let a = Math.floor(b);
+    let aux = h1;
+    h1 = a * h1 + h2;
+    h2 = aux;
+    aux = k1;
+    k1 = a * k1 + k2;
+    k2 = aux;
+    b = 1 / (b - a);
+  } while (Math.abs(frac - h1 / k1) > frac * tolerance);
+
+  const numerator = h1;
+  const denominator = k1;
+
+  const fractionString =
+    (whole > 0 ? `${whole} ` : "") + `${numerator}/${denominator}`;
+
+  // 3. Prepend the original sign to the final result
+  return `${sign}${fractionString}`;
 };
 
+// --- PDF COMPONENTS ---
+
+export const PDFHeader = ({ report, t, resultStatus }) => (
+  <View style={styles.docHeader} fixed>
+    <Text style={styles.companyName}>
+      YORKMARS (CAMBODIA) GARMENT MFG CO., LTD
+    </Text>
+    <Text style={styles.reportTitle}>
+      {t("cutting.cutPanelInspectionReportTitle")}
+    </Text>
+    <View style={styles.reportSubInfo}>
+      <Text>
+        {t("cutting.garmentType")}: {report.garmentType}
+      </Text>
+      <Text>
+        {t("cutting.moNo")}: {report.moNo}
+      </Text>
+      <Text>
+        {t("cutting.tableNo")}: {report.tableNo}
+      </Text>
+      <Text>
+        {t("cutting.spreadTable")}:{" "}
+        {report.cuttingTableDetails?.spreadTable || "N/A"}
+      </Text>
+      <Text>
+        {t("cutting.date")}: {report.inspectionDate}
+      </Text>
+      <Text>
+        <Text style={{ fontWeight: "bold" }}>{t("common.result")}: </Text>
+        <Text style={resultStatus.style}>{resultStatus.status}</Text>
+      </Text>
+    </View>
+  </View>
+);
+
+export const PDFFooter = () => (
+  <Text
+    style={styles.pageFooter}
+    fixed
+    render={({ pageNumber, totalPages }) =>
+      `Page ${pageNumber} of ${totalPages}`
+    }
+  />
+);
+
+export const CutPanelDetails = ({ report, t, qcUser, i18n }) => {
+  const markerRatioString =
+    report.mackerRatio
+      ?.map((mr) => `${mr.markerSize}: ${mr.ratio}`)
+      .join(" | ") || "N/A";
+
+  // Get the localized name from the qcUser object if it exists
+  const qcName = qcUser
+    ? getLocalizedText(qcUser.eng_name, qcUser.kh_name, null, i18n)
+    : report.cutting_emp_engName || ""; // Fallback to name in report data
+
+  // Format the final display string
+  const qcDisplayString = qcName
+    ? `${report.cutting_emp_id} (${qcName})`
+    : report.cutting_emp_id;
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>
+        {t("cutting.cutPanelDetailsTitle")}
+      </Text>
+      <View style={styles.gridContainer}>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.qcId")}:</Text>
+          {/* Use the new formatted string */}
+          <Text>{qcDisplayString}</Text>
+        </View>
+
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.lotNo")}:</Text>
+          <Text>{report.lotNo?.join(", ") || "N/A"}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.color")}:</Text>
+          <Text>{report.color}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.orderQty")}:</Text>
+          <Text>{report.orderQty}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.planLayers")}:</Text>
+          <Text>{report.cuttingTableDetails?.planLayers}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.actualLayers")}:</Text>
+          <Text>{report.cuttingTableDetails?.actualLayers}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.totalPcs")}:</Text>
+          <Text>{report.cuttingTableDetails?.totalPcs}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.totalBundleQty")}:</Text>
+          <Text>{report.totalBundleQty}</Text>
+        </View>
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.bundleQtyCheck")}:</Text>
+          <Text>{report.bundleQtyCheck}</Text>
+        </View>
+
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.cuttingBy")}:</Text>
+          <Text>{report.cuttingtype}</Text>
+        </View>
+
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.mackerNo")}:</Text>
+          <Text>{report.cuttingTableDetails?.mackerNo || "N/A"}</Text>
+        </View>
+
+        {/* NEWLY ADDED MARKER RATIO DISPLAY */}
+        <View style={styles.gridItem}>
+          <Text style={styles.gridLabel}>{t("cutting.markerRatio")}:</Text>
+          <Text>{markerRatioString}</Text>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+export const InspectionSummary = ({ data, t }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>
+      {t("cutting.inspectionSummaryOverall")}
+    </Text>
+    <View style={styles.table}>
+      <View style={[styles.tableRow, styles.tableHeader]}>
+        <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+          {t("cutting.size")}
+        </Text>
+        <Text style={[styles.tableCell]}>{t("cutting.inspectionQty")}</Text>
+        <Text style={[styles.tableCell]}>{t("cutting.pass")}</Text>
+        <Text style={[styles.tableCell]}>{t("cutting.reject")}</Text>
+        <Text style={[styles.tableCell]}>
+          {t("cutting.rejectMeasurements")}
+        </Text>
+        <Text style={[styles.tableCell]}>{t("cutting.rejectDefects")}</Text>
+        <Text style={[styles.tableCell, styles.tableCellLast]}>
+          {t("cutting.passRate")} (%)
+        </Text>
+      </View>
+      {data.details.map((item, index) => (
+        <View key={index} style={styles.tableRow} wrap={false}>
+          <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+            {item.size}
+          </Text>
+          <Text style={styles.tableCell}>{item.inspectedQty.total}</Text>
+          <Text style={styles.tableCell}>{item.pass.total}</Text>
+          <Text style={styles.tableCell}>{item.reject.total}</Text>
+          <Text style={styles.tableCell}>{item.rejectMeasurement.total}</Text>
+          <Text style={styles.tableCell}>
+            {item.rejectDefects.total < 0 ? 0 : item.rejectDefects.total}
+          </Text>
+          <Text style={[styles.tableCell, styles.tableCellLast]}>
+            {item.passRate.total.toFixed(2)}
+          </Text>
+        </View>
+      ))}
+      <View
+        style={[
+          styles.tableRow,
+          { fontWeight: "bold", backgroundColor: "#f3f4f6" }
+        ]}
+      >
+        <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+          {t("common.total")}
+        </Text>
+        <Text style={styles.tableCell}>{data.totals.inspectedQty.total}</Text>
+        <Text style={styles.tableCell}>{data.totals.pass.total}</Text>
+        <Text style={styles.tableCell}>{data.totals.reject.total}</Text>
+        <Text style={styles.tableCell}>
+          {data.totals.rejectMeasurement.total}
+        </Text>
+        <Text style={styles.tableCell}>
+          {data.totals.rejectDefects.total < 0
+            ? 0
+            : data.totals.rejectDefects.total}
+        </Text>
+        <Text style={[styles.tableCell, styles.tableCellLast]}>
+          {data.totals.passRate.total.toFixed(2)}
+        </Text>
+      </View>
+    </View>
+  </View>
+);
+
+export const MeasurementTableHeader = ({ data, t, fixed = false }) => (
+  <View style={[styles.tableRow, styles.tableHeader]} fixed={fixed}>
+    <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "8%" }]}>
+      {t("cutting.size")}
+    </Text>
+    <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+      {t("cutting.bundleNo")}
+    </Text>
+    <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "15%" }]}>
+      {t("cutting.partName")}
+    </Text>
+    <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "18%" }]}>
+      {t("cutting.measurementPoint")}
+    </Text>
+    {data.headers.map((pcsName) => (
+      <Text
+        key={pcsName}
+        style={[
+          styles.tableCell,
+          { flexBasis: `${51 / data.headers.length}%` }
+        ]}
+      >
+        {pcsName}
+      </Text>
+    ))}
+  </View>
+);
+
+export const MeasurementDetails = ({ data, t }) => {
+  // Define the height of the header row to use as a margin.
+  const headerHeight = 1;
+
+  return (
+    // 'wrap' is removed from the section to let the content flow naturally
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t("cutting.measurementDetails")}</Text>
+
+      {/* 1. RENDER THE FIXED HEADER. IT WILL REPEAT ON EVERY PAGE. */}
+      <MeasurementTableHeader data={data} t={t} fixed />
+
+      {/* 2. RENDER THE TABLE BODY IN A SEPARATE VIEW. */}
+      <View style={{ marginTop: headerHeight }}>
+        {data.data.map((row, rowIndex) => (
+          // The 'wrap={false}' here prevents a single row from being split across two pages.
+          <View key={rowIndex} style={styles.tableRow} wrap={false}>
+            <Text
+              style={[styles.tableCell, styles.textLeft, { flexBasis: "8%" }]}
+            >
+              {row.size}
+            </Text>
+            <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+              {row.bundleNo}
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.textLeft, { flexBasis: "15%" }]}
+            >
+              {row.partName}
+            </Text>
+            <Text
+              style={[styles.tableCell, styles.textLeft, { flexBasis: "18%" }]}
+            >
+              {row.measurementPoint}
+            </Text>
+            {data.headers.map((pcsName) => {
+              const value = row.values[pcsName];
+              const style = [
+                styles.tableCell,
+                { flexBasis: `${51 / data.headers.length}%` }
+              ];
+              if (row.tolerance && typeof value === "number") {
+                if (value < row.tolerance.min || value > row.tolerance.max) {
+                  style.push(styles.failColor);
+                } else {
+                  style.push(styles.passColor);
+                }
+              }
+              return (
+                <Text key={pcsName} style={style}>
+                  {decimalToFraction(value)}
+                </Text>
+              );
+            })}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+export const FabricDefectsPDF = ({ data, t }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>{t("cutting.fabricDefectsTitle")}</Text>
+    <View style={styles.table}>
+      <View style={[styles.tableRow, styles.tableHeader]}>
+        <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "8%" }]}>
+          {t("cutting.size")}
+        </Text>
+        <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+          {t("cutting.bundleNo")}
+        </Text>
+        <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "20%" }]}>
+          {t("cutting.partName")}
+        </Text>
+        <Text
+          style={[
+            styles.tableCell,
+            styles.textLeft,
+            styles.tableCellLast,
+            { flexBasis: "64%" }
+          ]}
+        >
+          {t("cutting.defectDetails")}
+        </Text>
+      </View>
+      {data.map((row, rowIndex) => (
+        <View key={rowIndex} style={styles.tableRow} wrap={false}>
+          <Text
+            style={[styles.tableCell, styles.textLeft, { flexBasis: "8%" }]}
+          >
+            {row.size}
+          </Text>
+          <Text style={[styles.tableCell, { flexBasis: "8%" }]}>
+            {row.bundleNo}
+          </Text>
+          <Text
+            style={[styles.tableCell, styles.textLeft, { flexBasis: "20%" }]}
+          >
+            {row.partName}
+          </Text>
+          <View
+            style={[
+              styles.tableCell,
+              styles.textLeft,
+              styles.tableCellLast,
+              { flexBasis: "64%" }
+            ]}
+          >
+            {Object.entries(row.defectsByPcs).map(([pcsName, defectsList]) => (
+              <Text key={pcsName}>
+                <Text style={{ fontWeight: "bold" }}>{pcsName}: </Text>
+                <Text style={{ fontFamily: "KhmerOS" }}>
+                  {" "}
+                  {defectsList
+                    .map((d) => `${d.displayName} (${d.qty})`)
+                    .join(", ")}
+                </Text>
+              </Text>
+            ))}
+          </View>
+        </View>
+      ))}
+    </View>
+  </View>
+);
+
+export const CuttingIssuesPDF = ({ report, t, i18n }) => (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>{t("cutting.cuttingIssuesTitle")}</Text>
+    <View style={styles.table}>
+      <View style={[styles.tableRow, styles.tableHeader]}>
+        <Text style={[styles.tableCell, { flexBasis: "10%" }]}>
+          {t("cutting.size")}
+        </Text>
+        <Text style={[styles.tableCell, styles.textLeft, { flexBasis: "30%" }]}>
+          {t("cutting.defectName")}
+        </Text>
+        <Text
+          style={[
+            styles.tableCell,
+            styles.textLeft,
+            styles.tableCellLast,
+            { flexBasis: "60%" }
+          ]}
+        >
+          {t("cutting.remarks")}
+        </Text>
+      </View>
+      {report.inspectionData.flatMap((sizeEntry) =>
+        (sizeEntry.cuttingDefects?.issues || []).map((issue, issueIdx) => (
+          <View
+            key={`${sizeEntry.inspectedSize}-${issueIdx}`}
+            style={styles.tableRow}
+            wrap={false}
+          >
+            <Text style={[styles.tableCell, { flexBasis: "10%" }]}>
+              {sizeEntry.inspectedSize}
+            </Text>
+
+            <Text
+              style={[styles.tableCell, styles.textLeft, { flexBasis: "30%" }]}
+            >
+              {getLocalizedText(
+                issue.cuttingdefectName,
+                issue.cuttingdefectNameKhmer,
+                null,
+                i18n
+              )}
+            </Text>
+            <Text
+              style={[
+                styles.tableCell,
+                styles.textLeft,
+                styles.tableCellLast,
+                { flexBasis: "60%" }
+              ]}
+            >
+              {issue.remarks}
+            </Text>
+          </View>
+        ))
+      )}
+    </View>
+  </View>
+);
+
+export const AdditionalImagesPDF = ({ report, t }) => {
+  // Check if there are any additional images across all sizes
+  const allImages = report.inspectionData.flatMap(
+    (sizeEntry) => sizeEntry.cuttingDefects?.additionalImages || []
+  );
+
+  if (allImages.length === 0) {
+    return null; // Don't render anything if there are no images
+  }
+
+  return (
+    <View style={styles.section} break>
+      <Text style={styles.sectionTitle}>{t("cutting.additionalImages")}</Text>
+      {report.inspectionData.map((sizeEntry, index) => {
+        const images = sizeEntry.cuttingDefects?.additionalImages;
+        if (!images || images.length === 0) {
+          return null;
+        }
+        return (
+          <View key={`img-section-${index}`} style={{ marginBottom: 10 }}>
+            <Text style={{ fontSize: 8, fontWeight: "bold", marginBottom: 5 }}>
+              {t("cutting.size")}: {sizeEntry.inspectedSize}
+            </Text>
+            <View style={styles.imageContainer}>
+              {images.map((img, imgIdx) =>
+                img.data ? ( // We will render based on the pre-loaded 'data' property
+                  <Image
+                    key={imgIdx}
+                    style={styles.image}
+                    src={img.data} // Use the base64 data URI
+                  />
+                ) : null
+              )}
+            </View>
+          </View>
+        );
+      })}
+    </View>
+  );
+};
+
+// --- MAIN DOCUMENT COMPONENT ---
+const CuttingReportPDFDoc = ({
+  report,
+  processedData,
+  i18n,
+  resultStatus,
+  qcUser
+}) => {
+  const { t } = i18n;
+  const hasCuttingIssues = report.inspectionData.some(
+    (sd) => sd.cuttingDefects?.issues?.length > 0
+  );
+
+  return (
+    <Document
+      author="Yorkmars Garment MFG Co., LTD"
+      title={`Cutting Report - ${report.moNo}`}
+    >
+      <Page size="A4" orientation="landscape" style={styles.page}>
+        <PDFHeader report={report} t={t} resultStatus={resultStatus} />
+        <CutPanelDetails report={report} t={t} qcUser={qcUser} i18n={i18n} />
+        <InspectionSummary data={processedData.inspectionSummary} t={t} />
+        {processedData.measurementData.data.length > 0 && (
+          <MeasurementDetails data={processedData.measurementData} t={t} />
+        )}
+        {processedData.defectData.length > 0 && (
+          <FabricDefectsPDF data={processedData.defectData} t={t} />
+        )}
+        {hasCuttingIssues && (
+          <CuttingIssuesPDF report={report} t={t} i18n={i18n} />
+        )}
+        <AdditionalImagesPDF report={report} t={t} />
+        <PDFFooter />
+      </Page>
+    </Document>
+  );
+};
+
+// --- EXPORTED GENERATOR FUNCTION ---
 export const generateCuttingReportPDF = async (
-  reportData,
-  qcUserData,
-  fabricDefectsMasterData,
-  i18nInstance
+  report,
+  qcUser,
+  fabricDefectsMaster,
+  i18n
 ) => {
-  if (!reportData) {
-    console.error("No report data provided for PDF generation.");
-    alert("No report data to generate PDF.");
-    return;
-  }
+  // --- FULL DATA PROCESSING LOGIC ---
+  const { t } = i18n;
 
-  const t = i18nInstance.t;
-  const currentLang = i18nInstance.language;
+  // --- ADD THIS HELPER FUNCTION TO FETCH AND CONVERT IMAGES ---
+  const imageToDataUri = async (url) => {
+    try {
+      // Construct the proxy URL
+      const proxyUrl = `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(
+        url
+      )}`;
 
-  const pdf = new jsPDF({
-    orientation: "landscape",
-    unit: "pt",
-    format: "a4"
-  });
+      // Fetch from your OWN backend. The browser will allow this.
+      const response = await fetch(proxyUrl);
 
-  const pageMargin = 30; // Reduced margin slightly for more content space
-  const pageWidth = pdf.internal.pageSize.getWidth() - 2 * pageMargin;
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  let currentY = pageMargin;
-  const lineSpacing = 11; // Slightly reduced
-  const sectionSpacing = 18; // Slightly reduced
-  const tableCellPadding = 2; // Slightly reduced
-
-  const addText = (text, x, y, options = {}) => {
-    pdf.setFontSize(options.fontSize || 9); // Default smaller font
-    pdf.setFont(undefined, options.fontStyle || "normal");
-    pdf.setTextColor(options.color || "#000000");
-    if (
-      options.maxWidth &&
-      (pdf.getStringUnitWidth(text) * (options.fontSize || 9)) /
-        pdf.internal.scaleFactor >
-        options.maxWidth
-    ) {
-      const lines = pdf.splitTextToSize(text, options.maxWidth);
-      pdf.text(lines, x, y, { align: options.align || "left" });
-      return y + lines.length * (options.lineHeight || lineSpacing * 0.75);
-    } else {
-      pdf.text(text, x, y, { align: options.align || "left" });
-      return y + (options.lineHeight || lineSpacing);
-    }
-  };
-
-  const checkAndAddPage = (spaceNeeded) => {
-    if (currentY + spaceNeeded > pageHeight - pageMargin) {
-      pdf.addPage(
-        pdf.internal.pageSize.getFormat(),
-        pdf.internal.pageSize.getOrientation()
-      );
-      currentY = pageMargin;
-      // Optional: Redraw consistent page headers here if needed
-      // pdf.setFontSize(8);
-      // pdf.text('Page ' + pdf.internal.getNumberOfPages(), pageWidth + pageMargin - 30, pageHeight - 15, {align: 'right'});
-      return true;
-    }
-    return false;
-  };
-
-  // --- PDF Content ---
-
-  // Section 1: Header
-  pdf.setFontSize(14); // Slightly smaller main title
-  pdf.setFont(undefined, "bold");
-  pdf.text(
-    "YORKMARS (CAMBODIA) GARMENT MFG CO., LTD",
-    pageWidth / 2 + pageMargin,
-    currentY,
-    { align: "center" }
-  );
-  currentY += lineSpacing * 1.3;
-
-  pdf.setFontSize(12); // Slightly smaller subtitle
-  pdf.setFont(undefined, "bold");
-  pdf.text(
-    t("cutting.cutPanelInspectionReportTitle", "Cut Panel Inspection Report"),
-    pageWidth / 2 + pageMargin,
-    currentY,
-    { align: "center" }
-  );
-  currentY += lineSpacing * 1.1;
-
-  pdf.setFontSize(8); // Smaller info text
-  pdf.setFont(undefined, "normal");
-  const headerInfo = `${t("cutting.panel")}: ${reportData.garmentType} | ${t(
-    "cutting.moNo"
-  )}: ${reportData.moNo} | ${t("cutting.tableNo")}: ${reportData.tableNo} | ${t(
-    "cutting.date"
-  )}: ${reportData.inspectionDate}`;
-  pdf.text(headerInfo, pageWidth / 2 + pageMargin, currentY, {
-    align: "center"
-  });
-  currentY += sectionSpacing * 0.8; // Reduced spacing
-
-  // Section 2: Cut Panel Details & QC Info
-  currentY = addText(
-    t("cutting.cutPanelDetailsTitle", "Cut Panel Details"),
-    pageMargin,
-    currentY,
-    { fontSize: 11, fontStyle: "bold" }
-  ); // Slightly smaller section title
-  currentY += lineSpacing * 0.4;
-
-  if (qcUserData || reportData.cutting_emp_id) {
-    const qcId = qcUserData?.emp_id || reportData.cutting_emp_id;
-    const qcName =
-      getPdfLocalizedText(
-        qcUserData?.eng_name,
-        qcUserData?.kh_name,
-        qcUserData?.chinese_name,
-        currentLang
-      ) ||
-      getPdfLocalizedText(
-        reportData.cutting_emp_engName,
-        reportData.cutting_emp_khName,
-        "",
-        currentLang
-      ) ||
-      "N/A";
-    const qcBoxWidth = 110; // Slightly narrower
-    const qcBoxX = pageWidth + pageMargin - qcBoxWidth - 5; // Adjusted X
-    let qcTempY = currentY - lineSpacing * 2;
-
-    pdf.setFontSize(7); // Smaller QC info
-    pdf.text(`${t("cutting.qcId")}: ${qcId}`, qcBoxX, qcTempY);
-    qcTempY += lineSpacing * 0.7;
-    const qcNameLines = pdf.splitTextToSize(qcName, qcBoxWidth - 5);
-    pdf.text(qcNameLines, qcBoxX, qcTempY);
-  }
-
-  let detailX = pageMargin;
-  let tempY = currentY;
-  const colWidthDetails = (pageWidth - 120) / 3 - 4; // Adjusted for QC box space
-
-  tempY = Math.max(
-    addText(
-      `${t("cutting.lotNo")}: ${reportData.lotNo?.join(", ") || "N/A"}`,
-      detailX,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.color")}: ${reportData.color}`,
-      detailX + colWidthDetails + 5,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.orderQty")}: ${reportData.orderQty}`,
-      detailX + 2 * (colWidthDetails + 5),
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    )
-  );
-  tempY = Math.max(
-    addText(
-      `${t("cutting.spreadTable")}: ${
-        reportData.cuttingTableDetails?.spreadTable || "N/A"
-      }`,
-      detailX,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.spreadTableNo")}: ${
-        reportData.cuttingTableDetails?.spreadTableNo || "N/A"
-      }`,
-      detailX + colWidthDetails + 5,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.planLayers")}: ${
-        reportData.cuttingTableDetails?.planLayers
-      }`,
-      detailX + 2 * (colWidthDetails + 5),
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    )
-  );
-  tempY = Math.max(
-    addText(
-      `${t("cutting.actualLayers")}: ${
-        reportData.cuttingTableDetails?.actualLayers
-      }`,
-      detailX,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.totalPcs")}: ${reportData.cuttingTableDetails?.totalPcs}`,
-      detailX + colWidthDetails + 5,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.mackerNo")}: ${reportData.cuttingTableDetails?.mackerNo}`,
-      detailX + 2 * (colWidthDetails + 5),
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    )
-  );
-  currentY = tempY;
-
-  currentY = addText(
-    t("cutting.markerRatio"),
-    pageMargin,
-    currentY + lineSpacing * 0.4,
-    { fontSize: 9, fontStyle: "bold" }
-  ); // Smaller title
-  if (reportData.mackerRatio && reportData.mackerRatio.length > 0) {
-    const markerHeaders = reportData.mackerRatio.map((mr) => mr.markerSize);
-    const markerRatios = reportData.mackerRatio.map((mr) =>
-      mr.ratio.toString()
-    );
-    autoTable(pdf, {
-      // Corrected: pass pdf instance as first argument
-      startY: currentY,
-      head: [markerHeaders],
-      body: [markerRatios],
-      theme: "grid",
-      styles: {
-        fontSize: 7,
-        cellPadding: tableCellPadding - 1,
-        halign: "center"
-      }, // Smaller font
-      headStyles: {
-        fillColor: [230, 230, 230],
-        textColor: 20,
-        fontStyle: "bold",
-        fontSize: 7
-      },
-      margin: { left: pageMargin, right: pageMargin },
-      tableWidth: "auto"
-    });
-    currentY = pdf.lastAutoTable.finalY + lineSpacing * 0.4;
-  } else {
-    currentY = addText("N/A", pageMargin + 20, currentY, { fontSize: 8 });
-  }
-
-  tempY = currentY;
-  tempY = Math.max(
-    addText(
-      `${t("cutting.totalBundleQty")}: ${reportData.totalBundleQty}`,
-      detailX,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.bundleQtyCheck")}: ${reportData.bundleQtyCheck}`,
-      detailX + colWidthDetails + 5,
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    ),
-    addText(
-      `${t("cutting.cuttingBy")}: ${reportData.cuttingtype}`,
-      detailX + 2 * (colWidthDetails + 5),
-      tempY,
-      { fontSize: 8, maxWidth: colWidthDetails }
-    )
-  );
-  currentY = tempY + sectionSpacing * 0.8;
-
-  // Section 3: Inspection Summary Table
-  checkAndAddPage(80);
-  currentY = addText(
-    t("cutting.inspectionSummaryOverall", "Inspection Summary (Overall)"),
-    pageMargin,
-    currentY,
-    { fontSize: 11, fontStyle: "bold" }
-  );
-  currentY += lineSpacing * 0.4;
-
-  const summaryHeaders = [
-    t("cutting.size"),
-    t("cutting.inspectionQty", "Insp. Qty"),
-    t("cutting.pass"),
-    t("cutting.reject"),
-    t("cutting.rejectMeasurements"),
-    t("cutting.rejectDefects"),
-    `${t("cutting.passRate")} (%)`
-  ];
-  const summaryBody = reportData.inspectionData.flatMap((item) => {
-    /* ... (same as before) ... */ const rejectDefectsVal =
-      item.rejectGarmentSize?.total || 0;
-    const mainRow = [
-      item.inspectedSize,
-      item.totalPcsSize || 0,
-      item.passSize?.total || 0,
-      item.rejectSize?.total || 0,
-      item.rejectMeasurementSize?.total || 0,
-      rejectDefectsVal,
-      (item.passrateSize?.total || 0).toFixed(2)
-    ];
-    const tmbRow = [
-      "",
-      `T:${item.pcsSize?.top || 0} M:${item.pcsSize?.middle || 0} B:${
-        item.pcsSize?.bottom || 0
-      }`,
-      `T:${item.passSize?.top || 0} M:${item.passSize?.middle || 0} B:${
-        item.passSize?.bottom || 0
-      }`,
-      `T:${item.rejectSize?.top || 0} M:${item.rejectSize?.middle || 0} B:${
-        item.rejectSize?.bottom || 0
-      }`,
-      `T:${item.rejectMeasurementSize?.top || 0} M:${
-        item.rejectMeasurementSize?.middle || 0
-      } B:${item.rejectMeasurementSize?.bottom || 0}`,
-      `T:${item.rejectGarmentSize?.top || 0} M:${
-        item.rejectGarmentSize?.middle || 0
-      } B:${item.rejectGarmentSize?.bottom || 0}`,
-      `T:${(item.passrateSize?.top || 0).toFixed(0)}% M:${(
-        item.passrateSize?.middle || 0
-      ).toFixed(0)}% B:${(item.passrateSize?.bottom || 0).toFixed(0)}%`
-    ];
-    return [mainRow, tmbRow];
-  });
-  const summaryTotals = reportData.inspectionData.reduce(
-    (acc, curr) => {
-      /* ... (same as before) ... */ acc.totalPcsSize += curr.totalPcsSize || 0;
-      acc.pcsSize.top += curr.pcsSize?.top || 0;
-      acc.pcsSize.middle += curr.pcsSize?.middle || 0;
-      acc.pcsSize.bottom += curr.pcsSize?.bottom || 0;
-      acc.passSize.total += curr.passSize?.total || 0;
-      acc.passSize.top += curr.passSize?.top || 0;
-      acc.passSize.middle += curr.passSize?.middle || 0;
-      acc.passSize.bottom += curr.passSize?.bottom || 0;
-      acc.rejectSize.total += curr.rejectSize?.total || 0;
-      acc.rejectSize.top += curr.rejectSize?.top || 0;
-      acc.rejectSize.middle += curr.rejectSize?.middle || 0;
-      acc.rejectSize.bottom += curr.rejectSize?.bottom || 0;
-      acc.rejectMeasurementSize.total += curr.rejectMeasurementSize?.total || 0;
-      acc.rejectMeasurementSize.top += curr.rejectMeasurementSize?.top || 0;
-      acc.rejectMeasurementSize.middle +=
-        curr.rejectMeasurementSize?.middle || 0;
-      acc.rejectMeasurementSize.bottom +=
-        curr.rejectMeasurementSize?.bottom || 0;
-      acc.rejectGarmentSize.total += curr.rejectGarmentSize?.total || 0;
-      acc.rejectGarmentSize.top += curr.rejectGarmentSize?.top || 0;
-      acc.rejectGarmentSize.middle += curr.rejectGarmentSize?.middle || 0;
-      acc.rejectGarmentSize.bottom += curr.rejectGarmentSize?.bottom || 0;
-      return acc;
-    },
-    {
-      totalPcsSize: 0,
-      pcsSize: { top: 0, middle: 0, bottom: 0 },
-      passSize: { total: 0, top: 0, middle: 0, bottom: 0 },
-      rejectSize: { total: 0, top: 0, middle: 0, bottom: 0 },
-      rejectMeasurementSize: { total: 0, top: 0, middle: 0, bottom: 0 },
-      rejectGarmentSize: { total: 0, top: 0, middle: 0, bottom: 0 }
-    }
-  );
-  const totalPassRate =
-    summaryTotals.totalPcsSize > 0
-      ? (summaryTotals.passSize.total / summaryTotals.totalPcsSize) * 100
-      : 0;
-  const totalPassRateT =
-    summaryTotals.pcsSize.top > 0
-      ? (summaryTotals.passSize.top / summaryTotals.pcsSize.top) * 100
-      : 0;
-  const totalPassRateM =
-    summaryTotals.pcsSize.middle > 0
-      ? (summaryTotals.passSize.middle / summaryTotals.pcsSize.middle) * 100
-      : 0;
-  const totalPassRateB =
-    summaryTotals.pcsSize.bottom > 0
-      ? (summaryTotals.passSize.bottom / summaryTotals.pcsSize.bottom) * 100
-      : 0;
-  const totalRowMain = [
-    t("common.total"),
-    summaryTotals.totalPcsSize,
-    summaryTotals.passSize.total,
-    summaryTotals.rejectSize.total,
-    summaryTotals.rejectMeasurementSize.total,
-    summaryTotals.rejectGarmentSize.total,
-    totalPassRate.toFixed(2)
-  ];
-  const totalRowTMB = [
-    "",
-    `T:${summaryTotals.pcsSize.top} M:${summaryTotals.pcsSize.middle} B:${summaryTotals.pcsSize.bottom}`,
-    `T:${summaryTotals.passSize.top} M:${summaryTotals.passSize.middle} B:${summaryTotals.passSize.bottom}`,
-    `T:${summaryTotals.rejectSize.top} M:${summaryTotals.rejectSize.middle} B:${summaryTotals.rejectSize.bottom}`,
-    `T:${summaryTotals.rejectMeasurementSize.top} M:${summaryTotals.rejectMeasurementSize.middle} B:${summaryTotals.rejectMeasurementSize.bottom}`,
-    `T:${summaryTotals.rejectGarmentSize.top} M:${summaryTotals.rejectGarmentSize.middle} B:${summaryTotals.rejectGarmentSize.bottom}`,
-    `T:${totalPassRateT.toFixed(0)}% M:${totalPassRateM.toFixed(
-      0
-    )}% B:${totalPassRateB.toFixed(0)}%`
-  ];
-  summaryBody.push(totalRowMain, totalRowTMB);
-
-  autoTable(pdf, {
-    // Corrected: pass pdf instance
-    startY: currentY,
-    head: [summaryHeaders],
-    body: summaryBody,
-    theme: "grid",
-    styles: {
-      fontSize: 7,
-      cellPadding: tableCellPadding - 1,
-      halign: "center"
-    }, // Smaller font
-    headStyles: {
-      fillColor: [220, 220, 220],
-      textColor: 20,
-      fontStyle: "bold",
-      fontSize: 7
-    },
-    didDrawCell: (data) => {
-      if (data.section === "body" && data.row.index % 2 !== 0) {
-        pdf.setFontSize(6);
-        pdf.setTextColor(100);
-      } // TMB rows even smaller
-      if (
-        data.section === "body" &&
-        (data.row.index === summaryBody.length - 2 ||
-          data.row.index === summaryBody.length - 1)
-      ) {
-        pdf.setFont(undefined, "bold");
-        if (data.row.index === summaryBody.length - 1) pdf.setFontSize(6);
+      if (!response.ok) {
+        throw new Error(`Proxy fetch failed with status ${response.status}`);
       }
-    },
-    margin: { left: pageMargin, right: pageMargin }
+
+      const blob = await response.blob();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error(
+        `Failed to fetch and convert image via proxy: ${url}`,
+        error
+      );
+      return null; // Return null if fetching fails
+    }
+  };
+
+  // --- PRE-LOAD AND PREPARE IMAGES ---
+  // We create a deep copy of the report to avoid mutating the original state.
+  const reportWithImageData = JSON.parse(JSON.stringify(report));
+
+  // Create an array of all image-fetching promises
+  const imagePromises = [];
+  reportWithImageData.inspectionData.forEach((sizeEntry) => {
+    const images = sizeEntry.cuttingDefects?.additionalImages;
+    if (images) {
+      images.forEach((img) => {
+        if (img.path) {
+          const promise = imageToDataUri(img.path).then((dataUri) => {
+            img.data = dataUri; // Attach the base64 data to the image object
+          });
+          imagePromises.push(promise);
+        }
+      });
+    }
   });
-  currentY = pdf.lastAutoTable.finalY + sectionSpacing * 0.8;
 
-  // Section 4: Measurement Details Table
-  checkAndAddPage(40);
-  const toleranceText =
-    reportData.inspectionData &&
-    reportData.inspectionData.length > 0 &&
-    reportData.inspectionData[0].tolerance
-      ? `(${t("cutting.tolerance")}: ${
-          reportData.inspectionData[0].tolerance.min
-        } / ${reportData.inspectionData[0].tolerance.max})`
-      : "";
-  currentY = addText(
-    `${t("cutting.measurementDetails")} ${toleranceText}`,
-    pageMargin,
-    currentY,
-    { fontSize: 11, fontStyle: "bold" }
+  // Wait for all images to be fetched and converted
+  await Promise.all(imagePromises);
+
+  const getDefectDisplayName = (defectNameFromInspection) => {
+    const masterDefect = fabricDefectsMaster.find(
+      (m) =>
+        m.defectName === defectNameFromInspection ||
+        m.defectNameEng === defectNameFromInspection
+    );
+    return masterDefect
+      ? getLocalizedText(
+          masterDefect.defectNameEng,
+          masterDefect.defectNameKhmer,
+          masterDefect.defectNameChinese,
+          i18n
+        )
+      : defectNameFromInspection;
+  };
+
+  const inspectionSummaryData = (() => {
+    if (!report || !report.inspectionData) return { details: [], totals: {} };
+    const details = report.inspectionData.map((sizeData) => ({
+      size: sizeData.inspectedSize,
+      inspectedQty: { total: sizeData.totalPcsSize || 0 },
+      pass: { total: sizeData.passSize?.total || 0 },
+      reject: { total: sizeData.rejectSize?.total || 0 },
+      rejectMeasurement: { total: sizeData.rejectMeasurementSize?.total || 0 },
+      rejectDefects: { total: sizeData.rejectGarmentSize?.total || 0 },
+      passRate: { total: sizeData.passrateSize?.total || 0 }
+    }));
+    const totals = details.reduce(
+      (acc, curr) => {
+        acc.inspectedQty.total += curr.inspectedQty.total;
+        acc.pass.total += curr.pass.total;
+        acc.reject.total += curr.reject.total;
+        acc.rejectMeasurement.total += curr.rejectMeasurement.total;
+        acc.rejectDefects.total += curr.rejectDefects.total;
+        return acc;
+      },
+      {
+        inspectedQty: { total: 0 },
+        pass: { total: 0 },
+        reject: { total: 0 },
+        rejectMeasurement: { total: 0 },
+        rejectDefects: { total: 0 }
+      }
+    );
+    totals.passRate = {
+      total:
+        totals.inspectedQty.total > 0
+          ? (totals.pass.total / totals.inspectedQty.total) * 100
+          : 0
+    };
+    return { details, totals };
+  })();
+
+  // ADD THIS CALCULATION
+  const resultStatus = getResultStatus(
+    report.totalInspectionQty || 0,
+    inspectionSummaryData.totals.reject.total || 0,
+    inspectionSummaryData.totals.inspectedQty.total || 0,
+    t
   );
-  currentY += lineSpacing * 0.4;
 
-  const measurementTableHeaders = [
-    t("cutting.size"),
-    t("cutting.bundleQty"),
-    t("cutting.bundleNo"),
-    t("cutting.partName"),
-    t("cutting.measurementPoint")
-  ];
-  const allPcsHeadersSet = new Set();
-  reportData.inspectionData.forEach((sd) =>
-    sd.bundleInspectionData.forEach((b) =>
-      b.measurementInsepctionData.forEach((p) =>
-        p.measurementPointsData.forEach((mp) =>
-          mp.measurementValues.forEach((mv) =>
-            mv.measurements.forEach((m) => allPcsHeadersSet.add(m.pcsName))
+  const processedMeasurementData = (() => {
+    if (!report || !report.inspectionData) return { data: [], headers: [] };
+    const allPcsNames = new Set();
+    report.inspectionData.forEach((sd) =>
+      sd.bundleInspectionData.forEach((b) =>
+        b.measurementInsepctionData.forEach((p) =>
+          p.measurementPointsData.forEach((mp) =>
+            mp.measurementValues.forEach((mv) =>
+              mv.measurements.forEach((m) => allPcsNames.add(m.pcsName))
+            )
           )
         )
       )
-    )
-  );
-  const sortedPcsHeaders = Array.from(allPcsHeadersSet).sort((a, b) => {
-    const pA = a[0],
-      pB = b[0],
-      nA = parseInt(a.slice(1)),
-      nB = parseInt(b.slice(1));
-    if (pA < pB) return -1;
-    if (pA > pB) return 1;
-    return nA - nB;
-  });
-  measurementTableHeaders.push(...sortedPcsHeaders);
+    );
+    const sortedHeaders = Array.from(allPcsNames).sort((a, b) => {
+      const prefixOrder = { T: 1, M: 2, B: 3 };
+      const prefixA = a.charAt(0).toUpperCase();
+      const prefixB = b.charAt(0).toUpperCase();
+      const numA = parseInt(a.substring(1), 10);
+      const numB = parseInt(b.substring(1), 10);
 
-  const measurementTableBody = [];
-  let currentSizeRendered = null;
-  let currentBundleRendered = null;
-  let currentPartRendered = null;
-  reportData.inspectionData.forEach((sizeData) => {
-    sizeData.bundleInspectionData.forEach((bundle) => {
-      bundle.measurementInsepctionData.forEach((part) => {
-        part.measurementPointsData.forEach((mp) => {
-          const rowValues = sortedPcsHeaders.map((pcsHeader) => {
-            for (const mv of mp.measurementValues) {
-              const m = mv.measurements.find((m) => m.pcsName === pcsHeader);
-              if (m) return decimalToFraction(m.valuedecimal);
-            }
-            return "-";
+      const orderA = prefixOrder[prefixA] || 4; // Default to 4 if prefix is not T, M, or B
+      const orderB = prefixOrder[prefixB] || 4;
+
+      if (orderA !== orderB) {
+        return orderA - orderB; // Sort by T, M, B
+      }
+      return numA - numB; // If prefixes are the same, sort by number
+    });
+
+    const data = [];
+    report.inspectionData.forEach((sizeData) => {
+      sizeData.bundleInspectionData.forEach((bundle) => {
+        bundle.measurementInsepctionData.forEach((part) => {
+          part.measurementPointsData.forEach((mp) => {
+            const row = {
+              size: sizeData.inspectedSize,
+              bundleNo: bundle.bundleNo,
+              partName: getLocalizedText(
+                part.partName,
+                part.partNameKhmer,
+                null,
+                i18n
+              ),
+              measurementPoint: getLocalizedText(
+                mp.measurementPointName,
+                mp.measurementPointNameKhmer,
+                null,
+                i18n
+              ),
+              values: {},
+              tolerance: sizeData.tolerance
+            };
+            sortedHeaders.forEach((pcsName) => {
+              const found = mp.measurementValues
+                .flatMap((mv) => mv.measurements)
+                .find((m) => m.pcsName === pcsName);
+              row.values[pcsName] = found ? found.valuedecimal : null;
+            });
+            data.push(row);
           });
-          measurementTableBody.push([
-            sizeData.inspectedSize === currentSizeRendered
-              ? ""
-              : sizeData.inspectedSize,
-            sizeData.inspectedSize === currentSizeRendered &&
-            bundle.bundleNo === currentBundleRendered
-              ? ""
-              : sizeData.bundleQtyCheckSize,
-            sizeData.inspectedSize === currentSizeRendered &&
-            bundle.bundleNo === currentBundleRendered
-              ? ""
-              : bundle.bundleNo,
-            sizeData.inspectedSize === currentSizeRendered &&
-            bundle.bundleNo === currentBundleRendered &&
-            part.partName === currentPartRendered
-              ? ""
-              : getPdfLocalizedText(
-                  part.partName,
-                  part.partNameKhmer,
-                  part.partNameChinese,
-                  currentLang
-                ),
-            getPdfLocalizedText(
-              mp.measurementPointName,
-              mp.measurementPointNameKhmer,
-              mp.measurementPointNameChinese,
-              currentLang
-            ),
-            ...rowValues
-          ]);
-          currentSizeRendered = sizeData.inspectedSize;
-          currentBundleRendered = bundle.bundleNo;
-          currentPartRendered = part.partName;
         });
       });
     });
-  });
+    return { data, headers: sortedHeaders };
+  })();
 
-  // Define column widths carefully for measurement table
-  const firstColsWidth = [25, 25, 25, 55, 65]; // Approx widths for Size, BQty, BNo, Part, MeasPoint
-  const dynamicColWidth =
-    (pageWidth -
-      firstColsWidth.reduce((a, b) => a + b, 0) -
-      (sortedPcsHeaders.length > 0 ? (sortedPcsHeaders.length - 1) * 2 : 0)) /
-    (sortedPcsHeaders.length || 1); // Remaining width / num dynamic cols, with some padding
-  const columnStylesMeas = {
-    0: { cellWidth: firstColsWidth[0] },
-    1: { cellWidth: firstColsWidth[1] },
-    2: { cellWidth: firstColsWidth[2] },
-    3: { cellWidth: firstColsWidth[3] },
-    4: { cellWidth: firstColsWidth[4], overflow: "linebreak" }
+  const processedDefectData = (() => {
+    if (!report || !report.inspectionData) return [];
+    const data = [];
+    report.inspectionData.forEach((sizeData) => {
+      sizeData.bundleInspectionData.forEach((bundle) => {
+        bundle.measurementInsepctionData.forEach((part) => {
+          const defectsForPart = {};
+          let hasDefects = false;
+          part.fabricDefects.forEach((loc) => {
+            loc.defectData.forEach((pcsDefect) => {
+              if (pcsDefect.totalDefects > 0) {
+                hasDefects = true;
+                if (!defectsForPart[pcsDefect.pcsName])
+                  defectsForPart[pcsDefect.pcsName] = [];
+                pcsDefect.defects.forEach((detail) => {
+                  if (detail.defectName) {
+                    let existing = defectsForPart[pcsDefect.pcsName].find(
+                      (d) => d.nameFromSchema === detail.defectName
+                    );
+                    if (existing) existing.qty += detail.defectQty || 0;
+                    else {
+                      // 1. Find the master record for the defect
+                      const masterDefect = fabricDefectsMaster.find(
+                        (m) =>
+                          m.defectName === detail.defectName ||
+                          m.defectNameEng === detail.defectName
+                      );
+                      // 2. Create the display name using ONLY the English name from the master record,
+                      //    or fall back to the original name if not found.
+                      const englishDisplayName =
+                        masterDefect?.defectNameEng || detail.defectName;
+
+                      defectsForPart[pcsDefect.pcsName].push({
+                        nameFromSchema: detail.defectName,
+                        //displayName: englishDisplayName,
+                        displayName: getDefectDisplayName(detail.defectName),
+                        qty: detail.defectQty || 0
+                      });
+                    }
+                  }
+                });
+              }
+            });
+          });
+          if (hasDefects) {
+            data.push({
+              size: sizeData.inspectedSize,
+              bundleNo: bundle.bundleNo,
+              partName: getLocalizedText(
+                part.partName,
+                part.partNameKhmer,
+                null,
+                i18n
+              ),
+              defectsByPcs: defectsForPart
+            });
+          }
+        });
+      });
+    });
+    return data;
+  })();
+
+  const processedData = {
+    inspectionSummary: inspectionSummaryData,
+    measurementData: processedMeasurementData,
+    defectData: processedDefectData
   };
-  sortedPcsHeaders.forEach((_, i) => {
-    columnStylesMeas[5 + i] = {
-      cellWidth: Math.max(dynamicColWidth, 20),
-      halign: "center"
-    };
-  }); // Min width for dynamic cols
 
-  autoTable(pdf, {
-    // Corrected: pass pdf instance
-    startY: currentY,
-    head: [measurementTableHeaders],
-    body: measurementTableBody,
-    theme: "grid",
-    styles: {
-      fontSize: 5,
-      cellPadding: 1,
-      halign: "center",
-      overflow: "hidden",
-      cellWidth: "auto"
-    }, // tiny font
-    headStyles: {
-      fillColor: [220, 220, 220],
-      textColor: 20,
-      fontStyle: "bold",
-      fontSize: 5.5
-    }, // tiny head font
-    columnStyles: columnStylesMeas,
-    margin: { left: pageMargin, right: pageMargin },
-    tableWidth: "wrap", // Or 'auto'
-    didDrawPage: function (data) {
-      pdf.setFontSize(8);
-      pdf.text(
-        "Page " + pdf.internal.getNumberOfPages(),
-        data.settings.margin.left,
-        pageHeight - 10
-      );
-    }
-  });
-  currentY = pdf.lastAutoTable.finalY + sectionSpacing * 0.8;
+  const blob = await pdf(
+    <CuttingReportPDFDoc
+      report={reportWithImageData}
+      //report={report}
+      processedData={processedData}
+      i18n={i18n}
+      resultStatus={resultStatus}
+      qcUser={qcUser}
+    />
+  ).toBlob();
 
-  // Section 5: Fabric Defects Table
-  checkAndAddPage(40);
-  currentY = addText(
-    t("cutting.fabricDefectsTitle", "Fabric Defects"),
-    pageMargin,
-    currentY,
-    { fontSize: 11, fontStyle: "bold" }
-  );
-  currentY += lineSpacing * 0.4;
-  const defectTableHeaders = [
-    t("cutting.size"),
-    t("cutting.bundleNo"),
-    t("cutting.partName"),
-    t("cutting.defectDetails")
-  ];
-  const defectTableBody = [];
-  reportData.inspectionData.forEach((sizeData) => {
-    sizeData.bundleInspectionData.forEach((bundle) => {
-      bundle.measurementInsepctionData.forEach((part) => {
-        let defectDetailsText = "";
-        let hasDefectsForPart = false;
-        part.fabricDefects.forEach((locDef) => {
-          locDef.defectData.forEach((pcsDef) => {
-            if (pcsDef.totalDefects > 0 && pcsDef.defects) {
-              hasDefectsForPart = true;
-              defectDetailsText += `${pcsDef.pcsName}: `;
-              defectDetailsText += pcsDef.defects
-                .map(
-                  (d) =>
-                    `${getDefectDisplayNamePDF(
-                      d.defectName,
-                      fabricDefectsMasterData,
-                      currentLang
-                    )} (${d.defectQty || 0})`
-                )
-                .join(", ");
-              defectDetailsText += "\n";
-            }
-          });
-        });
-        if (hasDefectsForPart) {
-          defectTableBody.push([
-            sizeData.inspectedSize,
-            bundle.bundleNo,
-            getPdfLocalizedText(
-              part.partName,
-              part.partNameKhmer,
-              part.partNameChinese,
-              currentLang
-            ),
-            defectDetailsText.trim()
-          ]);
-        }
-      });
-    });
-  });
-  if (defectTableBody.length > 0) {
-    autoTable(pdf, {
-      // Corrected: pass pdf instance
-      startY: currentY,
-      head: [defectTableHeaders],
-      body: defectTableBody,
-      theme: "grid",
-      styles: { fontSize: 7, cellPadding: tableCellPadding - 1, valign: "top" },
-      headStyles: {
-        fillColor: [220, 220, 220],
-        textColor: 20,
-        fontStyle: "bold",
-        fontSize: 7
-      },
-      columnStyles: { 3: { cellWidth: "auto", overflow: "linebreak" } },
-      margin: { left: pageMargin, right: pageMargin }
-    });
-    currentY = pdf.lastAutoTable.finalY + sectionSpacing * 0.8;
-  } else {
-    currentY = addText(
-      t("cutting.noFabricDefectsReported", "No fabric defects reported."),
-      pageMargin,
-      currentY,
-      { fontSize: 8 }
-    );
-  }
-
-  // Section 6: Cutting Issues
-  checkAndAddPage(40);
-  currentY = addText(
-    t("cutting.cuttingIssuesTitle", "Cutting Issues"),
-    pageMargin,
-    currentY,
-    { fontSize: 11, fontStyle: "bold" }
-  );
-  currentY += lineSpacing * 0.4;
-  const cuttingIssuesHeaders = [
-    t("cutting.size"),
-    t("cutting.defectName"),
-    t("cutting.remarks"),
-    t("cutting.evidence")
-  ];
-  const cuttingIssuesBody = [];
-  let hasAnyCuttingIssues = false;
-  reportData.inspectionData.forEach((sizeEntry) => {
-    if (sizeEntry.cuttingDefects?.issues?.length > 0) {
-      hasAnyCuttingIssues = true;
-      sizeEntry.cuttingDefects.issues.forEach((issue) => {
-        cuttingIssuesBody.push([
-          sizeEntry.inspectedSize,
-          getPdfLocalizedText(
-            issue.cuttingdefectName,
-            issue.cuttingdefectNameKhmer,
-            issue.cuttingdefectNameChinese,
-            currentLang
-          ),
-          issue.remarks || "",
-          issue.imageData?.length > 0
-            ? t("common.imageAttached", "See Attached")
-            : t("common.noImage", "N/A")
-        ]);
-      });
-    }
-  });
-  if (hasAnyCuttingIssues) {
-    autoTable(pdf, {
-      // Corrected: pass pdf instance
-      startY: currentY,
-      head: [cuttingIssuesHeaders],
-      body: cuttingIssuesBody,
-      theme: "grid",
-      styles: { fontSize: 7, cellPadding: tableCellPadding - 1, valign: "top" },
-      headStyles: {
-        fillColor: [220, 220, 220],
-        textColor: 20,
-        fontStyle: "bold",
-        fontSize: 7
-      },
-      columnStyles: { 2: { cellWidth: "auto" }, 3: { cellWidth: 50 } },
-      margin: { left: pageMargin, right: pageMargin }
-    });
-    currentY = pdf.lastAutoTable.finalY + lineSpacing * 0.7;
-  } else {
-    currentY = addText(
-      t(
-        "cutting.noSpecificIssuesReportedOverall",
-        "No specific cutting issues reported."
-      ),
-      pageMargin,
-      currentY,
-      { fontSize: 8 }
-    );
-  }
-  reportData.inspectionData.forEach((sizeEntry) => {
-    if (
-      sizeEntry.cuttingDefects?.additionalComments ||
-      sizeEntry.cuttingDefects?.additionalImages?.length > 0
-    ) {
-      checkAndAddPage(25);
-      currentY = addText(
-        `${t("cutting.additionalInfoForSize", "Additional Info for Size")}: ${
-          sizeEntry.inspectedSize
-        }`,
-        pageMargin,
-        currentY,
-        { fontSize: 9, fontStyle: "bold" }
-      );
-      if (sizeEntry.cuttingDefects.additionalComments) {
-        currentY = addText(
-          `${t("cutting.additionalComments")}:`,
-          pageMargin,
-          currentY,
-          { fontSize: 7, fontStyle: "italic" }
-        );
-        currentY = addText(
-          sizeEntry.cuttingDefects.additionalComments,
-          pageMargin + 5,
-          currentY,
-          { fontSize: 7, maxWidth: pageWidth - 10 }
-        );
-      }
-      if (sizeEntry.cuttingDefects.additionalImages?.length > 0) {
-        currentY = addText(
-          `${t("cutting.additionalImages")}: ${t(
-            "common.seeNoteImagesSeparate",
-            "(Images handled separately)"
-          )}`,
-          pageMargin,
-          currentY,
-          { fontSize: 7 }
-        );
-      }
-      currentY += lineSpacing * 0.7;
-    }
-  });
-
-  // Add final page number if not already added by a table
-  if (
-    !pdf.internal.getPageNumberInfo ||
-    pdf.internal.getPageNumberInfo().pageNumber ===
-      pdf.internal.getNumberOfPages()
-  ) {
-    pdf.setFontSize(8);
-    pdf.text(
-      "Page " + pdf.internal.getNumberOfPages(),
-      pageWidth + pageMargin - 30,
-      pageHeight - 15,
-      { align: "right" }
-    );
-  }
-
-  const fileName = `Cutting_Report_${reportData.moNo}_${reportData.tableNo}.pdf`;
-  pdf.save(fileName);
-  console.log("PDF generation complete:", fileName);
+  saveAs(blob, `Cutting_Report_${report.moNo}_${report.tableNo}.pdf`);
 };

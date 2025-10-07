@@ -1525,7 +1525,6 @@ const handleSaveInspection = async () => {
                       );
                     })}
                   </tbody>
-
                 </table>
               </div>
             </div>

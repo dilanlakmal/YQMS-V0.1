@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { API_BASE_URL } from "../../config";
 import ExcelUploader from '../components/inspection/QC2_Washing_Upload/ExcelUpload';
-import FinalResultTable from '../components/inspection/QC2_Washing_Upload/FinalResultTable';
+// import FinalResultTable from '../components/inspection/QC2_Washing_Upload/FinalResultTable';
 import Swal from 'sweetalert2';
 
 const QC2WashingUpload = () => {

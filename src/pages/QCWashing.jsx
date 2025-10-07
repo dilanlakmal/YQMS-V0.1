@@ -166,7 +166,6 @@ const initializeDefaultCheckpointData = async () => {
   }
 };
 
-
 function normalizeImagePreview(img) {
   if (!img) return "";
   if (typeof img === "string") return img;

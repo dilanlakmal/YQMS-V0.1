@@ -36,7 +36,7 @@ const LanguageSwitcher = () => {
   const languageOptions = {
     en: { name: "English", flag: "assets/Img/flag/ukFlag.png" },
     kh: { name: "Khmer", flag: "assets/Img/flag/khFlag.png" },
-    ch: { name: "Chinese", flag: "assets/Img/flag/chFlag.png" },
+    ch: { name: "Chinese", flag: "assets/Img/flag/chFlag.png" }
   };
 
   return (

@@ -9,19 +9,19 @@ const cuttingMenuItems = [
   {
     title: "Cutting Dashboard",
     icon: <BarChart3 className="w-6 h-6 text-white" />,
-    image: "assets/Dashboard/cutting.png",
+    image: "assets/Dashboard/CuttingDashboard.png",
     section: "Cutting Dashboard"
   },
   {
     title: "Cutting Reports",
     icon: <FileText className="w-6 h-6 text-white" />,
-    image: "assets/Dashboard/cutting.png",
+    image: "assets/Dashboard/CuttingReport.png",
     section: "Cutting Reports"
   },
   {
     title: "Cutting Trend",
     icon: <TrendingUp className="w-6 h-6 text-white" />,
-    image: "assets/Dashboard/cutting.png",
+    image: "assets/Dashboard/CuttingTrend.png",
     section: "Cutting Trend"
   }
 ];
@@ -37,11 +37,6 @@ const CuttingMenu = ({ setActiveSection }) => {
           ← Back to Home
         </button>
       </div>
-      
-      <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
-        Cutting Department
-      </h2>
-      
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
         {cuttingMenuItems.map((menu, index) => (
           <div

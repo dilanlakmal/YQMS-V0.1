@@ -10,6 +10,9 @@ import { PDFDownloadLink} from '@react-pdf/renderer';
 // Polyfill Buffer for client-side PDF generation
 window.Buffer = window.Buffer || Buffer;
 
+// Polyfill Buffer for client-side PDF generation
+window.Buffer = window.Buffer || Buffer;
+
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
@@ -1512,6 +1515,7 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.checkedQty || 'N/A'}
                       </td>
+
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {totalDefectCount}
                       </td>

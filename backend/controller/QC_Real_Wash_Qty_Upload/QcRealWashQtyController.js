@@ -271,7 +271,6 @@ export const getrealWashQty =  async (req, res) => {
       details: records.length > 0 ? records[0] : null,
       searchCriteria: { inspectionDate, styleNo, color }
     });
-
   } catch (error) {
     console.error("Error searching real wash qty:", error);
     res.status(500).json({

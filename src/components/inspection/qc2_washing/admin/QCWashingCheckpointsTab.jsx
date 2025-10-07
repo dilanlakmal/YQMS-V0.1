@@ -581,9 +581,7 @@ const QCWashingCheckpointsTab = () => {
         </div>
       </div>
     );
-  };
 
-  const renderOptionsDisplay = (options, isEditing = false, isSubPoint = false, subPointId = null, checkpointId = null) => {
     if (isEditing) {
       return (
         <div className="space-y-2 max-w-md">

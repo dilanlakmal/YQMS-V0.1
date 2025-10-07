@@ -20,7 +20,8 @@ import {
   Scan,
   Layers,
   FileText, // New Icon for reports
-  FlaskConical // New Icon for AQL
+  FlaskConical, // New Icon for AQL
+  ArrowLeft
 } from "lucide-react";
 import { useAuth } from "../../authentication/AuthContext";
 
@@ -32,7 +33,7 @@ const formatDateForApi = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const CuttingDashboard = () => {
+const CuttingDashboard = ({ onBackToCuttingLive }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -216,6 +217,17 @@ const CuttingDashboard = () => {
         theme === "dark" ? "bg-gray-900" : "bg-gray-100"
       }`}
     >
+      {onBackToCuttingLive && (
+        <div className="mb-4">
+          <button
+            onClick={onBackToCuttingLive}
+            className="flex items-center px-4 py-2 bg-blue-100 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <ArrowLeft size={20} className="mr-2" />
+            Cutting Home
+          </button>
+        </div>
+      )}
       {loading && (
         <div className="absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
           <div className="text-white text-xl animate-pulse">Updating...</div>

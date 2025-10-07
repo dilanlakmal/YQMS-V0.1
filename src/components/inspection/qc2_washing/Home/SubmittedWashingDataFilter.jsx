@@ -398,7 +398,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Before/After Wash
+                Before/After
               </label>
               <div className="relative">
                 <select
