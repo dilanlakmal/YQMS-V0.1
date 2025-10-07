@@ -10,6 +10,7 @@ import CuttingDashboardGarmentTypeChart from "./CuttingDashboardGarmentTypeChart
 import CuttingDashboardMeasurementIssues from "./CuttingDashboardMeasurementIssues";
 import CuttingDashboardSpreadTableOverallIssues from "./CuttingDashboardSpreadTableOverallIssues";
 import CuttingDashboardSpreadTableStyleCard from "./CuttingDashboardSpreadTableStyleCard";
+import CuttingDashboardTrendAnalysis from "./CuttingDashboardTrendAnalysis";
 import CuttingDashboardFabricIssues from "./CutttingDashboardFabricIssues";
 import HorizontalBarChart from "./HorizontalBarChart";
 import TrendLineChart from "./TrendLineChart";
@@ -31,6 +32,7 @@ import {
   Scissors,
   ScissorsIcon, // Icon for Overview
   Table,
+  TrendingUp,
   View,
   XCircle,
   ArrowLeft
@@ -345,6 +347,13 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
           onClick={() => setActiveView("cutting_defects")}
           theme={theme}
         />
+        <NavButton
+          icon={<TrendingUp size={32} />}
+          label="Overall Trend Analysis"
+          isActive={activeView === "trend_analysis"}
+          onClick={() => setActiveView("trend_analysis")}
+          theme={theme}
+        />
       </div>
 
       {/* --- NEW: Conditional Rendering based on activeView --- */}
@@ -464,6 +473,24 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
           <CuttingDashboardCuttingDefectIssues
             data={charts?.cuttingDefectAnalysis}
             title="Cutting Defect Analysis"
+          />
+        </>
+      )}
+
+      {activeView === "trend_analysis" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
+          />
+          {/* --- MODIFIED: Pass all three data props to the component --- */}
+          <CuttingDashboardTrendAnalysis
+            measurementData={charts?.trendAnalysisData || []}
+            fabricData={charts?.fabricDefectTrendData || []}
+            cuttingData={charts?.cuttingDefectTrendData || []}
+            inspectionQtyByDate={charts?.inspectionQtyByDate || []}
+            title="Overall Trend Analysis"
           />
         </>
       )}

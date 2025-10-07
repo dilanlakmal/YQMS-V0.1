@@ -27178,6 +27178,199 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
               }
             },
             { $sort: { moNo: 1 } }
+          ],
+          // --- NEW FACET: PIPELINE FOR TREND ANALYSIS MATRIX CHART ---
+          trendAnalysisData: [
+            // Stage 1: Unwind all the way down to the individual measurement level
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+
+            // Stage 2: Filter for only measurement failures
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status":
+                  { $ne: "Pass" }
+              }
+            },
+
+            // Stage 3: Group by measurement point and inspection date to get the daily failure count
+            {
+              $group: {
+                _id: {
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName",
+                  inspectionDate: "$inspectionDate"
+                },
+                count: { $sum: 1 }
+              }
+            },
+
+            // Stage 4: Group again by just the measurement point to create a breakdown object by date
+            {
+              $group: {
+                _id: "$_id.measurementPoint",
+                dateBreakdown: {
+                  $push: {
+                    k: "$_id.inspectionDate",
+                    v: "$count"
+                  }
+                }
+              }
+            },
+
+            // Stage 5: Final projection to format the data for the frontend
+            {
+              $project: {
+                _id: 0,
+                measurementPoint: "$_id",
+                dateBreakdown: { $arrayToObject: "$dateBreakdown" }
+              }
+            },
+            { $sort: { measurementPoint: 1 } } // Sort rows alphabetically
+          ],
+          // --- NEW FACET: TO GET TOTAL INSPECTION QTY PER DATE ---
+          inspectionQtyByDate: [
+            {
+              $group: {
+                _id: "$inspectionDate",
+                totalInspectionQty: { $sum: "$totalInspectionQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                inspectionDate: "$_id",
+                totalInspectionQty: 1
+              }
+            }
+          ],
+
+          // --- NEW FACET: PIPELINE FOR FABRIC DEFECT TREND ANALYSIS ---
+          fabricDefectTrendData: [
+            // Stage 1: Unwind all arrays down to the individual defect level
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects"
+            },
+
+            // Stage 2: Filter for valid defects
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName":
+                  { $ne: null, $ne: "" },
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty":
+                  { $gt: 0 }
+              }
+            },
+
+            // Stage 3: Group by defect name and inspection date to get daily defect counts
+            {
+              $group: {
+                _id: {
+                  defectName:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName",
+                  inspectionDate: "$inspectionDate"
+                },
+                qty: {
+                  $sum: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty"
+                }
+              }
+            },
+
+            // Stage 4: Group again by just the defect name to create a breakdown object by date
+            {
+              $group: {
+                _id: "$_id.defectName",
+                dateBreakdown: {
+                  $push: {
+                    k: "$_id.inspectionDate",
+                    v: "$qty"
+                  }
+                }
+              }
+            },
+
+            // Stage 5: Final projection to format the data
+            {
+              $project: {
+                _id: 0,
+                defectName: "$_id",
+                dateBreakdown: { $arrayToObject: "$dateBreakdown" }
+              }
+            },
+            { $sort: { defectName: 1 } }
+          ],
+          // --- NEW FACET: PIPELINE FOR CUTTING DEFECT TREND ANALYSIS ---
+          cuttingDefectTrendData: [
+            { $unwind: "$inspectionData.cuttingDefects.issues" },
+            {
+              $match: {
+                "inspectionData.cuttingDefects.issues.cuttingdefectName": {
+                  $ne: null,
+                  $ne: ""
+                }
+              }
+            },
+            // Group by defect name and date to get the daily count (each issue is 1)
+            {
+              $group: {
+                _id: {
+                  defectName:
+                    "$inspectionData.cuttingDefects.issues.cuttingdefectName",
+                  inspectionDate: "$inspectionDate"
+                },
+                qty: { $sum: 1 }
+              }
+            },
+            // Group again by just the defect name to create the date breakdown
+            {
+              $group: {
+                _id: "$_id.defectName",
+                dateBreakdown: {
+                  $push: {
+                    k: "$_id.inspectionDate",
+                    v: "$qty"
+                  }
+                }
+              }
+            },
+            // Final projection
+            {
+              $project: {
+                _id: 0,
+                cuttingDefectName: "$_id",
+                dateBreakdown: { $arrayToObject: "$dateBreakdown" }
+              }
+            },
+            { $sort: { cuttingDefectName: 1 } }
           ]
         }
       }
@@ -27230,7 +27423,11 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
           unwindResult[0]?.measurementIssuesBySpreadTableOverall || [],
         fabricDefectAnalysis: unwindResult[0]?.fabricDefectAnalysis || [],
         inspectionQtyByMo: unwindResult[0]?.inspectionQtyByMo || [],
-        cuttingDefectAnalysis: cuttingDefectData
+        cuttingDefectAnalysis: cuttingDefectData,
+        trendAnalysisData: unwindResult[0]?.trendAnalysisData || [],
+        fabricDefectTrendData: unwindResult[0]?.fabricDefectTrendData || [],
+        inspectionQtyByDate: unwindResult[0]?.inspectionQtyByDate || [],
+        cuttingDefectTrendData: unwindResult[0]?.cuttingDefectTrendData || []
       }
     };
 
