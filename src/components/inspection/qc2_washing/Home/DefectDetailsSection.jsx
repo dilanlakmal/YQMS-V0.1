@@ -52,14 +52,26 @@ const DefectDetailsSection = ({
     return d.english;
   };
 
+  // Calculate actual defect status when accepted defect is 0
+  let actualDefectStatus = defectStatus;
+  if (aql?.acceptedDefect === 0) {
+    // Calculate total defects from defectsByPc
+    const totalDefects = Object.values(defectsByPc).reduce((total, pcDefects) => {
+      return total + pcDefects.reduce((pcTotal, defect) => pcTotal + (parseInt(defect.defectQty) || 0), 0);
+    }, 0);
+    actualDefectStatus = totalDefects <= aql.acceptedDefect ? 'Pass' : 'Fail';
+  }
+  
+  // Ensure we always have a valid status
+  if (!actualDefectStatus || actualDefectStatus === 'N/A' || actualDefectStatus === '') {
+    actualDefectStatus = defectStatus || 'Pass';
+  }
+
   let statusColorClass = 'bg-gray-100 text-gray-800 dark:bg-gray-600 dark:text-gray-200';
-  // Correctly calculate total defects from the new defectsByPc structure
- if (defectStatus === 'Pass') {
+  if (actualDefectStatus === 'Pass') {
     statusColorClass = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
-  } else if (defectStatus === 'Fail') {
+  } else if (actualDefectStatus === 'Fail') {
     statusColorClass = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-  } else {
-    defectStatus = 'N/A';
   }
 
   const handleAddDefectCard = (pc) => {
@@ -71,7 +83,7 @@ const DefectDetailsSection = ({
           id: (prev[pc]?.length || 0) + 1,
           selectedDefect: '',
           defectName: '',
-          defectQty: 1,
+          defectQty: 0,
           defectImages: [],
           isBodyVisible: true,
         },
@@ -82,7 +94,7 @@ const DefectDetailsSection = ({
   const handleAddPc = () => {
     setDefectsByPc(prev => ({
       ...prev,
-      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '',defectNmae:'', defectQty: 1,  defectImages: [], isBodyVisible: true }],
+      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '',defectNmae:'', defectQty: 0,  defectImages: [], isBodyVisible: true }],
     }));
   };
   
@@ -403,7 +415,7 @@ const DefectDetailsSection = ({
     const defectDetails = {
       checkedQty: formData.checkedQty,
       washQty: formData.washQty,
-      result: defectStatus,
+      result: actualDefectStatus,
       levelUsed: formData.levelUsed,
       defectsByPc: [],
       additionalImages: [],
@@ -432,7 +444,7 @@ const DefectDetailsSection = ({
         pcDefectsArr.push({
           defectId: defect.selectedDefect,
           defectName: defectObj ? defectObj.english : "", // Always save English name
-          defectQty: defect.defectQty,
+          defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0), // Explicitly handle 0 values
           defectImages,
         });
       });
@@ -484,7 +496,7 @@ const DefectDetailsSection = ({
               id: index + 1,
               selectedDefect: defect.defectId || "",
               defectName: defectObj ? getDefectNameForDisplay(defectObj) : defect.defectName, // Display localized name
-              defectQty: defect.defectQty || "",
+              defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0),
               isBodyVisible: true,
               defectImages: (defect.defectImages || []).map(imgStr => ({
                 file: null,
@@ -577,7 +589,7 @@ const DefectDetailsSection = ({
     const defectDetails = {
       checkedQty: formData.checkedQty,
       washQty: formData.washQty,
-      result: defectStatus,
+      result: actualDefectStatus,
       levelUsed: formData.levelUsed,
       defectsByPc: [],
       additionalImages: [],
@@ -604,7 +616,7 @@ const DefectDetailsSection = ({
         pcDefectsArr.push({
           defectId: defect.selectedDefect,
           defectName: defectObj ? defectObj.english : "", // Always save English name
-          defectQty: defect.defectQty,
+          defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0), // Explicitly handle 0 values
           defectImages,
         });
       });
@@ -655,7 +667,7 @@ const DefectDetailsSection = ({
                   id: index + 1,
                   selectedDefect: defect.defectId || "",
                   defectName: defectObj ? getDefectNameForDisplay(defectObj) : defect.defectName,
-                  defectQty: defect.defectQty || "",
+                  defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0),
                   isBodyVisible: true,
                   defectImages: (defect.defectImages || []).map(imgStr => ({
                     file: null,
@@ -760,7 +772,7 @@ const DefectDetailsSection = ({
            
             {/* AQL Information Display */}
              {(['SOP', 'Inline', 'First Output'].includes(formData.reportType)) && 
-                (aql?.sampleSize || aql?.acceptedDefect || aql?.rejectedDefect) && (
+                (aql?.sampleSize || aql?.acceptedDefect === 0 || aql?.acceptedDefect || aql?.rejectedDefect) && (
                 <div className="md:col-span-2 bg-blue-50 dark:bg-slate-800 border border-blue-200 dark:border-slate-600 rounded-lg p-4">
                   <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">
                     AQL Information (Level II, AQL {aql?.levelUsed || 'N/A'})
@@ -772,7 +784,7 @@ const DefectDetailsSection = ({
                     </div>
                     <div>
                       <span className="font-medium text-blue-700 dark:text-blue-300">Accepted Defect:</span>
-                      <span className="ml-2 text-blue-900 dark:text-blue-200">{aql?.acceptedDefect || 'N/A'}</span>
+                      <span className="ml-2 text-blue-900 dark:text-blue-200">{aql?.acceptedDefect === 0 ? 0 : (aql?.acceptedDefect || 'N/A')}</span>
                     </div>
                     <div>
                       <span className="font-medium text-blue-700 dark:text-blue-300">Rejected Defect:</span>
@@ -781,7 +793,7 @@ const DefectDetailsSection = ({
                     <div>
                       <span className="font-medium text-blue-700 dark:text-blue-300">Status:</span>
                       <span className={`ml-2 px-2 py-1 rounded-full text-xs font-bold ${statusColorClass}`}>
-                        {defectStatus || 'N/A'}
+                        {actualDefectStatus || 'N/A'}
                       </span>
                     </div>
                   </div>
@@ -854,17 +866,17 @@ const DefectDetailsSection = ({
                       <div className="w-full md:w-40">
                         <label className="text-xs font-medium dark:text-gray-300">Quantity</label>
                       <div className="flex items-center space-x-2">
-                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(1, (parseInt(defect.defectQty, 10) || 1) - 1))} 
+                          <button onClick={() => handleDefectChange(pc, defect.id, 'defectQty', Math.max(0, (parseInt(defect.defectQty, 10) || 0) - 1))} 
                           disabled={!isEditing}
                           className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white disabled:bg-gray-200 disabled:dark:bg-gray-500">
                             
                            <Minus size={16} />
                          </button>
                           <input
-                          min="1"
+                          min="0"
                           value={defect.defectQty}
                           onChange={(e) => {
-                            const newValue = Math.max(1, parseInt(e.target.value, 10) || 1);
+                            const newValue = Math.max(0, parseInt(e.target.value, 10) || 0);
                             handleDefectChange(pc, defect.id, 'defectQty', newValue);
                           }}
                           className="w-full  border rounded-md dark:bg-gray-700 dark:text-white dark:border-gray-600 text-center disabled:bg-gray-200 disabled:dark:bg-gray-500"

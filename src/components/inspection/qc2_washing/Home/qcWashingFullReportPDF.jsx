@@ -165,6 +165,31 @@ const safeString = (value) => {
   return stringValue === '' ? "N/A" : stringValue;
 };
 
+// Memory management utilities
+const clearImageCache = () => {
+  imageCache.clear();
+  loadingPromises.clear();
+  activeLoads.clear();
+  console.log('🧹 Image cache cleared');
+};
+
+const getMemoryUsage = () => {
+  const cacheSize = imageCache.size;
+  const loadingSize = loadingPromises.size;
+  const activeSize = activeLoads.size;
+  return { cacheSize, loadingSize, activeSize };
+};
+
+// Performance monitoring
+const performanceTimer = {
+  start: (label) => {
+    console.time(label);
+  },
+  end: (label) => {
+    console.timeEnd(label);
+  }
+};
+
 // Safe Text Component to prevent empty string errors
 const SafeText = ({ children, style, ...props }) => {
   // Handle all falsy values and empty strings
@@ -186,183 +211,115 @@ const SafeText = ({ children, style, ...props }) => {
   return <Text style={style} {...props}>{content}</Text>;
 };
 
-// --- FIXED IMAGE LOADING UTILITY ---
+// --- OPTIMIZED IMAGE LOADING UTILITY ---
+const imageCache = new Map();
+const loadingPromises = new Map();
+const MAX_CONCURRENT_LOADS = 3; // Limit concurrent image loads
+const activeLoads = new Set();
+
 const loadImageAsBase64 = async (src, API_BASE_URL) => {
-  let imageUrl = src;
-  
-  // Handle different image data formats
-  if (typeof src === 'object' && src !== null) {
-    if (src.originalUrl) {
-      imageUrl = src.originalUrl;
-    } else {
-      imageUrl = src.url || src.src || src.path || JSON.stringify(src);
-    }
-  }
-  
-  if (typeof src === 'string' && src.startsWith('{')) {
-    try {
-      const parsed = JSON.parse(src);
-      if (parsed.originalUrl) {
-        imageUrl = parsed.originalUrl;
-      } else {
-        imageUrl = parsed.url || parsed.src || parsed.path || src;
-      }
-    } catch (e) {
-      imageUrl = src;
-    }
+  const imageUrl = normalizeImageUrl(src);
+  if (!imageUrl) return null;
+
+  // Check cache first
+  if (imageCache.has(imageUrl)) {
+    return imageCache.get(imageUrl);
   }
 
-  if (!imageUrl || typeof imageUrl !== 'string') {
-    console.warn('Invalid image URL:', src);
-    return null;
+  // Check if already loading
+  if (loadingPromises.has(imageUrl)) {
+    return loadingPromises.get(imageUrl);
   }
 
-  // If already base64, validate and return
-  if (imageUrl.startsWith('data:')) {
-    try {
-      const base64Parts = imageUrl.split(',');
-      if (base64Parts.length === 2 && base64Parts[1].length > 100) {
-        // Test decode to ensure validity
-        atob(base64Parts[1].substring(0, 100));
-        return imageUrl;
-      }
-    } catch (e) {
-      console.warn('Invalid base64 data:', e.message);
-      return null;
-    }
+  // Wait if too many concurrent loads
+  while (activeLoads.size >= MAX_CONCURRENT_LOADS) {
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
+
+  // Create loading promise
+  const loadPromise = loadImageOptimized(imageUrl, API_BASE_URL);
+  loadingPromises.set(imageUrl, loadPromise);
+  activeLoads.add(imageUrl);
 
   try {
-    // Clean and normalize the URL
-    let cleanUrl = imageUrl.trim();
-    
-    // Handle relative URLs
-    if (cleanUrl.startsWith('/storage/') || cleanUrl.startsWith('/public/')) {
+    const result = await loadPromise;
+    imageCache.set(imageUrl, result);
+    return result;
+  } finally {
+    loadingPromises.delete(imageUrl);
+    activeLoads.delete(imageUrl);
+  }
+};
+
+const normalizeImageUrl = (src) => {
+  if (!src) return null;
+  
+  if (typeof src === 'string') {
+    if (src.startsWith('data:')) return src;
+    if (src.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(src);
+        return parsed.originalUrl || parsed.url || parsed.src || parsed.path;
+      } catch (e) {
+        return src;
+      }
+    }
+    return src.trim();
+  }
+  
+  if (typeof src === 'object' && src !== null) {
+    return src.originalUrl || src.url || src.src || src.path;
+  }
+  
+  return null;
+};
+
+const loadImageOptimized = async (imageUrl, API_BASE_URL) => {
+  try {
+    // Return cached base64 immediately
+    if (imageUrl.startsWith('data:')) {
+      return imageUrl;
+    }
+
+    // Build proxy URL
+    let cleanUrl = imageUrl;
+    if (cleanUrl.startsWith('/')) {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
-    
-    // ENHANCED: Better handling for different image sources
-    // Try direct fetch first for external URLs if they look like valid image URLs
-    if (cleanUrl.startsWith('http')) {
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
 
-            const directResponse = await fetch(cleanUrl, {
-                method: 'GET',
-                headers: { 'Accept': 'image/*,*/*;q=0.8' },
-                mode: 'cors',
-                signal: controller.signal
-            });
-
-            clearTimeout(timeoutId);
-
-            if (directResponse.ok) {
-                const contentType = directResponse.headers.get('content-type');
-                if (!contentType || !contentType.startsWith('image/')) {
-                    console.warn(`⚠️ Invalid content type for direct fetch: ${contentType}`);
-                    throw new Error('Invalid content type');
-                }
-
-                const arrayBuffer = await directResponse.arrayBuffer();
-                const uint8Array = new Uint8Array(arrayBuffer);
-
-                // CRITICAL FIX: Validate image headers to prevent "SOI not found"
-                const isValidJPEG = uint8Array.length >= 2 && uint8Array[0] === 0xFF && uint8Array[1] === 0xD8;
-                const isValidPNG = uint8Array.length >= 4 && uint8Array[0] === 0x89 && uint8Array[1] === 0x50 && uint8Array[2] === 0x4E && uint8Array[3] === 0x47;
-                const isValidWebP = uint8Array.length >= 12 && uint8Array[8] === 0x57 && uint8Array[9] === 0x45 && uint8Array[10] === 0x42 && uint8Array[11] === 0x50;
-
-                if (!isValidJPEG && !isValidPNG && !isValidWebP) {
-                  console.warn('⚠️ Invalid image format - no valid header found');
-                  return null; // Return null instead of throwing error
-                }
-
-                // Convert to base64 using chunks to avoid call stack issues with large images
-                let binary = '';
-                const chunkSize = 8192;
-                for (let i = 0; i < uint8Array.length; i += chunkSize) {
-                    binary += String.fromCharCode.apply(null, uint8Array.subarray(i, i + chunkSize));
-                }
-                const base64 = btoa(binary);
-                const dataUrl = `data:${contentType};base64,${base64}`;
-
-                // Final validation
-                if (dataUrl.length > 1000) {
-                    return dataUrl;
-                } else {
-                    console.warn('⚠️ Generated base64 data is too short.');
-                    throw new Error('Generated base64 data too short');
-                }
-            } else {
-                throw new Error(`HTTP ${directResponse.status}`);
-            }
-        } catch (directError) {
-            console.log('⚠️ Direct load failed, falling back to proxy:', directError.message);
-            // Fallback to proxy will happen below
-        }
-    }
-
-    
-    // Fallback to proxy for all URLs
     const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8-second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
     
     const response = await fetch(proxyUrl, {
       method: 'GET',
-      headers: {
-        'Accept': 'application/json'
-      },
+      headers: { 'Accept': 'application/json' },
       signal: controller.signal
     });
-    
+
     clearTimeout(timeoutId);
 
-    if (response.ok) {
-      const data = await response.json();
-      
-      if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-        // Validate proxy base64 data
-        try {
-          const base64Part = data.dataUrl.split(',')[1];
-          if (base64Part && base64Part.length > 100) {
-            atob(base64Part.substring(0, 100)); 
-            return data.dataUrl;
-          } else {
-            console.warn('⚠️ Proxy base64 data too short');
-            return null;
-          }
-        } catch (decodeError) {
-          console.warn('⚠️ Proxy base64 decode failed:', decodeError.message);
-          return null;
-        }
-      } else if (data.base64 && data.contentType) {
-        // Handle alternative response format
-        try {
-          if (data.base64.length > 100) {
-            atob(data.base64.substring(0, 100)); // Test decode
-            const dataUrl = `data:${data.contentType};base64,${data.base64}`;
-            return dataUrl;
-          } else {
-            console.warn('⚠️ Alt format base64 data too short');
-            return null;
-          }
-        } catch (decodeError) {
-          console.warn('⚠️ Alt format base64 decode failed:', decodeError.message);
-          return null;
-        }
-      } else {
-        console.warn('❌ Invalid proxy response format:', data);
-      }
-    } else {
-      console.warn('❌ Proxy load failed:', response.status, response.statusText);
+    if (!response.ok) {
+      console.warn(`Failed to load image: ${response.status} ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    
+    // Validate response
+    if (!data.dataUrl || !data.dataUrl.startsWith('data:')) {
+      console.warn('Invalid image data received');
+      return null;
     }
     
-    return null;
-    
+    return data.dataUrl;
   } catch (error) {
-    console.warn('❌ Error loading image:', imageUrl, error.message);
+    if (error.name === 'AbortError') {
+      console.warn('Image load timeout:', imageUrl);
+    } else {
+      console.warn('Image load error:', error.message);
+    }
     return null;
   }
 };
@@ -1244,7 +1201,7 @@ const NewInspectionDetailsSection = ({ inspectionDetails, checkpointDefinitions 
                           {(subPoint.remark || (subPoint.comparisonImages && subPoint.comparisonImages.length > 0)) && (
                             <View style={{ marginTop: 4 }}>
                               {subPoint.remark && subPoint.remark.toString().trim() && (
-                                <Text style={{ fontSize: 7, color: "#6b7280", fontStyle: "italic", marginBottom: subPoint.comparisonImages && subPoint.comparisonImages.length > 0 ? 2 : 0 }}>
+                                <Text style={{ fontSize: 7, color: "#6b7280", marginBottom: subPoint.comparisonImages && subPoint.comparisonImages.length > 0 ? 2 : 0 }}>
                                   Remark: {safeString(subPoint.remark)}
                                 </Text>
                               )}
@@ -2151,112 +2108,84 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
         console.log('⏳ Waiting for inspector details...');
         return;
       }
+      
+      // Clear any existing cache to prevent memory buildup
+      clearImageCache();
+      
+      // Start performance monitoring
+      performanceTimer.start('PDF-ImageLoading');
+      
       try {
         const imageCollection = new Map();
+        const processedUrls = new Set(); // Prevent duplicate processing
         
-        // FIXED: Consistent helper function to add images using the same key logic
+        // OPTIMIZED: Streamlined helper function to add images
         const addImageToCollection = (img, context = '') => {
-  if (!img) return;
-  
-  
-  // Generate all possible keys for this image
-  const generateStorageKeys = (img) => {
-    const keys = new Set();
-    
-    if (typeof img === 'string') {
-      const cleanImg = img.trim();
-      keys.add(cleanImg);
-      keys.add(img); // untrimmed
-      
-      // Handle different URL formats
-      if (cleanImg.startsWith('/')) {
-        keys.add(cleanImg.substring(1));
-      } else {
-        keys.add('/' + cleanImg);
-      }
-      
-      // Handle full URLs - extract path for 192.167.12.85:5000
-      if (cleanImg.includes('192.167.12.85:5000')) {
-        const urlParts = cleanImg.split('192.167.12.85:5000');
-        if (urlParts.length > 1) {
-          const path = urlParts[1];
-          keys.add(path);
-          keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
-        }
-      }
-      
-      // FIXED: Handle yqms.yaikh.com URLs - extract path
-      if (cleanImg.includes('yqms.yaikh.com')) {
-        const urlParts = cleanImg.split('yqms.yaikh.com');
-        if (urlParts.length > 1) {
-          const path = urlParts[1];
-          keys.add(path);
-          keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
-        }
-      }
-      
-      // Handle storage/public paths
-      if (cleanImg.includes('/storage/') || cleanImg.includes('/public/')) {
-        const pathMatch = cleanImg.match(/(\/(?:storage|public)\/.+)/);
-        if (pathMatch) {
-          keys.add(pathMatch[1]);
-          keys.add(pathMatch[1].substring(1));
-        }
-      }
-      
-      // CRITICAL FIX: Handle JSON string format that might contain image URLs
-      if (cleanImg.startsWith('{') && cleanImg.endsWith('}')) {
-        try {
-          const parsed = JSON.parse(cleanImg);
-          if (parsed && typeof parsed === 'object') {
-            const possibleUrls = [
-              parsed.originalUrl,
-              parsed.url,
-              parsed.src,
-              parsed.path
-            ].filter(url => url && typeof url === 'string' && url.trim());
+          if (!img) return;
+          
+          // Quick duplicate check
+          const imgStr = typeof img === 'string' ? img : JSON.stringify(img);
+          if (processedUrls.has(imgStr)) return;
+          processedUrls.add(imgStr);
+          
+          // Generate essential keys only (reduced from previous version)
+          const generateEssentialKeys = (img) => {
+            const keys = new Set();
             
-            possibleUrls.forEach(url => {
-              const subKeys = generateStorageKeys(url);
-              subKeys.forEach(key => keys.add(key));
-            });
-          }
-        } catch (e) {
-          // If JSON parsing fails, treat as regular string
-          console.log(`⚠️ Failed to parse JSON string: ${cleanImg}`);
-        }
-      }
-      
-    } else if (typeof img === 'object' && img !== null) {
-      const possibleUrls = [
-        img.originalUrl,
-        img.url,
-        img.src,
-        img.path
-      ].filter(Boolean);
-      
-      possibleUrls.forEach(url => {
-        if (typeof url === 'string') {
-          const subKeys = generateStorageKeys(url);
-          subKeys.forEach(key => keys.add(key));
-        }
-      });
-      
-      keys.add(JSON.stringify(img));
-    }
-    
-    return Array.from(keys);
-  };
+            if (typeof img === 'string') {
+              const cleanImg = img.trim();
+              if (!cleanImg) return [];
+              
+              keys.add(cleanImg);
+              
+              // Handle path variations
+              if (cleanImg.startsWith('/')) {
+                keys.add(cleanImg.substring(1));
+              } else if (!cleanImg.startsWith('http') && !cleanImg.startsWith('data:')) {
+                keys.add('/' + cleanImg);
+              }
+              
+              // Extract path from full URLs
+              const urlMatch = cleanImg.match(/(?:192\.167\.12\.85:5000|yqms\.yaikh\.com)(\/.*)/); 
+              if (urlMatch && urlMatch[1]) {
+                keys.add(urlMatch[1]);
+                keys.add(urlMatch[1].substring(1));
+              }
+              
+              // Handle JSON strings efficiently
+              if (cleanImg.startsWith('{')) {
+                try {
+                  const parsed = JSON.parse(cleanImg);
+                  const url = parsed?.originalUrl || parsed?.url || parsed?.src || parsed?.path;
+                  if (url && typeof url === 'string') {
+                    const subKeys = generateEssentialKeys(url);
+                    subKeys.forEach(key => keys.add(key));
+                  }
+                } catch (e) {
+                  // Ignore parsing errors
+                }
+              }
+              
+            } else if (typeof img === 'object' && img !== null) {
+              const url = img.originalUrl || img.url || img.src || img.path;
+              if (url && typeof url === 'string') {
+                const subKeys = generateEssentialKeys(url);
+                subKeys.forEach(key => keys.add(key));
+              }
+            }
+            
+            return Array.from(keys).filter(key => key && key.trim());
+          };
 
-  const possibleKeys = generateStorageKeys(img);
-  
-  // Store all possible keys pointing to the same image source
-  possibleKeys.forEach(key => {
-    if (key && key.trim()) {
-      imageCollection.set(key.trim(), img);
-    }
-  });
-};
+          const essentialKeys = generateEssentialKeys(img);
+          
+          // Store only essential keys to reduce memory usage
+          essentialKeys.slice(0, 3).forEach(key => { // Limit to 3 keys per image
+            if (key && key.trim() && !imageCollection.has(key.trim())) {
+              imageCollection.set(key.trim(), img);
+            }
+          });
+        };
 
 
         // Collect defect images (both captured and uploaded)
@@ -2358,6 +2287,7 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           addImageToCollection(finalInspectorDetails.face_photo, 'inspector-photo');
         }
 
+        console.log(`📊 Found ${imageCollection.size} unique images to load`);
         
         if (imageCollection.size === 0) {
           if (isMounted) {
@@ -2366,47 +2296,78 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
           }
           return;
         }
+        
+        // Limit total images to prevent memory issues
+        const MAX_IMAGES = 50;
+        if (imageCollection.size > MAX_IMAGES) {
+          console.warn(`⚠️ Too many images (${imageCollection.size}), limiting to ${MAX_IMAGES}`);
+          const limitedEntries = Array.from(imageCollection.entries()).slice(0, MAX_IMAGES);
+          imageCollection.clear();
+          limitedEntries.forEach(([key, value]) => imageCollection.set(key, value));
+        }
 
-        // FIXED: Load images with better error handling and validation
+        // FIXED: Load images with batching and better error handling
         const imageMap = {};
-        const loadPromises = Array.from(imageCollection.entries()).map(async ([key, url], index) => {
-          try {
-            // Add progressive delay to avoid overwhelming server
-            await new Promise(resolve => setTimeout(resolve, index * 100));
-            
-            
-            const base64 = await loadImageAsBase64(url, API_BASE_URL);
-            
-            if (base64 && base64.startsWith('data:')) {
-              imageMap[key] = base64;
-              return { success: true, key };
-            } else {
-              console.warn(`❌ Invalid base64 data for: ${key}`);
-              return { success: false, key, error: 'Invalid base64 data' };
+        const imageEntries = Array.from(imageCollection.entries());
+        const BATCH_SIZE = 5; // Process images in batches
+        
+        // Process images in batches to avoid overwhelming the system
+        for (let i = 0; i < imageEntries.length; i += BATCH_SIZE) {
+          const batch = imageEntries.slice(i, i + BATCH_SIZE);
+          
+          const batchPromises = batch.map(async ([key, url], batchIndex) => {
+            try {
+              // Add small delay between requests in batch
+              await new Promise(resolve => setTimeout(resolve, batchIndex * 200));
+              
+              const base64 = await loadImageAsBase64(url, API_BASE_URL);
+              
+              if (base64 && base64.startsWith('data:')) {
+                imageMap[key] = base64;
+                return { success: true, key };
+              } else {
+                console.warn(`❌ Invalid base64 data for: ${key}`);
+                return { success: false, key, error: 'Invalid base64 data' };
+              }
+            } catch (error) {
+              console.error(`❌ Failed to load ${key}:`, error.message);
+              return { success: false, key, error: error.message };
             }
-          } catch (error) {
-            console.error(`❌ Failed to load ${key}:`, error.message);
-            return { success: false, key, error: error.message };
-          }
-        });
+          });
 
-        const results = await Promise.allSettled(loadPromises);
-        
-        let successCount = 0;
-        let failCount = 0;
-        
-        results.forEach((result) => {
-          if (result.status === 'fulfilled' && result.value.success) {
-            successCount++;
-          } else {
-            failCount++;
+          // Wait for current batch to complete before starting next batch
+          const batchResults = await Promise.allSettled(batchPromises);
+          
+          // Small delay between batches
+          if (i + BATCH_SIZE < imageEntries.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
           }
-        });
+        }
+
+        const results = []; // Placeholder for compatibility
+        
+        const successCount = Object.keys(imageMap).length;
+        const failCount = imageEntries.length - successCount;
+        
+        console.log(`📊 Image loading complete: ${successCount} success, ${failCount} failed`);
+  
+  // Log memory usage after loading
+  const finalMemory = getMemoryUsage();
+  console.log(`📊 Memory usage - Cache: ${finalMemory.cacheSize}, Loading: ${finalMemory.loadingSize}, Active: ${finalMemory.activeSize}`);
 
 
         if (isMounted) {
+          performanceTimer.end('PDF-ImageLoading');
           setPreloadedImages(imageMap);
           setLoading(false);
+          
+          // Schedule cache cleanup after a delay to free memory
+          setTimeout(() => {
+            if (imageCache.size > 100) {
+              console.log('🧹 Scheduled cache cleanup due to large size');
+              clearImageCache();
+            }
+          }, 60000); // Clean up after 1 minute
         }
 
       } catch (error) {
@@ -2419,27 +2380,34 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
       }
     };
 
-    // Set up timeout with cleanup
+    // Set up timeout with cleanup - increased timeout for batch loading
     const timeoutId = setTimeout(() => {
       if (isMounted) {
+        console.warn('⏰ Image loading timeout reached, proceeding with loaded images');
         setLoading(false);
       }
-    }, 15000);
+    }, 30000); // Increased to 30 seconds for batch processing
 
     // Only start loading images after inspector details are available
     if (finalInspectorDetails || !recordData?.userId) {
       preloadAllImages();
     }
 
-    // Cleanup function
+    // Cleanup function with memory management
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
+      // Clear cache when component unmounts to free memory
+      if (imageCache.size > 50) { // Only clear if cache is large
+        clearImageCache();
+      }
     };
   }, [recordData, API_BASE_URL, finalInspectorDetails]);
 
-  // FIXED LOADING SCREEN - Ensure no empty strings
+  // FIXED LOADING SCREEN with progress indication
   if (loading || (recordData?.userId && !fetchedInspectorDetails)) {
+    const memoryInfo = getMemoryUsage();
+    
     return (
       <Document>
         <Page style={styles.page}>
@@ -2460,19 +2428,41 @@ const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_
             <Text style={{ 
               fontSize: 12, 
               textAlign: 'center',
-              color: '#6b7280'
+              color: '#6b7280',
+              marginBottom: 8
             }}>
-              Loading inspector details and images. This will take a few seconds.
+              Loading inspector details and optimizing images.
             </Text>
+            <Text style={{ 
+              fontSize: 10, 
+              textAlign: 'center',
+              color: '#9ca3af'
+            }}>
+              Processing in batches to ensure optimal performance.
+            </Text>
+            {memoryInfo.cacheSize > 0 && (
+              <Text style={{ 
+                fontSize: 8, 
+                textAlign: 'center',
+                color: '#6b7280',
+                marginTop: 8
+              }}>
+                Loaded: {memoryInfo.cacheSize} images
+              </Text>
+            )}
           </View>
         </Page>
       </Document>
     );
   }
 
-  // Show error state if there was an error
+  // Show error state with fallback
   if (error) {
     console.log('🔄 Error occurred, falling back to PDF without images');
+    
+    // Clear cache on error to free memory
+    clearImageCache();
+    
     return (
       <QcWashingFullReportPDF 
         recordData={recordData}
