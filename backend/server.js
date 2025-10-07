@@ -122,7 +122,7 @@ import {
 
 /* ------------------------------
    SQL Query Import
-// ------------------------------ */
+------------------------------ */
 import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
 import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
@@ -12515,7 +12515,6 @@ app.delete("/api/accessory-issues/:id", async (req, res) => {
    QC Roving Pairing Endpoint
 ------------------------------ */
 
-
 /* ------------------------------
    QC Roving Pairing Image Upload Endpoints
 ------------------------------ */
@@ -12526,163 +12525,204 @@ const uploadRovingImage = multer({
   storage: rovingImageStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
     }
   }
 });
 
 // Upload images for defects
-app.post('/api/roving-pairing/upload-defect-images', uploadRovingImage.array('images', 5), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images provided' });
-    }
+app.post(
+  "/api/roving-pairing/upload-defect-images",
+  uploadRovingImage.array("images", 5),
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No images provided" });
+      }
 
-    const uploadedImages = [];
-    
-    for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'defect');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'defect');
-      uploadedImages.push(imagePath);
-    }
+      const uploadedImages = [];
 
-    res.json({ success: true, images: uploadedImages });
-  } catch (error) {
-    console.error('Error uploading defect images:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload images' });
+      for (const file of req.files) {
+        const filename = generateUniqueFilename(file.originalname, "defect");
+        const imagePath = await saveCompressedImage(
+          file.buffer,
+          filename,
+          "defect"
+        );
+        uploadedImages.push(imagePath);
+      }
+
+      res.json({ success: true, images: uploadedImages });
+    } catch (error) {
+      console.error("Error uploading defect images:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to upload images" });
+    }
   }
-});
+);
 
 // Upload images for measurements
-app.post('/api/roving-pairing/upload-measurement-images', uploadRovingImage.array('images', 5), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images provided' });
-    }
+app.post(
+  "/api/roving-pairing/upload-measurement-images",
+  uploadRovingImage.array("images", 5),
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No images provided" });
+      }
 
-    const uploadedImages = [];
-    
-    for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'measurement');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'measurement');
-      uploadedImages.push(imagePath);
-    }
+      const uploadedImages = [];
 
-    res.json({ success: true, images: uploadedImages });
-  } catch (error) {
-    console.error('Error uploading measurement images:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload images' });
+      for (const file of req.files) {
+        const filename = generateUniqueFilename(
+          file.originalname,
+          "measurement"
+        );
+        const imagePath = await saveCompressedImage(
+          file.buffer,
+          filename,
+          "measurement"
+        );
+        uploadedImages.push(imagePath);
+      }
+
+      res.json({ success: true, images: uploadedImages });
+    } catch (error) {
+      console.error("Error uploading measurement images:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to upload images" });
+    }
   }
-});
+);
 
 // Upload images for accessories
-app.post('/api/roving-pairing/upload-accessory-images', uploadRovingImage.array('images', 5), async (req, res) => {
-  try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ success: false, message: 'No images provided' });
-    }
+app.post(
+  "/api/roving-pairing/upload-accessory-images",
+  uploadRovingImage.array("images", 5),
+  async (req, res) => {
+    try {
+      if (!req.files || req.files.length === 0) {
+        return res
+          .status(400)
+          .json({ success: false, message: "No images provided" });
+      }
 
-    const uploadedImages = [];
-    
-    for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'accessory');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'accessory');
-      uploadedImages.push(imagePath);
-    }
+      const uploadedImages = [];
 
-    res.json({ success: true, images: uploadedImages });
-  } catch (error) {
-    console.error('Error uploading accessory images:', error);
-    res.status(500).json({ success: false, message: 'Failed to upload images' });
+      for (const file of req.files) {
+        const filename = generateUniqueFilename(file.originalname, "accessory");
+        const imagePath = await saveCompressedImage(
+          file.buffer,
+          filename,
+          "accessory"
+        );
+        uploadedImages.push(imagePath);
+      }
+
+      res.json({ success: true, images: uploadedImages });
+    } catch (error) {
+      console.error("Error uploading accessory images:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to upload images" });
+    }
   }
-});
+);
 
 // Delete image endpoint
-app.delete('/api/roving-pairing/delete-image', async (req, res) => {
+app.delete("/api/roving-pairing/delete-image", async (req, res) => {
   try {
     const { imagePath } = req.body;
-    
+
     if (!imagePath) {
-      return res.status(400).json({ success: false, message: 'Image path is required' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Image path is required" });
     }
 
     deleteImage(imagePath);
-    res.json({ success: true, message: 'Image deleted successfully' });
+    res.json({ success: true, message: "Image deleted successfully" });
   } catch (error) {
-    console.error('Error deleting image:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete image' });
+    console.error("Error deleting image:", error);
+    res.status(500).json({ success: false, message: "Failed to delete image" });
   }
 });
 
 // Get roving pairing data with images
-app.get('/api/roving-pairing/:id', async (req, res) => {
+app.get("/api/roving-pairing/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const record = await QCRovingPairing.findById(id);
-    
+
     if (!record) {
-      return res.status(404).json({ message: 'Record not found' });
+      return res.status(404).json({ message: "Record not found" });
     }
 
     res.json(record);
   } catch (error) {
-    console.error('Error fetching roving pairing data:', error);
-    res.status(500).json({ message: 'Failed to fetch data' });
+    console.error("Error fetching roving pairing data:", error);
+    res.status(500).json({ message: "Failed to fetch data" });
   }
 });
 
 // Save roving pairing data with images
-app.post('/api/roving-pairing/save', async (req, res) => {
+app.post("/api/roving-pairing/save", async (req, res) => {
   try {
     const pairingData = new QCRovingPairing(req.body);
     const savedData = await pairingData.save();
-    
-    res.status(201).json({ 
-      success: true, 
-      message: 'Roving pairing data saved successfully',
-      data: savedData 
+
+    res.status(201).json({
+      success: true,
+      message: "Roving pairing data saved successfully",
+      data: savedData
     });
   } catch (error) {
-    console.error('Error saving roving pairing data:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to save data',
-      error: error.message 
+    console.error("Error saving roving pairing data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save data",
+      error: error.message
     });
   }
 });
 
 // Save QC Roving Pairing data (existing endpoint)
-app.post('/api/save-qc-roving-pairing', async (req, res) => {
+app.post("/api/save-qc-roving-pairing", async (req, res) => {
   try {
     // Generate unique pairing_id
     const lastRecord = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
     const newPairingId = lastRecord ? lastRecord.pairing_id + 1 : 1;
-    
+
     const pairingData = {
       ...req.body,
       pairing_id: newPairingId,
       pairingData: [req.body.pairingDataItem] // Wrap single item in array
     };
-    
+
     const newRecord = new QCRovingPairing(pairingData);
     const savedData = await newRecord.save();
-    
-    res.status(201).json({ 
-      success: true, 
-      message: 'QC Roving Pairing data saved successfully',
-      data: savedData 
+
+    res.status(201).json({
+      success: true,
+      message: "QC Roving Pairing data saved successfully",
+      data: savedData
     });
   } catch (error) {
-    console.error('Error saving QC Roving Pairing data:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to save QC Roving Pairing data',
-      error: error.message 
+    console.error("Error saving QC Roving Pairing data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save QC Roving Pairing data",
+      error: error.message
     });
   }
 });
@@ -12690,26 +12730,26 @@ app.post('/api/save-qc-roving-pairing', async (req, res) => {
 /* ------------------------------
    End Points - Pairing Defects
 ------------------------------ */
-app.get('/api/pairing-defects', async (req, res) => {
+app.get("/api/pairing-defects", async (req, res) => {
   try {
     const defects = await PairingDefect.find({}).sort({ no: 1 }).lean();
     res.json(defects);
   } catch (error) {
-    console.error('Error fetching pairing defects:', error);
-    res.status(500).json({ message: 'Server error fetching pairing defects' });
+    console.error("Error fetching pairing defects:", error);
+    res.status(500).json({ message: "Server error fetching pairing defects" });
   }
 });
 
 /* ------------------------------
    End Points - Accessory Issues
 ------------------------------ */
-app.get('/api/accessory-issues', async (req, res) => {
+app.get("/api/accessory-issues", async (req, res) => {
   try {
     const issues = await AccessoryIssue.find({}).sort({ no: 1 }).lean();
     res.json(issues);
   } catch (error) {
-    console.error('Error fetching accessory issues:', error);
-    res.status(500).json({ message: 'Server error fetching accessory issues' });
+    console.error("Error fetching accessory issues:", error);
+    res.status(500).json({ message: "Server error fetching accessory issues" });
   }
 });
 
@@ -26110,6 +26150,68 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
             },
             { $limit: 30 }
           ],
+          measurementIssues: [
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status":
+                  {
+                    $ne: "Pass"
+                  }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                count: { $sum: 1 }
+              }
+            },
+            {
+              // --- NEW: Sort by count BEFORE grouping into the array ---
+              $sort: {
+                count: -1
+              }
+            },
+            {
+              $group: {
+                _id: "$_id.garmentType",
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    count: "$count"
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                garmentType: "$_id",
+                issues: 1
+              }
+            },
+            { $sort: { garmentType: 1 } }
+          ],
           passRateByGarmentType: [
             {
               $group: {
@@ -26134,6 +26236,948 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
               }
             },
             { $sort: { passRate: -1 } }
+          ],
+          measurementIssuesByMo: [
+            // Stage 1: Unwind all the way to the individual measurement document
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            // Stage 2: Group by the most granular level (including measurement point) to calculate all stats at once
+            {
+              $group: {
+                _id: {
+                  moNo: "$moNo",
+                  tableNo: "$tableNo",
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                // Pass Count for the entire document set
+                passCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $eq: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // Total Rejects for this specific measurement point
+                total: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $ne: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // TOL+ Rejects
+                tol_plus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $gt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // TOL- Rejects
+                tol_minus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $lt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // Collect all non-"0" fractions from rejected items into an array
+                fractions: {
+                  $push: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                              "0"
+                            ]
+                          }
+                        ]
+                      },
+                      "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                      "$$REMOVE"
+                    ]
+                  }
+                }
+              }
+            },
+            // Stage 3: Create the fractionCounts object and finalize the issue structure
+            {
+              $addFields: {
+                // This powerful stage converts the array of fractions (e.g., ["-1/4", "-1/8", "-1/4"])
+                // into a key-value object (e.g., { "-1/4": 2, "-1/8": 1 })
+                fractionCounts: {
+                  $arrayToObject: {
+                    $map: {
+                      input: { $setUnion: ["$fractions"] }, // Get unique fractions
+                      as: "fr",
+                      in: {
+                        k: "$$fr",
+                        v: {
+                          $size: {
+                            $filter: {
+                              input: "$fractions",
+                              cond: { $eq: ["$$this", "$$fr"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 4: Group by table and garment type
+            {
+              $group: {
+                _id: {
+                  moNo: "$_id.moNo",
+                  tableNo: "$_id.tableNo",
+                  garmentType: "$_id.garmentType"
+                },
+                totalPassForGarment: { $sum: "$passCount" },
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    total: "$total",
+                    tol_plus: "$tol_plus",
+                    tol_minus: "$tol_minus",
+                    fractionCounts: "$fractionCounts"
+                  }
+                }
+              }
+            },
+            // Stage 5: Group by table
+            {
+              $group: {
+                _id: { moNo: "$_id.moNo", tableNo: "$_id.tableNo" },
+                passCount: { $first: "$totalPassForGarment" },
+                issuesByGarmentType: {
+                  $push: {
+                    garmentType: "$_id.garmentType",
+                    issues: {
+                      $sortArray: {
+                        input: {
+                          // Filter out points that had no rejects
+                          $filter: {
+                            input: "$issues",
+                            as: "i",
+                            cond: { $gt: ["$$i.total", 0] }
+                          }
+                        },
+                        sortBy: { total: -1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 6: Final grouping by MO
+            {
+              $group: {
+                _id: "$_id.moNo",
+                tableNos: { $addToSet: "$_id.tableNo" },
+                totalPass: { $sum: "$passCount" },
+                issuesByTable: {
+                  $push: {
+                    tableNo: "$_id.tableNo",
+                    issuesByGarmentType: "$issuesByGarmentType"
+                  }
+                }
+              }
+            },
+            // Stage 7: Final projection to calculate overall rejects and rates
+            {
+              $addFields: {
+                totalRejects: {
+                  $sum: {
+                    $map: {
+                      input: "$issuesByTable",
+                      as: "table",
+                      in: {
+                        $sum: {
+                          $map: {
+                            input: "$$table.issuesByGarmentType",
+                            as: "gt",
+                            in: { $sum: "$$gt.issues.total" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                tableNos: 1,
+                totalPass: 1,
+                totalRejects: 1,
+                issuesByTable: 1,
+                totalPoints: { $add: ["$totalPass", "$totalRejects"] },
+                defectRate: {
+                  $cond: [
+                    { $gt: [{ $add: ["$totalPass", "$totalRejects"] }, 0] },
+                    {
+                      $multiply: [
+                        {
+                          $divide: [
+                            "$totalRejects",
+                            { $add: ["$totalPass", "$totalRejects"] }
+                          ]
+                        },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+          // --- NEW FACET: PIPELINE FOR SPREAD TABLE CARDS ---
+          measurementIssuesBySpreadTable: [
+            // Stage 1: Unwind all the way to the individual measurement document
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            // Stage 2: Group by the most granular level, using spreadTable as a key
+            {
+              $group: {
+                _id: {
+                  moNo: "$moNo",
+                  spreadTable: "$cuttingTableDetails.spreadTable", // <-- The key change is here
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                passCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $eq: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                total: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $ne: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_plus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $gt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_minus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $lt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                fractions: {
+                  $push: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                              "0"
+                            ]
+                          }
+                        ]
+                      },
+                      "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                      "$$REMOVE"
+                    ]
+                  }
+                }
+              }
+            },
+            // Stage 3: Create the fractionCounts object
+            {
+              $addFields: {
+                fractionCounts: {
+                  $arrayToObject: {
+                    $map: {
+                      input: { $setUnion: ["$fractions"] },
+                      as: "fr",
+                      in: {
+                        k: "$$fr",
+                        v: {
+                          $size: {
+                            $filter: {
+                              input: "$fractions",
+                              cond: { $eq: ["$$this", "$$fr"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 4: Group by spread table and garment type
+            {
+              $group: {
+                _id: {
+                  moNo: "$_id.moNo",
+                  spreadTable: "$_id.spreadTable", // <-- The key change is here
+                  garmentType: "$_id.garmentType"
+                },
+                totalPassForGarment: { $sum: "$passCount" },
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    total: "$total",
+                    tol_plus: "$tol_plus",
+                    tol_minus: "$tol_minus",
+                    fractionCounts: "$fractionCounts"
+                  }
+                }
+              }
+            },
+            // Stage 5: Group by spread table
+            {
+              $group: {
+                _id: { moNo: "$_id.moNo", spreadTable: "$_id.spreadTable" }, // <-- The key change is here
+                passCount: { $first: "$totalPassForGarment" },
+                issuesByGarmentType: {
+                  $push: {
+                    garmentType: "$_id.garmentType",
+                    issues: {
+                      $sortArray: {
+                        input: {
+                          $filter: {
+                            input: "$issues",
+                            as: "i",
+                            cond: { $gt: ["$$i.total", 0] }
+                          }
+                        },
+                        sortBy: { total: -1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 6: Final grouping by MO
+            {
+              $group: {
+                _id: "$_id.moNo",
+                spreadTables: { $addToSet: "$_id.spreadTable" }, // <-- The key change is here
+                totalPass: { $sum: "$passCount" },
+                issuesBySpreadTable: {
+                  // <-- The key change is here
+                  $push: {
+                    spreadTable: "$_id.spreadTable", // <-- The key change is here
+                    issuesByGarmentType: "$issuesByGarmentType"
+                  }
+                }
+              }
+            },
+            // Stage 7: Final projection to calculate overall rejects and rates
+            {
+              $addFields: {
+                totalRejects: {
+                  $sum: {
+                    $map: {
+                      input: "$issuesBySpreadTable",
+                      as: "table",
+                      in: {
+                        $sum: {
+                          $map: {
+                            input: "$$table.issuesByGarmentType",
+                            as: "gt",
+                            in: { $sum: "$$gt.issues.total" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                spreadTables: 1, // <-- The key change is here
+                totalPass: 1,
+                totalRejects: 1,
+                issuesBySpreadTable: 1, // <-- The key change is here
+                totalPoints: { $add: ["$totalPass", "$totalRejects"] },
+                defectRate: {
+                  $cond: [
+                    { $gt: [{ $add: ["$totalPass", "$totalRejects"] }, 0] },
+                    {
+                      $multiply: [
+                        {
+                          $divide: [
+                            "$totalRejects",
+                            { $add: ["$totalPass", "$totalRejects"] }
+                          ]
+                        },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+          // --- NEW FACET: PIPELINE FOR SPREAD TABLE OVERALL CARDS ---
+          measurementIssuesBySpreadTableOverall: [
+            // Stage 1: Filter out documents where spreadTable is null or empty
+            {
+              $match: {
+                "cuttingTableDetails.spreadTable": {
+                  $exists: true,
+                  $ne: null,
+                  $ne: ""
+                }
+              }
+            },
+            // Stage 2: Unwind all the way to the individual measurement document
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            // Stage 3: Group by the spreadTable and measurement point to calculate all stats
+            {
+              $group: {
+                _id: {
+                  spreadTable: "$cuttingTableDetails.spreadTable", // <-- Primary grouping key
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                passCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $eq: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                total: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $ne: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_plus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $gt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_minus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $lt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                fractions: {
+                  $push: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                              "0"
+                            ]
+                          }
+                        ]
+                      },
+                      "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                      "$$REMOVE"
+                    ]
+                  }
+                }
+              }
+            },
+            // Stage 4: Create the fractionCounts object
+            {
+              $addFields: {
+                fractionCounts: {
+                  $arrayToObject: {
+                    $map: {
+                      input: { $setUnion: ["$fractions"] },
+                      as: "fr",
+                      in: {
+                        k: "$$fr",
+                        v: {
+                          $size: {
+                            $filter: {
+                              input: "$fractions",
+                              cond: { $eq: ["$$this", "$$fr"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 5: Group by spread table and garment type
+            {
+              $group: {
+                _id: {
+                  spreadTable: "$_id.spreadTable",
+                  garmentType: "$_id.garmentType"
+                },
+                totalPassForGarment: { $sum: "$passCount" },
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    total: "$total",
+                    tol_plus: "$tol_plus",
+                    tol_minus: "$tol_minus",
+                    fractionCounts: "$fractionCounts"
+                  }
+                }
+              }
+            },
+            // Stage 6: Final grouping by Spread Table to assemble the card object
+            {
+              $group: {
+                _id: "$_id.spreadTable",
+                totalPass: { $sum: "$totalPassForGarment" },
+                issuesByGarmentType: {
+                  $push: {
+                    garmentType: "$_id.garmentType",
+                    issues: {
+                      $sortArray: {
+                        input: {
+                          $filter: {
+                            input: "$issues",
+                            as: "i",
+                            cond: { $gt: ["$$i.total", 0] }
+                          }
+                        },
+                        sortBy: { total: -1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 7: Final projection to calculate rejects and defect rate
+            {
+              $addFields: {
+                totalRejects: {
+                  $sum: {
+                    $map: {
+                      input: "$issuesByGarmentType",
+                      as: "gt",
+                      in: { $sum: "$$gt.issues.total" }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                spreadTable: "$_id",
+                totalPass: 1,
+                totalRejects: 1,
+                issuesByGarmentType: 1,
+                totalPoints: { $add: ["$totalPass", "$totalRejects"] },
+                defectRate: {
+                  $cond: [
+                    { $gt: [{ $add: ["$totalPass", "$totalRejects"] }, 0] },
+                    {
+                      $multiply: [
+                        {
+                          $divide: [
+                            "$totalRejects",
+                            { $add: ["$totalPass", "$totalRejects"] }
+                          ]
+                        },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+          // --- NEW FACET: PIPELINE FOR FABRIC DEFECT ANALYSIS ---
+          fabricDefectAnalysis: [
+            // Stage 1: Unwind all arrays down to the individual defect level
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects"
+            },
+
+            // Stage 2: Filter out any records with missing or empty defect names/quantities
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName":
+                  { $ne: null, $ne: "" },
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty":
+                  { $gt: 0 }
+              }
+            },
+
+            // Stage 3: Group by the defect name to get the total quantity and collect all source details
+            {
+              $group: {
+                _id: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName",
+                totalQty: {
+                  $sum: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty"
+                },
+                details: {
+                  $push: {
+                    moNo: "$moNo",
+                    spreadTable: "$cuttingTableDetails.spreadTable",
+                    qty: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty"
+                  }
+                }
+              }
+            },
+
+            // Stage 4: Final project and sort by highest quantity
+            {
+              $project: {
+                _id: 0,
+                defectName: "$_id",
+                totalQty: "$totalQty",
+                details: "$details"
+              }
+            },
+            { $sort: { totalQty: -1 } }
+          ],
+          inspectionQtyByMo: [
+            {
+              $group: {
+                _id: "$moNo",
+                totalInspectionQty: { $sum: "$totalInspectionQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                totalInspectionQty: 1
+              }
+            }
+          ],
+          // --- NEW, CORRECTED PIPELINE FOR CUTTING DEFECT PIVOT TABLE ---
+          cuttingDefectPivot: [
+            { $unwind: "$inspectionData.cuttingDefects.issues" },
+            {
+              $match: {
+                "inspectionData.cuttingDefects.issues.cuttingdefectName": {
+                  $ne: null,
+                  $ne: ""
+                }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  defectName:
+                    "$inspectionData.cuttingDefects.issues.cuttingdefectName",
+                  moNo: "$moNo"
+                },
+                qty: { $sum: 1 }
+              }
+            },
+            {
+              $group: {
+                _id: "$_id.defectName",
+                totalQty: { $sum: "$qty" },
+                moBreakdown: { $push: { k: "$_id.moNo", v: "$qty" } }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                defectName: "$_id",
+                totalQty: 1,
+                moBreakdown: { $arrayToObject: "$moBreakdown" }
+              }
+            },
+            { $sort: { totalQty: -1 } }
+          ],
+
+          // --- NEW, CORRECTED PIPELINE FOR CUTTING DEFECT EVIDENCE ---
+          cuttingDefectEvidence: [
+            {
+              $match: {
+                "inspectionData.cuttingDefects.additionalImages": {
+                  $exists: true,
+                  $ne: []
+                }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  moNo: "$moNo",
+                  tableNo: "$tableNo"
+                },
+                images: {
+                  $first: "$inspectionData.cuttingDefects.additionalImages.path"
+                }
+              }
+            },
+            {
+              $group: {
+                _id: "$_id.moNo",
+                imagesByTable: {
+                  $push: {
+                    tableNo: "$_id.tableNo",
+                    images: "$images"
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                imagesByTable: 1
+              }
+            },
+            { $sort: { moNo: 1 } }
           ]
         }
       }
@@ -26167,12 +27211,26 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
     };
     delete kpis._id;
 
+    const cuttingDefectData = {
+      pivotData: unwindResult[0]?.cuttingDefectPivot || [],
+      evidenceData: unwindResult[0]?.cuttingDefectEvidence || []
+    };
+
     const formattedResult = {
       kpis,
       charts: {
         passRateByMo: unwindResult[0]?.passRateByMo || [],
         passRateByDate: unwindResult[0]?.passRateByDate || [],
-        passRateByGarmentType: unwindResult[0]?.passRateByGarmentType || []
+        passRateByGarmentType: unwindResult[0]?.passRateByGarmentType || [],
+        measurementIssues: unwindResult[0]?.measurementIssues || [],
+        measurementIssuesByMo: unwindResult[0]?.measurementIssuesByMo || [],
+        measurementIssuesBySpreadTable:
+          unwindResult[0]?.measurementIssuesBySpreadTable || [],
+        measurementIssuesBySpreadTableOverall:
+          unwindResult[0]?.measurementIssuesBySpreadTableOverall || [],
+        fabricDefectAnalysis: unwindResult[0]?.fabricDefectAnalysis || [],
+        inspectionQtyByMo: unwindResult[0]?.inspectionQtyByMo || [],
+        cuttingDefectAnalysis: cuttingDefectData
       }
     };
 

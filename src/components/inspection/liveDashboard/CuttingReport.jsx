@@ -18,7 +18,8 @@ import {
   Bug,
   ClipboardList,
   Edit,
-  MessageSquare
+  MessageSquare,
+  ArrowLeft
 } from "lucide-react";
 import React, { useCallback, useEffect, useState, useRef } from "react";
 import DatePicker from "react-datepicker";
@@ -146,7 +147,7 @@ const getResultStatus = (
   };
 };
 
-const CuttingReport = () => {
+const CuttingReport = ({ onBackToCuttingLive }) => {
   const { t, i18n } = useTranslation();
 
   const initialFilters = {
@@ -260,7 +261,7 @@ const CuttingReport = () => {
         };
         const response = await axios.get(
           `${API_BASE_URL}/api/cutting-inspections-report`,
-          { params, withCredentials: true }
+          { params }
         );
         setReports(response.data.reports);
         setTotalPages(response.data.totalPages);
@@ -398,6 +399,17 @@ const CuttingReport = () => {
   return (
     <div className="p-1 sm:p-2 bg-gray-50 min-h-screen">
       <div className="max-w-8xl mx-auto bg-white p-3 sm:p-4 rounded-xl shadow-lg">
+        {onBackToCuttingLive && (
+          <div className="mb-4">
+            <button
+              onClick={onBackToCuttingLive}
+              className="flex items-center px-4 py-2 bg-blue-100 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={20} className="mr-2" />
+              Cutting Home
+            </button>
+          </div>
+        )}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12 gap-4 mb-1 p-1 border border-gray-200 rounded-lg">
           <div>
             <label className="block text-sm font-medium text-gray-700">

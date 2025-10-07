@@ -1,26 +1,39 @@
-// src/components/inspection/cutting/CuttingDashboard.jsx
-import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
-import { useTheme } from "../../context/ThemeContext";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../../../../config";
+import { useTheme } from "../../context/ThemeContext";
+import CuttingDashboardCuttingDefectIssues from "./CuttingDashbaordCuttingDefectIssues";
+import CuttingDashboardMeasurementIssuesStyleCard from "./CuttingDashbaordMeasurementIssuesStyleCard";
 import CuttingDashboardCard from "./CuttingDashboardCard";
+import CuttingDashboardFilter from "./CuttingDashboardFilter";
+import CuttingDashboardGarmentTypeChart from "./CuttingDashboardGarmentTypeChart";
+import CuttingDashboardMeasurementIssues from "./CuttingDashboardMeasurementIssues";
+import CuttingDashboardSpreadTableOverallIssues from "./CuttingDashboardSpreadTableOverallIssues";
+import CuttingDashboardSpreadTableStyleCard from "./CuttingDashboardSpreadTableStyleCard";
+import CuttingDashboardFabricIssues from "./CutttingDashboardFabricIssues";
 import HorizontalBarChart from "./HorizontalBarChart";
 import TrendLineChart from "./TrendLineChart";
-import CuttingDashboardGarmentTypeChart from "./CuttingDashboardGarmentTypeChart";
-import CuttingDashboardFilter from "./CuttingDashboardFilter";
+
 import {
-  ClipboardList,
-  CheckCircle,
-  XCircle,
   Beaker,
-  Scissors,
+  Bug,
+  CheckCircle,
+  ClipboardList,
+  FileCheck,
+  FileText,
+  FlaskConical, // Icon for IE Table
+  Grid,
+  Layers,
+  LayoutDashboard,
   Package,
   Percent,
-  FileCheck,
   Scan,
-  Layers,
-  FileText, // New Icon for reports
-  FlaskConical // New Icon for AQL
+  Scissors,
+  ScissorsIcon, // Icon for Overview
+  Table,
+  View,
+  XCircle,
+  ArrowLeft
 } from "lucide-react";
 import { useAuth } from "../../authentication/AuthContext";
 
@@ -32,9 +45,36 @@ const formatDateForApi = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-const CuttingDashboard = () => {
+// --- NEW: Navigation Button Component ---
+const NavButton = ({ icon, label, isActive, onClick, theme }) => {
+  const activeClasses =
+    theme === "dark" ? "bg-blue-600 text-white" : "bg-blue-600 text-white";
+  const inactiveClasses =
+    theme === "dark"
+      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
+      : "bg-white text-gray-600 hover:bg-gray-100";
+
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center text-center p-3 rounded-lg shadow-md transition-all duration-200 w-32 h-24 ${
+        isActive ? activeClasses : inactiveClasses
+      }`}
+    >
+      {icon}
+      <span className="text-xs font-semibold mt-2 leading-tight max-w-full">
+        {label}
+      </span>
+    </button>
+  );
+};
+
+const CuttingDashboard = ({ onBackToCuttingLive }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  // --- NEW: State to manage the active view ---
+  const [activeView, setActiveView] = useState("overview");
+
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [filters, setFilters] = useState({
@@ -108,7 +148,27 @@ const CuttingDashboard = () => {
   const kpis = data?.kpis;
   const charts = data?.charts;
 
-  // --- NEW: Define KPI groups for the three main cards ---
+  const sortedStyleData = useMemo(() => {
+    if (!charts?.measurementIssuesByMo) return [];
+    return [...charts.measurementIssuesByMo].sort(
+      (a, b) => b.defectRate - a.defectRate
+    );
+  }, [charts?.measurementIssuesByMo]);
+
+  const sortedSpreadTableData = useMemo(() => {
+    if (!charts?.measurementIssuesBySpreadTable) return [];
+    return [...charts.measurementIssuesBySpreadTable].sort(
+      (a, b) => b.defectRate - a.defectRate
+    );
+  }, [charts?.measurementIssuesBySpreadTable]);
+
+  // --- NEW: Memoized sorting for the overall spread table data ---
+  const sortedSpreadTableOverallData = useMemo(() => {
+    if (!charts?.measurementIssuesBySpreadTableOverall) return [];
+    return [...charts.measurementIssuesBySpreadTableOverall].sort(
+      (a, b) => b.defectRate - a.defectRate
+    );
+  }, [charts?.measurementIssuesBySpreadTableOverall]);
 
   const bundleDataKpis = kpis
     ? [
@@ -161,7 +221,7 @@ const CuttingDashboard = () => {
         },
         {
           title: "AQL Results",
-          value: "N/A", // As requested, this is a placeholder
+          value: "N/A",
           icon: <FlaskConical size={24} />,
           colorRule: "default"
         }
@@ -216,6 +276,17 @@ const CuttingDashboard = () => {
         theme === "dark" ? "bg-gray-900" : "bg-gray-100"
       }`}
     >
+      {onBackToCuttingLive && (
+        <div className="mb-4">
+          <button
+            onClick={onBackToCuttingLive}
+            className="flex items-center px-4 py-2 bg-blue-100 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            <ArrowLeft size={20} className="mr-2" />
+            Cutting Home
+          </button>
+        </div>
+      )}
       {loading && (
         <div className="absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
           <div className="text-white text-xl animate-pulse">Updating...</div>
@@ -223,54 +294,179 @@ const CuttingDashboard = () => {
       )}
 
       <p
-        className={`mb-6 text-md ${
+        className={`mb-4 text-md ${
           theme === "dark" ? "text-gray-400" : "text-gray-600"
         }`}
       >
         Cutting Inspection Dashboard - Version 1.0
       </p>
 
-      <CuttingDashboardFilter
-        filters={filters}
-        setFilters={setFilters}
-        onApply={handleApplyFilters}
-      />
-
-      {/* --- NEW: KPI Cards layout with 3 main sections --- */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-        <CuttingDashboardCard title="Bundle Data" stats={bundleDataKpis} />
-        <CuttingDashboardCard
-          title="Inspection Data"
-          stats={inspectionDataKpis}
+      {/* --- NEW: Navigation Section --- */}
+      <div className="flex items-center gap-4 mb-6">
+        <NavButton
+          icon={<LayoutDashboard size={32} />}
+          label="Overview"
+          isActive={activeView === "overview"}
+          onClick={() => setActiveView("overview")}
+          theme={theme}
         />
-        <CuttingDashboardCard title="Results Section" stats={resultsKpis} />
+        <NavButton
+          icon={<Table size={32} />}
+          label="Measurement Failure - By Style & IE Table"
+          isActive={activeView === "style_ie_table"}
+          onClick={() => setActiveView("style_ie_table")}
+          theme={theme}
+        />
+        <NavButton
+          icon={<Grid size={32} />}
+          label="Measurement Failure - By Style & Spread Table"
+          isActive={activeView === "style_spread_table"}
+          onClick={() => setActiveView("style_spread_table")}
+          theme={theme}
+        />
+        <NavButton
+          icon={<View size={32} />}
+          label="Measurement Failure by Spread Table"
+          isActive={activeView === "spread_table_overall"}
+          onClick={() => setActiveView("spread_table_overall")}
+          theme={theme}
+        />
+        <NavButton
+          icon={<Bug size={32} />}
+          label="Fabric Defect Analysis"
+          isActive={activeView === "fabric_defects"}
+          onClick={() => setActiveView("fabric_defects")}
+          theme={theme}
+        />
+        <NavButton
+          icon={<ScissorsIcon size={32} />}
+          label="Cutting Defect Analysis"
+          isActive={activeView === "cutting_defects"}
+          onClick={() => setActiveView("cutting_defects")}
+          theme={theme}
+        />
       </div>
 
-      {/* Charts section remains the same, matching the 3-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 xl:col-span-1">
-          <HorizontalBarChart
-            data={charts?.passRateByMo || []}
-            title="Pass Rate by MO No"
-            onTopNChange={handleTopNChange}
-            topN={topN}
-            sortOrder={sortOrder}
-            onSortOrderChange={handleSortOrderChange}
+      {/* --- NEW: Conditional Rendering based on activeView --- */}
+
+      {activeView === "overview" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
           />
-        </div>
-        <div className="lg:col-span-1 xl:col-span-1">
-          <CuttingDashboardGarmentTypeChart
-            data={charts?.passRateByGarmentType || []}
-            title="Pass Rate by Garment Type"
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+            <CuttingDashboardCard title="Bundle Data" stats={bundleDataKpis} />
+            <CuttingDashboardCard
+              title="Inspection Data"
+              stats={inspectionDataKpis}
+            />
+            <CuttingDashboardCard title="Results Section" stats={resultsKpis} />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="lg:col-span-1 xl:col-span-1">
+              <HorizontalBarChart
+                data={charts?.passRateByMo || []}
+                title="Pass Rate by MO No"
+                onTopNChange={handleTopNChange}
+                topN={topN}
+                sortOrder={sortOrder}
+                onSortOrderChange={handleSortOrderChange}
+              />
+            </div>
+            <div className="lg:col-span-1 xl:col-span-1">
+              <CuttingDashboardGarmentTypeChart
+                data={charts?.passRateByGarmentType || []}
+                title="Pass Rate by Garment Type"
+              />
+            </div>
+            <div className="lg:col-span-2 xl:col-span-1">
+              <TrendLineChart
+                data={charts?.passRateByDate || []}
+                title="Pass Rate by Date"
+              />
+            </div>
+          </div>
+          <div className="mt-6">
+            <CuttingDashboardMeasurementIssues
+              data={charts?.measurementIssues || []}
+              title="Measurement Point Failure Analysis by Garment Type (Total)"
+            />
+          </div>
+        </>
+      )}
+
+      {activeView === "style_ie_table" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
           />
-        </div>
-        <div className="lg:col-span-2 xl:col-span-1">
-          <TrendLineChart
-            data={charts?.passRateByDate || []}
-            title="Pass Rate by Date"
+          <CuttingDashboardMeasurementIssuesStyleCard
+            data={sortedStyleData}
+            title="Measurement Point Failure by MO and Table"
           />
-        </div>
-      </div>
+        </>
+      )}
+
+      {activeView === "style_spread_table" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
+          />
+          <CuttingDashboardSpreadTableStyleCard
+            data={sortedSpreadTableData}
+            title="Measurement Point Failure by MO and Spread Table"
+          />
+        </>
+      )}
+
+      {activeView === "spread_table_overall" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
+          />
+          <CuttingDashboardSpreadTableOverallIssues
+            data={sortedSpreadTableOverallData}
+            title="Measurement Point Failure by Spread Table"
+          />
+        </>
+      )}
+
+      {activeView === "fabric_defects" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
+          />
+          <CuttingDashboardFabricIssues
+            data={charts?.fabricDefectAnalysis || []}
+            totalInspectionQty={kpis?.totalInspectionQty || 0}
+            inspectionQtyByMo={charts?.inspectionQtyByMo || []}
+            title="Fabric Defect Analysis"
+          />
+        </>
+      )}
+      {activeView === "cutting_defects" && (
+        <>
+          <CuttingDashboardFilter
+            filters={filters}
+            setFilters={setFilters}
+            onApply={handleApplyFilters}
+          />
+          <CuttingDashboardCuttingDefectIssues
+            data={charts?.cuttingDefectAnalysis}
+            title="Cutting Defect Analysis"
+          />
+        </>
+      )}
     </div>
   );
 };

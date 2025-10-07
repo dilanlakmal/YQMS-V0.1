@@ -1,31 +1,60 @@
-// src/components/inspection/cutting/CuttingDashboardFilter.jsx
-import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
+import { Check, RotateCcw } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
+import Select from "react-select"; // Import the new library
 import { API_BASE_URL } from "../../../../config";
 import { useTheme } from "../../context/ThemeContext";
-import { Check, RotateCcw } from "lucide-react";
-import "react-datepicker/dist/react-datepicker.css";
 
-const FilterSelect = ({ options, value, onChange, placeholder, theme }) => (
-  <select
-    value={value}
-    onChange={(e) => onChange(e.target.value)}
-    className={`w-full p-2 rounded-md focus:ring-2 focus:ring-blue-500
-        ${
-          theme === "dark"
-            ? "bg-gray-700 text-white border-gray-600"
-            : "bg-gray-50 text-black border-gray-300"
-        }`}
-  >
-    <option value="">{placeholder}</option>
-    {options.map((opt) => (
-      <option key={opt} value={opt}>
-        {opt}
-      </option>
-    ))}
-  </select>
-);
+// --- NEW: Custom styling for react-select to match the theme ---
+const getCustomStyles = (theme) => ({
+  control: (provided, state) => ({
+    ...provided,
+    backgroundColor: theme === "dark" ? "#374151" : "#F9FAFB",
+    borderColor: theme === "dark" ? "#4B5563" : "#D1D5DB",
+    minHeight: "42px",
+    boxShadow: state.isFocused ? "0 0 0 2px #3B82F6" : "none",
+    "&:hover": {
+      borderColor: theme === "dark" ? "#6B7280" : "#A5B4FC"
+    }
+  }),
+  valueContainer: (provided) => ({
+    ...provided,
+    padding: "0 8px"
+  }),
+  singleValue: (provided) => ({
+    ...provided,
+    color: theme === "dark" ? "#F9FAFB" : "#111827"
+  }),
+  input: (provided) => ({
+    ...provided,
+    color: theme === "dark" ? "#F9FAFB" : "#111827"
+  }),
+  placeholder: (provided) => ({
+    ...provided,
+    color: theme === "dark" ? "#9CA3AF" : "#6B7280"
+  }),
+  menu: (provided) => ({
+    ...provided,
+    backgroundColor: theme === "dark" ? "#374151" : "#FFFFFF",
+    border: `1px solid ${theme === "dark" ? "#4B5563" : "#D1D5DB"}`
+  }),
+  option: (provided, state) => ({
+    ...provided,
+    backgroundColor: state.isSelected
+      ? "#3B82F6"
+      : state.isFocused
+      ? theme === "dark"
+        ? "#4B5563"
+        : "#E5E7EB"
+      : "transparent",
+    color: theme === "dark" ? "#F9FAFB" : "#111827",
+    "&:active": {
+      backgroundColor: "#2563EB"
+    }
+  })
+});
 
 const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
   const [filterOptions, setFilterOptions] = useState({
@@ -38,6 +67,7 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
   });
   const { theme } = useTheme();
 
+  // The core fetching logic remains the same
   const fetchOptions = useCallback(async (currentFilters) => {
     try {
       const params = {
@@ -49,12 +79,10 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           ? currentFilters.endDate.toISOString().split("T")[0]
           : ""
       };
-      // remove empty strings from params
       Object.keys(params).forEach(
         (key) =>
           (params[key] === "" || params[key] === null) && delete params[key]
       );
-
       const response = await axios.get(
         `${API_BASE_URL}/api/cutting-dashboard/filters`,
         { params }
@@ -73,6 +101,11 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
+  // A new handler specifically for react-select components
+  const handleSelectChange = (key, selectedOption) => {
+    handleFilterChange(key, selectedOption ? selectedOption.value : "");
+  };
+
   const handleReset = () => {
     const initialFilters = {
       startDate: null,
@@ -85,8 +118,15 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
       color: ""
     };
     setFilters(initialFilters);
-    onApply(initialFilters); // Also apply the reset to the dashboard
+    onApply(initialFilters);
   };
+
+  // Get the custom styles based on the current theme
+  const customStyles = getCustomStyles(theme);
+
+  // Helper function to transform string arrays into { value, label } objects
+  const toSelectOptions = (arr) =>
+    arr.map((item) => ({ value: item, label: item }));
 
   return (
     <div
@@ -95,7 +135,7 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
       }`}
     >
       <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-9 gap-4 items-end">
-        {/* Date Filters */}
+        {/* Date Filters remain the same */}
         <div>
           <label
             className={`block text-sm font-medium mb-1 ${
@@ -133,7 +173,7 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           />
         </div>
 
-        {/* Select Filters */}
+        {/* --- MODIFIED: Select Filters now use react-select --- */}
         <div>
           <label
             className={`block text-sm font-medium mb-1 ${
@@ -142,12 +182,18 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           >
             Buyer
           </label>
-          <FilterSelect
-            options={filterOptions.buyers}
-            value={filters.buyer}
-            onChange={(val) => handleFilterChange("buyer", val)}
+          <Select
+            options={toSelectOptions(filterOptions.buyers)}
+            value={
+              filters.buyer
+                ? { value: filters.buyer, label: filters.buyer }
+                : null
+            }
+            onChange={(option) => handleSelectChange("buyer", option)}
             placeholder="All Buyers"
-            theme={theme}
+            isClearable
+            isSearchable
+            styles={customStyles}
           />
         </div>
         <div>
@@ -158,12 +204,16 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           >
             MO No
           </label>
-          <FilterSelect
-            options={filterOptions.moNos}
-            value={filters.moNo}
-            onChange={(val) => handleFilterChange("moNo", val)}
+          <Select
+            options={toSelectOptions(filterOptions.moNos)}
+            value={
+              filters.moNo ? { value: filters.moNo, label: filters.moNo } : null
+            }
+            onChange={(option) => handleSelectChange("moNo", option)}
             placeholder="All MOs"
-            theme={theme}
+            isClearable
+            isSearchable
+            styles={customStyles}
           />
         </div>
         <div>
@@ -174,12 +224,18 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           >
             Table No
           </label>
-          <FilterSelect
-            options={filterOptions.tableNos}
-            value={filters.tableNo}
-            onChange={(val) => handleFilterChange("tableNo", val)}
+          <Select
+            options={toSelectOptions(filterOptions.tableNos)}
+            value={
+              filters.tableNo
+                ? { value: filters.tableNo, label: filters.tableNo }
+                : null
+            }
+            onChange={(option) => handleSelectChange("tableNo", option)}
             placeholder="All Tables"
-            theme={theme}
+            isClearable
+            isSearchable
+            styles={customStyles}
           />
         </div>
         <div>
@@ -190,12 +246,18 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           >
             Garment Type
           </label>
-          <FilterSelect
-            options={filterOptions.garmentTypes}
-            value={filters.garmentType}
-            onChange={(val) => handleFilterChange("garmentType", val)}
+          <Select
+            options={toSelectOptions(filterOptions.garmentTypes)}
+            value={
+              filters.garmentType
+                ? { value: filters.garmentType, label: filters.garmentType }
+                : null
+            }
+            onChange={(option) => handleSelectChange("garmentType", option)}
             placeholder="All Types"
-            theme={theme}
+            isClearable
+            isSearchable
+            styles={customStyles}
           />
         </div>
         <div>
@@ -206,16 +268,20 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           >
             Emp ID
           </label>
-          <FilterSelect
-            options={filterOptions.qcIds}
-            value={filters.qcId}
-            onChange={(val) => handleFilterChange("qcId", val)}
+          <Select
+            options={toSelectOptions(filterOptions.qcIds)}
+            value={
+              filters.qcId ? { value: filters.qcId, label: filters.qcId } : null
+            }
+            onChange={(option) => handleSelectChange("qcId", option)}
             placeholder="All Inspectors"
-            theme={theme}
+            isClearable
+            isSearchable
+            styles={customStyles}
           />
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons remain the same */}
         <div className="flex space-x-2">
           <button
             onClick={() => onApply(filters)}

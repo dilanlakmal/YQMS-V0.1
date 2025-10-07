@@ -2,6 +2,7 @@
 import axios from "axios";
 import {
   AlertTriangle,
+  ArrowLeft,
   BarChart3,
   Check,
   FileText,
@@ -42,7 +43,7 @@ function debounce(func, delay) {
   };
 }
 
-const CuttingGarmentTypeTrendAnalysis = () => {
+const CuttingGarmentTypeTrendAnalysis = ({ onBackToCuttingLive }) => {
   const { t, i18n } = useTranslation();
   const [filters, setFilters] = useState(initialFilters);
   const [appliedFiltersString, setAppliedFiltersString] = useState("");
@@ -522,6 +523,17 @@ const CuttingGarmentTypeTrendAnalysis = () => {
   return (
     <div className="p-4 sm:p-6 bg-gray-100 min-h-screen">
       <div className="max-w-full mx-auto">
+        {onBackToCuttingLive && (
+          <div className="mb-4">
+            <button
+              onClick={onBackToCuttingLive}
+              className="flex items-center px-4 py-2 bg-blue-100 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <ArrowLeft size={20} className="mr-2" />
+              Cutting Home
+            </button>
+          </div>
+        )}
         <div className="bg-white p-4 sm:p-6 rounded-xl shadow-lg mb-6">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2 text-center">
             {t("cutting.trendAnalysisTitle")}

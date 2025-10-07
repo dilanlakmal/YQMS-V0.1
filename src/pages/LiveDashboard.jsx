@@ -19,6 +19,7 @@ import WashingLive from "../components/inspection/liveDashboard/WashingLive";
 import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
 import PackingLive from "../components/inspection/liveDashboard/PackingLive";
+import CuttingLive from "../components/inspection/liveDashboard/CuttingLive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
 import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
@@ -26,6 +27,7 @@ import RovingReport from "../components/inspection/liveDashboard/RovingReport"; 
 import CuttingReport from "../components/inspection/liveDashboard/CuttingReport";
 import CuttingGarmentTypeTrendAnalysis from "../components/inspection/cutting/report/CuttingGarmentTypeTrendAnalysis";
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
+import CuttingMenu from "../components/inspection/liveDashboard/CuttingMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
 import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
 import DigitalMeasurementCPK from "../components/inspection/liveDashboard/DigitalMeasurement-CPK";
@@ -520,11 +522,25 @@ const LiveDashboard = () => {
           <HomeMenu setActiveSection={setActiveSection} />
         )}
 
+        {activeSection === "Cutting" && (
+          <CuttingMenu setActiveSection={setActiveSection} />
+        )}
+
         {activeSection === "Roving Report" && <RovingReport />}
-        {activeSection === "Cutting Dashboard" && <CuttingDashboard />}
-        {activeSection === "Cutting Reports" && <CuttingReport />}
+        {activeSection === "Cutting Dashboard" && (
+          <CuttingDashboard
+            onBackToCuttingLive={() => setActiveSection("Cutting")}
+          />
+        )}
+        {activeSection === "Cutting Reports" && (
+          <CuttingReport
+            onBackToCuttingLive={() => setActiveSection("Cutting")}
+          />
+        )}
         {activeSection === "Cutting Trend" && (
-          <CuttingGarmentTypeTrendAnalysis />
+          <CuttingGarmentTypeTrendAnalysis
+            onBackToCuttingLive={() => setActiveSection("Cutting")}
+          />
         )}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}
@@ -539,6 +555,7 @@ const LiveDashboard = () => {
         {activeSection === "Ironing" && <IroningLive />}
         {activeSection === "OPA" && <OPALive />}
         {activeSection === "Packing" && <PackingLive />}
+        {activeSection === "Cutting" && <CuttingLive />}
         {activeSection === "Live Dashboard" && (
           <>
             {/* Summary Cards (Common for all tabs) */}
