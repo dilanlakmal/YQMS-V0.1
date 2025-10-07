@@ -672,7 +672,7 @@ const QCWashingPage = () => {
         formData.reportType === "Inline" ||
         formData.firstOutput === "First Output" ||
         formData.reportType === "First Output") &&
-      aql?.acceptedDefect
+      aql?.acceptedDefect !== undefined
     ) {
       const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
       if (defectCheckedQty === 0) {

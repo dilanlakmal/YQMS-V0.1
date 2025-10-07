@@ -198,7 +198,6 @@ const QAInspectionForm = () => {
   }, [moNo, reportType, checkedQty]);
 
   const handleFinishInspection = async () => {
-    // --- FIX: ADJUST PAYLOAD TO HANDLE EMPTY DEFECTS ARRAY ---
     // Validation is now handled by the disabled button, but we keep this as a backup
     if (isFormInvalid) {
       Swal.fire(
@@ -251,7 +250,7 @@ const QAInspectionForm = () => {
       totalDefectPoints,
       qcAccuracy: accuracy,
       grade,
-      result, // <-- Add result to the payload
+      result,
       // --- ADD NEW FIELDS TO PAYLOAD ---
       remarks,
       extraImages: extraImages.filter(
@@ -398,7 +397,7 @@ const QAInspectionForm = () => {
             onChange={setMoNo}
             styles={reactSelectStyles} // Apply corrected styles
             placeholder={t("qcAccuracy.searchMo", "Search MO...")}
-            isClearable={true} // *** FIX #1: Add this prop to allow clearing the selection ***
+            isClearable={true}
           />
         </div>
         <div className="lg:col-span-2">
@@ -488,7 +487,7 @@ const QAInspectionForm = () => {
           defects={defects}
           setDefects={setDefects}
           availableDefects={allDefectsList}
-          standardDefects={standardDefectsList} // <-- Pass standard defects down
+          standardDefects={standardDefectsList}
           buyer={determinedBuyer}
           uploadMetadata={{ moNo: moNo?.value, qcId: user?.emp_id }} // Pass metadata
         />

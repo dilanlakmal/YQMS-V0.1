@@ -40,7 +40,6 @@ const QCAccuracy = () => {
         id: "results",
         labelKey: "qcAccuracy.tabs.results",
         icon: <BarChart3 size={18} />,
-        // --- FIX #3: REPLACE PLACEHOLDER WITH THE REAL COMPONENT ---
         component: <QAAccuracyResults />
       },
       {
@@ -55,12 +54,7 @@ const QCAccuracy = () => {
         icon: <BookOpen size={18} />,
         component: <QAAccuracyDashboard />
       },
-      // {
-      //   id: "results",
-      //   labelKey: "qcAccuracy.tabs.results",
-      //   icon: <BarChart3 size={18} />,
-      //   component: <PlaceholderComponent titleKey="qcAccuracy.tabs.results" />
-      // },
+
       {
         id: "trend",
         labelKey: "qcAccuracy.tabs.trend",
