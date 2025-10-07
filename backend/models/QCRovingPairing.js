@@ -5,7 +5,8 @@ const accessoryIssueRemarkSchema = new mongoose.Schema(
   {
     issueEng: { type: String, required: true },
     issueKhmer: { type: String, required: true },
-    issueChi: { type: String, required: true }
+    issueChi: { type: String, required: true },
+    images: [{ type: String }] // Array of image URLs
   },
   { _id: false }
 );
@@ -13,7 +14,8 @@ const accessoryIssueRemarkSchema = new mongoose.Schema(
 const measurementValueSchema = new mongoose.Schema(
   {
     partNo: { type: Number, required: true },
-    value: { type: String, required: true }
+    value: { type: String, required: true },
+    images: [{ type: String }] // Array of image URLs
   },
   { _id: false }
 );
@@ -31,7 +33,8 @@ const singleDefectEntrySchema = new mongoose.Schema(
   {
     defectNameEng: { type: String, required: true },
     defectNameKhmer: { type: String, required: true },
-    count: { type: Number, required: true, min: 1 }
+    count: { type: Number, required: true, min: 1 },
+    images: [{ type: String }] // Array of image URLs
   },
   { _id: false }
 );

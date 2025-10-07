@@ -19,6 +19,7 @@ import WashingLive from "../components/inspection/liveDashboard/WashingLive";
 import IroningLive from "../components/inspection/liveDashboard/IroningLive";
 import OPALive from "../components/inspection/liveDashboard/OPALive";
 import PackingLive from "../components/inspection/liveDashboard/PackingLive";
+import CuttingLive from "../components/inspection/liveDashboard/CuttingLive";
 import DailySummary from "../components/inspection/liveDashboard/DailySummary";
 import WeeklySummary from "../components/inspection/liveDashboard/WeeklySummary";
 import InspectorCard from "../components/inspection/liveDashboard/InspectorCard";
@@ -26,6 +27,7 @@ import RovingReport from "../components/inspection/liveDashboard/RovingReport"; 
 import CuttingReport from "../components/inspection/liveDashboard/CuttingReport";
 import CuttingGarmentTypeTrendAnalysis from "../components/inspection/cutting/report/CuttingGarmentTypeTrendAnalysis";
 import HomeMenu from "../components/inspection/liveDashboard/HomeMenu";
+import CuttingMenu from "../components/inspection/liveDashboard/CuttingMenu";
 import QCSunriseDashboard from "../components/inspection/liveDashboard/QCSunriseDashboard";
 import DigitalMeasurement from "../components/inspection/liveDashboard/DigitalMeasurement";
 import DigitalMeasurementCPK from "../components/inspection/liveDashboard/DigitalMeasurement-CPK";
@@ -476,10 +478,6 @@ const LiveDashboard = () => {
         </div>
         {/* --- END OF NEW HEADER --- */}
 
-        {/* <h1 className="text-2xl font-bold mb-4 text-center text-gray-800">
-          {activeSection}
-        </h1> */}
-
         {/* Common Filter Pane for QC2 Sections */}
         {[
           "Live Dashboard",
@@ -519,6 +517,10 @@ const LiveDashboard = () => {
         {activeSection === "Home" && (
           <HomeMenu setActiveSection={setActiveSection} />
         )}
+        
+        {activeSection === "Cutting" && (
+          <CuttingMenu setActiveSection={setActiveSection} />
+        )}
 
         {activeSection === "Roving Report" && <RovingReport />}
         {activeSection === "Cutting Dashboard" && <CuttingDashboard />}
@@ -538,6 +540,7 @@ const LiveDashboard = () => {
         {activeSection === "Washing" && <WashingLive />}
         {activeSection === "Ironing" && <IroningLive />}
         {activeSection === "OPA" && <OPALive />}
+        {activeSection === "Cutting" && <CuttingLive />}
         {activeSection === "Packing" && <PackingLive />}
         {activeSection === "Live Dashboard" && (
           <>

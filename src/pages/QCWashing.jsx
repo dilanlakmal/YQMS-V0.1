@@ -401,26 +401,9 @@ const QCWashingPage = () => {
   const [overallSummary, setOverallSummary] = useState(null);
   const [colorOrderQty, setColorOrderQty] = useState(null);
   //   const [sectionVisibility, setSectionVisibility] = useState({
-  //   orderDetails: true,
-  //   inspectionData: false,
-  //   defectDetails: false,
-  //   measurementDetails: false,
-  // });
   const [orderSectionSaved, setOrderSectionSaved] = useState(false);
   const [recordId, setRecordId] = useState(null);
   const aql = formData.aql && formData.aql[0];
-
-  // Function to activate the next section
-  // const activateNextSection = (currentSection) => {
-  //   setSectionVisibility((prev) => {
-  //     const order = ['orderDetails', 'inspectionData', 'defectDetails', 'measurementDetails'];
-  //     const idx = order.indexOf(currentSection);
-  //     if (idx !== -1 && idx < order.length - 1) {
-  //       return { ...prev, [order[idx + 1]]: true };
-  //     }
-  //     return prev;
-  //   });
-  // };
 
   const fetchOverallSummary = async (recordId) => {
     if (!recordId) return;
@@ -595,11 +578,6 @@ const QCWashingPage = () => {
     return englishRemark; // Return original if not a fiber remark
   };
 
-  // Section Toggle
-  // const toggleSection = (section) => {
-  //   setSectionVisibility((prev) => ({ ...prev, [section]: !prev[section] }));
-  // };
-
   const imageToBase64 = (imageObject) => {
     if (!imageObject) {
       return Promise.resolve(null);
@@ -630,7 +608,6 @@ const QCWashingPage = () => {
     fetchOrderNumbers();
     fetchChecklist();
   }, []);
-  useEffect(() => {}, [uploadedImages]);
 
   // --- useEffect: Calculate Checked Qty ---
   useEffect(() => {
@@ -705,56 +682,6 @@ const QCWashingPage = () => {
     formData.result,
     formData.checkedQty
   ]);
-
-  useEffect(() => {
-    const fetchColorOrderQty = async () => {
-      if (!formData.orderNo || !formData.color) {
-        setColorOrderQty(null);
-        return;
-      }
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
-            formData.orderNo
-          }/${encodeURIComponent(formData.color)}`
-        );
-        const data = await response.json();
-        if (data.success) {
-          setColorOrderQty(data.colorOrderQty);
-        } else {
-          setColorOrderQty(null);
-        }
-      } catch (error) {
-        setColorOrderQty(null);
-      }
-    };
-    fetchColorOrderQty();
-  }, [formData.orderNo, formData.color]);
-
-  useEffect(() => {
-    const fetchColorOrderQty = async () => {
-      if (!formData.orderNo || !formData.color) {
-        setColorOrderQty(null);
-        return;
-      }
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
-            formData.orderNo
-          }/${encodeURIComponent(formData.color)}`
-        );
-        const data = await response.json();
-        if (data.success) {
-          setColorOrderQty(data.colorOrderQty);
-        } else {
-          setColorOrderQty(null);
-        }
-      } catch (error) {
-        setColorOrderQty(null);
-      }
-    };
-    fetchColorOrderQty();
-  }, [formData.orderNo, formData.color]);
 
   useEffect(() => {
     const fetchColorOrderQty = async () => {

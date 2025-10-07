@@ -9,7 +9,8 @@ import {
   Clock,
   TrendingUp,
   Calendar,
-  FileText
+  FileText,
+  Scissors
 } from "lucide-react";
 
 // Array of tile card data for all main menus and QC2 submenus
@@ -85,6 +86,12 @@ const menuItems = [
     icon: <Box className="w-6 h-6 text-white" />,
     image: "assets/Dashboard/packing.png",
     section: "Packing"
+  },
+  {
+    title: "Cutting",
+    icon: <Scissors className="w-6 h-6 text-white" />,
+    image: "assets/Dashboard/CuttingLive.png",
+    section: "Cutting"
   }
 ];
 
