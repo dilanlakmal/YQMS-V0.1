@@ -110,8 +110,6 @@ const fetchSubmittedData = async (showLoading = true) => {
 
   useEffect(() => {
     fetchSubmittedData();
-    const interval = setInterval(() => fetchSubmittedData(false), 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -158,45 +156,56 @@ const fetchSubmittedData = async (showLoading = true) => {
       let dataToProcess = [...submittedData];
 
       if (viewMode === 'actual') {
-        let actualData = await Promise.all(
-          submittedData.map(async (record) => {
-            const washQtyData = await fetchRealWashQty(record);
-            let finalRecord = { ...record, ...washQtyData };
+        // Process in smaller batches to avoid overwhelming the server
+        const BATCH_SIZE = 5;
+        let actualData = [];
+        
+        for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
+          const batch = submittedData.slice(i, i + BATCH_SIZE);
+          const batchResults = await Promise.all(
+            batch.map(async (record) => {
+              const washQtyData = await fetchRealWashQty(record);
+              let finalRecord = { ...record, ...washQtyData };
 
-            if (record.reportType === 'Inline' && washQtyData.isActualWashQty && aqlEndpointAvailable) {
-              const newWashQty = washQtyData.displayWashQty;
-              try {
-                const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ lotSize: newWashQty, orderNo: record.orderNo })
-                });
-                
-                if (aqlResponse.ok) {
-                  const aqlData = await aqlResponse.json();
-                  if (aqlData.success && aqlData.aqlData) {
-                    finalRecord.aql = [aqlData.aqlData];
-                    finalRecord.checkedQty = Math.min(newWashQty, aqlData.aqlData.sampleSize);
-                    // Also update the aqlValue inside defectDetails for the full report modal
-                    if (finalRecord.defectDetails) {
-                      finalRecord.defectDetails.aqlValue = aqlData.aqlData.levelUsed;
-                    } else {
-                      finalRecord.defectDetails = { aqlValue: aqlData.aqlData.levelUsed };
+              // Skip AQL recalculation if endpoint is not available
+              if (record.reportType === 'Inline' && washQtyData.isActualWashQty && aqlEndpointAvailable) {
+                const newWashQty = washQtyData.displayWashQty;
+                try {
+                  const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ lotSize: newWashQty, orderNo: record.orderNo })
+                  });
+                  
+                  if (aqlResponse.ok) {
+                    const aqlData = await aqlResponse.json();
+                    if (aqlData.success && aqlData.aqlData) {
+                      finalRecord.aql = [aqlData.aqlData];
+                      finalRecord.checkedQty = Math.min(newWashQty, aqlData.aqlData.sampleSize);
+                      if (finalRecord.defectDetails) {
+                        finalRecord.defectDetails.aqlValue = aqlData.aqlData.levelUsed;
+                      } else {
+                        finalRecord.defectDetails = { aqlValue: aqlData.aqlData.levelUsed };
+                      }
                     }
+                  } else if (aqlResponse.status === 404) {
+                    setAqlEndpointAvailable(false);
+                    console.warn('AQL chart endpoint not available. Disabling AQL recalculation.');
                   }
-                } else if (aqlResponse.status === 404) {
-                  setAqlEndpointAvailable(false);
-                  console.warn('AQL chart endpoint not available. Disabling AQL recalculation.');
-                } else {
-                  console.warn(`AQL recalculation failed with status ${aqlResponse.status} for record ${record._id}`);
+                } catch (e) {
+                  console.error("Failed to recalculate AQL for record:", record._id, e);
                 }
-              } catch (e) {
-                console.error("Failed to recalculate AQL for record:", record._id, e);
               }
-            }
-            return finalRecord;
-          })
-        );
+              return finalRecord;
+            })
+          );
+          actualData.push(...batchResults);
+          
+          // Add delay between batches
+          if (i + BATCH_SIZE < submittedData.length) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
 
         dataToProcess = actualData;
       } else {
@@ -248,7 +257,14 @@ const fetchSubmittedData = async (showLoading = true) => {
         }
 
         try {
-          const response = await fetch(`${API_BASE_URL}/api/qc-real-washing-qty/search?` + new URLSearchParams({ inspectionDate: dateStr, styleNo: styleNo, color: color }));
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          
+          const response = await fetch(`${API_BASE_URL}/api/qc-real-washing-qty/search?` + new URLSearchParams({ inspectionDate: dateStr, styleNo: styleNo, color: color }), {
+            signal: controller.signal
+          });
+          clearTimeout(timeoutId);
+          
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.found && data.washQty > 0) {
@@ -256,7 +272,11 @@ const fetchSubmittedData = async (showLoading = true) => {
             }
           }
         } catch (error) {
-          console.error('Error fetching real wash qty from qc_real_washing_qty:', error);
+          if (error.name === 'AbortError') {
+            console.warn('Real wash qty request timed out for:', record.orderNo);
+          } else {
+            console.error('Error fetching real wash qty from qc_real_washing_qty:', error);
+          }
         }
         return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
       } else {
