@@ -6,6 +6,10 @@ import SubmittedWashingDataFilter from "./SubmittedWashingDataFilter";
 import QCWashingViewDetailsModal from "./QCWashingViewDetailsModal";
 import QCWashingFullReportModal from "./QCWashingFullReportModal";
 import { PDFDownloadLink } from "@react-pdf/renderer";
+import Swal from "sweetalert2";
+
+// Polyfill Buffer for client-side PDF generation
+window.Buffer = window.Buffer || Buffer;
 
 // Polyfill Buffer for client-side PDF generation
 window.Buffer = window.Buffer || Buffer;
@@ -15,10 +19,12 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState("actual"); // 'estimated' or 'actual'
+  const [viewMode, setViewMode] = useState("estimated"); // 'estimated' or 'actual'
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [aqlEndpointAvailable, setAqlEndpointAvailable] = useState(true);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,8 +110,6 @@ const SubmittedWashingDataPage = () => {
 
   useEffect(() => {
     fetchSubmittedData();
-    const interval = setInterval(() => fetchSubmittedData(false), 5000); // Refresh every 5 seconds
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -151,68 +155,58 @@ const SubmittedWashingDataPage = () => {
     const processDataForView = async () => {
       if (isLoading) return;
 
-      let dataToProcess = [...submittedData];
-
-      if (viewMode === "actual") {
-        let actualData = await Promise.all(
-          submittedData.map(async (record) => {
-            const washQtyData = await fetchRealWashQty(record);
-            let finalRecord = { ...record, ...washQtyData };
-
-            if (record.reportType === "Inline" && washQtyData.isActualWashQty) {
-              const newWashQty = washQtyData.displayWashQty;
-              try {
-                const aqlResponse = await fetch(
-                  `${API_BASE_URL}/api/qc-washing/aql-chart/find`,
-                  {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                      lotSize: newWashQty,
-                      orderNo: record.orderNo
-                    })
-                  }
-                );
-                const aqlData = await aqlResponse.json();
-
-                if (aqlData.success && aqlData.aqlData) {
-                  finalRecord.aql = [aqlData.aqlData];
-                  finalRecord.checkedQty = Math.min(
-                    newWashQty,
-                    aqlData.aqlData.sampleSize
-                  );
-                  // Also update the aqlValue inside defectDetails for the full report modal
-                  if (finalRecord.defectDetails) {
-                    finalRecord.defectDetails.aqlValue =
-                      aqlData.aqlData.levelUsed;
-                  } else {
-                    finalRecord.defectDetails = {
-                      aqlValue: aqlData.aqlData.levelUsed
-                    };
-                  }
-                }
-              } catch (e) {
-                console.error(
-                  "Failed to recalculate AQL for record:",
-                  record._id,
-                  e
-                );
-              }
-            }
-            return finalRecord;
-          })
-        );
-
-        dataToProcess = actualData;
-      } else {
-        dataToProcess = submittedData.map((record) => ({
+      if (viewMode === "estimated") {
+        const dataToProcess = submittedData.map((record) => ({
           ...record,
           displayWashQty: record.washQty,
           isActualWashQty: false
         }));
-      }
+        applyFilters(currentFilters || {}, false, dataToProcess);
+      } else {
+        // Show estimated data immediately, then process actual data in background
+        const estimatedData = submittedData.map((record) => ({
+          ...record,
+          displayWashQty: record.washQty,
+          isActualWashQty: false
+        }));
+        applyFilters(currentFilters || {}, false, estimatedData);
 
-      applyFilters(currentFilters || {}, false, dataToProcess);
+        setIsProcessing(true);
+
+        // Process actual data in background
+        setTimeout(async () => {
+          const BATCH_SIZE = 10;
+          let actualData = [];
+
+          for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
+            const batch = submittedData.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(
+              batch.map(async (record) => {
+                const washQtyData = await fetchRealWashQty(record);
+                return { ...record, ...washQtyData };
+              })
+            );
+            actualData.push(...batchResults);
+
+            // Update UI progressively
+            if (actualData.length % 20 === 0) {
+              applyFilters(currentFilters || {}, false, [
+                ...actualData,
+                ...submittedData
+                  .slice(actualData.length)
+                  .map((r) => ({
+                    ...r,
+                    displayWashQty: r.washQty,
+                    isActualWashQty: false
+                  }))
+              ]);
+            }
+          }
+
+          applyFilters(currentFilters || {}, false, actualData);
+          setIsProcessing(false);
+        }, 100);
+      }
     };
 
     processDataForView();
@@ -271,14 +265,22 @@ const SubmittedWashingDataPage = () => {
         }
 
         try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+
           const response = await fetch(
             `${API_BASE_URL}/api/qc-real-washing-qty/search?` +
               new URLSearchParams({
                 inspectionDate: dateStr,
                 styleNo: styleNo,
                 color: color
-              })
+              }),
+            {
+              signal: controller.signal
+            }
           );
+          clearTimeout(timeoutId);
+
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.found && data.washQty > 0) {
@@ -293,10 +295,17 @@ const SubmittedWashingDataPage = () => {
             }
           }
         } catch (error) {
-          console.error(
-            "Error fetching real wash qty from qc_real_washing_qty:",
-            error
-          );
+          if (error.name === "AbortError") {
+            console.warn(
+              "Real wash qty request timed out for:",
+              record.orderNo
+            );
+          } else {
+            console.error(
+              "Error fetching real wash qty from qc_real_washing_qty:",
+              error
+            );
+          }
         }
         return {
           displayWashQty: record.washQty || 0,
@@ -763,7 +772,7 @@ const SubmittedWashingDataPage = () => {
       // Add inspector photo to preloaded images if available
       if (inspectorDetails?.face_photo) {
         try {
-          const loadImageAsBase64 = async (src, API_BASE_URL) => {
+          const loadInspectorPhoto = async (src, API_BASE_URL) => {
             let imageUrl = src;
 
             if (typeof src === "object" && src !== null) {
@@ -776,6 +785,7 @@ const SubmittedWashingDataPage = () => {
             }
 
             if (!imageUrl || typeof imageUrl !== "string") {
+              console.warn("❌ Invalid inspector photo URL:", src);
               return null;
             }
 
@@ -785,45 +795,66 @@ const SubmittedWashingDataPage = () => {
 
             try {
               let cleanUrl = imageUrl.trim();
-              if (
-                cleanUrl.startsWith("/storage/") ||
-                cleanUrl.startsWith("/public/")
-              ) {
-                cleanUrl = `${API_BASE_URL}${cleanUrl}`;
-              }
 
               const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(
                 cleanUrl
               )}`;
               const response = await fetch(proxyUrl, {
                 method: "GET",
-                headers: { Accept: "application/json" },
-                timeout: 10000
+                headers: { Accept: "application/json" }
               });
 
               if (response.ok) {
                 const data = await response.json();
                 if (data.dataUrl && data.dataUrl.startsWith("data:")) {
                   return data.dataUrl;
+                } else {
+                  console.warn(
+                    "❌ Invalid response data for inspector photo:",
+                    data
+                  );
                 }
+              } else {
+                console.warn(
+                  "❌ Failed to fetch inspector photo:",
+                  response.status,
+                  response.statusText
+                );
               }
               return null;
             } catch (error) {
-              console.warn("Error loading inspector photo:", error);
+              console.error("❌ Error loading inspector photo:", error);
               return null;
             }
           };
 
-          const inspectorPhotoBase64 = await loadImageAsBase64(
+          const inspectorPhotoBase64 = await loadInspectorPhoto(
             inspectorDetails.face_photo,
             API_BASE_URL
           );
           if (inspectorPhotoBase64) {
-            preloadedImages[inspectorDetails.face_photo] = inspectorPhotoBase64;
+            // Store with multiple possible keys for better matching
+            const photoKeys = [
+              inspectorDetails.face_photo,
+              inspectorDetails.face_photo.trim(),
+              inspectorDetails.face_photo.startsWith("/")
+                ? inspectorDetails.face_photo.substring(1)
+                : "/" + inspectorDetails.face_photo
+            ];
+
+            photoKeys.forEach((key) => {
+              if (key && key.trim()) {
+                preloadedImages[key.trim()] = inspectorPhotoBase64;
+              }
+            });
+          } else {
+            console.warn("⚠️ Inspector photo could not be loaded");
           }
         } catch (error) {
-          console.warn("⚠️ Failed to load inspector photo:", error);
+          console.error("❌ Failed to load inspector photo:", error);
         }
+      } else {
+        console.log("ℹ️ No inspector photo available");
       }
 
       // Import the PDF renderer
@@ -861,6 +892,16 @@ const SubmittedWashingDataPage = () => {
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+
+      // Show success alert after download
+      Swal.fire({
+        title: "Success!",
+        text: "PDF downloaded successfully!",
+        icon: "success",
+        timer: 5000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     } catch (error) {
       // Provide more specific error messages
       let errorMessage = "Failed to generate PDF";
@@ -872,7 +913,14 @@ const SubmittedWashingDataPage = () => {
         errorMessage = "Network access error. Please check your connection.";
       }
 
-      alert(`${errorMessage}: ${error.message}`);
+      Swal.fire({
+        title: "Error!",
+        text: `${errorMessage}: ${error.message}`,
+        icon: "error",
+        timer: 5000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     } finally {
       setIsQcWashingPDF(false);
     }
@@ -1111,13 +1159,6 @@ const SubmittedWashingDataPage = () => {
       );
     }
 
-    // Note: Inspector photo will be handled separately in the main function
-
-    if (imageCollection.size === 0) {
-      console.log("No images found, proceeding without loading");
-      return {};
-    }
-
     // ENHANCED: Load images with better error handling and validation
     const loadImageAsBase64 = async (src, API_BASE_URL) => {
       let imageUrl = src;
@@ -1264,27 +1305,6 @@ const SubmittedWashingDataPage = () => {
 
     return imageMap;
   };
-
-  // const handleDelete = async (record) => {
-  //   console.log('Delete record:', record);
-  //   if (window.confirm('Are you sure you want to delete this record?')) {
-  //     try {
-  //       const response = await fetch(`${API_BASE_URL}/api/qc-washing/delete/${record._id}`, {
-  //         method: 'DELETE'
-  //       });
-
-  //       if (response.ok) {
-  //         setSubmittedData(prev => prev.filter(item => item._id !== record._id));
-  //         alert('Record deleted successfully');
-  //       } else {
-  //         alert('Failed to delete record');
-  //       }
-  //     } catch (error) {
-  //       console.error('Error deleting record:', error);
-  //       alert('Error deleting record');
-  //     }
-  //   }
-  // };
 
   const toggleDropdown = (recordId) => {
     setOpenDropdown(openDropdown === recordId ? null : recordId);
@@ -1520,7 +1540,12 @@ const SubmittedWashingDataPage = () => {
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-              Submitted QC Washing Reports
+              QC Washing Final Reports
+              {isProcessing && (
+                <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
+                  (Processing actual data...)
+                </span>
+              )}
             </h2>
             <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
               <button
@@ -1784,6 +1809,7 @@ const SubmittedWashingDataPage = () => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.checkedQty || "N/A"}
                       </td>
+
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {totalDefectCount}
                       </td>

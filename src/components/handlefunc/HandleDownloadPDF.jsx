@@ -1,6 +1,7 @@
 import html2pdf from "html2pdf.js";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
+import Swal from "sweetalert2";
 
 const HandleDownloadPDF = ({
   savedState,
@@ -9,7 +10,7 @@ const HandleDownloadPDF = ({
   goodOutput,
   defectPieces,
   language,
-  defectsList, // Add defectsList as a prop
+  defectsList // Add defectsList as a prop
 }) => {
   const handleDownloadPDF = async () => {
     try {
@@ -23,7 +24,7 @@ const HandleDownloadPDF = ({
           rate:
             checkedQuantity > 0
               ? ((count / checkedQuantity) * 100).toFixed(2)
-              : "0.00",
+              : "0.00"
         }))
         .sort((a, b) => b.count - a.count);
 
@@ -161,12 +162,30 @@ const HandleDownloadPDF = ({
         filename: "inspection-report.pdf",
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" }
       };
 
       await html2pdf().set(opt).from(element).save();
+
+      // Show success alert after download
+      Swal.fire({
+        title: "Success!",
+        text: "PDF downloaded successfully!",
+        icon: "success",
+        timer: 5000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     } catch (error) {
       console.error("Error generating PDF:", error);
+      Swal.fire({
+        title: "Error!",
+        text: "Failed to download PDF. Please try again.",
+        icon: "error",
+        timer: 5000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     }
   };
 

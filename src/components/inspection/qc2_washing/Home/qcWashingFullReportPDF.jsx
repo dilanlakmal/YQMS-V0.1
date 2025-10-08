@@ -173,7 +173,6 @@ const clearImageCache = () => {
   imageCache.clear();
   loadingPromises.clear();
   activeLoads.clear();
-  console.log("🧹 Image cache cleared");
 };
 
 const getMemoryUsage = () => {
@@ -3075,7 +3074,6 @@ const QcWashingFullReportPDFWrapper = ({
   React.useEffect(() => {
     const fetchInspectorDetails = async () => {
       if (!recordData?.userId) {
-        console.log("❌ No userId found in recordData");
         setFetchedInspectorDetails(null);
         return;
       }
@@ -3126,7 +3124,6 @@ const QcWashingFullReportPDFWrapper = ({
     const preloadAllImages = async () => {
       // Wait for inspector details to be fetched first
       if (!finalInspectorDetails && recordData?.userId) {
-        console.log("⏳ Waiting for inspector details...");
         return;
       }
 
@@ -3217,12 +3214,14 @@ const QcWashingFullReportPDFWrapper = ({
           });
         };
 
-        // Collect defect images (both captured and uploaded)
-        if (recordData.defectDetails?.defectsByPc) {
+        // SELECTIVE: Only collect defect images if defects exist and will be displayed
+        if (
+          recordData.defectDetails?.defectsByPc &&
+          recordData.defectDetails.defectsByPc.length > 0
+        ) {
           recordData.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
-            if (pc.pcDefects) {
+            if (pc.pcDefects && pc.pcDefects.length > 0) {
               pc.pcDefects.forEach((defect, defectIndex) => {
-                // FIXED: Check multiple possible property names
                 const capturedImages =
                   defect.defectImages || defect.capturedImages || [];
                 const uploadedImages =
@@ -3231,18 +3230,17 @@ const QcWashingFullReportPDFWrapper = ({
                   defect.images ||
                   [];
 
-                // Collect captured defect images
+                // Only collect first 2 images per defect to limit memory usage
                 if (Array.isArray(capturedImages)) {
-                  capturedImages.forEach((img, imgIndex) => {
+                  capturedImages.slice(0, 2).forEach((img, imgIndex) => {
                     addImageToCollection(
                       img,
                       `defect-pc${pcIndex}-defect${defectIndex}-captured${imgIndex}`
                     );
                   });
                 }
-                // Collect uploaded defect images
                 if (Array.isArray(uploadedImages)) {
-                  uploadedImages.forEach((img, imgIndex) => {
+                  uploadedImages.slice(0, 2).forEach((img, imgIndex) => {
                     addImageToCollection(
                       img,
                       `defect-pc${pcIndex}-defect${defectIndex}-uploaded${imgIndex}`
@@ -3254,69 +3252,81 @@ const QcWashingFullReportPDFWrapper = ({
           });
         }
 
-        // Collect additional images
+        // SELECTIVE: Only collect additional images if they exist and limit to first 5
         if (
           recordData.defectDetails?.additionalImages &&
-          Array.isArray(recordData.defectDetails.additionalImages)
+          Array.isArray(recordData.defectDetails.additionalImages) &&
+          recordData.defectDetails.additionalImages.length > 0
         ) {
-          recordData.defectDetails.additionalImages.forEach((img, index) => {
-            addImageToCollection(img, `additional-${index}`);
-          });
+          recordData.defectDetails.additionalImages
+            .slice(0, 5)
+            .forEach((img, index) => {
+              addImageToCollection(img, `additional-${index}`);
+            });
         }
 
-        // Collect new inspection images (both captured and uploaded)
-        if (recordData.inspectionDetails?.checkpointInspectionData) {
+        // SELECTIVE: Only collect inspection images if checkpoint data exists and limit images
+        if (
+          recordData.inspectionDetails?.checkpointInspectionData &&
+          recordData.inspectionDetails.checkpointInspectionData.length > 0
+        ) {
           recordData.inspectionDetails.checkpointInspectionData.forEach(
             (checkpoint, checkIndex) => {
-              // Collect captured comparison images
+              // Limit to first 2 images per checkpoint
               if (
                 checkpoint.comparisonImages &&
                 Array.isArray(checkpoint.comparisonImages)
               ) {
-                checkpoint.comparisonImages.forEach((img, imgIndex) => {
-                  addImageToCollection(
-                    img,
-                    `checkpoint${checkIndex}-main-img${imgIndex}`
-                  );
-                });
+                checkpoint.comparisonImages
+                  .slice(0, 2)
+                  .forEach((img, imgIndex) => {
+                    addImageToCollection(
+                      img,
+                      `checkpoint${checkIndex}-main-img${imgIndex}`
+                    );
+                  });
               }
-              // Collect uploaded comparison images
               if (
                 checkpoint.uploadedImages &&
                 Array.isArray(checkpoint.uploadedImages)
               ) {
-                checkpoint.uploadedImages.forEach((img, imgIndex) => {
-                  addImageToCollection(
-                    img,
-                    `checkpoint${checkIndex}-main-uploaded${imgIndex}`
-                  );
-                });
+                checkpoint.uploadedImages
+                  .slice(0, 2)
+                  .forEach((img, imgIndex) => {
+                    addImageToCollection(
+                      img,
+                      `checkpoint${checkIndex}-main-uploaded${imgIndex}`
+                    );
+                  });
               }
-              if (checkpoint.subPoints) {
+              if (checkpoint.subPoints && checkpoint.subPoints.length > 0) {
                 checkpoint.subPoints.forEach((subPoint, subIndex) => {
-                  // Collect captured sub-point images
+                  // Limit to first 1 image per sub-point
                   if (
                     subPoint.comparisonImages &&
                     Array.isArray(subPoint.comparisonImages)
                   ) {
-                    subPoint.comparisonImages.forEach((img, imgIndex) => {
-                      addImageToCollection(
-                        img,
-                        `checkpoint${checkIndex}-sub${subIndex}-img${imgIndex}`
-                      );
-                    });
+                    subPoint.comparisonImages
+                      .slice(0, 1)
+                      .forEach((img, imgIndex) => {
+                        addImageToCollection(
+                          img,
+                          `checkpoint${checkIndex}-sub${subIndex}-img${imgIndex}`
+                        );
+                      });
                   }
-                  // Collect uploaded sub-point images
                   if (
                     subPoint.uploadedImages &&
                     Array.isArray(subPoint.uploadedImages)
                   ) {
-                    subPoint.uploadedImages.forEach((img, imgIndex) => {
-                      addImageToCollection(
-                        img,
-                        `checkpoint${checkIndex}-sub${subIndex}-uploaded${imgIndex}`
-                      );
-                    });
+                    subPoint.uploadedImages
+                      .slice(0, 1)
+                      .forEach((img, imgIndex) => {
+                        addImageToCollection(
+                          img,
+                          `checkpoint${checkIndex}-sub${subIndex}-uploaded${imgIndex}`
+                        );
+                      });
                   }
                 });
               }
@@ -3324,22 +3334,23 @@ const QcWashingFullReportPDFWrapper = ({
           );
         }
 
-        // Collect legacy inspection images (both captured and uploaded)
-        if (recordData.inspectionDetails?.checkedPoints) {
+        // SELECTIVE: Only collect legacy inspection images if they exist and limit to first 2
+        if (
+          recordData.inspectionDetails?.checkedPoints &&
+          recordData.inspectionDetails.checkedPoints.length > 0
+        ) {
           recordData.inspectionDetails.checkedPoints.forEach(
             (point, pointIndex) => {
-              // Collect captured comparison images
               if (point.comparison && Array.isArray(point.comparison)) {
-                point.comparison.forEach((img, imgIndex) => {
+                point.comparison.slice(0, 2).forEach((img, imgIndex) => {
                   addImageToCollection(
                     img,
                     `legacy-point${pointIndex}-img${imgIndex}`
                   );
                 });
               }
-              // Collect uploaded comparison images
               if (point.uploadedImages && Array.isArray(point.uploadedImages)) {
-                point.uploadedImages.forEach((img, imgIndex) => {
+                point.uploadedImages.slice(0, 2).forEach((img, imgIndex) => {
                   addImageToCollection(
                     img,
                     `legacy-point${pointIndex}-uploaded${imgIndex}`
@@ -3350,8 +3361,11 @@ const QcWashingFullReportPDFWrapper = ({
           );
         }
 
-        // Collect machine images
-        if (recordData.inspectionDetails?.machineProcesses) {
+        // SELECTIVE: Only collect machine images if they exist
+        if (
+          recordData.inspectionDetails?.machineProcesses &&
+          recordData.inspectionDetails.machineProcesses.length > 0
+        ) {
           recordData.inspectionDetails.machineProcesses.forEach(
             (machine, machineIndex) => {
               if (machine.image) {
@@ -3369,22 +3383,19 @@ const QcWashingFullReportPDFWrapper = ({
           );
         }
 
-        console.log(`📊 Found ${imageCollection.size} unique images to load`);
-
+        // Early exit if no images needed
         if (imageCollection.size === 0) {
           if (isMounted) {
+            performanceTimer.end("PDF-ImageLoading");
             setPreloadedImages({});
             setLoading(false);
           }
           return;
         }
 
-        // Limit total images to prevent memory issues
-        const MAX_IMAGES = 50;
+        // Limit total images to prevent memory issues - reduced limit
+        const MAX_IMAGES = 20;
         if (imageCollection.size > MAX_IMAGES) {
-          console.warn(
-            `⚠️ Too many images (${imageCollection.size}), limiting to ${MAX_IMAGES}`
-          );
           const limitedEntries = Array.from(imageCollection.entries()).slice(
             0,
             MAX_IMAGES
@@ -3398,7 +3409,7 @@ const QcWashingFullReportPDFWrapper = ({
         // FIXED: Load images with batching and better error handling
         const imageMap = {};
         const imageEntries = Array.from(imageCollection.entries());
-        const BATCH_SIZE = 5; // Process images in batches
+        const BATCH_SIZE = 1; // Single image per batch to prevent server overload
 
         // Process images in batches to avoid overwhelming the system
         for (let i = 0; i < imageEntries.length; i += BATCH_SIZE) {
@@ -3406,9 +3417,9 @@ const QcWashingFullReportPDFWrapper = ({
 
           const batchPromises = batch.map(async ([key, url], batchIndex) => {
             try {
-              // Add small delay between requests in batch
+              // Add delay between requests to prevent server overload
               await new Promise((resolve) =>
-                setTimeout(resolve, batchIndex * 200)
+                setTimeout(resolve, batchIndex * 500)
               );
 
               const base64 = await loadImageAsBase64(url, API_BASE_URL);
@@ -3417,11 +3428,11 @@ const QcWashingFullReportPDFWrapper = ({
                 imageMap[key] = base64;
                 return { success: true, key };
               } else {
-                console.warn(`❌ Invalid base64 data for: ${key}`);
                 return { success: false, key, error: "Invalid base64 data" };
               }
             } catch (error) {
               console.error(`❌ Failed to load ${key}:`, error.message);
+              // Skip failed images instead of breaking the entire process
               return { success: false, key, error: error.message };
             }
           });
@@ -3431,7 +3442,7 @@ const QcWashingFullReportPDFWrapper = ({
 
           // Small delay between batches
           if (i + BATCH_SIZE < imageEntries.length) {
-            await new Promise((resolve) => setTimeout(resolve, 500));
+            await new Promise((resolve) => setTimeout(resolve, 1000));
           }
         }
 
@@ -3439,10 +3450,6 @@ const QcWashingFullReportPDFWrapper = ({
 
         const successCount = Object.keys(imageMap).length;
         const failCount = imageEntries.length - successCount;
-
-        console.log(
-          `📊 Image loading complete: ${successCount} success, ${failCount} failed`
-        );
 
         // Log memory usage after loading
         const finalMemory = getMemoryUsage();
@@ -3458,7 +3465,6 @@ const QcWashingFullReportPDFWrapper = ({
           // Schedule cache cleanup after a delay to free memory
           setTimeout(() => {
             if (imageCache.size > 100) {
-              console.log("🧹 Scheduled cache cleanup due to large size");
               clearImageCache();
             }
           }, 60000); // Clean up after 1 minute
@@ -3476,9 +3482,6 @@ const QcWashingFullReportPDFWrapper = ({
     // Set up timeout with cleanup - increased timeout for batch loading
     const timeoutId = setTimeout(() => {
       if (isMounted) {
-        console.warn(
-          "⏰ Image loading timeout reached, proceeding with loaded images"
-        );
         setLoading(false);
       }
     }, 30000); // Increased to 30 seconds for batch processing
@@ -3564,8 +3567,6 @@ const QcWashingFullReportPDFWrapper = ({
 
   // Show error state with fallback
   if (error) {
-    console.log("🔄 Error occurred, falling back to PDF without images");
-
     // Clear cache on error to free memory
     clearImageCache();
 
