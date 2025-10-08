@@ -1,6 +1,7 @@
 import html2pdf from "html2pdf.js";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faEye, faDownload } from "@fortawesome/free-solid-svg-icons";
+import Swal from 'sweetalert2';
 
 const HandleDownloadPDF = ({
   savedState,
@@ -165,8 +166,26 @@ const HandleDownloadPDF = ({
       };
 
       await html2pdf().set(opt).from(element).save();
+      
+      // Show success alert after download
+      Swal.fire({
+        title: 'Success!',
+        text: 'PDF downloaded successfully!',
+        icon: 'success',
+        timer: 5000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     } catch (error) {
       console.error("Error generating PDF:", error);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to download PDF. Please try again.',
+        icon: 'error',
+        timer: 5000,
+        timerProgressBar: true,
+        showConfirmButton: false
+      });
     }
   };
 

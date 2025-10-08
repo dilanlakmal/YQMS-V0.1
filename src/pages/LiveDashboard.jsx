@@ -544,7 +544,7 @@ const LiveDashboard = () => {
         {activeSection === "Washing" && <WashingLive />}
         {activeSection === "Ironing" && <IroningLive />}
         {activeSection === "OPA" && <OPALive />}
-        {activeSection === "Cutting" && <CuttingLive />}
+        {activeSection === "Cutting" && <CuttingLive setActiveSection={setActiveSection} />}
         {activeSection === "Packing" && <PackingLive />}
         {activeSection === "Live Dashboard" && (
           <>
