@@ -165,30 +165,6 @@ const safeString = (value) => {
   return stringValue === '' ? "N/A" : stringValue;
 };
 
-// Memory management utilities
-const clearImageCache = () => {
-  imageCache.clear();
-  loadingPromises.clear();
-  activeLoads.clear();
-};
-
-const getMemoryUsage = () => {
-  const cacheSize = imageCache.size;
-  const loadingSize = loadingPromises.size;
-  const activeSize = activeLoads.size;
-  return { cacheSize, loadingSize, activeSize };
-};
-
-// Performance monitoring
-const performanceTimer = {
-  start: (label) => {
-    console.time(label);
-  },
-  end: (label) => {
-    console.timeEnd(label);
-  }
-};
-
 // Safe Text Component to prevent empty string errors
 const SafeText = ({ children, style, ...props }) => {
   // Handle all falsy values and empty strings
@@ -209,120 +185,6 @@ const SafeText = ({ children, style, ...props }) => {
   
   return <Text style={style} {...props}>{content}</Text>;
 };
-
-// --- OPTIMIZED IMAGE LOADING UTILITY ---
-const imageCache = new Map();
-const loadingPromises = new Map();
-const MAX_CONCURRENT_LOADS = 3; // Limit concurrent image loads
-const activeLoads = new Set();
-
-const loadImageAsBase64 = async (src, API_BASE_URL) => {
-  const imageUrl = normalizeImageUrl(src);
-  if (!imageUrl) return null;
-
-  // Check cache first
-  if (imageCache.has(imageUrl)) {
-    return imageCache.get(imageUrl);
-  }
-
-  // Check if already loading
-  if (loadingPromises.has(imageUrl)) {
-    return loadingPromises.get(imageUrl);
-  }
-
-  // Wait if too many concurrent loads
-  while (activeLoads.size >= MAX_CONCURRENT_LOADS) {
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-
-  // Create loading promise
-  const loadPromise = loadImageOptimized(imageUrl, API_BASE_URL);
-  loadingPromises.set(imageUrl, loadPromise);
-  activeLoads.add(imageUrl);
-
-  try {
-    const result = await loadPromise;
-    imageCache.set(imageUrl, result);
-    return result;
-  } finally {
-    loadingPromises.delete(imageUrl);
-    activeLoads.delete(imageUrl);
-  }
-};
-
-const normalizeImageUrl = (src) => {
-  if (!src) return null;
-  
-  if (typeof src === 'string') {
-    if (src.startsWith('data:')) return src;
-    if (src.startsWith('{')) {
-      try {
-        const parsed = JSON.parse(src);
-        return parsed.originalUrl || parsed.url || parsed.src || parsed.path;
-      } catch (e) {
-        return src;
-      }
-    }
-    return src.trim();
-  }
-  
-  if (typeof src === 'object' && src !== null) {
-    return src.originalUrl || src.url || src.src || src.path;
-  }
-  
-  return null;
-};
-
-const loadImageOptimized = async (imageUrl, API_BASE_URL) => {
-  try {
-    // Return cached base64 immediately
-    if (imageUrl.startsWith('data:')) {
-      return imageUrl;
-    }
-
-    // Build proxy URL
-    let cleanUrl = imageUrl;
-    if (cleanUrl.startsWith('/')) {
-      cleanUrl = `${API_BASE_URL}${cleanUrl}`;
-    }
-
-    const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout
-    
-    const response = await fetch(proxyUrl, {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.warn(`Failed to load image: ${response.status} ${response.statusText}`);
-      return null;
-    }
-
-    const data = await response.json();
-    
-    // Validate response
-    if (!data.dataUrl || !data.dataUrl.startsWith('data:')) {
-      console.warn('Invalid image data received');
-      return null;
-    }
-    
-    return data.dataUrl;
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      console.warn('Image load timeout:', imageUrl);
-    } else {
-      console.warn('Image load error:', error.message);
-    }
-    return null;
-  }
-};
-
 
 // --- FIXED HELPER FUNCTION TO NORMALIZE IMAGE KEYS ---
 const normalizeImageKey = (src) => {
@@ -1749,10 +1611,29 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
 );
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
-const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], preloadedImages = {}, skipImageLoading = false, inspectorDetails = null }) => {
+const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], inspectorDetails = null }) => {
+  const [fetchedInspectorDetails, setFetchedInspectorDetails] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    const fetchInspectorDetails = async () => {
+      if (inspectorDetails || !recordData?.userId) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/users/${recordData.userId}`);
+        if (response.ok) setFetchedInspectorDetails(await response.json());
+      } catch (error) {
+        console.error('Error fetching inspector details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchInspectorDetails();
+  }, [recordData?.userId, API_BASE_URL, inspectorDetails]);
   
-  // Use passed inspector details or fetch if not provided
-  const finalInspectorDetails = inspectorDetails;
+  const finalInspectorDetails = inspectorDetails || fetchedInspectorDetails;
   
   // Helper for placeholder images
   const ImagePlaceholder = ({ style, text, subtext }) => (
@@ -1763,175 +1644,57 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
     </View>
   );
 
-  // FIXED SafeImage component - ONLY use preloaded images
+  // Simplified SafeImage component to build full URL
   const SafeImage = ({ src, style, alt }) => {
-  if (!src) {
-    return <ImagePlaceholder style={style} text="No Source" subtext="Missing URL" />;
-  }
+    const getFullUrl = (imgSrc) => {
+      if (!imgSrc) return null;
+
+      let url = '';
+      if (typeof imgSrc === 'string') {
+        url = imgSrc.trim();
+      } else if (typeof imgSrc === 'object' && imgSrc !== null) {
+        url = imgSrc.originalUrl || imgSrc.url || imgSrc.src || imgSrc.path || '';
+      }
   
-  // Enhanced key generation to handle all possible URL formats
-  const generateAllPossibleKeys = (src) => {
-    const keys = new Set();
-    
+      if (url.startsWith('data:')) return url;
+      if (!url) return null;
+  
+      // If the URL is external (starts with http), use the proxy.
+      if (url.startsWith('http')) {
+        // This creates a URL like: /api/image-proxy?url=https://ym.kottrahr.com/...
+        return `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(url)}`;
+      }
+  
+      // If it's a local/relative URL, construct the absolute path.
+      // This handles paths like /Uploads/Images/...
+      return `${API_BASE_URL}${url.startsWith('/') ? '' : '/'}${url.trim()}`;
+    };
+  
+    const imageUrl = getFullUrl(src);
+  
+    if (!imageUrl) {
+      return <ImagePlaceholder style={style} text="No Source" subtext={alt || 'Missing URL'} />;
+    }
+
+    try {
+      // Let @react-pdf/renderer handle the image fetching
+      return <Image src={imageUrl} style={style} />;
+    } catch (error) {
+      return <ImagePlaceholder style={style} text="Render Error" subtext={error.message} />;
+    }
+  };
+
+  if (loading) {
     if (typeof src === 'string') {
-      const cleanSrc = src.trim();
-      if (cleanSrc) {
-        keys.add(cleanSrc);
-        keys.add(src); // untrimmed version
-        
-        // Handle different URL formats
-        if (cleanSrc.startsWith('/')) {
-          keys.add(cleanSrc.substring(1));
-        } else {
-          keys.add('/' + cleanSrc);
-        }
-        
-        // Handle full URLs for 192.167.12.85:5000
-        if (cleanSrc.includes('192.167.12.85:5000')) {
-          const urlParts = cleanSrc.split('192.167.12.85:5000');
-          if (urlParts.length > 1) {
-            const path = urlParts[1];
-            if (path) {
-              keys.add(path);
-              keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
-            }
-          }
-        }
-        
-        // Handle yqms.yaikh.com URLs
-        if (cleanSrc.includes('yqms.yaikh.com')) {
-          const urlParts = cleanSrc.split('yqms.yaikh.com');
-          if (urlParts.length > 1) {
-            const path = urlParts[1];
-            if (path) {
-              keys.add(path);
-              keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
-            }
-          }
-        }
-        
-        // Handle storage and public paths
-        if (cleanSrc.includes('/storage/') || cleanSrc.includes('/public/')) {
-          const pathMatch = cleanSrc.match(/(\/(?:storage|public)\/.+)/);
-          if (pathMatch && pathMatch[1]) {
-            keys.add(pathMatch[1]);
-            keys.add(pathMatch[1].substring(1));
-          }
-        }
-        
-        // CRITICAL FIX: Handle JSON string format that might contain image URLs
-        if (cleanSrc.startsWith('{') && cleanSrc.endsWith('}')) {
-          try {
-            const parsed = JSON.parse(cleanSrc);
-            if (parsed && typeof parsed === 'object') {
-              const possibleUrls = [
-                parsed.originalUrl,
-                parsed.url,
-                parsed.src,
-                parsed.path
-              ].filter(url => url && typeof url === 'string' && url.trim());
-              
-              possibleUrls.forEach(url => {
-                const subKeys = generateAllPossibleKeys(url);
-                subKeys.forEach(key => keys.add(key));
-              });
-            }
-          } catch (e) {
-            // If JSON parsing fails, treat as regular string
-          }
-        }
-      }
-    } else if (typeof src === 'object' && src !== null) {
-      const possibleUrls = [
-        src.originalUrl,
-        src.url,
-        src.src,
-        src.path
-      ].filter(url => url && typeof url === 'string' && url.trim());
-      
-      possibleUrls.forEach(url => {
-        const subKeys = generateAllPossibleKeys(url);
-        subKeys.forEach(key => keys.add(key));
-      });
-      
-      try {
-        const jsonStr = JSON.stringify(src);
-        if (jsonStr && jsonStr !== '{}' && jsonStr !== 'null') {
-          keys.add(jsonStr);
-        }
-      } catch (e) {
-        // Ignore JSON stringify errors
-      }
-    }
-    
-    return Array.from(keys).filter(key => key && key.trim());
-  };
-
-  const possibleKeys = generateAllPossibleKeys(src);
-  
- 
-
-  // Try to find image with any of the possible keys
-  let imageSrc = null;
-  let matchedKey = null;
-  
-  for (const key of possibleKeys) {
-    if (preloadedImages[key]) {
-      imageSrc = preloadedImages[key];
-      matchedKey = key;
-      break;
+      return (
+        <Document>
+          <Page style={styles.page}><Text>Loading report...</Text></Page>
+        </Document>
+      );
     }
   }
-  
-  
 
-  if (!imageSrc) {
-    const filename = possibleKeys[0] ? possibleKeys[0].split('/').pop() || 'Image' : 'Image';
-    return <ImagePlaceholder style={style} text={filename} subtext="Not Preloaded" />;
-  }
-
-  // Validate base64 format
-  if (!imageSrc || typeof imageSrc !== 'string' || !imageSrc.startsWith('data:')) {
-    return <ImagePlaceholder style={style} text="Invalid Format" subtext="Bad Data" />;
-  }
-
-  const base64Parts = imageSrc.split(',');
-  if (base64Parts.length !== 2 || !base64Parts[1] || base64Parts[1].length < 100) {
-    return <ImagePlaceholder style={style} text="Corrupted Data" subtext="Invalid Base64" />;
-  }
-
-  try {
-    return <Image src={imageSrc} style={style} />;
-  } catch (error) {
-    return <ImagePlaceholder style={style} text="Render Error" subtext={error.message} />;
-  }
-};
-
-  const getCheckpointStatus = (checkpointId, decision, checkpointDefinitions) => {
-    if (!Array.isArray(checkpointDefinitions) || !checkpointId || !decision) {
-      return { isPass: null, status: 'N/A', color: '#6b7280' };
-    }
-    const checkpointDef = checkpointDefinitions.find(def => def._id === checkpointId);
-    if (!checkpointDef || !checkpointDef.options) {
-      return { isPass: null, status: 'N/A', color: '#6b7280' };
-    }
-    const selectedOption = checkpointDef.options.find(opt => opt.name === decision);
-    if (!selectedOption) {
-      return { isPass: null, status: 'N/A', color: '#6b7280' };
-    }
-    const isPass = !selectedOption.isFail;
-    return { isPass, status: isPass ? 'OK' : 'NO', color: isPass ? '#16a34a' : '#dc2626', backgroundColor: isPass ? '#dcfce7' : '#fee2e2' };
-  };
-  
-  if (!recordData) {
-    return (
-      <Document>
-        <Page style={styles.page}>
-          <Text>No report data available.</Text>
-        </Page>
-      </Document>
-    );
-  }
+  if (!recordData) return <Document><Page style={styles.page}><Text>No report data available.</Text></Page></Document>;
 
   // Detect which data structure we're dealing with
   const hasNewInspectionStructure = recordData.inspectionDetails?.checkpointInspectionData && 
@@ -2041,520 +1804,6 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
   );
 };
 
-// Wrapper component that optionally preloads images
-const QcWashingFullReportPDFWrapper = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], skipImageLoading = false, inspectorDetails = null }) => {
-  
-  const [preloadedImages, setPreloadedImages] = React.useState({});
-  const [loading, setLoading] = React.useState(true);
-  const [error, setError] = React.useState(null);
-  const [fetchedInspectorDetails, setFetchedInspectorDetails] = React.useState(null);
-
-  // Fetch inspector details from users collection
-  React.useEffect(() => {
-  const fetchInspectorDetails = async () => {
-    
-    
-    if (!recordData?.userId) {
-      setFetchedInspectorDetails(null);
-      return;
-    }
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/users/${recordData.userId}`);
-      
-      if (response.ok) {
-        const userData = await response.json();
-        setFetchedInspectorDetails(userData);
-      } else {
-        const errorText = await response.text();
-        console.warn('Error details:', errorText);
-        setFetchedInspectorDetails(null);
-      }
-    } catch (error) {
-      console.error('❌ Error fetching inspector details:', error);
-      setFetchedInspectorDetails(null);
-    }
-  };
-
-  fetchInspectorDetails();
-}, [recordData?.userId, API_BASE_URL]);
-
-  // Use passed inspector details first, then fallback to fetched details
-  const finalInspectorDetails = inspectorDetails || fetchedInspectorDetails;
-
-  // If skipImageLoading is true, render PDF directly without wrapper
-  if (skipImageLoading) {
-    return (
-      <QcWashingFullReportPDF 
-        recordData={recordData}
-        comparisonData={comparisonData}
-        API_BASE_URL={API_BASE_URL}
-        checkpointDefinitions={checkpointDefinitions}
-        preloadedImages={{}}
-        skipImageLoading={true}
-        inspectorDetails={finalInspectorDetails}
-      />
-    );
-  }
-
-  React.useEffect(() => {
-    let isMounted = true;
-
-    const preloadAllImages = async () => {
-      // Wait for inspector details to be fetched first
-      if (!finalInspectorDetails && recordData?.userId) {
-        return;
-      }
-      
-      // Clear any existing cache to prevent memory buildup
-      clearImageCache();
-      
-      // Start performance monitoring
-      performanceTimer.start('PDF-ImageLoading');
-      
-      try {
-        const imageCollection = new Map();
-        const processedUrls = new Set(); // Prevent duplicate processing
-        
-        // OPTIMIZED: Streamlined helper function to add images
-        const addImageToCollection = (img, context = '') => {
-          if (!img) return;
-          
-          // Quick duplicate check
-          const imgStr = typeof img === 'string' ? img : JSON.stringify(img);
-          if (processedUrls.has(imgStr)) return;
-          processedUrls.add(imgStr);
-          
-          // Generate essential keys only (reduced from previous version)
-          const generateEssentialKeys = (img) => {
-            const keys = new Set();
-            
-            if (typeof img === 'string') {
-              const cleanImg = img.trim();
-              if (!cleanImg) return [];
-              
-              keys.add(cleanImg);
-              
-              // Handle path variations
-              if (cleanImg.startsWith('/')) {
-                keys.add(cleanImg.substring(1));
-              } else if (!cleanImg.startsWith('http') && !cleanImg.startsWith('data:')) {
-                keys.add('/' + cleanImg);
-              }
-              
-              // Extract path from full URLs
-              const urlMatch = cleanImg.match(/(?:192\.167\.12\.85:5000|yqms\.yaikh\.com)(\/.*)/); 
-              if (urlMatch && urlMatch[1]) {
-                keys.add(urlMatch[1]);
-                keys.add(urlMatch[1].substring(1));
-              }
-              
-              // Handle JSON strings efficiently
-              if (cleanImg.startsWith('{')) {
-                try {
-                  const parsed = JSON.parse(cleanImg);
-                  const url = parsed?.originalUrl || parsed?.url || parsed?.src || parsed?.path;
-                  if (url && typeof url === 'string') {
-                    const subKeys = generateEssentialKeys(url);
-                    subKeys.forEach(key => keys.add(key));
-                  }
-                } catch (e) {
-                  // Ignore parsing errors
-                }
-              }
-              
-            } else if (typeof img === 'object' && img !== null) {
-              const url = img.originalUrl || img.url || img.src || img.path;
-              if (url && typeof url === 'string') {
-                const subKeys = generateEssentialKeys(url);
-                subKeys.forEach(key => keys.add(key));
-              }
-            }
-            
-            return Array.from(keys).filter(key => key && key.trim());
-          };
-
-          const essentialKeys = generateEssentialKeys(img);
-          
-          // Store only essential keys to reduce memory usage
-          essentialKeys.slice(0, 3).forEach(key => { // Limit to 3 keys per image
-            if (key && key.trim() && !imageCollection.has(key.trim())) {
-              imageCollection.set(key.trim(), img);
-            }
-          });
-        };
-
-
-        // SELECTIVE: Only collect defect images if defects exist and will be displayed
-        if (recordData.defectDetails?.defectsByPc && recordData.defectDetails.defectsByPc.length > 0) {
-          recordData.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
-            if (pc.pcDefects && pc.pcDefects.length > 0) {
-              pc.pcDefects.forEach((defect, defectIndex) => {
-                const capturedImages = defect.defectImages || defect.capturedImages || [];
-                const uploadedImages = defect.uploadedImages || defect.uploaded_images || defect.images || [];
-                
-                // Only collect first 2 images per defect to limit memory usage
-                if (Array.isArray(capturedImages)) {
-                  capturedImages.slice(0, 2).forEach((img, imgIndex) => {
-                    addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-captured${imgIndex}`);
-                  });
-                }
-                if (Array.isArray(uploadedImages)) {
-                  uploadedImages.slice(0, 2).forEach((img, imgIndex) => {
-                    addImageToCollection(img, `defect-pc${pcIndex}-defect${defectIndex}-uploaded${imgIndex}`);
-                  });
-                }
-              });
-            }
-          });
-        }
-
-        // SELECTIVE: Only collect additional images if they exist and limit to first 5
-        if (recordData.defectDetails?.additionalImages && Array.isArray(recordData.defectDetails.additionalImages) && recordData.defectDetails.additionalImages.length > 0) {
-          recordData.defectDetails.additionalImages.slice(0, 5).forEach((img, index) => {
-            addImageToCollection(img, `additional-${index}`);
-          });
-        }
-
-        // SELECTIVE: Only collect inspection images if checkpoint data exists and limit images
-        if (recordData.inspectionDetails?.checkpointInspectionData && recordData.inspectionDetails.checkpointInspectionData.length > 0) {
-          recordData.inspectionDetails.checkpointInspectionData.forEach((checkpoint, checkIndex) => {
-            // Limit to first 2 images per checkpoint
-            if (checkpoint.comparisonImages && Array.isArray(checkpoint.comparisonImages)) {
-              checkpoint.comparisonImages.slice(0, 2).forEach((img, imgIndex) => {
-                addImageToCollection(img, `checkpoint${checkIndex}-main-img${imgIndex}`);
-              });
-            }
-            if (checkpoint.uploadedImages && Array.isArray(checkpoint.uploadedImages)) {
-              checkpoint.uploadedImages.slice(0, 2).forEach((img, imgIndex) => {
-                addImageToCollection(img, `checkpoint${checkIndex}-main-uploaded${imgIndex}`);
-              });
-            }
-            if (checkpoint.subPoints && checkpoint.subPoints.length > 0) {
-              checkpoint.subPoints.forEach((subPoint, subIndex) => {
-                // Limit to first 1 image per sub-point
-                if (subPoint.comparisonImages && Array.isArray(subPoint.comparisonImages)) {
-                  subPoint.comparisonImages.slice(0, 1).forEach((img, imgIndex) => {
-                    addImageToCollection(img, `checkpoint${checkIndex}-sub${subIndex}-img${imgIndex}`);
-                  });
-                }
-                if (subPoint.uploadedImages && Array.isArray(subPoint.uploadedImages)) {
-                  subPoint.uploadedImages.slice(0, 1).forEach((img, imgIndex) => {
-                    addImageToCollection(img, `checkpoint${checkIndex}-sub${subIndex}-uploaded${imgIndex}`);
-                  });
-                }
-              });
-            }
-          });
-        }
-
-        // SELECTIVE: Only collect legacy inspection images if they exist and limit to first 2
-        if (recordData.inspectionDetails?.checkedPoints && recordData.inspectionDetails.checkedPoints.length > 0) {
-          recordData.inspectionDetails.checkedPoints.forEach((point, pointIndex) => {
-            if (point.comparison && Array.isArray(point.comparison)) {
-              point.comparison.slice(0, 2).forEach((img, imgIndex) => {
-                addImageToCollection(img, `legacy-point${pointIndex}-img${imgIndex}`);
-              });
-            }
-            if (point.uploadedImages && Array.isArray(point.uploadedImages)) {
-              point.uploadedImages.slice(0, 2).forEach((img, imgIndex) => {
-                addImageToCollection(img, `legacy-point${pointIndex}-uploaded${imgIndex}`);
-              });
-            }
-          });
-        }
-
-        // SELECTIVE: Only collect machine images if they exist
-        if (recordData.inspectionDetails?.machineProcesses && recordData.inspectionDetails.machineProcesses.length > 0) {
-          recordData.inspectionDetails.machineProcesses.forEach((machine, machineIndex) => {
-            if (machine.image) {
-              addImageToCollection(machine.image, `machine${machineIndex}`);
-            }
-          });
-        }
-
-        // Collect inspector photo
-        if (finalInspectorDetails?.face_photo) {
-          addImageToCollection(finalInspectorDetails.face_photo, 'inspector-photo');
-        }
-
-        
-        // Early exit if no images needed
-        if (imageCollection.size === 0) {
-          if (isMounted) {
-            performanceTimer.end('PDF-ImageLoading');
-            setPreloadedImages({});
-            setLoading(false);
-          }
-          return;
-        }
-        
-        // Limit total images to prevent memory issues - reduced limit
-        const MAX_IMAGES = 20;
-        if (imageCollection.size > MAX_IMAGES) {
-          const limitedEntries = Array.from(imageCollection.entries()).slice(0, MAX_IMAGES);
-          imageCollection.clear();
-          limitedEntries.forEach(([key, value]) => imageCollection.set(key, value));
-        }
-
-        // FIXED: Load images with batching and better error handling
-        const imageMap = {};
-        const imageEntries = Array.from(imageCollection.entries());
-        const BATCH_SIZE = 1; // Single image per batch to prevent server overload
-        
-        // Process images in batches to avoid overwhelming the system
-        for (let i = 0; i < imageEntries.length; i += BATCH_SIZE) {
-          const batch = imageEntries.slice(i, i + BATCH_SIZE);
-          
-          const batchPromises = batch.map(async ([key, url], batchIndex) => {
-            try {
-              // Add delay between requests to prevent server overload
-              await new Promise(resolve => setTimeout(resolve, batchIndex * 500));
-              
-              const base64 = await loadImageAsBase64(url, API_BASE_URL);
-              
-              if (base64 && base64.startsWith('data:')) {
-                imageMap[key] = base64;
-                return { success: true, key };
-              } else {
-                return { success: false, key, error: 'Invalid base64 data' };
-              }
-            } catch (error) {
-              console.error(`❌ Failed to load ${key}:`, error.message);
-              // Skip failed images instead of breaking the entire process
-              return { success: false, key, error: error.message };
-            }
-          });
-
-          // Wait for current batch to complete before starting next batch
-          const batchResults = await Promise.allSettled(batchPromises);
-          
-          // Small delay between batches
-          if (i + BATCH_SIZE < imageEntries.length) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          }
-        }
-
-        const results = []; // Placeholder for compatibility
-        
-        const successCount = Object.keys(imageMap).length;
-        const failCount = imageEntries.length - successCount;
-        
-  
-  // Log memory usage after loading
-  const finalMemory = getMemoryUsage();
-  console.log(`📊 Memory usage - Cache: ${finalMemory.cacheSize}, Loading: ${finalMemory.loadingSize}, Active: ${finalMemory.activeSize}`);
-
-
-        if (isMounted) {
-          performanceTimer.end('PDF-ImageLoading');
-          setPreloadedImages(imageMap);
-          setLoading(false);
-          
-          // Schedule cache cleanup after a delay to free memory
-          setTimeout(() => {
-            if (imageCache.size > 100) {
-              clearImageCache();
-            }
-          }, 60000); // Clean up after 1 minute
-        }
-
-      } catch (error) {
-        console.error('❌ Critical error in preloadAllImages:', error);
-        if (isMounted) {
-          setError(error.message);
-          setPreloadedImages({});
-          setLoading(false);
-        }
-      }
-    };
-
-    // Set up timeout with cleanup - increased timeout for batch loading
-    const timeoutId = setTimeout(() => {
-      if (isMounted) {
-        setLoading(false);
-      }
-    }, 30000); // Increased to 30 seconds for batch processing
-
-    // Only start loading images after inspector details are available
-    if (finalInspectorDetails || !recordData?.userId) {
-      preloadAllImages();
-    }
-
-    // Cleanup function with memory management
-    return () => {
-      isMounted = false;
-      clearTimeout(timeoutId);
-      // Clear cache when component unmounts to free memory
-      if (imageCache.size > 50) { // Only clear if cache is large
-        clearImageCache();
-      }
-    };
-  }, [recordData, API_BASE_URL, finalInspectorDetails]);
-
-  // FIXED LOADING SCREEN with progress indication
-  if (loading || (recordData?.userId && !fetchedInspectorDetails)) {
-    const memoryInfo = getMemoryUsage();
-    
-    return (
-      <Document>
-        <Page style={styles.page}>
-          <View style={{ 
-            flex: 1, 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            padding: 20
-          }}>
-            <Text style={{ 
-              fontSize: 16, 
-              fontWeight: 'bold',
-              marginBottom: 10,
-              textAlign: 'center'
-            }}>
-              Preparing your report...
-            </Text>
-            <Text style={{ 
-              fontSize: 12, 
-              textAlign: 'center',
-              color: '#6b7280',
-              marginBottom: 8
-            }}>
-              Loading inspector details and optimizing images.
-            </Text>
-            <Text style={{ 
-              fontSize: 10, 
-              textAlign: 'center',
-              color: '#9ca3af'
-            }}>
-              Processing in batches to ensure optimal performance.
-            </Text>
-            {memoryInfo.cacheSize > 0 && (
-              <Text style={{ 
-                fontSize: 8, 
-                textAlign: 'center',
-                color: '#6b7280',
-                marginTop: 8
-              }}>
-                Loaded: {memoryInfo.cacheSize} images
-              </Text>
-            )}
-          </View>
-        </Page>
-      </Document>
-    );
-  }
-
-  // Show error state with fallback
-  if (error) {
-    // Clear cache on error to free memory
-    clearImageCache();
-    
-    return (
-      <QcWashingFullReportPDF 
-        recordData={recordData}
-        comparisonData={comparisonData}
-        API_BASE_URL={API_BASE_URL}
-        checkpointDefinitions={checkpointDefinitions}
-        preloadedImages={{}}
-        skipImageLoading={true}
-        inspectorDetails={finalInspectorDetails}
-      />
-    );
-  }
-
-
-  return (
-    <QcWashingFullReportPDF 
-      recordData={recordData}
-      comparisonData={comparisonData}
-      API_BASE_URL={API_BASE_URL}
-      checkpointDefinitions={checkpointDefinitions}
-      preloadedImages={preloadedImages}
-      skipImageLoading={false}
-      inspectorDetails={finalInspectorDetails}
-    />
-  );
-};
-
-// SIMPLE PDF COMPONENT WITHOUT IMAGE LOADING (for your download function)
-const QcWashingSimplePDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], inspectorDetails = null }) => {
-  const [fetchedInspectorDetails, setFetchedInspectorDetails] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
-
-  // Fetch inspector details
-  React.useEffect(() => {
-    const fetchInspectorDetails = async () => {
-      if (!recordData?.userId) {
-        setFetchedInspectorDetails(null);
-        setLoading(false);
-        return;
-      }
-
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/users/${recordData.userId}`);
-        if (response.ok) {
-          const userData = await response.json();
-          setFetchedInspectorDetails(userData);
-        } else {
-          setFetchedInspectorDetails(null);
-        }
-      } catch (error) {
-        console.error('Error fetching inspector details:', error);
-        setFetchedInspectorDetails(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchInspectorDetails();
-  }, [recordData?.userId, API_BASE_URL]);
-
-  const finalInspectorDetails = fetchedInspectorDetails || inspectorDetails;
-
-  if (loading) {
-    return (
-      <Document>
-        <Page style={styles.page}>
-          <View style={{ 
-            flex: 1, 
-            justifyContent: 'center', 
-            alignItems: 'center',
-            padding: 20
-          }}>
-            <Text style={{ 
-              fontSize: 16, 
-              fontWeight: 'bold',
-              marginBottom: 10,
-              textAlign: 'center'
-            }}>
-              Preparing your download...
-            </Text>
-            <Text style={{ 
-              fontSize: 12, 
-              textAlign: 'center',
-              color: '#6b7280'
-            }}>
-              Fetching inspector details. Please wait.
-            </Text>
-          </View>
-        </Page>
-      </Document>
-    );
-  }
-
-  return (
-    <QcWashingFullReportPDF 
-      recordData={recordData}
-      comparisonData={comparisonData}
-      API_BASE_URL={API_BASE_URL}
-      checkpointDefinitions={checkpointDefinitions}
-      preloadedImages={{}}
-      skipImageLoading={true}
-      inspectorDetails={finalInspectorDetails}
-    />
-  );
-};
-
 // Export both components for different use cases
-export default QcWashingFullReportPDFWrapper;
-export { QcWashingFullReportPDF, QcWashingFullReportPDFWrapper, QcWashingSimplePDF };
+export default QcWashingFullReportPDF;
+export { QcWashingFullReportPDF };

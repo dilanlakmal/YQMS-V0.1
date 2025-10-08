@@ -14,8 +14,8 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData, checkpointDefin
   const [availableKValues, setAvailableKValues] = useState([]);
   const [showAllPcs, setShowAllPcs] = useState(false);
   const [processedReportData, setProcessedReportData] = useState(null);
-  const [showFullChart, setShowFullChart] = useState(true);
-  const [showSizeBySizeChart, setShowSizeBySizeChart] = useState(false);
+  // Lazy load heavy table views
+  const [activeView, setActiveView] = useState('none'); // 'none', 'full', 'size-by-size'
 
   // Helper function to convert file paths to accessible URLs
 // Helper function to convert file paths to accessible URLs
@@ -235,6 +235,16 @@ const getImageUrl = (imagePath) => {
   if (!isOpen && comparisonData) {
     setComparisonData(null);
   }
+
+  // Handler for toggling the heavy table views
+  const handleViewChange = (view) => {
+    setActiveView(currentView => {
+      if (currentView === view) {
+        return 'none'; // Toggle off if already active
+      }
+      return view; // Set to the new view
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -607,9 +617,9 @@ const getImageUrl = (imagePath) => {
                                                     alt={`Defect: ${defect.defectName}`}
                                                     className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                                     onClick={() => window.open(imageUrl, '_blank')}
-                                                    onError={(e) => {
-                                                      e.target.style.display = 'none';
-                                                      e.target.nextSibling.style.display = 'flex';
+                                                    onError={(e) => { 
+                                                      e.currentTarget.style.display = 'none';
+                                                      e.currentTarget.nextElementSibling.style.display = 'flex';
                                                     }}
                                                   />
                                                 ) : null}
@@ -668,9 +678,9 @@ const getImageUrl = (imagePath) => {
                                           alt={`Additional image ${imgIndex + 1}`}
                                           className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                           onClick={() => window.open(imageUrl, '_blank')}
-                                          onError={(e) => {
-                                            e.target.style.display = 'none';
-                                            e.target.nextSibling.style.display = 'flex';
+                                          onError={(e) => { 
+                                            e.currentTarget.style.display = 'none';
+                                            e.currentTarget.nextElementSibling.style.display = 'flex';
                                           }}
                                         />
                                       ) : null}
@@ -770,7 +780,7 @@ const getImageUrl = (imagePath) => {
                                                   alt={`Main point image ${imgIdx + 1}`}
                                                   className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                                   onClick={() => window.open(imageUrl, '_blank')}
-                                                  onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                                  onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling.style.display = 'flex'; }}
                                                 />
                                               ) : null}
                                               <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
@@ -823,7 +833,7 @@ const getImageUrl = (imagePath) => {
                                                             alt={`Sub-point image ${imgIdx + 1}`}
                                                             className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                                             onClick={() => window.open(imageUrl, '_blank')}
-                                                            onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                                            onError={(e) => { e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling.style.display = 'flex'; }}
                                                           />
                                                         ) : null}
                                                         <div className="w-full h-full flex items-center justify-center text-center" style={{display: 'none'}}>
@@ -921,9 +931,9 @@ const getImageUrl = (imagePath) => {
                                                     alt={`Point: ${point.pointName}`}
                                                     className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                                     onClick={() => window.open(imageUrl, '_blank')}
-                                                    onError={(e) => {
-                                                      e.target.style.display = 'none';
-                                                      e.target.nextSibling.style.display = 'flex';
+                                                    onError={(e) => { 
+                                                      e.currentTarget.style.display = 'none';
+                                                      e.currentTarget.nextElementSibling.style.display = 'flex';
                                                     }}
                                                   />
                                                 ) : null;
@@ -953,9 +963,9 @@ const getImageUrl = (imagePath) => {
                                                         alt={`Comparison ${imgIndex + 1}`}
                                                         className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                                         onClick={() => window.open(imageUrl, '_blank')}
-                                                        onError={(e) => {
-                                                          e.target.style.display = 'none';
-                                                          e.target.nextSibling.style.display = 'flex';
+                                                        onError={(e) => { 
+                                                          e.currentTarget.style.display = 'none';
+                                                          e.currentTarget.nextElementSibling.style.display = 'flex';
                                                         }}
                                                       />
                                                     ) : null}
@@ -1296,9 +1306,9 @@ const getImageUrl = (imagePath) => {
                                             alt={`Machine: ${machine.machineType}`}
                                             className="w-full h-full object-cover cursor-pointer hover:opacity-80 transition-opacity"
                                             onClick={() => window.open(imageUrl, '_blank')}
-                                            onError={(e) => {
-                                              e.target.style.display = 'none';
-                                              e.target.nextSibling.style.display = 'flex';
+                                            onError={(e) => { 
+                                              e.currentTarget.style.display = 'none';
+                                              e.currentTarget.nextElementSibling.style.display = 'flex';
                                             }}
                                           />
                                         ) : null;
@@ -1517,8 +1527,8 @@ const getImageUrl = (imagePath) => {
                       <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                         <input
                           type="checkbox"
-                          checked={showFullChart}
-                          onChange={() => setShowFullChart(!showFullChart)}
+                          checked={activeView === 'full'}
+                          onChange={() => handleViewChange('full')}
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span>Full Chart</span>
@@ -1526,8 +1536,8 @@ const getImageUrl = (imagePath) => {
                       <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                         <input
                           type="checkbox"
-                          checked={showSizeBySizeChart}
-                          onChange={() => setShowSizeBySizeChart(!showSizeBySizeChart)}
+                          checked={activeView === 'size-by-size'}
+                          onChange={() => handleViewChange('size-by-size')}
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                         />
                         <span>Size-by-Size</span>
@@ -1564,7 +1574,7 @@ const getImageUrl = (imagePath) => {
                     </div>
 
                     {/* NEW: Conditional rendering for Full Chart */}
-                    {showFullChart && (
+                    {activeView === 'full' && (
                       <div className="mb-8">
                       <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800">
                         <div className="flex items-center space-x-3 mb-6">
@@ -1874,7 +1884,7 @@ const getImageUrl = (imagePath) => {
                     )}
 
                     {/* NEW: Conditional rendering for Size-by-Size */}
-                    {showSizeBySizeChart && (
+                    {activeView === 'size-by-size' && (
 
                     <div className="space-y-8">
                       <div className="flex items-center space-x-3 mb-4">

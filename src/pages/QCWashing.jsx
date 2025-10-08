@@ -255,7 +255,7 @@ function calculateSummaryData(currentFormData) {
       ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
-  // 5. Result logic
+  // 5. Result logic - handle SOP differently
   let overallResult = "Pending";
   const measurementOverallResult =
     measurementPoints === 0
@@ -265,15 +265,32 @@ function calculateSummaryData(currentFormData) {
       : "Pass";
   const defectOverallResult = currentDefectDetails?.result || "Pending";
 
-  if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-    overallResult = "Fail";
-  } else if (
-    measurementOverallResult === "Pass" &&
-    defectOverallResult === "Pass"
-  ) {
-    overallResult = "Pass";
+  // Check if this is SOP report type
+  const isSOP = currentFormData.reportType === "SOP" || 
+                currentFormData.reportType === "sop" ||
+                (currentFormData.reportType === "" && 
+                 currentFormData.inline === "" && 
+                 currentFormData.firstOutput === "");
+
+  if (isSOP) {
+    // For SOP: Overall result is Pass only if there are no defects
+    if (defectCount === 0 && rejectedDefectPcs === 0) {
+      overallResult = "Pass";
+    } else {
+      overallResult = "Fail";
+    }
   } else {
-    overallResult = "Pending";
+    // For Inline/First Output: Use measurement + defect logic
+    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
+      overallResult = "Fail";
+    } else if (
+      measurementOverallResult === "Pass" &&
+      defectOverallResult === "Pass"
+    ) {
+      overallResult = "Pass";
+    } else {
+      overallResult = "Pending";
+    }
   }
 
   return {
@@ -1884,11 +1901,15 @@ if (
   const autoSaveSummary = async (summary, recordId) => {
     if (!recordId || !summary) return;
     try {
-      await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ summary })
       });
+      
+      if (!response.ok) {
+        console.error('Failed to save summary:', response.status, response.statusText);
+      }
     } catch (error) {
       console.error("Failed to auto-save summary:", error);
     }
@@ -2090,6 +2111,19 @@ if (
         defectDetails,
         measurementDetails
       });
+
+      // Only log if there are significant changes to help debug
+      if (summary.totalCheckedPcs !== formData.totalCheckedPcs || 
+          summary.overallFinalResult !== formData.overallFinalResult) {
+        console.log('Summary updated:', {
+          totalCheckedPcs: summary.totalCheckedPcs,
+          rejectedDefectPcs: summary.rejectedDefectPcs,
+          totalDefectCount: summary.totalDefectCount,
+          defectRate: summary.defectRate,
+          defectRatio: summary.defectRatio,
+          overallFinalResult: summary.overallFinalResult
+        });
+      }
 
       setFormData((prev) => ({
         ...prev,
@@ -2469,7 +2503,25 @@ if (
               summary={{
                 ...formData,
                 checkedQty: Number(formData.checkedQty) || 0,
-                washQty: Number(formData.washQty) || 0
+                washQty: Number(formData.washQty) || 0,
+                // Include inspection details for proper calculation
+                inspectionDetails: {
+                  checkpointInspectionData: checkpointInspectionData
+                }
+              }}
+              recordId={recordId}
+              onSummaryUpdate={(updatedSummary) => {
+                setFormData(prev => ({ 
+                  ...prev, 
+                  ...updatedSummary,
+                  // Ensure these critical fields are updated
+                  overallFinalResult: updatedSummary.overallFinalResult,
+                  totalCheckedPcs: updatedSummary.totalCheckedPcs,
+                  rejectedDefectPcs: updatedSummary.rejectedDefectPcs,
+                  totalDefectCount: updatedSummary.totalDefectCount,
+                  defectRate: updatedSummary.defectRate,
+                  defectRatio: updatedSummary.defectRatio
+                }));
               }}
               measurementData={formData.measurementDetails}
               defectDetails={formData.defectDetails}

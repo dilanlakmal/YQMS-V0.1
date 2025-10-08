@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect } from "react";
 import PropTypes from "prop-types";
 import { WashingMachine, ClipboardCheck } from "lucide-react";
+import { API_BASE_URL } from '../../../../../config';
 
-const OverAllSummaryCard = ({ summary }) => {
+const OverAllSummaryCard = ({ summary, recordId, onSummaryUpdate }) => {
   if (!summary) {
     return (
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
@@ -28,7 +29,16 @@ const OverAllSummaryCard = ({ summary }) => {
 
   // Calculate overall result dynamically based on current data
   const calculateOverallResult = () => {
-    const defectResult = defectDetails?.result || "Pass";
+    const defectResult = defectDetails?.result || "Pending";
+    
+    // Check inspection checkpoints for failures
+    let inspectionResult = "Pass";
+    if (summary.inspectionDetails?.checkpointInspectionData) {
+      const hasInspectionFail = summary.inspectionDetails.checkpointInspectionData.some(
+        checkpoint => checkpoint.decision === 'Fail'
+      );
+      if (hasInspectionFail) inspectionResult = "Fail";
+    }
     
     // Calculate overall measurement result from measurementSizeSummary
     let measurementResult = "Pass";
@@ -66,22 +76,47 @@ const OverAllSummaryCard = ({ summary }) => {
     
     if (totalPoints > 0) {
       calculatedPassRate = (totalPassPoints / totalPoints) * 100;
-      // You can adjust this threshold as needed (currently set to 95%)
       measurementResult = calculatedPassRate >= 95 ? "Pass" : "Fail";
     } else {
-      // If no measurement points, consider it as Pass (or adjust based on your business logic)
-      measurementResult = "Pass";
-      calculatedPassRate = 100;
+      // If no measurement points, consider it as pending rather than pass
+      measurementResult = "Pending";
+      calculatedPassRate = 0;
     }
     
-    // Overall result is Pass only if both defect and measurement results are Pass
-    const overallResult = (defectResult === "Pass" && measurementResult === "Pass") ? "Pass" : "Fail";
+    // Overall result logic - handle SOP differently
+    let overallResult = "Pending";
+    
+    // Check if this is SOP report type
+    const isSOP = summary.reportType === "SOP" || 
+                  summary.reportType === "sop" ||
+                  (summary.reportType === "" && 
+                   summary.inline === "" && 
+                   summary.firstOutput === "");
+    
+    if (isSOP) {
+      // For SOP: Overall result is Pass only if there are no defects
+      if ((summary.totalDefectCount || 0) === 0 && (summary.rejectedDefectPcs || 0) === 0) {
+        overallResult = "Pass";
+      } else {
+        overallResult = "Fail";
+      }
+    } else {
+      // For Inline/First Output: Use measurement + defect + inspection logic
+      if (defectResult === "Fail" || measurementResult === "Fail" || inspectionResult === "Fail") {
+        overallResult = "Fail";
+      } else if (defectResult === "Pass" && measurementResult === "Pass" && inspectionResult === "Pass") {
+        overallResult = "Pass";
+      } else {
+        overallResult = "Pending";
+      }
+    }
     
     return {
       overallResult,
       calculatedPassRate: Number(calculatedPassRate.toFixed(1)),
       measurementResult,
       defectResult,
+      inspectionResult,
       totalMeasurementPoints: totalPoints,
       totalMeasurementPass: totalPassPoints,
       totalMeasurementFail: totalFailPoints
@@ -93,10 +128,71 @@ const OverAllSummaryCard = ({ summary }) => {
     calculatedPassRate, 
     measurementResult, 
     defectResult,
+    inspectionResult,
     totalMeasurementPoints,
     totalMeasurementPass,
     totalMeasurementFail
   } = calculateOverallResult();
+
+  // Save updated summary to database when it changes
+  useEffect(() => {
+    const saveUpdatedSummary = async () => {
+      if (!recordId || !summary) return;
+      
+      const updatedSummary = {
+        ...summary,
+        overallFinalResult: overallResult,
+        passRate: calculatedPassRate,
+        totalCheckedPoint: totalMeasurementPoints,
+        totalPass: totalMeasurementPass,
+        totalFail: totalMeasurementFail,
+        totalCheckedPcs: summary.totalCheckedPcs || 0,
+        rejectedDefectPcs: summary.rejectedDefectPcs || 0,
+        totalDefectCount: summary.totalDefectCount || 0,
+        defectRate: summary.defectRate || 0,
+        defectRatio: summary.defectRatio || 0
+      };
+      
+      // Check if there are actual changes before making API call
+      const hasChanges = 
+        updatedSummary.overallFinalResult !== summary.overallFinalResult ||
+        updatedSummary.passRate !== summary.passRate ||
+        updatedSummary.totalCheckedPoint !== summary.totalCheckedPoint ||
+        updatedSummary.totalPass !== summary.totalPass ||
+        updatedSummary.totalFail !== summary.totalFail;
+      
+      if (!hasChanges) return;
+      
+      try {
+        // Debug logging only for significant changes
+        if (updatedSummary.overallFinalResult !== summary.overallFinalResult) {
+          console.log('OverAllSummaryCard: Overall result changed to:', updatedSummary.overallFinalResult);
+        }
+        
+        // Use the same endpoint as the main component's autoSaveSummary function
+        const response = await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ summary: updatedSummary })
+        });
+        
+        if (response.ok) {
+          console.log('Summary saved successfully');
+          if (onSummaryUpdate) {
+            onSummaryUpdate(updatedSummary);
+          }
+        } else {
+          console.error('Failed to save summary:', response.status, response.statusText);
+        }
+      } catch (error) {
+        console.error('Failed to save updated summary:', error);
+      }
+    };
+    
+    // Add a small delay to prevent too frequent API calls
+    const timeoutId = setTimeout(saveUpdatedSummary, 300);
+    return () => clearTimeout(timeoutId);
+  }, [overallResult, calculatedPassRate, totalMeasurementPoints, totalMeasurementPass, totalMeasurementFail, recordId, summary?.orderNo, summary?.color, summary?.totalCheckedPcs, summary?.rejectedDefectPcs, summary?.totalDefectCount, summary?.defectRate, summary?.defectRatio, onSummaryUpdate]);
 
   // Use calculated pass rate instead of saved one
   const displayPassRate = calculatedPassRate;
@@ -204,6 +300,8 @@ OverAllSummaryCard.propTypes = {
     defectDetails: PropTypes.object,
     measurementDetails: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
   }),
+  recordId: PropTypes.string,
+  onSummaryUpdate: PropTypes.func,
 };
 
 export default OverAllSummaryCard;
