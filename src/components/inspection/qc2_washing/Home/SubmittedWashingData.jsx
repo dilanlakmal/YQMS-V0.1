@@ -19,7 +19,8 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('actual'); // 'estimated' or 'actual'
+  const [viewMode, setViewMode] = useState('estimated'); // 'estimated' or 'actual'
+  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
@@ -153,70 +154,49 @@ const fetchSubmittedData = async (showLoading = true) => {
     const processDataForView = async () => {
       if (isLoading) return;
 
-      let dataToProcess = [...submittedData];
-
-      if (viewMode === 'actual') {
-        // Process in smaller batches to avoid overwhelming the server
-        const BATCH_SIZE = 5;
-        let actualData = [];
-        
-        for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
-          const batch = submittedData.slice(i, i + BATCH_SIZE);
-          const batchResults = await Promise.all(
-            batch.map(async (record) => {
-              const washQtyData = await fetchRealWashQty(record);
-              let finalRecord = { ...record, ...washQtyData };
-
-              // Skip AQL recalculation if endpoint is not available
-              if (record.reportType === 'Inline' && washQtyData.isActualWashQty && aqlEndpointAvailable) {
-                const newWashQty = washQtyData.displayWashQty;
-                try {
-                  const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ lotSize: newWashQty, orderNo: record.orderNo })
-                  });
-                  
-                  if (aqlResponse.ok) {
-                    const aqlData = await aqlResponse.json();
-                    if (aqlData.success && aqlData.aqlData) {
-                      finalRecord.aql = [aqlData.aqlData];
-                      finalRecord.checkedQty = Math.min(newWashQty, aqlData.aqlData.sampleSize);
-                      if (finalRecord.defectDetails) {
-                        finalRecord.defectDetails.aqlValue = aqlData.aqlData.levelUsed;
-                      } else {
-                        finalRecord.defectDetails = { aqlValue: aqlData.aqlData.levelUsed };
-                      }
-                    }
-                  } else if (aqlResponse.status === 404) {
-                    setAqlEndpointAvailable(false);
-                    console.warn('AQL chart endpoint not available. Disabling AQL recalculation.');
-                  }
-                } catch (e) {
-                  console.error("Failed to recalculate AQL for record:", record._id, e);
-                }
-              }
-              return finalRecord;
-            })
-          );
-          actualData.push(...batchResults);
-          
-          // Add delay between batches
-          if (i + BATCH_SIZE < submittedData.length) {
-            await new Promise(resolve => setTimeout(resolve, 100));
-          }
-        }
-
-        dataToProcess = actualData;
-      } else {
-        dataToProcess = submittedData.map(record => ({
+      if (viewMode === 'estimated') {
+        const dataToProcess = submittedData.map(record => ({
           ...record,
           displayWashQty: record.washQty,
           isActualWashQty: false,
         }));
+        applyFilters(currentFilters || {}, false, dataToProcess);
+      } else {
+        // Show estimated data immediately, then process actual data in background
+        const estimatedData = submittedData.map(record => ({
+          ...record,
+          displayWashQty: record.washQty,
+          isActualWashQty: false,
+        }));
+        applyFilters(currentFilters || {}, false, estimatedData);
+        
+        setIsProcessing(true);
+        
+        // Process actual data in background
+        setTimeout(async () => {
+          const BATCH_SIZE = 10;
+          let actualData = [];
+          
+          for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
+            const batch = submittedData.slice(i, i + BATCH_SIZE);
+            const batchResults = await Promise.all(
+              batch.map(async (record) => {
+                const washQtyData = await fetchRealWashQty(record);
+                return { ...record, ...washQtyData };
+              })
+            );
+            actualData.push(...batchResults);
+            
+            // Update UI progressively
+            if (actualData.length % 20 === 0) {
+              applyFilters(currentFilters || {}, false, [...actualData, ...submittedData.slice(actualData.length).map(r => ({ ...r, displayWashQty: r.washQty, isActualWashQty: false }))]);
+            }
+          }
+          
+          applyFilters(currentFilters || {}, false, actualData);
+          setIsProcessing(false);
+        }, 100);
       }
-
-      applyFilters(currentFilters || {}, false, dataToProcess);
     };
 
     processDataForView();
@@ -1309,6 +1289,11 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
               QC Washing Final Reports
+              {isProcessing && (
+                <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
+                  (Processing actual data...)
+                </span>
+              )}
             </h2>
              <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
               <button
