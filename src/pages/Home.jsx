@@ -655,6 +655,13 @@ function Home() {
             description: "Order data from York-sys"
           },
           {
+            path: "/packing-list",
+            roles: ["QA Clerk"],
+            image: "assets/Home/PackingList.png",
+            title: "Upload Packing List",
+            description: "Packing List from Shipping Dept"
+          },
+          {
             path: "/final-inspection",
             roles: ["QA"],
             image: "assets/Home/qafinal.png",

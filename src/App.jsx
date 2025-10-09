@@ -50,6 +50,7 @@ import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import QCWashingPage from "./pages/QCWashing.jsx";
+import PackingList from "./pages/PackingList.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -448,6 +449,7 @@ function AppContent() {
                 path="/qc2-washing-upload"
                 element={<QC2WashingUpload />}
               />
+              <Route path="/packing-list" element={<PackingList />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

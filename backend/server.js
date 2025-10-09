@@ -102,6 +102,8 @@ import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
 import createQCWorkersModel from "./models/QCWorkers.js";
 import createDTOrdersSchema from "./models/dt_orders.js";
 
+import createPlanPackingListModel from "./models/PlanPackingList.js";
+
 // import sql from "mssql"; // Import mssql for SQL Server connection
 // import cron from "node-cron"; // Import node-cron for scheduling
 
@@ -470,6 +472,8 @@ const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
+const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
@@ -34963,6 +34967,44 @@ app.get("/api/image-proxy", async (req, res) => {
     res.status(500).json({
       error: "Failed to retrieve image.",
       details: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   PACKING LIST API ENDPOINTS
+------------------------------ */
+
+app.post("/api/packing-list/upload", async (req, res) => {
+  try {
+    const packingListData = req.body;
+
+    const result = await PlanPackingList.findOneAndUpdate(
+      { moNo: packingListData.moNo, poNo: packingListData.poNo }, // Query to find the document
+      packingListData, // The new data to insert or update with
+      { new: true, upsert: true, runValidators: true } // Options
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Packing list uploaded successfully.",
+      data: result
+    });
+  } catch (error) {
+    console.error("Error saving packing list:", error);
+    // Handle specific error for duplicate key
+    if (error.code === 11000) {
+      return res.status(409).json({
+        // 409 Conflict
+        success: false,
+        message:
+          "A packing list with this MO Number and PO Number already exists."
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "An error occurred on the server.",
+      error: error.message
     });
   }
 });
