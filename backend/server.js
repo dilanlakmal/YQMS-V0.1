@@ -124,15 +124,15 @@ import {
 
 /* ------------------------------
    SQL Query Import
------------------------------- */
-import sqlQuery from "./route/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// ------------------------------ */
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 import {
   ymEcoConnection,
   ymProdConnection
 } from "./controller/MongoDB/dbConnectionController.js";
-import qcRealWashQty from "./route/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
+import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 
 /* ------------------------------
    Connection String
@@ -484,7 +484,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs start
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 
 /* ------------------------------
   Functional routs
@@ -29273,7 +29273,8 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
         .json({ success: false, message: "Record not found." });
     }
 
-    // ALWAYS recalculate from fresh data - ignore previous overallFinalResult
+    // Store the previous result for comparison
+    const previousResult = qcRecord.overallFinalResult;
 
     // 1. Calculate measurement statistics from current data
     let totalMeasurementPoints = 0;
@@ -29352,22 +29353,13 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
         ? Number(
             ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
           )
-        : 0;
+        : 100;
 
-    // 4. Determine measurement result based on current data
+    // 4. Determine measurement result based on 95% threshold
     let measurementResult = "Pass";
-    if (totalMeasurementPoints > 0 && totalMeasurementFail > 0) {
-      // You can adjust this logic based on your business rules:
-
-      // Option 1: Any failure = Fail (strict)
-      measurementResult = "Fail";
-
-      // Option 2: Use threshold (e.g., 95% pass rate required)
-      // measurementResult = passRate >= 95 ? "Pass" : "Fail";
-
-      // Option 3: Allow small number of failures
-      // const failureThreshold = Math.ceil(totalMeasurementPoints * 0.05); // 5% threshold
-      // measurementResult = totalMeasurementFail <= failureThreshold ? "Pass" : "Fail";
+    if (totalMeasurementPoints > 0) {
+      // Use 95% pass rate threshold
+      measurementResult = passRate >= 95 ? "Pass" : "Fail";
     }
 
     // 5. Determine defect result based on current data and AQL
@@ -29384,8 +29376,8 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
         (totalDefectCount === 0 ? "Pass" : "Fail");
     }
 
-    // 6. Calculate FRESH overall result - this is the key fix
-    const overallFinalResult =
+    // 6. Calculate FRESH overall result
+    const newOverallFinalResult =
       measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
 
     // 7. Update ALL calculated fields with fresh values
@@ -29405,19 +29397,45 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
     qcRecord.totalFail = totalMeasurementFail;
     qcRecord.passRate = passRate;
 
-    // FORCE update the overall result with fresh calculation
-    qcRecord.overallFinalResult = overallFinalResult;
+    // CRITICAL FIX: Set the new overall result
+    qcRecord.overallFinalResult = newOverallFinalResult;
 
     // Mark the field as modified to ensure it gets saved
     qcRecord.markModified("overallFinalResult");
 
+    // Save the record
     await qcRecord.save();
 
+    // DETAILED RESPONSE FOR DEBUGGING
     res.json({
       success: true,
-      message: "Overall result recalculated successfully",
-      previousResult: qcRecord.overallFinalResult,
-      newResult: overallFinalResult,
+      message: "Overall result recalculated and saved successfully",
+      previousResult: previousResult,
+      newResult: newOverallFinalResult,
+      debugInfo: {
+        measurementCalculation: {
+          totalPoints: totalMeasurementPoints,
+          totalPass: totalMeasurementPass,
+          totalFail: totalMeasurementFail,
+          passRate: passRate,
+          measurementResult: measurementResult,
+          logic: `${passRate}% >= 95% = ${measurementResult}`
+        },
+        defectCalculation: {
+          totalDefectCount: totalDefectCount,
+          aqlAcceptedDefect: aql?.acceptedDefect || "N/A",
+          defectResult: defectResult,
+          logic: `${totalDefectCount} defects <= ${
+            aql?.acceptedDefect || 0
+          } = ${defectResult}`
+        },
+        overallCalculation: {
+          measurementResult: measurementResult,
+          defectResult: defectResult,
+          overallResult: newOverallFinalResult,
+          logic: `(${measurementResult} AND ${defectResult}) = ${newOverallFinalResult}`
+        }
+      },
       calculatedValues: {
         totalCheckedPcs,
         rejectedDefectPcs,
@@ -29428,7 +29446,7 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
         passRate,
         measurementResult,
         defectResult,
-        overallFinalResult
+        overallFinalResult: newOverallFinalResult
       }
     });
   } catch (error) {
@@ -29439,18 +29457,19 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
   }
 });
 
+// Updated GET endpoint
 app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
   try {
     const { recordId } = req.params;
-    const qcRecord = await QCWashing.findById(recordId);
 
+    const qcRecord = await QCWashing.findById(recordId);
     if (!qcRecord) {
       return res
         .status(404)
         .json({ success: false, message: "No data found for this record." });
     }
 
-    // Recalculate overall result to ensure accuracy
+    // Recalculate overall result to ensure accuracy (but don't save)
     let totalMeasurementPoints = 0;
     let totalMeasurementPass = 0;
     let totalMeasurementFail = 0;
@@ -29491,16 +29510,13 @@ app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
           )
         : 100;
 
+    // Use 95% threshold for measurement result
     const measurementResult =
-      totalMeasurementPoints === 0
-        ? "Pass"
-        : totalMeasurementFail > 0
-        ? "Fail"
-        : "Pass";
+      totalMeasurementPoints === 0 ? "Pass" : passRate >= 95 ? "Pass" : "Fail";
 
     const defectResult = qcRecord.defectDetails?.result || "Pass";
 
-    const overallResult =
+    const calculatedOverallResult =
       measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
 
     res.json({
@@ -29517,15 +29533,16 @@ app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
         defectRate: qcRecord.defectRate ?? 0,
         defectRatio: qcRecord.defectRatio ?? 0,
         passRate: passRate,
-        overallResult: overallResult,
-        overallFinalResult: overallResult, // Ensure consistency
+        overallResult: calculatedOverallResult,
+        overallFinalResult: qcRecord.overallFinalResult, // Use saved value
 
         // Additional debug information
         measurementStats: {
           totalPoints: totalMeasurementPoints,
           totalPass: totalMeasurementPass,
           totalFail: totalMeasurementFail,
-          measurementResult: measurementResult
+          measurementResult: measurementResult,
+          passRateThreshold: 95
         },
         defectStats: {
           defectResult: defectResult
@@ -29545,18 +29562,21 @@ app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
   }
 });
 
+// Updated recalculate endpoint
 app.post(
   "/api/qc-washing/recalculate-overall-result/:recordId",
   async (req, res) => {
     try {
       const { recordId } = req.params;
-      const qcRecord = await QCWashing.findById(recordId);
 
+      const qcRecord = await QCWashing.findById(recordId);
       if (!qcRecord) {
         return res
           .status(404)
           .json({ success: false, message: "Record not found." });
       }
+
+      const previousResult = qcRecord.overallFinalResult;
 
       // Recalculate everything from scratch
       let totalMeasurementPoints = 0;
@@ -29580,16 +29600,17 @@ app.post(
             )
           : 100;
 
+      // Use 95% threshold for measurement result
       const measurementResult =
         totalMeasurementPoints === 0
           ? "Pass"
-          : totalMeasurementFail > 0
-          ? "Fail"
-          : "Pass";
+          : passRate >= 95
+          ? "Pass"
+          : "Fail";
 
       const defectResult = qcRecord.defectDetails?.result || "Pass";
 
-      const overallResult =
+      const newOverallResult =
         measurementResult === "Pass" && defectResult === "Pass"
           ? "Pass"
           : "Fail";
@@ -29599,21 +29620,28 @@ app.post(
       qcRecord.totalPass = totalMeasurementPass;
       qcRecord.totalFail = totalMeasurementFail;
       qcRecord.passRate = passRate;
-      qcRecord.overallFinalResult = overallResult;
+      qcRecord.overallFinalResult = newOverallResult;
 
+      // Mark as modified and save
+      qcRecord.markModified("overallFinalResult");
       await qcRecord.save();
 
       res.json({
         success: true,
-        message: "Overall result recalculated successfully",
+        message: "Overall result recalculated and saved successfully",
+        previousResult: previousResult,
+        newResult: newOverallResult,
         result: {
-          overallResult,
+          overallResult: newOverallResult,
           measurementResult,
           defectResult,
           passRate,
+          passRateThreshold: 95,
           totalMeasurementPoints,
+
           totalMeasurementPass,
-          totalMeasurementFail
+          totalMeasurementFail,
+          logic: `${passRate}% >= 95% = ${measurementResult}`
         }
       });
     } catch (error) {

@@ -51,8 +51,8 @@ const QCWashingFullReportModal = ({
   const [availableKValues, setAvailableKValues] = useState([]);
   const [showAllPcs, setShowAllPcs] = useState(false);
   const [processedReportData, setProcessedReportData] = useState(null);
-  const [showFullChart, setShowFullChart] = useState(true);
-  const [showSizeBySizeChart, setShowSizeBySizeChart] = useState(false);
+  // Lazy load heavy table views
+  const [activeView, setActiveView] = useState("none"); // 'none', 'full', 'size-by-size'
 
   // Helper function to convert file paths to accessible URLs
   // Helper function to convert file paths to accessible URLs
@@ -298,6 +298,16 @@ const QCWashingFullReportModal = ({
   if (!isOpen && comparisonData) {
     setComparisonData(null);
   }
+
+  // Handler for toggling the heavy table views
+  const handleViewChange = (view) => {
+    setActiveView((currentView) => {
+      if (currentView === view) {
+        return "none"; // Toggle off if already active
+      }
+      return view; // Set to the new view
+    });
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -792,9 +802,9 @@ const QCWashingFullReportModal = ({
                                                               )
                                                             }
                                                             onError={(e) => {
-                                                              e.target.style.display =
+                                                              e.currentTarget.style.display =
                                                                 "none";
-                                                              e.target.nextSibling.style.display =
+                                                              e.currentTarget.nextElementSibling.style.display =
                                                                 "flex";
                                                             }}
                                                           />
@@ -887,8 +897,9 @@ const QCWashingFullReportModal = ({
                                               window.open(imageUrl, "_blank")
                                             }
                                             onError={(e) => {
-                                              e.target.style.display = "none";
-                                              e.target.nextSibling.style.display =
+                                              e.currentTarget.style.display =
+                                                "none";
+                                              e.currentTarget.nextElementSibling.style.display =
                                                 "flex";
                                             }}
                                           />
@@ -1045,9 +1056,9 @@ const QCWashingFullReportModal = ({
                                                           )
                                                         }
                                                         onError={(e) => {
-                                                          e.target.style.display =
+                                                          e.currentTarget.style.display =
                                                             "none";
-                                                          e.target.nextSibling.style.display =
+                                                          e.currentTarget.nextElementSibling.style.display =
                                                             "flex";
                                                         }}
                                                       />
@@ -1103,9 +1114,11 @@ const QCWashingFullReportModal = ({
                                                   key={subPoint.id || subIndex}
                                                   className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
                                                 >
-                                                  <div className="flex justify-between items-first">
+                                                  <div className="flex justify-between items-center">
                                                     <p className="text-sm text-gray-700 dark:text-gray-300">
-                                                      {subPoint.name}:<br></br>
+                                                      {subPoint.name}:
+                                                    </p>
+                                                    <div className="flex items-center space-x-2">
                                                       <span
                                                         className={`font-medium ${
                                                           isFail
@@ -1115,9 +1128,6 @@ const QCWashingFullReportModal = ({
                                                       >
                                                         {subPoint.decision}
                                                       </span>
-                                                    </p>
-
-                                                    <div className="flex items-center space-x-2">
                                                       <span
                                                         className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
                                                           isFail
@@ -1172,9 +1182,9 @@ const QCWashingFullReportModal = ({
                                                                       onError={(
                                                                         e
                                                                       ) => {
-                                                                        e.target.style.display =
+                                                                        e.currentTarget.style.display =
                                                                           "none";
-                                                                        e.target.nextSibling.style.display =
+                                                                        e.currentTarget.nextElementSibling.style.display =
                                                                           "flex";
                                                                       }}
                                                                     />
@@ -1334,9 +1344,9 @@ const QCWashingFullReportModal = ({
                                                       )
                                                     }
                                                     onError={(e) => {
-                                                      e.target.style.display =
+                                                      e.currentTarget.style.display =
                                                         "none";
-                                                      e.target.nextSibling.style.display =
+                                                      e.currentTarget.nextElementSibling.style.display =
                                                         "flex";
                                                     }}
                                                   />
@@ -1390,9 +1400,9 @@ const QCWashingFullReportModal = ({
                                                               )
                                                             }
                                                             onError={(e) => {
-                                                              e.target.style.display =
+                                                              e.currentTarget.style.display =
                                                                 "none";
-                                                              e.target.nextSibling.style.display =
+                                                              e.currentTarget.nextElementSibling.style.display =
                                                                 "flex";
                                                             }}
                                                           />
@@ -2039,9 +2049,9 @@ const QCWashingFullReportModal = ({
                                                   )
                                                 }
                                                 onError={(e) => {
-                                                  e.target.style.display =
+                                                  e.currentTarget.style.display =
                                                     "none";
-                                                  e.target.nextSibling.style.display =
+                                                  e.currentTarget.nextElementSibling.style.display =
                                                     "flex";
                                                 }}
                                               />
@@ -2337,8 +2347,8 @@ const QCWashingFullReportModal = ({
                         <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                           <input
                             type="checkbox"
-                            checked={showFullChart}
-                            onChange={() => setShowFullChart(!showFullChart)}
+                            checked={activeView === "full"}
+                            onChange={() => handleViewChange("full")}
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           />
                           <span>Full Chart</span>
@@ -2346,10 +2356,8 @@ const QCWashingFullReportModal = ({
                         <label className="flex items-center space-x-2 text-sm text-gray-700 dark:text-gray-300">
                           <input
                             type="checkbox"
-                            checked={showSizeBySizeChart}
-                            onChange={() =>
-                              setShowSizeBySizeChart(!showSizeBySizeChart)
-                            }
+                            checked={activeView === "size-by-size"}
+                            onChange={() => handleViewChange("size-by-size")}
                             className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           />
                           <span>Size-by-Size</span>
@@ -2394,7 +2402,7 @@ const QCWashingFullReportModal = ({
                     </div>
 
                     {/* NEW: Conditional rendering for Full Chart */}
-                    {showFullChart && (
+                    {activeView === "full" && (
                       <div className="mb-8">
                         <div className="bg-gradient-to-br from-indigo-50 to-indigo-100 dark:from-indigo-900/20 dark:to-indigo-800/20 rounded-xl p-6 border border-indigo-200 dark:border-indigo-800">
                           <div className="flex items-center space-x-3 mb-6">
@@ -2847,7 +2855,7 @@ const QCWashingFullReportModal = ({
                     )}
 
                     {/* NEW: Conditional rendering for Size-by-Size */}
-                    {showSizeBySizeChart && (
+                    {activeView === "size-by-size" && (
                       <div className="space-y-8">
                         <div className="flex items-center space-x-3 mb-4">
                           <div className="bg-teal-500 p-2 rounded-lg">
