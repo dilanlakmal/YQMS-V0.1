@@ -34155,6 +34155,127 @@ app.delete("/api/subcon-sewing-factories-manage/:id", async (req, res) => {
   }
 });
 
+// --- QC LIST MANAGEMENT IN SUB CON---
+
+// GET: Fetch a flattened list of all QCs from all factories for the management table
+app.get("/api/subcon-sewing-factories-manage/qcs/all", async (req, res) => {
+  try {
+    const factories = await SubconSewingFactory.find({
+      "qcList.0": { $exists: true }
+    }).lean();
+
+    const allQCs = factories.flatMap((factory) =>
+      factory.qcList.map((qc) => ({
+        factoryId: factory._id,
+        factoryName: factory.factory,
+        qcMongoId: qc._id, // Mongoose subdocument ID
+        qcIndex: qc.qcIndex,
+        qcID: qc.qcID,
+        qcName: qc.qcName
+      }))
+    );
+
+    res.json(allQCs);
+  } catch (error) {
+    console.error("Error fetching all QCs:", error);
+    res.status(500).json({ error: "Failed to fetch QC list" });
+  }
+});
+
+// POST: Add a new QC to a specific factory's qcList
+app.post(
+  "/api/subcon-sewing-factories-manage/:factoryId/qcs",
+  async (req, res) => {
+    const { factoryId } = req.params;
+    const { qcID, qcName } = req.body;
+
+    try {
+      const factory = await SubconSewingFactory.findById(factoryId);
+      if (!factory) {
+        return res.status(404).json({ error: "Factory not found." });
+      }
+
+      // Check for duplicate qcID within the same factory
+      if (factory.qcList.some((qc) => qc.qcID === qcID)) {
+        return res
+          .status(409)
+          .json({ error: "This QC ID already exists for this factory." });
+      }
+
+      const newQcIndex =
+        factory.qcList.length > 0
+          ? Math.max(...factory.qcList.map((q) => q.qcIndex)) + 1
+          : 1;
+
+      const newQc = {
+        qcIndex: newQcIndex,
+        qcID,
+        qcName
+      };
+
+      factory.qcList.push(newQc);
+      await factory.save();
+
+      res.status(201).json(factory.qcList[factory.qcList.length - 1]); // Return the newly added QC
+    } catch (error) {
+      console.error("Error adding QC:", error);
+      res.status(500).json({ error: "Failed to add QC" });
+    }
+  }
+);
+
+// PUT: Update a specific QC in a factory's qcList
+app.put(
+  "/api/subcon-sewing-factories-manage/qcs/:qcMongoId",
+  async (req, res) => {
+    const { qcMongoId } = req.params;
+    const { qcID, qcName } = req.body;
+
+    try {
+      const factory = await SubconSewingFactory.findOne({
+        "qcList._id": qcMongoId
+      });
+      if (!factory) {
+        return res.status(404).json({ error: "QC not found in any factory." });
+      }
+
+      const qcToUpdate = factory.qcList.id(qcMongoId);
+      qcToUpdate.qcID = qcID;
+      qcToUpdate.qcName = qcName;
+
+      await factory.save();
+      res.json(qcToUpdate);
+    } catch (error) {
+      console.error("Error updating QC:", error);
+      res.status(500).json({ error: "Failed to update QC" });
+    }
+  }
+);
+
+// DELETE: Remove a specific QC from a factory's qcList
+app.delete(
+  "/api/subcon-sewing-factories-manage/qcs/:qcMongoId",
+  async (req, res) => {
+    const { qcMongoId } = req.params;
+
+    try {
+      const result = await SubconSewingFactory.updateOne(
+        { "qcList._id": qcMongoId },
+        { $pull: { qcList: { _id: qcMongoId } } }
+      );
+
+      if (result.nModified === 0) {
+        return res.status(404).json({ error: "QC not found." });
+      }
+
+      res.json({ message: "QC deleted successfully." });
+    } catch (error) {
+      console.error("Error deleting QC:", error);
+      res.status(500).json({ error: "Failed to delete QC" });
+    }
+  }
+);
+
 // --- DEFECT MANAGEMENT ---
 
 // GET all defects with filtering
@@ -34622,10 +34743,10 @@ app.get("/api/subcon-qc-dashboard-daily", async (req, res) => {
 });
 
 /* ----------------------------------------------------
-   End Points - NEW for Sub-Con QA Sample Data
+   End Points - NEW for Sub-Con QA Sample Data (Modified)
 ---------------------------------------------------- */
 
-// 1. ENDPOINT: Search for QA Standard Defects
+// 1. ENDPOINT: Search for QA Standard Defects (No Change Needed, this is correct)
 app.get("/api/qa-standard-defects", async (req, res) => {
   try {
     const { searchTerm } = req.query;
@@ -34635,8 +34756,13 @@ app.get("/api/qa-standard-defects", async (req, res) => {
 
     const searchNumber = parseInt(searchTerm, 10);
     const query = isNaN(searchNumber)
-      ? { english: { $regex: searchTerm, $options: "i" } } // Search by name (case-insensitive)
-      : { code: searchNumber }; // Search by code
+      ? {
+          $or: [
+            { english: { $regex: searchTerm, $options: "i" } },
+            { khmer: { $regex: searchTerm, $options: "i" } }
+          ]
+        }
+      : { code: searchNumber };
 
     const defects = await QAStandardDefectsModel.find(query)
       .limit(20)
@@ -34648,7 +34774,19 @@ app.get("/api/qa-standard-defects", async (req, res) => {
   }
 });
 
-// 2. ENDPOINT: Image Upload for QA Module
+app.get("/api/qa-standard-defects-list", async (req, res) => {
+  try {
+    const defects = await QAStandardDefectsModel.find({})
+      .sort({ code: 1 })
+      .lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA standard defects list:", error);
+    res.status(500).json({ error: "Failed to fetch QA defects list" });
+  }
+});
+
+// 2. ENDPOINT: Generic Image Upload for Sub-Con QA Module
 const qaImageStorage = multer.memoryStorage();
 const qaImageUpload = multer({
   storage: qaImageStorage,
@@ -34660,13 +34798,22 @@ app.post(
   qaImageUpload.single("imageFile"),
   async (req, res) => {
     try {
-      const { date, factory, lineNo, moNo, defectCode } = req.body;
+      const {
+        reportType,
+        factory,
+        lineNo,
+        moNo,
+        color,
+        qcId,
+        imageType,
+        sectionName
+      } = req.body; // imageType can be 'defect', 'spi', etc.
       const imageFile = req.file;
 
       if (!imageFile) {
         return res.status(400).json({ message: "No image file provided." });
       }
-      if (!date || !factory || !lineNo || !moNo || !defectCode) {
+      if (!moNo || !qcId || !imageType) {
         return res.status(400).json({ message: "Missing required metadata." });
       }
 
@@ -34676,23 +34823,22 @@ app.post(
         "storage",
         "sub-con-qc1"
       );
+      // Ensure the directory exists
       //await fsPromises.mkdir(uploadPath, { recursive: true });
 
+      const sanitizedReportType = sanitize(reportType);
       const sanitizedFactory = sanitize(factory);
-      const sanitizedDate = sanitize(date);
-      const sanitizedLineNo = sanitize(lineNo);
+      const sanitizedlineNo = sanitize(lineNo);
       const sanitizedMoNo = sanitize(moNo);
-      const sanitizedDefectCode = sanitize(defectCode);
+      const sanitizedColor = sanitize(color);
+      const sanitizedQcId = sanitize(qcId);
+      const sanitizedImageType = sanitize(imageType);
+      const sanitizedSection = sanitize(sectionName || "");
 
-      const imagePrefix = `QA_${sanitizedDate}_${sanitizedFactory}_${sanitizedLineNo}_${sanitizedMoNo}_${sanitizedDefectCode}_`;
-
-      const filesInDir = await fsPromises.readdir(uploadPath);
-      const existingImageCount = filesInDir.filter((f) =>
-        f.startsWith(imagePrefix)
-      ).length;
-      const imageIndex = existingImageCount + 1;
-
-      const newFilename = `${imagePrefix}${imageIndex}.webp`;
+      const timestamp = Date.now();
+      const newFilename = `${sanitizedImageType}${
+        sanitizedSection ? `_${sanitizedSection}` : ""
+      }_${sanitizedReportType}_${sanitizedFactory}_${sanitizedlineNo}_${sanitizedMoNo}_${sanitizedColor}_${sanitizedQcId}_${timestamp}.webp`;
       const finalDiskPath = path.join(uploadPath, newFilename);
 
       await sharp(imageFile.buffer)
@@ -34705,12 +34851,10 @@ app.post(
         .webp({ quality: 80 })
         .toFile(finalDiskPath);
 
-      // ---Use a relative URL for the frontend ---
       const relativeUrl = `/storage/sub-con-qc1/${newFilename}`;
-
-      res.json({ success: true, filePath: relativeUrl }); // Send the relative path
+      res.json({ success: true, filePath: relativeUrl });
     } catch (error) {
-      console.error("Error in QA image upload:", error);
+      console.error("Error in Sub-Con QA image upload:", error);
       res
         .status(500)
         .json({ message: "Server error during image processing." });
@@ -34718,7 +34862,7 @@ app.post(
   }
 );
 
-// Helper function to generate a unique Report ID for QA
+// Helper function to generate a unique Report ID
 const generateSubconQAReportID = async () => {
   const date = new Date();
   const year = date.getFullYear().toString().slice(-2);
@@ -34740,12 +34884,11 @@ const generateSubconQAReportID = async () => {
 app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
   try {
     const reportData = req.body;
-
     const startOfDay = new Date(reportData.inspectionDate);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
     const reportID = await generateSubconQAReportID();
-    const buyer = getBuyerFromMoNumber(reportData.moNo); // Assuming you have this helper function
+    const buyer = getBuyerFromMoNumber(reportData.moNo);
 
     const newReport = new SubconSewingQAReport({
       ...reportData,
@@ -34755,13 +34898,18 @@ app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
     });
 
     await newReport.save();
-
     res.status(201).json({
       message: "QA Report saved successfully!",
       reportID: reportID
     });
   } catch (error) {
     console.error("Error saving Sub-Con QA report:", error);
+    if (error.code === 11000) {
+      // Catch duplicate key error from the index
+      return res
+        .status(409)
+        .json({ error: "A report with these exact details already exists." });
+    }
     if (error.name === "ValidationError") {
       return res
         .status(400)
@@ -34771,16 +34919,21 @@ app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
   }
 });
 
-/* -----------------------------------------------------------
-   End Points - ADDITIONS for Sub-Con QA Sample Data (Find & Update)
------------------------------------------------------------ */
-
-// 4. ENDPOINT: Find a specific QA report to check for existence/edit
+// 4. ENDPOINT: Find a specific QA report
 app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
   try {
-    const { inspectionDate, factory, lineNo, moNo, color } = req.query;
+    const { inspectionDate, reportType, factory, lineNo, moNo, color, qcId } =
+      req.query;
 
-    if (!inspectionDate || !factory || !lineNo || !moNo || !color) {
+    if (
+      !inspectionDate ||
+      !reportType ||
+      !factory ||
+      !lineNo ||
+      !moNo ||
+      !color ||
+      !qcId
+    ) {
       return res
         .status(400)
         .json({ error: "Missing required search parameters." });
@@ -34794,16 +34947,14 @@ app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
 
     const report = await SubconSewingQAReport.findOne({
       factory,
+      reportType,
       lineNo,
       moNo,
       color,
-      inspectionDate: {
-        $gte: startOfDay,
-        $lte: endOfDay
-      }
-    });
+      "qcList.qcID": qcId,
+      inspectionDate: { $gte: startOfDay, $lte: endOfDay }
+    }).lean(); // Use .lean() for faster, plain JS object results
 
-    // If a report is found, send it. Otherwise, `report` will be null.
     res.json(report);
   } catch (error) {
     console.error("Error finding Sub-Con QA report:", error);
@@ -34817,7 +34968,6 @@ app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
     const { id } = req.params;
     const reportData = req.body;
 
-    // Always normalize the inspection date to the start of the day
     const startOfDay = new Date(reportData.inspectionDate);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
@@ -34826,7 +34976,7 @@ app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
     const updatedReport = await SubconSewingQAReport.findByIdAndUpdate(
       id,
       { ...reportData, inspectionDate: startOfDay, buyer: buyer },
-      { new: true, runValidators: true } // Return the updated document
+      { new: true, runValidators: true }
     );
 
     if (!updatedReport) {
