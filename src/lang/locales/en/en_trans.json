@@ -2006,5 +2006,32 @@
     "fiber 01": "Cleaning must be done by fabric mill.",
     "fiber 02": "YM doing the cleaning, front & back side.",
     "fiber 03": "Randomly 2-3 pcs back side hairly can acceptable."
+  },
+
+  "subConQC1": {
+    "Inspection Date": "Inspection Date",
+    "Factory": "Factory",
+    "Line No": "Line No",
+    "Style (MO No)": "Style (MO No)",
+    "Color": "Color",
+    "Checked Qty": "Checked Qty",
+    "Total Defect Qty": "Total Defect Qty",
+    "Total Defect Rate": "Total Defect Rate",
+    "Prepared By": "Prepared By",
+    "Comments": "Comments",
+    "Search by": "Search by",
+    "Defect Name": "Defect Name",
+    "Defect Code": "Defect Code",
+    "Filter": "Filter",
+    "Preview": "Preview",
+    "Save Inspection": "Save Inspection"
+  },
+  "subcon": {
+    "tabs": {
+      "inspection": "Inspection",
+      "qaSampleData": "QA Sample Data",
+      "report": "Report",
+      "dashboard": "Dashboard"
+    }
   }
 }

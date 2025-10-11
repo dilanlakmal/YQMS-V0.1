@@ -125,8 +125,8 @@ import {
 /* ------------------------------
    SQL Query Import
 // ------------------------------ */
-// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 import {
   ymEcoConnection,
@@ -484,7 +484,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs start
 ------------------------------ */
-// app.use(sqlQuery);
+app.use(sqlQuery);
 
 /* ------------------------------
   Functional routs

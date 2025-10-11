@@ -12,7 +12,7 @@ import {
   Save,
   Search,
   User,
-  XCircle,
+  XCircle
 } from "lucide-react";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
@@ -25,35 +25,39 @@ import { useAuth } from "../../authentication/AuthContext";
 import SubConQCInspectionPreview from "./SubConQCInspectionPreview";
 
 // --- A dedicated card for the Checked Qty input---
-const CheckedQtyCard = ({ checkedQty, onChange, isLocked, onLockToggle }) => (
-  <div className="p-4 rounded-lg shadow-md flex flex-col bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700">
-    <div className="flex items-center justify-between mb-2">
-      <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
-        Checked Qty
-      </h4>
-      <button
-        onClick={onLockToggle}
-        title={isLocked ? "Unlock to edit" : "Lock quantity"}
-        className={`p-1 rounded-md ${
-          isLocked
-            ? "bg-blue-500 text-white"
-            : "bg-blue-200 dark:bg-gray-700 text-blue-600 dark:text-gray-300"
-        }`}
-      >
-        <Check size={16} />
-      </button>
+const CheckedQtyCard = ({ checkedQty, onChange, isLocked, onLockToggle }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="p-4 rounded-lg shadow-md flex flex-col bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+          {t("subConQC1.Checked Qty")}
+        </h4>
+        <button
+          onClick={onLockToggle}
+          title={isLocked ? "Unlock to edit" : "Lock quantity"}
+          className={`p-1 rounded-md ${
+            isLocked
+              ? "bg-blue-500 text-white"
+              : "bg-blue-200 dark:bg-gray-700 text-blue-600 dark:text-gray-300"
+          }`}
+        >
+          <Check size={16} />
+        </button>
+      </div>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={checkedQty}
+        onChange={onChange}
+        disabled={isLocked}
+        className="w-full bg-white dark:bg-gray-900/50 border-2 border-blue-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 rounded-md text-4xl font-bold p-2 text-blue-600 dark:text-blue-300 disabled:opacity-70 disabled:cursor-not-allowed"
+        placeholder="0"
+      />
     </div>
-    <input
-      type="text"
-      inputMode="numeric"
-      value={checkedQty}
-      onChange={onChange}
-      disabled={isLocked}
-      className="w-full bg-white dark:bg-gray-900/50 border-2 border-blue-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 rounded-md text-4xl font-bold p-2 text-blue-600 dark:text-blue-300 disabled:opacity-70 disabled:cursor-not-allowed"
-      placeholder="0"
-    />
-  </div>
-);
+  );
+};
 
 // --- Compact, vertical summary card for the left column ---
 const VerticalSummaryCard = ({
@@ -61,7 +65,7 @@ const VerticalSummaryCard = ({
   title,
   value,
   colorClass,
-  bgColorClass,
+  bgColorClass
 }) => (
   <div
     className={`p-3 rounded-lg shadow-sm flex flex-col h-full ${bgColorClass}`}
@@ -78,28 +82,32 @@ const VerticalSummaryCard = ({
 
 // --- A dedicated card for the Comments input ---
 
-const CommentsCard = ({ comments, onChange, maxLength = 500 }) => (
-  <div className="p-4 rounded-lg shadow-md flex flex-col bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-    <label
-      htmlFor="comments-box"
-      className="text-sm font-bold text-gray-800 dark:text-gray-300 uppercase tracking-wider mb-2"
-    >
-      Comments
-    </label>
-    <textarea
-      id="comments-box"
-      value={comments}
-      onChange={onChange}
-      maxLength={maxLength}
-      rows={4}
-      className="w-full bg-white dark:bg-gray-900/50 border-2 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 rounded-md p-2 text-gray-700 dark:text-gray-200 resize-none"
-      placeholder="Enter any comments here..."
-    />
-    <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-1">
-      {maxLength - (comments?.length || 0)} characters remaining
+const CommentsCard = ({ comments, onChange, maxLength = 500 }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="p-4 rounded-lg shadow-md flex flex-col bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+      <label
+        htmlFor="comments-box"
+        className="text-sm font-bold text-gray-800 dark:text-gray-300 uppercase tracking-wider mb-2"
+      >
+        {t("subConQC1.Comments")}
+      </label>
+      <textarea
+        id="comments-box"
+        value={comments}
+        onChange={onChange}
+        maxLength={maxLength}
+        rows={4}
+        className="w-full bg-white dark:bg-gray-900/50 border-2 border-gray-300 dark:border-gray-600 focus:ring-indigo-500 focus:border-indigo-500 rounded-md p-2 text-gray-700 dark:text-gray-200 resize-none"
+        placeholder="Enter any comments here..."
+      />
+      <div className="text-right text-xs text-gray-500 dark:text-gray-400 mt-1">
+        {maxLength - (comments?.length || 0)} characters remaining
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 // --- Defect Card component ---
 const DefectCard = ({
@@ -107,7 +115,7 @@ const DefectCard = ({
   checkedQty,
   onQtyChange,
   getDefectRateCellColor,
-  isLocked,
+  isLocked
 }) => {
   const defectRate =
     checkedQty > 0 ? (Number(defect.qty || 0) / checkedQty) * 100 : null;
@@ -201,7 +209,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       }
       try {
         const res = await axios.get(`${API_BASE_URL}/api/search-mono`, {
-          params: { term: searchTerm },
+          params: { term: searchTerm }
         });
         setMoNoOptions(res.data.map((mo) => ({ value: mo, label: mo })));
       } catch (error) {
@@ -260,7 +268,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           value: matchedFactory.factory,
           label: matchedFactory.factory_second_name
             ? `${matchedFactory.factory} (${matchedFactory.factory_second_name})`
-            : matchedFactory.factory,
+            : matchedFactory.factory
         };
         // Update the state to auto-select this factory.
         handleStateChange("factory", factoryOption);
@@ -279,7 +287,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         if (inspectionState.defects.length === 0) {
           setInspectionState((prevState) => ({
             ...prevState,
-            defects: defectsWithQty,
+            defects: defectsWithQty
           }));
         }
       } catch (error) {
@@ -304,7 +312,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             factory: factory.value,
             lineNo: lineNo.value,
             moNo: moNo.value,
-            color: color.value,
+            color: color.value
           };
           const res = await axios.get(
             `${API_BASE_URL}/api/subcon-sewing-qc1-report/find`,
@@ -333,7 +341,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             // Map over the full defect list and update quantities from the map
             const updatedDefects = inspectionState.defects.map((defect) => ({
               ...defect,
-              qty: (defectQtyMap.get(defect.DefectCode) || "").toString(),
+              qty: (defectQtyMap.get(defect.DefectCode) || "").toString()
             }));
 
             handleStateChange("defects", updatedDefects);
@@ -346,7 +354,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
               toast: true,
               position: "top-end",
               showConfirmButton: false,
-              timer: 3500,
+              timer: 3500
             });
           } else {
             // --- NO REPORT FOUND: RESET TO A NEW FORM STATE ---
@@ -355,7 +363,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             handleStateChange("checkedQty", "");
             const resetDefects = inspectionState.defects.map((d) => ({
               ...d,
-              qty: "",
+              qty: ""
             }));
             handleStateChange("defects", resetDefects);
             handleStateChange("comments", "");
@@ -374,7 +382,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     inspectionState.factory,
     inspectionState.lineNo,
     inspectionState.moNo,
-    inspectionState.color,
+    inspectionState.color
     // Note: inspectionState.defects.length is added to ensure we have the base defect list before running this
   ]);
 
@@ -412,7 +420,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         setLineOptions(
           selectedFactoryData.lineList.map((line) => ({
             value: line,
-            label: line,
+            label: line
           }))
         );
       }
@@ -498,16 +506,16 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     if (totalDefectRate > 5)
       return {
         color: "text-red-600 dark:text-red-400",
-        bg: "bg-red-100 dark:bg-red-900/50",
+        bg: "bg-red-100 dark:bg-red-900/50"
       };
     if (totalDefectRate >= 3)
       return {
         color: "text-orange-500 dark:text-orange-400",
-        bg: "bg-orange-100 dark:bg-orange-900/50",
+        bg: "bg-orange-100 dark:bg-orange-900/50"
       };
     return {
       color: "text-green-600 dark:text-green-400",
-      bg: "bg-green-100 dark:bg-green-900/50",
+      bg: "bg-green-100 dark:bg-green-900/50"
     };
   };
 
@@ -522,14 +530,14 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
     control: (base) => ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
-      borderColor: "var(--color-border)",
+      borderColor: "var(--color-border)"
     }),
     singleValue: (base) => ({ ...base, color: "var(--color-text-primary)" }),
     input: (base) => ({ ...base, color: "var(--color-text-primary)" }),
     menu: (base) => ({
       ...base,
       backgroundColor: "var(--color-bg-secondary)",
-      zIndex: 50,
+      zIndex: 50
     }),
     option: (base, { isFocused, isSelected }) => ({
       ...base,
@@ -538,8 +546,8 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         : isFocused
         ? "var(--color-bg-tertiary)"
         : "var(--color-bg-secondary)",
-      color: isSelected ? "white" : "var(--color-text-primary)",
-    }),
+      color: isSelected ? "white" : "var(--color-text-primary)"
+    })
   };
 
   // --- ENHANCED factoryOptions LOGIC ---
@@ -565,8 +573,8 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             value: matchedFactory.factory,
             label: matchedFactory.factory_second_name
               ? `${matchedFactory.factory} (${matchedFactory.factory_second_name})`
-              : matchedFactory.factory,
-          },
+              : matchedFactory.factory
+          }
         ];
       }
     }
@@ -577,7 +585,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       value: f.factory,
       label: f.factory_second_name
         ? `${f.factory} (${f.factory_second_name})`
-        : f.factory,
+        : f.factory
     }));
   }, [allFactories, user]); // <-- Add 'user' to the dependency array.
 
@@ -612,7 +620,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         defectCode: d.DefectCode,
         displayCode: d.DisplayCode,
         defectName: d.DefectNameEng, // English name only
-        qty: Number(d.qty),
+        qty: Number(d.qty)
       }));
 
     const factoryData = allFactories.find(
@@ -628,12 +636,12 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       color: inspectionState.color.value,
       preparedBy: {
         empId: user.emp_id,
-        engName: user.eng_name,
+        engName: user.eng_name
       },
       checkedQty: Number(inspectionState.checkedQty),
       totalDefectQty: totalDefectQty,
       defectList: defectsToSave,
-      comments: inspectionState.comments || "",
+      comments: inspectionState.comments || ""
     };
 
     try {
@@ -649,7 +657,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           title: "Report Updated!",
           text: `The report has been successfully updated.`,
           timer: 2000,
-          showConfirmButton: false,
+          showConfirmButton: false
         });
       } else {
         // --- CREATE a new report ---
@@ -662,14 +670,14 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           title: "Report Saved!",
           text: `Your new report has been saved with ID: ${response.data.reportID}`,
           timer: 2000,
-          showConfirmButton: false,
+          showConfirmButton: false
         });
       }
 
       // --- FORM RESET LOGIC ---
       const resetDefects = inspectionState.defects.map((d) => ({
         ...d,
-        qty: "",
+        qty: ""
       }));
 
       setInspectionState((prevState) => ({
@@ -679,7 +687,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
         color: null,
         checkedQty: "",
         defects: resetDefects,
-        comments: "",
+        comments: ""
       }));
 
       // Clear local state and reset edit mode
@@ -704,20 +712,30 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
       <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
           <div className="space-y-1">
-            <label className="text-sm font-medium flex items-center gap-2">
+            <label
+              htmlFor="inspectionDate"
+              className="text-sm font-medium flex items-center gap-2"
+            >
               <Calendar size={16} />
-              Inspection Date
+              {t("subConQC1.Inspection Date")}
             </label>
             <DatePicker
+              id="inspectionDate"
               selected={inspectionState.inspectionDate}
               onChange={(date) => handleStateChange("inspectionDate", date)}
               className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              dateFormat="yyyy-MM-dd"
+              maxDate={new Date()}
+              showMonthDropdown
+              showYearDropdown
+              dropdownMode="select"
+              placeholderText="YYYY-MM-DD"
             />
           </div>
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <Factory size={16} />
-              Factory
+              {t("subConQC1.Factory")}
             </label>
             <Select
               options={factoryOptions}
@@ -731,7 +749,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <List size={16} />
-              Line No
+              {t("subConQC1.Line No")}
             </label>
             <Select
               options={lineOptions}
@@ -746,7 +764,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <Hash size={16} />
-              MO No
+              {t("subConQC1.Style (MO No)")}
             </label>
             <Select
               options={moNoOptions}
@@ -761,7 +779,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <Palette size={16} />
-              Color
+              {t("subConQC1.Color")}
             </label>
             <Select
               options={colorOptions}
@@ -788,21 +806,21 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           {/* --- SUMMARY CARDS --- */}
           <VerticalSummaryCard
             icon={<AlertTriangle size={20} />}
-            title="Total Defect Qty"
+            title={t("subConQC1.Total Defect Qty")}
             value={totalDefectQty}
             colorClass="text-yellow-500 dark:text-yellow-400"
             bgColorClass="bg-yellow-100 dark:bg-yellow-900/50"
           />
           <VerticalSummaryCard
             icon={<Percent size={20} />}
-            title="Total Defect Rate"
+            title={t("subConQC1.Total Defect Rate")}
             value={`${totalDefectRate.toFixed(2)}%`}
             colorClass={getTotalRateStyling().color}
             bgColorClass={getTotalRateStyling().bg}
           />
           <VerticalSummaryCard
             icon={<User size={20} />}
-            title="Prepared By"
+            title={t("subConQC1.Prepared By")}
             value={user?.emp_id || user?.name || "N/A"}
             colorClass="text-gray-500 dark:text-gray-300"
             bgColorClass="bg-gray-200 dark:bg-gray-700/50"
@@ -816,7 +834,8 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
               onClick={() => setIsPreviewOpen(true)}
               className="flex items-center justify-center gap-2 px-6 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 shadow-lg"
             >
-              <Eye size={18} /> Preview
+              <Eye size={18} />
+              {t("subConQC1.Preview")}
             </button>
             <button
               onClick={handleSave}
@@ -832,7 +851,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
                 ? "Saving..."
                 : existingReportId
                 ? "Update Inspection"
-                : "Save Inspection"}
+                : t("subConQC1.Save Inspection")}
             </button>
           </div>
         </div>
@@ -843,7 +862,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             <div className="flex items-end gap-4 mb-4">
               <div className="flex-shrink-0">
                 <label htmlFor="search-type" className="text-sm font-medium">
-                  Search By
+                  {t("subConQC1.Search by")}
                 </label>
                 <select
                   id="search-type"
@@ -851,13 +870,17 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
                   onChange={(e) => setSearchType(e.target.value)}
                   className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
                 >
-                  <option value="defectName">Defect Name</option>
-                  <option value="displayCode">Display Code</option>
+                  <option value="defectName">
+                    {t("subConQC1.Defect Name")}
+                  </option>
+                  <option value="displayCode">
+                    {t("subConQC1.Defect Code")}
+                  </option>
                 </select>
               </div>
               <div className="relative flex-grow">
                 <label htmlFor="defect-search" className="text-sm font-medium">
-                  Filter
+                  {t("subConQC1.Filter")}
                 </label>
                 <input
                   id="defect-search"
@@ -910,7 +933,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           user,
           defects: inspectionState.defects,
           getTotalRateStyling,
-          getDefectRateCellColor,
+          getDefectRateCellColor
         }}
       />
     </div>
