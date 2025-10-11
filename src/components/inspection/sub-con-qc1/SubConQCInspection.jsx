@@ -24,13 +24,17 @@ import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
 import SubConQCInspectionPreview from "./SubConQCInspectionPreview";
 
+
 // --- A dedicated card for the Checked Qty input---
-const CheckedQtyCard = ({ checkedQty, onChange, isLocked, onLockToggle }) => (
-  <div className="p-4 rounded-lg shadow-md flex flex-col bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700">
-    <div className="flex items-center justify-between mb-2">
-      <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
-        Checked Qty
-      </h4>
+const CheckedQtyCard = ({ checkedQty, onChange, isLocked, onLockToggle }) => {
+  const { t } = useTranslation();
+
+  return (
+    <div className="p-4 rounded-lg shadow-md flex flex-col bg-blue-50 dark:bg-gray-800 border border-blue-200 dark:border-gray-700">
+      <div className="flex items-center justify-between mb-2">
+        <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+          {t("subConQC1.Checked Qty")}
+        </h4>
       <button
         onClick={onLockToggle}
         title={isLocked ? "Unlock to edit" : "Lock quantity"}
@@ -53,7 +57,8 @@ const CheckedQtyCard = ({ checkedQty, onChange, isLocked, onLockToggle }) => (
       placeholder="0"
     />
   </div>
-);
+)
+};
 
 // --- Compact, vertical summary card for the left column ---
 const VerticalSummaryCard = ({
@@ -78,13 +83,17 @@ const VerticalSummaryCard = ({
 
 // --- A dedicated card for the Comments input ---
 
-const CommentsCard = ({ comments, onChange, maxLength = 500 }) => (
+const CommentsCard = ({ comments, onChange, maxLength = 500 }) => {
+  const { t } = useTranslation();
+
+  return (
+
   <div className="p-4 rounded-lg shadow-md flex flex-col bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
     <label
       htmlFor="comments-box"
       className="text-sm font-bold text-gray-800 dark:text-gray-300 uppercase tracking-wider mb-2"
     >
-      Comments
+      {t("subConQC1.Comments")}
     </label>
     <textarea
       id="comments-box"
@@ -99,7 +108,8 @@ const CommentsCard = ({ comments, onChange, maxLength = 500 }) => (
       {maxLength - (comments?.length || 0)} characters remaining
     </div>
   </div>
-);
+)
+};
 
 // --- Defect Card component ---
 const DefectCard = ({
@@ -709,7 +719,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
               className="text-sm font-medium flex items-center gap-2"
             >
               <Calendar size={16} />
-              Inspection Date
+              {t("subConQC1.Inspection Date")}
             </label>
             <DatePicker
               id="inspectionDate"
@@ -727,7 +737,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <Factory size={16} />
-              Factory
+              {t("subConQC1.Factory")}
             </label>
             <Select
               options={factoryOptions}
@@ -741,7 +751,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <List size={16} />
-              Line No
+              {t("subConQC1.Line No")}
             </label>
             <Select
               options={lineOptions}
@@ -756,7 +766,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <Hash size={16} />
-              MO No
+              {t("subConQC1.Style (MO No)")}
             </label>
             <Select
               options={moNoOptions}
@@ -771,7 +781,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           <div className="space-y-1">
             <label className="text-sm font-medium flex items-center gap-2">
               <Palette size={16} />
-              Color
+              {t("subConQC1.Color")}
             </label>
             <Select
               options={colorOptions}
@@ -798,21 +808,21 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
           {/* --- SUMMARY CARDS --- */}
           <VerticalSummaryCard
             icon={<AlertTriangle size={20} />}
-            title="Total Defect Qty"
+            title={t("subConQC1.Total Defect Qty")}
             value={totalDefectQty}
             colorClass="text-yellow-500 dark:text-yellow-400"
             bgColorClass="bg-yellow-100 dark:bg-yellow-900/50"
           />
           <VerticalSummaryCard
             icon={<Percent size={20} />}
-            title="Total Defect Rate"
+            title={t("subConQC1.Total Defect Rate")}
             value={`${totalDefectRate.toFixed(2)}%`}
             colorClass={getTotalRateStyling().color}
             bgColorClass={getTotalRateStyling().bg}
           />
           <VerticalSummaryCard
             icon={<User size={20} />}
-            title="Prepared By"
+            title={t("subConQC1.Prepared By")}
             value={user?.emp_id || user?.name || "N/A"}
             colorClass="text-gray-500 dark:text-gray-300"
             bgColorClass="bg-gray-200 dark:bg-gray-700/50"
@@ -826,24 +836,24 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
               onClick={() => setIsPreviewOpen(true)}
               className="flex items-center justify-center gap-2 px-6 py-2 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-700 shadow-lg"
             >
-              <Eye size={18} /> Preview
+              <Eye size={18} />{t("subConQC1.Preview")}
             </button>
             <button
-              onClick={handleSave}
-              disabled={isSubmitting || isFormInvalid}
-              className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-            >
-              {isSubmitting ? (
-                <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
-              ) : (
-                <Save size={18} />
-              )}
-              {isSubmitting
-                ? "Saving..."
-                : existingReportId
-                ? "Update Inspection"
-                : "Save Inspection"}
-            </button>
+                onClick={handleSave}
+                disabled={isSubmitting || isFormInvalid}
+                className="flex items-center gap-2 px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              >
+                {isSubmitting ? (
+                  <span className="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></span>
+                ) : (
+                  <Save size={18} />
+                )}
+                {isSubmitting
+                  ? "Saving..."
+                  : existingReportId
+                  ? "Update Inspection"
+                  : t("subConQC1.Save Inspection")}
+              </button>
           </div>
         </div>
 
@@ -853,7 +863,7 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
             <div className="flex items-end gap-4 mb-4">
               <div className="flex-shrink-0">
                 <label htmlFor="search-type" className="text-sm font-medium">
-                  Search By
+                  {t("subConQC1.Search by")}
                 </label>
                 <select
                   id="search-type"
@@ -861,13 +871,13 @@ const SubConQCInspection = ({ inspectionState, setInspectionState }) => {
                   onChange={(e) => setSearchType(e.target.value)}
                   className="w-full mt-1 p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
                 >
-                  <option value="defectName">Defect Name</option>
-                  <option value="displayCode">Display Code</option>
+                  <option value="defectName">{t("subConQC1.Defect Name")}</option>
+                  <option value="displayCode">{t("subConQC1.Defect Code")}</option>
                 </select>
               </div>
               <div className="relative flex-grow">
                 <label htmlFor="defect-search" className="text-sm font-medium">
-                  Filter
+                  {t("subConQC1.Filter")}
                 </label>
                 <input
                   id="defect-search"

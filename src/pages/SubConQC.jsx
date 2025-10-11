@@ -190,7 +190,7 @@ const SubConQC = () => {
         id: "dashboard",
         labelKey: "subcon.tabs.dashboard",
         icon: <LayoutDashboard size={18} />,
-        component: <SubConQCDashboard title="Dashboard" />
+        component: <SubConQCDashboard title={"Dashboard"} />
       }
     ];
 
