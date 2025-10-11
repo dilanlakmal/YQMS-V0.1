@@ -125,8 +125,8 @@ import {
 /* ------------------------------
    SQL Query Import
 // ------------------------------ */
-import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 import {
   ymEcoConnection,
@@ -484,7 +484,7 @@ app.use((req, res, next) => {
 /* ------------------------------
   SQL Query routs start
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 
 /* ------------------------------
   Functional routs
@@ -3055,16 +3055,16 @@ app.get("/api/inline-orders-details", async (req, res) => {
    Graceful Shutdown
 ------------------------------ */
 
-process.on("SIGINT", async () => {
-  try {
-    await closeSQLPools();
-    console.log("SQL connection pools closed.");
-  } catch (err) {
-    console.error("Error closing SQL connection pools:", err);
-  } finally {
-    process.exit(0);
-  }
-});
+// process.on("SIGINT", async () => {
+//   try {
+//     await closeSQLPools();
+//     console.log("SQL connection pools closed.");
+//   } catch (err) {
+//     console.error("Error closing SQL connection pools:", err);
+//   } finally {
+//     process.exit(0);
+//   }
+// });
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
