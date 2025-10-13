@@ -1,5 +1,6 @@
 import mongoose from "mongoose";
 
+// Sub-schema for identifying the QC inspector
 const qcReportItemSchema = new mongoose.Schema(
   {
     qcID: { type: String, required: true },
@@ -8,16 +9,16 @@ const qcReportItemSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Sub-schema for individual defects within the report
+// Sub-schema for individual defects
 const qaDefectItemSchema = new mongoose.Schema(
   {
-    pcsNo: { type: Number, required: true }, // Which garment piece this defect is on
+    pcsNo: { type: Number, required: true },
     defectCode: { type: Number, required: true },
-    defectName: { type: String, required: true }, // English name
+    defectName: { type: String, required: true },
     khmerName: { type: String, required: true },
     chineseName: { type: String, default: "" },
     qty: { type: Number, required: true, min: 1 },
-    images: [{ type: String }], // Array of image URLs
+    images: [{ type: String }],
     decision: { type: String, required: true },
     standardStatus: { type: String, required: true }
   },
@@ -36,6 +37,23 @@ const statusImageSchema = new mongoose.Schema(
   { _id: false }
 );
 
+// Sub-schema for the data collected by each individual QC inspector
+const qcDataItemSchema = new mongoose.Schema(
+  {
+    qcID: { type: String, required: true },
+    qcName: { type: String, required: true },
+    checkedQty: { type: Number, required: true, default: 20 },
+    rejectPcs: { type: Number, required: true, default: 0 },
+    totalDefectQty: { type: Number, required: true, default: 0 },
+    defectList: [qaDefectItemSchema],
+    spi: statusImageSchema,
+    measurement: statusImageSchema,
+    labelling: statusImageSchema
+  },
+  { _id: false }
+);
+
+// --- MAIN SCHEMA ---
 const subconSewingQAReportSchema = new mongoose.Schema(
   {
     reportID: { type: String, required: true, unique: true },
@@ -51,19 +69,20 @@ const subconSewingQAReportSchema = new mongoose.Schema(
     moNo: { type: String, required: true },
     color: { type: String, required: true },
     qcList: { type: [qcReportItemSchema], required: true },
-    //qcId: { type: String, required: true },
     buyer: { type: String, required: true },
     preparedBy: {
       empId: { type: String, required: true },
       engName: { type: String, required: true }
     },
-    checkedQty: { type: Number, required: true }, // Renamed from sampleSize
-    rejectPcs: { type: Number, required: true, default: 0 },
-    totalDefectQty: { type: Number, required: true, default: 0 },
-    defectList: [qaDefectItemSchema], // Array of defects
-    spi: statusImageSchema,
-    measurement: statusImageSchema,
-    labelling: statusImageSchema,
+
+    // --- NEW DATA STRUCTURE ---
+    qcData: [qcDataItemSchema],
+
+    // --- NEW TOP-LEVEL TOTALS ---
+    totalCheckedQty: { type: Number, required: true, default: 0 },
+    totalRejectPcs: { type: Number, required: true, default: 0 },
+    totalOverallDefectQty: { type: Number, required: true, default: 0 },
+
     additionalComments: {
       type: String,
       maxLength: [500, "Comments cannot exceed 500 characters."],
@@ -72,11 +91,11 @@ const subconSewingQAReportSchema = new mongoose.Schema(
   },
   {
     collection: "subcon_sewing_qa_reports",
-    timestamps: true // Automatically adds createdAt and updatedAt
+    timestamps: true
   }
 );
 
-// Create a compound index to ensure uniqueness for the key fields
+// Compound index to ensure one report per day for the same set of parameters
 subconSewingQAReportSchema.index(
   {
     inspectionDate: 1,

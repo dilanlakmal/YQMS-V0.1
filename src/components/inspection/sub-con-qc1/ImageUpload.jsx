@@ -38,14 +38,7 @@ const ImageUpload = ({
         return;
       }
     }
-    // if (!uploadMetadata?.moNo || !uploadMetadata?.qcId) {
-    //   Swal.fire(
-    //     "Error",
-    //     "Cannot upload image without MO Number and QC ID.",
-    //     "error"
-    //   );
-    //   return;
-    // }
+
     if (imageUrls.length >= maxImages) {
       Swal.fire(
         "Limit Reached",

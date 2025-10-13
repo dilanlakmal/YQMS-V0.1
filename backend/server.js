@@ -34880,21 +34880,38 @@ const generateSubconQAReportID = async () => {
   return reportID;
 };
 
-// 3. ENDPOINT: Save a new QA Sample Report
+// 3. ENDPOINT: Save a new QA Sample Report (MODIFIED)
 app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
   try {
     const reportData = req.body;
-    const startOfDay = new Date(reportData.inspectionDate);
+    const { qcData, ...headerData } = reportData;
+
+    // --- Calculate totals from the qcData array ---
+    let totalCheckedQty = 0;
+    let totalRejectPcs = 0;
+    let totalOverallDefectQty = 0;
+
+    qcData.forEach((qc) => {
+      totalCheckedQty += Number(qc.checkedQty) || 0;
+      totalRejectPcs += Number(qc.rejectPcs) || 0;
+      totalOverallDefectQty += Number(qc.totalDefectQty) || 0;
+    });
+
+    const startOfDay = new Date(headerData.inspectionDate);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
     const reportID = await generateSubconQAReportID();
-    const buyer = getBuyerFromMoNumber(reportData.moNo);
+    const buyer = getBuyerFromMoNumber(headerData.moNo);
 
     const newReport = new SubconSewingQAReport({
-      ...reportData,
+      ...headerData,
+      qcData,
       inspectionDate: startOfDay,
-      reportID: reportID,
-      buyer: buyer
+      reportID,
+      buyer,
+      totalCheckedQty,
+      totalRejectPcs,
+      totalOverallDefectQty
     });
 
     await newReport.save();
@@ -34905,7 +34922,6 @@ app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
   } catch (error) {
     console.error("Error saving Sub-Con QA report:", error);
     if (error.code === 11000) {
-      // Catch duplicate key error from the index
       return res
         .status(409)
         .json({ error: "A report with these exact details already exists." });
@@ -34919,10 +34935,10 @@ app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
   }
 });
 
-// 4. ENDPOINT: Find a specific QA report
+// 4. ENDPOINT: Find a specific QA report (MODIFIED)
 app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
   try {
-    const { inspectionDate, reportType, factory, lineNo, moNo, color, qcId } =
+    const { inspectionDate, reportType, factory, lineNo, moNo, color } =
       req.query;
 
     if (
@@ -34931,8 +34947,7 @@ app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
       !factory ||
       !lineNo ||
       !moNo ||
-      !color ||
-      !qcId
+      !color
     ) {
       return res
         .status(400)
@@ -34951,9 +34966,8 @@ app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
       lineNo,
       moNo,
       color,
-      "qcList.qcID": qcId,
       inspectionDate: { $gte: startOfDay, $lte: endOfDay }
-    }).lean(); // Use .lean() for faster, plain JS object results
+    }).lean();
 
     res.json(report);
   } catch (error) {
@@ -34962,20 +34976,44 @@ app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
   }
 });
 
-// 5. ENDPOINT: Update an existing QA report by its ID
+// 5. ENDPOINT: Update an existing QA report by its ID (MODIFIED)
 app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
   try {
     const { id } = req.params;
     const reportData = req.body;
+    const { qcData, ...headerData } = reportData;
 
-    const startOfDay = new Date(reportData.inspectionDate);
+    // --- Recalculate totals from the qcData array ---
+    let totalCheckedQty = 0;
+    let totalRejectPcs = 0;
+    let totalOverallDefectQty = 0;
+
+    if (qcData && Array.isArray(qcData)) {
+      qcData.forEach((qc) => {
+        totalCheckedQty += Number(qc.checkedQty) || 0;
+        totalRejectPcs += Number(qc.rejectPcs) || 0;
+        totalOverallDefectQty += Number(qc.totalDefectQty) || 0;
+      });
+    }
+
+    const startOfDay = new Date(headerData.inspectionDate);
     startOfDay.setUTCHours(0, 0, 0, 0);
 
-    const buyer = getBuyerFromMoNumber(reportData.moNo);
+    const buyer = getBuyerFromMoNumber(headerData.moNo);
+
+    const updatePayload = {
+      ...headerData,
+      qcData,
+      inspectionDate: startOfDay,
+      buyer,
+      totalCheckedQty,
+      totalRejectPcs,
+      totalOverallDefectQty
+    };
 
     const updatedReport = await SubconSewingQAReport.findByIdAndUpdate(
       id,
-      { ...reportData, inspectionDate: startOfDay, buyer: buyer },
+      updatePayload,
       { new: true, runValidators: true }
     );
 

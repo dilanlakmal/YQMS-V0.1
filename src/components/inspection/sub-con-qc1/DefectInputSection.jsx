@@ -47,27 +47,28 @@ const DefectInputSection = ({
   };
 
   const handleUpdate = (tempId, updatedData) => {
-    setDefects((prevDefects) =>
-      prevDefects.map((d) =>
-        d.tempId === tempId ? { ...d, ...updatedData } : d
-      )
+    const newDefects = defects.map((d) =>
+      d.tempId === tempId ? { ...d, ...updatedData } : d
     );
+    setDefects(newDefects); // Pass the final, new array up to the parent
   };
 
   const handleDelete = (tempIdToDelete) => {
-    setDefects((prevDefects) =>
-      prevDefects.filter((d) => d.tempId !== tempIdToDelete)
-    );
+    const newDefects = defects.filter((d) => d.tempId !== tempIdToDelete);
+    setDefects(newDefects); // Pass the final, new array up to the parent
   };
 
   const defectsByGarment = useMemo(() => {
     const groups = new Map();
-    defects.forEach((defect) => {
-      if (!groups.has(defect.pcsNo)) {
-        groups.set(defect.pcsNo, []);
-      }
-      groups.get(defect.pcsNo).push(defect);
-    });
+
+    if (Array.isArray(defects)) {
+      defects.forEach((defect) => {
+        if (!groups.has(defect.pcsNo)) {
+          groups.set(defect.pcsNo, []);
+        }
+        groups.get(defect.pcsNo).push(defect);
+      });
+    }
     return Array.from(groups.values());
   }, [defects]);
 
