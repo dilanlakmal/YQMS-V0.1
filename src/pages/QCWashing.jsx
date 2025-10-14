@@ -266,15 +266,22 @@ function calculateSummaryData(currentFormData) {
   const defectOverallResult = currentDefectDetails?.result || "Pending";
 
   // Check if this is SOP report type
-  const isSOP = currentFormData.reportType === "SOP" || 
-                currentFormData.reportType === "sop" ||
-                (currentFormData.reportType === "" && 
-                 currentFormData.inline === "" && 
-                 currentFormData.firstOutput === "");
+  const isSOP =
+    currentFormData.reportType === "SOP" ||
+    currentFormData.reportType === "sop" ||
+    (currentFormData.reportType === "" &&
+      currentFormData.inline === "" &&
+      currentFormData.firstOutput === "");
 
   if (isSOP) {
-    // For SOP: Overall result is Pass only if there are no defects
-    if (defectCount === 0 && rejectedDefectPcs === 0) {
+    // For SOP, both measurement and defect results must be "Pass"
+    // The measurement result is based on a 95% pass rate threshold.
+    const measurementPassRate =
+      measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
+    const isMeasurementPass = measurementPassRate >= 95;
+    const isDefectPass = defectCount === 0 && rejectedDefectPcs === 0;
+
+    if (isMeasurementPass && isDefectPass) {
       overallResult = "Pass";
     } else {
       overallResult = "Fail";
@@ -2112,18 +2119,6 @@ if (
         measurementDetails
       });
 
-      // Only log if there are significant changes to help debug
-      if (summary.totalCheckedPcs !== formData.totalCheckedPcs || 
-          summary.overallFinalResult !== formData.overallFinalResult) {
-        console.log('Summary updated:', {
-          totalCheckedPcs: summary.totalCheckedPcs,
-          rejectedDefectPcs: summary.rejectedDefectPcs,
-          totalDefectCount: summary.totalDefectCount,
-          defectRate: summary.defectRate,
-          defectRatio: summary.defectRatio,
-          overallFinalResult: summary.overallFinalResult
-        });
-      }
 
       setFormData((prev) => ({
         ...prev,

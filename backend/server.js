@@ -172,6 +172,7 @@ app.get("/api/image-proxy/:imageUrl(*)", async (req, res) => {
 });
 
 
+
 app.get("/api/image-proxy-selected/:id", async (req, res) => {
   try {
     const { id } = req.params;
@@ -9694,6 +9695,142 @@ app.get("/api/qc-washing/results/filters", async (req, res) => {
   }
 });
 
+// Get order details by style number
+app.get("/api/qc-washing/order-details-by-style/:orderNo", async (req, res) => {
+  const { orderNo } = req.params;
+  const collection = ymProdConnection.db.collection("dt_orders");
+
+  try {
+    const orders = await collection.find({ Order_No: orderNo }).toArray();
+
+    if (!orders || orders.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: `Style '${orderNo}' not found.` });
+    }
+
+    // Extract all available colors from OrderColors array
+    const colorSet = new Set();
+    orders.forEach((order) => {
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        order.OrderColors.forEach((colorObj) => {
+          if (colorObj && colorObj.Color) {
+            colorSet.add(colorObj.Color);
+          }
+        });
+      }
+    });
+    const availableColors = Array.from(colorSet);
+
+    const orderQty = orders.reduce(
+      (sum, order) => sum + (order.TotalQty || 0),
+      0
+    );
+    const buyerName = getBuyerFromMoNumber(orderNo);
+
+    res.json({
+      success: true,
+      colors: availableColors,
+      orderQty,
+      buyer: buyerName
+    });
+  } catch (error) {
+    console.error(`Error fetching order details for style ${orderNo}:`, error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching order details."
+    });
+  }
+});
+
+// GET - Get total order qty for a specific orderNo and color
+app.get("/api/qc-washing/order-color-qty/:orderNo/:color", async (req, res) => {
+  const { orderNo, color } = req.params;
+  const collection = ymProdConnection.db.collection("dt_orders");
+  try {
+    const orders = await collection.find({ Order_No: orderNo }).toArray();
+    if (!orders || orders.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: `Order '${orderNo}' not found.` });
+    }
+    let totalQty = 0;
+    orders.forEach((order) => {
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        const colorObj = order.OrderColors.find(
+          (c) => c.Color.toLowerCase() === color.toLowerCase()
+        );
+        if (colorObj && Array.isArray(colorObj.OrderQty)) {
+          colorObj.OrderQty.forEach((sizeObj) => {
+            // Each sizeObj is like { "XS": 32 }
+            Object.values(sizeObj).forEach((qty) => {
+              if (typeof qty === "number" && qty > 0) totalQty += qty;
+            });
+          });
+        }
+      }
+    });
+    res.json({ success: true, orderNo, color, colorOrderQty: totalQty });
+  } catch (error) {
+    console.error(
+      `Error fetching color order qty for ${orderNo} / ${color}:`,
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching color order qty."
+    });
+  }
+});
+
+// Get sizes for a specific order and color
+app.get("/api/qc-washing/order-sizes/:orderNo/:color", async (req, res) => {
+  const { orderNo, color } = req.params;
+  const collection = ymProdConnection.db.collection("dt_orders");
+
+  try {
+    const orders = await collection.find({ Order_No: orderNo }).toArray();
+
+    if (!orders || orders.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: `Order '${orderNo}' not found.` });
+    }
+
+    const sizes = new Set();
+    orders.forEach((order) => {
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        const matchingColor = order.OrderColors.find(
+          (c) => c.Color.toLowerCase() === color.toLowerCase()
+        );
+
+        if (matchingColor && matchingColor.OrderQty) {
+          matchingColor.OrderQty.forEach((entry) => {
+            const sizeName = Object.keys(entry)[0];
+            const quantity = entry[sizeName];
+            if (quantity > 0) {
+              const cleanSize = sizeName.split(";")[0].trim();
+              sizes.add(cleanSize);
+            }
+          });
+        }
+      }
+    });
+
+    const sizesArray = Array.from(sizes);
+    res.json({ success: true, sizes: sizesArray });
+  } catch (error) {
+    console.error(
+      `Error fetching sizes for order ${orderNo} and color ${color}:`,
+      error
+    );
+    res
+      .status(500)
+      .json({ success: false, message: "Server error while fetching sizes." });
+  }
+});
+
+
 app.get(
   "/api/qc-washing/measurement-specs/:orderNo/:color",
   async (req, res) => {
@@ -9891,6 +10028,110 @@ app.get("/api/qc-washing/order-details-by-order/:orderNo", async (req, res) => {
   }
 });
 
+// Save size data
+app.post("/api/qc-washing/save-size", async (req, res) => {
+  try {
+    const { orderNo, color, sizeData, userId } = req.body;
+
+    // Find existing QC record or create new one
+    let qcRecord = await QCWashing.findOne({
+      orderNo: orderNo,
+      isAutoSave: true,
+      userId: userId
+    });
+
+    if (!qcRecord) {
+      qcRecord = new QCWashing({
+        orderNo: orderNo,
+        isAutoSave: true,
+        userId: userId,
+        status: "auto-saved",
+        color: {
+          orderDetails: { color: color },
+          measurementDetails: new Map()
+        }
+      });
+    }
+
+    // Validate measurements against tolerance
+    const validateMeasurement = (measurement, specs, tolMinus, tolPlus) => {
+      if (!measurement || !specs) return "pass";
+
+      const measValue = parseFloat(measurement);
+      const specValue = parseFloat(specs);
+      const minTol = parseFloat(tolMinus) || 0;
+      const maxTol = parseFloat(tolPlus) || 0;
+
+      const minAllowed = specValue + minTol;
+      const maxAllowed = specValue + maxTol;
+
+      return measValue >= minAllowed && measValue <= maxAllowed
+        ? "pass"
+        : "fail";
+    };
+
+    const sizeKey = `size_${sizeData.size}`;
+    const measurementData = {
+      size: sizeData.size,
+      qty: sizeData.qty,
+      measurements: sizeData.measurements,
+      selectedRows: sizeData.selectedRows,
+      fullColumns: sizeData.fullColumns,
+      results: {},
+      savedAt: new Date()
+    };
+
+    // Add validation results
+    Object.keys(sizeData.measurements || {}).forEach((cellKey) => {
+      const measurement = sizeData.measurements[cellKey];
+      measurementData.results[cellKey] = {
+        value: measurement.decimal,
+        fraction: measurement.fraction,
+        result: "pass"
+      };
+    });
+
+    qcRecord.color.measurementDetails.set(sizeKey, measurementData);
+    await qcRecord.save();
+
+    res.json({ success: true, message: "Size data saved successfully" });
+  } catch (error) {
+    console.error("Save size error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to save size data" });
+  }
+});
+
+// Get saved sizes
+app.get("/api/qc-washing/saved-sizes/:orderNo/:color", async (req, res) => {
+  try {
+    const { orderNo, color } = req.params;
+    const qcRecord = await QCWashing.findOne({
+      orderNo: orderNo,
+      colorName: color,
+      isAutoSave: true
+    });
+
+    if (qcRecord && qcRecord.color && qcRecord.color.measurementDetails) {
+      const savedSizes = [];
+      qcRecord.color.measurementDetails.forEach((value, key) => {
+        if (key.startsWith("size_")) {
+          savedSizes.push(value.size);
+        }
+      });
+      res.json({ success: true, savedSizes: savedSizes });
+    } else {
+      res.json({ success: true, savedSizes: [] });
+    }
+  } catch (error) {
+    console.error("Get saved sizes error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get saved sizes" });
+  }
+});
+
 app.post("/api/qc-washing/submit", async (req, res) => {
   try {
     const { orderNo } = req.body;
@@ -9929,6 +10170,64 @@ app.post("/api/qc-washing/submit", async (req, res) => {
       error: error.message,
       stack: error.stack
     });
+  }
+});
+
+// Load color-specific data
+app.get("/api/qc-washing/load-color-data/:orderNo/:color", async (req, res) => {
+  try {
+    const { orderNo, color } = req.params;
+    const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
+
+    if (qcRecord && qcRecord.colors) {
+      const colorData = qcRecord.colors.find((c) => c.colorName === color);
+
+      if (colorData) {
+        // res.json({ success: true, colorData: colorData });
+        res.json({
+          success: true,
+          colorData: {
+            ...colorData,
+            before_after_wash: qcRecord.before_after_wash,
+            washQty: qcRecord.washQty,
+            checkedQty: qcRecord.checkedQty,
+            totalCheckedPoint: qcRecord.totalCheckedPoint,
+            totalPass: qcRecord.totalPass,
+            totalFail: qcRecord.totalFail,
+            passRate: qcRecord.passRate
+          }
+        });
+      } else {
+        res.json({ success: false, message: "Color data not found" });
+      }
+    } else {
+      res.json({ success: false, message: "No saved data found" });
+    }
+  } catch (error) {
+    console.error("Load color data error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to load color data" });
+  }
+});
+
+// Get all saved colors for an order
+app.get("/api/qc-washing/saved-colors/:orderNo", async (req, res) => {
+  try {
+    const { orderNo } = req.params;
+    const qcRecord = await QCWashing.findOne({ orderNo: orderNo });
+
+    if (qcRecord && qcRecord.colors) {
+      const savedColors = qcRecord.colors.map((c) => c.colorName);
+      res.json({ success: true, savedColors: savedColors });
+    } else {
+      res.json({ success: true, savedColors: [] });
+    }
+  } catch (error) {
+    console.error("Get saved colors error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get saved colors" });
   }
 });
 
@@ -10052,18 +10351,18 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
 
     // 3. Calculate pass rate
     const passRate = totalMeasurementPoints > 0 
-      ? Number(((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1))
+      ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
       : 100;
 
     // 4. Determine measurement result based on 95% threshold
     let measurementResult = "Pass";
     if (totalMeasurementPoints > 0) {
-      // Use 95% pass rate threshold
+      // Use 95% pass rate threshold for measurement result
       measurementResult = passRate >= 95 ? "Pass" : "Fail";
     }
 
     // 5. Determine defect result based on current data and AQL
-    let defectResult = "Pass";
+    let defectResult;
     const aql = qcRecord.aql?.[0];
     
     if (aql && typeof aql.acceptedDefect === "number") {
@@ -10071,13 +10370,27 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
       defectResult = totalDefectCount <= aql.acceptedDefect ? "Pass" : "Fail";
     } else {
       // Fallback: use saved defect result or assume Pass if no defects
-      defectResult = qcRecord.defectDetails?.result || (totalDefectCount === 0 ? "Pass" : "Fail");
+      defectResult =
+        qcRecord.defectDetails?.result ||
+        (totalDefectCount === 0 ? "Pass" : "Fail");
     }
 
     // 6. Calculate FRESH overall result
-    const newOverallFinalResult = (measurementResult === "Pass" && defectResult === "Pass") 
-      ? "Pass" 
-      : "Fail";
+    let newOverallFinalResult;
+    const isSOP = qcRecord.reportType === "SOP";
+
+    // For SOP, both measurement and defects must pass.
+    const isMeasurementPass = passRate >= 95;
+    const isDefectPass = totalDefectCount === 0;
+
+    if (isSOP) {
+      newOverallFinalResult =
+        isMeasurementPass && isDefectPass ? "Pass" : "Fail";
+    } else {
+      // For other report types, use the individual results
+      newOverallFinalResult =
+        measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+    }
 
     // 7. Update ALL calculated fields with fresh values
     qcRecord.totalCheckedPcs = totalCheckedPcs;
@@ -10116,7 +10429,9 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
           totalFail: totalMeasurementFail,
           passRate: passRate,
           measurementResult: measurementResult,
-          logic: `${passRate}% >= 95% = ${measurementResult}`
+          logic: qcRecord.reportType === "SOP"
+            ? `SOP Logic: (Measurement Pass Rate ${passRate}% >= 95%) AND (Defect Count ${totalDefectCount} === 0)`
+            : `Standard Logic: (Measurement Result '${measurementResult}' === 'Pass') AND (Defect Result '${defectResult}' === 'Pass')`
         },
         defectCalculation: {
           totalDefectCount: totalDefectCount,
@@ -10198,7 +10513,7 @@ app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
     }
 
     const passRate = totalMeasurementPoints > 0 
-      ? Number(((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1))
+      ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
       : 100;
 
     // Use 95% threshold for measurement result
@@ -10284,7 +10599,7 @@ app.post("/api/qc-washing/recalculate-overall-result/:recordId", async (req, res
     }
 
     const passRate = totalMeasurementPoints > 0 
-      ? Number(((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1))
+      ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
       : 100;
 
     // Use 95% threshold for measurement result

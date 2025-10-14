@@ -620,7 +620,6 @@ const processImageToBase64 = async (imagePath) => {
       if (res.ok) {
         const data = await res.json();
         Object.assign(preloadedImages, data.images || {});
-        console.log(`✅ Loaded ${Object.keys(preloadedImages).length} record images`);
       } else {
         console.warn("⚠️ Could not load record images:", res.statusText);
       }
@@ -632,6 +631,7 @@ const processImageToBase64 = async (imagePath) => {
     // 4️⃣ Add inspector photo (if available)
     // -------------------------------
     if (inspectorDetails?.face_photo) {
+      
       try {
         
        const res = await fetch(`${API_BASE_URL}/api/image-proxy/${encodeURIComponent(inspectorDetails.face_photo)}`);
@@ -639,7 +639,6 @@ const processImageToBase64 = async (imagePath) => {
           const data = await res.json();
           if (data.dataUrl?.startsWith("data:")) {
             preloadedImages[inspectorDetails.face_photo] = data.dataUrl;
-            console.log("✅ Inspector photo loaded");
           }
         } else {
           console.warn("⚠️ Inspector photo failed:", res.statusText);
