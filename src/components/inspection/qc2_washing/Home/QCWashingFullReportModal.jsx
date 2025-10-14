@@ -435,18 +435,17 @@ const getImageUrl = (imagePath) => {
                       </div>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-cyan-50 to-cyan-100 dark:from-cyan-900/20 dark:to-cyan-800/20 rounded-xl p-4 border border-cyan-200 dark:border-cyan-800 hover:shadow-md transition-shadow">
+                  <div className="bg-gradient-to-br from-red-50 to-red-100 dark:from-red-900/20 dark:to-red-800/20 rounded-xl p-4 border border-red-200 dark:border-red-800 hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between">
-                      <div className="bg-cyan-500 p-3 rounded-xl">
-                        <Droplets className="w-6 h-6 text-white" />
+                      <div className="bg-red-500 p-3 rounded-xl">
+                        <AlertTriangle className="w-6 h-6 text-white" />
                       </div>
                       <div className="text-right">
-                        <p className="text-xs font-medium text-cyan-600 dark:text-cyan-300 uppercase tracking-wide mb-1">Wash Qty</p>
-                        <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">
-                          {processedReportData.displayWashQty ?? processedReportData.washQty}
-                          {processedReportData.isActualWashQty && (
-                            <span className="text-sm text-green-500 ml-1">(Actual)</span>
-                          )}
+                        <p className="text-xs font-medium text-red-600 dark:text-red-300 uppercase tracking-wide mb-1">Defective PCs / Qty</p>
+                        <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                          {processedReportData.defectDetails?.defectsByPc?.length || 0}
+                          <span className="text-lg mx-1">/</span>
+                          {processedReportData.defectDetails?.defectsByPc?.reduce((sum, pc) => sum + (pc.pcDefects?.reduce((pcSum, defect) => pcSum + (defect.defectQty || 0), 0) || 0), 0) || 0}
                         </p>
                       </div>
                     </div>

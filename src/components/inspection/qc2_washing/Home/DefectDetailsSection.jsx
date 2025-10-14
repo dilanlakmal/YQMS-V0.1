@@ -54,14 +54,14 @@ const DefectDetailsSection = ({
 
   // Calculate actual defect status when accepted defect is 0
   let actualDefectStatus = defectStatus;
-  if (aql?.acceptedDefect === 0) {
+  if (aql && aql.acceptedDefect !== undefined) {
     // Calculate total defects from defectsByPc
     const totalDefects = Object.values(defectsByPc).reduce((total, pcDefects) => {
       return total + pcDefects.reduce((pcTotal, defect) => pcTotal + (parseInt(defect.defectQty) || 0), 0);
     }, 0);
     actualDefectStatus = totalDefects <= aql.acceptedDefect ? 'Pass' : 'Fail';
   }
-  
+
   // Ensure we always have a valid status
   if (!actualDefectStatus || actualDefectStatus === 'N/A' || actualDefectStatus === '') {
     actualDefectStatus = defectStatus || 'Pass';
@@ -82,8 +82,8 @@ const DefectDetailsSection = ({
         {
           id: (prev[pc]?.length || 0) + 1,
           selectedDefect: '',
-          defectName: '',
-          defectQty: 0,
+          defectName: '', // defectName is derived from selectedDefect
+          defectQty: 1, // Default to 1 as requested
           defectImages: [],
           isBodyVisible: true,
         },
@@ -94,7 +94,7 @@ const DefectDetailsSection = ({
   const handleAddPc = () => {
     setDefectsByPc(prev => ({
       ...prev,
-      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '',defectNmae:'', defectQty: 0,  defectImages: [], isBodyVisible: true }],
+      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectName: '', defectQty: 1,  defectImages: [], isBodyVisible: true }],
     }));
   };
   
@@ -444,7 +444,7 @@ const DefectDetailsSection = ({
         pcDefectsArr.push({
           defectId: defect.selectedDefect,
           defectName: defectObj ? defectObj.english : "", // Always save English name
-          defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0), // Explicitly handle 0 values
+          defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 1), // Default to 1 if not set
           defectImages,
         });
       });
@@ -496,7 +496,7 @@ const DefectDetailsSection = ({
               id: index + 1,
               selectedDefect: defect.defectId || "",
               defectName: defectObj ? getDefectNameForDisplay(defectObj) : defect.defectName, // Display localized name
-              defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0),
+              defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 1),
               isBodyVisible: true,
               defectImages: (defect.defectImages || []).map(imgStr => ({
                 file: null,
@@ -616,7 +616,7 @@ const DefectDetailsSection = ({
         pcDefectsArr.push({
           defectId: defect.selectedDefect,
           defectName: defectObj ? defectObj.english : "", // Always save English name
-          defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0), // Explicitly handle 0 values
+          defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 1), // Default to 1 if not set
           defectImages,
         });
       });
@@ -667,7 +667,7 @@ const DefectDetailsSection = ({
                   id: index + 1,
                   selectedDefect: defect.defectId || "",
                   defectName: defectObj ? getDefectNameForDisplay(defectObj) : defect.defectName,
-                  defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 0),
+                  defectQty: defect.defectQty === 0 ? 0 : (defect.defectQty || 1),
                   isBodyVisible: true,
                   defectImages: (defect.defectImages || []).map(imgStr => ({
                     file: null,
