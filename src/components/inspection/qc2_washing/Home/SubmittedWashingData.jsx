@@ -11,8 +11,6 @@ import Swal from 'sweetalert2';
 // Polyfill Buffer for client-side PDF generation
 window.Buffer = window.Buffer || Buffer;
 
-// Polyfill Buffer for client-side PDF generation
-window.Buffer = window.Buffer || Buffer;
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
@@ -561,196 +559,158 @@ const processImageToBase64 = async (imagePath) => {
   const handleDownloadPDF = async (record) => {
   try {
     setIsQcWashingPDF(true);
-    
-    if (!API_BASE_URL) {
-      throw new Error('API_BASE_URL is not defined');
-    }
-    
-    // Fetch inspector details if userId exists
+    if (!API_BASE_URL) throw new Error("API_BASE_URL is not defined");
+
+    // -------------------------------
+    // 1️⃣ Fetch inspector details
+    // -------------------------------
     let inspectorDetails = null;
     if (record.userId) {
       try {
-        const inspectorResponse = await fetch(`${API_BASE_URL}/api/users/${record.userId}`);
-        if (inspectorResponse.ok) {
-          const userData = await inspectorResponse.json();
-          if (userData && !userData.error) {
-            inspectorDetails = userData;
-          }
+        const res = await fetch(`${API_BASE_URL}/api/users/${record.userId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data && !data.error) inspectorDetails = data;
         } else {
-          console.warn('⚠️ Failed to fetch inspector details:', inspectorResponse.status);
+          console.warn("⚠️ Failed to fetch inspector:", res.status);
         }
-      } catch (inspectorError) {
-        console.warn('❌ Could not fetch inspector details:', inspectorError);
+      } catch (err) {
+        console.warn("❌ Inspector fetch failed:", err.message);
       }
     }
-    
-    // Fetch comparison data
+
+    // -------------------------------
+    // 2️⃣ Fetch comparison data
+    // -------------------------------
     let comparisonData = null;
     if (record.measurementDetails?.measurement?.length > 0) {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/results?` + new URLSearchParams({
+        const params = new URLSearchParams({
           orderNo: record.orderNo,
           color: record.color,
           washType: record.washType,
           reportType: record.reportType,
-          factory: record.factoryName
-        }));
-        
-        if (response.ok) {
-          const data = await response.json();
-          const targetWashType = record.before_after_wash === 'Before Wash' ? 'After Wash' : 'Before Wash';
-          comparisonData = data.find(r => 
-            r.orderNo === record.orderNo &&
-            r.color === record.color &&
-            r.washType === record.washType &&
-            r.reportType === record.reportType &&
-            r.factoryName === record.factoryName &&
-            r.before_after_wash === targetWashType
+          factory: record.factoryName,
+        });
+        const res = await fetch(`${API_BASE_URL}/api/qc-washing/results?${params}`);
+        if (res.ok) {
+          const data = await res.json();
+          const opposite = record.before_after_wash === "Before Wash" ? "After Wash" : "Before Wash";
+          comparisonData = data.find(
+            (r) =>
+              r.orderNo === record.orderNo &&
+              r.color === record.color &&
+              r.washType === record.washType &&
+              r.reportType === record.reportType &&
+              r.factoryName === record.factoryName &&
+              r.before_after_wash === opposite
           );
         }
-      } catch (error) {
-        console.warn('Could not fetch comparison data:', error);
+      } catch (err) {
+        console.warn("❌ Comparison fetch failed:", err.message);
       }
     }
-    
-    // FIXED: Preload images before generating PDF
-    const preloadedImages = await preloadImagesForRecord(record, API_BASE_URL);
-    
-    // Add inspector photo to preloaded images if available
+
+    // -------------------------------
+    // 3️⃣ Preload only record-related images (NEW optimized API)
+    // -------------------------------
+    const preloadedImages = {};
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/image-proxy-selected/${record._id}`);
+      if (res.ok) {
+        const data = await res.json();
+        Object.assign(preloadedImages, data.images || {});
+        console.log(`✅ Loaded ${Object.keys(preloadedImages).length} record images`);
+      } else {
+        console.warn("⚠️ Could not load record images:", res.statusText);
+      }
+    } catch (err) {
+      console.error("❌ Image preload failed:", err.message);
+    }
+
+    // -------------------------------
+    // 4️⃣ Add inspector photo (if available)
+    // -------------------------------
     if (inspectorDetails?.face_photo) {
       try {
-        const loadInspectorPhoto = async (src, API_BASE_URL) => {
-          let imageUrl = src;
-          
-          if (typeof src === 'object' && src !== null) {
-            imageUrl = src.originalUrl || src.url || src.src || src.path || JSON.stringify(src);
-          }
-          
-          if (!imageUrl || typeof imageUrl !== 'string') {
-            console.warn('❌ Invalid inspector photo URL:', src);
-            return null;
-          }
-          
-          if (imageUrl.startsWith('data:')) {
-            return imageUrl;
-          }
-          
-          try {
-            let cleanUrl = imageUrl.trim();
-            
-            const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
-            const response = await fetch(proxyUrl, {
-              method: 'GET',
-              headers: { 'Accept': 'application/json' }
-            });
-            
-            if (response.ok) {
-              const data = await response.json();
-              if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-                return data.dataUrl;
-              } else {
-                console.warn('❌ Invalid response data for inspector photo:', data);
-              }
-            } else {
-              console.warn('❌ Failed to fetch inspector photo:', response.status, response.statusText);
-            }
-            return null;
-          } catch (error) {
-            console.error('❌ Error loading inspector photo:', error);
-            return null;
-          }
-        };
         
-        const inspectorPhotoBase64 = await loadInspectorPhoto(inspectorDetails.face_photo, API_BASE_URL);
-        if (inspectorPhotoBase64) {
-          // Store with multiple possible keys for better matching
-          const photoKeys = [
-            inspectorDetails.face_photo,
-            inspectorDetails.face_photo.trim(),
-            inspectorDetails.face_photo.startsWith('/') ? inspectorDetails.face_photo.substring(1) : '/' + inspectorDetails.face_photo
-          ];
-          
-          photoKeys.forEach(key => {
-            if (key && key.trim()) {
-              preloadedImages[key.trim()] = inspectorPhotoBase64;
-            }
-          });
-          
+       const res = await fetch(`${API_BASE_URL}/api/image-proxy/${encodeURIComponent(inspectorDetails.face_photo)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.dataUrl?.startsWith("data:")) {
+            preloadedImages[inspectorDetails.face_photo] = data.dataUrl;
+            console.log("✅ Inspector photo loaded");
+          }
         } else {
-          console.warn('⚠️ Inspector photo could not be loaded');
+          console.warn("⚠️ Inspector photo failed:", res.statusText);
         }
-      } catch (error) {
-        console.error('❌ Failed to load inspector photo:', error);
+      } catch (err) {
+        console.error("❌ Inspector photo error:", err.message);
       }
-    } else {
-      console.log('ℹ️ No inspector photo available');
     }
-    
-    
-    // Import the PDF renderer
-    const { pdf } = await import('@react-pdf/renderer');
-    const { QcWashingFullReportPDF } = await import('./qcWashingFullReportPDF');
-    
-    if (!record || !record._id) {
-      throw new Error('Invalid record data');
-    }
-    // Generate PDF with preloaded images and inspector details
+
+    // -------------------------------
+    // 5️⃣ Generate PDF (React PDF)
+    // -------------------------------
+    const { pdf } = await import("@react-pdf/renderer");
+    const { QcWashingFullReportPDF } = await import("./qcWashingFullReportPDF");
+
+    if (!record?._id) throw new Error("Invalid record data");
+
     const blob = await pdf(
       React.createElement(QcWashingFullReportPDF, {
         recordData: record,
-        comparisonData: comparisonData,
-        API_BASE_URL: API_BASE_URL,
-        checkpointDefinitions: checkpointDefinitions,
-        preloadedImages: preloadedImages,
+        comparisonData,
+        API_BASE_URL,
+        checkpointDefinitions,
+        preloadedImages,
         skipImageLoading: false,
-        inspectorDetails: inspectorDetails
+        inspectorDetails,
       })
     ).toBlob();
-    
-    
-    // Download
+
+    // -------------------------------
+    // 6️⃣ Download the file
+    // -------------------------------
     const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
+    const link = document.createElement("a");
     link.href = url;
-    link.download = `QC_Washing_Report_${record.orderNo}_${record.color}_${record.before_after_wash.replace(' ', '_')}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = `QC_Washing_Report_${record.orderNo}_${record.color}_${record.before_after_wash.replace(
+      " ",
+      "_"
+    )}_${new Date().toISOString().split("T")[0]}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    
-    // Show success alert after download
+
     Swal.fire({
-      title: 'Success!',
-      text: 'PDF downloaded successfully!',
-      icon: 'success',
-      timer: 5000,
-      timerProgressBar: true,
-      showConfirmButton: false
+      title: "Success!",
+      text: "PDF downloaded successfully!",
+      icon: "success",
+      timer: 4000,
+      showConfirmButton: false,
     });
-    
   } catch (error) {
-    // Provide more specific error messages
-    let errorMessage = 'Failed to generate PDF';
-    if (error.message.includes('SOI not found')) {
-      errorMessage = 'Image format error. Some images may be corrupted.';
-    } else if (error.message.includes('string child')) {
-      errorMessage = 'Data formatting error. Please try again.';
-    } else if (error.message.includes('CORS')) {
-      errorMessage = 'Network access error. Please check your connection.';
-    }
-    
+    console.error("❌ PDF generation failed:", error);
+
+    let errorMessage = "Failed to generate PDF";
+    if (error.message.includes("SOI not found")) errorMessage = "Image format error (corrupt image).";
+    else if (error.message.includes("string child")) errorMessage = "Formatting issue in PDF content.";
+    else if (error.message.includes("CORS")) errorMessage = "Network access error.";
+
     Swal.fire({
-      title: 'Error!',
+      title: "Error!",
       text: `${errorMessage}: ${error.message}`,
-      icon: 'error',
+      icon: "error",
       timer: 5000,
-      timerProgressBar: true,
-      showConfirmButton: false
+      showConfirmButton: false,
     });
   } finally {
     setIsQcWashingPDF(false);
   }
 };
+
 
 // FIXED: Add this helper function to preload images
 const preloadImagesForRecord = async (record, API_BASE_URL) => {
@@ -992,18 +952,9 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
   }
 
   try {
-    // Clean and normalize the URL
-    let cleanUrl = imageUrl.trim();
+    // Clean and normalize the URL;
     
-    // Handle relative URLs
-    if (cleanUrl.startsWith('/storage/') || cleanUrl.startsWith('/public/')) {
-      cleanUrl = `${API_BASE_URL}${cleanUrl}`;
-    }
-    
-    // ALWAYS use proxy to avoid CORS issues
-    const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(cleanUrl)}`;
-    
-    const response = await fetch(proxyUrl, {
+    const response = await fetch( {
       method: 'GET',
       headers: {
         'Accept': 'application/json'
