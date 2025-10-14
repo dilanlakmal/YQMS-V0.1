@@ -180,6 +180,55 @@ const io = new Server(server, {
   }
 });
 
+// Define allowed origins once
+const allowedOrigins = [
+  "https://192.167.12.85:3001",
+  "http://localhost:3001",
+  "https://localhost:3001",
+  "https://yqms.yaikh.com",
+  "https://192.167.12.162:3001"
+];
+
+// CORS configuration
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log("CORS blocked origin:", origin);
+      callback(null, true); // Allow all origins for image proxy
+    }
+  },
+  methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+    "Cache-Control",
+    "Origin",
+    "X-Requested-With",
+    "Accept",
+    "Pragma",
+    "Expires",
+    "Last-Modified",
+    "If-Modified-Since",
+    "If-None-Match",
+    "ETag"
+  ],
+  exposedHeaders: [
+    "Content-Length",
+    "Content-Type",
+    "Cache-Control",
+    "Last-Modified",
+    "ETag"
+  ],
+  credentials: false, // Set to false for broader compatibility
+  optionsSuccessStatus: 204
+};
+
+// Apply CORS globally
+app.use(cors(corsOptions));
+
 app.use(
   "/storage",
   express.static(path.join(__dirname, "public/storage"), {
@@ -212,102 +261,27 @@ app.get("/storage/qc2_images/default-placeholder.png", (req, res) => {
 });
 
 // Simplified image proxy endpoint
-app.get("/api/image-proxy-all", async (req, res) => {
-  // Set permissive CORS headers for image proxy
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "*");
-
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
+app.get("/api/image-proxy/:imageUrl(*)", async (req, res) => {
   try {
-    const { url } = req.query;
-    if (!url) {
-      return res.status(400).json({ error: "URL parameter is required" });
-    }
+    const imageUrl = decodeURIComponent(req.params.imageUrl);
 
-    let imageUrl = url;
-
-    // Handle relative URLs
-    if (url.startsWith("/storage/") || url.startsWith("/public/")) {
-      const baseUrl =
-        process.env.API_BASE_URL ||
-        "https://192.167.12.85:5000" ||
-        "https://192.167.12.162:5000";
-      imageUrl = `${baseUrl}${url}`;
-    } else if (url.startsWith("storage/") || url.startsWith("public/")) {
-      const baseUrl =
-        process.env.API_BASE_URL ||
-        "https://192.167.12.85:5000" ||
-        "https://192.167.12.162:5000";
-      imageUrl = `${baseUrl}/${url}`;
-    }
-
-    // Validate URL
-    try {
-      new URL(imageUrl);
-    } catch (urlError) {
-      return res.status(400).json({ error: "Invalid URL format" });
-    }
+    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
 
     const response = await axios.get(imageUrl, {
       responseType: "arraybuffer",
-      timeout: 15000,
-      maxRedirects: 3,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; ImageProxy/1.0)",
-        Accept: "image/*,*/*;q=0.8"
-      },
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: false, // Allow self-signed certificates
-        keepAlive: true,
-        timeout: 15000
-      }),
-      validateStatus: (status) => status < 500
+      timeout: 10000,
+      httpsAgent,
+      headers: { "User-Agent": "Mozilla/5.0" }
     });
 
-    if (response.status >= 400) {
-      return res.status(response.status).json({
-        error: `HTTP ${response.status}`,
-        url: imageUrl
-      });
-    }
-
-    // Validate content type
     const contentType = response.headers["content-type"] || "image/jpeg";
-    if (!contentType.startsWith("image/")) {
-      return res.status(400).json({ error: "Not an image", contentType });
-    }
-
-    const buffer = Buffer.from(response.data);
-
-    // Validate image data
-    if (buffer.length < 100) {
-      return res.status(400).json({ error: "Image data too small" });
-    }
-
-    const base64 = buffer.toString("base64");
+    const base64 = Buffer.from(response.data).toString("base64");
     const dataUrl = `data:${contentType};base64,${base64}`;
 
-    // Set cache headers
-    res.setHeader("Cache-Control", "public, max-age=3600");
     res.json({ dataUrl });
   } catch (error) {
     console.error("Image proxy error:", error.message);
-
-    if (error.code === "ENOTFOUND") {
-      return res.status(404).json({ error: "Host not found" });
-    }
-    if (error.code === "ECONNREFUSED") {
-      return res.status(503).json({ error: "Connection refused" });
-    }
-    if (error.code === "ETIMEDOUT") {
-      return res.status(408).json({ error: "Request timeout" });
-    }
-
-    res.status(500).json({ error: "Failed to fetch image" });
+    res.status(404).json({ error: "Image not found" });
   }
 });
 
@@ -29350,20 +29324,18 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
     // 3. Calculate pass rate
     const passRate =
       totalMeasurementPoints > 0
-        ? Number(
-            ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
-          )
+        ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100)
         : 100;
 
     // 4. Determine measurement result based on 95% threshold
     let measurementResult = "Pass";
     if (totalMeasurementPoints > 0) {
-      // Use 95% pass rate threshold
+      // Use 95% pass rate threshold for measurement result
       measurementResult = passRate >= 95 ? "Pass" : "Fail";
     }
 
     // 5. Determine defect result based on current data and AQL
-    let defectResult = "Pass";
+    let defectResult;
     const aql = qcRecord.aql?.[0];
 
     if (aql && typeof aql.acceptedDefect === "number") {
@@ -29377,8 +29349,23 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
     }
 
     // 6. Calculate FRESH overall result
-    const newOverallFinalResult =
-      measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+    let newOverallFinalResult;
+    const isSOP = qcRecord.reportType === "SOP";
+
+    // For SOP, both measurement and defects must pass.
+    const isMeasurementPass = passRate >= 95;
+    const isDefectPass = totalDefectCount === 0;
+
+    if (isSOP) {
+      newOverallFinalResult =
+        isMeasurementPass && isDefectPass ? "Pass" : "Fail";
+    } else {
+      // For other report types, use the individual results
+      newOverallFinalResult =
+        measurementResult === "Pass" && defectResult === "Pass"
+          ? "Pass"
+          : "Fail";
+    }
 
     // 7. Update ALL calculated fields with fresh values
     qcRecord.totalCheckedPcs = totalCheckedPcs;
@@ -29419,7 +29406,10 @@ app.post("/api/qc-washing/save-summary/:recordId", async (req, res) => {
           totalFail: totalMeasurementFail,
           passRate: passRate,
           measurementResult: measurementResult,
-          logic: `${passRate}% >= 95% = ${measurementResult}`
+          logic:
+            qcRecord.reportType === "SOP"
+              ? `SOP Logic: (Measurement Pass Rate ${passRate}% >= 95%) AND (Defect Count ${totalDefectCount} === 0)`
+              : `Standard Logic: (Measurement Result '${measurementResult}' === 'Pass') AND (Defect Result '${defectResult}' === 'Pass')`
         },
         defectCalculation: {
           totalDefectCount: totalDefectCount,
@@ -29505,9 +29495,7 @@ app.get("/api/qc-washing/overall-summary-by-id/:recordId", async (req, res) => {
 
     const passRate =
       totalMeasurementPoints > 0
-        ? Number(
-            ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
-          )
+        ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100)
         : 100;
 
     // Use 95% threshold for measurement result
@@ -29595,9 +29583,7 @@ app.post(
 
       const passRate =
         totalMeasurementPoints > 0
-          ? Number(
-              ((totalMeasurementPass / totalMeasurementPoints) * 100).toFixed(1)
-            )
+          ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100)
           : 100;
 
       // Use 95% threshold for measurement result
@@ -31977,154 +31963,125 @@ app.get("/api/qc-washing/comparison", async (req, res) => {
   res.json(comparisonRecord);
 });
 
-app.get("/api/qc-washing/pdf/:id", async (req, res) => {
+/* ------------------------------
+   QC Washing PDF Generation
+------------------------------ */
+
+app.get("/api/image-proxy-selected/:id", async (req, res) => {
   try {
     const { id } = req.params;
-
-    // Fetch the QC washing record
     const record = await QCWashing.findById(id);
-    if (!record) {
-      return res.status(404).json({ error: "QC Washing record not found" });
-    }
+    if (!record) return res.status(404).json({ error: "Record not found" });
 
-    // Fetch checkpoint definitions
-    const checkpointDefinitions = await QCWashingCheckList.find({});
+    const API_BASE = process.env.API_BASE_URL || "https://192.167.12.162:5000";
+    const collectedUrls = new Set();
 
-    // Server-side image loading function
-    const loadImageServerSide = async (imageUrl) => {
+    // Small helper to clean URLs
+    const cleanUrl = (url) => {
+      if (!url || typeof url !== "string") return null;
+      let u = url.trim();
+      u = u.replace(/^\/+/, "").replace(/^https?:\/+https?:\/+/, "https://");
+      if (!u.startsWith("http")) u = `${API_BASE}/${u}`;
       try {
-        if (!imageUrl || typeof imageUrl !== "string") return null;
-
-        let cleanUrl = imageUrl;
-        if (
-          imageUrl.startsWith("/storage/") ||
-          imageUrl.startsWith("/public/")
-        ) {
-          cleanUrl = `${
-            process.env.API_BASE_URL ||
-            "https://192.167.12.85:5000" ||
-            "https://192.167.12.162:5000"
-          }${imageUrl}`;
-        }
-
-        const response = await axios.get(cleanUrl, {
-          responseType: "arraybuffer",
-          timeout: 10000,
-          headers: {
-            "User-Agent":
-              "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-          },
-          httpsAgent: new https.Agent({
-            rejectUnauthorized: process.env.NODE_ENV === "production"
-          })
-        });
-
-        if (response.status === 200) {
-          const buffer = Buffer.from(response.data);
-          const contentType = response.headers["content-type"] || "image/jpeg";
-          return `data:${contentType};base64,${buffer.toString("base64")}`;
-        }
-        return null;
-      } catch (error) {
-        console.warn(
-          "Failed to load image server-side:",
-          imageUrl,
-          error.message
-        );
+        new URL(u);
+        return u;
+      } catch {
+        console.warn("❌ Skipped invalid URL:", url);
         return null;
       }
     };
 
-    // Collect and load all images server-side
-    const imageUrls = new Set();
-    const preloadedImages = {};
-
-    // Helper to collect image URLs
-    const addImageUrl = (img) => {
-      if (!img) return;
-      let url =
-        typeof img === "string" ? img : img.originalUrl || img.url || img.src;
-      if (url) imageUrls.add(url);
+    // Collect only valid URLs
+    const add = (img) => {
+      const url =
+        typeof img === "string"
+          ? img
+          : img?.url || img?.src || img?.originalUrl;
+      const valid = cleanUrl(url);
+      if (valid) collectedUrls.add(valid);
     };
 
-    // Collect images from defects
-    if (record.defectDetails?.defectsByPc) {
-      record.defectDetails.defectsByPc.forEach((pc) => {
-        if (pc.pcDefects) {
-          pc.pcDefects.forEach((defect) => {
-            if (defect.defectImages) {
-              defect.defectImages.forEach(addImageUrl);
-            }
-          });
-        }
-      });
-    }
-
-    // Collect additional images
-    if (record.defectDetails?.additionalImages) {
-      record.defectDetails.additionalImages.forEach(addImageUrl);
-    }
-
-    // Collect inspection images
-    if (record.inspectionDetails?.checkpointInspectionData) {
-      record.inspectionDetails.checkpointInspectionData.forEach(
-        (checkpoint) => {
-          if (checkpoint.comparisonImages) {
-            checkpoint.comparisonImages.forEach(addImageUrl);
-          }
-          if (checkpoint.subPoints) {
-            checkpoint.subPoints.forEach((subPoint) => {
-              if (subPoint.comparisonImages) {
-                subPoint.comparisonImages.forEach(addImageUrl);
-              }
-            });
-          }
-        }
-      );
-    }
-
-    // Load all images
-    const imagePromises = Array.from(imageUrls).map(async (url) => {
-      const base64 = await loadImageServerSide(url);
-      return { url, base64 };
-    });
-
-    const imageResults = await Promise.all(imagePromises);
-    imageResults.forEach(({ url, base64 }) => {
-      if (base64) preloadedImages[url] = base64;
-    });
-
-    // Import the PDF component
-    const { QcWashingFullReportPDF } = await import(
-      "../src/components/inspection/qc2_washing/Home/qcWashingFullReportPDF.jsx"
+    // Extract images from record safely
+    record.defectDetails?.defectsByPc?.forEach((pc) =>
+      pc.pcDefects?.forEach((d) => d.defectImages?.forEach(add))
     );
+    record.defectDetails?.additionalImages?.forEach(add);
+    record.inspectionDetails?.checkpointInspectionData?.forEach((cp) => {
+      cp.comparisonImages?.forEach(add);
+      cp.subPoints?.forEach((sp) => sp.comparisonImages?.forEach(add));
+    });
 
-    // Generate PDF with preloaded images
-    const pdfBuffer = await renderToBuffer(
-      React.createElement(QcWashingFullReportPDF, {
-        recordData: record,
-        comparisonData: null,
-        API_BASE_URL:
-          process.env.API_BASE_URL ||
-          "https://192.167.12.85:5000" ||
-          "https://192.167.12.162:5000",
-        checkpointDefinitions: checkpointDefinitions,
-        preloadedImages: preloadedImages,
-        skipImageLoading: false
+    if (collectedUrls.size === 0) {
+      return res.json({ images: {}, total: 0, loaded: 0 });
+    }
+
+    // Fetch safely in parallel
+    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
+    const preloaded = {};
+    const results = await Promise.allSettled(
+      Array.from(collectedUrls).map(async (url) => {
+        const resp = await axios.get(url, {
+          responseType: "arraybuffer",
+          timeout: 10000,
+          httpsAgent,
+          headers: { "User-Agent": "Mozilla/5.0" }
+        });
+        const contentType = resp.headers["content-type"] || "image/jpeg";
+        const base64 = `data:${contentType};base64,${Buffer.from(
+          resp.data
+        ).toString("base64")}`;
+        preloaded[url] = base64;
       })
     );
 
-    // Set response headers
+    const failed = results.filter((r) => r.status === "rejected").length;
+    if (failed > 0) console.warn(`⚠️ ${failed} images failed to load`);
+
+    res.json({
+      recordId: id,
+      total: collectedUrls.size,
+      loaded: Object.keys(preloaded).length,
+      images: preloaded
+    });
+  } catch (err) {
+    console.error("❌ image-proxy-selected crashed:", err.message);
+    res
+      .status(500)
+      .json({ error: "Internal server error", details: err.message });
+  }
+});
+
+// Light QC Washing PDF Generator
+app.get("/api/qc-washing/pdf/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const [record, checkpointDefinitions] = await Promise.all([
+      QCWashing.findById(id),
+      QCWashingCheckList.find({})
+    ]);
+
+    if (!record) return res.status(404).json({ error: "Record not found" });
+
+    const { QcWashingFullReportPDF } = await import(
+      "../src/components/inspection/qc2_washing/Home/qcWashingFullReportPDF.jsx"
+    );
+    const pdfBuffer = await renderToBuffer(
+      React.createElement(QcWashingFullReportPDF, {
+        recordData: record,
+        checkpointDefinitions,
+        preloadedImages: {}, // no need to load images
+        skipImageLoading: true
+      })
+    );
+
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="QC_Washing_Report_${record.orderNo}_${record.color}_with_images.pdf"`
+      `attachment; filename="QC_Washing_Report_${record.orderNo}_${record.color}.pdf"`
     );
-    res.setHeader("Content-Length", pdfBuffer.length);
-
     res.send(pdfBuffer);
   } catch (error) {
-    console.error("Error generating QC Washing PDF with images:", error);
+    console.error("PDF generation failed:", error);
     res
       .status(500)
       .json({ error: "Failed to generate PDF", details: error.message });
@@ -32238,173 +32195,6 @@ app.get("/storage/qc2_images/default-placeholder.png", (req, res) => {
   );
   res.set("Content-Type", "image/png");
   res.send(transparentPng);
-});
-
-// Image proxy endpoint for PDF generation
-app.get("/api/image-proxy-all", async (req, res) => {
-  // Set CORS headers based on the request origin
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    "https://192.167.12.85:3001",
-    "http://localhost:3001",
-    "https://localhost:3001",
-    "https://yqms.yaikh.com",
-    "https://192.167.12.162:3001"
-  ];
-
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  } else {
-    res.header("Access-Control-Allow-Origin", "*");
-  }
-
-  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control"
-  );
-  res.header("Access-Control-Max-Age", "86400");
-
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  try {
-    const { url } = req.query;
-    if (!url) {
-      return res.status(400).json({ error: "URL parameter is required" });
-    }
-
-    let imageUrl = url;
-
-    // Handle relative URLs with more flexibility
-    if (url.startsWith("/storage/") || url.startsWith("/public/")) {
-      const baseUrl =
-        process.env.API_BASE_URL ||
-        "https://192.167.12.85:5000" ||
-        "https://192.167.12.162:5000";
-      imageUrl = `${baseUrl}${url}`;
-    } else if (url.startsWith("storage/") || url.startsWith("public/")) {
-      // Handle URLs without leading slash
-      const baseUrl =
-        process.env.API_BASE_URL ||
-        "https://192.167.12.85:5000" ||
-        "https://192.167.12.162:5000";
-      imageUrl = `${baseUrl}/${url}`;
-    }
-
-    // Validate URL format
-    try {
-      new URL(imageUrl);
-    } catch (urlError) {
-      console.log("❌ Invalid URL format:", imageUrl);
-      return res.status(400).json({ error: "Invalid URL format" });
-    }
-
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      timeout: 20000,
-      maxRedirects: 5,
-      headers: {
-        "User-Agent":
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "image/*,*/*;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        Connection: "keep-alive",
-        "Cache-Control": "no-cache"
-      },
-      httpsAgent: new https.Agent({
-        rejectUnauthorized: process.env.NODE_ENV === "production",
-        keepAlive: true,
-        timeout: 20000
-      }),
-      validateStatus: function (status) {
-        return status < 500;
-      }
-    });
-
-    if (response.status === 404) {
-      console.log("❌ Image not found (404):", imageUrl);
-      return res.status(404).json({ error: "Image not found", url: imageUrl });
-    }
-
-    if (response.status >= 400) {
-      return res.status(response.status).json({
-        error: `HTTP ${response.status}: ${response.statusText}`,
-        url: imageUrl
-      });
-    }
-
-    // Validate content type
-    const contentType = response.headers["content-type"] || "image/jpeg";
-    if (!contentType.startsWith("image/")) {
-      console.log(
-        "❌ Invalid content type:",
-        contentType,
-        "for URL:",
-        imageUrl
-      );
-      return res
-        .status(400)
-        .json({ error: "URL does not point to an image", contentType });
-    }
-
-    const buffer = Buffer.from(response.data);
-    const base64 = buffer.toString("base64");
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
-    // Set cache headers
-    res.setHeader("Cache-Control", "public, max-age=3600");
-    res.json({ dataUrl });
-  } catch (error) {
-    console.error("❌ Image proxy error:", {
-      message: error.message,
-      code: error.code,
-      url: url
-    });
-
-    // Return appropriate error responses
-    if (error.code === "ENOTFOUND") {
-      return res.status(404).json({ error: "Host not found", url });
-    }
-    if (error.code === "ECONNREFUSED") {
-      return res.status(503).json({ error: "Connection refused", url });
-    }
-    if (error.code === "ETIMEDOUT" || error.code === "ECONNABORTED") {
-      return res.status(408).json({ error: "Request timeout", url });
-    }
-
-    res
-      .status(500)
-      .json({ error: "Failed to fetch image", details: error.message, url });
-  }
-});
-
-// Add OPTIONS handler for the image proxy endpoint specifically
-app.options("/api/image-proxy-all", (req, res) => {
-  const origin = req.headers.origin;
-  const allowedOrigins = [
-    "https://192.167.12.85:3001",
-    "http://localhost:3001",
-    "https://localhost:3001",
-    "https://yqms.yaikh.com",
-    "https://192.167.12.162:3001"
-  ];
-
-  if (allowedOrigins.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-  } else {
-    res.header("Access-Control-Allow-Origin", "*");
-  }
-
-  res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
-  res.header(
-    "Access-Control-Allow-Headers",
-    "Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control"
-  );
-  res.header("Access-Control-Max-Age", "86400");
-  res.status(200).end();
 });
 
 /* -------------------------------------------

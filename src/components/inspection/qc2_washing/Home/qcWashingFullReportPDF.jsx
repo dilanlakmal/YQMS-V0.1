@@ -424,20 +424,10 @@ const QualitySummaryCards = ({ recordData }) => (
         {recordData.totalCheckedPcs || 0}
       </Text>
     </View>
-    {/* Defective PCs / Qty Card */}
     <View style={styles.summaryCard}>
-      <Text style={styles.summaryCardTitle}>Defective PCs / Qty</Text>
+      <Text style={styles.summaryCardTitle}>Check Points</Text>
       <Text style={styles.summaryCardValue}>
-        {recordData.defectDetails?.defectsByPc?.length || 0} /{" "}
-        {recordData.defectDetails?.defectsByPc?.reduce(
-          (sum, pc) =>
-            sum +
-            (pc.pcDefects?.reduce(
-              (pcSum, defect) => pcSum + (defect.defectQty || 0),
-              0
-            ) || 0),
-          0
-        ) || 0}
+        {recordData.totalCheckedPoint || 0}
       </Text>
     </View>
     <View style={styles.summaryCard}>

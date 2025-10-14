@@ -58,11 +58,7 @@ const loadImageOptimized = async (imageUrl, API_BASE_URL) => {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
 
-    const proxyUrl = `${API_BASE_URL}/api/image-proxy-all?url=${encodeURIComponent(
-      cleanUrl
-    )}`;
-
-    const response = await fetch(proxyUrl, {
+    const response = await fetch({
       method: "GET",
       headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(3000) // 3s timeout
