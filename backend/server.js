@@ -124,7 +124,7 @@ import {
 
 /* ------------------------------
    SQL Query Import
-// ------------------------------ */
+// // ------------------------------ */
 // import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
 // import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
@@ -33930,8 +33930,8 @@ app.get("/api/subcon-sewing-qc1-report-data", async (req, res) => {
                 totalQty: { $sum: "$allDefects.qty" },
                 totalCheckedQty: { $first: "$totalCheckedQty" },
                 totalDefectQty: { $first: "$totalDefectQty" },
-                totalQASampleSize: { $first: "$totalQASampleSize" },
-                totalQADefectQty: { $first: "$totalQADefectQty" }
+                totalQASampleSize: { $sum: "$qaReport.totalCheckedQty" },
+                totalQADefectQty: { $sum: "$qaReport.totalOverallDefectQty" }
               }
             },
             { $sort: { totalQty: -1 } },
