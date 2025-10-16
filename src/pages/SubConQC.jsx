@@ -123,7 +123,11 @@ const SubConQC = () => {
     // If the user is a factory user, filter out the "QA Sample Data" tab
     if (isFactoryUser) {
       return allPossibleTabs.filter(
-        (tab) => tab.id !== "QA Sample Data" && tab.id !== "qc_list"
+        (tab) =>
+          tab.id !== "QA Sample Data" &&
+          tab.id !== "report-mobile" &&
+          tab.id !== "qc_list" &&
+          tab.id !== "QA_Report"
       );
     }
 
