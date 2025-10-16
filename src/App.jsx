@@ -78,6 +78,7 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
+import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -444,6 +445,11 @@ function AppContent() {
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
               <Route path="/sub-con-qc1" element={<SubConQC />} />
+              <Route
+                path="/subcon-qa-inspection/view-report/:reportId"
+                element={<SubConQADataFullReport />}
+              />
+
               <Route path="/qc2-upload-data" element={<QC2UploadData />} />
               <Route
                 path="/qc2-washing-upload"

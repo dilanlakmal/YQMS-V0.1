@@ -761,9 +761,9 @@ const syncQC1SunriseData = async () => {
     console.log(`Prepared ${documents.length} documents for MongoDB`);
 
     // Log a sample document
-    if (documents.length > 0) {
-      console.log("Sample Document:", documents[0]);
-    }
+    // if (documents.length > 0) {
+    //   console.log("Sample Document:", documents[0]);
+    // }
 
     // Fetch existing documents from MongoDB for comparison (only for the last 7 days)
     const existingDocs = await QC1Sunrise.find({
