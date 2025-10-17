@@ -4,13 +4,14 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
+import SubConQAInspectionData from "../components/inspection/sub-con-qc1/SubConQAInspectionData";
 import SubConQASampleData from "../components/inspection/sub-con-qc1/SubConQASampleData";
 import SubConQCInspection from "../components/inspection/sub-con-qc1/SubConQCInspection";
 import SubConQCList from "../components/inspection/sub-con-qc1/SubConQCList";
 import SubConQCReport from "../components/inspection/sub-con-qc1/SubConQCReport";
 import SubConQCReportMobileView from "../components/inspection/sub-con-qc1/SubConQCReportMobileView";
+import SubConQCResults from "../components/inspection/sub-con-qc1/SubConQCResults";
 import SubConQCDashboard from "../components/inspection/sub-con-qc1/dashboard/SubConQCDashboard";
-import SubConQAInspectionData from "../components/inspection/sub-con-qc1/SubConQAInspectionData";
 
 const PlaceholderComponent = ({ title }) => {
   return (
@@ -99,6 +100,12 @@ const SubConQC = () => {
         component: <SubConQAInspectionData title="QA Report" />
       },
       {
+        id: "QC Results",
+        labelKey: "subcon.tabs.qcResults",
+        icon: <BarChart3 size={18} />,
+        component: <SubConQCResults title="QC Results" />
+      },
+      {
         id: "dashboard",
         labelKey: "subcon.tabs.dashboard",
         icon: <LayoutDashboard size={18} />,
@@ -127,7 +134,8 @@ const SubConQC = () => {
           tab.id !== "QA Sample Data" &&
           tab.id !== "report-mobile" &&
           tab.id !== "qc_list" &&
-          tab.id !== "QA_Report"
+          tab.id !== "QA_Report" &&
+          tab.id !== "QC Results"
       );
     }
 

@@ -1,18 +1,17 @@
-import React, { useState, useCallback } from "react";
 import {
-  Upload,
-  FileText,
-  Loader,
   AlertTriangle,
-  Save,
   CheckCircle,
-  XCircle,
-  FileUp
+  FileText,
+  FileUp,
+  Loader,
+  Save,
+  XCircle
 } from "lucide-react";
+import React, { useCallback, useState } from "react";
 import { read, utils } from "xlsx";
+import { API_BASE_URL } from "../../config";
 import { cleanYorksysOrderData } from "../components/inspection/qa-pivot/YorksysOrderClean";
 import YorksysOrderPreview from "../components/inspection/qa-pivot/YorksysOrderPreview";
-import { API_BASE_URL } from "../../config";
 
 const UploadYorksysOrders = () => {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -112,6 +111,108 @@ const UploadYorksysOrders = () => {
     }
   }, [selectedFile]);
 
+  // ============================================================
+  // 🆕 NEW: Helper function to transform data for MongoDB
+  // ============================================================
+  /**
+   * Transforms the preview data into the format required by MongoDB schema
+   * @param {Object} data - The cleaned order data from preview
+   * @returns {Object} Transformed data matching MongoDB schema
+   */
+  const transformOrderDataForSave = (data) => {
+    // 1. Parse Fabric Content string into array
+    // Example: "COTTON: 60%, POLYESTER: 40%" -> [{fabricName: "COTTON", percentageValue: 60}, ...]
+    const parseFabricContent = (fabricContentStr) => {
+      if (!fabricContentStr || fabricContentStr === "N/A") return [];
+
+      return fabricContentStr.split(",").map((item) => {
+        const parts = item.trim().split(":");
+        const fabricName = parts[0]?.trim() || "";
+        const percentageStr = parts[1]?.trim().replace("%", "") || "0";
+        const percentageValue = parseInt(percentageStr, 10) || 0;
+
+        return { fabricName, percentageValue };
+      });
+    };
+
+    // 2. Transform PO Summary
+    const transformMOSummary = (poSummary) => {
+      if (!poSummary || poSummary.length === 0) return [];
+
+      return poSummary.map((po) => ({
+        TotalSku: po.totalSkus || 0,
+        AllETD: po.uniqueEtds ? po.uniqueEtds.split(", ") : [],
+        AllETA: po.uniqueEtas ? po.uniqueEtas.split(", ") : [],
+        ETDPeriod: po.etdPeriod || "N/A",
+        ETAPeriod: po.etaPeriod || "N/A",
+        TotalColors: po.totalColors || 0,
+        TotalPos: po.totalPoLines || 0,
+        TotalQty: po.totalQty || 0
+      }));
+    };
+
+    // 3. Transform SKU Details
+    const transformSKUData = (skuDetails) => {
+      if (!skuDetails || skuDetails.length === 0) return [];
+
+      return skuDetails.map((sku) => ({
+        sku: sku.sku || "",
+        ETD: sku.etd || "",
+        ETA: sku.eta || "",
+        POLine: sku.poLine || "",
+        Color: sku.color || "",
+        Qty: sku.qty || 0
+      }));
+    };
+
+    // 4. Transform Order Qty by Country
+    const transformOrderQtyByCountry = (orderQtyByCountry) => {
+      if (!orderQtyByCountry || orderQtyByCountry.length === 0) return [];
+
+      return orderQtyByCountry.map((country) => {
+        // Parse the qtyByColor string "Black: 100, White: 200" into array
+        const colorQtyArray =
+          country.qtyByColor && country.qtyByColor !== "N/A"
+            ? country.qtyByColor.split(", ").map((item) => {
+                const [colorName, qty] = item.split(": ");
+                return {
+                  ColorName: colorName?.trim() || "",
+                  Qty: parseInt(qty?.replace(/,/g, ""), 10) || 0
+                };
+              })
+            : [];
+
+        return {
+          CountryID: country.countryId || "",
+          TotalQty: country.totalQty || 0,
+          ColorQty: colorQtyArray
+        };
+      });
+    };
+
+    // Build the final payload
+    return {
+      buyer: data.buyer || "N/A",
+      factory: data.factory || "N/A",
+      moNo: data.moNo || "N/A",
+      season: data.season || "N/A",
+      style: data.style || "N/A",
+      product: data.product || "N/A",
+      destination: data.destination || "N/A",
+      shipMode: data.shipMode || "N/A",
+      currency: data.currency || "N/A",
+      skuDescription: data.skuDescription || "N/A",
+      FabricContent: parseFabricContent(data.fabricContent),
+      MOSummary: transformMOSummary(data.poSummary),
+      SKUData: transformSKUData(data.skuDetails),
+      OrderQtyByCountry: transformOrderQtyByCountry(data.orderQtyByCountry)
+    };
+  };
+  // ============================================================
+
+  // ============================================================
+  // 🆕 MODIFIED: Transform data before sending to backend
+  // ============================================================
   const handleSave = async () => {
     if (!orderData) {
       setError("No data to save. Please preview a file first.");
@@ -123,10 +224,15 @@ const UploadYorksysOrders = () => {
     setError("");
 
     try {
+      // Transform the data to match MongoDB schema
+      const transformedData = transformOrderDataForSave(orderData);
+
+      console.log("Transformed Data:", transformedData); // For debugging
+
       const response = await fetch(`${API_BASE_URL}/yorksys-orders/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(transformedData)
       });
 
       const result = await response.json();
@@ -135,7 +241,10 @@ const UploadYorksysOrders = () => {
         throw new Error(result.message || "Failed to save data.");
       }
 
-      setSaveStatus({ message: result.message, type: "success" });
+      setSaveStatus({
+        message: result.message || "Order saved successfully!",
+        type: "success"
+      });
     } catch (err) {
       console.error("Save Error:", err);
       setSaveStatus({ message: err.message, type: "error" });
@@ -143,6 +252,7 @@ const UploadYorksysOrders = () => {
       setIsSaving(false);
     }
   };
+  // ============================================================
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">

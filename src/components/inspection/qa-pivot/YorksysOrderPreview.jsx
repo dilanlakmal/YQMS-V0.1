@@ -9,21 +9,27 @@ const YorksysOrderPreview = ({ orderData }) => {
     return null;
   }
 
+  // ============================================================
+  // 🆕 MODIFIED: Destructure the new orderQtyByCountry field
+  // ============================================================
   const {
-    buyer, // Destructure the new buyer property
+    buyer,
     factory,
     moNo,
     style,
     season,
     skuDescription,
+    fabricContent,
+    product,
     destination,
     shipMode,
     currency,
     skuDetails,
-    poSummary
+    poSummary,
+    orderQtyByCountry // 🆕 NEW: Country aggregation data
   } = orderData;
+  // ============================================================
 
-  // Add Buyer to the list of summary items
   const summaryItems = [
     { label: "Factory", value: factory },
     { label: "Buyer", value: buyer },
@@ -31,6 +37,8 @@ const YorksysOrderPreview = ({ orderData }) => {
     { label: "Style", value: style },
     { label: "Season", value: season },
     { label: "SKU Description", value: skuDescription },
+    { label: "Product", value: product },
+    { label: "Fabric Content", value: fabricContent },
     { label: "Destination", value: destination },
     { label: "Ship Mode", value: shipMode },
     { label: "Currency", value: currency }
@@ -42,7 +50,6 @@ const YorksysOrderPreview = ({ orderData }) => {
         <h2 className="text-xl font-bold text-gray-800 mb-4 text-center">
           Yorksys Order Upload | MO No: {moNo}
         </h2>
-        {/* The grid will automatically adjust to include the new Buyer field */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-6 gap-y-4 p-4 border border-gray-200 rounded-md bg-gray-50">
           {summaryItems.map((item) => (
             <div key={item.label}>
@@ -57,7 +64,7 @@ const YorksysOrderPreview = ({ orderData }) => {
         </div>
       </div>
 
-      {/* --- PO Summary Table (No changes here) --- */}
+      {/* --- PO Summary Table --- */}
       <div>
         <h3 className="text-lg font-semibold text-gray-700 mb-3">PO Summary</h3>
         <div className="overflow-x-auto border border-gray-200 rounded-lg">
@@ -124,6 +131,84 @@ const YorksysOrderPreview = ({ orderData }) => {
           </table>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* 🆕 NEW: Order Qty by Country Table */}
+      {/* ============================================================ */}
+
+      {orderQtyByCountry && orderQtyByCountry.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-700 mb-3">
+            Order Qty by Country
+          </h3>
+          <div className="overflow-x-auto border border-gray-200 rounded-lg">
+            <table className="min-w-full divide-y divide-gray-200 text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    Country ID
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    Total Qty
+                  </th>
+                  <th className="px-3 py-2 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    Color
+                  </th>
+                  <th className="px-3 py-2 text-right text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    Qty
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {/* 🆕 MODIFIED: Parse color quantities and display in separate rows */}
+                {orderQtyByCountry.map((country, countryIndex) => {
+                  // Parse the qtyByColor string into an array of objects
+                  const colorItems = country.qtyByColor
+                    .split(", ")
+                    .map((item) => {
+                      const [color, qty] = item.split(": ");
+                      return { color, qty };
+                    });
+
+                  return colorItems.map((colorItem, colorIndex) => (
+                    <tr
+                      key={`${country.countryId}-${countryIndex}-${colorIndex}`}
+                      className="hover:bg-gray-50 transition-colors"
+                    >
+                      {/* Show Country ID and Total Qty only in the first row */}
+                      {colorIndex === 0 && (
+                        <>
+                          <td
+                            className="px-3 py-3 font-semibold text-gray-800 border-r border-gray-200"
+                            rowSpan={colorItems.length}
+                          >
+                            {country.countryId}
+                          </td>
+                          <td
+                            className="px-3 py-3 text-right font-medium text-gray-800 border-r border-gray-200"
+                            rowSpan={colorItems.length}
+                          >
+                            {country.totalQty.toLocaleString()}
+                          </td>
+                        </>
+                      )}
+                      {/* Color and Qty appear in each row */}
+                      <td className="px-3 py-3 text-gray-800">
+                        {colorItem.color}
+                      </td>
+                      <td className="px-3 py-3 text-right text-gray-800">
+                        {colorItem.qty}
+                      </td>
+                    </tr>
+                  ));
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================ */}
 
       {/* --- SKU Details Table --- */}
       <div>
