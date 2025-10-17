@@ -17,7 +17,7 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('estimated'); // 'estimated' or 'actual'
+  const [viewMode, setViewMode] = useState('actual'); // 'estimated' or 'actual'
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
@@ -180,7 +180,28 @@ const fetchSubmittedData = async (showLoading = true) => {
             const batchResults = await Promise.all(
               batch.map(async (record) => {
                 const washQtyData = await fetchRealWashQty(record);
-                return { ...record, ...washQtyData };
+                let finalRecord = { ...record, ...washQtyData };
+
+                // If we have an actual wash quantity, fetch the corresponding AQL sample size for display.
+                if (finalRecord.isActualWashQty && finalRecord.displayWashQty > 0 && aqlEndpointAvailable) {
+                  try {
+                    const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ lotSize: finalRecord.displayWashQty, orderNo: record.orderNo })
+                    });
+
+                    if (aqlResponse.ok) {
+                      const aqlResult = await aqlResponse.json();
+                      if (aqlResult.success && aqlResult.aqlData) {
+                        // Temporarily override checkedQty for display purposes only.
+                        finalRecord.checkedQty = aqlResult.aqlData.sampleSize;
+                      }
+                    }
+                  } catch (e) { console.error("AQL fetch for display failed:", e); }
+                }
+
+                return finalRecord;
               })
             );
             actualData.push(...batchResults);
@@ -1346,7 +1367,7 @@ const preloadImagesForRecord = async (record, API_BASE_URL) => {
                    Wash Qty
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
-                   Checked Qty
+                   Checked Qty (AQL)
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                    Defect Qty
