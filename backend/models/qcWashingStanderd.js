@@ -9,7 +9,7 @@ const MachineStandardSchema = new mongoose.Schema(
         "Acid Wash",
         "Garment Dye",
         "Soft Wash",
-        "Acid Wash + Garment Dye"
+        "Garment Dye + Acid Wash"
       ],
       required: true
     },

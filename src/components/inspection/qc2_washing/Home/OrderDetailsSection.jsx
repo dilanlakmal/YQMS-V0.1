@@ -850,10 +850,48 @@ const OrderDetailsSection = ({
               <option value="Acid Wash">Acid</option>
               <option value="Garment Dye">Garment Dye</option>
               <option value="Soft Wash">Soft</option>
-              <option value="Acid Wash + Garment Dye">
-                Acid + Garment Dye
+              <option value="Garment Dye + Acid Wash">
+                {" "}
+                Garment Dye + Acid{" "}
               </option>
             </select>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <label className="w-20 text-sm font-medium dark:text-gray-300">
+              Factory Name:
+            </label>
+            <select
+              value={formData.factoryName}
+              onChange={(e) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  factoryName: e.target.value
+                }))
+              }
+              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
+              disabled={isSaved}
+            >
+              {subFactories.map((factory) => (
+                <option key={factory} value={factory}>
+                  {factory}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center space-x-4">
+            <label className="w-20 text-sm font-medium dark:text-gray-300">
+              Buyer:
+            </label>
+            <input
+              type="text"
+              value={formData.buyer}
+              onChange={(e) => handleInputChange("buyer", e.target.value)}
+              readOnly
+              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white cursor-not-allowed"
+              style={{ opacity: 1, color: "inherit" }}
+              disabled={isSaved}
+            />
           </div>
 
           <div className="flex items-center space-x-4">
@@ -900,43 +938,6 @@ const OrderDetailsSection = ({
                 Inline
               </label>
             </div>
-          </div>
-          <div className="flex items-center space-x-4">
-            <label className="w-20 text-sm font-medium dark:text-gray-300">
-              Buyer:
-            </label>
-            <input
-              type="text"
-              value={formData.buyer}
-              onChange={(e) => handleInputChange("buyer", e.target.value)}
-              readOnly
-              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white cursor-not-allowed"
-              style={{ opacity: 1, color: "inherit" }}
-              disabled={isSaved}
-            />
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <label className="w-20 text-sm font-medium dark:text-gray-300">
-              Factory Name:
-            </label>
-            <select
-              value={formData.factoryName}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  factoryName: e.target.value
-                }))
-              }
-              className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:text-white"
-              disabled={isSaved}
-            >
-              {subFactories.map((factory) => (
-                <option key={factory} value={factory}>
-                  {factory}
-                </option>
-              ))}
-            </select>
           </div>
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">
