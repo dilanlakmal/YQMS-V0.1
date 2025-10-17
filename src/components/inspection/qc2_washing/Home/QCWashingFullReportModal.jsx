@@ -15,7 +15,7 @@ const QCWashingFullReportModal = ({ isOpen, onClose, recordData, checkpointDefin
   const [showAllPcs, setShowAllPcs] = useState(false);
   const [processedReportData, setProcessedReportData] = useState(null);
   // Lazy load heavy table views
-  const [activeView, setActiveView] = useState('none'); // 'none', 'full', 'size-by-size'
+  const [activeView, setActiveView] = useState('full'); // 'none', 'full', 'size-by-size'
 
   // Helper function to convert file paths to accessible URLs
 // Helper function to convert file paths to accessible URLs
