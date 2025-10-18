@@ -229,7 +229,7 @@ const UploadYorksysOrders = () => {
 
       console.log("Transformed Data:", transformedData); // For debugging
 
-      const response = await fetch(`${API_BASE_URL}/yorksys-orders/save`, {
+      const response = await fetch(`${API_BASE_URL}/api/yorksys-orders/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(transformedData)

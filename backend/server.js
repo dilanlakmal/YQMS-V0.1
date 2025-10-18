@@ -35380,7 +35380,7 @@ app.post("/api/packing-list/upload", async (req, res) => {
  * POST /yorksys-orders/save
  * Saves Yorksys order data to MongoDB
  */
-app.post("/yorksys-orders/save", async (req, res) => {
+app.post("/api/yorksys-orders/save", async (req, res) => {
   try {
     const orderPayload = req.body;
 
@@ -35444,7 +35444,7 @@ app.post("/yorksys-orders/save", async (req, res) => {
  * GET /yorksys-orders/:moNo
  * Retrieves a specific order by MO Number
  */
-app.get("/yorksys-orders/:moNo", async (req, res) => {
+app.get("/api/yorksys-orders/:moNo", async (req, res) => {
   try {
     const { moNo } = req.params;
     const order = await YorksysOrders.findOne({ moNo });
