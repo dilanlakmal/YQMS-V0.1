@@ -183,7 +183,12 @@ const fetchSubmittedData = async (showLoading = true) => {
                 let finalRecord = { ...record, ...washQtyData };
 
                 // If we have an actual wash quantity, fetch the corresponding AQL sample size for display.
-                if (finalRecord.isActualWashQty && finalRecord.displayWashQty > 0 && aqlEndpointAvailable) {
+                if (
+                  finalRecord.isActualWashQty &&
+                  finalRecord.displayWashQty > 0 &&
+                  aqlEndpointAvailable &&
+                  record.reportType?.toLowerCase() === 'inline' // Only update for 'inline' reports
+                ) {
                   try {
                     const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
                       method: 'POST',
