@@ -186,7 +186,8 @@ const SubmittedWashingDataPage = () => {
                 if (
                   finalRecord.isActualWashQty &&
                   finalRecord.displayWashQty > 0 &&
-                  aqlEndpointAvailable
+                  aqlEndpointAvailable &&
+                  record.reportType?.toLowerCase() === "inline" // Only update for 'inline' reports
                 ) {
                   try {
                     const aqlResponse = await fetch(
