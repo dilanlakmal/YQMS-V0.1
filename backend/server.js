@@ -15474,7 +15474,7 @@ const upload = multer({
 ------------------------------ */
 
 // User routes
-app.get("/api/users-main", async (req, res) => {
+app.get("/users", async (req, res) => {
   try {
     const users = await UserMain.find();
     res.json(users);
@@ -15485,7 +15485,7 @@ app.get("/api/users-main", async (req, res) => {
 });
 
 // POST /users - Create an External User / Device
-app.post("/api/users", async (req, res) => {
+app.post("/users", async (req, res) => {
   try {
     const {
       emp_id,
@@ -15553,7 +15553,7 @@ app.post("/api/users", async (req, res) => {
 });
 
 //Delete
-app.delete("/api/users/:id", async (req, res) => {
+app.delete("/users/:id", async (req, res) => {
   try {
     await UserMain.findByIdAndDelete(req.params.id);
     res.json({ message: "User deleted" });
