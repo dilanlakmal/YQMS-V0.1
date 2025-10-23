@@ -25,7 +25,7 @@ const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingUser) {
-      await axios.put(`${API_BASE_URL}/users/${editingUser._id}`, {
+      await axios.put(`${API_BASE_URL}/api/users/${editingUser._id}`, {
         emp_id,
         name,
         eng_name,
@@ -35,7 +35,7 @@ const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
       });
       setEditingUser(null);
     } else {
-      await axios.post(`${API_BASE_URL}/users`, {
+      await axios.post(`${API_BASE_URL}/api/users`, {
         emp_id,
         name,
         eng_name,

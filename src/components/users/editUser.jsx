@@ -8,39 +8,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
   const [userRoles, setUserRoles] = useState([]);
   const [selectedRoles, setSelectedRoles] = useState([]);
   const [message, setMessage] = useState({ type: "", text: "" });
-
-  // Currently, only phone_number is editable (true), all others are false.
-  const editableFields = {
-    name: false,
-    phone_number: false,
-    eng_name: false,
-    kh_name: false,
-    job_title: false,
-    email: false
-  };
-
-  const availableRoles = [
-    "Cutting",
-    "SCC",
-    "Bundle Registration",
-    "Washing",
-    "OPA",
-    "Ironing",
-    "Packing",
-    "QC Roving",
-    "Printing",
-    "QC2 Tracking",
-    "QC1 Inspection",
-    "QC2 Inspection",
-    "QA Audit",
-    "Final Inspection",
-    "Download Data",
-    "Live Dashboard",
-    "Power BI",
-    "QC1 Sunrise",
-    "ANF QA",
-    "QA"
-  ];
+  const [availableRoles, setAvailableRoles] = useState([]);
 
   // Array of allowed working statuses that can modify roles.
   const allowWorkingStatus = ["Working"];
@@ -48,22 +16,34 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
 
   useEffect(() => {
     if (user?.emp_id) {
-      fetchUserRoles();
+      const fetchInitialData = async () => {
+        await fetchAllRoles();
+        await fetchUserRoles();
+      };
+      fetchInitialData();
     }
   }, [user]);
+
+  const fetchAllRoles = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/role-management`);
+      // Filter out system roles like 'Super Admin' and 'Admin'
+      const filteredRoles = response.data
+        .map(role => role.role)
+        .filter(roleName => roleName !== 'Super Admin' && roleName !== 'Admin');
+      setAvailableRoles(filteredRoles.sort());
+    } catch (error) {
+      console.error("Error fetching all available roles:", error);
+      setMessage({ type: "error", text: "Could not load available roles." });
+    }
+  };
 
   const fetchUserRoles = async () => {
     try {
       const response = await axios.get(
         `${API_BASE_URL}/api/user-roles/${user.emp_id}`
       );
-      setUserRoles(response.data.roles);
       setSelectedRoles(response.data.roles);
-
-      // If user is Super Admin/Admin, disable role editing
-      if (roles.includes("Super Admin") || roles.includes("Admin")) {
-        setDisableRoles(true);
-      }
     } catch (error) {
       console.error("Error fetching user roles:", error);
     }
@@ -81,27 +61,13 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
-    const updatedUser = {
-      ...user,
-      name: formData.get("name"),
-      phone_number: formData.get("phone_number"),
-      eng_name: formData.get("eng_name"),
-      kh_name: formData.get("kh_name"),
-      job_title: formData.get("job_title"),
-      email: formData.get("email")
-    };
 
     try {
-      // First update user details
-      await onSubmit(updatedUser);
-
-      // Then update roles
+      // Update roles
       const response = await axios.post(
         `${API_BASE_URL}/api/update-user-roles`,
         {
           emp_id: user.emp_id,
-          currentRoles: userRoles,
           newRoles: selectedRoles,
           userData: {
             emp_id: user.emp_id,
@@ -110,8 +76,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
             kh_name: updatedUser.kh_name,
             job_title: updatedUser.job_title,
             dept_name: user.dept_name,
-            sect_name: user.sect_name,
-            phone_number: updatedUser.phone_number,
+            sect_name: user.sect_name, // Ensure these fields are passed from the user object
+            phone_number: user.phone_number,
             working_status: user.working_status,
             face_photo: user.face_photo
           }
@@ -129,7 +95,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
         }, 2000);
       }
     } catch (error) {
-      console.error("Error updating user:", error);
+      console.error("Error updating user roles:", error);
       setMessage({
         type: "error",
         text: error.response?.data?.message || "Failed to update user roles"
@@ -251,8 +217,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <input
                   type="text"
                   name="name"
-                  defaultValue={user.name}
-                  readOnly={!editableFields.name}
+                  defaultValue={user.name || ''}
+                  readOnly={true}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
@@ -265,8 +231,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <input
                   type="text"
                   name="name"
-                  defaultValue={user.phone_number}
-                  readOnly={!editableFields.phone_number}
+                  defaultValue={user.phone_number || ''}
+                  readOnly={true}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
@@ -279,8 +245,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <input
                   type="text"
                   name="eng_name"
-                  defaultValue={user.eng_name}
-                  readOnly={!editableFields.eng_name}
+                  defaultValue={user.eng_name || ''}
+                  readOnly={true}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
@@ -292,8 +258,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <input
                   type="text"
                   name="kh_name"
-                  defaultValue={user.kh_name}
-                  readOnly={!editableFields.kh_name}
+                  defaultValue={user.kh_name || ''}
+                  readOnly={true}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
@@ -305,8 +271,8 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <input
                   type="text"
                   name="job_title"
-                  defaultValue={user.job_title}
-                  readOnly={!editableFields.job_title}
+                  defaultValue={user.job_title || ''}
+                  readOnly={true}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   required
                 />
@@ -319,15 +285,15 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                 <input
                   type="email"
                   name="email"
-                  defaultValue={user.email}
-                  readOnly={!editableFields.email}
+                  defaultValue={user.email || ''}
+                  readOnly={true}
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 />
               </div>
 
               {/* Role Management Section */}
               <div className="col-span-2">
-                <label className="block text-sm font-medium text-white mb-2">
+                <label className="block text-sm font-medium text-gray-900 dark:text-white mb-2">
                   Roles
                 </label>
                 {selectedRoles.includes("Super Admin") ? (
@@ -352,7 +318,7 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
                         />
                         <label
                           htmlFor={`role-${role}`}
-                          className="ml-2 text-sm font-medium text-white"
+                          className="ml-2 text-sm font-medium text-gray-700 dark:text-gray-300"
                         >
                           {role}
                         </label>
@@ -371,12 +337,12 @@ const EditUserModal = ({ isOpen, onClose, user, onSubmit }) => {
               >
                 Cancel
               </button>
-              <button
+              {/* <button
                 type="submit"
                 className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
               >
                 Update
-              </button>
+              </button> */}
             </div>
           </form>
         </div>
