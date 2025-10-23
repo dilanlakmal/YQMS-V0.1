@@ -49,6 +49,7 @@ import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
+import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
 import QCWashingPage from "./pages/QCWashing.jsx";
 import PackingList from "./pages/PackingList.jsx";
 
@@ -432,6 +433,11 @@ function AppContent() {
               <Route
                 path="/anf-washing/style-full-report/:moNo"
                 element={<ANFStyleViewFullReport />}
+              />
+
+              <Route
+                path="/anf-washing/buyer-style-full-report/:moNo"
+                element={<ANFBuyerStyleViewFullReport />}
               />
 
               <Route

@@ -14,6 +14,7 @@ import ANFMeasurementInspectionForm from "../components/inspection/ANF_measureme
 import ANFMeasurementResults from "../components/inspection/ANF_measurement/ANFMeasurementResults";
 import ANFMeasurementQCDailyReport from "../components/inspection/ANF_measurement/ANFMeasurementQCDailyReport";
 import ANFMeasurementBuyerReportSize from "../components/inspection/ANF_measurement/ANFMeasurementBuyerReportSize";
+import ANFBuyerStyleView from "../components/inspection/ANF_measurement/ANFBuyerStyleView";
 
 // --- DYNAMICALLY IMPORT the component due to heavy content ---
 const ANFStyleView = lazy(() =>
@@ -97,6 +98,17 @@ const ANFMeasurement = () => {
         labelKey: "anfMeasurement.tabs.buyerReportSize",
         icon: <UserCheck size={18} />,
         component: <ANFMeasurementBuyerReportSize />
+      },
+      {
+        id: "buyer-style-view",
+        labelKey: "anfMeasurement.tabs.buyerstyleView",
+        icon: <FileBarChart size={18} />,
+        // --- WRAP the lazy component in Suspense ---
+        component: (
+          <Suspense fallback={<TabLoader />}>
+            <ANFBuyerStyleView />
+          </Suspense>
+        )
       },
       {
         id: "dashboard",
