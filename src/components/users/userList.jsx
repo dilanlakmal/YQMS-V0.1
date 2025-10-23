@@ -30,7 +30,7 @@ const UserList = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/users`);
+      const response = await axios.get(`${API_BASE_URL}/api/users-main`);
       setUsers(response.data);
       setFilteredUsers(response.data);
       setError(null); // Clear any previous errors
@@ -42,7 +42,7 @@ const UserList = () => {
 
   const fetchRoles = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/roles`); // Adjust the URL as needed
+      const response = await axios.get(`${API_BASE_URL}/api/role-management`); // Adjust the URL as needed
       setRoles(response.data);
     } catch (error) {
       if (error.response && error.response.status === 404) {
@@ -79,7 +79,7 @@ const UserList = () => {
 
   const handleDelete = async (id) => {
     try {
-      await axios.delete(`${API_BASE_URL}/users/${id}`);
+      await axios.delete(`${API_BASE_URL}/api/users/${id}`);
       fetchUsers();
       handleCloseDeleteModal();
     } catch (error) {
@@ -118,7 +118,10 @@ const UserList = () => {
 
   const handleUpdateUser = async (updatedUser) => {
     try {
-      await axios.put(`${API_BASE_URL}/users/${updatedUser._id}`, updatedUser);
+      await axios.put(
+        `${API_BASE_URL}/api/users/${updatedUser._id}`,
+        updatedUser
+      );
       fetchUsers();
       handleCloseModal();
     } catch (error) {
@@ -129,7 +132,7 @@ const UserList = () => {
 
   const handleCreateUser = async (newUser) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/users`, newUser);
+      const response = await axios.post(`${API_BASE_URL}/api/users`, newUser);
       setUsers([...users, response.data]);
       handleCloseCreateModal();
       return response;
@@ -216,12 +219,12 @@ const UserList = () => {
             </div>
           </div>
         </form>
-        <button
+        {/* <button
           onClick={handleAddUser}
           className="ml-4 p-2 w-40 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
           + Add User
-        </button>
+        </button> */}
       </div>
       {error && <div className="text-red-500 mb-4">{error}</div>}
       <div className="overflow-x-auto">
@@ -260,12 +263,12 @@ const UserList = () => {
                   >
                     Edit
                   </button>
-                  <button
+                  {/* <button
                     onClick={() => handleDeleteUser(user)}
                     className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
                   >
                     Delete
-                  </button>
+                  </button> */}
                 </td>
               </tr>
             ))}
@@ -347,21 +350,21 @@ const UserList = () => {
         roles={roles}
         onSubmit={handleUpdateUser}
       />
-      <CreateUserModal
+      {/* <CreateUserModal
         isOpen={isCreateModalOpen}
         onClose={handleCloseCreateModal}
         roles={roles}
         onSubmit={handleCreateUser}
         existingUserIds={existingUserIds}
-      />
-      {isDeleteModalOpen && selectedUser && (
+      /> */}
+      {/* {isDeleteModalOpen && selectedUser && (
         <DeleteUserModal
           isOpen={isDeleteModalOpen}
           onClose={handleCloseDeleteModal}
           user={selectedUser}
           onDelete={handleDelete}
         />
-      )}
+      )} */}
     </div>
   );
 };
