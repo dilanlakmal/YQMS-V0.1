@@ -506,3 +506,25 @@ export function escapeRegex(string) {
 }
 
 
+// Configure multer for roving pairing images
+const rovingImageStorage = multer.memoryStorage();
+export const uploadRovingImage = multer({
+  storage: rovingImageStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
+    }
+  }
+});
+
+// MODIFIED: Use memoryStorage to handle the file in memory for processing.
+const cuttingMemoryStorage = multer.memoryStorage();
+ export const cutting_upload = multer({
+  storage: cuttingMemoryStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
+});
+

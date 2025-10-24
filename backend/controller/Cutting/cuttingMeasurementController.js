@@ -1,6 +1,8 @@
 import {
-  CuttingMeasurementPoint,                
+  CuttingMeasurementPoint,
+  CuttingInspection,                
 } from "../MongoDB/dbConnectionController.js";
+import mongoose from "mongoose";
 
 /* ------------------------------
    Cutting Measurement Points
@@ -325,4 +327,141 @@ export const updateMeasurementPoint = async (req, res) => {
       error: error.message
     });
   }
+};
+
+// Get summarized measurement issues for a specific report
+export const getMeasurementIssues = async (req, res) => {
+  try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ message: "Invalid report ID format" });
+      }
+  
+      const measurementIssuesPipeline = [
+        // Step 1: Match the specific report document
+        { $match: { _id: new mongoose.Types.ObjectId(id) } },
+  
+        // Step 2: Deconstruct the nested arrays to get to individual measurements
+        { $unwind: "$inspectionData" },
+        { $unwind: "$inspectionData.bundleInspectionData" },
+        {
+          $unwind:
+            "$inspectionData.bundleInspectionData.measurementInsepctionData"
+        },
+        {
+          $unwind:
+            "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+        },
+        {
+          $unwind:
+            "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+        },
+        {
+          $unwind:
+            "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+        },
+  
+        // Step 3: Filter for only the measurements that have a status of "Fail"
+        {
+          $match: {
+            "inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status":
+              "Fail"
+          }
+        },
+  
+        // Step 4: Group the results by Inspected Size and Measurement Point Name
+        {
+          $group: {
+            _id: {
+              inspectedSize: "$inspectionData.inspectedSize",
+              measurementPointName:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+            },
+            // Create an array of all the failed values with their context
+            measuredValues: {
+              $push: {
+                value:
+                  "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+  
+                bundleNo: "$inspectionData.bundleInspectionData.bundleNo",
+                pcsName:
+                  "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.pcsName",
+                //partNo: "$inspectionData.bundleInspectionData.measurementInsepctionData.partNo",
+                valuedecimal:
+                  "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal"
+              }
+            }
+          }
+        },
+  
+        // Step 5: Reshape the data and calculate counts
+        {
+          $project: {
+            _id: 0,
+            inspectedSize: "$_id.inspectedSize",
+            measurementPointName: "$_id.measurementPointName",
+            measuredValues: 1,
+            totalCount: { $size: "$measuredValues" },
+            totalNegTol: {
+              $sum: {
+                $map: {
+                  input: "$measuredValues",
+                  as: "mv",
+                  in: { $cond: [{ $lt: ["$$mv.valuedecimal", 0] }, 1, 0] }
+                }
+              }
+            },
+            totalPosTol: {
+              $sum: {
+                $map: {
+                  input: "$measuredValues",
+                  as: "mv",
+                  in: { $cond: [{ $gt: ["$$mv.valuedecimal", 0] }, 1, 0] }
+                }
+              }
+            }
+          }
+        },
+        // Step 6: Sort the final results for consistent display
+        { $sort: { inspectedSize: 1, measurementPointName: 1 } }
+      ];
+  
+      const issues = await CuttingInspection.aggregate(measurementIssuesPipeline);
+      res.json(issues);
+    } catch (error) {
+      console.error("Error fetching measurement issues:", error);
+      res.status(500).json({
+        message: "Failed to fetch measurement issues",
+        error: error.message
+      });
+    }
+};
+
+// ** NEW: Endpoint to delete a measurement point by _id **
+export const deleteMeasurementPoint = async (req, res) => {
+  try {
+      const { id } = req.params;
+  
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res
+          .status(400)
+          .json({ message: "Invalid measurement point ID format." });
+      }
+  
+      const deletedPoint = await CuttingMeasurementPoint.findByIdAndDelete(id);
+  
+      if (!deletedPoint) {
+        return res.status(404).json({ message: "Measurement point not found." });
+      }
+  
+      res
+        .status(200)
+        .json({ message: "Measurement point deleted successfully." });
+    } catch (error) {
+      console.error("Error deleting measurement point:", error);
+      res.status(500).json({
+        message: "Failed to delete measurement point.",
+        error: error.message
+      });
+    }
 };

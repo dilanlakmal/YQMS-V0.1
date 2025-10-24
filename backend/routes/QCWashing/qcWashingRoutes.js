@@ -49,7 +49,6 @@ const router = express.Router();
 
 router.get('/storage/qc2_images/default-placeholder.png', getQCWashingDefaltImagePlaceholder);
 router.get('/api/image-proxy/:imageUrl(*)', getQCWashingImageProxy);
-// router.get('/api/image-proxy', getQCWashingImageProxy);
 router.get('/api/image-proxy-selected/:id', getQCWashingImgeSelected);
 router.get('/api/qc-washing/pdf/:id', getqcwashingPDF);
 router.get('/api/qc-washing/results', getqcwashingResult);

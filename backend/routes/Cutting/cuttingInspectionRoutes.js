@@ -11,7 +11,13 @@ import {
   getCuttingInspectionReportDetail,
   getCuttingInspectDetailRepo,
   getCuttingInspectMoNo,
-  getCuttingInspectFilterOptions
+  getCuttingInspectFilterOptions,
+  getCuttingInspectDetail,
+  getCuttingInspectDetailForManagee,
+  deleteCuttingInspection,
+  deleteCuttingInspectionSize,
+  updateCuttingInspectionGeneral,
+  updateCuttingInspectionFull,
 } from '../../controller/Cutting/cuttingInspectionController.js';
 
 const router = express.Router();
@@ -28,6 +34,11 @@ router.get('/api/cutting-inspection-report-detail/:id', getCuttingInspectionRepo
 router.get('/api/cutting-inspection-detailed-report', getCuttingInspectDetailRepo);
 router.get('/api/cutting-inspection-mo-nos', getCuttingInspectMoNo);
 router.get('/api/cutting-inspection-filter-options', getCuttingInspectFilterOptions);
-
+router.get('/api/cutting-inspection-full-details', getCuttingInspectDetail);
+router.get('/api/cutting-inspection-details-for-manage', getCuttingInspectDetailForManagee);
+router.delete('/api/cutting-inspection-record/:id', deleteCuttingInspection);
+router.delete('/api/cutting-inspection-record/:id/size/:inspectedSize', deleteCuttingInspectionSize);
+router.put('/api/cutting-inspection-general-update/:id', updateCuttingInspectionGeneral);
+router.put('/api/cutting-inspection-full-update/:id', updateCuttingInspectionFull);
 
 export default router;
