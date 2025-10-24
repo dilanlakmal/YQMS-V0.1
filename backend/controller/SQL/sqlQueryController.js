@@ -1,23 +1,15 @@
 import sql from "mssql"; // Import mssql for SQL Server connection
 import cron from "node-cron"; // Import node-cron for scheduling
+import {
+  InlineOrders,
+  CutPanelOrders,
+  QCWorkers,
+  DtOrder,
+  QC1Sunrise,
+  // CuttingInlineOrders
+} from "../MongoDB/dbConnectionController.js";
 
-let InlineOrders, CutPanelOrders, QCWorkers, DtOrder, QC1Sunrise;
 
-// Function to initialize models after they're imported
-const initializeModels = async () => {
-  try {
-    const models = await import("../../server.js");
-    InlineOrders = models.InlineOrders;
-    CutPanelOrders = models.CutPanelOrders;
-    QCWorkers = models.QCWorkers;
-    DtOrder = models.DtOrder;
-    QC1Sunrise = models.QC1Sunrise;
-    console.log("✅ Models initialized successfully");
-  } catch (error) {
-    console.error("❌ Failed to initialize models:", error);
-    throw error;
-  }
-};
 /* ------------------------------
    YM DataSore SQL
 ------------------------------ */
@@ -66,53 +58,34 @@ const sqlConfigYMCE = {
 };
 
 /* ------------------------------
-   YMWHSYS2 SQL Configuration
+   FC_SYSTEM & DTrade_CONN SQL Configuration (Consolidated)
 ------------------------------ */
 
-const sqlConfigYMWHSYS2 = {
+const sqlConfigFCSystem = {
   user: "user01",
   password: "Ur@12323",
   server: "192.167.1.14", //"YM-WHSYS",
-  database: "FC_SYSTEM",
+  // Database will be specified in the query
   options: {
     encrypt: false,
     trustServerCertificate: true
   },
-  requestTimeout: 18000000,
-  connectionTimeout: 18000000,
-  pool: { max: 10, min: 2, idleTimeoutMillis: 60000 }
-};
-
-/* ------------------------------
-   DTrade SQL Configuration
------------------------------- */
-
-const sqlConfigDTrade = {
-  user: "user01",
-  password: "Ur@12323",
-  server: "192.167.1.14",
-  database: "DTrade_CONN", // This should be DTrade_CONN, not FC_SYSTEM
-  options: {
-    encrypt: false,
-    trustServerCertificate: true
-  },
+  // Use the longer of the two timeouts to be safe
   requestTimeout: 21000000,
   connectionTimeout: 21000000,
-  pool: { max: 10, min: 1, idleTimeoutMillis: 60000 }
+  pool: { max: 10, min: 2, idleTimeoutMillis: 60000 }
 };
 
 // Create connection pools
 const poolYMDataStore = new sql.ConnectionPool(sqlConfig);
 const poolYMCE = new sql.ConnectionPool(sqlConfigYMCE);
-const poolYMWHSYS2 = new sql.ConnectionPool(sqlConfigYMWHSYS2);
-const poolDTrade = new sql.ConnectionPool(sqlConfigDTrade);
+const poolFCSystem = new sql.ConnectionPool(sqlConfigFCSystem);
 
 // MODIFICATION: Add a status tracker for SQL connections
 const sqlConnectionStatus = {
   YMDataStore: false,
   YMCE_SYSTEM: false,
-  YMWHSYS2: false,
-  DTrade_CONN: false 
+  FCSystem: false,
 };
 
 // Function to connect to a pool, now it updates the status tracker
@@ -208,8 +181,6 @@ async function dropConflictingIndex() {
 async function initializeServer() {
   console.log("--- Initializing Server ---");
 
-   await initializeModels();
-
   // 1. Handle MongoDB Index
   await dropConflictingIndex();
 
@@ -218,8 +189,7 @@ async function initializeServer() {
   const connectionPromises = [
     connectPool(poolYMDataStore, "YMDataStore"),
     connectPool(poolYMCE, "YMCE_SYSTEM"),
-    connectPool(poolYMWHSYS2, "YMWHSYS2"),
-    connectPool(poolDTrade, "DTrade_CONN")
+    connectPool(poolFCSystem, "FCSystem"),
   ];
 
   // Promise.allSettled will not short-circuit. It waits for all promises.
@@ -246,6 +216,7 @@ async function initializeServer() {
   await syncQC1SunriseData();
   await syncDTOrdersData();
   await syncQC1WorkerData();
+  // await syncCuttingInlineOrders(); // Fetch all historical data on initial startup
 
   console.log("--- Server Initialization Complete ---");
 }
@@ -855,14 +826,14 @@ export const getSunriseQC1Sync = async (req, res) => {
 };
 
 // Schedule daily sync at midnight
-cron.schedule("0 0 * * *", async () => {
-  console.log("Running daily QC1 Sunrise data sync...");
-  try {
-    await syncQC1SunriseData();
-  } catch (err) {
-    console.error("Error in daily QC1 Sunrise sync:", err);
-  }
-});
+// cron.schedule("0 0 * * *", async () => {
+//   console.log("Running daily QC1 Sunrise data sync...");
+//   try {
+//     await syncQC1SunriseData();
+//   } catch (err) {
+//     console.error("Error in daily QC1 Sunrise sync:", err);
+//   }
+// });
 
 /* ------------------------------
    Fetch inline data from SQL to ym_prod
@@ -1013,10 +984,10 @@ export const getInlineOrdersSync = async (req, res) => {
 };
 
 // Schedule the sync to run every day at 11 AM
-cron.schedule("0 11 * * *", async () => {
-  console.log("Running scheduled inline_orders sync at 11 AM...");
-  await syncInlineOrders();
-});
+// cron.schedule("0 11 * * *", async () => {
+//   console.log("Running scheduled inline_orders sync at 11 AM...");
+//   await syncInlineOrders();
+// });
 
 // Run the sync immediately on server start (optional, for testing)
 syncInlineOrders().then(() => {
@@ -1096,45 +1067,24 @@ async function syncCutPanelOrders() {
     return;
   }
 
-  // *** 3. THE TRY...FINALLY BLOCK TO ENSURE THE LOCK IS RELEASED ***
-  let retryCount = 0;
-  const maxRetries = 3;
-  
-  while (retryCount < maxRetries) {
-    try {
-      isCutPanelSyncRunning = true; // Set the lock
-      console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
-
-      if (!sqlConnectionStatus.YMWHSYS2) {
-        console.warn(
-          "[CutPanelOrders] Skipping sync: YMWHSYS2 database is not connected."
-        );
-        return; // The 'finally' block will still run to release the lock
-      }
-
-      try {
-        await ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2");
-      } catch (connErr) {
-        console.error("[CutPanelOrders] Failed to connect to FC_SYSTEM:", connErr.message);
-        return;
-      }
-
-      break; // Exit retry loop if successful
-    } catch (err) {
-      if (err.number === 1205 && retryCount < maxRetries - 1) {
-        retryCount++;
-        const delay = Math.random() * 1000 + 1000; // Random delay 1-2 seconds
-        console.log(`[CutPanelOrders] Deadlock detected. Retrying in ${delay}ms (attempt ${retryCount}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      throw err; // Re-throw if not a deadlock or max retries reached
-    }
-  }
-
   try {
-    // This is your query for a rolling 3-day update. This is perfect for the cron job.
-    const query = `
+    isCutPanelSyncRunning = true; // Set the lock
+    console.log("[CutPanelOrders] Starting sync at", new Date().toISOString());
+    
+    if (!sqlConnectionStatus.FCSystem) {
+      console.warn(
+        "[CutPanelOrders] Skipping sync: FCSystem database is not connected."
+      );
+      return;
+    }
+
+    let records = [];
+    const maxRetries = 3;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await ensurePoolConnected(poolFCSystem, "FCSystem");
+        const request = poolFCSystem.request();
+        const query = `
       DECLARE @StartDate DATE = CAST(DATEADD(DAY, -3, GETDATE()) AS DATE);
       -- The rest of your optimized SQL query...
       WITH
@@ -1177,10 +1127,22 @@ async function syncCutPanelOrders() {
       ORDER BY v.Create_Date DESC;
     `;
 
-    const result = await poolYMWHSYS2.request().query(query);
-    const records = result.recordset;
+        const result = await request.query(query);
+        records = result.recordset;
+        break; // Success, exit retry loop
+      } catch (err) {
+        if (err.number === 1205 && attempt < maxRetries) {
+          const delay = Math.random() * 1000 + 1500; // Random delay 1.5-2.5 seconds
+          console.warn(`[CutPanelOrders] Deadlock detected. Retrying in ${delay.toFixed(0)}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          throw err; // Re-throw if not a deadlock or max retries reached
+        }
+      }
+    }
 
     if (records.length > 0) {
+      console.log(`[CutPanelOrders] Fetched ${records.length} records from SQL Server.`);
       const bulkOps = records.map((row) => ({
         updateOne: {
           filter: { TxnNo: row.TxnNo },
@@ -1249,8 +1211,8 @@ async function syncCutPanelOrders() {
 }
 
 // Schedule the syncCutPanelOrders function to run every 5 minutes
-cron.schedule("*/5 * * * *", syncCutPanelOrders);
-console.log("Scheduled cutpanelorders sync with deadlock protection.");
+// cron.schedule("*/5 * * * *", syncCutPanelOrders);
+// console.log("Scheduled cutpanelorders sync with deadlock protection.");
 
 /* ------------------------------
    Manual Sync Endpoint & Server Start
@@ -1526,19 +1488,19 @@ async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date())
 //   });
 
 // Schedule to run every day at 11:00 PM
-cron.schedule("0 23 * * *", async () => {
-  const endDate = new Date();
-  const startDate = new Date();
-  startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
+// cron.schedule("0 23 * * *", async () => {
+//   const endDate = new Date();
+//   const startDate = new Date();
+//   startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
 
-  await syncQC1WorkerData(startDate, endDate)
-    .then(() => {
-      console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
-    })
-    .catch((err) => {
-      console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
-    });
-});
+//   await syncQC1WorkerData(startDate, endDate)
+//     .then(() => {
+//       console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
+//     })
+//     .catch((err) => {
+//       console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
+//     });
+// });
 
 
 // DT Orders Data Migration Function
@@ -1546,18 +1508,16 @@ async function syncDTOrdersData() {
   try {
     console.log("🔄 Starting DT Orders data migration...");
     
-    // Ensure DTrade connection
+    // Ensure FCSystem connection (which covers both DTrade and FC_SYSTEM)
      try {
       await Promise.all([
-        ensurePoolConnected(poolDTrade, "DTrade_CONN"),
-        ensurePoolConnected(poolYMWHSYS2, "YMWHSYS2")
+        ensurePoolConnected(poolFCSystem, "FCSystem")
       ]);
     } catch (connErr) {
       console.error("❌ Failed to establish required connections:", connErr.message);
       throw connErr;
     }
-    const request = poolDTrade.request();
-    const requestFC = poolYMWHSYS2.request();
+    const request = poolFCSystem.request();
 
     // 1. Fetch Order Headers WITH actual size names AND Order Colors and Shipping in one query
     // console.log("📊 Fetching order headers with size names and shipping data...");
@@ -1679,7 +1639,7 @@ async function syncDTOrdersData() {
       GROUP BY [BuyerStyle], [StyleNo], [ColorCode], [ChColor], [EngColor], [SIZE]
       ORDER BY [StyleNo], [ColorCode], [SIZE]
     `;
-    const cutQtyResult = await requestFC.query(cutQtyQuery);
+    const cutQtyResult = await request.query(cutQtyQuery);
 
     // Create size mapping from database for each order
     const orderSizeMapping = new Map();
@@ -2291,7 +2251,7 @@ export const syncDtOrders = async (req, res) => {
 //   });
 
 // Schedule to run every 15 minutes
-  cron.schedule("*/15 * * * *", async () => {
+  cron.schedule("0 */3 * * *", async () => {
    await syncDTOrdersData()
     .then((result) => {
       console.log("✅ DT Orders Data Sync completed ", result);
@@ -2301,12 +2261,361 @@ export const syncDtOrders = async (req, res) => {
     });
 });
 
+
+// /* ------------------------------
+//    Cutting Inline Orders Sync with MongoDB
+// ------------------------------ */
+
+// // Gatekeeper to prevent multiple syncs
+// let isCuttingInlineOrdersSyncRunning = false;
+
+// const convertToMarkerRatioArray = (record) => {
+//   const markerRatio = [];
+//   // Process sizes 1-10
+//   for (let i = 1; i <= 10; i++) {
+//     const size = record[`Size${i}`];
+//     const orderQty = record[`OrderQty${i}`];
+//     const cuttingRatio = record[`CuttingRatio${i}`];
+
+//     // Only add to array if size exists
+//     if (size) {
+//       markerRatio.push({
+//         no: i,
+//         size: size,
+//         ratio: cuttingRatio || 0,
+//         qty: orderQty || 0
+//       });
+//     }
+//   }
+//   return markerRatio;
+// };
+
+// /**
+//  * Synchronizes cutting inline orders from the SQL server to MongoDB.
+//  * @param {number | string} daysBack - The number of days of data to sync.
+//  * If a non-numeric value (like 'all') is passed, it defaults to a very large number to sync all historical data.
+//  * Defaults to 2 days if not provided.
+//  */
+// async function syncCuttingInlineOrders(daysBack = 2) {
+//   // Gatekeeper check
+//   if (isCuttingInlineOrdersSyncRunning) {
+//     console.log("[CuttingInlineOrders] Sync is already in progress. Skipping this run.");
+//     return;
+//   }
+
+//   const maxRetries = 3;
+//   let attempt = 0;
+//   let records = [];
+
+//   // Safeguard: Ensure daysBack is a valid number for the SQL query.
+//   // If 'all' or another non-numeric string is passed, use a large number to fetch all data.
+//   let effectiveDaysBack;
+//   if (daysBack === 'all') {
+//     effectiveDaysBack = 9999; // A large number to signify all data
+//     console.log(`[CuttingInlineOrders] Fetching all historical data as requested.`);
+//   } else {
+//     effectiveDaysBack = !isNaN(parseInt(daysBack)) ? parseInt(daysBack) : 2; // Default to 2 days on invalid input
+//   }
+
+//   try {
+//     isCuttingInlineOrdersSyncRunning = true;
+//     console.log("[CuttingInlineOrders] Starting sync at", new Date().toISOString());
+
+//     // FIX 1: Check connection status *before* attempting to query.
+//     if (!sqlConnectionStatus.FCSystem) {
+//       console.warn(
+//         "[CuttingInlineOrders] Skipping sync: FCSystem database is not connected."
+//       );
+//       isCuttingInlineOrdersSyncRunning = false; // Release the lock
+//       return;
+//     }
+
+//     while (attempt < maxRetries) {
+//       try {
+//         // Ensure connection before each attempt
+//         await ensurePoolConnected(poolFCSystem, "FCSystem");
+//         const request = poolFCSystem.request();
+
+//         const query = `
+//            DECLARE @StartDate DATE = CAST(DATEADD(DAY, -${effectiveDaysBack}, GETDATE()) AS DATE);
+
+//           -- ================================================
+//           -- Optimized Spreading and Order Data Report
+//           -- ================================================
+
+//           WITH 
+//           -- ------------------------------------------------
+//           -- 1. Lot Data: Combine all Lot numbers by Style + Table
+//           -- ------------------------------------------------
+//           LotData AS (
+//               SELECT 
+//                   v.Style,
+//                   v.TableNo,
+//                   STUFF((
+//                       SELECT DISTINCT ', ' + v_inner.Lot
+//                       FROM [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v_inner
+//                       WHERE 
+//                           v_inner.Style = v.Style 
+//                           AND v_inner.TableNo = v.TableNo
+//                           AND v_inner.Lot IS NOT NULL 
+//                           AND v_inner.Lot <> ''
+//                       FOR XML PATH(''), TYPE
+//                   ).value('.', 'NVARCHAR(MAX)'), 1, 2, '') AS LotNos
+//               FROM 
+//                   [FC_SYSTEM].[dbo].[ViewSpreading_ForQC] AS v
+//                   INNER JOIN [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS inv_filter 
+//                       ON v.TxnNo = inv_filter.TxnNo
+//               WHERE 
+//                   v.Lot IS NOT NULL 
+//                   AND v.Lot <> '' 
+//                   AND inv_filter.Create_Date >= @StartDate
+//               GROUP BY 
+//                   v.Style, v.TableNo
+//           ),
+
+//           -- ------------------------------------------------
+//           -- 2. Order Data: Aggregate Order Quantities by Style + Color
+//           -- ------------------------------------------------
+//           OrderData AS (
+//               SELECT 
+//                   Style,
+//                   EngColor,
+//                   Size1, Size2, Size3, Size4, Size5, 
+//                   Size6, Size7, Size8, Size9, Size10,
+//                   OrderQty1, OrderQty2, OrderQty3, OrderQty4, OrderQty5,
+//                   OrderQty6, OrderQty7, OrderQty8, OrderQty9, OrderQty10,
+//                   TotalOrderQty,
+//                   SUM(TotalOrderQty) OVER (PARTITION BY Style) AS TotalOrderQtyStyle
+//               FROM (
+//                   SELECT 
+//                       o.Style,
+//                       o.EngColor,
+//                       MAX(o.Size1) AS Size1,
+//                       MAX(o.Size2) AS Size2,
+//                       MAX(o.Size3) AS Size3,
+//                       MAX(o.Size4) AS Size4,
+//                       MAX(o.Size5) AS Size5,
+//                       MAX(o.Size6) AS Size6,
+//                       MAX(o.Size7) AS Size7,
+//                       MAX(o.Size8) AS Size8,
+//                       MAX(o.Size9) AS Size9,
+//                       MAX(o.Size10) AS Size10,
+//                       SUM(ISNULL(o.Qty1, 0)) AS OrderQty1,
+//                       SUM(ISNULL(o.Qty2, 0)) AS OrderQty2,
+//                       SUM(ISNULL(o.Qty3, 0)) AS OrderQty3,
+//                       SUM(ISNULL(o.Qty4, 0)) AS OrderQty4,
+//                       SUM(ISNULL(o.Qty5, 0)) AS OrderQty5,
+//                       SUM(ISNULL(o.Qty6, 0)) AS OrderQty6,
+//                       SUM(ISNULL(o.Qty7, 0)) AS OrderQty7,
+//                       SUM(ISNULL(o.Qty8, 0)) AS OrderQty8,
+//                       SUM(ISNULL(o.Qty9, 0)) AS OrderQty9,
+//                       SUM(ISNULL(o.Qty10, 0)) AS OrderQty10,
+//                       SUM(ISNULL(o.Total, 0)) AS TotalOrderQty
+//                   FROM 
+//                       [FC_SYSTEM].[dbo].[ViewOrderQty] AS o
+//                   WHERE 
+//                       EXISTS (
+//                           SELECT 1 
+//                           FROM [FC_SYSTEM].[dbo].[ViewSpreading_Inv] vi 
+//                           WHERE 
+//                               vi.Style = o.Style 
+//                               AND vi.EngColor = o.EngColor 
+//                               AND vi.Create_Date >= @StartDate
+//                       )
+//                   GROUP BY 
+//                       o.Style, o.EngColor
+//               ) AS OrderColorAggregates
+//           )
+
+//           -- ------------------------------------------------
+//           -- 3. Main Query: Combine Spreading, Lot, and Order Data
+//           -- ------------------------------------------------
+//           SELECT
+//               v.SPBarcode AS Barcode, 
+//               v.Style AS StyleNo,
+//               v.Create_Date AS TxnDate,
+//               v.TxnNo,
+//               CASE WHEN v.Buyer = 'ABC' THEN 'ANF' ELSE v.Buyer END AS Buyer,
+//               v.BuyerStyle,
+//               v.EngColor AS Color,
+//               v.ChnColor,
+//               v.ColorNo AS ColorCode,
+//               v.Fabric_Type AS FabricType,
+//               v.Material,
+//               CASE 
+//                   WHEN PATINDEX('%[_ ]%', v.PreparedBy) > 0 
+//                       THEN LTRIM(SUBSTRING(v.PreparedBy, PATINDEX('%[_ ]%', v.PreparedBy) + 1, LEN(v.PreparedBy)))
+//                   ELSE v.PreparedBy 
+//               END AS SpreadTable,
+//               v.TableNo,
+//               v.RollQty,
+//               ROUND(v.SpreadYds, 3) AS SpreadYds,
+//               v.Unit,
+//               ROUND(v.GrossKgs, 3) AS GrossKgs,
+//               ROUND(v.NetKgs, 3) AS NetKgs,
+//               ROUND(v.PlanLayer,0) AS PlanLayer,
+//               v.ActualLayer,
+//               CAST(
+//                   ISNULL(v.PlanLayer, 0) * (
+//                       ISNULL(v.Ratio1, 0) + ISNULL(v.Ratio2, 0) + ISNULL(v.Ratio3, 0) + 
+//                       ISNULL(v.Ratio4, 0) + ISNULL(v.Ratio5, 0) + ISNULL(v.Ratio6, 0) + 
+//                       ISNULL(v.Ratio7, 0) + ISNULL(v.Ratio8, 0) + ISNULL(v.Ratio9, 0) + 
+//                       ISNULL(v.Ratio10, 0)
+//                   ) AS INT
+//               ) AS TotalPcs,
+//               v.Pattern AS MackerNo,
+//               ROUND(v.MarkerLength, 3) AS MackerLength,
+//               v.Edit_Width AS MackerWidth,
+//               v.Relax_SetTime AS Standard_Relax_Time,
+//               ld.LotNos,
+//               od.OrderQty1, od.OrderQty2, od.OrderQty3, od.OrderQty4, od.OrderQty5,
+//               od.OrderQty6, od.OrderQty7, od.OrderQty8, od.OrderQty9, od.OrderQty10,
+//               od.TotalOrderQty,
+//               od.TotalOrderQtyStyle,
+//               v.Ratio1 AS CuttingRatio1, v.Ratio2 AS CuttingRatio2, v.Ratio3 AS CuttingRatio3,
+//               v.Ratio4 AS CuttingRatio4, v.Ratio5 AS CuttingRatio5, v.Ratio6 AS CuttingRatio6,
+//               v.Ratio7 AS CuttingRatio7, v.Ratio8 AS CuttingRatio8, v.Ratio9 AS CuttingRatio9,
+//               v.Ratio10 AS CuttingRatio10,
+//               v.Size1, v.Size2, v.Size3, v.Size4, v.Size5, v.Size6, v.Size7, v.Size8, v.Size9, v.Size10
+//           FROM 
+//               [FC_SYSTEM].[dbo].[ViewSpreading_Inv] AS v
+//               LEFT JOIN LotData AS ld 
+//                   ON v.Style = ld.Style 
+//                   AND v.TableNo = ld.TableNo
+//               LEFT JOIN OrderData AS od 
+//                   ON v.Style = od.Style 
+//                   AND v.EngColor = od.EngColor
+//           WHERE 
+//               v.Create_Date >= @StartDate
+//               AND v.Fabric_Type = 'A'
+//           ORDER BY 
+//               v.Create_Date DESC;
+//         `;
+
+//         const result = await request.query(query);
+//         records = result.recordset;
+//         break; // If successful, break out of the retry loop
+
+//       } catch (err) {
+//         attempt++;
+//         if (err.number === 1205 && attempt < maxRetries) {
+//           const delay = Math.random() * 1000 + 1000; // Random delay 1-2 seconds
+//           console.warn(`[CuttingInlineOrders] Deadlock detected. Retrying in ${delay.toFixed(0)}ms (attempt ${attempt}/${maxRetries})`);
+//           await new Promise(resolve => setTimeout(resolve, delay));
+//         } else {
+//           // If it's not a deadlock or we've run out of retries, throw the error
+//           throw err;
+//         }
+//       }
+//     }
+
+//     console.log(`[CuttingInlineOrders] Fetched ${records.length} records from SQL Server`);
+
+//     if (records.length === 0) {
+//       console.log("[CuttingInlineOrders] No records to process");
+//       return;
+//     }
+
+//     // *** OPTIMIZATION: Use bulkWrite instead of one-by-one updates ***
+//     const bulkOps = records.map(record => {
+//       const markerRatio = convertToMarkerRatioArray(record);
+
+//       const updateData = {
+//         barcode: record.Barcode,
+//         styleNo: record.StyleNo,
+//         txnDate: record.TxnDate,
+//         txnNo: record.TxnNo,
+//         buyer: record.Buyer,
+//         buyerStyle: record.BuyerStyle,
+//         color: record.Color,
+//         chnColor: record.ChnColor,
+//         colorCode: record.ColorCode,
+//         fabricType: record.FabricType,
+//         material: record.Material,
+//         spreadTable: record.SpreadTable,
+//         tableNo: record.TableNo,
+//         rollQty: record.RollQty,
+//         spreadYds: record.SpreadYds,
+//         unit: record.Unit,
+//         grossKgs: record.GrossKgs,
+//         netKgs: record.NetKgs,
+//         planLayer: record.PlanLayer,
+//         actualLayer: record.ActualLayer,
+//         totalPcs: record.TotalPcs,
+//         mackerNo: record.MackerNo,
+//         mackerLength: record.MackerLength,
+//         mackerWidth: record.MackerWidth,
+//         standardRelaxTime: record.Standard_Relax_Time,
+//         lotNos: record.LotNos,
+//         totalOrderQty: record.TotalOrderQty,
+//         totalOrderQtyStyle: record.TotalOrderQtyStyle,
+//         markerRatio: markerRatio // Single array with all size data
+//       };
+
+//       return {
+//         updateOne: {
+//           filter: { barcode: record.Barcode },
+//           update: { $set: updateData },
+//           upsert: true
+//         }
+//       };
+//     });
+
+//     if (bulkOps.length > 0) {
+//       // FIX 2: Added 'await' to ensure the database operation completes.
+//       const bulkResult = await CuttingInlineOrders.bulkWrite(bulkOps); 
+//       console.log(`[CuttingInlineOrders] MongoDB bulkWrite result: Matched: ${bulkResult.matchedCount}, Upserted: ${bulkResult.upsertedCount}, Modified: ${bulkResult.modifiedCount}`);
+//       return { total: records.length, saved: bulkResult.upsertedCount, updated: bulkResult.modifiedCount };
+//     } else {
+//       console.log("[CuttingInlineOrders] No operations to perform in bulkWrite.");
+//       return { total: 0, saved: 0, updated: 0 };
+//     }
+
+//   } catch (error) {
+//     console.error("[CuttingInlineOrders] Error during sync:", error);
+//     throw error;
+//   } finally {
+//     isCuttingInlineOrdersSyncRunning = false;
+//   }
+// }
+
+// // Manual sync endpoint for Cutting Inline Orders
+// // api/sync-cutting-inline-orders
+// export const syncCuttingInlineOrdersData = async (req, res) => {
+//   try {
+//     const result = await syncCuttingInlineOrders();
+//     res.json({
+//       success: true,
+//       message: "Cutting Inline Orders sync completed successfully",
+//       data: result
+//     });
+//   } catch (error) {
+//     console.error("Cutting Inline Orders sync API error:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Cutting Inline Orders sync failed",
+//       error: error.message
+//     });
+//   }
+// };
+
+// cron.schedule("*/10 * * * *", async () => {
+//   console.log("Running scheduled Cutting Inline Orders sync...");
+//   try {
+//     await syncCuttingInlineOrders(2); // Sync only the last 2 days for regular scheduled runs.
+//   } catch (error) {
+//     console.error("Error in scheduled Cutting Inline Orders sync:", error);
+//   }
+// });
+
+// console.log("Scheduled Cutting Inline Orders sync every 4 minutes.");
+
 export async function closeSQLPools() {
     try {
         await Promise.all([
             poolYMDataStore.close(),
             poolYMCE.close(),
-            poolYMWHSYS2.close()
+            poolFCSystem.close()
         ]);
         console.log("SQL connection pools closed.");
     } catch (err) {

@@ -6,7 +6,8 @@ import {
   getInlineOrdersSync,
   getYMCESystemData,
   cutpanelOrdersSync,
-  syncDtOrders
+  syncDtOrders,
+  syncCuttingInlineOrdersData
 } from '../../controller/SQL/sqlQueryController.js';
 
 const router = express.Router();
@@ -18,5 +19,6 @@ router.get("/api/sync-inline-orders", getInlineOrdersSync);
 router.get("/api/ymce-system-data", getYMCESystemData);
 router.post("/api/sync-cutpanel-orders", cutpanelOrdersSync);
 router.get("/api/sync-dt-orders", syncDtOrders);
+router.get("/api/sync-cutting-inline-orders", syncCuttingInlineOrdersData);
 
 export default router;

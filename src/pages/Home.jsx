@@ -169,6 +169,13 @@ function Home() {
             title: t("home.qcWashing"),
             description: "Washing Report"
           },
+           {
+            path: "/qcWashing",
+            roles: ["QC Washing"],
+            image: "assets/Home/measurement.png",
+            title: t("home.Measurement"),
+            description: "Washing Report"
+          },
           {
             path: "/upload-beforewash-specs",
             roles: ["Washing Clerk"],

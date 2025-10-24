@@ -23,8 +23,6 @@ const AQLChart = () => {
             withCredentials: true
           }
         );
-        console.log("AQL Mappings:", mappingResponse.data);
-        console.log("Sample Size Code Letters:", codeLettersResponse.data);
         setAqlMappings(mappingResponse.data);
         setSampleSizeCodeLetters(codeLettersResponse.data);
         setLoading(false);
