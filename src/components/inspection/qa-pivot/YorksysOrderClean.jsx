@@ -25,6 +25,76 @@ const getBuyerFromMoNumber = (moNo) => {
   return "Other";
 };
 
+// ============================================================
+// 🆕 NEW FUNCTION: Extract Country Code from SKU
+// ============================================================
+/**
+ * Extracts the country code from SKU number.
+ * Example: "SJCC 02-01-46880-FA25(AG1996)-ARP2338-64389-62-CAN" -> "CAN"
+ * @param {string} sku - The SKU number string
+ * @returns {string} The country code
+ */
+const extractCountryFromSku = (sku) => {
+  if (!sku) return "N/A";
+  const parts = sku.split("-");
+  // Get the last part after the last hyphen
+  const country = parts[parts.length - 1]?.trim() || "N/A";
+  return country;
+};
+// ============================================================
+
+/**
+ * Parses SKU description to extract fabric content and product name.
+ * Example: "MEN'S 60% COTTON 40% COOLMAX LACOSTA KNITTED T-SHIRT"
+ * Returns: {
+ *   fabricContent: "COTTON: 60%, COOLMAX: 40%",
+ *   product: "MEN'S LACOSTA KNITTED T-SHIRT"
+ * }
+ * @param {string} description - The SKU description string
+ * @returns {Object} Object containing fabricContent and product
+ */
+const parseSkuDescription = (description) => {
+  if (!description) return { fabricContent: "N/A", product: "N/A" };
+
+  // STEP 1: Normalize the description by adding space after % if missing
+  // This handles cases like "70%COTTON" -> "70% COTTON"
+  let normalizedDescription = description.replace(/(\d+)%([A-Z])/g, "$1% $2");
+
+  // Updated regex to capture optional prefix word before fabric keyword
+  // Matches patterns like "70% COTTON" or "70% RECYCLE POLYESTER"
+  // The fabric keywords list: COTTON, POLYESTER, SPANDEX, NYLON, VISCOSE, WOOL
+  const percentagePattern =
+    /(\d+)%\s+((?:[A-Z]+\s+)?(?:COTTON|POLYESTER|SPANDEX|NYLON|VISCOSE|WOOL))/gi;
+
+  let fabricParts = [];
+  let match;
+
+  // Extract all fabric content (percentage + fabric type including multi-word names)
+  while ((match = percentagePattern.exec(normalizedDescription)) !== null) {
+    const percentage = match[1];
+    const fabricType = match[2].trim();
+    fabricParts.push(`${fabricType}: ${percentage}%`);
+  }
+
+  // Remove fabric content from description to get product name
+  let product = normalizedDescription
+    .replace(
+      /\d+%\s+(?:[A-Z]+\s+)?(?:COTTON|POLYESTER|SPANDEX|NYLON|VISCOSE|WOOL)/gi,
+      ""
+    )
+    .trim();
+
+  // Clean up multiple spaces that may result from removal
+  product = product.replace(/\s+/g, " ");
+
+  const fabricContent = fabricParts.length > 0 ? fabricParts.join(", ") : "N/A";
+
+  return {
+    fabricContent,
+    product: product || "N/A",
+  };
+};
+
 /** HELPER 1: Formats a JavaScript Date object into 'M/D/YYYY'. */
 const formatJSDate = (date) => {
   if (date instanceof Date && !isNaN(date.getTime())) {
@@ -67,7 +137,13 @@ export const cleanYorksysOrderData = (data) => {
   const moNo = summaryRow["PO #"] || "N/A";
   const buyer = getBuyerFromMoNumber(moNo);
 
-  // --- Create the detailed data list ---
+  // Parse SKU Description into Fabric Content and Product
+  const skuDescription = summaryRow["SKU DESCRIPTION"] || "N/A";
+  const { fabricContent, product } = parseSkuDescription(skuDescription);
+
+  // ============================================================
+  // 🆕 MODIFIED: Add country extraction to skuDetails
+  // ============================================================
   const skuDetails = data
     .map((row) => {
       const rawColor = row["COLOR"] || "";
@@ -75,17 +151,21 @@ export const cleanYorksysOrderData = (data) => {
         ? rawColor.split("[")[0].trim()
         : rawColor.trim();
       const poLine = row["PO LINE ATTRIBUTE # 1"];
+      const sku = row["SKU #"] || "";
+      const country = extractCountryFromSku(sku); // 🆕 Extract country from SKU
 
       return {
-        sku: row["SKU #"] || "",
+        sku: sku,
         etd: formatJSDate(row["ETD"]),
         eta: convertExcelSerialDate(row["ETA"]),
         poLine: poLine === "TBA" ? "" : poLine || "",
         color: color,
-        qty: Number(row["QUANTITY"]) || 0
+        qty: Number(row["QUANTITY"]) || 0,
+        country: country, // 🆕 Add country field
       };
     })
     .filter((detail) => detail.sku);
+  // ============================================================
 
   // --- Aggregate data for the comprehensive PO Summary ---
   const orderSummary = {
@@ -94,7 +174,7 @@ export const cleanYorksysOrderData = (data) => {
     etaDates: [],
     uniqueColors: new Set(),
     uniquePoLines: new Set(),
-    totalQty: 0
+    totalQty: 0,
   };
 
   for (const row of data) {
@@ -141,22 +221,69 @@ export const cleanYorksysOrderData = (data) => {
       etaPeriod: getPeriodString(orderSummary.etaDates),
       totalColors: orderSummary.uniqueColors.size,
       totalPoLines: orderSummary.uniquePoLines.size,
-      totalQty: orderSummary.totalQty
-    }
+      totalQty: orderSummary.totalQty,
+    },
   ];
 
-  // --- Return all data, now including the Buyer ---
+  // ============================================================
+  // 🆕 NEW: Aggregate Order Qty by Country
+  // ============================================================
+  const countryMap = new Map();
+
+  skuDetails.forEach((detail) => {
+    const { country, color, qty } = detail;
+
+    if (!countryMap.has(country)) {
+      countryMap.set(country, {
+        countryId: country,
+        totalQty: 0,
+        colorQtyMap: new Map(), // Map to store color -> qty
+      });
+    }
+
+    const countryData = countryMap.get(country);
+    countryData.totalQty += qty;
+
+    // Aggregate qty by color
+    if (countryData.colorQtyMap.has(color)) {
+      countryData.colorQtyMap.set(
+        color,
+        countryData.colorQtyMap.get(color) + qty
+      );
+    } else {
+      countryData.colorQtyMap.set(color, qty);
+    }
+  });
+
+  // Convert Map to Array and format color quantities
+  const orderQtyByCountry = Array.from(countryMap.values()).map((country) => {
+    // Format color quantities as "Color: Qty, Color: Qty"
+    const qtyByColor = Array.from(country.colorQtyMap.entries())
+      .map(([color, qty]) => `${color}: ${qty.toLocaleString()}`)
+      .join(", ");
+
+    return {
+      countryId: country.countryId,
+      totalQty: country.totalQty,
+      qtyByColor: qtyByColor || "N/A",
+    };
+  });
+  // ============================================================
+
   return {
-    buyer: buyer, // Add the determined buyer
+    buyer: buyer,
     factory: summaryRow["SUPPLIER/COMPANY"] || "N/A",
     moNo: moNo,
     season: summaryRow["SEASON"] || "N/A",
     style: summaryRow["STYLE"] || "N/A",
-    skuDescription: summaryRow["SKU DESCRIPTION"] || "N/A",
+    skuDescription: skuDescription,
+    fabricContent: fabricContent,
+    product: product,
     destination: summaryRow["DESTINATION"] || "N/A",
     shipMode: summaryRow["SHIP MODE"] || "N/A",
     currency: summaryRow["CURRENCY"] || "N/A",
     skuDetails,
-    poSummary
+    poSummary,
+    orderQtyByCountry, // 🆕 NEW: Add country aggregation data
   };
 };

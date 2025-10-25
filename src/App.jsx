@@ -50,7 +50,8 @@ import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
 import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
-
+import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
+import PackingList from "./pages/PackingList.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -78,6 +79,7 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
+import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -435,6 +437,11 @@ function AppContent() {
               />
 
               <Route
+                path="/anf-washing/buyer-style-full-report/:moNo"
+                element={<ANFBuyerStyleViewFullReport />}
+              />
+
+              <Route
                 path="/anf-washing-ver2"
                 element={<ANFMeasurementVer2 />}
               />
@@ -445,8 +452,17 @@ function AppContent() {
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
               <Route path="/sub-con-qc1" element={<SubConQC />} />
+              <Route
+                path="/subcon-qa-inspection/view-report/:reportId"
+                element={<SubConQADataFullReport />}
+              />
+
               <Route path="/qc2-upload-data" element={<QC2UploadData />} />
-              <Route path="/qc2-washing-upload" element={<QC2WashingUpload />} />
+              <Route
+                path="/qc2-washing-upload"
+                element={<QC2WashingUpload />}
+              />
+              <Route path="/packing-list" element={<PackingList />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

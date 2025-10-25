@@ -4,7 +4,7 @@ import {
   StyleSheet,
   Text,
   View,
-  pdf,
+  pdf
 } from "@react-pdf/renderer";
 import { saveAs } from "file-saver";
 import React from "react";
@@ -13,36 +13,36 @@ import Swal from 'sweetalert2';
 const styles = StyleSheet.create({
   page: {
     padding: 30,
-    backgroundColor: "white",
+    backgroundColor: "white"
   },
   companyName: {
     fontSize: 20,
     fontWeight: "bold",
     marginBottom: 20,
-    textAlign: "center",
+    textAlign: "center"
   },
   reportName: {
     fontSize: 16,
     fontWeight: "bold",
     marginBottom: 20,
-    textAlign: "center",
+    textAlign: "center"
   },
   table: {
     display: "table",
     width: "auto",
     marginTop: 10,
-    borderStyle: "solid",
+    borderStyle: "solid"
   },
   tableRow: {
     flexDirection: "row",
     borderBottomWidth: 1,
     borderBottomColor: "#000",
     minHeight: 25,
-    alignItems: "center",
+    alignItems: "center"
   },
   tableHeader: {
     backgroundColor: "#E6F3FF",
-    fontWeight: "bold",
+    fontWeight: "bold"
   },
   tableCell: {
     width: "10%",
@@ -50,8 +50,8 @@ const styles = StyleSheet.create({
     fontSize: 8,
     borderRightWidth: 1,
     borderRightColor: "#000",
-    textAlign: "left",
-  },
+    textAlign: "left"
+  }
 });
 
 function PDFDocument({ data, filters }) {
@@ -76,7 +76,7 @@ function PDFDocument({ data, filters }) {
               "Color",
               "Size",
               "Buyer",
-              "Bundle ID",
+              "Bundle ID"
             ].map((header, i) => (
               <Text key={i} style={styles.tableCell}>
                 {header}

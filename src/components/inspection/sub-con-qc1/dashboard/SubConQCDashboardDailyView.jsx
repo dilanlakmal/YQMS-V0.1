@@ -862,8 +862,8 @@ const SubConQCDashboardDailyView = () => {
                     const colorClass = getRateColorClass(defectRateOverall);
                     const qaReport = report.qaReport;
                     const qaDefectRate =
-                      qaReport && qaReport.sampleSize > 0
-                        ? (qaReport.totalDefectQty / qaReport.sampleSize) * 100
+                      qaReport && qaReport.checkedQty > 0
+                        ? (qaReport.totalDefectQty / qaReport.checkedQty) * 100
                         : 0;
                     const hasImages = qaReport?.defectList?.some(
                       (d) => d.images && d.images.length > 0
@@ -922,7 +922,7 @@ const SubConQCDashboardDailyView = () => {
                           )}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          {qaReport?.sampleSize || ""}
+                          {qaReport?.checkedQty || ""}
                         </td>
                         <td className="px-3 py-2 text-center">
                           {qaReport?.totalDefectQty || ""}
@@ -962,8 +962,8 @@ const SubConQCDashboardDailyView = () => {
                                 .map((defect) => {
                                   // 2. Calculate rate for each specific defect
                                   const defectSpecificRate =
-                                    qaReport.sampleSize > 0
-                                      ? (defect.qty / qaReport.sampleSize) * 100
+                                    qaReport.checkedQty > 0
+                                      ? (defect.qty / qaReport.checkedQty) * 100
                                       : 0;
                                   return (
                                     // 3. Render each defect in its own div

@@ -78,7 +78,7 @@ const ToggleButton = ({ label, value, activeValue, onClick }) => (
   </button>
 );
 
-// --- Modal component for displaying QA Inspector's Information ---
+// --- 👈 NEW: Modal component for displaying QA Inspector's Information ---
 const QAUserModal = ({ user, isLoading, onClose }) => {
   if (!user && !isLoading) return null;
 
@@ -125,7 +125,7 @@ const QAUserModal = ({ user, isLoading, onClose }) => {
   );
 };
 
-// --- Modal component for displaying defect images ---
+// --- 👈 NEW: Modal component for displaying defect images ---
 const QAImageModal = ({ data, onClose }) => {
   if (!data) return null;
 
@@ -750,8 +750,8 @@ const SubConQCReport = () => {
                     (d) => d.images && d.images.length > 0
                   );
                   const qaDefectRate =
-                    qaReport && qaReport.sampleSize > 0
-                      ? (qaReport.totalDefectQty / qaReport.sampleSize) * 100
+                    qaReport && qaReport.checkedQty > 0
+                      ? (qaReport.totalDefectQty / qaReport.checkedQty) * 100
                       : 0;
 
                   return (
@@ -792,7 +792,7 @@ const SubConQCReport = () => {
 
                       {/* --- 👈 NEW: New data columns rendered here --- */}
                       <td className="px-4 py-2 text-center border-l">
-                        {qaReport ? qaReport.sampleSize : ""}
+                        {qaReport ? qaReport.checkedQty : ""}
                       </td>
                       <td className="px-4 py-2 text-center border-l">
                         {qaReport ? qaReport.totalDefectQty : ""}

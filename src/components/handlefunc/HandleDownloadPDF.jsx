@@ -10,7 +10,7 @@ const HandleDownloadPDF = ({
   goodOutput,
   defectPieces,
   language,
-  defectsList, // Add defectsList as a prop
+  defectsList // Add defectsList as a prop
 }) => {
   const handleDownloadPDF = async () => {
     try {
@@ -24,7 +24,7 @@ const HandleDownloadPDF = ({
           rate:
             checkedQuantity > 0
               ? ((count / checkedQuantity) * 100).toFixed(2)
-              : "0.00",
+              : "0.00"
         }))
         .sort((a, b) => b.count - a.count);
 
@@ -162,7 +162,7 @@ const HandleDownloadPDF = ({
         filename: "inspection-report.pdf",
         image: { type: "jpeg", quality: 0.98 },
         html2canvas: { scale: 2 },
-        jsPDF: { unit: "in", format: "letter", orientation: "portrait" },
+        jsPDF: { unit: "in", format: "letter", orientation: "portrait" }
       };
 
       await html2pdf().set(opt).from(element).save();

@@ -3,6 +3,100 @@ import axios from "axios";
 
 import multer from "multer";
 import path from "path";
+import { Server } from "socket.io"; // Import Socket.io
+import { fileURLToPath } from "url";
+import createIroningModel from "./models/Ironing.js";
+//import createRoleModel from "./models/Role.js";
+import createRoleManagmentModel from "./models/RoleManagment.js";
+import createOPAModel from "./models/OPA.js";
+import createPackingModel from "./models/Packing.js";
+import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
+import createUserModel from "./models/User.js";
+import createWashingModel from "./models/Washing.js";
+import createQCDataModel from "./models/qc1_data.js";
+import createQc2OrderDataModel from "./models/qc2_orderdata.js";
+import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
+import createQC2ReworksModel from "./models/qc2_rework.js";
+import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
+import createSubconFactoryModel from "./models/SubconFactory.js";
+import createQC2DefectsModel from "./models/QC2DefectsModel.js";
+import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
+import createQC2BGradeModel from "./models/QC2BGrade.js";
+import createQC2TaskModel from "./models/QC2Task.js";
+import createIEWorkerTaskModel from "./models/IEWorkerTask.js";
+
+import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
+import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
+import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
+import createPairingDefectModel from "./models/PairingDefect.js";
+import createAccessoryIssueModel from "./models/AccessoryIssue.js";
+import createQCRovingPairingModel from "./models/QCRovingPairing.js";
+import createSewingDefectsModel from "./models/SewingDefects.js";
+
+import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
+import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
+import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
+import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
+import createCuttingIssueModel from "./models/CuttingIssues.js";
+import createAQLChartModel from "./models/AQLChart.js";
+
+import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
+
+import createHTFirstOutputModel from "./models/HTFirstOutput.js";
+import createFUFirstOutputModel from "./models/FUFirstOutput.js";
+import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
+import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
+import createDailyTestingFUQCModel from "./models/DailyTestingFUQCModel.js";
+import createSCCDefectModel from "./models/SCCDefectModel.js";
+import createSCCScratchDefectModel from "./models/SCCScratchDefectModel.js";
+import createHTInspectionReportModel from "./models/HTInspectionReportModel.js";
+import createElasticReportModel from "./models/ElasticReport.js";
+
+// Import the new SCC Operator models
+import createSCCHTOperatorModel from "./models/SCCHTOperatorModel.js";
+import createSCCFUOperatorModel from "./models/SCCFUOperatorModel.js";
+import createSCCElasticOperatorModel from "./models/SCCElasticOperatorModel.js";
+
+import createEMBDefectModel from "./models/EMBdefect.js";
+import createPrintingDefectModel from "./models/printingDefect.js";
+import createEMBReportModel from "./models/EMBReport.js";
+
+import createQADefectsModel from "./models/QADefectsModel.js";
+import createQCAccuracyReportModel from "./models/QCAccuracyReportModel.js";
+import createQAStandardDefectsModel from "./models/QAStandardDefectsModel.js";
+
+import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
+
+import createBuyerSpecTemplateModel from "./models/BuyerSpecTemplate.js";
+import createANFMeasurementReportModel from "./models/ANFMeasurementReport.js";
+import createSizeCompletionStatusModel from "./models/SizeCompletionStatus.model.js";
+
+import createQCWashingDefectsModel from "./models/QCWashingDefectsModel.js";
+import createQCWashingCheckpointsModel from "./models/QCWashingCheckpointsModel.js";
+import createQCWashingFirstOutputModel from "./models/QCWashingFirstOutputModel.js";
+import createQCWashingModel from "./models/QCWashing.js";
+
+import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
+import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
+
+import createSubConDefectsModel from "./models/sub_con_defects.js";
+import createSubconSewingQAReportModel from "./models/subconSewingQAReportSchema.js";
+import createSubconSewingFactoryModel from "./models/subcon_sewing_factory.js";
+import createSubconSewingQc1ReportModel from "./models/subcon_sewing_qc1_report.js";
+
+import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
+import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
+import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
+import createQCWorkersModel from "./models/QCWorkers.js";
+import createDTOrdersSchema from "./models/dt_orders.js";
+
+import createPlanPackingListModel from "./models/PlanPackingList.js";
+
+import createYorksysOrdersModel from "./models/YorksysOrders.js";
+
+// import sql from "mssql"; // Import mssql for SQL Server connection
+// import cron from "node-cron"; // Import node-cron for scheduling
+
 import { promises as fsPromises } from "fs";
 
 import mongoose from "mongoose";
@@ -219,7 +313,6 @@ app.use(rovingParing);
 //     process.exit(0);
 //   }
 // });
-
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
@@ -5420,6 +5513,68 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
             },
             { $limit: 30 }
           ],
+          measurementIssues: [
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status":
+                  {
+                    $ne: "Pass"
+                  }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                count: { $sum: 1 }
+              }
+            },
+            {
+              // --- NEW: Sort by count BEFORE grouping into the array ---
+              $sort: {
+                count: -1
+              }
+            },
+            {
+              $group: {
+                _id: "$_id.garmentType",
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    count: "$count"
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                garmentType: "$_id",
+                issues: 1
+              }
+            },
+            { $sort: { garmentType: 1 } }
+          ],
           passRateByGarmentType: [
             {
               $group: {
@@ -5444,6 +5599,1141 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
               }
             },
             { $sort: { passRate: -1 } }
+          ],
+          measurementIssuesByMo: [
+            // Stage 1: Unwind all the way to the individual measurement document
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            // Stage 2: Group by the most granular level (including measurement point) to calculate all stats at once
+            {
+              $group: {
+                _id: {
+                  moNo: "$moNo",
+                  tableNo: "$tableNo",
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                // Pass Count for the entire document set
+                passCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $eq: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // Total Rejects for this specific measurement point
+                total: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $ne: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // TOL+ Rejects
+                tol_plus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $gt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // TOL- Rejects
+                tol_minus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $lt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                // Collect all non-"0" fractions from rejected items into an array
+                fractions: {
+                  $push: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                              "0"
+                            ]
+                          }
+                        ]
+                      },
+                      "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                      "$$REMOVE"
+                    ]
+                  }
+                }
+              }
+            },
+            // Stage 3: Create the fractionCounts object and finalize the issue structure
+            {
+              $addFields: {
+                // This powerful stage converts the array of fractions (e.g., ["-1/4", "-1/8", "-1/4"])
+                // into a key-value object (e.g., { "-1/4": 2, "-1/8": 1 })
+                fractionCounts: {
+                  $arrayToObject: {
+                    $map: {
+                      input: { $setUnion: ["$fractions"] }, // Get unique fractions
+                      as: "fr",
+                      in: {
+                        k: "$$fr",
+                        v: {
+                          $size: {
+                            $filter: {
+                              input: "$fractions",
+                              cond: { $eq: ["$$this", "$$fr"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 4: Group by table and garment type
+            {
+              $group: {
+                _id: {
+                  moNo: "$_id.moNo",
+                  tableNo: "$_id.tableNo",
+                  garmentType: "$_id.garmentType"
+                },
+                totalPassForGarment: { $sum: "$passCount" },
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    total: "$total",
+                    tol_plus: "$tol_plus",
+                    tol_minus: "$tol_minus",
+                    fractionCounts: "$fractionCounts"
+                  }
+                }
+              }
+            },
+            // Stage 5: Group by table
+            {
+              $group: {
+                _id: { moNo: "$_id.moNo", tableNo: "$_id.tableNo" },
+                passCount: { $first: "$totalPassForGarment" },
+                issuesByGarmentType: {
+                  $push: {
+                    garmentType: "$_id.garmentType",
+                    issues: {
+                      $sortArray: {
+                        input: {
+                          // Filter out points that had no rejects
+                          $filter: {
+                            input: "$issues",
+                            as: "i",
+                            cond: { $gt: ["$$i.total", 0] }
+                          }
+                        },
+                        sortBy: { total: -1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 6: Final grouping by MO
+            {
+              $group: {
+                _id: "$_id.moNo",
+                tableNos: { $addToSet: "$_id.tableNo" },
+                totalPass: { $sum: "$passCount" },
+                issuesByTable: {
+                  $push: {
+                    tableNo: "$_id.tableNo",
+                    issuesByGarmentType: "$issuesByGarmentType"
+                  }
+                }
+              }
+            },
+            // Stage 7: Final projection to calculate overall rejects and rates
+            {
+              $addFields: {
+                totalRejects: {
+                  $sum: {
+                    $map: {
+                      input: "$issuesByTable",
+                      as: "table",
+                      in: {
+                        $sum: {
+                          $map: {
+                            input: "$$table.issuesByGarmentType",
+                            as: "gt",
+                            in: { $sum: "$$gt.issues.total" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                tableNos: 1,
+                totalPass: 1,
+                totalRejects: 1,
+                issuesByTable: 1,
+                totalPoints: { $add: ["$totalPass", "$totalRejects"] },
+                defectRate: {
+                  $cond: [
+                    { $gt: [{ $add: ["$totalPass", "$totalRejects"] }, 0] },
+                    {
+                      $multiply: [
+                        {
+                          $divide: [
+                            "$totalRejects",
+                            { $add: ["$totalPass", "$totalRejects"] }
+                          ]
+                        },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+          // --- NEW FACET: PIPELINE FOR SPREAD TABLE CARDS ---
+          measurementIssuesBySpreadTable: [
+            // Stage 1: Unwind all the way to the individual measurement document
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            // Stage 2: Group by the most granular level, using spreadTable as a key
+            {
+              $group: {
+                _id: {
+                  moNo: "$moNo",
+                  spreadTable: "$cuttingTableDetails.spreadTable", // <-- The key change is here
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                passCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $eq: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                total: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $ne: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_plus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $gt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_minus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $lt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                fractions: {
+                  $push: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                              "0"
+                            ]
+                          }
+                        ]
+                      },
+                      "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                      "$$REMOVE"
+                    ]
+                  }
+                }
+              }
+            },
+            // Stage 3: Create the fractionCounts object
+            {
+              $addFields: {
+                fractionCounts: {
+                  $arrayToObject: {
+                    $map: {
+                      input: { $setUnion: ["$fractions"] },
+                      as: "fr",
+                      in: {
+                        k: "$$fr",
+                        v: {
+                          $size: {
+                            $filter: {
+                              input: "$fractions",
+                              cond: { $eq: ["$$this", "$$fr"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 4: Group by spread table and garment type
+            {
+              $group: {
+                _id: {
+                  moNo: "$_id.moNo",
+                  spreadTable: "$_id.spreadTable", // <-- The key change is here
+                  garmentType: "$_id.garmentType"
+                },
+                totalPassForGarment: { $sum: "$passCount" },
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    total: "$total",
+                    tol_plus: "$tol_plus",
+                    tol_minus: "$tol_minus",
+                    fractionCounts: "$fractionCounts"
+                  }
+                }
+              }
+            },
+            // Stage 5: Group by spread table
+            {
+              $group: {
+                _id: { moNo: "$_id.moNo", spreadTable: "$_id.spreadTable" }, // <-- The key change is here
+                passCount: { $first: "$totalPassForGarment" },
+                issuesByGarmentType: {
+                  $push: {
+                    garmentType: "$_id.garmentType",
+                    issues: {
+                      $sortArray: {
+                        input: {
+                          $filter: {
+                            input: "$issues",
+                            as: "i",
+                            cond: { $gt: ["$$i.total", 0] }
+                          }
+                        },
+                        sortBy: { total: -1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 6: Final grouping by MO
+            {
+              $group: {
+                _id: "$_id.moNo",
+                spreadTables: { $addToSet: "$_id.spreadTable" }, // <-- The key change is here
+                totalPass: { $sum: "$passCount" },
+                issuesBySpreadTable: {
+                  // <-- The key change is here
+                  $push: {
+                    spreadTable: "$_id.spreadTable", // <-- The key change is here
+                    issuesByGarmentType: "$issuesByGarmentType"
+                  }
+                }
+              }
+            },
+            // Stage 7: Final projection to calculate overall rejects and rates
+            {
+              $addFields: {
+                totalRejects: {
+                  $sum: {
+                    $map: {
+                      input: "$issuesBySpreadTable",
+                      as: "table",
+                      in: {
+                        $sum: {
+                          $map: {
+                            input: "$$table.issuesByGarmentType",
+                            as: "gt",
+                            in: { $sum: "$$gt.issues.total" }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                spreadTables: 1, // <-- The key change is here
+                totalPass: 1,
+                totalRejects: 1,
+                issuesBySpreadTable: 1, // <-- The key change is here
+                totalPoints: { $add: ["$totalPass", "$totalRejects"] },
+                defectRate: {
+                  $cond: [
+                    { $gt: [{ $add: ["$totalPass", "$totalRejects"] }, 0] },
+                    {
+                      $multiply: [
+                        {
+                          $divide: [
+                            "$totalRejects",
+                            { $add: ["$totalPass", "$totalRejects"] }
+                          ]
+                        },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+          // --- NEW FACET: PIPELINE FOR SPREAD TABLE OVERALL CARDS ---
+          measurementIssuesBySpreadTableOverall: [
+            // Stage 1: Filter out documents where spreadTable is null or empty
+            {
+              $match: {
+                "cuttingTableDetails.spreadTable": {
+                  $exists: true,
+                  $ne: null,
+                  $ne: ""
+                }
+              }
+            },
+            // Stage 2: Unwind all the way to the individual measurement document
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+            // Stage 3: Group by the spreadTable and measurement point to calculate all stats
+            {
+              $group: {
+                _id: {
+                  spreadTable: "$cuttingTableDetails.spreadTable", // <-- Primary grouping key
+                  garmentType: "$garmentType",
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName"
+                },
+                passCount: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $eq: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                total: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $ne: [
+                          "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                          "Pass"
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_plus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $gt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                tol_minus: {
+                  $sum: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $lt: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuedecimal",
+                              0
+                            ]
+                          }
+                        ]
+                      },
+                      1,
+                      0
+                    ]
+                  }
+                },
+                fractions: {
+                  $push: {
+                    $cond: [
+                      {
+                        $and: [
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status",
+                              "Pass"
+                            ]
+                          },
+                          {
+                            $ne: [
+                              "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                              "0"
+                            ]
+                          }
+                        ]
+                      },
+                      "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.valuefraction",
+                      "$$REMOVE"
+                    ]
+                  }
+                }
+              }
+            },
+            // Stage 4: Create the fractionCounts object
+            {
+              $addFields: {
+                fractionCounts: {
+                  $arrayToObject: {
+                    $map: {
+                      input: { $setUnion: ["$fractions"] },
+                      as: "fr",
+                      in: {
+                        k: "$$fr",
+                        v: {
+                          $size: {
+                            $filter: {
+                              input: "$fractions",
+                              cond: { $eq: ["$$this", "$$fr"] }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 5: Group by spread table and garment type
+            {
+              $group: {
+                _id: {
+                  spreadTable: "$_id.spreadTable",
+                  garmentType: "$_id.garmentType"
+                },
+                totalPassForGarment: { $sum: "$passCount" },
+                issues: {
+                  $push: {
+                    measurementPoint: "$_id.measurementPoint",
+                    total: "$total",
+                    tol_plus: "$tol_plus",
+                    tol_minus: "$tol_minus",
+                    fractionCounts: "$fractionCounts"
+                  }
+                }
+              }
+            },
+            // Stage 6: Final grouping by Spread Table to assemble the card object
+            {
+              $group: {
+                _id: "$_id.spreadTable",
+                totalPass: { $sum: "$totalPassForGarment" },
+                issuesByGarmentType: {
+                  $push: {
+                    garmentType: "$_id.garmentType",
+                    issues: {
+                      $sortArray: {
+                        input: {
+                          $filter: {
+                            input: "$issues",
+                            as: "i",
+                            cond: { $gt: ["$$i.total", 0] }
+                          }
+                        },
+                        sortBy: { total: -1 }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            // Stage 7: Final projection to calculate rejects and defect rate
+            {
+              $addFields: {
+                totalRejects: {
+                  $sum: {
+                    $map: {
+                      input: "$issuesByGarmentType",
+                      as: "gt",
+                      in: { $sum: "$$gt.issues.total" }
+                    }
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                spreadTable: "$_id",
+                totalPass: 1,
+                totalRejects: 1,
+                issuesByGarmentType: 1,
+                totalPoints: { $add: ["$totalPass", "$totalRejects"] },
+                defectRate: {
+                  $cond: [
+                    { $gt: [{ $add: ["$totalPass", "$totalRejects"] }, 0] },
+                    {
+                      $multiply: [
+                        {
+                          $divide: [
+                            "$totalRejects",
+                            { $add: ["$totalPass", "$totalRejects"] }
+                          ]
+                        },
+                        100
+                      ]
+                    },
+                    0
+                  ]
+                }
+              }
+            }
+          ],
+          // --- NEW FACET: PIPELINE FOR FABRIC DEFECT ANALYSIS ---
+          fabricDefectAnalysis: [
+            // Stage 1: Unwind all arrays down to the individual defect level
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects"
+            },
+
+            // Stage 2: Filter out any records with missing or empty defect names/quantities
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName":
+                  { $ne: null, $ne: "" },
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty":
+                  { $gt: 0 }
+              }
+            },
+
+            // Stage 3: Group by the defect name to get the total quantity and collect all source details
+            {
+              $group: {
+                _id: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName",
+                totalQty: {
+                  $sum: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty"
+                },
+                details: {
+                  $push: {
+                    moNo: "$moNo",
+                    spreadTable: "$cuttingTableDetails.spreadTable",
+                    qty: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty"
+                  }
+                }
+              }
+            },
+
+            // Stage 4: Final project and sort by highest quantity
+            {
+              $project: {
+                _id: 0,
+                defectName: "$_id",
+                totalQty: "$totalQty",
+                details: "$details"
+              }
+            },
+            { $sort: { totalQty: -1 } }
+          ],
+          inspectionQtyByMo: [
+            {
+              $group: {
+                _id: "$moNo",
+                totalInspectionQty: { $sum: "$totalInspectionQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                totalInspectionQty: 1
+              }
+            }
+          ],
+          // --- NEW, CORRECTED PIPELINE FOR CUTTING DEFECT PIVOT TABLE ---
+          cuttingDefectPivot: [
+            { $unwind: "$inspectionData.cuttingDefects.issues" },
+            {
+              $match: {
+                "inspectionData.cuttingDefects.issues.cuttingdefectName": {
+                  $ne: null,
+                  $ne: ""
+                }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  defectName:
+                    "$inspectionData.cuttingDefects.issues.cuttingdefectName",
+                  moNo: "$moNo"
+                },
+                qty: { $sum: 1 }
+              }
+            },
+            {
+              $group: {
+                _id: "$_id.defectName",
+                totalQty: { $sum: "$qty" },
+                moBreakdown: { $push: { k: "$_id.moNo", v: "$qty" } }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                defectName: "$_id",
+                totalQty: 1,
+                moBreakdown: { $arrayToObject: "$moBreakdown" }
+              }
+            },
+            { $sort: { totalQty: -1 } }
+          ],
+
+          // --- NEW, CORRECTED PIPELINE FOR CUTTING DEFECT EVIDENCE ---
+          cuttingDefectEvidence: [
+            {
+              $match: {
+                "inspectionData.cuttingDefects.additionalImages": {
+                  $exists: true,
+                  $ne: []
+                }
+              }
+            },
+            {
+              $group: {
+                _id: {
+                  moNo: "$moNo",
+                  tableNo: "$tableNo"
+                },
+                images: {
+                  $first: "$inspectionData.cuttingDefects.additionalImages.path"
+                }
+              }
+            },
+            {
+              $group: {
+                _id: "$_id.moNo",
+                imagesByTable: {
+                  $push: {
+                    tableNo: "$_id.tableNo",
+                    images: "$images"
+                  }
+                }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                moNo: "$_id",
+                imagesByTable: 1
+              }
+            },
+            { $sort: { moNo: 1 } }
+          ],
+          // --- NEW FACET: PIPELINE FOR TREND ANALYSIS MATRIX CHART ---
+          trendAnalysisData: [
+            // Stage 1: Unwind all the way down to the individual measurement level
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements"
+            },
+
+            // Stage 2: Filter for only measurement failures
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementValues.measurements.status":
+                  { $ne: "Pass" }
+              }
+            },
+
+            // Stage 3: Group by measurement point and inspection date to get the daily failure count
+            {
+              $group: {
+                _id: {
+                  measurementPoint:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.measurementPointsData.measurementPointName",
+                  inspectionDate: "$inspectionDate"
+                },
+                count: { $sum: 1 }
+              }
+            },
+
+            // Stage 4: Group again by just the measurement point to create a breakdown object by date
+            {
+              $group: {
+                _id: "$_id.measurementPoint",
+                dateBreakdown: {
+                  $push: {
+                    k: "$_id.inspectionDate",
+                    v: "$count"
+                  }
+                }
+              }
+            },
+
+            // Stage 5: Final projection to format the data for the frontend
+            {
+              $project: {
+                _id: 0,
+                measurementPoint: "$_id",
+                dateBreakdown: { $arrayToObject: "$dateBreakdown" }
+              }
+            },
+            { $sort: { measurementPoint: 1 } } // Sort rows alphabetically
+          ],
+          // --- NEW FACET: TO GET TOTAL INSPECTION QTY PER DATE ---
+          inspectionQtyByDate: [
+            {
+              $group: {
+                _id: "$inspectionDate",
+                totalInspectionQty: { $sum: "$totalInspectionQty" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                inspectionDate: "$_id",
+                totalInspectionQty: 1
+              }
+            }
+          ],
+
+          // --- NEW FACET: PIPELINE FOR FABRIC DEFECT TREND ANALYSIS ---
+          fabricDefectTrendData: [
+            // Stage 1: Unwind all arrays down to the individual defect level
+            { $unwind: "$inspectionData.bundleInspectionData" },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData"
+            },
+            {
+              $unwind:
+                "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects"
+            },
+
+            // Stage 2: Filter for valid defects
+            {
+              $match: {
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName":
+                  { $ne: null, $ne: "" },
+                "inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty":
+                  { $gt: 0 }
+              }
+            },
+
+            // Stage 3: Group by defect name and inspection date to get daily defect counts
+            {
+              $group: {
+                _id: {
+                  defectName:
+                    "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectName",
+                  inspectionDate: "$inspectionDate"
+                },
+                qty: {
+                  $sum: "$inspectionData.bundleInspectionData.measurementInsepctionData.fabricDefects.defectData.defects.defectQty"
+                }
+              }
+            },
+
+            // Stage 4: Group again by just the defect name to create a breakdown object by date
+            {
+              $group: {
+                _id: "$_id.defectName",
+                dateBreakdown: {
+                  $push: {
+                    k: "$_id.inspectionDate",
+                    v: "$qty"
+                  }
+                }
+              }
+            },
+
+            // Stage 5: Final projection to format the data
+            {
+              $project: {
+                _id: 0,
+                defectName: "$_id",
+                dateBreakdown: { $arrayToObject: "$dateBreakdown" }
+              }
+            },
+            { $sort: { defectName: 1 } }
+          ],
+          // --- NEW FACET: PIPELINE FOR CUTTING DEFECT TREND ANALYSIS ---
+          cuttingDefectTrendData: [
+            { $unwind: "$inspectionData.cuttingDefects.issues" },
+            {
+              $match: {
+                "inspectionData.cuttingDefects.issues.cuttingdefectName": {
+                  $ne: null,
+                  $ne: ""
+                }
+              }
+            },
+            // Group by defect name and date to get the daily count (each issue is 1)
+            {
+              $group: {
+                _id: {
+                  defectName:
+                    "$inspectionData.cuttingDefects.issues.cuttingdefectName",
+                  inspectionDate: "$inspectionDate"
+                },
+                qty: { $sum: 1 }
+              }
+            },
+            // Group again by just the defect name to create the date breakdown
+            {
+              $group: {
+                _id: "$_id.defectName",
+                dateBreakdown: {
+                  $push: {
+                    k: "$_id.inspectionDate",
+                    v: "$qty"
+                  }
+                }
+              }
+            },
+            // Final projection
+            {
+              $project: {
+                _id: 0,
+                cuttingDefectName: "$_id",
+                dateBreakdown: { $arrayToObject: "$dateBreakdown" }
+              }
+            },
+            { $sort: { cuttingDefectName: 1 } }
           ]
         }
       }
@@ -5477,12 +6767,30 @@ app.get("/api/cutting-dashboard-data", async (req, res) => {
     };
     delete kpis._id;
 
+    const cuttingDefectData = {
+      pivotData: unwindResult[0]?.cuttingDefectPivot || [],
+      evidenceData: unwindResult[0]?.cuttingDefectEvidence || []
+    };
+
     const formattedResult = {
       kpis,
       charts: {
         passRateByMo: unwindResult[0]?.passRateByMo || [],
         passRateByDate: unwindResult[0]?.passRateByDate || [],
-        passRateByGarmentType: unwindResult[0]?.passRateByGarmentType || []
+        passRateByGarmentType: unwindResult[0]?.passRateByGarmentType || [],
+        measurementIssues: unwindResult[0]?.measurementIssues || [],
+        measurementIssuesByMo: unwindResult[0]?.measurementIssuesByMo || [],
+        measurementIssuesBySpreadTable:
+          unwindResult[0]?.measurementIssuesBySpreadTable || [],
+        measurementIssuesBySpreadTableOverall:
+          unwindResult[0]?.measurementIssuesBySpreadTableOverall || [],
+        fabricDefectAnalysis: unwindResult[0]?.fabricDefectAnalysis || [],
+        inspectionQtyByMo: unwindResult[0]?.inspectionQtyByMo || [],
+        cuttingDefectAnalysis: cuttingDefectData,
+        trendAnalysisData: unwindResult[0]?.trendAnalysisData || [],
+        fabricDefectTrendData: unwindResult[0]?.fabricDefectTrendData || [],
+        inspectionQtyByDate: unwindResult[0]?.inspectionQtyByDate || [],
+        cuttingDefectTrendData: unwindResult[0]?.cuttingDefectTrendData || []
       }
     };
 
@@ -7723,6 +9031,127 @@ app.post("/api/ai/ask", async (req, res) => {
 // --- FACTORY MANAGEMENT ---
 
 
+// --- QC LIST MANAGEMENT IN SUB CON---
+
+// GET: Fetch a flattened list of all QCs from all factories for the management table
+app.get("/api/subcon-sewing-factories-manage/qcs/all", async (req, res) => {
+  try {
+    const factories = await SubconSewingFactory.find({
+      "qcList.0": { $exists: true }
+    }).lean();
+
+    const allQCs = factories.flatMap((factory) =>
+      factory.qcList.map((qc) => ({
+        factoryId: factory._id,
+        factoryName: factory.factory,
+        qcMongoId: qc._id, // Mongoose subdocument ID
+        qcIndex: qc.qcIndex,
+        qcID: qc.qcID,
+        qcName: qc.qcName
+      }))
+    );
+
+    res.json(allQCs);
+  } catch (error) {
+    console.error("Error fetching all QCs:", error);
+    res.status(500).json({ error: "Failed to fetch QC list" });
+  }
+});
+
+// POST: Add a new QC to a specific factory's qcList
+app.post(
+  "/api/subcon-sewing-factories-manage/:factoryId/qcs",
+  async (req, res) => {
+    const { factoryId } = req.params;
+    const { qcID, qcName } = req.body;
+
+    try {
+      const factory = await SubconSewingFactory.findById(factoryId);
+      if (!factory) {
+        return res.status(404).json({ error: "Factory not found." });
+      }
+
+      // Check for duplicate qcID within the same factory
+      if (factory.qcList.some((qc) => qc.qcID === qcID)) {
+        return res
+          .status(409)
+          .json({ error: "This QC ID already exists for this factory." });
+      }
+
+      const newQcIndex =
+        factory.qcList.length > 0
+          ? Math.max(...factory.qcList.map((q) => q.qcIndex)) + 1
+          : 1;
+
+      const newQc = {
+        qcIndex: newQcIndex,
+        qcID,
+        qcName
+      };
+
+      factory.qcList.push(newQc);
+      await factory.save();
+
+      res.status(201).json(factory.qcList[factory.qcList.length - 1]); // Return the newly added QC
+    } catch (error) {
+      console.error("Error adding QC:", error);
+      res.status(500).json({ error: "Failed to add QC" });
+    }
+  }
+);
+
+// PUT: Update a specific QC in a factory's qcList
+app.put(
+  "/api/subcon-sewing-factories-manage/qcs/:qcMongoId",
+  async (req, res) => {
+    const { qcMongoId } = req.params;
+    const { qcID, qcName } = req.body;
+
+    try {
+      const factory = await SubconSewingFactory.findOne({
+        "qcList._id": qcMongoId
+      });
+      if (!factory) {
+        return res.status(404).json({ error: "QC not found in any factory." });
+      }
+
+      const qcToUpdate = factory.qcList.id(qcMongoId);
+      qcToUpdate.qcID = qcID;
+      qcToUpdate.qcName = qcName;
+
+      await factory.save();
+      res.json(qcToUpdate);
+    } catch (error) {
+      console.error("Error updating QC:", error);
+      res.status(500).json({ error: "Failed to update QC" });
+    }
+  }
+);
+
+// DELETE: Remove a specific QC from a factory's qcList
+app.delete(
+  "/api/subcon-sewing-factories-manage/qcs/:qcMongoId",
+  async (req, res) => {
+    const { qcMongoId } = req.params;
+
+    try {
+      const result = await SubconSewingFactory.updateOne(
+        { "qcList._id": qcMongoId },
+        { $pull: { qcList: { _id: qcMongoId } } }
+      );
+
+      if (result.nModified === 0) {
+        return res.status(404).json({ error: "QC not found." });
+      }
+
+      res.json({ message: "QC deleted successfully." });
+    } catch (error) {
+      console.error("Error deleting QC:", error);
+      res.status(500).json({ error: "Failed to delete QC" });
+    }
+  }
+);
+
 // --- DEFECT MANAGEMENT ---
 
 
@@ -7731,12 +9160,938 @@ app.post("/api/ai/ask", async (req, res) => {
 ------------------------------------------------------------------ */
 
 /* ----------------------------------------------------
-   End Points - NEW for Sub-Con QA Sample Data
+   End Points - NEW for Sub-Con QA Sample Data (Modified)
 ---------------------------------------------------- */
 
-/* -----------------------------------------------------------
-   End Points - ADDITIONS for Sub-Con QA Sample Data (Find & Update)
------------------------------------------------------------ */
+// 1. ENDPOINT: Search for QA Standard Defects (No Change Needed, this is correct)
+app.get("/api/qa-standard-defects", async (req, res) => {
+  try {
+    const { searchTerm } = req.query;
+    if (!searchTerm) {
+      return res.json([]);
+    }
+
+    const searchNumber = parseInt(searchTerm, 10);
+    const query = isNaN(searchNumber)
+      ? {
+          $or: [
+            { english: { $regex: searchTerm, $options: "i" } },
+            { khmer: { $regex: searchTerm, $options: "i" } }
+          ]
+        }
+      : { code: searchNumber };
+
+    const defects = await QAStandardDefectsModel.find(query)
+      .limit(20)
+      .sort({ code: 1 });
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA standard defects:", error);
+    res.status(500).json({ error: "Failed to fetch QA defects" });
+  }
+});
+
+app.get("/api/qa-standard-defects-list", async (req, res) => {
+  try {
+    const defects = await QAStandardDefectsModel.find({})
+      .sort({ code: 1 })
+      .lean();
+    res.json(defects);
+  } catch (error) {
+    console.error("Error fetching QA standard defects list:", error);
+    res.status(500).json({ error: "Failed to fetch QA defects list" });
+  }
+});
+
+// 2. ENDPOINT: Generic Image Upload for Sub-Con QA Module
+const qaImageStorage = multer.memoryStorage();
+const qaImageUpload = multer({
+  storage: qaImageStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+});
+
+app.post(
+  "/api/subcon-qa/upload-image",
+  qaImageUpload.single("imageFile"),
+  async (req, res) => {
+    try {
+      const {
+        reportType,
+        factory,
+        lineNo,
+        moNo,
+        color,
+        qcId,
+        imageType,
+        sectionName
+      } = req.body; // imageType can be 'defect', 'spi', etc.
+      const imageFile = req.file;
+
+      if (!imageFile) {
+        return res.status(400).json({ message: "No image file provided." });
+      }
+      if (!moNo || !qcId || !imageType) {
+        return res.status(400).json({ message: "Missing required metadata." });
+      }
+
+      const uploadPath = path.join(
+        __dirname,
+        "public",
+        "storage",
+        "sub-con-qc1"
+      );
+      // Ensure the directory exists
+      //await fsPromises.mkdir(uploadPath, { recursive: true });
+
+      const sanitizedReportType = sanitize(reportType);
+      const sanitizedFactory = sanitize(factory);
+      const sanitizedlineNo = sanitize(lineNo);
+      const sanitizedMoNo = sanitize(moNo);
+      const sanitizedColor = sanitize(color);
+      const sanitizedQcId = sanitize(qcId);
+      const sanitizedImageType = sanitize(imageType);
+      const sanitizedSection = sanitize(sectionName || "");
+
+      const timestamp = Date.now();
+      const newFilename = `${sanitizedImageType}${
+        sanitizedSection ? `_${sanitizedSection}` : ""
+      }_${sanitizedReportType}_${sanitizedFactory}_${sanitizedlineNo}_${sanitizedMoNo}_${sanitizedColor}_${sanitizedQcId}_${timestamp}.webp`;
+      const finalDiskPath = path.join(uploadPath, newFilename);
+
+      await sharp(imageFile.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        })
+        .webp({ quality: 80 })
+        .toFile(finalDiskPath);
+
+      const relativeUrl = `/storage/sub-con-qc1/${newFilename}`;
+      res.json({ success: true, filePath: relativeUrl });
+    } catch (error) {
+      console.error("Error in Sub-Con QA image upload:", error);
+      res
+        .status(500)
+        .json({ message: "Server error during image processing." });
+    }
+  }
+);
+
+// Helper function to generate a unique Report ID
+const generateSubconQAReportID = async () => {
+  const date = new Date();
+  const year = date.getFullYear().toString().slice(-2);
+  const month = (date.getMonth() + 1).toString().padStart(2, "0");
+  const day = date.getDate().toString().padStart(2, "0");
+  const randomPart = Math.floor(1000 + Math.random() * 9000).toString();
+  let reportID = `SQA${year}${month}${day}${randomPart}`;
+
+  let existingReport = await SubconSewingQAReport.findOne({ reportID });
+  while (existingReport) {
+    const newRandomPart = Math.floor(1000 + Math.random() * 9000).toString();
+    reportID = `SQA${year}${month}${day}${newRandomPart}`;
+    existingReport = await SubconSewingQAReport.findOne({ reportID });
+  }
+  return reportID;
+};
+
+// 3. ENDPOINT: Save a new QA Sample Report (MODIFIED)
+app.post("/api/subcon-sewing-qa-reports", async (req, res) => {
+  try {
+    const reportData = req.body;
+    const { qcData, ...headerData } = reportData;
+
+    // --- Calculate totals from the qcData array ---
+    let totalCheckedQty = 0;
+    let totalRejectPcs = 0;
+    let totalOverallDefectQty = 0;
+
+    qcData.forEach((qc) => {
+      totalCheckedQty += Number(qc.checkedQty) || 0;
+      totalRejectPcs += Number(qc.rejectPcs) || 0;
+      totalOverallDefectQty += Number(qc.totalDefectQty) || 0;
+    });
+
+    const startOfDay = new Date(headerData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const reportID = await generateSubconQAReportID();
+    const buyer = getBuyerFromMoNumber(headerData.moNo);
+
+    const newReport = new SubconSewingQAReport({
+      ...headerData,
+      qcData,
+      inspectionDate: startOfDay,
+      reportID,
+      buyer,
+      totalCheckedQty,
+      totalRejectPcs,
+      totalOverallDefectQty
+    });
+
+    await newReport.save();
+    res.status(201).json({
+      message: "QA Report saved successfully!",
+      reportID: reportID
+    });
+  } catch (error) {
+    console.error("Error saving Sub-Con QA report:", error);
+    if (error.code === 11000) {
+      return res
+        .status(409)
+        .json({ error: "A report with these exact details already exists." });
+    }
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to save QA report" });
+  }
+});
+
+// 4. ENDPOINT: Find a specific QA report (MODIFIED)
+app.get("/api/subcon-sewing-qa-report/find", async (req, res) => {
+  try {
+    const { inspectionDate, reportType, factory, lineNo, moNo, color } =
+      req.query;
+
+    if (
+      !inspectionDate ||
+      !reportType ||
+      !factory ||
+      !lineNo ||
+      !moNo ||
+      !color
+    ) {
+      return res
+        .status(400)
+        .json({ error: "Missing required search parameters." });
+    }
+
+    const startOfDay = new Date(inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(inspectionDate);
+    endOfDay.setUTCHours(23, 59, 59, 999);
+
+    const report = await SubconSewingQAReport.findOne({
+      factory,
+      reportType,
+      lineNo,
+      moNo,
+      color,
+      inspectionDate: { $gte: startOfDay, $lte: endOfDay }
+    }).lean();
+
+    res.json(report);
+  } catch (error) {
+    console.error("Error finding Sub-Con QA report:", error);
+    res.status(500).json({ error: "Failed to find QA report" });
+  }
+});
+
+// 5. ENDPOINT: Update an existing QA report by its ID (MODIFIED)
+app.put("/api/subcon-sewing-qa-reports/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const reportData = req.body;
+    const { qcData, ...headerData } = reportData;
+
+    // --- Recalculate totals from the qcData array ---
+    let totalCheckedQty = 0;
+    let totalRejectPcs = 0;
+    let totalOverallDefectQty = 0;
+
+    if (qcData && Array.isArray(qcData)) {
+      qcData.forEach((qc) => {
+        totalCheckedQty += Number(qc.checkedQty) || 0;
+        totalRejectPcs += Number(qc.rejectPcs) || 0;
+        totalOverallDefectQty += Number(qc.totalDefectQty) || 0;
+      });
+    }
+
+    const startOfDay = new Date(headerData.inspectionDate);
+    startOfDay.setUTCHours(0, 0, 0, 0);
+
+    const buyer = getBuyerFromMoNumber(headerData.moNo);
+
+    const updatePayload = {
+      ...headerData,
+      qcData,
+      inspectionDate: startOfDay,
+      buyer,
+      totalCheckedQty,
+      totalRejectPcs,
+      totalOverallDefectQty
+    };
+
+    const updatedReport = await SubconSewingQAReport.findByIdAndUpdate(
+      id,
+      updatePayload,
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedReport) {
+      return res.status(404).json({ error: "QA Report not found." });
+    }
+
+    res.json({
+      message: "QA Report updated successfully!",
+      report: updatedReport
+    });
+  } catch (error) {
+    console.error("Error updating Sub-Con QA report:", error);
+    if (error.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({ error: "Validation failed", details: error.message });
+    }
+    res.status(500).json({ error: "Failed to update QA report" });
+  }
+});
+
+/* ----------------------------------------------------
+   NEW ENDPOINT - Sub-Con QA Inspection Data Report
+---------------------------------------------------- */
+
+app.get("/api/subcon-qa-inspection-data", async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      reportType,
+      factory,
+      lineNo,
+      moNo,
+      color,
+      qaId,
+      qcId,
+      result
+    } = req.query;
+
+    // Build match query
+    const matchQuery = {};
+
+    if (startDate && endDate) {
+      matchQuery.inspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (reportType) matchQuery.reportType = reportType;
+    if (factory) matchQuery.factory = factory;
+    if (lineNo) matchQuery.lineNo = lineNo;
+    if (moNo) matchQuery.moNo = moNo;
+    if (color) matchQuery.color = color;
+    if (qaId) matchQuery["preparedBy.empId"] = qaId;
+
+    // Aggregate pipeline
+    const pipeline = [
+      { $match: matchQuery },
+      { $sort: { inspectionDate: -1, _id: -1 } },
+
+      // Unwind qcData to create one document per QC
+      { $unwind: "$qcData" },
+
+      // Optional: Filter by qcId if provided
+      ...(qcId ? [{ $match: { "qcData.qcID": qcId } }] : []),
+
+      // Calculate severity counts and pass rate for each QC
+      {
+        $addFields: {
+          minorCount: {
+            $reduce: {
+              input: "$qcData.defectList",
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ["$$this.standardStatus", "Minor"] },
+                  { $add: ["$$value", "$$this.qty"] },
+                  "$$value"
+                ]
+              }
+            }
+          },
+          majorCount: {
+            $reduce: {
+              input: "$qcData.defectList",
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ["$$this.standardStatus", "Major"] },
+                  { $add: ["$$value", "$$this.qty"] },
+                  "$$value"
+                ]
+              }
+            }
+          },
+          criticalCount: {
+            $reduce: {
+              input: "$qcData.defectList",
+              initialValue: 0,
+              in: {
+                $cond: [
+                  { $eq: ["$$this.standardStatus", "Critical"] },
+                  { $add: ["$$value", "$$this.qty"] },
+                  "$$value"
+                ]
+              }
+            }
+          }
+        }
+      },
+
+      // Calculate weighted defect sum
+      {
+        $addFields: {
+          weightedDefectSum: {
+            $reduce: {
+              input: "$qcData.defectList",
+              initialValue: 0,
+              in: {
+                $add: [
+                  "$$value",
+                  {
+                    $multiply: [
+                      "$$this.qty",
+                      {
+                        $switch: {
+                          branches: [
+                            {
+                              case: { $eq: ["$$this.standardStatus", "Minor"] },
+                              then: 1
+                            },
+                            {
+                              case: { $eq: ["$$this.standardStatus", "Major"] },
+                              then: 1.5
+                            },
+                            {
+                              case: {
+                                $eq: ["$$this.standardStatus", "Critical"]
+                              },
+                              then: 2
+                            }
+                          ],
+                          default: 0
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+
+      // Calculate pass rate and result
+      {
+        $addFields: {
+          passRate: {
+            $cond: [
+              { $eq: ["$qcData.checkedQty", 0] },
+              0,
+              {
+                $subtract: [
+                  1,
+                  { $divide: ["$weightedDefectSum", "$qcData.checkedQty"] }
+                ]
+              }
+            ]
+          }
+        }
+      },
+
+      {
+        $addFields: {
+          passRatePercent: { $multiply: ["$passRate", 100] },
+          result: {
+            $switch: {
+              branches: [
+                {
+                  case: { $eq: [{ $multiply: ["$passRate", 100] }, 100] },
+                  then: "A"
+                },
+                {
+                  case: {
+                    $and: [
+                      { $gte: [{ $multiply: ["$passRate", 100] }, 95] },
+                      { $lt: [{ $multiply: ["$passRate", 100] }, 100] }
+                    ]
+                  },
+                  then: "B"
+                },
+                {
+                  case: {
+                    $and: [
+                      { $gte: [{ $multiply: ["$passRate", 100] }, 92.5] },
+                      { $lt: [{ $multiply: ["$passRate", 100] }, 95] }
+                    ]
+                  },
+                  then: "C"
+                }
+              ],
+              default: "D"
+            }
+          },
+          defectRate: {
+            $cond: [
+              { $eq: ["$qcData.checkedQty", 0] },
+              0,
+              {
+                $multiply: [
+                  {
+                    $divide: ["$qcData.totalDefectQty", "$qcData.checkedQty"]
+                  },
+                  100
+                ]
+              }
+            ]
+          }
+        }
+      },
+
+      // Optional: Filter by result if provided
+      ...(result ? [{ $match: { result: result } }] : []),
+
+      // Use $facet to get both data and filter options
+      {
+        $facet: {
+          reports: [{ $sort: { inspectionDate: -1 } }],
+
+          summary: [
+            {
+              $group: {
+                _id: null,
+                totalCheckedQty: { $sum: "$qcData.checkedQty" },
+                totalRejectPcs: { $sum: "$qcData.rejectPcs" },
+                totalDefectQty: { $sum: "$qcData.totalDefectQty" },
+                totalMinorCount: { $sum: "$minorCount" },
+                totalMajorCount: { $sum: "$majorCount" },
+                totalCriticalCount: { $sum: "$criticalCount" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                totalCheckedQty: 1,
+                totalRejectPcs: 1,
+                totalDefectQty: 1,
+                totalMinorCount: 1,
+                totalMajorCount: 1,
+                totalCriticalCount: 1,
+                defectRate: {
+                  $cond: [
+                    { $eq: ["$totalCheckedQty", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalDefectQty", "$totalCheckedQty"] },
+                        100
+                      ]
+                    }
+                  ]
+                },
+                defectRatio: {
+                  $cond: [
+                    { $eq: ["$totalCheckedQty", 0] },
+                    0,
+                    {
+                      $multiply: [
+                        { $divide: ["$totalRejectPcs", "$totalCheckedQty"] },
+                        100
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          ],
+
+          filterOptions: [
+            {
+              $group: {
+                _id: null,
+                reportTypes: { $addToSet: "$reportType" },
+                factories: { $addToSet: "$factory" },
+                lineNos: { $addToSet: "$lineNo" },
+                moNos: { $addToSet: "$moNo" },
+                colors: { $addToSet: "$color" },
+                qaIds: { $addToSet: "$preparedBy.empId" },
+                qcIds: { $addToSet: "$qcData.qcID" },
+                results: { $addToSet: "$result" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                reportTypes: {
+                  $sortArray: { input: "$reportTypes", sortBy: 1 }
+                },
+                factories: { $sortArray: { input: "$factories", sortBy: 1 } },
+                lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } },
+                moNos: { $sortArray: { input: "$moNos", sortBy: 1 } },
+                colors: { $sortArray: { input: "$colors", sortBy: 1 } },
+                qaIds: { $sortArray: { input: "$qaIds", sortBy: 1 } },
+                qcIds: { $sortArray: { input: "$qcIds", sortBy: 1 } },
+                results: { $sortArray: { input: "$results", sortBy: 1 } }
+              }
+            }
+          ]
+        }
+      },
+
+      {
+        $project: {
+          reports: "$reports",
+          summary: { $arrayElemAt: ["$summary", 0] },
+          filterOptions: { $arrayElemAt: ["$filterOptions", 0] }
+        }
+      }
+    ];
+
+    const resultQA = await SubconSewingQAReport.aggregate(pipeline);
+
+    const responseData = {
+      reports: resultQA[0]?.reports || [],
+      summary: resultQA[0]?.summary || {
+        totalCheckedQty: 0,
+        totalRejectPcs: 0,
+        totalDefectQty: 0,
+        totalMinorCount: 0,
+        totalMajorCount: 0,
+        totalCriticalCount: 0,
+        defectRate: 0,
+        defectRatio: 0
+      },
+      filterOptions: resultQA[0]?.filterOptions || {
+        reportTypes: [],
+        factories: [],
+        lineNos: [],
+        moNos: [],
+        colors: [],
+        qaIds: [],
+        qcIds: [],
+        results: []
+      }
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Error fetching QA inspection data:", error);
+    res.status(500).json({ error: "Failed to fetch inspection data" });
+  }
+});
+
+/* ----------------------------------------------------
+   NEW ENDPOINT - Get Single QA Inspection Report by ID
+---------------------------------------------------- */
+
+app.get("/api/subcon-qa-inspection-data/:reportId", async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const report = await SubconSewingQAReport.findById(reportId).lean();
+
+    if (!report) {
+      return res.status(404).json({ error: "Report not found" });
+    }
+
+    res.json({ report });
+  } catch (error) {
+    console.error("Error fetching QA inspection report:", error);
+    res.status(500).json({ error: "Failed to fetch report" });
+  }
+});
+
+/* -------------------------------------
+// Improved Image Proxy for PDF CORS Issue
+// This endpoint acts as a middleman to bypass browser CORS restrictions.
+------------------------------------- */
+
+app.get("/api/image-proxy", async (req, res) => {
+  const { url } = req.query;
+
+  if (!url) {
+    console.error("Image Proxy: No URL provided");
+    return res.status(400).json({ error: "An image URL is required." });
+  }
+
+  try {
+    // If it's a local file on the same server
+    if (url.includes(`${API_BASE_URL}/storage/`)) {
+      const localPath = url.replace(`${API_BASE_URL}/storage/`, "");
+      const fullPath = path.join(__dirname, "public/storage", localPath);
+
+      if (fs.existsSync(fullPath)) {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+        res.header(
+          "Access-Control-Allow-Headers",
+          "Origin, X-Requested-With, Content-Type, Accept"
+        );
+
+        const ext = path.extname(fullPath).toLowerCase();
+
+        // If it's a WebP image, convert it to JPEG
+        if (ext === ".webp") {
+          try {
+            console.log("Converting WebP to JPEG:", fullPath);
+
+            // Use Sharp to convert WebP to JPEG
+            const convertedBuffer = await sharp(fullPath)
+              .jpeg({ quality: 90 })
+              .toBuffer();
+
+            res.setHeader("Content-Type", "image/jpeg");
+            res.setHeader("Cache-Control", "public, max-age=3600");
+            res.send(convertedBuffer);
+
+            return;
+          } catch (conversionError) {
+            console.error("Error converting WebP:", conversionError);
+            return res
+              .status(500)
+              .json({ error: "Failed to convert WebP image." });
+          }
+        } else {
+          // For non-WebP images, serve as normal
+          let contentType = "application/octet-stream";
+
+          switch (ext) {
+            case ".jpg":
+            case ".jpeg":
+              contentType = "image/jpeg";
+              break;
+            case ".png":
+              contentType = "image/png";
+              break;
+            case ".gif":
+              contentType = "image/gif";
+              break;
+            case ".svg":
+              contentType = "image/svg+xml";
+              break;
+          }
+
+          res.setHeader("Content-Type", contentType);
+          res.setHeader("Cache-Control", "public, max-age=3600");
+
+          const fileStream = fs.createReadStream(fullPath);
+          fileStream.pipe(res);
+          return;
+        }
+      } else {
+        console.error("Image Proxy: Local file not found:", fullPath);
+        return res.status(404).json({ error: "Image file not found." });
+      }
+    }
+
+    // For external URLs, fetch and convert if needed
+    const response = await axios({
+      method: "get",
+      url: url,
+      responseType: "arraybuffer",
+      timeout: 100000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; ImageProxy/1.0)"
+      }
+    });
+
+    const contentType = response.headers["content-type"];
+
+    if (!contentType || !contentType.startsWith("image/")) {
+      console.error(
+        "Image Proxy: Not a valid image content type:",
+        contentType
+      );
+      return res
+        .status(400)
+        .json({ error: "URL does not point to a valid image." });
+    }
+
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.header(
+      "Access-Control-Allow-Headers",
+      "Origin, X-Requested-With, Content-Type, Accept"
+    );
+
+    // If it's WebP, convert to JPEG
+    if (contentType === "image/webp") {
+      try {
+        console.log("Converting external WebP to JPEG");
+
+        const convertedBuffer = await sharp(Buffer.from(response.data))
+          .jpeg({ quality: 90 })
+          .toBuffer();
+
+        res.setHeader("Content-Type", "image/jpeg");
+        res.setHeader("Cache-Control", "public, max-age=3600");
+        res.send(convertedBuffer);
+
+        return;
+      } catch (conversionError) {
+        console.error("Error converting external WebP:", conversionError);
+        return res.status(500).json({ error: "Failed to convert WebP image." });
+      }
+    } else {
+      // For non-WebP images, serve as normal
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      res.send(Buffer.from(response.data));
+    }
+  } catch (error) {
+    console.error("Image Proxy Error:", {
+      url: url,
+      message: error.message,
+      code: error.code
+    });
+
+    res.status(500).json({
+      error: "Failed to retrieve image.",
+      details: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   PACKING LIST API ENDPOINTS
+------------------------------ */
+
+app.post("/api/packing-list/upload", async (req, res) => {
+  try {
+    const packingListData = req.body;
+
+    const result = await PlanPackingList.findOneAndUpdate(
+      { moNo: packingListData.moNo, poNo: packingListData.poNo }, // Query to find the document
+      packingListData, // The new data to insert or update with
+      { new: true, upsert: true, runValidators: true } // Options
+    );
+
+    res.status(201).json({
+      success: true,
+      message: "Packing list uploaded successfully.",
+      data: result
+    });
+  } catch (error) {
+    console.error("Error saving packing list:", error);
+    // Handle specific error for duplicate key
+    if (error.code === 11000) {
+      return res.status(409).json({
+        // 409 Conflict
+        success: false,
+        message:
+          "A packing list with this MO Number and PO Number already exists."
+      });
+    }
+    res.status(500).json({
+      success: false,
+      message: "An error occurred on the server.",
+      error: error.message
+    });
+  }
+});
+
+/* ============================================================
+   🆕 YORKSYS ORDERS - Save Endpoint
+   ============================================================ */
+
+/**
+ * POST /yorksys-orders/save
+ * Saves Yorksys order data to MongoDB
+ */
+app.post("/api/yorksys-orders/save", async (req, res) => {
+  try {
+    const orderPayload = req.body;
+
+    // Validate required fields
+    if (!orderPayload.moNo || !orderPayload.factory || !orderPayload.buyer) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: moNo, factory, or buyer."
+      });
+    }
+
+    // ============================================================
+    // 🆕 MODIFIED: Use findOneAndUpdate with upsert to replace existing record
+    // ============================================================
+    const updatedOrder = await YorksysOrders.findOneAndUpdate(
+      {
+        moNo: orderPayload.moNo,
+        factory: orderPayload.factory
+      },
+      orderPayload, // Replace entire document with new data
+      {
+        new: true, // Return the updated document
+        upsert: true, // Create if doesn't exist
+        runValidators: true // Run schema validators
+      }
+    );
+
+    // Check if it was an update or insert
+    const isNewRecord =
+      !updatedOrder.createdAt ||
+      updatedOrder.createdAt.getTime() === updatedOrder.updatedAt.getTime();
+
+    return res.status(isNewRecord ? 201 : 200).json({
+      success: true,
+      message: isNewRecord
+        ? `Order ${orderPayload.moNo} saved successfully!`
+        : `Order ${orderPayload.moNo} updated successfully!`,
+      data: updatedOrder
+    });
+    // ============================================================
+  } catch (error) {
+    console.error("Error saving Yorksys order:", error);
+
+    // Handle validation errors
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: "Validation error: " + error.message
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while saving order.",
+      error: error.message
+    });
+  }
+});
+
+/**
+ * GET /yorksys-orders/:moNo
+ * Retrieves a specific order by MO Number
+ */
+app.get("/api/yorksys-orders/:moNo", async (req, res) => {
+  try {
+    const { moNo } = req.params;
+    const order = await YorksysOrders.findOne({ moNo });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: `Order ${moNo} not found.`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: order
+    });
+  } catch (error) {
+    console.error("Error fetching Yorksys order:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching order.",
+      error: error.message
+    });
+  }
+});
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {

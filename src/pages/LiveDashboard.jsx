@@ -522,15 +522,25 @@ const LiveDashboard = () => {
           <CuttingMenu setActiveSection={setActiveSection} />
         )}
 
+        {activeSection === "Cutting" && (
+          <CuttingMenu setActiveSection={setActiveSection} />
+        )}
+
         {activeSection === "Roving Report" && <RovingReport />}
         {activeSection === "Cutting Dashboard" && (
-          <CuttingDashboard onBackToCuttingLive={() => setActiveSection("Cutting")} />
+          <CuttingDashboard
+            onBackToCuttingLive={() => setActiveSection("Cutting")}
+          />
         )}
         {activeSection === "Cutting Reports" && (
-          <CuttingReport onBackToCuttingLive={() => setActiveSection("Cutting")} />
+          <CuttingReport
+            onBackToCuttingLive={() => setActiveSection("Cutting")}
+          />
         )}
         {activeSection === "Cutting Trend" && (
-          <CuttingGarmentTypeTrendAnalysis onBackToCuttingLive={() => setActiveSection("Cutting")} />
+          <CuttingGarmentTypeTrendAnalysis
+            onBackToCuttingLive={() => setActiveSection("Cutting")}
+          />
         )}
         {activeSection === "Buyer Specs" && <DigitalMeasurementBuyerSpec />}
         {activeSection === "Measurement Summary" && <DigitalMeasurement />}
@@ -546,6 +556,7 @@ const LiveDashboard = () => {
         {activeSection === "OPA" && <OPALive />}
         {activeSection === "Cutting" && <CuttingLive setActiveSection={setActiveSection} />}
         {activeSection === "Packing" && <PackingLive />}
+        {activeSection === "Cutting" && <CuttingLive />}
         {activeSection === "Live Dashboard" && (
           <>
             {/* Summary Cards (Common for all tabs) */}

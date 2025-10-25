@@ -31,7 +31,7 @@ const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
         eng_name,
         kh_name,
         dept_name,
-        sect_name,
+        sect_name
       });
       setEditingUser(null);
     } else {
@@ -41,7 +41,7 @@ const UserForm = ({ fetchUsers, editingUser, setEditingUser }) => {
         eng_name,
         kh_name,
         dept_name,
-        sect_name,
+        sect_name
       });
     }
     setEmpId("");
