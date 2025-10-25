@@ -72,6 +72,8 @@ import createQCWashingQtyOldSchema from "../../models/QCWashingQtyOld.js";
 import createDTOrdersSchema from "../../models/dt_orders.js";
 import createIEWorkerTaskModel from "../../models/IEWorkerTask.js";
 import CuttingInlineOrdersModel from "../../models/CuttingInlineOrders.js";
+import createPlanPackingListModel from "../../models/PlanPackingList.js";
+import createYorksysOrdersModel from "../../models/YorksysOrders.js";
 
 
 //MongoDB Connections
@@ -168,6 +170,8 @@ export const SubConDefect = createSubConDefectsModel(ymProdConnection);
 export const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
 export const SubconSewingQc1Report = createSubconSewingQc1ReportModel(ymProdConnection);
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
+export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
+export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

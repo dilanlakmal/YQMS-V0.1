@@ -5,108 +5,14 @@ import multer from "multer";
 import path from "path";
 import { Server } from "socket.io"; // Import Socket.io
 import { fileURLToPath } from "url";
-import createIroningModel from "./models/Ironing.js";
-//import createRoleModel from "./models/Role.js";
-import createRoleManagmentModel from "./models/RoleManagment.js";
-import createOPAModel from "./models/OPA.js";
-import createPackingModel from "./models/Packing.js";
-import createQC2DefectPrintModel from "./models/QC2DefectPrint.js";
-import createUserModel from "./models/User.js";
-import createWashingModel from "./models/Washing.js";
-import createQCDataModel from "./models/qc1_data.js";
-import createQc2OrderDataModel from "./models/qc2_orderdata.js";
-import createQC2InspectionPassBundleModel from "./models/qc2_inspection.js";
-import createQC2ReworksModel from "./models/qc2_rework.js";
-import createQC2RepairTrackingModel from "./models/qc2_repair_tracking.js";
-import createSubconFactoryModel from "./models/SubconFactory.js";
-import createQC2DefectsModel from "./models/QC2DefectsModel.js";
-import createQC2WorkersDataModel from "./models/QC2WorkersData.js";
-import createQC2BGradeModel from "./models/QC2BGrade.js";
-import createQC2TaskModel from "./models/QC2Task.js";
-import createIEWorkerTaskModel from "./models/IEWorkerTask.js";
 
-import createInlineOrdersModel from "./models/InlineOrders.js"; // Import the new model
-import createLineSewingWorkerModel from "./models/LineSewingWorkers.js";
-import createQCInlineRovingModel from "./models/QC_Inline_Roving.js";
-import createPairingDefectModel from "./models/PairingDefect.js";
-import createAccessoryIssueModel from "./models/AccessoryIssue.js";
-import createQCRovingPairingModel from "./models/QCRovingPairing.js";
-import createSewingDefectsModel from "./models/SewingDefects.js";
-
-import createCutPanelOrdersModel from "./models/CutPanelOrders.js"; // New model import
-import createCuttingInspectionModel from "./models/cutting_inspection.js"; // New model import
-import createCuttingMeasurementPointModel from "./models/CuttingMeasurementPoints.js"; // New model import
-import createCuttingFabricDefectModel from "./models/CuttingFabricDefects.js";
-import createCuttingIssueModel from "./models/CuttingIssues.js";
-import createAQLChartModel from "./models/AQLChart.js";
-
-import createQC1SunriseModel from "./models/QC1Sunrise.js"; // New model import
-
-import createHTFirstOutputModel from "./models/HTFirstOutput.js";
-import createFUFirstOutputModel from "./models/FUFirstOutput.js";
-import createSCCDailyTestingModel from "./models/SCCDailyTesting.js";
-import createDailyTestingHTFUtModel from "./models/dailyTestingHTFUModel.js";
-import createDailyTestingFUQCModel from "./models/DailyTestingFUQCModel.js";
-import createSCCDefectModel from "./models/SCCDefectModel.js";
-import createSCCScratchDefectModel from "./models/SCCScratchDefectModel.js";
-import createHTInspectionReportModel from "./models/HTInspectionReportModel.js";
-import createElasticReportModel from "./models/ElasticReport.js";
-
-// Import the new SCC Operator models
-import createSCCHTOperatorModel from "./models/SCCHTOperatorModel.js";
-import createSCCFUOperatorModel from "./models/SCCFUOperatorModel.js";
-import createSCCElasticOperatorModel from "./models/SCCElasticOperatorModel.js";
-
-import createEMBDefectModel from "./models/EMBdefect.js";
-import createPrintingDefectModel from "./models/printingDefect.js";
-import createEMBReportModel from "./models/EMBReport.js";
-
-import createQADefectsModel from "./models/QADefectsModel.js";
-import createQCAccuracyReportModel from "./models/QCAccuracyReportModel.js";
-import createQAStandardDefectsModel from "./models/QAStandardDefectsModel.js";
-
-import createAuditCheckPointModel from "./models/AuditCheckPoint.js";
-
-import createBuyerSpecTemplateModel from "./models/BuyerSpecTemplate.js";
-import createANFMeasurementReportModel from "./models/ANFMeasurementReport.js";
-import createSizeCompletionStatusModel from "./models/SizeCompletionStatus.model.js";
-
-import createQCWashingDefectsModel from "./models/QCWashingDefectsModel.js";
-import createQCWashingCheckpointsModel from "./models/QCWashingCheckpointsModel.js";
-import createQCWashingFirstOutputModel from "./models/QCWashingFirstOutputModel.js";
-import createQCWashingModel from "./models/QCWashing.js";
-
-import createSupplierIssuesDefectModel from "./models/SupplierIssuesDefect.js";
-import createSupplierIssueReportModel from "./models/SupplierIssueReport.js";
-
-import createSubConDefectsModel from "./models/sub_con_defects.js";
-import createSubconSewingQAReportModel from "./models/subconSewingQAReportSchema.js";
-import createSubconSewingFactoryModel from "./models/subcon_sewing_factory.js";
-import createSubconSewingQc1ReportModel from "./models/subcon_sewing_qc1_report.js";
-
-import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
-import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
-import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
-import createQCWorkersModel from "./models/QCWorkers.js";
-import createDTOrdersSchema from "./models/dt_orders.js";
-
-import createPlanPackingListModel from "./models/PlanPackingList.js";
-
-import createYorksysOrdersModel from "./models/YorksysOrders.js";
-
-// import sql from "mssql"; // Import mssql for SQL Server connection
-// import cron from "node-cron"; // Import node-cron for scheduling
 
 import { promises as fsPromises } from "fs";
 
 import mongoose from "mongoose";
 import sharp from "sharp";
 
-import { app, server, PORT, API_BASE_URL } from "./Config/appConfig.js";
-
-const __filename = fileURLToPath(import.meta.url);
-export const __backendDir = path.dirname(__filename);
-import { fileURLToPath } from "url";
+import { app, server, PORT, API_BASE_URL,  __backendDir } from "./Config/appConfig.js";
 
 import { 
   ymProdConnection ,

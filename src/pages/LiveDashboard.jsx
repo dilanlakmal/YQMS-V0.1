@@ -522,9 +522,7 @@ const LiveDashboard = () => {
           <CuttingMenu setActiveSection={setActiveSection} />
         )}
 
-        {activeSection === "Cutting" && (
-          <CuttingMenu setActiveSection={setActiveSection} />
-        )}
+       
 
         {activeSection === "Roving Report" && <RovingReport />}
         {activeSection === "Cutting Dashboard" && (
