@@ -569,7 +569,7 @@ const handleExportExcel = async () => {
         };
 
         // Add the sheet with a clean name
-        const sheetName = `${tabKey.toUpperCase()}_Measurements`.substring(0, 31);
+        const sheetName = `${tabKey.toUpperCase()}`.substring(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }
     });
