@@ -12,6 +12,8 @@ import {
   getSections,
   getUserByEmpId,
   getUserByEmpIdForInspector,
+  searchUsersByEmpIdOrName,
+  getWorkingUsers
 } from '../../controller/User/userController.js';
 
 const router = express.Router();
@@ -29,5 +31,7 @@ router.get('/api/users-paginated', getUsersPaginated);
 router.get('/api/sections', getSections);
 router.get('/api/user-by-emp-id', getUserByEmpId);
 router.get('/api/users/:emp_id', getUserByEmpIdForInspector);
+router.get('/api/users/search', searchUsersByEmpIdOrName);
+router.get('/api/users', getWorkingUsers);
 
 export default router;

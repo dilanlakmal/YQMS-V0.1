@@ -170,7 +170,7 @@ function Home() {
             description: "Washing Report"
           },
            {
-            path: "/qcWashing",
+            path: "/measurement",
             roles: ["QC Washing"],
             image: "assets/Home/measurement.png",
             title: t("home.Measurement"),

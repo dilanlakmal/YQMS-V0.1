@@ -5,7 +5,8 @@ const PowerBI = () => {
   // State to track which card's iframe is visible and full-screen status
   const [activeCard, setActiveCard] = useState(null);
   const [fullScreenCard, setFullScreenCard] = useState(null);
-  const [screenWidth, setScreenWidth] = useState(window.innerWidth); // Track screen width dynamically
+  const [screenWidth, setScreenWidth] = useState(window.innerWidth);
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
 
   // Array of card data with titles and iframe sources
   const cards = [
@@ -78,11 +79,14 @@ const PowerBI = () => {
     setFullScreenCard(null);
   };
 
-  // Effect to update screen width dynamically on resize
+  // Effect to update screen dimensions dynamically on resize
   useEffect(() => {
-    const handleResize = () => setScreenWidth(window.innerWidth);
+    const handleResize = () => {
+      setScreenWidth(window.innerWidth);
+      setScreenHeight(window.innerHeight);
+    };
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize); // Cleanup
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   return (
@@ -141,7 +145,7 @@ const PowerBI = () => {
       {/* Full-Screen Modal for Power BI Dashboard */}
       {fullScreenCard !== null && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg shadow-xl max-w-full max-h-full">
+          <div className="bg-white rounded-lg shadow-xl w-full h-full flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-2xl font-bold text-indigo-800">
                 {cards[fullScreenCard].title}
@@ -155,12 +159,12 @@ const PowerBI = () => {
             </div>
             <iframe
               title={cards[fullScreenCard].title}
-              width={screenWidth} // Dynamically set to screen width
-              height="800"
+              width={screenWidth}
+              height={screenHeight}
               src={cards[fullScreenCard].iframeSrc}
               frameBorder="0"
               allowFullScreen="true"
-              className="rounded-md"
+              className="rounded-md flex-grow"
             ></iframe>
           </div>
         </div>

@@ -2,7 +2,7 @@ import express from 'express';
 import {
   getStanderdDefect,
   saveQaImageUpload,
-} from '../../controller/SubConQC/qcController.js';
+} from '../../controller/SubConQA/subConQADefectController.js';
 
 import { qaImageUpload } from "../../Helpers/helperFunctions.js";
 

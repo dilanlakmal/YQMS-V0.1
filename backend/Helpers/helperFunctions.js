@@ -505,7 +505,6 @@ export function escapeRegex(string) {
   return string.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 }
 
-
 // Configure multer for roving pairing images
 const rovingImageStorage = multer.memoryStorage();
 export const uploadRovingImage = multer({
@@ -527,4 +526,153 @@ const cuttingMemoryStorage = multer.memoryStorage();
   storage: cuttingMemoryStorage,
   limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
 });
+
+
+// Helper to parse pressure string to number (if needed, but schema now enforces Number)
+export const parsePressureToNumber = (pressureStr) => {
+  if (pressureStr === null || pressureStr === undefined || pressureStr === "")
+    return null;
+  const num = parseFloat(pressureStr);
+  return isNaN(num) ? null : num;
+};
+
+
+// Helper function to generate all necessary date formats from a single input
+export const getConsolidatedDateFormats = (dateInput) => {
+  const date = new Date(dateInput);
+
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+
+  // Format for schemas without leading zeros: 'M/D/YYYY'
+  const stringDate = `${month}/${day}/${year}`;
+
+  // Format for schemas WITH leading zeros: 'MM/DD/YYYY'
+  const paddedStringDate = `${String(month).padStart(2, "0")}/${String(
+    day
+  ).padStart(2, "0")}/${year}`;
+
+  // Format for ISODate-based schemas (timestamp)
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return {
+    stringDate,
+    paddedStringDate,
+    isoStartDate: startOfDay,
+    isoEndDate: endOfDay
+  };
+};
+
+
+// 1. Define the absolute destination path and ensure the directory exists
+const auditUploadPath = path.join(
+  __backendDir,
+  "public",
+  "storage",
+  "audit_images"
+);
+//fs.mkdirSync(auditUploadPath, { recursive: true }); // This is the correct way to ensure the directory exists
+
+// 2. Update the multer storage configuration
+const audit_storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Use the absolute path variable here
+    cb(null, auditUploadPath);
+  },
+  filename: (req, file, cb) => {
+    // Sanitize requirementId or use a UUID for more robust filenames
+    const requirementId = req.body.requirementId || "unknown";
+    cb(
+      null,
+      `audit-${requirementId}-${Date.now()}${path.extname(file.originalname)}`
+    );
+  }
+});
+
+export const audit_image_upload = multer({
+  storage: audit_storage,
+  fileFilter: (req, file, cb) => {
+    // Same fileFilter as your cutting_upload
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif"]; // Added GIF
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF images are allowed"), false);
+    }
+  },
+  limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
+});
+
+
+// Helper function to map page identifiers to keywords in processName
+export const getProcessKeywordForPage = (pageIdentifier) => {
+  const keywordMap = {
+    "bundle-registration": "bundle",
+    washing: "washing",
+    opa: "opa",
+    ironing: "ironing",
+    packing: "packing", // The keyword remains the same
+    "qc2-inspection": "qc2"
+  };
+  return keywordMap[pageIdentifier.toLowerCase()];
+};
+
+// --- FIX #2: NEW IMAGE UPLOAD ENDPOINT FOR QA ACCURACY ---
+const qaAccuracyStorage = multer.memoryStorage();
+export const qaAccuracyUpload = multer({
+  storage: qaAccuracyStorage,
+  limits: { fileSize: 25 * 1024 * 1024 }
+});
+
+
+// Helper function to generate date strings in M/D/YYYY format for filtering
+export const generateDateStringsCuttingDashboard = (startDate, endDate) => {
+  if (!startDate || !endDate) return [];
+  const dates = [];
+  let currentDate = new Date(startDate);
+  const lastDate = new Date(endDate);
+
+  currentDate.setHours(0, 0, 0, 0);
+  lastDate.setHours(0, 0, 0, 0);
+
+  while (currentDate <= lastDate) {
+    const M = currentDate.getMonth() + 1;
+    const D = currentDate.getDate();
+    const Y = currentDate.getFullYear();
+    dates.push(`${M}/${D}/${Y}`);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+  return dates;
+};
+
+// This is the logic for the buyer helper, translated into MongoDB aggregation syntax.
+// It will be used inside an $addFields stage.
+export const derivedBuyerLogic = {
+  $switch: {
+    branches: [
+      { case: { $regexMatch: { input: "$moNo", regex: "COM" } }, then: "MWW" },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "CO" } },
+        then: "Costco"
+      },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "AR" } },
+        then: "Aritzia"
+      },
+      {
+        case: { $regexMatch: { input: "$moNo", regex: "RT" } },
+        then: "Reitmans"
+      },
+      { case: { $regexMatch: { input: "$moNo", regex: "AF" } }, then: "ANF" },
+      { case: { $regexMatch: { input: "$moNo", regex: "NT" } }, then: "STORI" }
+    ],
+    default: "Other"
+  }
+};
+
 

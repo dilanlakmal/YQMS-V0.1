@@ -42,6 +42,7 @@ import {
   getQCWashingImageFilename,
   updateQCWashingQty,
   updateQCWashingQtySub,
+  getAllQCWashingSubmittedData,
 } from '../../controller/QCWashing/qcWashingController.js';
 import { uploadInspectionImage, uploadDefectImage} from "../../Helpers/helperFunctions.js";
 
@@ -89,5 +90,6 @@ router.use('/storage', useAditionalImageSaving);
 router.get('/api/storage/qc_washing_images/:type/:filename', getQCWashingImageFilename);
 router.put('/api/qc-washing/update-wash-qty/:id', updateQCWashingQty);
 router.put('/api/qc-washing/update-edited-wash-qty/:id', updateQCWashingQtySub);
+router.get('/api/qc-washing/all-submitted', getAllQCWashingSubmittedData);
 
 export default router;

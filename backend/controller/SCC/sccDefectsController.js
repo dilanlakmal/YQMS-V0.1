@@ -2,7 +2,9 @@ import {
   SCCDefect,
   FUFirstOutput,
   SCCDailyTesting,
-  DailyTestingHTFU,                
+  DailyTestingHTFU,
+  PrintingDefect,   
+  EMBDefect,             
 } from "../MongoDB/dbConnectionController.js";
 import mongoose from "mongoose";
 
@@ -168,4 +170,34 @@ export const deleteSccDefect = async (req, res) => {
       .status(500)
       .json({ message: "Failed to delete SCC defect", error: error.message });
   }
+};
+
+// GET - Fetch all Printing defects
+export const getPrintingDefects = async (req, res) => {
+  try {
+      const defects = await PrintingDefect.find({}).sort({ no: 1 }).lean();
+      res.json(defects);
+    } catch (error) {
+      console.error("Error fetching Printing defects:", error);
+      res.status(500).json({ message: "Server error fetching Printing defects" });
+    }
+};
+
+//GET - all combined defects
+export const getAllCombinedDefects = async (req, res) => {
+  try {
+      const [embDefects, printingDefects] = await Promise.all([
+        EMBDefect.find({}).sort({ no: 1 }).lean(),
+        PrintingDefect.find({}).sort({ no: 1 }).lean()
+      ]);
+  
+      const allDefects = [...embDefects, ...printingDefects].sort(
+        (a, b) => a.no - b.no
+      );
+  
+      res.json(allDefects);
+    } catch (error) {
+      console.error("Error fetching all defects:", error);
+      res.status(500).json({ message: "Server error fetching all defects" });
+    }
 };

@@ -2806,3 +2806,26 @@ export const updateQCWashingQtySub = async (req, res) => {
     });
   }
 };
+
+// Endpoint to fetch all submitted QC washing data
+export const getAllQCWashingSubmittedData = async (req, res) => {
+  try {
+      const submittedData = await QCWashing.find({ 
+        status: { $in: ['submitted', 'processing', 'auto-saved'] }
+      }).sort({ createdAt: -1 });
+  
+      res.json({ 
+        success: true, 
+        data: submittedData,
+        count: submittedData.length
+      });
+  
+    } catch (error) {
+      console.error("Error fetching submitted QC washing data:", error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to fetch submitted data", 
+        error: error.message 
+      });
+    }
+};

@@ -9,7 +9,11 @@ import {
   addRequirementToCheckpoint,
   updateRequirementInCheckpoint,
   deleteRequirementFromCheckpoint,
+  saveAuditImage,
 } from '../../controller/Audit/auditController.js';
+import {
+  audit_image_upload,
+} from '../../Helpers/helperFunctions.js';
 
 const router = express.Router();
 
@@ -22,5 +26,7 @@ router.delete('/api/audit-checkpoints/:id', deleteAuditCheckPoint);
 router.post('/api/audit-checkpoints/:checkpointId/requirements', addRequirementToCheckpoint);
 router.put('/api/audit-checkpoints/:checkpointId/requirements/:requirementId', updateRequirementInCheckpoint);
 router.delete('/api/audit-checkpoints/:checkpointId/requirements/:requirementId', deleteRequirementFromCheckpoint);
+router.post('/api/audit/upload-image', audit_image_upload.single("auditImage"), saveAuditImage);
+
 
 export default router;

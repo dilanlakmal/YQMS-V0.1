@@ -184,7 +184,7 @@ export const getUsersPaginated = async (req, res) => {
     const skip = (page - 1) * limit;
     const jobTitle = req.query.jobTitle || ""; 
     const empId = req.query.empId || ""; 
-    const section = req.query.section || ""; filter
+    const section = req.query.section || "";
 
     // Build the query object
     const query = {};
@@ -286,4 +286,78 @@ export const getUserByEmpIdForInspector = async (req, res) => {
     );
     res.status(500).json({ error: "Failed to fetch user" });
   }
+};
+
+// NEW ENDPOINT: Search for users by emp_id or name
+export const searchUsersByEmpIdOrName = async (req, res) => {
+  try {
+      const searchTerm = req.query.term;
+      if (!searchTerm || searchTerm.trim().length < 2) {
+        return res.json([]); // Return empty if search term is too short
+      }
+  
+      // Create a case-insensitive regular expression for searching
+      const regex = new RegExp(searchTerm, "i");
+  
+      const users = await UserMain.find({
+        $and: [
+          { working_status: "Working" }, // Ensure only active users
+          {
+            $or: [{ emp_id: { $regex: regex } }, { eng_name: { $regex: regex } }]
+          }
+        ]
+      })
+        .limit(10) // Limit results for performance
+        .select("emp_id eng_name job_title face_photo") // Select only needed fields
+        .exec();
+  
+      res.json(users);
+    } catch (err) {
+      console.error("Error searching users:", err);
+      res
+        .status(500)
+        .json({ message: "Failed to search for users", error: err.message });
+    }
+};
+
+export const getWorkingUsers = async (req, res) => {
+  try {
+      const userList = await UserMain.find(
+        { working_status: "Working" }, // Optional: only get active users
+        {
+          _id: 1,
+          emp_id: 1,
+          eng_name: 1,
+          name: 1,
+          dept_name: 1,
+          sect_name: 1,
+          job_title: 1
+        }
+      ).sort({ eng_name: 1 });
+  
+      // Transform the data to match what your frontend expects
+      const transformedUsers = userList.map((user) => ({
+        userId: user.emp_id, // Map emp_id to userId
+        _id: user._id,
+        name: user.eng_name, // Use eng_name as the display name
+        username: user.name, // Keep original name as username
+        emp_id: user.emp_id,
+        eng_name: user.eng_name,
+        dept_name: user.dept_name,
+        sect_name: user.sect_name,
+        job_title: user.job_title
+      }));
+  
+      res.json({
+        success: true,
+        users: transformedUsers
+      });
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch users",
+        error: error.message
+      });
+    }
 };
