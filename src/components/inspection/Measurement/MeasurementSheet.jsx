@@ -186,7 +186,7 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
     }
   };
 
-  const handleExportExcel = async () => {
+const handleExportExcel = async () => {
   setIsExporting(true);
   try {
     const wb = XLSX.utils.book_new();
@@ -204,77 +204,148 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
     kTabs.forEach((tabKey, index) => {
       const { headers, body } = getTableData(tabKey);
       if (body.length > 0) {
-        // Create attractive header section
+        // Create enhanced header section with more professional layout
         const sheetData = [
-          // Row 1: Company Header
-          ['YORKMARS (CAMBODIA) GARMENT MFG CO., LTD'],
-          // Row 2: Document Title
-          [`${tabKey.toUpperCase()} MEASUREMENT SPECIFICATIONS`],
-          // Row 3: Empty for spacing
-          [''],
-          // Row 4: Document Info Header
-          ['DOCUMENT INFORMATION'],
-          // Row 5-9: Document Details
-          ['Style Number:', filterCriteria.styleNo, '', 'Wash Type:', filterCriteria.washType === 'beforeWash' ? 'Before Wash' : 'After Wash'],
-          ['Generated Date:', new Date().toLocaleDateString(), '', 'Generated Time:', new Date().toLocaleTimeString()],
-          ['Filter Applied:', showAll ? 'All Measurements' : 'ANF Points Only', '', 'Total Items:', body.length.toString()],
-          ['Available Sizes:', sizes.join(', '), '', 'Group:', tabKey.toUpperCase()],
-          // Row 9: Empty for spacing
-          [''],
-          // Row 10: Measurement Data Header
-          ['MEASUREMENT DATA'],
-          // Row 11: Empty for spacing
-          [''],
-          // Row 12: Table headers
+          // Row 0: Company Header with logo space
+          ['🏭 YORKMARS (CAMBODIA) GARMENT MFG CO., LTD', '', '', '', '', '', '', '📊 MEASUREMENT SPECIFICATION'],
+          // Row 1: Document Title with decorative elements
+          [`📋 ${tabKey.toUpperCase()} MEASUREMENT SPECIFICATIONS`, '', '', '', '', '', '', '✅ QUALITY CONTROL DOCUMENT'],
+          // Row 2: Decorative separator
+          ['═══════════════════════════════════════════════════════════════════════════════════════════════'],
+          // Row 3: Document Information Header
+          ['📄 DOCUMENT INFORMATION', '', '', '', '', '⚙️ TECHNICAL DETAILS', '', ''],
+          // Row 4: Style and Wash info
+          ['Style Number:', filterCriteria.styleNo, '', 'Wash Type:', filterCriteria.washType === 'beforeWash' ? '🧼 Before Wash' : '🌊 After Wash', 'Total Items:', body.length.toString(), ''],
+          // Row 5: Date and time info
+          ['Generated Date:', new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          }), '', 'Generated Time:', new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+          }), 'Group Type:', `📏 ${tabKey.toUpperCase()}`, ''],
+          // Row 6: Filter and size info
+          ['Filter Applied:', showAll ? '🔍 All Measurements' : '⭐ ANF Points Only', '', 'Available Sizes:', sizes.join(' | '), 'Status:', '✅ Active', ''],
+          // Row 7: Quality info
+          ['Quality Level:', '🏆 Premium Grade', '', 'Tolerance Check:', '✅ Verified', 'Export Format:', '📊 Excel Professional', ''],
+          // Row 8: Decorative separator
+          ['═══════════════════════════════════════════════════════════════════════════════════════════════'],
+          // Row 9: Measurement Data Header
+          ['📊 MEASUREMENT DATA TABLE', '', '', '', '', '', '', ''],
+          // Row 10: Sub header with instructions
+          ['📌 Point Name', '📈 Tolerance (+)', '📉 Tolerance (-)', ...sizes.map(size => `📏 Size ${size}`), ''],
+          // Row 11: Table headers (actual data headers)
           headers,
-          // Row 13+: Table data
+          // Row 12+: Table data
           ...body
         ];
 
         const ws = XLSX.utils.aoa_to_sheet(sheetData);
         
-        // Set column widths for better readability
+        // Enhanced column widths for better readability
         const colWidths = [
-          { width: 35 }, // Measurement Point - wider for long names
-          { width: 12 }, // Tol+ 
-          { width: 12 }, // Tol-
-          ...sizes.map(() => ({ width: 15 })) // Size columns - wider for better readability
+          { width: 40 }, // Measurement Point - extra wide for long names
+          { width: 18 }, // Tol+ - wider for better visibility
+          { width: 18 }, // Tol- - wider for better visibility
+          ...sizes.map(() => ({ width: 20 })) // Size columns - much wider for comfort
         ];
         ws['!cols'] = colWidths;
 
-        // Apply styles using the correct XLSX format
+        // Apply enhanced styles
         const range = XLSX.utils.decode_range(ws['!ref']);
         
-        // Style each cell individually
         for (let R = range.s.r; R <= range.e.r; ++R) {
           for (let C = range.s.c; C <= range.e.c; ++C) {
             const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
             if (!ws[cellAddress]) continue;
             
-            // Initialize cell style
             if (!ws[cellAddress].s) ws[cellAddress].s = {};
             
-            // Company Header (Row 0)
+            // Company Header (Row 0) - Premium blue gradient effect
             if (R === 0) {
               ws[cellAddress].s = {
-                font: { bold: true, sz: 16, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "1F4E79" } },
-                alignment: { horizontal: "center", vertical: "center" },
+                font: { 
+                  bold: true, 
+                  sz: 18, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri"
+                },
+                fill: { fgColor: { rgb: "1F4E79" } }, // Deep professional blue
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center",
+                  wrapText: false
+                },
                 border: {
-                  top: { style: "thick", color: { rgb: "1F4E79" } },
-                  bottom: { style: "thick", color: { rgb: "1F4E79" } },
-                  left: { style: "thick", color: { rgb: "1F4E79" } },
-                  right: { style: "thick", color: { rgb: "1F4E79" } }
+                  top: { style: "thick", color: { rgb: "0F2A44" } },
+                  bottom: { style: "thick", color: { rgb: "0F2A44" } },
+                  left: { style: "thick", color: { rgb: "0F2A44" } },
+                  right: { style: "thick", color: { rgb: "0F2A44" } }
                 }
               };
             }
             
-            // Document Title (Row 1)
+            // Document Title (Row 1) - Lighter blue
             else if (R === 1) {
               ws[cellAddress].s = {
-                font: { bold: true, sz: 14, color: { rgb: "FFFFFF" } },
+                font: { 
+                  bold: true, 
+                  sz: 16, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri"
+                },
                 fill: { fgColor: { rgb: "2E75B6" } },
-                alignment: { horizontal: "center", vertical: "center" },
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center",
+                  wrapText: false
+                },
+                border: {
+                  top: { style: "medium", color: { rgb: "1F4E79" } },
+                  bottom: { style: "medium", color: { rgb: "1F4E79" } },
+                  left: { style: "medium", color: { rgb: "1F4E79" } },
+                  right: { style: "medium", color: { rgb: "1F4E79" } }
+                }
+              };
+            }
+            
+            // Decorative separators (Rows 2, 8)
+            else if (R === 2 || R === 8) {
+              ws[cellAddress].s = {
+                font: { 
+                  bold: true, 
+                  sz: 12, 
+                  color: { rgb: "4472C4" },
+                  name: "Consolas"
+                },
+                fill: { fgColor: { rgb: "F2F8FF" } },
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center"
+                },
+                border: {
+                  top: { style: "thin", color: { rgb: "4472C4" } },
+                  bottom: { style: "thin", color: { rgb: "4472C4" } }
+                }
+              };
+            }
+            
+            // Document Info Header (Row 3)
+            else if (R === 3) {
+              ws[cellAddress].s = {
+                font: { 
+                  bold: true, 
+                  sz: 14, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri"
+                },
+                fill: { fgColor: { rgb: "5B9BD5" } },
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center"
+                },
                 border: {
                   top: { style: "medium", color: { rgb: "2E75B6" } },
                   bottom: { style: "medium", color: { rgb: "2E75B6" } },
@@ -284,34 +355,24 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
               };
             }
             
-            // Document Info Header (Row 3)
-            else if (R === 3) {
-              ws[cellAddress].s = {
-                font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "5B9BD5" } },
-                alignment: { horizontal: "center", vertical: "center" },
-                border: {
-                  top: { style: "medium", color: { rgb: "5B9BD5" } },
-                  bottom: { style: "medium", color: { rgb: "5B9BD5" } },
-                  left: { style: "medium", color: { rgb: "5B9BD5" } },
-                  right: { style: "medium", color: { rgb: "5B9BD5" } }
-                }
-              };
-            }
-            
-            // Document Info Rows (4-7)
+            // Document Info Rows (4-7) - Enhanced with alternating colors
             else if (R >= 4 && R <= 7) {
-              const isLabel = C === 0 || C === 3;
+              const isLabel = C === 0 || C === 3 || C === 5;
+              const rowColor = R % 2 === 0 ? "F8FBFF" : "EDF4FF";
+              const labelColor = R % 2 === 0 ? "E1EFFF" : "D6E8FF";
+              
               ws[cellAddress].s = {
                 font: { 
                   bold: isLabel, 
-                  sz: 10, 
-                  color: { rgb: isLabel ? "1F4E79" : "333333" } 
+                  sz: 11, 
+                  color: { rgb: isLabel ? "1F4E79" : "2C3E50" },
+                  name: "Calibri"
                 },
-                fill: { fgColor: { rgb: isLabel ? "E7F3FF" : "F8FBFF" } },
+                fill: { fgColor: { rgb: isLabel ? labelColor : rowColor } },
                 alignment: { 
                   horizontal: isLabel ? "right" : "left", 
-                  vertical: "center" 
+                  vertical: "center",
+                  indent: isLabel ? 1 : 0
                 },
                 border: {
                   top: { style: "thin", color: { rgb: "B4C7E7" } },
@@ -325,112 +386,190 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
             // Measurement Data Header (Row 9)
             else if (R === 9) {
               ws[cellAddress].s = {
-                font: { bold: true, sz: 12, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "70AD47" } },
-                alignment: { horizontal: "center", vertical: "center" },
+                font: { 
+                  bold: true, 
+                  sz: 16, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri"
+                },
+                fill: { fgColor: { rgb: "70AD47" } }, // Professional green
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center"
+                },
                 border: {
-                  top: { style: "medium", color: { rgb: "70AD47" } },
-                  bottom: { style: "medium", color: { rgb: "70AD47" } },
-                  left: { style: "medium", color: { rgb: "70AD47" } },
-                  right: { style: "medium", color: { rgb: "70AD47" } }
+                  top: { style: "thick", color: { rgb: "548235" } },
+                  bottom: { style: "thick", color: { rgb: "548235" } },
+                  left: { style: "thick", color: { rgb: "548235" } },
+                  right: { style: "thick", color: { rgb: "548235" } }
                 }
               };
             }
             
-            // Table Headers (Row 11)
-            else if (R === 11) {
+            // Sub Headers (Row 10) - Instructional row
+            else if (R === 10) {
               ws[cellAddress].s = {
-                font: { bold: true, sz: 11, color: { rgb: "FFFFFF" } },
-                fill: { fgColor: { rgb: "2E75B6" } },
-                alignment: { horizontal: "center", vertical: "center" },
+                font: { 
+                  bold: true, 
+                  sz: 12, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri",
+                  italic: true
+                },
+                fill: { fgColor: { rgb: "A9D18E" } }, // Lighter green
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center"
+                },
                 border: {
-                  top: { style: "medium", color: { rgb: "2E75B6" } },
-                  bottom: { style: "medium", color: { rgb: "2E75B6" } },
+                  top: { style: "medium", color: { rgb: "70AD47" } },
+                  bottom: { style: "medium", color: { rgb: "70AD47" } },
                   left: { style: "thin", color: { rgb: "FFFFFF" } },
                   right: { style: "thin", color: { rgb: "FFFFFF" } }
                 }
               };
             }
             
-            // Data Rows (Row 12+)
+            // Table Headers (Row 11) - Professional header styling
+            else if (R === 11) {
+              let headerColor = "2E75B6"; // Default blue
+              if (C === 1) headerColor = "70AD47"; // Green for Tol+
+              if (C === 2) headerColor = "C5504B"; // Red for Tol-
+              if (C > 2) headerColor = "7030A0"; // Purple for sizes
+              
+              ws[cellAddress].s = {
+                font: { 
+                  bold: true, 
+                  sz: 12, 
+                  color: { rgb: "FFFFFF" },
+                  name: "Calibri"
+                },
+                fill: { fgColor: { rgb: headerColor } },
+                alignment: { 
+                  horizontal: "center", 
+                  vertical: "center",
+                  wrapText: true
+                },
+                border: {
+                  top: { style: "thick", color: { rgb: "1F4E79" } },
+                  bottom: { style: "thick", color: { rgb: "1F4E79" } },
+                  left: { style: "medium", color: { rgb: "FFFFFF" } },
+                  right: { style: "medium", color: { rgb: "FFFFFF" } }
+                }
+              };
+            }
+            
+            // Data Rows (Row 12+) - Enhanced with professional styling
             else if (R >= 12) {
               const dataRowIndex = R - 12;
               const isEvenRow = dataRowIndex % 2 === 0;
               
-              let fillColor, textColor = "333333";
+              let fillColor, textColor = "2C3E50", borderColor = "D5DBDB";
               
               if (C === 0) {
-                // Measurement Point column
-                fillColor = isEvenRow ? "F2F2F2" : "E8E8E8";
+                // Measurement Point column - Professional blue theme
+                fillColor = isEvenRow ? "F8F9FA" : "EBF3FD";
                 textColor = "1F4E79";
+                borderColor = "AED6F1";
               } else if (C === 1) {
-                // Tol+ column
-                fillColor = isEvenRow ? "E2EFDA" : "D5E8D4";
-                textColor = "375623";
+                // Tol+ column - Success green theme
+                fillColor = isEvenRow ? "E8F5E8" : "D4EDDA";
+                textColor = "155724";
+                borderColor = "C3E6CB";
               } else if (C === 2) {
-                // Tol- column
-                fillColor = isEvenRow ? "FCE4EC" : "F8BBD9";
-                textColor = "C5504B";
+                // Tol- column - Warning red theme
+                fillColor = isEvenRow ? "FDF2F2" : "FADBD8";
+                textColor = "721C24";
+                borderColor = "F1C0C7";
               } else {
-                // Size columns
-                fillColor = isEvenRow ? "F2F8FF" : "E6F3FF";
-                textColor = "1F4E79";
+                // Size columns - Professional purple theme
+                fillColor = isEvenRow ? "F8F4FF" : "F0E6FF";
+                textColor = "4A148C";
+                borderColor = "D1C4E9";
               }
-
+              
               ws[cellAddress].s = {
                 font: { 
-                  sz: 10, 
+                  sz: 11, 
                   color: { rgb: textColor },
-                  bold: C === 0
+                  bold: C === 0,
+                  name: "Calibri"
                 },
                 fill: { fgColor: { rgb: fillColor } },
                 alignment: { 
                   horizontal: C === 0 ? "left" : "center", 
-                  vertical: "center" 
+                  vertical: "center",
+                  indent: C === 0 ? 1 : 0
                 },
                 border: {
-                  top: { style: "thin", color: { rgb: "B4C7E7" } },
-                  bottom: { style: "thin", color: { rgb: "B4C7E7" } },
-                  left: { style: "thin", color: { rgb: "B4C7E7" } },
-                  right: { style: "thin", color: { rgb: "B4C7E7" } }
+                  top: { style: "thin", color: { rgb: borderColor } },
+                  bottom: { style: "thin", color: { rgb: borderColor } },
+                  left: { style: "thin", color: { rgb: borderColor } },
+                  right: { style: "thin", color: { rgb: borderColor } }
                 }
               };
+              
+              // Add special formatting for measurement values
+              if (C > 2 && ws[cellAddress].v) {
+                // Add number formatting for measurement values
+                ws[cellAddress].z = '0.00';
+              }
             }
           }
         }
 
-        // Set up merges for headers
-        const maxCol = Math.max(headers.length - 1, 4);
+        // Enhanced merges for professional layout
+        const maxCol = Math.max(headers.length - 1, 7);
         ws['!merges'] = [
-          // Company header
-          { s: { r: 0, c: 0 }, e: { r: 0, c: maxCol } },
-          // Document title
-          { s: { r: 1, c: 0 }, e: { r: 1, c: maxCol } },
-          // Document info header
-          { s: { r: 3, c: 0 }, e: { r: 3, c: maxCol } },
-          // Measurement data header
+          // Company header spans
+          { s: { r: 0, c: 0 }, e: { r: 0, c: 6 } },
+          { s: { r: 0, c: 7 }, e: { r: 0, c: maxCol } },
+          // Document title spans
+          { s: { r: 1, c: 0 }, e: { r: 1, c: 6 } },
+          { s: { r: 1, c: 7 }, e: { r: 1, c: maxCol } },
+          // Decorative separators
+          { s: { r: 2, c: 0 }, e: { r: 2, c: maxCol } },
+          { s: { r: 8, c: 0 }, e: { r: 8, c: maxCol } },
+          // Section headers
+          { s: { r: 3, c: 0 }, e: { r: 3, c: 4 } },
+          { s: { r: 3, c: 5 }, e: { r: 3, c: maxCol } },
+          // Data header
           { s: { r: 9, c: 0 }, e: { r: 9, c: maxCol } }
         ];
 
-        // Set row heights for better appearance
+        // Enhanced row heights for professional appearance
         ws['!rows'] = [
-          { hpt: 25 }, // Company header
-          { hpt: 20 }, // Document title
-          { hpt: 15 }, // Empty
-          { hpt: 18 }, // Info header
-          { hpt: 16 }, // Info rows
-          { hpt: 16 }, // Info rows
-          { hpt: 16 }, // Info rows
-          { hpt: 16 }, // Info rows
-          { hpt: 15 }, // Empty
-          { hpt: 18 }, // Data header
-          { hpt: 15 }, // Empty
-          { hpt: 20 }, // Table headers
-          ...body.map(() => ({ hpt: 18 })) // Data rows
+          { hpt: 35 }, // Company header - taller
+          { hpt: 30 }, // Document title
+          { hpt: 20 }, // Separator
+          { hpt: 25 }, // Info header
+          { hpt: 22 }, // Info rows
+          { hpt: 22 }, // Info rows
+          { hpt: 22 }, // Info rows
+          { hpt: 22 }, // Info rows
+          { hpt: 20 }, // Separator
+          { hpt: 30 }, // Data header - taller
+          { hpt: 25 }, // Sub header
+          { hpt: 28 }, // Table headers - taller
+          ...body.map(() => ({ hpt: 24 })) // Data rows - comfortable height
         ];
 
+        // Add print settings for professional output
+        ws['!printHeader'] = [
+          ['YORKMARS (CAMBODIA) GARMENT MFG CO., LTD - MEASUREMENT SPECIFICATIONS']
+        ];
+        
+        ws['!margins'] = {
+          left: 0.7,
+          right: 0.7,
+          top: 0.75,
+          bottom: 0.75,
+          header: 0.3,
+          footer: 0.3
+        };
+
         // Add the sheet with a clean name
-        const sheetName = tabKey.toUpperCase().substring(0, 31);
+        const sheetName = `${tabKey.toUpperCase()}_Measurements`.substring(0, 31);
         XLSX.utils.book_append_sheet(wb, ws, sheetName);
       }
     });
@@ -440,17 +579,18 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
       return;
     }
 
-    // Generate filename with current date and time
+    // Generate professional filename
     const now = new Date();
     const dateStr = now.toISOString().split('T')[0];
     const timeStr = now.toTimeString().split(' ')[0].replace(/:/g, '-');
-    const fileName = `${filterCriteria.styleNo}_K_Measurements_${dateStr}_${timeStr}.xlsx`;
+    const fileName = `${filterCriteria.styleNo}_Professional_Measurements_${dateStr}_${timeStr}.xlsx`;
     
-    // Write file with proper options to ensure styling
+    // Write file with enhanced options
     XLSX.writeFile(wb, fileName, { 
       bookType: 'xlsx',
       cellStyles: true,
-      sheetStubs: false
+      sheetStubs: false,
+      compression: true
     });
     
   } catch (error) {
@@ -460,6 +600,7 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
     setIsExporting(false);
   }
 };
+
 
 
 
