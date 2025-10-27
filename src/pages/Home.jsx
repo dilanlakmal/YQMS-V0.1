@@ -174,7 +174,7 @@ function Home() {
             roles: ["QC Washing"],
             image: "assets/Home/measurement.png",
             title: t("home.Measurement"),
-            description: "Washing Report"
+            description: "All Style measurements"
           },
           {
             path: "/upload-beforewash-specs",
