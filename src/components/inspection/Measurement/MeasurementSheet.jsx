@@ -109,237 +109,301 @@ const handleExportPDF = async () => {
           doc.addPage('landscape');
         }
 
-        // ULTRA COMPACT HEADER SECTION
-        let currentY = 5;
-        
-        // Main title - very compact
-        doc.setFillColor(240, 240, 240);
-        doc.rect(5, currentY, pageWidth - 10, 8, 'F');
-        doc.setTextColor(0, 0, 0);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Yorkmars (Cambodia) Garment MFG. Co. Ltd. - Measurement List', pageWidth / 2, currentY + 5, { align: 'center' });
-        currentY += 10;
+        let currentPageY = 5;
+        let isFirstPageOfGroup = true;
 
-        // Customer info in single compact row
-        doc.setFontSize(7);
-        doc.setFont('helvetica', 'normal');
-        
-        // All info in one line
-        doc.text(`Customer: ${filterCriteria.customer || 'ARITZIA LP'}`, 8, currentY);
-        doc.text(`Our ref: ${filterCriteria.ourRef || 'GPAR1910'}`, 8, currentY + 3);
-        
-        doc.text(`Customer Style: ${filterCriteria.styleNo}`, pageWidth / 2 - 25, currentY);
-        doc.text(`Order Qty: ${filterCriteria.orderQty || '1,800 PCS'}`, pageWidth / 2 - 25, currentY + 3);
-        
-        doc.text(`Actual Qty:`, pageWidth - 50, currentY);
-        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - 50, currentY + 3);
-        
-        currentY += 8;
+        // Function to add header to page
+        const addHeader = (y) => {
+          // Main title
+          doc.setFillColor(240, 240, 240);
+          doc.rect(5, y, pageWidth - 10, 8, 'F');
+          doc.setTextColor(0, 0, 0);
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Yorkmars (Cambodia) Garment MFG. Co. Ltd. - Measurement List', pageWidth / 2, y + 5, { align: 'center' });
+          y += 10;
 
-        // MEASUREMENT DATA TABLE
-        const tableStartY = currentY;
-        const footerHeight = 20;
-        const availableHeight = pageHeight - currentY - footerHeight - 3;
+          // Customer info
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'normal');
+          
+          doc.text(`Customer: ${filterCriteria.customer || 'ARITZIA LP'}`, 8, y);
+          doc.text(`Our ref: ${filterCriteria.ourRef || 'GPAR1910'}`, 8, y + 3);
+          
+          doc.text(`Customer Style: ${filterCriteria.styleNo}`, pageWidth / 2 - 25, y);
+          doc.text(`Order Qty: ${filterCriteria.orderQty || '1,800 PCS'}`, pageWidth / 2 - 25, y + 3);
+          
+          doc.text(`Actual Qty:`, pageWidth - 50, y);
+          doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - 50, y + 3);
+          
+          return y + 8;
+        };
+
+        // Function to add table headers
+        const addTableHeaders = (y) => {
+          const rowHeight = 8;
+          const fontSize = 6;
+          
+          // Column structure
+          const measurementPointWidth = 80;
+          const tolPlusWidth = 8;
+          const tolMinusWidth = 8;
+          const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth;
+          const sizeGroupWidth = remainingWidth / sizes.length;
+          const sizeColumnWidth = sizeGroupWidth / 4;
+          
+          let tableY = y;
+          
+          // First header row - Merged headers
+          doc.setFillColor(220, 220, 220);
+          doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(fontSize);
+          
+          let colX = 5;
+          
+          // Measurement Point header
+          doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
+          doc.text('Measurement Point', colX + measurementPointWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += measurementPointWidth;
+          
+          // Tolerance header
+          doc.rect(colX, tableY, tolPlusWidth + tolMinusWidth, rowHeight, 'S');
+          doc.text('Tolerance', colX + (tolPlusWidth + tolMinusWidth)/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += tolPlusWidth + tolMinusWidth;
+          
+          // Size headers
+          sizes.forEach(size => {
+            doc.rect(colX, tableY, sizeGroupWidth, rowHeight, 'S');
+            doc.text(size, colX + sizeGroupWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+            colX += sizeGroupWidth;
+          });
+          
+          tableY += rowHeight;
+
+          // Second header row - Sub column headers
+          doc.setFillColor(200, 200, 200);
+          doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(fontSize - 0.5);
+          
+          colX = 5;
+          
+          // Empty cell under Measurement Point
+          doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
+          colX += measurementPointWidth;
+          
+          // Tolerance sub-headers
+          doc.rect(colX, tableY, tolPlusWidth, rowHeight, 'S');
+          doc.text('+', colX + tolPlusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += tolPlusWidth;
+          
+          doc.rect(colX, tableY, tolMinusWidth, rowHeight, 'S');
+          doc.text('-', colX + tolMinusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += tolMinusWidth;
+          
+          // Size sub-headers
+          sizes.forEach(size => {
+            // First column - Spec
+            doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+            doc.text('Spec', colX + sizeColumnWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+            colX += sizeColumnWidth;
+            
+            // Three empty columns
+            for (let i = 0; i < 3; i++) {
+              doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+              colX += sizeColumnWidth;
+            }
+          });
+          
+          return tableY + rowHeight;
+        };
+
+        // Function to add footer
+        const addFooter = () => {
+          const footerY = pageHeight - 18;
+          
+          doc.setFillColor(240, 240, 240);
+          doc.rect(5, footerY, pageWidth - 10, 16, 'F');
+          
+          doc.setDrawColor(0, 0, 0);
+          doc.setLineWidth(0.2);
+          doc.rect(5, footerY, pageWidth - 10, 16);
+          
+          doc.setFontSize(6);
+          doc.setFont('helvetica', 'normal');
+          
+          // Left section
+          const leftWidth = 60;
+          doc.line(5 + leftWidth, footerY, 5 + leftWidth, footerY + 16);
+          
+          doc.setFont('helvetica', 'bold');
+          doc.text('Inspect Quantity', 7, footerY + 4);
+          doc.setFont('helvetica', 'normal');
+          
+          doc.rect(7, footerY + 5, 2, 2);
+          doc.text('Accept', 10, footerY + 7);
+          
+          doc.rect(7, footerY + 10, 2, 2);
+          doc.text('Reject', 10, footerY + 12);
+          
+          doc.rect(30, footerY + 10, 2, 2);
+          doc.text('Wait for Approval', 33, footerY + 12);
+          
+          // Center section
+          const centerWidth = pageWidth - 10 - leftWidth - 70;
+          doc.line(5 + leftWidth + centerWidth, footerY, 5 + leftWidth + centerWidth, footerY + 16);
+          
+          doc.setFont('helvetica', 'bold');
+          doc.text('Remark:', 5 + leftWidth + 2, footerY + 4);
+          doc.setFont('helvetica', 'normal');
+          
+          doc.text('Quality Inspector:', 5 + leftWidth + 2, footerY + 10);
+          doc.text('Quality Inspector’s Signature:', 5 + leftWidth + 2, footerY + 14);
+          
+          // Right section
+          doc.setFont('helvetica', 'bold');
+          doc.text('QC Signature', 5 + leftWidth + centerWidth + 2, footerY + 4);
+          doc.setFont('helvetica', 'normal');
+          
+          doc.text('Factory Signature', 5 + leftWidth + centerWidth + 2, footerY + 10);
+          doc.text('Supervisor Approval', 5 + leftWidth + centerWidth + 2, footerY + 14);
+          
+          doc.line(5, footerY + 8, pageWidth - 5, footerY + 8);
+        };
+
+        // Function to calculate required row height for text wrapping
+        const calculateRowHeight = (text, width, fontSize) => {
+          doc.setFontSize(fontSize);
+          doc.setFont('helvetica', 'bold');
+          
+          // Split text to fit within the column width with proper padding
+          const lines = doc.splitTextToSize(text, width - 6); // More padding for safety
+          const lineHeight = fontSize * 1.3; // Better line spacing
+          const minRowHeight = 12; // Increased minimum row height
+          const textHeight = lines.length * lineHeight + 6; // Add top/bottom padding
+          
+          return Math.max(minRowHeight, Math.ceil(textHeight));
+        };
+
+        // Add header to first page
+        currentPageY = addHeader(currentPageY);
         
-        const rowCount = groupData.length;
-        const headerRows = 2;
-        const totalRows = rowCount + headerRows;
-        const rowHeight = Math.max(5, availableHeight / totalRows);
-        const fontSize = Math.max(4.5, rowHeight * 0.8);
+        // Add table headers
+        let tableY = addTableHeaders(currentPageY);
         
-        // Column structure: Measurement Point + Tol+ + Tol- + (4 columns per size)
+        // Column dimensions
         const measurementPointWidth = 80;
-        const tolPlusWidth = 15;
-        const tolMinusWidth = 15;
+        const tolPlusWidth = 8;
+        const tolMinusWidth = 8;
         const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth;
         const sizeGroupWidth = remainingWidth / sizes.length;
         const sizeColumnWidth = sizeGroupWidth / 4;
         
-        let tableY = currentY;
+        // Data row settings
+        const measurementPointFontSize = 7; // Slightly smaller for better fit
+        const toleranceFontSize = 7;
+        const specFontSize = 7;
         
-        // First header row - Merged headers
-        doc.setFillColor(220, 220, 220);
-        doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(fontSize);
-        
-        // Draw merged header backgrounds and borders
-        let colX = 5;
-        
-        // Measurement Point header (single column)
-        doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
-        doc.text('Measurement Point', colX + measurementPointWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
-        colX += measurementPointWidth;
-        
-        // Tolerance header (merged across 2 columns)
-        doc.rect(colX, tableY, tolPlusWidth + tolMinusWidth, rowHeight, 'S');
-        doc.text('Tolerance', colX + (tolPlusWidth + tolMinusWidth)/2, tableY + rowHeight/2 + 1, { align: 'center' });
-        colX += tolPlusWidth + tolMinusWidth;
-        
-        // Size headers (each merged across 4 columns)
-        sizes.forEach(size => {
-          doc.rect(colX, tableY, sizeGroupWidth, rowHeight, 'S');
-          doc.text(size, colX + sizeGroupWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
-          colX += sizeGroupWidth;
-        });
-        
-        tableY += rowHeight;
-
-        // Second header row - Sub column headers
-        doc.setFillColor(200, 200, 200);
-        doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(fontSize - 0.5);
-        
-        colX = 5;
-        
-        // Empty cell under Measurement Point
-        doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
-        colX += measurementPointWidth;
-        
-        // Tolerance sub-headers
-        doc.rect(colX, tableY, tolPlusWidth, rowHeight, 'S');
-        doc.text('+', colX + tolPlusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
-        colX += tolPlusWidth;
-        
-        doc.rect(colX, tableY, tolMinusWidth, rowHeight, 'S');
-        doc.text('-', colX + tolMinusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
-        colX += tolMinusWidth;
-        
-        // Size sub-headers (4 columns each: 1 spec + 3 empty)
-        sizes.forEach(size => {
-          // First column - Spec
-          doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
-          doc.text('Spec', colX + sizeColumnWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
-          colX += sizeColumnWidth;
-          
-          // Three empty columns
-          for (let i = 0; i < 3; i++) {
-            doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
-            colX += sizeColumnWidth;
-          }
-        });
-        
-        tableY += rowHeight;
-
-        // Data rows - WITH BORDERS FOR ALL CELLS
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(fontSize - 0.5);
-        
+        // Process data rows
         groupData.forEach((item, index) => {
+          // Calculate required row height based on measurement point text
+          const requiredRowHeight = calculateRowHeight(item.point, measurementPointWidth, measurementPointFontSize);
+          
+          // Check if we need a new page (reserve space for footer)
+          if (tableY + requiredRowHeight > pageHeight - 25) {
+            // Add footer to current page
+            addFooter();
+            
+            // Add new page
+            doc.addPage('landscape');
+            currentPageY = 5;
+            isFirstPageOfGroup = false;
+            
+            // Add header to new page
+            currentPageY = addHeader(currentPageY);
+            
+            // Add table headers to new page
+            tableY = addTableHeaders(currentPageY);
+          }
+          
+          // Draw data row with dynamic height
           if (index % 2 === 0) {
             doc.setFillColor(248, 248, 248);
-            doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
+            doc.rect(5, tableY, pageWidth - 10, requiredRowHeight, 'F');
           }
           
-          colX = 5;
+          let colX = 5;
           
-          // Measurement Point - WITH BORDER
-          doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
+          // Measurement Point - WITH IMPROVED TEXT WRAPPING
+          doc.rect(colX, tableY, measurementPointWidth, requiredRowHeight, 'S');
+          doc.setFontSize(measurementPointFontSize);
+          doc.setFont('helvetica', 'bold');
+          
           const measurementText = item.point;
-          if (measurementText.length > 35) {
-            const lines = doc.splitTextToSize(measurementText, measurementPointWidth - 4);
-            const lineHeight = fontSize * 0.8;
-            const startY = tableY + rowHeight/2 - ((lines.length - 1) * lineHeight / 2);
-            lines.forEach((line, lineIndex) => {
-              doc.text(line, colX + 2, startY + (lineIndex * lineHeight) + 1);
-            });
-          } else {
-            doc.text(measurementText, colX + 2, tableY + rowHeight/2 + 1);
-          }
+          
+          // Split text with proper width consideration
+          const lines = doc.splitTextToSize(measurementText, measurementPointWidth - 6);
+          const lineHeight = measurementPointFontSize * 1.3;
+          
+          // Calculate starting Y position to center text vertically
+          const totalTextHeight = lines.length * lineHeight;
+          const paddingTop = (requiredRowHeight - totalTextHeight) / 2;
+          const startY = tableY + paddingTop + lineHeight * 0.8; // Adjust baseline
+          
+          // Draw each line of text
+          lines.forEach((line, lineIndex) => {
+            const yPos = startY + (lineIndex * lineHeight);
+            doc.text(line.trim(), colX + 3, yPos); // Left align with padding
+          });
+          
           colX += measurementPointWidth;
           
-          // Tolerance Plus - WITH BORDER
-          doc.rect(colX, tableY, tolPlusWidth, rowHeight, 'S');
-          doc.text(decimalToFraction(item.tolerancePlus), colX + tolPlusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          // Tolerance Plus - centered vertically
+          doc.rect(colX, tableY, tolPlusWidth, requiredRowHeight, 'S');
+          doc.setFontSize(toleranceFontSize);
+          doc.setFont('helvetica', 'normal');
+          doc.text(decimalToFraction(item.tolerancePlus), colX + tolPlusWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
           colX += tolPlusWidth;
           
-          // Tolerance Minus - WITH BORDER
-          doc.rect(colX, tableY, tolMinusWidth, rowHeight, 'S');
-          doc.text(decimalToFraction(item.toleranceMinus), colX + tolMinusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          // Tolerance Minus - centered vertically
+          doc.rect(colX, tableY, tolMinusWidth, requiredRowHeight, 'S');
+          doc.setFontSize(toleranceFontSize);
+          doc.text(decimalToFraction(item.toleranceMinus), colX + tolMinusWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
           colX += tolMinusWidth;
           
-          // Size values - WITH BORDERS FOR ALL 4 COLUMNS
+          // Size values - centered vertically
           item.values.forEach((value, valueIndex) => {
             if (valueIndex < sizes.length) {
-              // First column (Spec column) - with data
-              doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
-              doc.text(decimalToFraction(value), colX + sizeColumnWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+              // First column (Spec column)
+              doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
+              doc.setFontSize(specFontSize);
+              doc.setFont('helvetica', 'bold');
+              doc.text(decimalToFraction(value), colX + sizeColumnWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
               colX += sizeColumnWidth;
               
-              // Three empty columns - with borders
+              // Three empty columns
               for (let i = 0; i < 3; i++) {
-                doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+                doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
                 colX += sizeColumnWidth;
               }
             }
           });
           
-          // Handle remaining size groups if item.values is shorter than sizes array
+          // Handle remaining size groups
           const remainingSizes = sizes.length - item.values.length;
           for (let i = 0; i < remainingSizes; i++) {
-            // Draw 4 empty columns for each remaining size
             for (let j = 0; j < 4; j++) {
-              doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+              doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
               colX += sizeColumnWidth;
             }
           }
           
-          tableY += rowHeight;
+          tableY += requiredRowHeight;
         });
-
-        // FOOTER SECTION
-        const footerY = pageHeight - 18;
         
-        doc.setFillColor(240, 240, 240);
-        doc.rect(5, footerY, pageWidth - 10, 16, 'F');
-        
-        doc.setDrawColor(0, 0, 0);
-        doc.setLineWidth(0.2);
-        doc.rect(5, footerY, pageWidth - 10, 16);
-        
-        // Footer content
-        doc.setFontSize(6);
-        doc.setFont('helvetica', 'normal');
-        
-        // Left section
-        const leftWidth = 60;
-        doc.line(5 + leftWidth, footerY, 5 + leftWidth, footerY + 16);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Inspect Quantity', 7, footerY + 4);
-        doc.setFont('helvetica', 'normal');
-        
-        doc.rect(7, footerY + 6, 2, 2);
-        doc.text('Accept', 10, footerY + 8);
-        
-        doc.rect(7, footerY + 10, 2, 2);
-        doc.text('Reject', 10, footerY + 12);
-        
-        doc.rect(30, footerY + 10, 2, 2);
-        doc.text('Wait for Approval', 33, footerY + 12);
-        
-        // Center section
-        const centerWidth = pageWidth - 10 - leftWidth - 70;
-        doc.line(5 + leftWidth + centerWidth, footerY, 5 + leftWidth + centerWidth, footerY + 16);
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Remark:', 5 + leftWidth + 2, footerY + 4);
-        doc.setFont('helvetica', 'normal');
-        
-        doc.text('Quality Inspector:', 5 + leftWidth + 2, footerY + 10);
-        doc.text('Quality Inspector’s Signature:', 5 + leftWidth + 2, footerY + 14);
-        
-        // Right section
-        doc.setFont('helvetica', 'bold');
-        doc.text('QC Signature', 5 + leftWidth + centerWidth + 2, footerY + 4);
-        doc.setFont('helvetica', 'normal');
-        
-        doc.text('Factory Signature', 5 + leftWidth + centerWidth + 2, footerY + 10);
-        doc.text('Supervisor Approval', 5 + leftWidth + centerWidth + 2, footerY + 14);
-        
-        doc.line(5, footerY + 8, pageWidth - 5, footerY + 8);
+        // Add footer to the last page of this group
+        addFooter();
       }
     });
 
