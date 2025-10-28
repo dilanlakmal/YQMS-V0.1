@@ -826,14 +826,14 @@ export const getSunriseQC1Sync = async (req, res) => {
 };
 
 // Schedule daily sync at midnight
-// cron.schedule("0 0 * * *", async () => {
-//   console.log("Running daily QC1 Sunrise data sync...");
-//   try {
-//     await syncQC1SunriseData();
-//   } catch (err) {
-//     console.error("Error in daily QC1 Sunrise sync:", err);
-//   }
-// });
+cron.schedule("0 0 * * *", async () => {
+  console.log("Running daily QC1 Sunrise data sync...");
+  try {
+    await syncQC1SunriseData();
+  } catch (err) {
+    console.error("Error in daily QC1 Sunrise sync:", err);
+  }
+});
 
 /* ------------------------------
    Fetch inline data from SQL to ym_prod
@@ -984,10 +984,10 @@ export const getInlineOrdersSync = async (req, res) => {
 };
 
 // Schedule the sync to run every day at 11 AM
-// cron.schedule("0 11 * * *", async () => {
-//   console.log("Running scheduled inline_orders sync at 11 AM...");
-//   await syncInlineOrders();
-// });
+cron.schedule("0 11 * * *", async () => {
+  console.log("Running scheduled inline_orders sync at 11 AM...");
+  await syncInlineOrders();
+});
 
 // Run the sync immediately on server start (optional, for testing)
 syncInlineOrders().then(() => {
@@ -1211,8 +1211,8 @@ async function syncCutPanelOrders() {
 }
 
 // Schedule the syncCutPanelOrders function to run every 5 minutes
-// cron.schedule("*/5 * * * *", syncCutPanelOrders);
-// console.log("Scheduled cutpanelorders sync with deadlock protection.");
+cron.schedule("*/30 * * * *", syncCutPanelOrders);
+console.log("Scheduled cutpanelorders sync with deadlock protection.");
 
 /* ------------------------------
    Manual Sync Endpoint & Server Start
@@ -1488,19 +1488,19 @@ async function syncQC1WorkerData(startDate = "2025-07-01", endDate = new Date())
 //   });
 
 // Schedule to run every day at 11:00 PM
-// cron.schedule("0 23 * * *", async () => {
-//   const endDate = new Date();
-//   const startDate = new Date();
-//   startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
+cron.schedule("0 23 * * *", async () => {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 2); // last 3 days: today, yesterday, day before
 
-//   await syncQC1WorkerData(startDate, endDate)
-//     .then(() => {
-//       console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
-//     })
-//     .catch((err) => {
-//       console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
-//     });
-// });
+  await syncQC1WorkerData(startDate, endDate)
+    .then(() => {
+      console.log("✅ QC1 Worker Data Sync completed (last 3 days, scheduled 11pm).");
+    })
+    .catch((err) => {
+      console.error("❌ QC1 Worker Data Sync failed (last 3 days, scheduled 11pm):", err);
+    });
+});
 
 
 // DT Orders Data Migration Function

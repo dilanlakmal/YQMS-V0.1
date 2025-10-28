@@ -108,7 +108,6 @@ router.post("/api/get-user-data", getUserDataByToken); // This might need auth d
 
 router.put("/api/user-profile", authenticateUser, upload, updateUserProfile);
 router.get("/api/user-profile", authenticateUser, getUserProfile);
-router.put("/api/user-profile", authenticateUser, upload, updateUserProfile);
 
 export default router;
 

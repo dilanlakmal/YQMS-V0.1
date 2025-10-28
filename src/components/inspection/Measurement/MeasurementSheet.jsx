@@ -4,6 +4,40 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
+  const decimalToFraction = (decimal) => {
+    if (decimal === null || decimal === undefined || isNaN(parseFloat(decimal))) {
+      return 'N/A';
+    }
+
+    const num = parseFloat(decimal);
+    if (Number.isInteger(num)) {
+      return num.toString();
+    }
+
+    const tolerance = 1.0E-6;
+    const integerPart = Math.trunc(num);
+    let fractionalPart = Math.abs(num - integerPart);
+
+    if (fractionalPart < tolerance) {
+      return integerPart.toString();
+    }
+
+    // Common denominators for garment industry
+    const denominators = [2, 4, 8, 16, 32, 64];
+    for (const d of denominators) {
+      if (Math.abs(fractionalPart * d - Math.round(fractionalPart * d)) < tolerance * d) {
+        const numerator = Math.round(fractionalPart * d);
+        const gcd = (a, b) => b < 0.00001 ? a : gcd(b, Math.floor(a % b));
+        const commonDivisor = gcd(numerator, d);
+        const simplifiedNumerator = numerator / commonDivisor;
+        const simplifiedDenominator = d / commonDivisor;
+        return `${integerPart || ''} ${simplifiedNumerator}/${simplifiedDenominator}`.trim();
+      }
+    }
+
+    return num.toFixed(2); // Fallback for uncommon fractions
+  };
+
   const measurementGroups = useMemo(() => {
     if (!data) return {};
     return data[filterCriteria.washType] || {};
@@ -50,141 +84,245 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
     const groupData = measurementGroups[groupKey] || [];    
     const headers = ["Measurement Point", "Tol+", "Tol-", ...sizes];
     const body = groupData.map(m => ([
-      m.point,
-      `+${m.tolerancePlus}`,
-      `${m.toleranceMinus}`,
-      ...m.values
+      m.point, // Measurement Point
+      `+${decimalToFraction(m.tolerancePlus)}`, // Tol+
+      `-${decimalToFraction(m.toleranceMinus)}`, // Tol-
+      ...m.values.map(v => decimalToFraction(v))
     ]));
     return { headers, body };
   };
 
-  const handleExportPDF = async () => {
-    setIsExporting(true);
-    try {
-      const doc = new jsPDF('landscape'); // Use landscape for better table fit
-      
-      // Company Header with Logo Space
-      doc.setFillColor(41, 128, 185);
-      doc.rect(0, 0, doc.internal.pageSize.width, 35, 'F');
-      
-      // Company Name
-      doc.setTextColor(255, 255, 255);
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Yorkmars (Cambodia) Garment MFG Co., LTD', 20, 15);
-      
-      // Document Title
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'normal');
-      doc.text('MEASUREMENT SPECIFICATION SHEET', 20, 25);
-      
-      // Document Info Section
-      doc.setTextColor(44, 62, 80);
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      
-      // Info Box Background
-      doc.setFillColor(248, 249, 250);
-      doc.rect(20, 45, doc.internal.pageSize.width - 40, 25, 'F');
-      doc.setDrawColor(220, 220, 220);
-      doc.rect(20, 45, doc.internal.pageSize.width - 40, 25, 'S');
-      
-      // Document Details
-      const infoY = 55;
-      doc.text(`Style No: ${filterCriteria.styleNo}`, 25, infoY);
-      doc.text(`Wash Type: ${filterCriteria.washType === 'beforeWash' ? 'Before Wash' : 'After Wash'}`, 120, infoY);
-      doc.text(`Generated: ${new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      })}`, 220, infoY);
-      
-      doc.text(`Filter: ${showAll ? 'All Measurements' : 'ANF Points Only'}`, 25, infoY + 8);
-      doc.text(`Total Groups: ${tabs.length}`, 120, infoY + 8);
-      doc.text(`Page: 1`, 220, infoY + 8);
+const handleExportPDF = async () => {
+  setIsExporting(true);
+  try {
+    const doc = new jsPDF('landscape');
+    
+    // Ultra-minimal header - only 15px total
+    doc.setFillColor(41, 128, 185);
+    doc.rect(0, 0, doc.internal.pageSize.width, 15, 'F');
+    
+    // Compact company info in single line
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Yorkmars Cambodia | Style: ${filterCriteria.styleNo} | ${filterCriteria.washType === 'beforeWash' ? 'Before Wash' : 'After Wash'} | ${new Date().toLocaleDateString()}`, 10, 10);
 
-      let finalY = 80;
+    // Process each K group on separate pages
+    tabs.forEach((tabKey, tabIndex) => {
+      const groupData = measurementGroups[tabKey] || [];
+      
+      if (groupData.length > 0) {
+        // Add new page for each group (except first)
+        if (tabIndex > 0) {
+          doc.addPage('landscape');
+        }
 
-      tabs.forEach((tabKey, tabIndex) => {
-        const { headers, body } = getTableData(tabKey);
-        if (body.length > 0) {
-          // Check if we need a new page
-          if (finalY > doc.internal.pageSize.height - 100 && tabIndex > 0) {
-            doc.addPage('landscape');
-            finalY = 20;
-          }
+        // Ultra-compact group header - only 8px
+        doc.setFillColor(52, 152, 219);
+        doc.rect(5, 18, doc.internal.pageSize.width - 10, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${tabKey.toUpperCase()} (${groupData.length} items)`, 8, 24);
 
-          // Group Header
-          doc.setFillColor(52, 152, 219);
-          doc.rect(20, finalY - 5, doc.internal.pageSize.width - 40, 15, 'F');
-          doc.setTextColor(255, 255, 255);
-          doc.setFontSize(14);
-          doc.setFont('helvetica', 'bold');
-          doc.text(`${tabKey.toUpperCase()} MEASUREMENTS (${body.length} items)`, 25, finalY + 5);
+        // Ultra-compact headers - abbreviated everything except measurement point
+        const baseHeaders = ["Measurement Point", "+", "-"];
+        const sizeHeaders = [];
+        
+        // Super short size headers
+        sizes.forEach(size => {
+          const shortSize = size.substring(0, 3); // Only 3 characters
+          sizeHeaders.push(shortSize, '', '', ''); // Main + 3 empty
+        });
+        
+        const headers = [...baseHeaders, ...sizeHeaders];
+
+        // Ultra-compact body data with FULL measurement point names
+        const body = groupData.map(m => {
+          const baseData = [
+            m.point, // FULL measurement point name - NO truncation
+            `+${decimalToFraction(m.tolerancePlus)}`,
+            `-${decimalToFraction(m.toleranceMinus)}`,
+          ];
           
-          finalY += 15;
-
-          // Enhanced Table
-          autoTable(doc, {
-            startY: finalY,
-            head: [headers],
-            body: body,
-            theme: 'grid',
-            headStyles: { 
-              fillColor: [41, 128, 185],
-              textColor: [255, 255, 255],
-              fontSize: 10,
-              fontStyle: 'bold',
-              halign: 'center',
-              cellPadding: 3
-            },
-            bodyStyles: {
-              fontSize: 9,
-              cellPadding: 2,
-              halign: 'center'
-            },
-            alternateRowStyles: { 
-              fillColor: [248, 249, 250] 
-            },
-            columnStyles: {
-              0: { halign: 'left', fontStyle: 'bold', fillColor: [236, 240, 241] }, // Measurement Point
-              1: { fillColor: [212, 237, 218], textColor: [21, 87, 36] }, // Tol+
-              2: { fillColor: [248, 215, 218], textColor: [114, 28, 36] }  // Tol-
-            },
-            margin: { left: 20, right: 20 },
-            tableWidth: 'auto',
-            styles: {
-              lineColor: [189, 195, 199],
-              lineWidth: 0.5
-            }
+          const sizeData = [];
+          m.values.forEach((value) => {
+            sizeData.push(decimalToFraction(value), '', '', '');
           });
           
-          finalY = doc.lastAutoTable.finalY + 20;
+          return [...baseData, ...sizeData];
+        });
+
+        // Ultra-aggressive sizing for other columns
+        const rowCount = body.length;
+        let headerFontSize = 6;
+        let bodyFontSize = 5.5;
+        let cellPadding = 0.3;
+        let measurementPointFontSize = 6; // Slightly larger for readability
+
+        // Even smaller for large datasets
+        if (rowCount > 40) {
+          headerFontSize = 5.5;
+          bodyFontSize = 5;
+          cellPadding = 0.2;
+          measurementPointFontSize = 5.5;
+        } else if (rowCount > 30) {
+          headerFontSize = 6;
+          bodyFontSize = 5.5;
+          cellPadding = 0.25;
+          measurementPointFontSize = 6;
         }
-      });
 
-      // Footer
-      const pageCount = doc.internal.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFillColor(52, 73, 94);
-        doc.rect(0, doc.internal.pageSize.height - 15, doc.internal.pageSize.width, 15, 'F');
+        // Adjusted column widths - more space for measurement point
+        const availableWidth = doc.internal.pageSize.width - 10; // Minimal margins
+        const pointColumnWidth = 60; // Increased width for full names
+        const tolColumnWidth = 8; // Very narrow
+        const remainingWidth = availableWidth - pointColumnWidth - (2 * tolColumnWidth);
+        const sizeColumnWidth = Math.max(6, remainingWidth / (sizes.length * 4)); // Minimum 6px
+
+        // Ultra-compressed table starting at y=28
+        autoTable(doc, {
+          startY: 28,
+          head: [headers],
+          body: body,
+          theme: 'grid',
+          headStyles: { 
+            fillColor: [41, 128, 185],
+            textColor: [255, 255, 255],
+            fontSize: headerFontSize,
+            fontStyle: 'bold',
+            halign: 'center',
+            cellPadding: cellPadding,
+            minCellHeight: 5,
+            lineWidth: 0.1
+          },
+          bodyStyles: {
+            fontSize: bodyFontSize,
+            cellPadding: cellPadding,
+            halign: 'center',
+            minCellHeight: 6, // Slightly taller for full names
+            lineWidth: 0.1
+          },
+          alternateRowStyles: { 
+            fillColor: [250, 250, 250] 
+          },
+          columnStyles: {
+            // Measurement point column - wider with full names
+            0: { 
+              halign: 'left', 
+              fontStyle: 'bold', 
+              fillColor: [240, 240, 240],
+              cellWidth: pointColumnWidth,
+              fontSize: measurementPointFontSize,
+              cellPadding: 1, // More padding for readability
+              overflow: 'linebreak', // Allow text wrapping if needed
+              cellWidth: pointColumnWidth
+            },
+            // Minimal tolerance columns
+            1: { 
+              fillColor: [220, 245, 220], 
+              textColor: [0, 100, 0],
+              cellWidth: tolColumnWidth,
+              fontSize: bodyFontSize - 0.5
+            },
+            2: { 
+              fillColor: [245, 220, 220], 
+              textColor: [150, 0, 0],
+              cellWidth: tolColumnWidth,
+              fontSize: bodyFontSize - 0.5
+            },
+            // Ultra-compact size columns
+            ...Object.fromEntries(
+              sizes.flatMap((size, sizeIndex) => {
+                const startCol = 3 + (sizeIndex * 4);
+                return [
+                  // Main size column
+                  [startCol, { 
+                    fillColor: [200, 230, 255], 
+                    textColor: [0, 50, 150],
+                    fontStyle: 'bold',
+                    cellWidth: sizeColumnWidth * 1.2,
+                    fontSize: bodyFontSize
+                  }],
+                  // Minimal empty columns
+                  [startCol + 1, { 
+                    fillColor: [248, 248, 248], 
+                    cellWidth: sizeColumnWidth * 0.7,
+                    fontSize: bodyFontSize - 1
+                  }],
+                  [startCol + 2, { 
+                    fillColor: [248, 248, 248], 
+                    cellWidth: sizeColumnWidth * 0.7,
+                    fontSize: bodyFontSize - 1
+                  }],
+                  [startCol + 3, { 
+                    fillColor: [248, 248, 248], 
+                    cellWidth: sizeColumnWidth * 0.7,
+                    fontSize: bodyFontSize - 1
+                  }]
+                ];
+              })
+            )
+          },
+          margin: { left: 5, right: 5, top: 0, bottom: 8 }, // Minimal margins
+          tableWidth: 'auto',
+          styles: {
+            lineColor: [200, 200, 200],
+            lineWidth: 0.1, // Ultra-thin lines
+            fontSize: bodyFontSize,
+            cellPadding: cellPadding,
+            overflow: 'linebreak', // Allow text wrapping
+            cellWidth: 'wrap'
+          },
+          pageBreak: 'avoid',
+          showHead: 'everyPage',
+          // Custom handling for long measurement point names
+          didParseCell: function(data) {
+            // For measurement point column (index 0), allow text wrapping
+            if (data.column.index === 0 && data.cell.text && data.cell.text.length > 0) {
+              // Enable text wrapping for long measurement point names
+              data.cell.styles.cellWidth = pointColumnWidth;
+              data.cell.styles.overflow = 'linebreak';
+              data.cell.styles.cellPadding = 1;
+            }
+          },
+          didDrawCell: function(data) {
+            // Minimal group separators
+            if (data.column.index >= 3 && (data.column.index - 3) % 4 === 0) {
+              doc.setDrawColor(100, 150, 200);
+              doc.setLineWidth(0.3);
+              doc.line(
+                data.cell.x, 
+                data.cell.y, 
+                data.cell.x, 
+                data.cell.y + data.cell.height
+              );
+            }
+          }
+        });
+
+        // Minimal footer - only 6px
+        const footerY = doc.internal.pageSize.height - 6;
+        doc.setFillColor(60, 60, 60);
+        doc.rect(0, footerY, doc.internal.pageSize.width, 6, 'F');
         doc.setTextColor(255, 255, 255);
-        doc.setFontSize(8);
-        doc.text(`Generated by Yorkmars Measurement System | ${new Date().toLocaleString()}`, 20, doc.internal.pageSize.height - 5);
-        doc.text(`Page ${i} of ${pageCount}`, doc.internal.pageSize.width - 40, doc.internal.pageSize.height - 5);
+        doc.setFontSize(6);
+        doc.text(`${tabKey.toUpperCase()}`, 8, footerY + 4);
+        doc.text(`Generated: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.width - 50, footerY + 4);
       }
+    });
 
-      doc.save(`Measurement_Sheet_${filterCriteria.styleNo}_${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (error) {
-      console.error('PDF Export failed:', error);
-      alert('Failed to export PDF. Please try again.');
-    } finally {
-      setIsExporting(false);
-    }
-  };
+    // Save with compact filename
+    const timestamp = new Date().toISOString().split('T')[0];
+    doc.save(`${filterCriteria.styleNo}_${timestamp}_Compact.pdf`);
+
+  } catch (error) {
+    console.error('PDF Export failed:', error);
+    alert('Failed to export PDF. Please try again.');
+  } finally {
+    setIsExporting(false);
+  }
+};
 
 const handleExportExcel = async () => {
   setIsExporting(true);
@@ -601,9 +739,6 @@ const handleExportExcel = async () => {
   }
 };
 
-
-
-
   return (
     <div className="bg-white rounded-xl shadow-lg mt-6 border border-gray-100 overflow-hidden">
       {/* Enhanced Header */}
@@ -776,12 +911,12 @@ const handleExportExcel = async () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm border-r border-gray-200">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    {item.tolerancePlus}
+                    +{decimalToFraction(item.tolerancePlus)}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm border-r border-gray-200">
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    {item.toleranceMinus}
+                    -{decimalToFraction(item.toleranceMinus)}
                   </span>
                 </td>
                 {item.values?.map((value, vIndex) => (
@@ -789,7 +924,7 @@ const handleExportExcel = async () => {
                     vIndex < item.values.length - 1 ? 'border-r border-gray-200' : ''
                   }`}>
                     <span className="px-2 py-1 bg-gray-100 rounded group-hover:bg-blue-100 transition-colors">
-                      {value || 'N/A'}
+                      {decimalToFraction(value)}
                                         </span>
                   </td>
                 ))}
@@ -828,4 +963,3 @@ const handleExportExcel = async () => {
 };
 
 export default MeasurementSheet;
-
