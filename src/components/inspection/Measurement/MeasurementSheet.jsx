@@ -96,16 +96,8 @@ const handleExportPDF = async () => {
   setIsExporting(true);
   try {
     const doc = new jsPDF('landscape');
-    
-    // Ultra-minimal header - only 15px total
-    doc.setFillColor(41, 128, 185);
-    doc.rect(0, 0, doc.internal.pageSize.width, 15, 'F');
-    
-    // Compact company info in single line
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Yorkmars Cambodia | Style: ${filterCriteria.styleNo} | ${filterCriteria.washType === 'beforeWash' ? 'Before Wash' : 'After Wash'} | ${new Date().toLocaleDateString()}`, 10, 10);
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
 
     // Process each K group on separate pages
     tabs.forEach((tabKey, tabIndex) => {
@@ -117,204 +109,242 @@ const handleExportPDF = async () => {
           doc.addPage('landscape');
         }
 
-        // Ultra-compact group header - only 8px
-        doc.setFillColor(52, 152, 219);
-        doc.rect(5, 18, doc.internal.pageSize.width - 10, 8, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFontSize(9);
+        // ULTRA COMPACT HEADER SECTION
+        let currentY = 5;
+        
+        // Main title - very compact
+        doc.setFillColor(240, 240, 240);
+        doc.rect(5, currentY, pageWidth - 10, 8, 'F');
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
-        doc.text(`${tabKey.toUpperCase()} (${groupData.length} items)`, 8, 24);
+        doc.text('Yorkmars (Cambodia) Garment MFG. Co. Ltd. - Measurement List', pageWidth / 2, currentY + 5, { align: 'center' });
+        currentY += 10;
 
-        // Ultra-compact headers - abbreviated everything except measurement point
-        const baseHeaders = ["Measurement Point", "+", "-"];
-        const sizeHeaders = [];
+        // Customer info in single compact row
+        doc.setFontSize(7);
+        doc.setFont('helvetica', 'normal');
         
-        // Super short size headers
+        // All info in one line
+        doc.text(`Customer: ${filterCriteria.customer || 'ARITZIA LP'}`, 8, currentY);
+        doc.text(`Our ref: ${filterCriteria.ourRef || 'GPAR1910'}`, 8, currentY + 3);
+        
+        doc.text(`Customer Style: ${filterCriteria.styleNo}`, pageWidth / 2 - 25, currentY);
+        doc.text(`Order Qty: ${filterCriteria.orderQty || '1,800 PCS'}`, pageWidth / 2 - 25, currentY + 3);
+        
+        doc.text(`Actual Qty:`, pageWidth - 50, currentY);
+        doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - 50, currentY + 3);
+        
+        currentY += 8;
+
+        // MEASUREMENT DATA TABLE
+        const tableStartY = currentY;
+        const footerHeight = 20;
+        const availableHeight = pageHeight - currentY - footerHeight - 3;
+        
+        const rowCount = groupData.length;
+        const headerRows = 2;
+        const totalRows = rowCount + headerRows;
+        const rowHeight = Math.max(5, availableHeight / totalRows);
+        const fontSize = Math.max(4.5, rowHeight * 0.8);
+        
+        // Column structure: Measurement Point + Tol+ + Tol- + (4 columns per size)
+        const measurementPointWidth = 80;
+        const tolPlusWidth = 15;
+        const tolMinusWidth = 15;
+        const remainingWidth = pageWidth - 10 - measurementPointWidth - tolPlusWidth - tolMinusWidth;
+        const sizeGroupWidth = remainingWidth / sizes.length;
+        const sizeColumnWidth = sizeGroupWidth / 4;
+        
+        let tableY = currentY;
+        
+        // First header row - Merged headers
+        doc.setFillColor(220, 220, 220);
+        doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(fontSize);
+        
+        // Draw merged header backgrounds and borders
+        let colX = 5;
+        
+        // Measurement Point header (single column)
+        doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
+        doc.text('Measurement Point', colX + measurementPointWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+        colX += measurementPointWidth;
+        
+        // Tolerance header (merged across 2 columns)
+        doc.rect(colX, tableY, tolPlusWidth + tolMinusWidth, rowHeight, 'S');
+        doc.text('Tolerance', colX + (tolPlusWidth + tolMinusWidth)/2, tableY + rowHeight/2 + 1, { align: 'center' });
+        colX += tolPlusWidth + tolMinusWidth;
+        
+        // Size headers (each merged across 4 columns)
         sizes.forEach(size => {
-          const shortSize = size.substring(0, 3); // Only 3 characters
-          sizeHeaders.push(shortSize, '', '', ''); // Main + 3 empty
+          doc.rect(colX, tableY, sizeGroupWidth, rowHeight, 'S');
+          doc.text(size, colX + sizeGroupWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += sizeGroupWidth;
         });
         
-        const headers = [...baseHeaders, ...sizeHeaders];
+        tableY += rowHeight;
 
-        // Ultra-compact body data with FULL measurement point names
-        const body = groupData.map(m => {
-          const baseData = [
-            m.point, // FULL measurement point name - NO truncation
-            `+${decimalToFraction(m.tolerancePlus)}`,
-            `-${decimalToFraction(m.toleranceMinus)}`,
-          ];
+        // Second header row - Sub column headers
+        doc.setFillColor(200, 200, 200);
+        doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(fontSize - 0.5);
+        
+        colX = 5;
+        
+        // Empty cell under Measurement Point
+        doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
+        colX += measurementPointWidth;
+        
+        // Tolerance sub-headers
+        doc.rect(colX, tableY, tolPlusWidth, rowHeight, 'S');
+        doc.text('+', colX + tolPlusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+        colX += tolPlusWidth;
+        
+        doc.rect(colX, tableY, tolMinusWidth, rowHeight, 'S');
+        doc.text('-', colX + tolMinusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+        colX += tolMinusWidth;
+        
+        // Size sub-headers (4 columns each: 1 spec + 3 empty)
+        sizes.forEach(size => {
+          // First column - Spec
+          doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+          doc.text('Spec', colX + sizeColumnWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += sizeColumnWidth;
           
-          const sizeData = [];
-          m.values.forEach((value) => {
-            sizeData.push(decimalToFraction(value), '', '', '');
-          });
-          
-          return [...baseData, ...sizeData];
-        });
-
-        // Ultra-aggressive sizing for other columns
-        const rowCount = body.length;
-        let headerFontSize = 6;
-        let bodyFontSize = 5.5;
-        let cellPadding = 0.3;
-        let measurementPointFontSize = 6; // Slightly larger for readability
-
-        // Even smaller for large datasets
-        if (rowCount > 40) {
-          headerFontSize = 5.5;
-          bodyFontSize = 5;
-          cellPadding = 0.2;
-          measurementPointFontSize = 5.5;
-        } else if (rowCount > 30) {
-          headerFontSize = 6;
-          bodyFontSize = 5.5;
-          cellPadding = 0.25;
-          measurementPointFontSize = 6;
-        }
-
-        // Adjusted column widths - more space for measurement point
-        const availableWidth = doc.internal.pageSize.width - 10; // Minimal margins
-        const pointColumnWidth = 60; // Increased width for full names
-        const tolColumnWidth = 8; // Very narrow
-        const remainingWidth = availableWidth - pointColumnWidth - (2 * tolColumnWidth);
-        const sizeColumnWidth = Math.max(6, remainingWidth / (sizes.length * 4)); // Minimum 6px
-
-        // Ultra-compressed table starting at y=28
-        autoTable(doc, {
-          startY: 28,
-          head: [headers],
-          body: body,
-          theme: 'grid',
-          headStyles: { 
-            fillColor: [41, 128, 185],
-            textColor: [255, 255, 255],
-            fontSize: headerFontSize,
-            fontStyle: 'bold',
-            halign: 'center',
-            cellPadding: cellPadding,
-            minCellHeight: 5,
-            lineWidth: 0.1
-          },
-          bodyStyles: {
-            fontSize: bodyFontSize,
-            cellPadding: cellPadding,
-            halign: 'center',
-            minCellHeight: 6, // Slightly taller for full names
-            lineWidth: 0.1
-          },
-          alternateRowStyles: { 
-            fillColor: [250, 250, 250] 
-          },
-          columnStyles: {
-            // Measurement point column - wider with full names
-            0: { 
-              halign: 'left', 
-              fontStyle: 'bold', 
-              fillColor: [240, 240, 240],
-              cellWidth: pointColumnWidth,
-              fontSize: measurementPointFontSize,
-              cellPadding: 1, // More padding for readability
-              overflow: 'linebreak', // Allow text wrapping if needed
-              cellWidth: pointColumnWidth
-            },
-            // Minimal tolerance columns
-            1: { 
-              fillColor: [220, 245, 220], 
-              textColor: [0, 100, 0],
-              cellWidth: tolColumnWidth,
-              fontSize: bodyFontSize - 0.5
-            },
-            2: { 
-              fillColor: [245, 220, 220], 
-              textColor: [150, 0, 0],
-              cellWidth: tolColumnWidth,
-              fontSize: bodyFontSize - 0.5
-            },
-            // Ultra-compact size columns
-            ...Object.fromEntries(
-              sizes.flatMap((size, sizeIndex) => {
-                const startCol = 3 + (sizeIndex * 4);
-                return [
-                  // Main size column
-                  [startCol, { 
-                    fillColor: [200, 230, 255], 
-                    textColor: [0, 50, 150],
-                    fontStyle: 'bold',
-                    cellWidth: sizeColumnWidth * 1.2,
-                    fontSize: bodyFontSize
-                  }],
-                  // Minimal empty columns
-                  [startCol + 1, { 
-                    fillColor: [248, 248, 248], 
-                    cellWidth: sizeColumnWidth * 0.7,
-                    fontSize: bodyFontSize - 1
-                  }],
-                  [startCol + 2, { 
-                    fillColor: [248, 248, 248], 
-                    cellWidth: sizeColumnWidth * 0.7,
-                    fontSize: bodyFontSize - 1
-                  }],
-                  [startCol + 3, { 
-                    fillColor: [248, 248, 248], 
-                    cellWidth: sizeColumnWidth * 0.7,
-                    fontSize: bodyFontSize - 1
-                  }]
-                ];
-              })
-            )
-          },
-          margin: { left: 5, right: 5, top: 0, bottom: 8 }, // Minimal margins
-          tableWidth: 'auto',
-          styles: {
-            lineColor: [200, 200, 200],
-            lineWidth: 0.1, // Ultra-thin lines
-            fontSize: bodyFontSize,
-            cellPadding: cellPadding,
-            overflow: 'linebreak', // Allow text wrapping
-            cellWidth: 'wrap'
-          },
-          pageBreak: 'avoid',
-          showHead: 'everyPage',
-          // Custom handling for long measurement point names
-          didParseCell: function(data) {
-            // For measurement point column (index 0), allow text wrapping
-            if (data.column.index === 0 && data.cell.text && data.cell.text.length > 0) {
-              // Enable text wrapping for long measurement point names
-              data.cell.styles.cellWidth = pointColumnWidth;
-              data.cell.styles.overflow = 'linebreak';
-              data.cell.styles.cellPadding = 1;
-            }
-          },
-          didDrawCell: function(data) {
-            // Minimal group separators
-            if (data.column.index >= 3 && (data.column.index - 3) % 4 === 0) {
-              doc.setDrawColor(100, 150, 200);
-              doc.setLineWidth(0.3);
-              doc.line(
-                data.cell.x, 
-                data.cell.y, 
-                data.cell.x, 
-                data.cell.y + data.cell.height
-              );
-            }
+          // Three empty columns
+          for (let i = 0; i < 3; i++) {
+            doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+            colX += sizeColumnWidth;
           }
         });
+        
+        tableY += rowHeight;
 
-        // Minimal footer - only 6px
-        const footerY = doc.internal.pageSize.height - 6;
-        doc.setFillColor(60, 60, 60);
-        doc.rect(0, footerY, doc.internal.pageSize.width, 6, 'F');
-        doc.setTextColor(255, 255, 255);
+        // Data rows - WITH BORDERS FOR ALL CELLS
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(fontSize - 0.5);
+        
+        groupData.forEach((item, index) => {
+          if (index % 2 === 0) {
+            doc.setFillColor(248, 248, 248);
+            doc.rect(5, tableY, pageWidth - 10, rowHeight, 'F');
+          }
+          
+          colX = 5;
+          
+          // Measurement Point - WITH BORDER
+          doc.rect(colX, tableY, measurementPointWidth, rowHeight, 'S');
+          const measurementText = item.point;
+          if (measurementText.length > 35) {
+            const lines = doc.splitTextToSize(measurementText, measurementPointWidth - 4);
+            const lineHeight = fontSize * 0.8;
+            const startY = tableY + rowHeight/2 - ((lines.length - 1) * lineHeight / 2);
+            lines.forEach((line, lineIndex) => {
+              doc.text(line, colX + 2, startY + (lineIndex * lineHeight) + 1);
+            });
+          } else {
+            doc.text(measurementText, colX + 2, tableY + rowHeight/2 + 1);
+          }
+          colX += measurementPointWidth;
+          
+          // Tolerance Plus - WITH BORDER
+          doc.rect(colX, tableY, tolPlusWidth, rowHeight, 'S');
+          doc.text(decimalToFraction(item.tolerancePlus), colX + tolPlusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += tolPlusWidth;
+          
+          // Tolerance Minus - WITH BORDER
+          doc.rect(colX, tableY, tolMinusWidth, rowHeight, 'S');
+          doc.text(decimalToFraction(item.toleranceMinus), colX + tolMinusWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+          colX += tolMinusWidth;
+          
+          // Size values - WITH BORDERS FOR ALL 4 COLUMNS
+          item.values.forEach((value, valueIndex) => {
+            if (valueIndex < sizes.length) {
+              // First column (Spec column) - with data
+              doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+              doc.text(decimalToFraction(value), colX + sizeColumnWidth/2, tableY + rowHeight/2 + 1, { align: 'center' });
+              colX += sizeColumnWidth;
+              
+              // Three empty columns - with borders
+              for (let i = 0; i < 3; i++) {
+                doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+                colX += sizeColumnWidth;
+              }
+            }
+          });
+          
+          // Handle remaining size groups if item.values is shorter than sizes array
+          const remainingSizes = sizes.length - item.values.length;
+          for (let i = 0; i < remainingSizes; i++) {
+            // Draw 4 empty columns for each remaining size
+            for (let j = 0; j < 4; j++) {
+              doc.rect(colX, tableY, sizeColumnWidth, rowHeight, 'S');
+              colX += sizeColumnWidth;
+            }
+          }
+          
+          tableY += rowHeight;
+        });
+
+        // FOOTER SECTION
+        const footerY = pageHeight - 18;
+        
+        doc.setFillColor(240, 240, 240);
+        doc.rect(5, footerY, pageWidth - 10, 16, 'F');
+        
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.2);
+        doc.rect(5, footerY, pageWidth - 10, 16);
+        
+        // Footer content
         doc.setFontSize(6);
-        doc.text(`${tabKey.toUpperCase()}`, 8, footerY + 4);
-        doc.text(`Generated: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.width - 50, footerY + 4);
+        doc.setFont('helvetica', 'normal');
+        
+        // Left section
+        const leftWidth = 60;
+        doc.line(5 + leftWidth, footerY, 5 + leftWidth, footerY + 16);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('Inspect Quantity', 7, footerY + 4);
+        doc.setFont('helvetica', 'normal');
+        
+        doc.rect(7, footerY + 6, 2, 2);
+        doc.text('Accept', 10, footerY + 8);
+        
+        doc.rect(7, footerY + 10, 2, 2);
+        doc.text('Reject', 10, footerY + 12);
+        
+        doc.rect(30, footerY + 10, 2, 2);
+        doc.text('Wait for Approval', 33, footerY + 12);
+        
+        // Center section
+        const centerWidth = pageWidth - 10 - leftWidth - 70;
+        doc.line(5 + leftWidth + centerWidth, footerY, 5 + leftWidth + centerWidth, footerY + 16);
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('Remark:', 5 + leftWidth + 2, footerY + 4);
+        doc.setFont('helvetica', 'normal');
+        
+        doc.text('Quality Inspector:', 5 + leftWidth + 2, footerY + 10);
+        doc.text('Quality Inspector’s Signature:', 5 + leftWidth + 2, footerY + 14);
+        
+        // Right section
+        doc.setFont('helvetica', 'bold');
+        doc.text('QC Signature', 5 + leftWidth + centerWidth + 2, footerY + 4);
+        doc.setFont('helvetica', 'normal');
+        
+        doc.text('Factory Signature', 5 + leftWidth + centerWidth + 2, footerY + 10);
+        doc.text('Supervisor Approval', 5 + leftWidth + centerWidth + 2, footerY + 14);
+        
+        doc.line(5, footerY + 8, pageWidth - 5, footerY + 8);
       }
     });
 
-    // Save with compact filename
     const timestamp = new Date().toISOString().split('T')[0];
-    doc.save(`${filterCriteria.styleNo}_${timestamp}_Compact.pdf`);
+    doc.save(`${filterCriteria.styleNo}_${filterCriteria.washType}_${timestamp}.pdf`);
 
   } catch (error) {
     console.error('PDF Export failed:', error);
@@ -747,7 +777,7 @@ const handleExportExcel = async () => {
           <div>
             <h2 className="text-2xl font-bold text-gray-800 mb-1">Measurement Details</h2>
             <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1">  
                 <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
