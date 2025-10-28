@@ -14,6 +14,7 @@ import {
   getDailyFullReport,
   getanfStyleViewSummary,
   getStyleViewFullReport,
+  getAnfOrderDetails,
 } from '../../controller/ANF/anfController.js';
 
 const router = express.Router();
@@ -32,6 +33,7 @@ router.get('/api/anf-measurement/qc-daily-reports/filters', getDynamicFilterOpti
 router.get('/api/anf-measurement/qc-daily-report/detail/:pageId', getDailyFullReport);
 router.get('/api/anf-measurement/style-view-summary', getanfStyleViewSummary);
 router.get('//api/anf-measurement/style-view-full-report/:moNo', getStyleViewFullReport);
+router.get('/api/anf-measurement/order-details/:moNo', getAnfOrderDetails);
 
 
 export default router;
