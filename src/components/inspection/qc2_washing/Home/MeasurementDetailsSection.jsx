@@ -758,7 +758,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${color}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${encodeURIComponent(color)}`);
       const data = await response.json();
       
       if (data.success) {
@@ -823,7 +823,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
 
   const fetchMeasurementSpecs = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${color}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(color)}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
