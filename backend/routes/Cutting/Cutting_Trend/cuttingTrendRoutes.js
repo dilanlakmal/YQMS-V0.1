@@ -10,7 +10,7 @@ import {
   getFabricDefectTrend,
   getTopMeasurementIssues,
   getTopDefectIssues,
-} from '../../controller/Cutting/cuttingTrendController.js';
+} from '../../../controller/Cutting/Cutting_Trend/cuttingTrendController.js';
 
 const router = express.Router();
 

@@ -1,10 +1,10 @@
 import {
   CuttingInspection,
-} from "../MongoDB/dbConnectionController.js";
+} from "../../MongoDB/dbConnectionController.js";
 import {
   generateDateStringsCuttingDashboard,
   derivedBuyerLogic,
-} from "../../Helpers/helperFunctions.js";
+} from "../../../Helpers/helperFunctions.js";
 
 // GET DYNAMIC/CROSS-FILTERED filter options for Cutting Dashboard
 export const getCuttingDashboardFilters = async (req, res) => {

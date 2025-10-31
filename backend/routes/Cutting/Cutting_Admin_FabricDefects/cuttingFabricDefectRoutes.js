@@ -4,7 +4,7 @@ import {
   updateCuttingFabricDefect,
   updateCuttingFabricDefectById,
   deleteCuttingFabricDefect,
-} from '../../controller/Cutting/cuttingFabricDefectController.js';
+} from '../../../controller/Cutting/Cutting_Admin_FabricDefects/cuttingFabricDefectController.js';
 
 const router = express.Router();
 

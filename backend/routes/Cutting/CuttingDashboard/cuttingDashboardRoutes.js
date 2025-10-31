@@ -2,7 +2,7 @@ import express from 'express';
 import {
   getCuttingDashboardFilters,
   getCuttingDashboardData,
-} from '../../controller/Cutting/cuttingDashboardController.js';
+} from '../../../controller/Cutting/CuttingDashboard/cuttingDashboardController.js';
 
 const router = express.Router();
 

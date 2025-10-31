@@ -1,8 +1,8 @@
 import {
   CuttingInspection,
   CuttingMeasurementPoint,                
-} from "../MongoDB/dbConnectionController.js"; 
-import { normalizeDateString } from "../../Helpers/helperFunctions.js";
+} from "../../MongoDB/dbConnectionController.js"; 
+import { normalizeDateString } from "../../../Helpers/helperFunctions.js";
 
 // --- Trend Analysis Filter Options ---//
 export const getCuttingFilterMo = async (req, res) => {

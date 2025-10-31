@@ -2,10 +2,10 @@ import express from 'express';
 import {
   getCuttingIssues,
   uploadCuttingImage,
-} from '../../Controller/Cutting/cuttingIssueController.js';
+} from '../../../controller/Cutting/CuttingInspection/cuttingIssueController.js';
 import {
   cutting_upload,
-} from "../../Helpers/helperFunctions.js";
+} from "../../../Helpers/helperFunctions.js";
 
 const router = express.Router();
 

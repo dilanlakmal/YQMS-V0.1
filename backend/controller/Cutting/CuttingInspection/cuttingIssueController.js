@@ -1,10 +1,10 @@
 import {
   CuttingIssue,                
-} from "../MongoDB/dbConnectionController.js"; 
+} from "../../MongoDB/dbConnectionController.js"; 
 import multer from "multer";
 import path from "path";
 import sharp from "sharp";
-import { __backendDir } from "../../Config/appConfig.js";
+import { __backendDir } from "../../../Config/appConfig.js";
 
 /* ------------------------------
   Cutting Issues ENDPOINTS

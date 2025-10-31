@@ -1,6 +1,6 @@
 import {
   CuttingFabricDefect,                
-} from "../MongoDB/dbConnectionController.js"; 
+} from "../../MongoDB/dbConnectionController.js"; 
 
 
 /* ------------------------------

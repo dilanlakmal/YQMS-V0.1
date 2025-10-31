@@ -1,6 +1,7 @@
 import multer from "multer";
 import sharp from "sharp";
 import path from "path";
+import { __backendDir } from "../../../Config/appConfig.js";
 // Image upload endpoint
 export const uploadImage = async(req, res) => { 
     try {
