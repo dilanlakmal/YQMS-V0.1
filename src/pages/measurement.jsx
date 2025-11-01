@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect,  useMemo } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../../config.js';
 import FilterPlane from '../components/inspection/Measurement/FilterPlane.jsx';
@@ -24,6 +24,7 @@ const Measurement = () => {
         axios.get(`${API_BASE_URL}/api/measurement/template-by-style/${criteria.styleNo}`)
       ]);
 
+    
       setMeasurementData(measurementResponse.data || null);
       setAnfPoints(templateResponse.data?.measurementPoints || []);
     } catch (err) {
@@ -34,6 +35,21 @@ const Measurement = () => {
       setLoading(false);
     }
   };
+
+  // Create enhanced filter criteria that includes data from both sources
+  const enhancedFilterCriteria = useMemo(() => {
+    if (!filterCriteria || !measurementData) return null;
+
+    const enhanced = {
+      ...filterCriteria, // This includes washType, styleNo from FilterPlane
+      customer: measurementData.customer || '',
+      custStyle: measurementData.custStyle || '',
+      totalQty: measurementData.totalQty || '',
+      sizes: measurementData.sizes || []
+    };
+
+    return enhanced;
+  }, [filterCriteria, measurementData]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
@@ -50,10 +66,10 @@ const Measurement = () => {
 
       {error && <div className="text-center p-4 bg-red-100 text-red-700 rounded-md mt-4">{error}</div>}
 
-      {!loading && filterCriteria && (
+      {!loading && enhancedFilterCriteria && filterCriteria && (
         <MeasurementSheet 
           data={measurementData?.measurements} 
-          filterCriteria={{...filterCriteria, sizes: measurementData?.sizes || []}}
+          filterCriteria={enhancedFilterCriteria}
           anfPoints={anfPoints}
         />
       )}

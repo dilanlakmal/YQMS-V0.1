@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 
 const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
   const decimalToFraction = (decimal) => {
-    if (decimal === null || decimal === undefined || isNaN(parseFloat(decimal))) {
+    if (decimal === null || decimal === undefined || decimal === '' || isNaN(parseFloat(decimal))) {
       return 'N/A';
     }
 
@@ -87,7 +87,10 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
       m.point, // Measurement Point
       `+${decimalToFraction(m.tolerancePlus)}`, // Tol+
       `-${decimalToFraction(m.toleranceMinus)}`, // Tol-
-      ...m.values.map(v => decimalToFraction(v))
+      ...sizes.map((size, index) => {
+        const value = m.values?.[index];
+        return decimalToFraction(value);
+      })
     ]));
     return { headers, body };
   };
@@ -113,7 +116,8 @@ const handleExportPDF = async () => {
         let isFirstPageOfGroup = true;
 
         // Function to add header to page
-        const addHeader = (y) => {
+        const addHeader = (y, kValue) => {
+
           // Main title
           doc.setFillColor(240, 240, 240);
           doc.rect(5, y, pageWidth - 10, 8, 'F');
@@ -127,17 +131,19 @@ const handleExportPDF = async () => {
           doc.setFontSize(7);
           doc.setFont('helvetica', 'normal');
           
-          doc.text(`Customer: ${filterCriteria.customer || 'ARITZIA LP'}`, 8, y);
-          doc.text(`Our ref: ${filterCriteria.ourRef || 'GPAR1910'}`, 8, y + 3);
+          doc.text(`Customer: ${filterCriteria.customer || ''}`, 8, y);
+          doc.text(`CustStyle: ${filterCriteria.custStyle || ''}`, 8, y + 3); // Uses custStyle
           
-          doc.text(`Customer Style: ${filterCriteria.styleNo}`, pageWidth / 2 - 25, y);
-          doc.text(`Order Qty: ${filterCriteria.orderQty || '1,800 PCS'}`, pageWidth / 2 - 25, y + 3);
+          doc.text(`Our Ref: ${filterCriteria.styleNo || ''}`, pageWidth / 2 - 25, y); // Uses styleNo (which is order_no)
+          doc.text(`Order Qty: ${filterCriteria.totalQty || ''}`, pageWidth / 2 - 25, y + 3); // Uses totalQty
           
           doc.text(`Actual Qty:`, pageWidth - 50, y);
-          doc.text(`Date: ${new Date().toLocaleDateString('en-GB')}`, pageWidth - 50, y + 3);
+          doc.text(`Date:`, pageWidth - 50, y + 3);
           
-          return y + 8;
+          return y + 8; // Adjusted y position
         };
+
+    
 
         // Function to add table headers
         const addTableHeaders = (y) => {
@@ -258,8 +264,10 @@ const handleExportPDF = async () => {
           doc.text('Remark:', 5 + leftWidth + 2, footerY + 4);
           doc.setFont('helvetica', 'normal');
           
-          doc.text('Quality Inspector:', 5 + leftWidth + 2, footerY + 10);
-          doc.text('Quality Inspector’s Signature:', 5 + leftWidth + 2, footerY + 14);
+          doc.text('Inspector:', 5 + leftWidth + 2, footerY + 10);
+          doc.text('Inspector’s Signature:', 5 + leftWidth + 2, footerY + 14);
+          doc.text(`Color:`, 5 + leftWidth + 70, footerY + 10);
+          doc.text(`K-Value: ${tabKey || ''}`, 5 + leftWidth + 70, footerY + 14);
           
           // Right section
           doc.setFont('helvetica', 'bold');
@@ -278,16 +286,16 @@ const handleExportPDF = async () => {
           doc.setFont('helvetica', 'bold');
           
           // Split text to fit within the column width with proper padding
-          const lines = doc.splitTextToSize(text, width - 6); // More padding for safety
-          const lineHeight = fontSize * 1.3; // Better line spacing
-          const minRowHeight = 12; // Increased minimum row height
-          const textHeight = lines.length * lineHeight + 6; // Add top/bottom padding
+          const lines = doc.splitTextToSize(text, width - 1); // Minimal padding
+          const lineHeight = fontSize * 1.05; // Very tight line spacing
+          const minRowHeight = 6; // Reduced minimum row height
+          const textHeight = lines.length * lineHeight + 1; // Reduced top/bottom padding
           
-          return Math.max(minRowHeight, Math.ceil(textHeight));
+          return Math.max(minRowHeight, textHeight);
         };
 
         // Add header to first page
-        currentPageY = addHeader(currentPageY);
+        currentPageY = addHeader(currentPageY, tabKey);
         
         // Add table headers
         let tableY = addTableHeaders(currentPageY);
@@ -301,9 +309,9 @@ const handleExportPDF = async () => {
         const sizeColumnWidth = sizeGroupWidth / 4;
         
         // Data row settings
-        const measurementPointFontSize = 7; // Slightly smaller for better fit
-        const toleranceFontSize = 7;
-        const specFontSize = 7;
+        const measurementPointFontSize = 6; // Slightly smaller for better fit
+        const toleranceFontSize = 6;
+        const specFontSize = 6;
         
         // Process data rows
         groupData.forEach((item, index) => {
@@ -321,7 +329,7 @@ const handleExportPDF = async () => {
             isFirstPageOfGroup = false;
             
             // Add header to new page
-            currentPageY = addHeader(currentPageY);
+            currentPageY = addHeader(currentPageY, tabKey);
             
             // Add table headers to new page
             tableY = addTableHeaders(currentPageY);
@@ -344,11 +352,11 @@ const handleExportPDF = async () => {
           
           // Split text with proper width consideration
           const lines = doc.splitTextToSize(measurementText, measurementPointWidth - 6);
-          const lineHeight = measurementPointFontSize * 1.3;
+          const lineHeight = measurementPointFontSize * 1.05;
           
           // Calculate starting Y position to center text vertically
           const totalTextHeight = lines.length * lineHeight;
-          const paddingTop = (requiredRowHeight - totalTextHeight) / 2;
+          const paddingTop = Math.max(0, (requiredRowHeight - totalTextHeight) / 2);
           const startY = tableY + paddingTop + lineHeight * 0.8; // Adjust baseline
           
           // Draw each line of text
@@ -373,31 +381,24 @@ const handleExportPDF = async () => {
           colX += tolMinusWidth;
           
           // Size values - centered vertically
-          item.values.forEach((value, valueIndex) => {
-            if (valueIndex < sizes.length) {
-              // First column (Spec column)
+          sizes.forEach((size, valueIndex) => {
+            const value = item.values?.[valueIndex];
+
+            // First column (Spec column)
+            doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
+            doc.setFontSize(specFontSize);
+            doc.setFont('helvetica', 'bold');
+            
+            const textToDisplay = (value !== undefined && value !== null && value !== '') ? decimalToFraction(value) : '-';
+            doc.text(textToDisplay, colX + sizeColumnWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
+            colX += sizeColumnWidth;
+            
+            // Three empty columns
+            for (let j = 0; j < 3; j++) {
               doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
-              doc.setFontSize(specFontSize);
-              doc.setFont('helvetica', 'bold');
-              doc.text(decimalToFraction(value), colX + sizeColumnWidth/2, tableY + requiredRowHeight/2 + 2, { align: 'center' });
               colX += sizeColumnWidth;
-              
-              // Three empty columns
-              for (let i = 0; i < 3; i++) {
-                doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
-                colX += sizeColumnWidth;
-              }
             }
           });
-          
-          // Handle remaining size groups
-          const remainingSizes = sizes.length - item.values.length;
-          for (let i = 0; i < remainingSizes; i++) {
-            for (let j = 0; j < 4; j++) {
-              doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
-              colX += sizeColumnWidth;
-            }
-          }
           
           tableY += requiredRowHeight;
         });
@@ -1013,15 +1014,25 @@ const handleExportExcel = async () => {
                     -{decimalToFraction(item.toleranceMinus)}
                   </span>
                 </td>
-                {item.values?.map((value, vIndex) => (
-                  <td key={vIndex} className={`px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium ${
-                    vIndex < item.values.length - 1 ? 'border-r border-gray-200' : ''
-                  }`}>
-                    <span className="px-2 py-1 bg-gray-100 rounded group-hover:bg-blue-100 transition-colors">
-                      {decimalToFraction(value)}
-                                        </span>
-                  </td>
-                ))}
+                {sizes.map((size, vIndex) => {
+                  const value = item.values?.[vIndex];
+                  return (
+                    <td
+                      key={vIndex}
+                      className={`px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium ${
+                        vIndex < sizes.length - 1 ? 'border-r border-gray-200' : ''
+                      }`}
+                    >
+                      {value !== undefined && value !== null ? (
+                        <span className="px-2 py-1 bg-gray-100 rounded group-hover:bg-blue-100 transition-colors">
+                          {decimalToFraction(value)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                  );
+                })}
               </tr>
             ))}
             {currentMeasurements.length === 0 && (

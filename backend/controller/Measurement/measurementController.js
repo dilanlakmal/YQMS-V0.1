@@ -2,6 +2,7 @@ import {
   DtOrder,
    BuyerSpecTemplate,
  } from "../MongoDB/dbConnectionController.js";
+import { getBuyerFromMoNumber } from "../../helpers/helperFunctions.js";
 
 const processSpecs = (specArray, allSizes) => {
   if (!specArray || specArray.length === 0) {
@@ -11,25 +12,34 @@ const processSpecs = (specArray, allSizes) => {
   const groupedSpecs = {};
 
   specArray.forEach((spec) => {
-    // Use 'main' for 'NA' kValue, otherwise use the kValue directly (e.g., 'K1', 'K2')
     const groupKey = spec.kValue === "NA" ? "main" : spec.kValue;
-
+    
     if (!groupedSpecs[groupKey]) {
       groupedSpecs[groupKey] = [];
     }
 
     // Create a map of size to value for quick lookups
     const valuesMap = new Map();
-    if (spec.Specs) {
+    if (spec.Specs && Array.isArray(spec.Specs)) {
       spec.Specs.forEach(s => {
-        valuesMap.set(s.size, s.decimal);
+        if (s.size && s.decimal !== null && s.decimal !== undefined) {
+          valuesMap.set(s.size, s.decimal);
+        }
       });
     }
 
+    console.log(`Processing ${spec.MeasurementPointEngName}:`, {
+      groupKey,
+      valuesMap: Object.fromEntries(valuesMap),
+      allSizes
+    });
+
     groupedSpecs[groupKey].push({
       point: spec.MeasurementPointEngName,
-      // For each size, get the value from the map or default to "N/A"
-      values: allSizes.map(size => valuesMap.get(size) || "N/A"),
+      values: allSizes.map(size => {
+        const value = valuesMap.get(size);
+        return value !== undefined ? value : "N/A";
+      }),
       tolerancePlus: spec.TolPlus ? spec.TolPlus.decimal : 0,
       toleranceMinus: spec.TolMinus ? spec.TolMinus.decimal : 0,
     });
@@ -80,30 +90,60 @@ export const getMeasurementDataByStyle = async (req, res) => {
       return res.status(400).json({ message: "Style No is required." });
     }
 
-    // Find the order in the dt_orders collection by Order_No
     const order = await DtOrder.findOne({ Order_No: styleNo }).lean();
 
     if (!order) {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
 
-    // Extract all unique sizes from the first spec array as a reference
-    const allSizes = [];
-    if (order.BeforeWashSpecs && order.BeforeWashSpecs.length > 0 && order.BeforeWashSpecs[0].Specs) {
-        order.BeforeWashSpecs[0].Specs.forEach(spec => {
-            if (!allSizes.includes(spec.size)) {
-                allSizes.push(spec.size);
-            }
+    // Enhanced size collection - collect from both BeforeWashSpecs and AfterWashSpecs
+    const allSizesSet = new Set();
+    const specsToScan = [...(order.BeforeWashSpecs || []), ...(order.AfterWashSpecs || [])];
+    
+    specsToScan.forEach((measurementPoint) => {
+      if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
+        measurementPoint.Specs.forEach((spec) => {
+          if (spec.size && spec.size.trim() !== '') {
+            allSizesSet.add(spec.size.trim());
+          }
         });
-    }
+      }
+    });
+
+    // Sort sizes in logical order
+    const allSizes = Array.from(allSizesSet).sort((a, b) => {
+      const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+      const aIndex = sizeOrder.indexOf(a);
+      const bIndex = sizeOrder.indexOf(b);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      } else if (aIndex !== -1) {
+        return -1;
+      } else if (bIndex !== -1) {
+        return 1;
+      } else {
+        return a.localeCompare(b);
+      }
+    });
+
+    console.log('All sizes found:', allSizes);
 
     // Process both before and after wash specs
     const beforeWashData = processSpecs(order.BeforeWashSpecs, allSizes);
     const afterWashData = processSpecs(order.AfterWashSpecs, allSizes);
 
-    // Construct the final response object
+    console.log('Processed data:', {
+      beforeWashData: Object.keys(beforeWashData),
+      afterWashData: Object.keys(afterWashData),
+      sampleBeforeWash: beforeWashData[Object.keys(beforeWashData)[0]]?.[0]
+    });
+
     const responseData = {
       styleNo: order.Order_No,
+      customer: getBuyerFromMoNumber(styleNo),
+      custStyle: order.CustStyle || '',
+      totalQty: order.TotalQty || '',
       sizes: allSizes,
       measurements: {
         beforeWash: beforeWashData,
@@ -112,6 +152,7 @@ export const getMeasurementDataByStyle = async (req, res) => {
     };
 
     res.status(200).json(responseData);
+
   } catch (error) {
     console.error("Error fetching measurement data:", error);
     res.status(500).json({
