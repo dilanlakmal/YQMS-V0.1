@@ -9,6 +9,7 @@ import {
   getqcwashingOrderbysize,
   getqcwashingOrderColorQty, 
   getqcwashingOrderSizes,
+  savedMeasurementDataSpec,
   getmeasurmentSpec,
   getqcWashingOrderbyOrderNo,
   qcwashingaveSize,
@@ -44,7 +45,7 @@ import {
   updateQCWashingQtySub,
   getAllQCWashingSubmittedData,
 } from '../../controller/QCWashing/qcWashingController.js';
-import { uploadInspectionImage, uploadDefectImage} from "../../Helpers/helperFunctions.js";
+import { uploadInspectionImage, uploadDefectImage} from "../../helpers/helperFunctions.js";
 
 const router = express.Router();
 
@@ -55,8 +56,9 @@ router.get('/api/qc-washing/pdf/:id', getqcwashingPDF);
 router.get('/api/qc-washing/results', getqcwashingResult);
 router.get('/api/qc-washing/results/filters', getqcwashingresultFilter);
 router.get('/api/qc-washing/order-details-by-style/:orderNo', getqcwashingOrderbysize);
-router.get('/api/qc-washing/order-color-qty/:orderNo/:color', getqcwashingOrderColorQty )
+router.get('/api/qc-washing/order-color-qty/:orderNo/:color', getqcwashingOrderColorQty);
 router.get('/api/qc-washing/order-sizes/:orderNo/:color', getqcwashingOrderSizes);
+router.post('/api/qc-washing/find-saved-measurement', savedMeasurementDataSpec);
 router.get('/api/qc-washing/measurement-specs/:orderNo/:color', getmeasurmentSpec);
 router.get('/api/qc-washing/order-details-by-order/:orderNo', getqcWashingOrderbyOrderNo);
 router.post('/api/qc-washing/save-size', qcwashingaveSize);
