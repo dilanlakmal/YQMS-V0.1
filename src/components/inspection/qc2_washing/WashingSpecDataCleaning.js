@@ -6,17 +6,15 @@
  */
 
 const fractionToDecimal = (value) => {
-  const originalValue = value; // This will now be the formatted string like "13 3/4"
+  const originalValue = value;
 
   if (value === null || value === undefined || String(value).trim() === "") {
     return { raw: originalValue, decimal: null };
   }
 
-  // FIX 2: Since `raw: false` in the reader gives us strings, we can remove the `typeof value === "number"` check.
-  // The function now assumes it's always working with a string.
-
-  // Normalize all possible fraction slashes ('⁄' and '/') and trim whitespace.
-  const strValue = String(value).trim().replace(/⁄/g, "/");
+  // Normalize all possible fraction slashes and trim whitespace
+  // FIX: Replace multiple spaces with single space
+  const strValue = String(value).trim().replace(/⁄/g, "/").replace(/\s+/g, " "); // ← ADD THIS: Replace multiple spaces with single space
 
   let total = 0;
 
@@ -51,15 +49,15 @@ const fractionToDecimal = (value) => {
       }
       total = numerator / denominator;
     }
-    // It's a regular number (as a string, e.g., "13.75" or "12")
+    // It's a regular number
     else {
       total = parseFloat(strValue);
     }
 
     const decimal = isNaN(total) ? null : parseFloat(total.toFixed(4));
 
-    // This is now perfect. `originalValue` is the desired fraction string, and `decimal` is the calculated number.
-    return { raw: originalValue, decimal: decimal };
+    // Return the NORMALIZED string as raw, not the original with double spaces
+    return { raw: strValue, decimal: decimal }; // ← CHANGED: Use strValue instead of originalValue
   } catch (e) {
     console.error(`Could not parse fraction: "${originalValue}"`, e);
     return { raw: originalValue, decimal: null };
