@@ -963,7 +963,9 @@ const MeasurementDetailsSection = ({
       setLoading(true);
       setError(null);
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${encodeURIComponent(
+          color
+        )}`
       );
       const data = await response.json();
 
@@ -1030,7 +1032,9 @@ const MeasurementDetailsSection = ({
   const fetchMeasurementSpecs = async () => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(
+          color
+        )}`
       );
       const data = await response.json();
 
