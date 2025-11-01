@@ -125,20 +125,20 @@ const handleExportPDF = async () => {
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.text('Yorkmars (Cambodia) Garment MFG. Co. Ltd. - Measurement List', pageWidth / 2, y + 5, { align: 'center' });
-          y += 10;
+          y += 15;
 
           // Customer info
           doc.setFontSize(7);
           doc.setFont('helvetica', 'normal');
           
           doc.text(`Customer: ${filterCriteria.customer || ''}`, 8, y);
-          doc.text(`CustStyle: ${filterCriteria.custStyle || ''}`, 8, y + 3); // Uses custStyle
+          doc.text(`CustStyle: ${filterCriteria.custStyle || ''}`, 8, y + 6); // Uses custStyle
           
           doc.text(`Our Ref: ${filterCriteria.styleNo || ''}`, pageWidth / 2 - 25, y); // Uses styleNo (which is order_no)
-          doc.text(`Order Qty: ${filterCriteria.totalQty || ''}`, pageWidth / 2 - 25, y + 3); // Uses totalQty
+          doc.text(`Order Qty: ${filterCriteria.totalQty || ''}`, pageWidth / 2 - 25, y + 6); // Uses totalQty
           
           doc.text(`Actual Qty:`, pageWidth - 50, y);
-          doc.text(`Date:`, pageWidth - 50, y + 3);
+          doc.text(`Date:`, pageWidth - 50, y + 6);
           
           return y + 8; // Adjusted y position
         };
@@ -227,7 +227,7 @@ const handleExportPDF = async () => {
 
         // Function to add footer
         const addFooter = () => {
-          const footerY = pageHeight - 18;
+          const footerY = pageHeight - 22;
           
           doc.setFillColor(240, 240, 240);
           doc.rect(5, footerY, pageWidth - 10, 16, 'F');
