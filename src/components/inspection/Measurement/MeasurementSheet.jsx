@@ -394,7 +394,7 @@ const handleExportPDF = async () => {
             colX += sizeColumnWidth;
             
             // Three empty columns
-            for (let j = 0; j < 3; j++) {
+            for (let j = 0; j < 4; j++) {
               doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
               colX += sizeColumnWidth;
             }

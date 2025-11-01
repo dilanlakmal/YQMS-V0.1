@@ -28,12 +28,6 @@ const processSpecs = (specArray, allSizes) => {
       });
     }
 
-    console.log(`Processing ${spec.MeasurementPointEngName}:`, {
-      groupKey,
-      valuesMap: Object.fromEntries(valuesMap),
-      allSizes
-    });
-
     groupedSpecs[groupKey].push({
       point: spec.MeasurementPointEngName,
       values: allSizes.map(size => {
@@ -127,17 +121,10 @@ export const getMeasurementDataByStyle = async (req, res) => {
       }
     });
 
-    console.log('All sizes found:', allSizes);
 
     // Process both before and after wash specs
     const beforeWashData = processSpecs(order.BeforeWashSpecs, allSizes);
     const afterWashData = processSpecs(order.AfterWashSpecs, allSizes);
-
-    console.log('Processed data:', {
-      beforeWashData: Object.keys(beforeWashData),
-      afterWashData: Object.keys(afterWashData),
-      sampleBeforeWash: beforeWashData[Object.keys(beforeWashData)[0]]?.[0]
-    });
 
     const responseData = {
       styleNo: order.Order_No,
@@ -161,6 +148,150 @@ export const getMeasurementDataByStyle = async (req, res) => {
     });
   }
 };
+
+export const getMeasurementDataByStyleV2 = async (req, res) => {
+  try {
+    const { styleNo } = req.params;
+    const { washType } = req.query; // Get washType from query parameter
+    
+    if (!styleNo) {
+      return res.status(400).json({ message: "Style No is required." });
+    }
+
+    if (!washType || !['beforeWash', 'afterWash'].includes(washType)) {
+      return res.status(400).json({ message: "Valid washType (beforeWash or afterWash) is required." });
+    }
+
+    const order = await DtOrder.findOne({ Order_No: styleNo }).lean();
+
+    if (!order) {
+      return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
+    }
+
+    // Enhanced size collection - collect from both BeforeWashSpecs and SizeSpec
+    const allSizesSet = new Set();
+    
+    // Collect sizes from BeforeWashSpecs
+    if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
+      order.BeforeWashSpecs.forEach((measurementPoint) => {
+        if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
+          measurementPoint.Specs.forEach((spec) => {
+            if (spec.size && spec.size.trim() !== '') {
+              allSizesSet.add(spec.size.trim());
+            }
+          });
+        }
+      });
+    }
+
+    // Collect sizes from SizeSpec (for after wash)
+    if (order.SizeSpec && Array.isArray(order.SizeSpec)) {
+      order.SizeSpec.forEach((sizeSpec) => {
+        if (sizeSpec.Specs && Array.isArray(sizeSpec.Specs)) {
+          sizeSpec.Specs.forEach((spec) => {
+            Object.keys(spec).forEach(size => {
+              if (size && size.trim() !== '') {
+                allSizesSet.add(size.trim());
+              }
+            });
+          });
+        }
+      });
+    }
+
+    // Sort sizes in logical order
+    const allSizes = Array.from(allSizesSet).sort((a, b) => {
+      const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+      const aIndex = sizeOrder.indexOf(a);
+      const bIndex = sizeOrder.indexOf(b);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      } else if (aIndex !== -1) {
+        return -1;
+      } else if (bIndex !== -1) {
+        return 1;
+      } else {
+        return a.localeCompare(b);
+      }
+    });
+
+    let measurementData = {};
+
+    if (washType === 'beforeWash') {
+      // Use existing logic for before wash
+      measurementData = {
+        beforeWash: processSpecs(order.BeforeWashSpecs, allSizes)
+      };
+    } else if (washType === 'afterWash') {
+      // Use SizeSpec for after wash
+      measurementData = {
+        afterWash: processSizeSpecs(order.SizeSpec, allSizes)
+      };
+    }
+
+    const responseData = {
+      styleNo: order.Order_No,
+      customer: getBuyerFromMoNumber(styleNo),
+      custStyle: order.CustStyle || '',
+      totalQty: order.TotalQty || '',
+      sizes: allSizes,
+      measurements: measurementData,
+    };
+
+    res.status(200).json(responseData);
+
+  } catch (error) {
+    console.error("Error fetching measurement data:", error);
+    res.status(500).json({
+      message: "An internal server error occurred while fetching measurement data.",
+      error: error.message,
+    });
+  }
+};
+
+// New function to process SizeSpec data
+const processSizeSpecs = (sizeSpecArray, allSizes) => {
+  if (!sizeSpecArray || sizeSpecArray.length === 0) {
+    return {};
+  }
+
+  const groupedSpecs = {};
+
+  sizeSpecArray.forEach((sizeSpec) => {
+    // For SizeSpec, we'll group everything under "main" since there's no kValue
+    const groupKey = "main";
+    
+    if (!groupedSpecs[groupKey]) {
+      groupedSpecs[groupKey] = [];
+    }
+
+    // Create a map of size to value for quick lookups
+    const valuesMap = new Map();
+    if (sizeSpec.Specs && Array.isArray(sizeSpec.Specs)) {
+      sizeSpec.Specs.forEach(spec => {
+        Object.keys(spec).forEach(size => {
+          if (spec[size] && spec[size].decimal !== null && spec[size].decimal !== undefined) {
+            valuesMap.set(size, spec[size].decimal);
+          }
+        });
+      });
+    }
+
+    groupedSpecs[groupKey].push({
+      point: sizeSpec.EnglishRemark || sizeSpec.ChineseName || `Point ${sizeSpec.Seq}`,
+      values: allSizes.map(size => {
+        const value = valuesMap.get(size);
+        return value !== undefined ? value : "N/A";
+      }),
+      tolerancePlus: sizeSpec.TolerancePlus ? sizeSpec.TolerancePlus.decimal : 0,
+      toleranceMinus: sizeSpec.ToleranceMinus ? sizeSpec.ToleranceMinus.decimal : 0,
+    });
+  });
+
+  return groupedSpecs;
+};
+
 
 export const getTemplateByBuyer = async (req, res) => {
   try {

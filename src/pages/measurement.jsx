@@ -12,44 +12,46 @@ const Measurement = () => {
   const [error, setError] = useState('');
 
   const handleFilter = async (criteria) => {
-    setLoading(true);
-    setError('');
-    setFilterCriteria(criteria);
-    setMeasurementData(null); // Clear previous data
+  setLoading(true);
+  setError('');
+  setFilterCriteria(criteria);
+  setMeasurementData(null); // Clear previous data
 
-    try {
-      // Fetch both measurement data and ANF template points concurrently
-      const [measurementResponse, templateResponse] = await Promise.all([
-        axios.get(`${API_BASE_URL}/api/measurement/${criteria.styleNo}`),
-        axios.get(`${API_BASE_URL}/api/measurement/template-by-style/${criteria.styleNo}`)
-      ]);
-
+  try {
+    // Use the new v2 endpoint with washType as query parameter
+    const measurementUrl = `${API_BASE_URL}/api/measurement-v2/${criteria.styleNo}?washType=${criteria.washType}`;
     
-      setMeasurementData(measurementResponse.data || null);
-      setAnfPoints(templateResponse.data?.measurementPoints || []);
-    } catch (err) {
-      console.error("Error fetching measurement data:", err);
-      setError(err.response?.data?.message || 'Failed to fetch data. Please try again.');
-      setMeasurementData(null); // Clear previous data on error
-    } finally {
-      setLoading(false);
-    }
-  };
+    // Fetch both measurement data and ANF template points concurrently
+    const [measurementResponse, templateResponse] = await Promise.all([
+      axios.get(measurementUrl),
+      axios.get(`${API_BASE_URL}/api/measurement/template-by-style/${criteria.styleNo}`)
+    ]);
+  
+    setMeasurementData(measurementResponse.data || null);
+    setAnfPoints(templateResponse.data?.measurementPoints || []);
 
+  } catch (err) {
+    console.error("Error fetching measurement data:", err);
+    setError(err.response?.data?.message || 'Failed to fetch data. Please try again.');
+    setMeasurementData(null); // Clear previous data on error
+  } finally {
+    setLoading(false);
+  }
+};
   // Create enhanced filter criteria that includes data from both sources
   const enhancedFilterCriteria = useMemo(() => {
-    if (!filterCriteria || !measurementData) return null;
+  if (!filterCriteria || !measurementData) return null;
 
-    const enhanced = {
-      ...filterCriteria, // This includes washType, styleNo from FilterPlane
-      customer: measurementData.customer || '',
-      custStyle: measurementData.custStyle || '',
-      totalQty: measurementData.totalQty || '',
-      sizes: measurementData.sizes || []
-    };
+  const enhanced = {
+    ...filterCriteria, // This includes washType, styleNo from FilterPlane
+    customer: measurementData.customer || '',
+    custStyle: measurementData.custStyle || '',
+    totalQty: measurementData.totalQty || '',
+    sizes: measurementData.sizes || []
+  };
 
-    return enhanced;
-  }, [filterCriteria, measurementData]);
+  return enhanced;
+}, [filterCriteria, measurementData]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
