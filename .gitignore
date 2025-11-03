@@ -22,6 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+##====ignor .env
+.env
 
 # ==================================
 #      BACKEND SPECIFIC IGNORES

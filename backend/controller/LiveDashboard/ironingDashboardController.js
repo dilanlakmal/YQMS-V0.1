@@ -2,7 +2,7 @@ import {
   Ironing ,              
 } from "../MongoDB/dbConnectionController.js";
 
-import { getDayRange } from "../../Helpers/helperFunctions.js";
+import { getDayRange } from "../../helpers/helperFunctions.js";
 
 export const getIroningData = async (req, res) => {
   try {

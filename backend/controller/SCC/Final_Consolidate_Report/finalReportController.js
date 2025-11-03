@@ -12,7 +12,7 @@ import {
 } from "../../MongoDB/dbConnectionController.js";
 import {
   getConsolidatedDateFormats,
-} from "../../../Helpers/helperFunctions.js";
+} from "../../../helpers/helperFunctions.js";
 
 export const getFinalHTreport = async (req, res) => {
   try {

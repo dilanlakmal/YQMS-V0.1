@@ -2,7 +2,7 @@ import {
   SewingDefects,
   UserMain,
  } from "../MongoDB/dbConnectionController.js";
-import { escapeRegex } from "../../Helpers/helperFunctions.js";
+import { escapeRegex } from "../../helpers/helperFunctions.js";
 
 export const getDefectDefinition = async (req, res) => {
    try {

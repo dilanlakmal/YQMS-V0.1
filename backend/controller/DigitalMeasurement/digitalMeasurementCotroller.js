@@ -626,7 +626,10 @@ export const getMeasurementDetailsByMono = async (req, res) => {
         ...record,
         reference_no: record.reference_no 
       })),
+      custStyle: order.CustStyle,
+      buyer: order.ShortName,
       sizeSpec: correctedSizeSpec,
+      totalQty: order.TotalQty,
       measurementPointSummary
     });
   } catch (error) {

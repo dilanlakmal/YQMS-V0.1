@@ -294,17 +294,4 @@ export const getQADefectsForDropdown = async (req, res) => {
     }
 };
 
-// --- FIX #2: NEW ENDPOINT TO FETCH STANDARD DEFECTS FOR THE FORM ---
-export const getStandardDefectsForForm = async (req, res) => {
-   try {
-      const defects = await QAStandardDefectsModel.find({})
-        .sort({ code: 1 })
-        .lean(); // Use lean for performance
-      res.json(defects);
-    } catch (error) {
-      console.error("Error fetching standard defects list:", error);
-      res
-        .status(500)
-        .json({ message: "Server error fetching standard defects list" });
-    }
-};
+

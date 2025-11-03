@@ -2,6 +2,9 @@ import { QCRovingPairing } from "../MongoDB/dbConnectionController.js";
 import {
    generateUniqueFilename,
   saveCompressedImage } from "../../Utils//imageCompression.js";
+import {
+  API_BASE_URL
+} from "../../Config/appConfig.js";
 
 // Upload images for defects
 export const uploadParingimagers = async (req, res) => {
@@ -15,7 +18,8 @@ export const uploadParingimagers = async (req, res) => {
       for (const file of req.files) {
         const filename = generateUniqueFilename(file.originalname, 'defect');
         const imagePath = await saveCompressedImage(file.buffer, filename, 'defect');
-        uploadedImages.push(imagePath);
+        const imageUrl = `${API_BASE_URL}${imagePath}`;
+        uploadedImages.push(imageUrl);
       }
   
       res.json({ success: true, images: uploadedImages });
@@ -37,7 +41,8 @@ export const uploadMeasurementImages = async (req, res) => {
     for (const file of req.files) {
       const filename = generateUniqueFilename(file.originalname, 'measurement');
       const imagePath = await saveCompressedImage(file.buffer, filename, 'measurement');
-      uploadedImages.push(imagePath);
+      const imageUrl = `${API_BASE_URL}${imagePath}`;
+      uploadedImages.push(imageUrl);
     }
 
     res.json({ success: true, images: uploadedImages });
@@ -59,7 +64,8 @@ export const uploadAccessoryImages = async (req, res) => {
     for (const file of req.files) {
       const filename = generateUniqueFilename(file.originalname, 'accessory');
       const imagePath = await saveCompressedImage(file.buffer, filename, 'accessory');
-      uploadedImages.push(imagePath);
+      const imageUrl = `${API_BASE_URL}${imagePath}`;
+      uploadedImages.push(imageUrl);
     }
 
     res.json({ success: true, images: uploadedImages });
@@ -161,7 +167,7 @@ export const saveQCRovingPairingData = async (req, res) => {
       inspection_date,
       moNo,
       lineNo,
-      report_name,
+      report_name,      
       emp_id,
       eng_name,
       operationNo,
@@ -200,6 +206,27 @@ export const saveQCRovingPairingData = async (req, res) => {
       pairingDataItem.accessoryIssues = [];
     }
 
+    // --- NEW: Sanitize image arrays to ensure they are saved ---
+    // Sanitize accessory issues images
+    if (pairingDataItem.accessoryIssues) {
+      pairingDataItem.accessoryIssues.forEach((issue) => {
+        issue.images = issue.images || [];
+      });
+    }
+    // Sanitize measurement images
+    if (pairingDataItem.measurementData) {
+      pairingDataItem.measurementData.forEach((part) => {
+        part.measurements.forEach((m) => (m.images = m.images || []));
+      });
+    }
+    // Sanitize defect images
+    if (pairingDataItem.defectSummary?.defectDetails) {
+      pairingDataItem.defectSummary.defectDetails.forEach((part) => {
+        part.defectsForPart.forEach((dfp) => {
+          dfp.defects.forEach((d) => (d.images = d.images || []));
+        });
+      });
+    }
     // ---------------------------------------------------------------------
 
     //Add the current server timestamp to the object from the frontend

@@ -1,5 +1,5 @@
 import fsPromises from 'fs/promises';
-import {sanitize } from "../../Helpers/helperFunctions.js";
+import {sanitize } from "../../helpers/helperFunctions.js";
 import multer from "multer";
 import sharp from "sharp";
 import path from "path";

@@ -42,37 +42,20 @@ const MeasurementModal = ({
   isOpen,
   onClose,
   onSave,
-  currentMeasurements,
+  measurement,
   partIdentifier
 }) => {
   const { t } = useTranslation();
-  const [measurements, setMeasurements] = useState(currentMeasurements || []);
+  const [measurements, setMeasurements] = useState(measurement || { value: '', images: [] });
 
   useEffect(() => {
-    setMeasurements(currentMeasurements || []);
-  }, [currentMeasurements]);
+    setMeasurements(measurement || { value: '', images: [] });
+  }, [measurement]);
 
   if (!isOpen) return null;
 
-  const addMeasurement = () => {
-    const newPartNo = measurements.length > 0 ? Math.max(...measurements.map(m => m.partNo)) + 1 : 1;
-    setMeasurements(prev => [...prev, { partNo: newPartNo, value: '', images: [] }]);
-  };
-
-  const updateMeasurement = (index, field, value) => {
-    setMeasurements(prev => prev.map((m, i) => 
-      i === index ? { ...m, [field]: value } : m
-    ));
-  };
-
-  const updateMeasurementImages = (index, images) => {
-    setMeasurements(prev => prev.map((m, i) => 
-      i === index ? { ...m, images } : m
-    ));
-  };
-
-  const removeMeasurement = (index) => {
-    setMeasurements(prev => prev.filter((_, i) => i !== index));
+  const handleImagesChange = (images) => {
+    setMeasurements(prev => ({ ...prev, images: images.map(img => typeof img === 'string' ? img : (img.url || img)) }));
   };
 
   return (
@@ -81,7 +64,7 @@ const MeasurementModal = ({
       onClick={onClose}
     >
       <div
-        className="bg-white p-5 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        className="bg-white p-5 rounded-lg shadow-xl w-full max-w-md"
         onClick={(e) => e.stopPropagation()}
       >
         <h3 className="text-xl font-semibold mb-4">
@@ -89,57 +72,26 @@ const MeasurementModal = ({
         </h3>
         
         <div className="space-y-4 mb-4">
-          {measurements.map((measurement, index) => (
-            <div key={index} className="p-3 bg-gray-100 rounded-md">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <label className="text-sm font-medium">Part {measurement.partNo}:</label>
-                  <input
-                    type="text"
-                    value={measurement.value}
-                    onChange={(e) => updateMeasurement(index, 'value', e.target.value)}
-                    className="px-2 py-1 border rounded-md w-24"
-                    placeholder="Value"
-                  />
-                </div>
-                <button
-                  onClick={() => removeMeasurement(index)}
-                  className="p-1 text-red-500 hover:bg-red-100 rounded"
-                >
-                  <X size={16} />
-                </button>
-              </div>
-              <ImageUpload
-                images={measurement.images || []}
-                onImagesChange={(images) => updateMeasurementImages(index, images)}
-                uploadEndpoint="/api/roving-pairing/upload-measurement-images"
-                maxImages={3}
-                type="measurement"
-              />
-            </div>
-          ))}
-        </div>
-        
-        <div className="flex gap-2 mb-4">
-          <button
-            onClick={addMeasurement}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
-          >
-            <Plus size={16} />
-            Add Measurement
-          </button>
+          <p className="text-lg">Value: <span className="font-mono bg-gray-100 px-2 py-1 rounded">{measurements.value}</span></p>
+          <ImageUpload
+            images={measurements.images || []}
+            onImagesChange={handleImagesChange}
+            uploadEndpoint="/api/roving-pairing/upload-measurement-images"
+            maxImages={3}
+            type="measurement"
+          />
         </div>
         
         <div className="flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"
+            className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400 w-full"
           >
             {t("cancel", "Cancel")}
           </button>
           <button
-            onClick={() => onSave(measurements)}
-            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+            onClick={() => onSave(measurements)} // Pass the whole object back
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
           >
             Save Measurements
           </button>
@@ -153,7 +105,7 @@ const MeasurementModal = ({
 const MeasurementNumPad = ({ onClose, onSetValue, currentValue }) => {
   const [nValue, setNValue] = useState(0);
   const [isNegative, setIsNegative] = useState(
-    currentValue?.startsWith("-") || false
+    currentValue?.value?.startsWith("-") || false
   );
 
   const handleNClick = () => setNValue((prev) => (prev + 1) % 6);
@@ -279,16 +231,12 @@ const DefectModal = ({
 
   const updateCount = (defectId, change) =>
     setDefectsForPart((prev) =>
-      prev.map((d) =>
-        d._id === defectId ? { ...d, count: Math.max(1, d.count + change) } : d
-      )
+      prev.map((d) => (d._id === defectId ? { ...d, count: Math.max(1, d.count + change) } : d))
     );
     
   const updateDefectImages = (defectId, images) =>
     setDefectsForPart((prev) =>
-      prev.map((d) =>
-        d._id === defectId ? { ...d, images } : d
-      )
+      prev.map((d) => (d._id === defectId ? { ...d, images: images.map(img => typeof img === 'string' ? img : (img.url || img)) } : d))
     );
     
   const removeDefect = (defectId) =>
@@ -423,9 +371,7 @@ const AccessoryModal = ({
   };
 
   const updateAccessoryImages = (issueId, images) => {
-    setAccessoryIssues(prev => prev.map(issue => 
-      issue._id === issueId ? { ...issue, images } : issue
-    ));
+    setAccessoryIssues(prev => prev.map(issue => (issue._id === issueId ? { ...issue, images: images.map(img => typeof img === 'string' ? img : (img.url || img)) } : issue)));
   };
 
   const removeAccessoryIssue = (issueId) => {
@@ -543,8 +489,7 @@ const RovingPairing = () => {
   const [isDefectModalOpen, setIsDefectModalOpen] = useState(false);
   const [isMeasurementModalOpen, setIsMeasurementModalOpen] = useState(false);
   const [isAccessoryModalOpen, setIsAccessoryModalOpen] = useState(false);
-  const [activeCell, setActiveCell] = useState(null);
-  const [activeMeasurementPart, setActiveMeasurementPart] = useState(null);
+  const [activeCell, setActiveCell] = useState(null);  
 
   // Refs
   const moNoDropdownRef = useRef(null);
@@ -658,44 +603,30 @@ const RovingPairing = () => {
   const handleDefectCellClick = (part, index) => {
     setActiveCell({ type: "defect", part, index });
     setIsDefectModalOpen(true);
-  };
+  };  
 
   const handleSetMeasurement = (value) => {
-    if (activeCell)
+    if (activeCell) {
+      const key = `${activeCell.part}-${activeCell.index}`;
       setMeasurementData((prev) => ({
         ...prev,
-        [`${activeCell.part}-${activeCell.index}`]: value
+        [key]: { ...prev[key], value }
       }));
+    }
     setShowNumPad(false);
     setActiveCell(null);
   };
 
   const handleSaveDefects = (defects) => {
     const key = `${activeCell.part}-${activeCell.index}`;
-    if (defects.length > 0)
+    if (defects.length > 0) {
       setDefectData((prev) => ({ ...prev, [key]: defects }));
-    else {
-      setDefectData((prev) => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
+    } else {
+      const { [key]: _, ...rest } = defectData;
+      setDefectData(rest);
     }
     setIsDefectModalOpen(false);
     setActiveCell(null);
-  };
-
-  const handleSaveMeasurements = (measurements) => {
-    // Update measurement data with images
-    const updatedMeasurementData = { ...measurementData };
-    measurements.forEach((measurement) => {
-      const key = `${activeMeasurementPart}-${measurement.partNo - 1}`;
-      updatedMeasurementData[key] = measurement.value;
-      // Store images separately if needed
-    });
-    setMeasurementData(updatedMeasurementData);
-    setIsMeasurementModalOpen(false);
-    setActiveMeasurementPart(null);
   };
 
   const handleSaveAccessoryIssues = (issues) => {
@@ -703,21 +634,16 @@ const RovingPairing = () => {
     setIsAccessoryModalOpen(false);
   };
 
-  const handleMeasurementPartClick = (part) => {
-    setActiveMeasurementPart(part);
+  const handleMeasurementImageClick = (part, index) => {
+    setActiveCell({ type: "measure", part, index });
     setIsMeasurementModalOpen(true);
   };
 
-  const getCurrentMeasurements = (part) => {
-    const measurements = [];
-    for (let i = 0; i < quantities[part]; i++) {
-      measurements.push({
-        partNo: i + 1,
-        value: measurementData[`${part}-${i}`] || '',
-        images: [] // TODO: Get images from state
-      });
-    }
-    return measurements;
+  const handleSaveMeasurementImages = (measurement) => {
+    const key = `${activeCell.part}-${activeCell.index}`;
+    setMeasurementData(prev => ({ ...prev, [key]: { ...prev[key], ...measurement } }));
+    setIsMeasurementModalOpen(false);
+    setActiveCell(null);
   };
 
   const getDefectDisplayName = (defect) => {
@@ -772,14 +698,14 @@ const RovingPairing = () => {
     let stats = {
       total: 0,
       positive: 0,
-      negative: 0,
+      negative: 0,      
       rejectedParts: new Set()
     };
     Object.entries(measurementData).forEach(([key, value]) => {
-      if (isOutOfTolerance(value)) {
+      if (isOutOfTolerance(value.value)) {
         stats.total++;
-        getFractionValue(value) > 0 ? stats.positive++ : stats.negative++;
-        stats.rejectedParts.add(key);
+        getFractionValue(value.value) > 0 ? stats.positive++ : stats.negative++;
+        stats.rejectedParts.add(key);        
       }
     });
     return stats;
@@ -844,14 +770,16 @@ const RovingPairing = () => {
             ? selectedAccessoryIssues.map((issue) => ({
                 issueEng: issue.issueEng,
                 issueKhmer: issue.issueKhmer,
-                issueChi: issue.issueChi
+                issueChi: issue.issueChi,
+                images: issue.images || []
               }))
             : [],
         measurementData: Object.entries(quantities).map(([partType, qty]) => ({
           partType,
           measurements: Array.from({ length: qty }, (_, i) => ({
             partNo: i + 1,
-            value: measurementData[`${partType}-${i}`] || "✔"
+            value: measurementData[`${partType}-${i}`]?.value || "✔",
+            images: measurementData[`${partType}-${i}`]?.images?.map(img => typeof img === 'string' ? img : img.url) || []
           }))
         })),
         defectSummary: {
@@ -867,7 +795,8 @@ const RovingPairing = () => {
                   defectNameEng: d.defectNameEng,
                   defectNameKhmer: d.defectNameKhmer,
                   defectNameChinese: d.defectNameChinese,
-                  count: d.count
+                  count: d.count,                  
+                  images: d.images?.map(img => typeof img === 'string' ? img : img.url) || []
                 })) || []
             })).filter((p) => p.defects.length > 0)
           }))
@@ -914,10 +843,10 @@ const RovingPairing = () => {
 
   // --- (NEW) Helper function to format measurement values with a + sign ---
   const formatMeasurementValue = (value) => {
-    if (!value || value === "✔") return "✔";
-    const numericValue = getFractionValue(value);
-    if (numericValue > 0 && !value.startsWith("+")) return `+${value}`;
-    return value;
+    if (!value?.value || value.value === "✔") return "✔";
+    const numericValue = getFractionValue(value.value);
+    if (numericValue > 0 && !value.value.startsWith("+")) return `+${value.value}`;
+    return value.value;
   };
 
   return (
@@ -1191,23 +1120,9 @@ const RovingPairing = () => {
         </div>
 
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-lg font-semibold text-gray-800">
-              {t("qcPairing.measurementDetails")}
-            </h3>
-            <div className="flex gap-2">
-              {["T", "M", "B"].map((part) => (
-                <button
-                  key={part}
-                  onClick={() => handleMeasurementPartClick(part)}
-                  className="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600 text-sm flex items-center gap-1"
-                >
-                  <Ruler size={14} />
-                  {part} Images
-                </button>
-              ))}
-            </div>
-          </div>
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
+            {t("qcPairing.measurementDetails")}
+          </h3>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-center">
               <thead className="bg-gray-100">
@@ -1230,17 +1145,23 @@ const RovingPairing = () => {
                           <td key={i} className="border p-2 bg-gray-200"></td>
                         );
                       const cellValue = measurementData[`${part}-${i}`];
-                      const isReject = isOutOfTolerance(cellValue);
+                      const isReject = isOutOfTolerance(cellValue?.value);
                       const cellColor = isReject
                         ? "bg-red-200 text-red-800 font-bold"
                         : "bg-green-100";
                       return (
                         <td
                           key={i}
-                          className={`border p-2 cursor-pointer ${cellColor} hover:bg-blue-100 transition-colors duration-150`}
-                          onClick={() => handleMeasurementCellClick(part, i)}
+                          className={`border p-2 ${cellColor} transition-colors duration-150 relative group`}
                         >
-                          {formatMeasurementValue(cellValue)}
+                          <div className="flex justify-center items-center gap-2">
+                            <span className="cursor-pointer flex-grow" onClick={() => handleMeasurementCellClick(part, i)}>
+                              {formatMeasurementValue(cellValue)}
+                            </span>
+                            <button onClick={() => handleMeasurementImageClick(part, i)} className="p-1 rounded-full hover:bg-gray-300 opacity-50 group-hover:opacity-100 transition-opacity">
+                              <Ruler size={14} />
+                            </button>
+                          </div>
                         </td>
                       );
                     })}
@@ -1414,7 +1335,7 @@ const RovingPairing = () => {
           onClose={() => setShowNumPad(false)}
           onSetValue={handleSetMeasurement}
           currentValue={
-            measurementData[`${activeCell.part}-${activeCell.index}`] || ""
+            measurementData[`${activeCell.part}-${activeCell.index}`]
           }
         />
       )}
@@ -1434,9 +1355,9 @@ const RovingPairing = () => {
         <MeasurementModal
           isOpen={isMeasurementModalOpen}
           onClose={() => setIsMeasurementModalOpen(false)}
-          onSave={handleSaveMeasurements}
-          currentMeasurements={getCurrentMeasurements(activeMeasurementPart)}
-          partIdentifier={activeMeasurementPart}
+          onSave={handleSaveMeasurementImages}
+          measurement={measurementData[`${activeCell?.part}-${activeCell?.index}`] || { value: '', images: [] }}
+          partIdentifier={`${activeCell?.part}-${activeCell?.index + 1}`}
         />
       )}
       {isAccessoryModalOpen && (

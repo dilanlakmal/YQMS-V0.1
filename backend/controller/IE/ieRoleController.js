@@ -5,7 +5,7 @@ import {
 } from "../MongoDB/dbConnectionController.js";
 import {
   getProcessKeywordForPage,
-} from "../../Helpers/helperFunctions.js";
+} from "../../helpers/helperFunctions.js";
 
 // GET - Check if a specific user has access to a page based on their assigned tasks.
 export const checkUserAccess = async (req, res) => {

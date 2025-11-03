@@ -2,7 +2,7 @@ import {
   OPA ,              
 } from "../MongoDB/dbConnectionController.js";
 
-import { getDayRange } from "../../Helpers/helperFunctions.js";
+import { getDayRange } from "../../helpers/helperFunctions.js";
 
 // Endpoint to fetch filter options for OPA Dashboard
 export const getFilterOptions = async (req, res) => {

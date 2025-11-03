@@ -5,7 +5,7 @@ import {
 } from '../../../controller/Cutting/CuttingInspection/cuttingIssueController.js';
 import {
   cutting_upload,
-} from "../../../Helpers/helperFunctions.js";
+} from "../../../helpers/helperFunctions.js";
 
 const router = express.Router();
 

@@ -2,7 +2,7 @@ import {
   Packing ,              
 } from "../MongoDB/dbConnectionController.js";
 
-import { getDayRange } from "../../Helpers/helperFunctions.js";
+import { getDayRange } from "../../helpers/helperFunctions.js";
 
 export const getPackingData = async (req, res) => {
     try {

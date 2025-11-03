@@ -3,7 +3,7 @@ import {
   QC2OrderData,              
 } from "../MongoDB/dbConnectionController.js";
 
-import { formatDate } from "../../Helpers/helperFunctions.js";
+import { formatDate } from "../../helpers/helperFunctions.js";
 
 /* ------------------------------
    End Points - Download Data

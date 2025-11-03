@@ -9,7 +9,7 @@ import {
   saveQCRovingPairingData,
 } from '../../controller/Roving/paringController.js';
 
-import { uploadRovingImage } from "../../Helpers/helperFunctions.js";
+import { uploadRovingImage } from "../../helpers/helperFunctions.js";
 
 const router = express.Router();
 

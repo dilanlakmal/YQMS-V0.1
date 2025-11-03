@@ -4,7 +4,7 @@ import {
 import {
   generateDateStringsCuttingDashboard,
   derivedBuyerLogic,
-} from "../../../Helpers/helperFunctions.js";
+} from "../../../helpers/helperFunctions.js";
 
 // GET DYNAMIC/CROSS-FILTERED filter options for Cutting Dashboard
 export const getCuttingDashboardFilters = async (req, res) => {

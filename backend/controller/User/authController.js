@@ -6,7 +6,7 @@ import {
   RoleManagment, 
   ymProdConnection,
 } from "../MongoDB/dbConnectionController.js"; 
-import { API_BASE_URL } from "../../../config.js"; 
+import { API_BASE_URL } from "../../Config/appConfig.js"; 
 
 // Helper function to get profile image URL
 const getProfileImageUrl = (user) => {
@@ -51,13 +51,13 @@ export const loginUser = async (req, res) => {
   
       const accessToken = jwt.sign(
         { userId: user._id, email: user.email, name: user.name },
-        "your_jwt_secret",
+       process.env.JWT_SECRET,
         { expiresIn: "1h" }
       );
   
       const refreshToken = jwt.sign(
         { userId: user._id },
-        "your_refresh_token_secret",
+        process.env.JWT_REFRESH_SECRET,
         { expiresIn: "30d" }
       );
   
@@ -169,7 +169,7 @@ export const registerUser = async (req, res) => {
 export const getUserProfile = async (req, res) => {
   try {
     const token = req.headers.authorization.split(" ")[1];
-    const decoded = jwt.verify(token, "your_jwt_secret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await UserMain.findById(decoded.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -213,7 +213,7 @@ export const getUserProfile = async (req, res) => {
 export const updateUserProfile = async (req, res) => {
   try {
       const token = req.headers.authorization.split(" ")[1];
-      const decoded = jwt.verify(token, "your_jwt_secret");
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const userId = decoded.userId;
   
       // Update additional fields along with existing ones.
@@ -266,7 +266,7 @@ export const getUserDataByToken = async (req, res) => {
       return res.status(400).json({ message: "Token is required" });
     }
 
-    const decoded = jwt.verify(token, "your_jwt_secret");
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await UserMain.findById(decoded.userId);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
@@ -301,14 +301,14 @@ export const refreshToken = async (req, res) => {
          return res.status(401).json({ message: "Refresh token is required" });
        }
    
-       jwt.verify(refreshToken, "your_refresh_token_secret", (err, decoded) => {
+       jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET, (err, decoded) => {
          if (err) {
            return res.status(401).json({ message: "Invalid refresh token" });
          }
    
          const accessToken = jwt.sign(
            { userId: decoded.userId },
-           "your_jwt_secret",
+           process.env.JWT_SECRET,
            { expiresIn: "1h" }
          );
    

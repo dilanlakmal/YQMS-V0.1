@@ -15,6 +15,8 @@ import {
   refreshToken as refreshTokenController, 
 } from '../../controller/User/authController.js'; 
 
+import authenticateUser from "../../middleware/authenticateUser.js";
+
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __backendDir = path.dirname(__filename);
@@ -83,19 +85,6 @@ const upload = multer({
   }
 }).single("profile");
 
-// Middleware to authenticate user using JWT
-const authenticateUser = (req, res, next) => {
- try {
-    const token = req.headers.authorization.split(" ")[1];
-    const decodedToken = jwt.verify(token, "your_jwt_secret");
-    req.userId = decodedToken.userId; // Set the userId in the request object
-    next();
-  } catch (error) {
-    res
-      .status(401)
-      .json({ message: "Authentication failed", error: error.message });
-  }
-};
 
 const router = express.Router();
 

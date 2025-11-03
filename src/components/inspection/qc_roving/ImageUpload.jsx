@@ -153,10 +153,10 @@ const ImageUpload = ({
           {images.map((image, index) => (
             <div key={index} className="relative group">
               <img
-                src={`${API_BASE_URL}${image}`}
+                src={image}
                 alt={`${getTypeLabel()} ${index + 1}`}
                 className="w-full h-20 object-cover rounded-md border cursor-pointer"
-                onClick={() => setPreviewImage(`${API_BASE_URL}${image}`)}
+                onClick={() => setPreviewImage(image)}
               />
               
               {/* Remove Button */}
@@ -171,7 +171,7 @@ const ImageUpload = ({
               {/* Preview Button */}
               <button
                 type="button"
-                onClick={() => setPreviewImage(`${API_BASE_URL}${image}`)}
+                onClick={() => setPreviewImage(image)}
                 className="absolute bottom-1 right-1 bg-black bg-opacity-50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
               >
                 <Eye size={12} />

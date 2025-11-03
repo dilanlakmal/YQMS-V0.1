@@ -12,7 +12,7 @@ import {
   updateQAStandardDefect,
   deleteQAStandardDefect,
   getQADefectsForDropdown,
-  getStandardDefectsForForm,
+
 } from '../../controller/QAAccuracy/qaDefectController.js';
 
 const router = express.Router();
@@ -29,6 +29,6 @@ router.post('/api/qa-standard-defects', addQAStandardDefect);
 router.put('/api/qa-standard-defects/:id', updateQAStandardDefect);
 router.delete('/api/qa-standard-defects/:id', deleteQAStandardDefect);
 router.get('/api/qa-defects-list', getQADefectsForDropdown);
-router.get('/api/qa-standard-defects-list', getStandardDefectsForForm);
+
 
 export default router;

@@ -18,7 +18,7 @@ import {
   editQC2Image,
   deleteQC2Image,
 } from '../../controller/QC2Inspection/qc2InspectionController.js';
-import {uploadQc2Image} from "../../Helpers/helperFunctions.js"
+import {uploadQc2Image} from "../../helpers/helperFunctions.js"
 
 const router = express.Router();
 

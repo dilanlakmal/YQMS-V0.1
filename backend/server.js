@@ -4,22 +4,14 @@ import {
   SewingDefects,
 } from "./controller/MongoDB/dbConnectionController.js";
 import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
-import aql from "./routes/AQL/AQLRoutes.js";
+import aql from "./routes/Common/AQL/AQLRoutes.js";
 import accessoryIssue from "./routes/AccessoryIssue/accessoryIssueRoutes.js";
 import audit from "./routes/Audit/auditRoutes.js";
 import bundle from "./routes/Bundle/bundelRoutes.js";
 import auth from "./routes/User/authRoutes.js";
 import roleManagement from "./routes/User/roleManagementRoutes.js";
 import user from "./routes/User/userRoutes.js";
-import cutPanelOrder from "./routes/Cutting/cutPanelOrderRoutes.js";
-import cuttingFabricDefect from "./routes/Cutting/cuttingFabricDefectRoutes.js";
-import cuttingImageUpload from "./routes/Cutting/cuttingImageUploadRoutes.js";
-import cuttinginspection from "./routes/Cutting/cuttingInspectionRoutes.js";
-import cuttingissue from "./routes/Cutting/cuttingIssueRoutes.js";
-import cuttingMeasurement from "./routes/Cutting/cuttingMeasurementRoutes.js";
-import cuttingOrder from "./routes/Cutting/cuttingOrderRoutes.js";
-import cuttingTrend from "./routes/Cutting/cuttingTrendRoutes.js";
-import cuttingReport from "./routes/Cutting/reportRoutes.js";
+
 import sewingDefect from "./routes/Defects/sewingDefectRoutes.js";
 import digitalMeasurement from "./routes/DigitalMeasurement/digitalMeasurmentRoutes.js";
 import downloadData from "./routes/DownloadData/downloaddataRoutes.js";
@@ -42,30 +34,10 @@ import QCInlineImageUpload from "./routes/QCInlineRoving/qcInineImageUploadRoute
 import QCInlineRoving from "./routes/QCInlineRoving/qcInlineRovingRoutes.js";
 import QCInlineWorker from "./routes/QCInlineRoving/qcInlineWorkersRoutes.js"
 import QCRovingParing from "./routes/QCInlineRoving/qcRovingParingRoutes.js";
-import SCC from "./routes/SCC/sccRoutes.js";
-import sccDefects from "./routes/SCC/sccDefectRoutes.js";
-import sccImageUpload from "./routes/SCC/sccImageUploadRoutes.js";
-import sccOperators from "./routes/SCC/sccOperatorsRoutes.js";
-import sccScratchedDefect from "./routes/SCC/sccScratchedDefectRoutes.js";
-import EMB from "./routes/SCC/embRoutes.js";
-import FUQC from "./routes/SCC/Daily_FUQC/fuqcRoutes.js";
-import DailyHT from "./routes/SCC/Daily_HT_QC/dailyHTRoutes.js";
-import HTFU from "./routes/SCC/Daily_HTFU/htfuRoutes.js";
-import Elastic from "./routes/SCC/Elastic_Report/elasticRoutes.js";
-import EMBReport from "./routes/SCC/EMB_Report/embReportRoutes.js";
-import SCCFinalReport from "./routes/SCC/Final_Consolidate_Report/finalReport.js";
-import HTInspection from "./routes/SCC/HT_Inspection/htInspectionRoutes.js";
+
 import washing from "./routes/Washing/washingRoutes.js";
-import qcWashing from "./routes/QCWashing/qcWashingRoutes.js";
-import qcWashingAdmin from "./routes/QCWashing/qcWashingAdminRoutes.js";
-import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
-import subConFactory from "./routes/SubConFactory/factoryRoutes.js";
-import subConQC from "./routes/SubConQC/qcRoutes.js";
-import subConQC1Report from "./routes/SubConQC/qc1ReportRoutes.js";
-import qcFactoryManagment from "./routes/SubConQC/qcFactoryManagementRoutes.js";
-import qcDefectManagement from "./routes/SubConQC/qcDefectManagementRoutes.js";
-import subConQADefect from "./routes/SubConQA/subConQADefectRoutes.js";
-import QAReport from "./routes/SubConQA/qaReportRoutes.js";
+
+
 import ie from "./routes/IE/ieRoutes.js";
 import ieRole from "./routes/IE/ieRolerRoutes.js";
 import roving from "./routes/Roving/rovingRoutes.js";
@@ -74,15 +46,65 @@ import washingSpecs from "./routes/WashingSpecs/specRoutes.js";
 import qc2Workers from "./routes/QC2Workers/qc2WorkerRoutes.js";
 import qaDefect from "./routes/QAAccuracy/qaDefectRoutes.js";
 import qaAccuracy from "./routes/QAAccuracy/accuracyRoutes.js";
-import cuttingDashboard from "./routes/Cutting/cuttingDashboardRoutes.js";
+
 import buyerSpec from "./routes/BuyerSpecTemp/buyerSpecRoutes.js";
 import ANF from "./routes/ANF/anfRoutes.js";
 import supplierIssue from "./routes/SupplierIssue/supplierRoutes.js";
 import supplierIssueReport from "./routes/SupplierIssue/supplierIssueReportRoutes.js";
 import qc2UploadData from "./routes/QC2_upload_Data/qc2UploadRoutes.js";
 import PackingList from "./routes/PackingList/packingListRoutes.js";
+
+//Yorksys Orders Imports
 import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
+
+//measurement Imports
 import measurementRoutes from "./routes/Measurement/measurementRoutes.js";
+
+//SCC Imports
+import SCC from "./routes/SCC/SCC_Inspection/sccDailyTestingRoutes.js";
+import sccDefects from "./routes/SCC/SCC_Admin/sccDefectRoutes.js";
+import sccImageUpload from "./routes/SCC/SCC_Inspection/sccImageUploadRoutes.js";
+import sccOperators from "./routes/SCC/SCC_Admin/sccOperatorsRoutes.js";
+import sccScratchedDefect from "./routes/SCC/SCC_Admin/sccScratchedDefectRoutes.js";
+import EMB from "./routes/SCC/SCC_Admin/embDefectsRoutes.js";
+import FUQC from "./routes/SCC/SCC_Inspection/fuqcRoutes.js";
+import DailyHT from "./routes/SCC/SCC_Inspection/dailyHTRoutes.js";
+import HTFU from "./routes/SCC/SCC_Inspection/htfuRoutes.js";
+import Elastic from "./routes/SCC/SCC_Inspection/elasticRoutes.js";
+import EMBReport from "./routes/SCC/SCC_Inspection/embReportRoutes.js";
+import SCCFinalReport from "./routes/SCC/SCC_Final_Consolidate_Report/finalReport.js";
+import HTInspection from "./routes/SCC/SCC_Inspection/htInspectionRoutes.js";
+import SCCInspection from "./routes/SCC/SCC_Inspection/sccFirstOutPutHTFURoutes.js";
+
+//Sub Con QC Imports
+import subConQAInspection from "./routes/Sub-ConQC1/Sub-ConQA/subConQAInspectionRoutes.js";
+import SubConQAReport from "./routes/Sub-ConQC1/Sub-ConQA/subConQAReportRoutes.js";
+import SubConDefectManagement from "./routes/Sub-ConQC1/Sub-ConQC1 Admin/subConSewingQCDefectsRoutes.js";
+import subConSewingQCFactory from "./routes/Sub-ConQC1/Sub-ConQC1 Admin/subConSewingQCFactoryRoutes.js";
+import subConSewingQCInspection from "./routes/Sub-ConQC1/Sub-ConQC1 Inspection/subConsewingQCInspectionRoutes.js";
+import subConQADashboard from "./routes/Sub-ConQC1/SubConQCDashboard/subConQCDashboardRoutes.js";
+import subConSewingQCReport from "./routes/Sub-ConQC1/Sub-ConQC1 Inspection/subConsewingQCReportRoutes.js";
+
+//Cutting Imports
+import cuttingImageProxy from "./routes/Cutting/CuttingReport/cuttingImageProxyRoutes.js";
+import cuttingDashboard from "./routes/Cutting/CuttingDashboard/cuttingDashboardRoutes.js";
+import cutPanelOrder from "./routes/Cutting/Cutting_Orders/cutPanelOrderRoutes.js";
+import cuttingFabricDefect from "./routes/Cutting/Cutting_Admin_FabricDefects/cuttingFabricDefectRoutes.js";
+import cuttingImageUpload from "./routes/Cutting/CuttingInspection/cuttingImageUploadRoutes.js";
+import cuttinginspection from "./routes/Cutting/CuttingInspection/cuttingInspectionRoutes.js";
+import cuttingissue from "./routes/Cutting/CuttingInspection/cuttingIssueRoutes.js";
+import cuttingMeasurementPoints from "./routes/Cutting/Cutting_Admin_MeasurementPoint/cuttingMeasurementPointsRoutes.js";
+import cuttingMeasurementPointEdit from "./routes/Cutting/Cutting_Admin_MeasurementPoint/cuttingMeasurementPointEditRoutes.js";
+import cuttingInspectionReportManagemenrtt from "./routes/Cutting/Cutting_Admin_Inspection_Report/cuttingInspectionReportManageRoutes.js";
+import cuttingTrend from "./routes/Cutting//Cutting_Trend/cuttingTrendRoutes.js";
+import cuttingReport from "./routes/Cutting/CuttingReport/reportRoutes.js";
+
+//QCWashing Imports
+// import qcWashing from "./routes/QCWashing/qcWashingRoutes.js";
+import qcWashingInspection from "./routes/QCWashing/QCWashing Inspection/qcWashingInspectionRoutes.js";
+import qcWashingAdmin from "./routes/QCWashing/QCWashing Admin/qcWashingAdminRoutes.js";
+import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReportRoutes.js";
+import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
 
 /* ------------------------------
    SQL Query Import
@@ -106,15 +128,7 @@ app.use(bundle);
 app.use(auth);
 app.use(roleManagement);
 app.use(user);
-app.use(cutPanelOrder);
-app.use(cuttingFabricDefect);
-app.use(cuttingImageUpload);
-app.use(cuttinginspection);
-app.use(cuttingissue);
-app.use(cuttingMeasurement);
-app.use(cuttingOrder);
-app.use(cuttingTrend);
-app.use(cuttingReport);
+
 app.use(sewingDefect);
 app.use(digitalMeasurement);
 app.use(downloadData);
@@ -137,6 +151,28 @@ app.use(QCInlineImageUpload);
 app.use(QCInlineRoving);
 app.use(QCInlineWorker);
 app.use(QCRovingParing);
+app.use(washing);
+
+
+
+app.use(ie);
+app.use(ieRole);
+app.use(roving);
+app.use(rovingParing);
+app.use(washingSpecs);
+app.use(qc2Workers);
+app.use(rovingParing);
+app.use(qaDefect);
+app.use(qaAccuracy);
+app.use(cuttingDashboard);
+app.use(buyerSpec);
+app.use(ANF);
+app.use(supplierIssue);
+app.use(supplierIssueReport);
+app.use(qc2UploadData);
+app.use(PackingList);
+
+//SCC Routes
 app.use(SCC);
 app.use(EMB);
 app.use(FUQC);
@@ -150,34 +186,44 @@ app.use(sccDefects);
 app.use(sccImageUpload);
 app.use(sccOperators);
 app.use(sccScratchedDefect);
-app.use(washing);
-app.use(qcWashing);
-app.use(qcWashingAdmin);
-app.use(qcWashingOldQty);
-app.use(subConFactory);
-app.use(subConQC);
-app.use(subConQC1Report);
-app.use(qcFactoryManagment);
-app.use(qcDefectManagement);
-app.use(subConQADefect);
-app.use(QAReport);
-app.use(ie);
-app.use(ieRole);
-app.use(roving);
-app.use(washingSpecs);
-app.use(qc2Workers);
-app.use(rovingParing);
-app.use(qaDefect);
-app.use(qaAccuracy);
-app.use(cuttingDashboard);
-app.use(buyerSpec);
-app.use(ANF);
-app.use(supplierIssue);
-app.use(supplierIssueReport);
-app.use(qc2UploadData);
-app.use(PackingList);
+app.use(SCCInspection);
+
+//Yorksys Orders Routes
 app.use(YourksysOrders);
+
+//measurement Routes
 app.use(measurementRoutes);
+
+//Sub Con QC Routes
+app.use(subConSewingQCFactory);
+app.use(SubConQAReport);
+app.use(SubConDefectManagement);
+app.use(subConQAInspection);
+app.use(subConSewingQCInspection);
+app.use(subConSewingQCReport);
+app.use(subConQADashboard);
+
+//Cutting Routes
+app.use(cuttingImageProxy);
+app.use(cutPanelOrder);
+app.use(cuttingFabricDefect);
+app.use(cuttingImageUpload);
+app.use(cuttinginspection);
+app.use(cuttingissue);
+app.use(cuttingMeasurementPointEdit);
+app.use(cuttingMeasurementPoints);
+app.use(cuttingInspectionReportManagemenrtt);
+app.use(cuttingTrend);
+app.use(cuttingReport);
+
+//Washing Routes
+app.use(qcWashingInspection);
+app.use(qcWashingAdmin);
+app.use(qcWashingReport);
+app.use(qcWashingOldQty);
+
+
+
 
 // process.on("SIGINT", async () => {
 //   try {

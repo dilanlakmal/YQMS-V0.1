@@ -3,7 +3,7 @@ import {
  QC2OrderData,                
 } from "../MongoDB/dbConnectionController.js";
 
-import { normalizeDateString, generateRandomId } from "../../Helpers/helperFunctions.js";
+import { normalizeDateString, generateRandomId } from "../../helpers/helperFunctions.js";
 
 // Update the MONo search endpoint to handle partial matching
 export const getMoNoSearch = async (req, res) => {

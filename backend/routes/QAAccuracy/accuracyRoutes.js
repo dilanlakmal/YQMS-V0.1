@@ -15,7 +15,7 @@ import {
 
 import {
   qaAccuracyUpload,
-} from "../../Helpers/helperFunctions.js";
+} from "../../helpers/helperFunctions.js";
 
 const router = express.Router();
 

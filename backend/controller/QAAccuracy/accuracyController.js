@@ -2,7 +2,7 @@ import path from "path";
 import { promises as fsPromises } from "fs";
 import sharp from "sharp";
 import {API_BASE_URL,  __backendDir } from "../../Config/appConfig.js";
-import { sanitize } from "../../Helpers/helperFunctions.js";
+import { sanitize } from "../../helpers/helperFunctions.js";
 import mongoose from "mongoose";
 import { 
   QCAccuracyReportModel,

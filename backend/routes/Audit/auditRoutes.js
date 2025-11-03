@@ -13,7 +13,7 @@ import {
 } from '../../controller/Audit/auditController.js';
 import {
   audit_image_upload,
-} from '../../Helpers/helperFunctions.js';
+} from '../../helpers/helperFunctions.js';
 
 const router = express.Router();
 
