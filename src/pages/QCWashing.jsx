@@ -11,6 +11,7 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
+import { sanitize } from "../../backend/helpers/helperFunctions.js";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
@@ -716,7 +717,7 @@ const QCWashingPage = () => {
         const response = await fetch(
           `${API_BASE_URL}/api/qc-washing/order-color-qty/${
             formData.orderNo 
-          }/${encodeURIComponent(formData.color)}`
+          }/${encodeURIComponent(sanitize(formData.color))}`
         );
         const data = await response.json();
         if (data.success) {
@@ -2141,7 +2142,7 @@ if (
     setIsDataLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${encodeURIComponent(color)}`
+        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${encodeURIComponent(sanitize(color))}`
       );
 
       if (response.ok) {
@@ -2368,7 +2369,7 @@ if (
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${encodeURIComponent(color)}`
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${encodeURIComponent(sanitize(color))}`
       );
 
       if (!response.ok) {

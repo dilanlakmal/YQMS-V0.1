@@ -5,6 +5,7 @@ import Swal from "sweetalert2";
 import MeasurementNumPad from "../../cutting/MeasurementNumPad";
 import SummaryCard from "../Home/SummaryCard";
 import PropTypes from "prop-types";
+import { sanitize } from "../../../../../backend/helpers/helperFunctions.js";
 
 const MeasurementDetailsSection = ({
   orderNo,
@@ -22,15 +23,7 @@ const MeasurementDetailsSection = ({
   formData = {}
 }) => {
   const sanitizeColor = (colorInput) => {
-  if (!colorInput || typeof colorInput !== 'string') {
-    return '';
-  }
-  
-  return colorInput
-    .trim()                    // Remove leading/trailing whitespace
-    .toLowerCase()             // Convert to lowercase for consistent comparison
-    .replace(/[^a-z0-9\s-]/gi, '') // Remove special characters, keep alphanumeric, spaces, and hyphens
-    .replace(/\s+/g, ' ');     // Replace multiple spaces with single space
+    return sanitize(colorInput);
   };
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
@@ -800,7 +793,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
       }
 
 
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${sanitizedColor}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
       const data = await response.json();
       
       if (data.success) {
@@ -875,7 +868,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${sanitizedColor}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
