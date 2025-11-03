@@ -21,6 +21,17 @@ const MeasurementDetailsSection = ({
   recordId,
   formData = {}
 }) => {
+  const sanitizeColor = (colorInput) => {
+  if (!colorInput || typeof colorInput !== 'string') {
+    return '';
+  }
+  
+  return colorInput
+    .trim()                    // Remove leading/trailing whitespace
+    .toLowerCase()             // Convert to lowercase for consistent comparison
+    .replace(/[^a-z0-9\s-]/gi, '') // Remove special characters, keep alphanumeric, spaces, and hyphens
+    .replace(/\s+/g, ' ');     // Replace multiple spaces with single space
+  };
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [measurementSpecs, setMeasurementSpecs] = useState({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
@@ -236,7 +247,6 @@ const setKValueForSize = async (size, washType, kValue) => {
   await applyPattern();
 };
 
-
 // Helper function to get default measurement points from saved Before Wash data
 const getDefaultMeasurementPointsFromSavedData = (savedMeasurementData, size) => {
   if (!savedMeasurementData || savedMeasurementData.length === 0) return [];
@@ -300,9 +310,15 @@ const getSelectedRowsFromSavedData = (savedMeasurementData, size, currentSpecs) 
 const findSavedMeasurementData = async (styleNo, color, reportType, washType, factory) => {
   
   try {
+    const sanitizedColor = sanitizeColor(color);
+
+    if (!sanitizedColor) {
+        console.error('Invalid color parameter for finding saved measurement data');
+        return null;
+      }
     const requestBody = {
       styleNo,
-      color,
+       color: sanitizedColor,
       reportType: reportType || undefined, // Ensure it's undefined if empty
       washType,
       factory: factory || undefined // Ensure it's undefined if empty
@@ -745,8 +761,16 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
 
   useEffect(() => {
     if (orderNo && color) {
+      const sanitizedColor = sanitizeColor(color);
+      if (sanitizedColor) {
       fetchSizes();
       fetchMeasurementSpecs();
+    } else {
+      setError('Invalid color parameter provided');
+      setSizes([]);
+      setSelectedSizes([]);
+      setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+    }
     } else {
       setSizes([]);
       setSelectedSizes([]);
@@ -754,11 +778,29 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
     }
   }, [orderNo, color]);
 
+  const getDisplayColor = () => {
+    return sanitizeColor(color) || color;
+  };
+
     const fetchSizes = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${encodeURIComponent(color)}`);
+
+
+      // Sanitize the color before making the API call
+      const sanitizedColor = sanitizeColor(color);
+      
+      // Validate sanitized color
+      if (!sanitizedColor) {
+        setError('Invalid color parameter provided');
+        setSizes([]);
+        setSelectedSizes([]);
+        return;
+      }
+
+
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
       const data = await response.json();
       
       if (data.success) {
@@ -823,7 +865,17 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
 
   const fetchMeasurementSpecs = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(color)}`);
+     // Sanitize the color before making the API call
+      const sanitizedColor = sanitizeColor(color);
+      
+      // Validate sanitized color
+      if (!sanitizedColor) {
+        setNoMeasurementData(false);
+        setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
@@ -1487,7 +1539,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
       {noMeasurementData ? (
         <div className="mb-8">
           <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
-            Measurement Details
+            Measurement Details {color && `- ${getDisplayColor()}`}
           </h4>
           <div className="text-sm text-gray-500 p-4 border border-gray-300 rounded">
             No measurement data are available for this style.
