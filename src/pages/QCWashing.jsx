@@ -715,7 +715,7 @@ const QCWashingPage = () => {
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/qc-washing/order-color-qty/${
-            formData.orderNo
+            formData.orderNo 
           }/${encodeURIComponent(formData.color)}`
         );
         const data = await response.json();
@@ -2141,7 +2141,7 @@ if (
     setIsDataLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${encodeURIComponent(color)}`
       );
 
       if (response.ok) {
@@ -2368,7 +2368,7 @@ if (
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${encodeURIComponent(color)}`
       );
 
       if (!response.ok) {
