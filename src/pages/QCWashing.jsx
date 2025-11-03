@@ -11,7 +11,7 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
-import { sanitize } from "../../backend/helpers/helperFunctions.js";
+import { sanitize } from "../utils/helperFunctions";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
