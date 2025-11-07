@@ -4,11 +4,11 @@ import {
   getBuyerSpecMoNos,
   getBuyerSpecData,
   updateBuyerSpecTemplate,
-} from '../../controller/BuyerSpecTemp/buyerSpecController.js';
+} from '../../controller/DT Orders Buyer Specs/buyerSpecController.js';
 
 const router = express.Router();
 
-router.get('/api/buyer-spec-templates', saveBuyerSpecTemplate);
+router.post('/api/buyer-spec-templates', saveBuyerSpecTemplate);
 router.get('/api/buyer-spec-templates/mo-options', getBuyerSpecMoNos);
 router.get('/api/edit-specs-data/:moNo', getBuyerSpecData);
 router.put('/api/buyer-spec-templates/:moNo', updateBuyerSpecTemplate);

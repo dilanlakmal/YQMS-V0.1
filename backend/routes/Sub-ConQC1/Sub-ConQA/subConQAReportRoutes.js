@@ -3,7 +3,7 @@ import {
   
   getSubConQAInspectionData,
   getSubConQCInspectionDataByID,
-} from '../../../controller/Sub-ConQC1/Sub-ConQA/subCobQAReportController.js';
+} from '../../../controller/Sub-ConQC1/Sub-ConQA/subConQAReportController.js';
 
 const router = express.Router();
 

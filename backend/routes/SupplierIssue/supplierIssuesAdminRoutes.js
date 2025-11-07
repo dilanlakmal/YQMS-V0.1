@@ -9,7 +9,7 @@ import {
    saveSupplierIssuesDefect,
    updateSupplierIssueDefect,
    deleteSupplierIssueDefect,
-} from '../../controller/SupplierIssue/supplierController.js';
+} from '../../controller/SupplierIssue/supplierIssuesAdminController.js';
 
 const router = express.Router();
 

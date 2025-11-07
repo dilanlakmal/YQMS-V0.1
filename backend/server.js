@@ -47,11 +47,23 @@ import qc2Workers from "./routes/QC2Workers/qc2WorkerRoutes.js";
 import qaDefect from "./routes/QAAccuracy/qaDefectRoutes.js";
 import qaAccuracy from "./routes/QAAccuracy/accuracyRoutes.js";
 
-import buyerSpec from "./routes/BuyerSpecTemp/buyerSpecRoutes.js";
-import ANF from "./routes/ANF/anfRoutes.js";
-import supplierIssue from "./routes/SupplierIssue/supplierRoutes.js";
-import supplierIssueReport from "./routes/SupplierIssue/supplierIssueReportRoutes.js";
+//Buyer Spec Imports
+import buyerSpec from "./routes/DT Orders Buyer Specs/buyerSpecRoutes.js";
+
+// ANF Imports
+import ANF from "./routes/ANF/ANFReportRoutes.js";
+import ANFInspection from "./routes/ANF/ANFInspectionRoutes.js";
+import ANFResult from "./routes/ANF/ANFResultRoutes.js";
+
+//QC2 Upload Data Imports
 import qc2UploadData from "./routes/QC2_upload_Data/qc2UploadRoutes.js";
+
+//Supplier Issue Imports
+import supplierIssuesAdmin from "./routes/SupplierIssue/supplierIssuesAdminRoutes.js";
+import supplierIssueReport from "./routes/SupplierIssue/supplierIssueReportRoutes.js";
+import supplierIssueInspection from "./routes/SupplierIssue/supplierIssueInspectionRoutes.js";
+
+//Packing List Imports
 import PackingList from "./routes/PackingList/packingListRoutes.js";
 
 //Yorksys Orders Imports
@@ -165,11 +177,24 @@ app.use(rovingParing);
 app.use(qaDefect);
 app.use(qaAccuracy);
 app.use(cuttingDashboard);
+
+//Buyer Spec Routes
 app.use(buyerSpec);
+
+// ANF Routes
 app.use(ANF);
-app.use(supplierIssue);
-app.use(supplierIssueReport);
+app.use(ANFInspection); 
+app.use(ANFResult);
+
+//QC2 Upload Data Routes
 app.use(qc2UploadData);
+
+//Supplier Issue Routes
+app.use(supplierIssuesAdmin);
+app.use(supplierIssueInspection);
+app.use(supplierIssueReport);
+
+//Packing List Routes
 app.use(PackingList);
 
 //SCC Routes

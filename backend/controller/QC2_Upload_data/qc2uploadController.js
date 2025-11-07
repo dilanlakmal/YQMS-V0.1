@@ -1,5 +1,7 @@
 import { 
   QC2OlderDefect,
+  QCWorkers,
+  QCWashingQtyOld,
  } from "../MongoDB/dbConnectionController.js";
 
 
@@ -286,4 +288,139 @@ import {
         console.error(err);
         res.status(500).json({ error: 'Failed to process and save QC2 data.' });
       }
+  };
+
+  export const saveManualqc2UploadData = async (req, res) => {
+    try {
+    const { finalDocs, washingQtyData } = req.body;
+
+    // Validate QC data
+    const validQCDocs = (finalDocs || []).filter((doc) => {
+      return doc.Inspection_date && doc.QC_ID;
+    });
+
+    if (validQCDocs.length === 0) {
+      return res.status(400).json({ error: "No valid QC data to save." });
+    }
+
+    // Validate washing quantity data
+    const validWashingDocs = (washingQtyData || []).filter((doc) => {
+      return (
+        doc.Inspection_date &&
+        doc.Style_No &&
+        Array.isArray(doc.WorkerWashQty) &&
+        doc.WorkerWashQty.length > 0 &&
+        doc.WorkerWashQty.every((worker) => worker.QC_ID)
+      );
+    });
+
+    // QC data bulk operations
+    const bulkOps = validQCDocs.map((doc) => ({
+      updateOne: {
+        filter: {
+          Inspection_date:
+            doc.Inspection_date instanceof Date
+              ? doc.Inspection_date
+              : new Date(doc.Inspection_date),
+          QC_ID: doc.QC_ID
+        },
+        update: { $set: doc },
+        upsert: true
+      }
+    }));
+
+    // Washing quantity data bulk operations
+    let washingBulkOps = [];
+    if (validWashingDocs.length > 0) {
+      washingBulkOps = validWashingDocs.map((doc) => ({
+        updateOne: {
+          filter: {
+            Inspection_date:
+              doc.Inspection_date instanceof Date
+                ? doc.Inspection_date
+                : new Date(doc.Inspection_date),
+            Style_No: doc.Style_No,
+            Color: doc.Color
+          },
+          update: {
+            $set: {
+              Inspection_date:
+                doc.Inspection_date instanceof Date
+                  ? doc.Inspection_date
+                  : new Date(doc.Inspection_date),
+              Style_No: doc.Style_No,
+              Color: doc.Color,
+              Total_Wash_Qty: doc.Total_Wash_Qty,
+              WorkerWashQty: doc.WorkerWashQty
+            }
+          },
+          upsert: true
+        }
+      }));
+    }
+
+    // Execute both bulk operations
+    const results = [];
+
+    if (bulkOps.length > 0) {
+      try {
+        const qcResult = await QCWorkers.bulkWrite(bulkOps);
+        results.push({ type: "QC", result: qcResult });
+      } catch (qcError) {
+        console.error("QC bulk write error:", qcError);
+        return res.status(500).json({
+          error: "Failed to save QC data",
+          details: qcError.message
+        });
+      }
+    }
+
+    if (washingBulkOps.length > 0) {
+      try {
+        const washingResult = await QCWashingQtyOld.bulkWrite(washingBulkOps);
+        results.push({ type: "Washing", result: washingResult });
+      } catch (washingError) {
+        console.error("Washing bulk write error:", washingError);
+        return res.status(500).json({
+          error: "Failed to save washing data",
+          details: washingError.message
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      qcDataCount: bulkOps.length,
+      washingQtyCount: washingBulkOps.length,
+      skippedQCRecords: (finalDocs || []).length - validQCDocs.length,
+      skippedWashingRecords:
+        (washingQtyData || []).length - validWashingDocs.length,
+      results: results
+    });
+  } catch (err) {
+    console.error("Manual save error:", err);
+    res.status(500).json({
+      error: "Failed to manually save QC2 data.",
+      details: err.message
+    });
+  }
+  };
+
+  export const getQC2WorkerData = async (req, res) => {
+    try {
+    const results = await QCWorkers.find({}).lean();
+    res.json(results);
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch QC2 data." });
+  }
+  };
+
+  export const getQCWashingOldData = async (req, res) => {
+    try {
+    const results = await QCWashingQtyOld.find({}).lean();
+    res.json(results);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Failed to fetch washing quantity data." });
+  }
   };
