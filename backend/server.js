@@ -1,78 +1,170 @@
 import axios from "axios";
 import { app, server, PORT} from "./Config/appConfig.js";
+
 import { 
   SewingDefects,
 } from "./controller/MongoDB/dbConnectionController.js";
+/* -----------------------------
+Real Wash Qty Imports
+------------------------------ */
 import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
+/* -----------------------------
+AQL Imports
+------------------------------ */
 import aql from "./routes/Common/AQL/AQLRoutes.js";
+/* -----------------------------
+Accessory Issue Imports
+------------------------------ */
 import accessoryIssue from "./routes/AccessoryIssue/accessoryIssueRoutes.js";
+/* -----------------------------
+Audit Imports
+------------------------------ */
 import audit from "./routes/Audit/auditRoutes.js";
+/* -----------------------------
+Bundle Imports
+------------------------------ */
 import bundle from "./routes/Bundle/bundelRoutes.js";
+/* -----------------------------
+User Imports
+------------------------------ */
 import auth from "./routes/User/authRoutes.js";
 import roleManagement from "./routes/User/roleManagementRoutes.js";
 import user from "./routes/User/userRoutes.js";
-
+/* -----------------------------
+Sewing Defect Imports
+------------------------------ */
 import sewingDefect from "./routes/Defects/sewingDefectRoutes.js";
+/* -----------------------------
+Digital Measurement Imports
+------------------------------ */
 import digitalMeasurement from "./routes/DigitalMeasurement/digitalMeasurmentRoutes.js";
+/* -----------------------------
+Download Data Imports
+------------------------------ */
 import downloadData from "./routes/DownloadData/downloaddataRoutes.js";
+/* -----------------------------
+Ironing Imports
+------------------------------ */
 import ironing from "./routes/Ironing/ironingRoutes.js";
 import ironingDashboard from "./routes/LiveDashboard/ironingDashboardRoutes.js";
+/* -----------------------------
+OPA Imports
+------------------------------ */
 import opaDashboard from "./routes/LiveDashboard/opaDashboardRoutes.js";
 import packingDashboard from "./routes/LiveDashboard/packingDashboardRoutes.js";
+/* -----------------------------
+Process Dashboard Imports
+------------------------------ */
 import processDashboard from "./routes/LiveDashboard/processDashboardRoutes.js";
+/* -----------------------------
+QC1 Dashboard Imports
+------------------------------ */
 import qc1Dashboard from "./routes/LiveDashboard/qc1DashboardRoutes.js";
+/* -----------------------------
+QC2 Dashboard Imports
+------------------------------ */
 import qc2dashboard from "./routes/LiveDashboard/qc2DashboardRoutes.js";
+/* -----------------------------
+Washing Imports
+------------------------------ */
+import washing from "./routes/Washing/washingRoutes.js";
 import washingDashboard from "./routes/LiveDashboard/washingDashboardRoutes.js";
+/* -----------------------------
+OPA Routes Imports
+------------------------------ */
 import opa from "./routes/OPA/opaRoutes.js";
+/* -----------------------------
+Packing Routes Imports
+------------------------------ */
 import packing from "./routes/Packing/packingRoutes.js";
+/* -----------------------------
+Paring Defects Imports
+------------------------------ */
 import paringDefects from "./routes/ParingDefects/paringDefectRoutes.js";
+/* -----------------------------
+QC1 Inspection Imports
+------------------------------ */
 import qc1Inspection from "./routes/QC1Inspection/qc1InspectionRoutes.js";
+/* -----------------------------
+QC1 Sunrise Imports
+------------------------------ */
 import QC1Sunrise from "./routes/QC1Sunrise/qc1SunriseRoutes.js";
+/* -----------------------------
+QC2 Inspection Imports
+------------------------------ */
 import QC2Inspection from "./routes/QC2Inspection/qc2InspectionRoutes.js";
+/* -----------------------------
+QC2 Repair Tracking Imports
+------------------------------ */
 import QC2repairTracking from "./routes/QC2RepairTracking/qc2RepairtrackingRoutes.js";
+/* -----------------------------
+QC Inline Roving Imports
+------------------------------ */
 import QCInlineImageUpload from "./routes/QCInlineRoving/qcInineImageUploadRoutes.js";
 import QCInlineRoving from "./routes/QCInlineRoving/qcInlineRovingRoutes.js";
 import QCInlineWorker from "./routes/QCInlineRoving/qcInlineWorkersRoutes.js"
 import QCRovingParing from "./routes/QCInlineRoving/qcRovingParingRoutes.js";
-
-import washing from "./routes/Washing/washingRoutes.js";
-
-
+/* -----------------------------
+IE Imports
+------------------------------ */
 import ie from "./routes/IE/ieRoutes.js";
 import ieRole from "./routes/IE/ieRolerRoutes.js";
+/* -----------------------------
+Roving Imports
+------------------------------ */
 import roving from "./routes/Roving/rovingRoutes.js";
 import rovingParing from "./routes/Roving/paringRoutes.js";
+/* -----------------------------
+Washing Specs Imports
+------------------------------ */
 import washingSpecs from "./routes/WashingSpecs/specRoutes.js";
+/* -----------------------------
+QC2 Workers Imports
+------------------------------ */
 import qc2Workers from "./routes/QC2Workers/qc2WorkerRoutes.js";
+/* -----------------------------
+QA Defecect Imports
+------------------------------ */
 import qaDefect from "./routes/QAAccuracy/qaDefectRoutes.js";
+/* -----------------------------
+QA Accuracy Imports
+------------------------------ */
 import qaAccuracy from "./routes/QAAccuracy/accuracyRoutes.js";
-
-//Buyer Spec Imports
+/* -----------------------------
+Buyer Spec Imports
+------------------------------ */
 import buyerSpec from "./routes/DT Orders Buyer Specs/buyerSpecRoutes.js";
-
-// ANF Imports
+/* -----------------------------
+ANF Imports
+------------------------------ */
 import ANF from "./routes/ANF/ANFReportRoutes.js";
 import ANFInspection from "./routes/ANF/ANFInspectionRoutes.js";
 import ANFResult from "./routes/ANF/ANFResultRoutes.js";
-
-//QC2 Upload Data Imports
+/* -----------------------------
+QC2 Upload Data Imports
+------------------------------ */
 import qc2UploadData from "./routes/QC2_upload_Data/qc2UploadRoutes.js";
-
-//Supplier Issue Imports
+/* -----------------------------
+Supplier Issue Imports
+------------------------------ */
 import supplierIssuesAdmin from "./routes/SupplierIssue/supplierIssuesAdminRoutes.js";
 import supplierIssueReport from "./routes/SupplierIssue/supplierIssueReportRoutes.js";
 import supplierIssueInspection from "./routes/SupplierIssue/supplierIssueInspectionRoutes.js";
-
-//Packing List Imports
+/* -----------------------------
+Packing List Imports
+------------------------------ */
 import PackingList from "./routes/PackingList/packingListRoutes.js";
-
-//Yorksys Orders Imports
+/* -----------------------------
+Yorksys Orders Imports
+------------------------------ */
 import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
-
-//measurement Imports
+/* -----------------------------
+Measurement Imports
+------------------------------ */
 import measurementRoutes from "./routes/Measurement/measurementRoutes.js";
-
-//SCC Imports
+/* -----------------------------
+SCC Imports
+------------------------------ */
 import SCC from "./routes/SCC/SCC_Inspection/sccDailyTestingRoutes.js";
 import sccDefects from "./routes/SCC/SCC_Admin/sccDefectRoutes.js";
 import sccImageUpload from "./routes/SCC/SCC_Inspection/sccImageUploadRoutes.js";
@@ -87,8 +179,9 @@ import EMBReport from "./routes/SCC/SCC_Inspection/embReportRoutes.js";
 import SCCFinalReport from "./routes/SCC/SCC_Final_Consolidate_Report/finalReport.js";
 import HTInspection from "./routes/SCC/SCC_Inspection/htInspectionRoutes.js";
 import SCCInspection from "./routes/SCC/SCC_Inspection/sccFirstOutPutHTFURoutes.js";
-
-//Sub Con QC Imports
+/* -----------------------------
+Sub Con QC Imports
+------------------------------ */
 import subConQAInspection from "./routes/Sub-ConQC1/Sub-ConQA/subConQAInspectionRoutes.js";
 import SubConQAReport from "./routes/Sub-ConQC1/Sub-ConQA/subConQAReportRoutes.js";
 import SubConDefectManagement from "./routes/Sub-ConQC1/Sub-ConQC1 Admin/subConSewingQCDefectsRoutes.js";
@@ -96,8 +189,9 @@ import subConSewingQCFactory from "./routes/Sub-ConQC1/Sub-ConQC1 Admin/subConSe
 import subConSewingQCInspection from "./routes/Sub-ConQC1/Sub-ConQC1 Inspection/subConsewingQCInspectionRoutes.js";
 import subConQADashboard from "./routes/Sub-ConQC1/SubConQCDashboard/subConQCDashboardRoutes.js";
 import subConSewingQCReport from "./routes/Sub-ConQC1/Sub-ConQC1 Inspection/subConsewingQCReportRoutes.js";
-
-//Cutting Imports
+/* -----------------------------
+Cutting Imports
+------------------------------ */
 import cuttingImageProxy from "./routes/Cutting/CuttingReport/cuttingImageProxyRoutes.js";
 import cuttingDashboard from "./routes/Cutting/CuttingDashboard/cuttingDashboardRoutes.js";
 import cutPanelOrder from "./routes/Cutting/Cutting_Orders/cutPanelOrderRoutes.js";
@@ -110,94 +204,217 @@ import cuttingMeasurementPointEdit from "./routes/Cutting/Cutting_Admin_Measurem
 import cuttingInspectionReportManagemenrtt from "./routes/Cutting/Cutting_Admin_Inspection_Report/cuttingInspectionReportManageRoutes.js";
 import cuttingTrend from "./routes/Cutting//Cutting_Trend/cuttingTrendRoutes.js";
 import cuttingReport from "./routes/Cutting/CuttingReport/reportRoutes.js";
-
-//QCWashing Imports
+/* -----------------------------
+QCWashing Imports
+------------------------------ */
 // import qcWashing from "./routes/QCWashing/qcWashingRoutes.js";
 import qcWashingInspection from "./routes/QCWashing/QCWashing Inspection/qcWashingInspectionRoutes.js";
 import qcWashingAdmin from "./routes/QCWashing/QCWashing Admin/qcWashingAdminRoutes.js";
 import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReportRoutes.js";
 import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
 
-/* ------------------------------
+
+/* -----------------------------
    SQL Query Import
 ------------------------------ */
 // import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
 // import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
-
 /* ------------------------------
   SQL Query routs
 ------------------------------ */
 // app.use(sqlQuery);
-
 /* ------------------------------
   Functional routs
 ------------------------------ */
+
+/* -----------------------------
+Real Wash QTY Routes
+------------------------------ */
 app.use(qcRealWashQty);
+
+/* -----------------------------
+Accessory Issue Routes
+------------------------------ */
 app.use(accessoryIssue);
+
+/* -----------------------------
+AQL Routes
+------------------------------ */
 app.use(aql);
+
+/* -----------------------------
+Audit Routes
+------------------------------ */
 app.use(audit);
+
+/* -----------------------------
+Bundle Routes
+------------------------------ */
 app.use(bundle);
+
+/* -----------------------------
+User Routes
+------------------------------ */
 app.use(auth);
 app.use(roleManagement);
 app.use(user);
 
+/* -----------------------------
+Sewing Defect Routes
+------------------------------ */
 app.use(sewingDefect);
+
+/* -----------------------------
+Digital Measurement Routes
+------------------------------ */
 app.use(digitalMeasurement);
+
+/* -----------------------------
+Download Data Routes
+------------------------------ */
 app.use(downloadData);
+
+/* -----------------------------
+Ironing Routes
+------------------------------ */
 app.use(ironing);
 app.use(ironingDashboard);
-app.use(opaDashboard);
-app.use(packingDashboard);
-app.use(processDashboard);
-app.use(qc1Dashboard);
-app.use(qc2dashboard);
-app.use(washingDashboard);
+
+/* -----------------------------
+OPA Routes
+------------------------------ */
 app.use(opa);
+app.use(opaDashboard);
+
+/* -----------------------------
+Packing Routes
+------------------------------ */
 app.use(packing);
+app.use(packingDashboard);
+
+/* -----------------------------
+Processing Routes
+------------------------------ */
+app.use(processDashboard);
+
+/* -----------------------------
+QC1 Dashboard Routes
+------------------------------ */
+app.use(qc1Dashboard);
+
+/* -----------------------------
+QC2 Dashboard Routes
+------------------------------ */
+app.use(qc2dashboard);
+
+/* -----------------------------
+Washing Routes
+------------------------------ */
+app.use(washing);
+app.use(washingDashboard);
+
+/* -----------------------------
+PAring Defects Routes
+------------------------------ */
 app.use(paringDefects);
+
+/* -----------------------------
+QC1 Inspection Routes
+------------------------------ */
 app.use(qc1Inspection);
+
+/* -----------------------------
+QC1 Sunrise Routes
+------------------------------ */
 app.use(QC1Sunrise);
+
+/* -----------------------------
+QC2 Inspection Routes
+------------------------------ */
 app.use(QC2Inspection);
+
+/* -----------------------------
+QC2 Repair Tracking Routes
+------------------------------ */
 app.use(QC2repairTracking);
+
+/* -----------------------------
+QC2 Inline Roving Routes
+------------------------------ */
 app.use(QCInlineImageUpload);
 app.use(QCInlineRoving);
 app.use(QCInlineWorker);
 app.use(QCRovingParing);
-app.use(washing);
 
-
-
+/* -----------------------------
+IE Routes
+------------------------------ */
 app.use(ie);
 app.use(ieRole);
+
+/* -----------------------------
+Roving Routes
+------------------------------ */
 app.use(roving);
 app.use(rovingParing);
+
+/* -----------------------------
+Washing Specs Routes
+------------------------------ */
 app.use(washingSpecs);
+
+/* -----------------------------
+QC2 Workers Routes
+------------------------------ */
 app.use(qc2Workers);
-app.use(rovingParing);
+
+/* -----------------------------
+QC2 Defect Routes
+------------------------------ */
 app.use(qaDefect);
+
+/* -----------------------------
+QC2 Accuracy Routes
+------------------------------ */
 app.use(qaAccuracy);
+
+/* -----------------------------
+Cutting Dashboard Routes
+------------------------------ */
 app.use(cuttingDashboard);
 
-//Buyer Spec Routes
+/* -----------------------------
+Buyer Spec Routes
+------------------------------ */
 app.use(buyerSpec);
 
-// ANF Routes
+/* -----------------------------
+ANF Routes
+------------------------------ */
 app.use(ANF);
 app.use(ANFInspection); 
 app.use(ANFResult);
 
-//QC2 Upload Data Routes
+/* -----------------------------
+QC2 Upload Data Routes
+------------------------------ */
 app.use(qc2UploadData);
 
-//Supplier Issue Routes
+/* -----------------------------
+Supplier Issue Routes
+------------------------------ */
 app.use(supplierIssuesAdmin);
 app.use(supplierIssueInspection);
 app.use(supplierIssueReport);
 
-//Packing List Routes
+/* -----------------------------
+Packing List Routes
+------------------------------ */
 app.use(PackingList);
 
-//SCC Routes
+/* -----------------------------
+SCC Routes
+------------------------------ */
 app.use(SCC);
 app.use(EMB);
 app.use(FUQC);
@@ -213,13 +430,19 @@ app.use(sccOperators);
 app.use(sccScratchedDefect);
 app.use(SCCInspection);
 
-//Yorksys Orders Routes
+/* -----------------------------
+Yorksys Orders Routes
+------------------------------ */
 app.use(YourksysOrders);
 
-//measurement Routes
+/* -----------------------------
+measurement Routes
+------------------------------ */
 app.use(measurementRoutes);
 
-//Sub Con QC Routes
+/* -----------------------------
+Sub Con QC Routes
+------------------------------ */
 app.use(subConSewingQCFactory);
 app.use(SubConQAReport);
 app.use(SubConDefectManagement);
@@ -228,7 +451,9 @@ app.use(subConSewingQCInspection);
 app.use(subConSewingQCReport);
 app.use(subConQADashboard);
 
-//Cutting Routes
+/* -----------------------------
+ Cutting Routes
+------------------------------ */
 app.use(cuttingImageProxy);
 app.use(cutPanelOrder);
 app.use(cuttingFabricDefect);
@@ -241,13 +466,13 @@ app.use(cuttingInspectionReportManagemenrtt);
 app.use(cuttingTrend);
 app.use(cuttingReport);
 
-//Washing Routes
+/* -----------------------------
+  Washing Routes
+------------------------------ */
 app.use(qcWashingInspection);
 app.use(qcWashingAdmin);
 app.use(qcWashingReport);
 app.use(qcWashingOldQty);
-
-
 
 
 // process.on("SIGINT", async () => {
