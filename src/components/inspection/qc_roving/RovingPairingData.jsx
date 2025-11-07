@@ -547,49 +547,122 @@ const RovingPairingData = () => {
 
                       const constructTooltipContent = (inspection, summary, row) => {
                         if (!inspection || !summary) return { text: "No inspection data", html: "<p>No inspection data available</p>" };
-                        
+
                         let defectsHtmlList = [];
                         let defectsTextList = [];
+                        let allImages = [];
                         
-                        // Access defects from the correct data structure
-                          if (inspection?.defectSummary?.defectDetails?.length > 0) {
-                            inspection.defectSummary.defectDetails.forEach((partTypeData) => {
-                              if (partTypeData?.defectsForPart?.length > 0) {
-                                partTypeData.defectsForPart.forEach((partData) => {
-                                  if (partData?.defects?.length > 0) {
-                                    partData.defects.forEach((defect) => {                                      
-                                      const localizedDefectName = getDefectNameByLanguage(defect, currentLanguage);
+                        // Access defects from row.pairingData (the original MongoDB data structure)
+                        if (row?.pairingData?.length > 0) {
+                          
+                          const pairingRecord = row.pairingData.find(data => {
+                            return data.inspection_rep_name === inspection.rep_name;
+                          });
+                         
+                          
+                          if (pairingRecord) {
+                            
+                            if (pairingRecord.defectSummary?.defectDetails?.length > 0) {
+                              
+                              pairingRecord.defectSummary.defectDetails.forEach((partTypeData,) => {
+                                
+                                if (partTypeData?.defectsForPart?.length > 0) {
+                                  
+                                  partTypeData.defectsForPart.forEach((partData, partIndex) => {
+                                    
+                                    if (partData?.defects?.length > 0) {
                                       
-                                      defectsTextList.push(
-                                        `${partTypeData.partType} Part ${partData.partNo}: ${localizedDefectName} (Qty: ${defect.count})`
-                                      );
-                                      
-                                      let singleDefectHtml = `<div style="margin: 4px 0; padding: 6px; border-left: 3px solid #dc2626; background-color: #fef2f2;">`;
-                                      singleDefectHtml += `<strong>${partTypeData.partType} Part ${partData.partNo}:</strong> ${localizedDefectName} (Qty: ${defect.count})`;
-                                      
-                                      // Access images from the defect object
-                                      if (defect.images && defect.images.length > 0) {
-                                        singleDefectHtml += `<div style="margin-top: 8px;">`;
-                                        defect.images.forEach((image, imgIndex) => {
-                                          singleDefectHtml += `<img src="${image}" alt="Defect Image ${imgIndex + 1}" class="defect-image-clickable" style="max-width: 80px; max-height: 80px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />`;
-                                        });
+                                      partData.defects.forEach((defect, defectIndex) => {
+                                        console.log(`Defect ${defectIndex}:`, defect);
+                                        
+                                        const defectName = defect.defectNameEng || 'Unknown Defect';
+                                        const localizedDefectName = currentLanguage.startsWith('kh') 
+                                          ? (defect.defectNameKhmer || defectName)
+                                          : currentLanguage.startsWith('zh')
+                                          ? (defect.defectNameChinese || defectName)
+                                          : defectName;
+                                        
+                                        defectsTextList.push(
+                                          `${partTypeData.partType} Part ${partData.partNo}: ${localizedDefectName} (Qty: ${defect.count})`
+                                        );
+                                        
+                                        let singleDefectHtml = `<div style="margin: 4px 0; padding: 6px; border-left: 3px solid #dc2626; background-color: #fef2f2;">`;
+                                        singleDefectHtml += `<strong>${partTypeData.partType} Part ${partData.partNo}:</strong> ${localizedDefectName} (Qty: ${defect.count})`;
+                                        
+                                        // Handle defect images
+                                        if (defect.images && Array.isArray(defect.images) && defect.images.length > 0) {
+                                          console.log(`Found ${defect.images.length} images for defect:`, defect.images);
+                                          singleDefectHtml += `<div style="margin-top: 8px;">`;
+                                          defect.images.forEach((image, imgIndex) => {
+                                            if (image && typeof image === 'string') {
+                                              allImages.push(image);
+                                              singleDefectHtml += `<img src="${image}" alt="Defect Image ${imgIndex + 1}" class="defect-image-clickable" style="max-width: 80px; max-height: 80px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />`;
+                                            }
+                                          });
+                                          singleDefectHtml += `</div>`;
+                                        } else {
+                                          console.log('No images found for defect or images is not an array:', defect.images);
+                                        }
                                         singleDefectHtml += `</div>`;
-                                      }
-                                      singleDefectHtml += `</div>`;
-                                      defectsHtmlList.push(singleDefectHtml);
-                                    });
-                                  }
-                                });
-                              }
-                            });
+                                        defectsHtmlList.push(singleDefectHtml);
+                                      });
+                                    } else {
+                                      console.log(`No defects found for part ${partData.partNo}`);
+                                    }
+                                  });
+                                } else {
+                                  console.log(`No defectsForPart found for part type ${partTypeData.partType}`);
+                                }
+                              });
+                            } else {
+                              console.log('No defect details found or defectDetails is empty');
+                            }
+                            
+                            // Collect measurement images from pairingData
+                            if (pairingRecord.measurementData?.length > 0) {
+                              console.log('Processing measurement data for images...');
+                              pairingRecord.measurementData.forEach((partTypeData) => {
+                                if (partTypeData?.measurements?.length > 0) {
+                                  partTypeData.measurements.forEach((measurement) => {
+                                    if (measurement?.images?.length > 0) {
+                                      console.log(`Found ${measurement.images.length} measurement images:`, measurement.images);
+                                      measurement.images.forEach((image) => {
+                                        if (image && typeof image === 'string') {
+                                          allImages.push(image);
+                                        }
+                                      });
+                                    }
+                                  });
+                                }
+                              });
+                            }
+                          } else {
+                            console.log('No matching pairing record found for inspection:', inspection.rep_name);
                           }
-
+                        } else {
+                          console.log('No pairingData found in row');
+                        }
+                        
+                        console.log('Final Defects HTML List:', defectsHtmlList);
+                        console.log('Final All Images:', allImages);
+                        console.log('=== END DEBUGGING ===');
                         
                         let finalDefectsHtml = "<strong>Defects:</strong> None";
                         if (defectsHtmlList.length > 0) {
                           finalDefectsHtml = `<strong>Defects Found:</strong><div style="margin-top: 8px;">${defectsHtmlList.join('')}</div>`;
                         }
                         
+                        // Add all other images section
+                        let allImagesHtml = "";
+                        if (allImages.length > 0) {
+                          allImagesHtml = `<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                            <strong>All Images:</strong>
+                            <div style="margin-top: 8px;">`;
+                          allImages.forEach((image, index) => {
+                            allImagesHtml += `<img src="${image}" alt="Image ${index + 1}" class="defect-image-clickable" style="max-width: 80px; max-height: 80px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />`;
+                          });
+                          allImagesHtml += `</div></div>`;
+                        }
                         
                         return {
                           text: `Pairing Inspection Details:
@@ -597,19 +670,21 @@ const RovingPairingData = () => {
                               Line No: ${row.lineNo || 'N/A'}
                               MO No: ${row.moNo || 'N/A'}
                               Operator ID: ${row.operatorId || 'N/A'}
-                              Inspection: ${repName}
+                              Inspection: ${inspection.rep_name}
                               Accessory Complete: ${inspection.accessoryComplete || 'N/A'}
                               Total Parts: ${summary?.totalParts || 0}
                               Total Pass: ${summary?.totalPass || 0}
                               Total Rejects: ${summary?.totalRejects || 0}
                               Pass Rate: ${summary?.passRate || 'N/A'}
                               Defect Rejected Parts: ${summary?.defectTotalRejectedParts || 0}
-                              Defect Total Qty: ${summary?.defectTotalQty || 0}\n
+                              Defect Total Qty: ${summary?.defectTotalQty || 0}
+
                               Measurement Rejects:
                                 Total: ${summary?.measurementTotalRejects || 0}
                                 (+) ${summary?.measurementPositiveRejects || 0}
-                                (-) ${summary?.measurementNegativeRejects || 0}\n
-                              ${defectsTextList.length > 0 ? `Defects: ${defectsTextList.join(', ')}` : 'Defects: None'}`,
+                                (-) ${summary?.measurementNegativeRejects || 0}
+
+                              ${defectsTextList.length > 0 ? `Defects Found: ${defectsTextList.join(', ')}` : 'Defects: None'}`,
                           html: `
                             <div style="text-align: left; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
                               <h3 style="margin: 0 0 12px 0; color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 4px;">Pairing Inspection Details</h3>
@@ -638,11 +713,12 @@ const RovingPairingData = () => {
                               <div style="padding-top: 8px; border-top: 1px solid #e5e7eb;">
                                 ${finalDefectsHtml}
                               </div>
+                              ${allImagesHtml}
                             </div>
                           `
                         };
                       };
-                      
+
                       const tooltipContent = constructTooltipContent(inspection, summary, row);
                       
                       const accessoryCell = (

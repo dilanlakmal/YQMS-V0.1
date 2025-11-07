@@ -76,6 +76,9 @@ export const getRovingPairingReportData = async (req, res) => {
             accessoryComplete: "$pairingData.accessoryComplete",
             totalSummary: "$pairingData.totalSummary"
           }
+        },
+        pairingData: {
+          $push: "$pairingData"
         }
       }
     });
@@ -89,7 +92,8 @@ export const getRovingPairingReportData = async (req, res) => {
         lineNo: "$_id.lineNo", // Was "$_id.line"
         moNo: "$_id.moNo", // Was "$_id.mo"
         operatorName: "$operatorName",
-        inspections: "$inspections"
+        inspections: "$inspections",
+        pairingData: "$pairingData"
       }
     });
     // **** END OF CORRECTION ****
