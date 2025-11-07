@@ -90,48 +90,54 @@ export const getMeasurementDataByStyle = async (req, res) => {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
 
-    // Get size order exactly as it appears in BeforeWashSpecs
-    const getSizeOrderFromBeforeWashSpecs = (beforeWashSpecs) => {
-      const sizeOrder = [];
-      const sizeOrderSet = new Set();
+    // Get sizes from OrderColors (actual ordered sizes)
+    const getSizesFromOrderColors = (orderColors) => {
+      const sizesSet = new Set();
       
-      if (beforeWashSpecs && Array.isArray(beforeWashSpecs)) {
-        // Iterate through each measurement point in order
-        beforeWashSpecs.forEach((measurementPoint) => {
-          if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
-            // Iterate through specs in order to maintain sequence
-            measurementPoint.Specs.forEach((spec) => {
-              if (spec.size && spec.size.trim() !== '' && !sizeOrderSet.has(spec.size.trim())) {
-                sizeOrder.push(spec.size.trim());
-                sizeOrderSet.add(spec.size.trim());
-              }
+      if (orderColors && Array.isArray(orderColors)) {
+        orderColors.forEach((color) => {
+          if (color.OrderQty && Array.isArray(color.OrderQty)) {
+            color.OrderQty.forEach((sizeObj) => {
+              Object.keys(sizeObj).forEach((size) => {
+                if (size && size.trim() !== '') {
+                  sizesSet.add(size.trim());
+                }
+              });
             });
           }
         });
       }
       
-      return sizeOrder;
+      return Array.from(sizesSet);
     };
 
-    // Get the exact size order from BeforeWashSpecs
-    const orderedSizes = getSizeOrderFromBeforeWashSpecs(order.BeforeWashSpecs);
+    // Get the actual ordered sizes
+    const allSizes = getSizesFromOrderColors(order.OrderColors);
 
-    // Collect any additional sizes from AfterWashSpecs that might not be in BeforeWashSpecs
-    const additionalSizesSet = new Set();
-    if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
-      order.AfterWashSpecs.forEach((measurementPoint) => {
-        if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
-          measurementPoint.Specs.forEach((spec) => {
-            if (spec.size && spec.size.trim() !== '' && !orderedSizes.includes(spec.size.trim())) {
-              additionalSizesSet.add(spec.size.trim());
+    // If no sizes found in OrderColors, fallback to original method
+    if (allSizes.length === 0) {
+      const getSizeOrderFromBeforeWashSpecs = (beforeWashSpecs) => {
+        const sizeOrder = [];
+        const sizeOrderSet = new Set();
+        
+        if (beforeWashSpecs && Array.isArray(beforeWashSpecs)) {
+          beforeWashSpecs.forEach((measurementPoint) => {
+            if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
+              measurementPoint.Specs.forEach((spec) => {
+                if (spec.size && spec.size.trim() !== '' && !sizeOrderSet.has(spec.size.trim())) {
+                  sizeOrder.push(spec.size.trim());
+                  sizeOrderSet.add(spec.size.trim());
+                }
+              });
             }
           });
         }
-      });
-    }
+        
+        return sizeOrder;
+      };
 
-    // Final sizes array: BeforeWashSpecs order + any additional from AfterWashSpecs
-    const allSizes = [...orderedSizes, ...Array.from(additionalSizesSet)];
+      allSizes.push(...getSizeOrderFromBeforeWashSpecs(order.BeforeWashSpecs));
+    }
 
     // Process both before and after wash specs
     const beforeWashData = processSpecs(order.BeforeWashSpecs, allSizes);
@@ -155,14 +161,15 @@ export const getMeasurementDataByStyle = async (req, res) => {
     res.status(500).json({
       message: "An internal server error occurred while fetching measurement data.",
       error: error.message,
-      });
+    });
   }
 };
+
 
 export const getMeasurementDataByStyleV2 = async (req, res) => {
   try {
     const { styleNo } = req.params;
-    const { washType } = req.query; // Get washType from query parameter
+    const { washType } = req.query;
     
     if (!styleNo) {
       return res.status(400).json({ message: "Style No is required." });
@@ -178,21 +185,17 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
 
-    // Get size order exactly as it appears in SizeSpec > Specs
-    const getSizeOrderFromSizeSpecs = (sizeSpecs) => {
-      const sizeOrder = [];
-      const sizeOrderSet = new Set();
+    // Get sizes from OrderColors (actual ordered sizes)
+    const getSizesFromOrderColors = (orderColors) => {
+      const sizesSet = new Set();
       
-      if (sizeSpecs && Array.isArray(sizeSpecs)) {
-        // Iterate through each SizeSpec in order
-        sizeSpecs.forEach((sizeSpec) => {
-          if (sizeSpec.Specs && Array.isArray(sizeSpec.Specs)) {
-            // Iterate through specs in order to maintain sequence
-            sizeSpec.Specs.forEach((spec) => {
-              Object.keys(spec).forEach(size => {
-                if (size && size.trim() !== '' && !sizeOrderSet.has(size.trim())) {
-                  sizeOrder.push(size.trim());
-                  sizeOrderSet.add(size.trim());
+      if (orderColors && Array.isArray(orderColors)) {
+        orderColors.forEach((color) => {
+          if (color.OrderQty && Array.isArray(color.OrderQty)) {
+            color.OrderQty.forEach((sizeObj) => {
+              Object.keys(sizeObj).forEach((size) => {
+                if (size && size.trim() !== '') {
+                  sizesSet.add(size.trim());
                 }
               });
             });
@@ -200,38 +203,46 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
         });
       }
       
-      return sizeOrder;
+      return Array.from(sizesSet);
     };
 
-    // Get the exact size order from SizeSpec
-    const orderedSizes = getSizeOrderFromSizeSpecs(order.SizeSpec);
+    // Get the actual ordered sizes
+    let allSizes = getSizesFromOrderColors(order.OrderColors);
 
-    // Collect any additional sizes from BeforeWashSpecs that might not be in SizeSpec
-    const additionalSizesSet = new Set();
-    if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
-      order.BeforeWashSpecs.forEach((measurementPoint) => {
-        if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
-          measurementPoint.Specs.forEach((spec) => {
-            if (spec.size && spec.size.trim() !== '' && !orderedSizes.includes(spec.size.trim())) {
-              additionalSizesSet.add(spec.size.trim());
+    // If no sizes found in OrderColors, fallback to SizeSpec
+    if (allSizes.length === 0) {
+      const getSizeOrderFromSizeSpecs = (sizeSpecs) => {
+        const sizeOrder = [];
+        const sizeOrderSet = new Set();
+        
+        if (sizeSpecs && Array.isArray(sizeSpecs)) {
+          sizeSpecs.forEach((sizeSpec) => {
+            if (sizeSpec.Specs && Array.isArray(sizeSpec.Specs)) {
+              sizeSpec.Specs.forEach((spec) => {
+                Object.keys(spec).forEach(size => {
+                  if (size && size.trim() !== '' && !sizeOrderSet.has(size.trim())) {
+                    sizeOrder.push(size.trim());
+                    sizeOrderSet.add(size.trim());
+                  }
+                });
+              });
             }
           });
         }
-      });
-    }
+        
+        return sizeOrder;
+      };
 
-    // Final sizes array: SizeSpec order + any additional from BeforeWashSpecs
-    const allSizes = [...orderedSizes, ...Array.from(additionalSizesSet)];
+      allSizes = getSizeOrderFromSizeSpecs(order.SizeSpec);
+    }
 
     let measurementData = {};
 
     if (washType === 'beforeWash') {
-      // Use existing logic for before wash
       measurementData = {
         beforeWash: processSpecs(order.BeforeWashSpecs, allSizes)
       };
     } else if (washType === 'afterWash') {
-      // Use SizeSpec for after wash
       measurementData = {
         afterWash: processSizeSpecs(order.SizeSpec, allSizes)
       };
@@ -255,6 +266,7 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
     });
   }
 };
+
 
 
 // New function to process SizeSpec data

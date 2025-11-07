@@ -178,12 +178,18 @@ const handleExportPDF = async () => {
         // Function to add header to page
         const addHeader = (y, kValue) => {
           // Main title
+          const washTypeDisplay = filterCriteria.washType === 'beforeWash' ? 'Before Wash' : 'After Wash';
           doc.setFillColor(240, 240, 240);
-          doc.rect(5, y, pageWidth - 10, 8, 'F');
+          doc.rect(5, y, pageWidth - 10, 12, 'F'); // Increased height for subtitle
           doc.setTextColor(0, 0, 0);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.text('Yorkmars (Cambodia) Garment MFG. Co. Ltd. - Measurement List', pageWidth / 2, y + 5, { align: 'center' });
+
+          // Wash Type Subtitle
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`(${washTypeDisplay})`, pageWidth / 2, y + 10, { align: 'center' });
 
           y += 15;
 
