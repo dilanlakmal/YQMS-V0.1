@@ -90,37 +90,48 @@ export const getMeasurementDataByStyle = async (req, res) => {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
 
-    // Enhanced size collection - collect from both BeforeWashSpecs and AfterWashSpecs
-    const allSizesSet = new Set();
-    const specsToScan = [...(order.BeforeWashSpecs || []), ...(order.AfterWashSpecs || [])];
-    
-    specsToScan.forEach((measurementPoint) => {
-      if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
-        measurementPoint.Specs.forEach((spec) => {
-          if (spec.size && spec.size.trim() !== '') {
-            allSizesSet.add(spec.size.trim());
+    // Get size order exactly as it appears in BeforeWashSpecs
+    const getSizeOrderFromBeforeWashSpecs = (beforeWashSpecs) => {
+      const sizeOrder = [];
+      const sizeOrderSet = new Set();
+      
+      if (beforeWashSpecs && Array.isArray(beforeWashSpecs)) {
+        // Iterate through each measurement point in order
+        beforeWashSpecs.forEach((measurementPoint) => {
+          if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
+            // Iterate through specs in order to maintain sequence
+            measurementPoint.Specs.forEach((spec) => {
+              if (spec.size && spec.size.trim() !== '' && !sizeOrderSet.has(spec.size.trim())) {
+                sizeOrder.push(spec.size.trim());
+                sizeOrderSet.add(spec.size.trim());
+              }
+            });
           }
         });
       }
-    });
-
-    // Sort sizes in logical order
-    const allSizes = Array.from(allSizesSet).sort((a, b) => {
-      const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-      const aIndex = sizeOrder.indexOf(a);
-      const bIndex = sizeOrder.indexOf(b);
       
-      if (aIndex !== -1 && bIndex !== -1) {
-        return aIndex - bIndex;
-      } else if (aIndex !== -1) {
-        return -1;
-      } else if (bIndex !== -1) {
-        return 1;
-      } else {
-        return a.localeCompare(b);
-      }
-    });
+      return sizeOrder;
+    };
 
+    // Get the exact size order from BeforeWashSpecs
+    const orderedSizes = getSizeOrderFromBeforeWashSpecs(order.BeforeWashSpecs);
+
+    // Collect any additional sizes from AfterWashSpecs that might not be in BeforeWashSpecs
+    const additionalSizesSet = new Set();
+    if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
+      order.AfterWashSpecs.forEach((measurementPoint) => {
+        if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
+          measurementPoint.Specs.forEach((spec) => {
+            if (spec.size && spec.size.trim() !== '' && !orderedSizes.includes(spec.size.trim())) {
+              additionalSizesSet.add(spec.size.trim());
+            }
+          });
+        }
+      });
+    }
+
+    // Final sizes array: BeforeWashSpecs order + any additional from AfterWashSpecs
+    const allSizes = [...orderedSizes, ...Array.from(additionalSizesSet)];
 
     // Process both before and after wash specs
     const beforeWashData = processSpecs(order.BeforeWashSpecs, allSizes);
@@ -139,13 +150,12 @@ export const getMeasurementDataByStyle = async (req, res) => {
     };
 
     res.status(200).json(responseData);
-
   } catch (error) {
     console.error("Error fetching measurement data:", error);
     res.status(500).json({
       message: "An internal server error occurred while fetching measurement data.",
       error: error.message,
-    });
+      });
   }
 };
 
@@ -168,53 +178,50 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
       return res.status(404).json({ message: `No order found for Style No: ${styleNo}` });
     }
 
-    // Enhanced size collection - collect from both BeforeWashSpecs and SizeSpec
-    const allSizesSet = new Set();
-    
-    // Collect sizes from BeforeWashSpecs
+    // Get size order exactly as it appears in SizeSpec > Specs
+    const getSizeOrderFromSizeSpecs = (sizeSpecs) => {
+      const sizeOrder = [];
+      const sizeOrderSet = new Set();
+      
+      if (sizeSpecs && Array.isArray(sizeSpecs)) {
+        // Iterate through each SizeSpec in order
+        sizeSpecs.forEach((sizeSpec) => {
+          if (sizeSpec.Specs && Array.isArray(sizeSpec.Specs)) {
+            // Iterate through specs in order to maintain sequence
+            sizeSpec.Specs.forEach((spec) => {
+              Object.keys(spec).forEach(size => {
+                if (size && size.trim() !== '' && !sizeOrderSet.has(size.trim())) {
+                  sizeOrder.push(size.trim());
+                  sizeOrderSet.add(size.trim());
+                }
+              });
+            });
+          }
+        });
+      }
+      
+      return sizeOrder;
+    };
+
+    // Get the exact size order from SizeSpec
+    const orderedSizes = getSizeOrderFromSizeSpecs(order.SizeSpec);
+
+    // Collect any additional sizes from BeforeWashSpecs that might not be in SizeSpec
+    const additionalSizesSet = new Set();
     if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
       order.BeforeWashSpecs.forEach((measurementPoint) => {
         if (measurementPoint.Specs && Array.isArray(measurementPoint.Specs)) {
           measurementPoint.Specs.forEach((spec) => {
-            if (spec.size && spec.size.trim() !== '') {
-              allSizesSet.add(spec.size.trim());
+            if (spec.size && spec.size.trim() !== '' && !orderedSizes.includes(spec.size.trim())) {
+              additionalSizesSet.add(spec.size.trim());
             }
           });
         }
       });
     }
 
-    // Collect sizes from SizeSpec (for after wash)
-    if (order.SizeSpec && Array.isArray(order.SizeSpec)) {
-      order.SizeSpec.forEach((sizeSpec) => {
-        if (sizeSpec.Specs && Array.isArray(sizeSpec.Specs)) {
-          sizeSpec.Specs.forEach((spec) => {
-            Object.keys(spec).forEach(size => {
-              if (size && size.trim() !== '') {
-                allSizesSet.add(size.trim());
-              }
-            });
-          });
-        }
-      });
-    }
-
-    // Sort sizes in logical order
-    const allSizes = Array.from(allSizesSet).sort((a, b) => {
-      const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
-      const aIndex = sizeOrder.indexOf(a);
-      const bIndex = sizeOrder.indexOf(b);
-      
-      if (aIndex !== -1 && bIndex !== -1) {
-        return aIndex - bIndex;
-      } else if (aIndex !== -1) {
-        return -1;
-      } else if (bIndex !== -1) {
-        return 1;
-      } else {
-        return a.localeCompare(b);
-      }
-    });
+    // Final sizes array: SizeSpec order + any additional from BeforeWashSpecs
+    const allSizes = [...orderedSizes, ...Array.from(additionalSizesSet)];
 
     let measurementData = {};
 
@@ -240,7 +247,6 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
     };
 
     res.status(200).json(responseData);
-
   } catch (error) {
     console.error("Error fetching measurement data:", error);
     res.status(500).json({
@@ -249,6 +255,7 @@ export const getMeasurementDataByStyleV2 = async (req, res) => {
     });
   }
 };
+
 
 // New function to process SizeSpec data
 const processSizeSpecs = (sizeSpecArray, allSizes) => {
