@@ -5,7 +5,7 @@ import Swal from "sweetalert2";
 import MeasurementNumPad from "../../cutting/MeasurementNumPad";
 import SummaryCard from "../Home/SummaryCard";
 import PropTypes from "prop-types";
-import { sanitize } from "../../../../utils/helperFunctions";
+import { sanitize } from "../../../../utils/measurementHelperFunction";
 
 const MeasurementDetailsSection = ({
   orderNo,

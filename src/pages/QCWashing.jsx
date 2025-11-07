@@ -11,9 +11,9 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
-import { sanitize } from "../utils/helperFunctions";
+import { sanitize } from "../utils/measurementHelperFunction";
 
-const normalizeImageSrc = (src) => {
+const normalizeImageSrc = (src) => {    
   if (!src) return "";
 
   // If it's already a data URL, return as is

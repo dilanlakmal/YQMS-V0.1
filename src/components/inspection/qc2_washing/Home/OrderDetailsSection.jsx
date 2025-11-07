@@ -2,7 +2,7 @@ import {useState,useEffect} from "react";
 import PropTypes from "prop-types";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
-import { sanitize } from "../../../../utils/helperFunctions";
+import { sanitize } from "../../../../utils/measurementHelperFunction";
 
 const OrderDetailsSection = ({
   formData,
