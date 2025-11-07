@@ -231,28 +231,6 @@ const processWashingDataForSave = (data) => {
           <p className="text-gray-600 dark:text-gray-400 text-lg">Upload and manage washing quality control data</p>
         </div>
 
-        {/* Upload Progress Indicators */}
-        <div className="mb-6 flex flex-wrap justify-center gap-4">
-          {uploadProgress.output && (
-            <div className="flex items-center px-3 py-1 bg-green-100 dark:bg-green-800 text-green-700 dark:text-green-300 rounded-full text-sm">
-              <span className="mr-1">📊</span>
-              Output Data Loaded ({outputData.length})
-            </div>
-          )}
-          {uploadProgress.defect && (
-            <div className="flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-800 text-blue-700 dark:text-blue-300 rounded-full text-sm">
-              <span className="mr-1">🔍</span>
-              Defect Data Loaded ({defectData.length})
-            </div>
-          )}
-          {uploadProgress.washing && (
-            <div className="flex items-center px-3 py-1 bg-purple-100 dark:bg-purple-800 text-purple-700 dark:text-purple-300 rounded-full text-sm">
-              <span className="mr-1">🧺</span>
-              Washing Data Loaded ({washingData.length})
-            </div>
-          )}
-        </div>
-
         {/* Single Upload Section */}
         <div className="mb-8">
           <div className="flex items-center mb-6">
@@ -261,7 +239,7 @@ const processWashingDataForSave = (data) => {
             </div>
             <div>
               <h3 className="text-xl font-bold text-gray-800 dark:text-gray-200">Excel Data Upload</h3>
-              <p className="text-gray-500 dark:text-gray-400 text-sm">Upload Excel files (Output, Defect, or Washing data)</p>
+              <p className="text-gray-500 dark:text-gray-400 text-sm">Upload Excel files </p>
             </div>
           </div>
           
