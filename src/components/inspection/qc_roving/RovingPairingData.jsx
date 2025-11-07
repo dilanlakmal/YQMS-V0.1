@@ -568,12 +568,11 @@ const RovingPairingData = () => {
                                 
                                 if (partTypeData?.defectsForPart?.length > 0) {
                                   
-                                  partTypeData.defectsForPart.forEach((partData, partIndex) => {
+                                  partTypeData.defectsForPart.forEach((partData) => {
                                     
                                     if (partData?.defects?.length > 0) {
                                       
-                                      partData.defects.forEach((defect, defectIndex) => {
-                                        console.log(`Defect ${defectIndex}:`, defect);
+                                      partData.defects.forEach((defect) => {
                                         
                                         const defectName = defect.defectNameEng || 'Unknown Defect';
                                         const localizedDefectName = currentLanguage.startsWith('kh') 
@@ -591,7 +590,6 @@ const RovingPairingData = () => {
                                         
                                         // Handle defect images
                                         if (defect.images && Array.isArray(defect.images) && defect.images.length > 0) {
-                                          console.log(`Found ${defect.images.length} images for defect:`, defect.images);
                                           singleDefectHtml += `<div style="margin-top: 8px;">`;
                                           defect.images.forEach((image, imgIndex) => {
                                             if (image && typeof image === 'string') {
@@ -600,32 +598,22 @@ const RovingPairingData = () => {
                                             }
                                           });
                                           singleDefectHtml += `</div>`;
-                                        } else {
-                                          console.log('No images found for defect or images is not an array:', defect.images);
-                                        }
+                                        } 
                                         singleDefectHtml += `</div>`;
                                         defectsHtmlList.push(singleDefectHtml);
                                       });
-                                    } else {
-                                      console.log(`No defects found for part ${partData.partNo}`);
-                                    }
+                                    } 
                                   });
-                                } else {
-                                  console.log(`No defectsForPart found for part type ${partTypeData.partType}`);
-                                }
+                                } 
                               });
-                            } else {
-                              console.log('No defect details found or defectDetails is empty');
-                            }
+                            } 
                             
                             // Collect measurement images from pairingData
                             if (pairingRecord.measurementData?.length > 0) {
-                              console.log('Processing measurement data for images...');
                               pairingRecord.measurementData.forEach((partTypeData) => {
                                 if (partTypeData?.measurements?.length > 0) {
                                   partTypeData.measurements.forEach((measurement) => {
                                     if (measurement?.images?.length > 0) {
-                                      console.log(`Found ${measurement.images.length} measurement images:`, measurement.images);
                                       measurement.images.forEach((image) => {
                                         if (image && typeof image === 'string') {
                                           allImages.push(image);
@@ -636,16 +624,8 @@ const RovingPairingData = () => {
                                 }
                               });
                             }
-                          } else {
-                            console.log('No matching pairing record found for inspection:', inspection.rep_name);
-                          }
-                        } else {
-                          console.log('No pairingData found in row');
-                        }
-                        
-                        console.log('Final Defects HTML List:', defectsHtmlList);
-                        console.log('Final All Images:', allImages);
-                        console.log('=== END DEBUGGING ===');
+                          } 
+                        } 
                         
                         let finalDefectsHtml = "<strong>Defects:</strong> None";
                         if (defectsHtmlList.length > 0) {
