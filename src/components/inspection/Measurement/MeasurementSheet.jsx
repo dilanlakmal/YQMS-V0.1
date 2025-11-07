@@ -4,6 +4,61 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
 const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
+  
+  // Sanitize function for measurement point names
+  const sanitizeMeasurementPoint = (point, forPDF = false) => {
+    // 1. Guard clause for invalid input
+    if (!point || typeof point !== "string") {
+      return "N/A";
+    }
+
+    let sanitized = String(point);
+
+    // 2. If sanitizing for PDF, replace Unicode special characters with ASCII equivalents
+    if (forPDF) {
+      sanitized = sanitized
+        .replace(/≤/g, "<=") // Less than or equal to
+        .replace(/≥/g, ">=") // Greater than or equal to
+        .replace(/≠/g, "!=") // Not equal to
+        .replace(/±/g, "+/-") // Plus-minus
+        .replace(/×/g, "x") // Multiplication sign
+        .replace(/÷/g, "/") // Division sign
+        .replace(/°/g, "deg") // Degree symbol
+        .replace(/″/g, '"') // Double prime (inches)
+        .replace(/′/g, "'") // Prime (feet)
+        .replace(/…/g, "...") // Ellipsis
+        .replace(/–/g, "-") // En dash
+        .replace(/—/g, "-") // Em dash
+        .replace(/'/g, "'") // Left single quote
+        .replace(/'/g, "'") // Right single quote
+        .replace(/"/g, '"') // Left double quote
+        .replace(/"/g, '"'); // Right double quote
+    }
+
+    // 3. NEW: Intelligently find and fix only the spaced-out words.
+    sanitized = sanitized.replace(
+      /\b([a-zA-Z0-9])(?:\s\1)+\b|\b[a-zA-Z0-9](?:\s[a-zA-Z0-9])+\b/g,
+      (match) => {
+        return match.replace(/\s/g, "");
+      }
+    );
+
+    // 4. Remove only specific unwanted characters, like double quotes (if not for PDF).
+    if (!forPDF) {
+      sanitized = sanitized.replace(/"/g, "");
+    }
+
+    // 5. Collapse multiple spaces (2 or more) into a single space.
+    sanitized = sanitized.replace(/ {2,}/g, " ");
+
+    // 6. Trim whitespace from the beginning and end of the string.
+    sanitized = sanitized.trim();
+
+    // 7. Limit length to prevent overflow
+    return sanitized.substring(0, 100);
+  };
+
+
   const decimalToFraction = (decimal) => {
     if (decimal === null || decimal === undefined || decimal === '' || isNaN(parseFloat(decimal))) {
       return 'N/A';
@@ -24,6 +79,7 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
 
     // Common denominators for garment industry
     const denominators = [2, 4, 8, 16, 32, 64];
+
     for (const d of denominators) {
       if (Math.abs(fractionalPart * d - Math.round(fractionalPart * d)) < tolerance * d) {
         const numerator = Math.round(fractionalPart * d);
@@ -72,10 +128,12 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
   }
 
   const allMeasurementsForTab = measurementGroups[activeTab] || [];
+
   const currentMeasurements = useMemo(() => {
     if (showAll || anfPoints.length === 0) {
       return allMeasurementsForTab;
     }
+
     const anfPointSet = new Set(anfPoints);
     return allMeasurementsForTab.filter(m => anfPointSet.has(m.point));
   }, [activeTab, showAll, anfPoints, measurementGroups]);
@@ -83,15 +141,17 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
   const getTableData = (groupKey) => {
     const groupData = measurementGroups[groupKey] || [];    
     const headers = ["Measurement Point", "Tol+", "Tol-", ...sizes];
+
     const body = groupData.map(m => ([
-      m.point, // Measurement Point
-      `+${decimalToFraction(m.tolerancePlus)}`, // Tol+
-      `-${decimalToFraction(m.toleranceMinus)}`, // Tol-
+      sanitizeMeasurementPoint(m.point), // Apply sanitization here
+      `+${decimalToFraction(m.tolerancePlus)}`,
+      `-${decimalToFraction(m.toleranceMinus)}`,
       ...sizes.map((size, index) => {
         const value = m.values?.[index];
         return decimalToFraction(value);
       })
     ]));
+
     return { headers, body };
   };
 
@@ -117,7 +177,6 @@ const handleExportPDF = async () => {
 
         // Function to add header to page
         const addHeader = (y, kValue) => {
-
           // Main title
           doc.setFillColor(240, 240, 240);
           doc.rect(5, y, pageWidth - 10, 8, 'F');
@@ -125,6 +184,7 @@ const handleExportPDF = async () => {
           doc.setFontSize(10);
           doc.setFont('helvetica', 'bold');
           doc.text('Yorkmars (Cambodia) Garment MFG. Co. Ltd. - Measurement List', pageWidth / 2, y + 5, { align: 'center' });
+
           y += 15;
 
           // Customer info
@@ -132,19 +192,17 @@ const handleExportPDF = async () => {
           doc.setFont('helvetica', 'normal');
           
           doc.text(`Customer: ${filterCriteria.customer || ''}`, 8, y);
-          doc.text(`CustStyle: ${filterCriteria.custStyle || ''}`, 8, y + 6); // Uses custStyle
+          doc.text(`CustStyle: ${filterCriteria.custStyle || ''}`, 8, y + 6);
           
-          doc.text(`Our Ref: ${filterCriteria.styleNo || ''}`, pageWidth / 2 - 25, y); // Uses styleNo (which is order_no)
-          doc.text(`Order Qty: ${filterCriteria.totalQty || ''}`, pageWidth / 2 - 25, y + 6); // Uses totalQty
+          doc.text(`Our Ref: ${filterCriteria.styleNo || ''}`, pageWidth / 2 - 25, y);
+          doc.text(`Order Qty: ${filterCriteria.totalQty || ''}`, pageWidth / 2 - 25, y + 6);
           
           doc.text(`Actual Qty:`, pageWidth - 50, y);
           doc.text(`Date:`, pageWidth - 50, y + 6);
           
-          return y + 8; // Adjusted y position
+          return y + 8;
         };
-
     
-
         // Function to add table headers
         const addTableHeaders = (y) => {
           const rowHeight = 8;
@@ -265,7 +323,7 @@ const handleExportPDF = async () => {
           doc.setFont('helvetica', 'normal');
           
           doc.text('Inspector:', 5 + leftWidth + 2, footerY + 10);
-          doc.text('Inspector’s Signature:', 5 + leftWidth + 2, footerY + 14);
+          doc.text('Inspector\'s Signature:', 5 + leftWidth + 2, footerY + 14);
           doc.text(`Color:`, 5 + leftWidth + 70, footerY + 10);
           doc.text(`K-Value: ${tabKey || ''}`, 5 + leftWidth + 70, footerY + 14);
           
@@ -285,11 +343,14 @@ const handleExportPDF = async () => {
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'bold');
           
+          // Sanitize the text before calculating height
+          const sanitizedText = sanitizeMeasurementPoint(text, true);
+          
           // Split text to fit within the column width with proper padding
-          const lines = doc.splitTextToSize(text, width - 1); // Minimal padding
-          const lineHeight = fontSize * 1.05; // Very tight line spacing
-          const minRowHeight = 6; // Reduced minimum row height
-          const textHeight = lines.length * lineHeight + 1; // Reduced top/bottom padding
+          const lines = doc.splitTextToSize(sanitizedText, width - 1);
+          const lineHeight = fontSize * 1.05;
+          const minRowHeight = 6;
+          const textHeight = lines.length * lineHeight + 1;
           
           return Math.max(minRowHeight, textHeight);
         };
@@ -309,13 +370,13 @@ const handleExportPDF = async () => {
         const sizeColumnWidth = sizeGroupWidth / 4;
         
         // Data row settings
-        const measurementPointFontSize = 6; // Slightly smaller for better fit
+        const measurementPointFontSize = 6;
         const toleranceFontSize = 6;
         const specFontSize = 6;
         
         // Process data rows
         groupData.forEach((item, index) => {
-          // Calculate required row height based on measurement point text
+          // Calculate required row height based on sanitized measurement point text
           const requiredRowHeight = calculateRowHeight(item.point, measurementPointWidth, measurementPointFontSize);
           
           // Check if we need a new page (reserve space for footer)
@@ -343,26 +404,27 @@ const handleExportPDF = async () => {
           
           let colX = 5;
           
-          // Measurement Point - WITH IMPROVED TEXT WRAPPING
+          // Measurement Point - WITH IMPROVED TEXT WRAPPING AND SANITIZATION
           doc.rect(colX, tableY, measurementPointWidth, requiredRowHeight, 'S');
           doc.setFontSize(measurementPointFontSize);
           doc.setFont('helvetica', 'bold');
           
-          const measurementText = item.point;
+          // Sanitize the measurement text before processing
+          const sanitizedMeasurementText = sanitizeMeasurementPoint(item.point, true);
           
           // Split text with proper width consideration
-          const lines = doc.splitTextToSize(measurementText, measurementPointWidth - 6);
+          const lines = doc.splitTextToSize(sanitizedMeasurementText, measurementPointWidth - 6);
           const lineHeight = measurementPointFontSize * 1.05;
           
           // Calculate starting Y position to center text vertically
           const totalTextHeight = lines.length * lineHeight;
           const paddingTop = Math.max(0, (requiredRowHeight - totalTextHeight) / 2);
-          const startY = tableY + paddingTop + lineHeight * 0.8; // Adjust baseline
+          const startY = tableY + paddingTop + lineHeight * 0.8;
           
           // Draw each line of text
           lines.forEach((line, lineIndex) => {
             const yPos = startY + (lineIndex * lineHeight);
-            doc.text(line.trim(), colX + 3, yPos); // Left align with padding
+            doc.text(line.trim(), colX + 3, yPos);
           });
           
           colX += measurementPointWidth;
@@ -383,7 +445,6 @@ const handleExportPDF = async () => {
           // Size values - centered vertically
           sizes.forEach((size, valueIndex) => {
             const value = item.values?.[valueIndex];
-
             // First column (Spec column)
             doc.rect(colX, tableY, sizeColumnWidth, requiredRowHeight, 'S');
             doc.setFontSize(specFontSize);
@@ -471,7 +532,7 @@ const handleExportExcel = async () => {
           ['📌 Point Name', '📈 Tolerance (+)', '📉 Tolerance (-)', ...sizes.map(size => `📏 Size ${size}`), ''],
           // Row 11: Table headers (actual data headers)
           headers,
-          // Row 12+: Table data
+          // Row 12+: Table data (sanitized measurement points are already applied in getTableData)
           ...body
         ];
 
@@ -486,7 +547,7 @@ const handleExportExcel = async () => {
         ];
         ws['!cols'] = colWidths;
 
-        // Apply enhanced styles
+        // Apply enhanced styles (keeping the existing styling code)
         const range = XLSX.utils.decode_range(ws['!ref']);
         
         for (let R = range.s.r; R <= range.e.r; ++R) {
@@ -505,7 +566,7 @@ const handleExportExcel = async () => {
                   color: { rgb: "FFFFFF" },
                   name: "Calibri"
                 },
-                fill: { fgColor: { rgb: "1F4E79" } }, // Deep professional blue
+                fill: { fgColor: { rgb: "1F4E79" } },
                 alignment: { 
                   horizontal: "center", 
                   vertical: "center",
@@ -625,7 +686,7 @@ const handleExportExcel = async () => {
                   color: { rgb: "FFFFFF" },
                   name: "Calibri"
                 },
-                fill: { fgColor: { rgb: "70AD47" } }, // Professional green
+                fill: { fgColor: { rgb: "70AD47" } },
                 alignment: { 
                   horizontal: "center", 
                   vertical: "center"
@@ -639,7 +700,7 @@ const handleExportExcel = async () => {
               };
             }
             
-            // Sub Headers (Row 10) - Instructional row
+                        // Sub Headers (Row 10) - Instructional row
             else if (R === 10) {
               ws[cellAddress].s = {
                 font: { 
@@ -649,7 +710,7 @@ const handleExportExcel = async () => {
                   name: "Calibri",
                   italic: true
                 },
-                fill: { fgColor: { rgb: "A9D18E" } }, // Lighter green
+                fill: { fgColor: { rgb: "A9D18E" } },
                 alignment: { 
                   horizontal: "center", 
                   vertical: "center"
@@ -1001,7 +1062,8 @@ const handleExportExcel = async () => {
                       checked={!showAll}
                       disabled
                       className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-0 cursor-default" />
-                    {item.point}
+                    {/* Apply sanitization to the displayed measurement point */}
+                    {sanitizeMeasurementPoint(item.point)}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm border-r border-gray-200">
@@ -1068,3 +1130,5 @@ const handleExportExcel = async () => {
 };
 
 export default MeasurementSheet;
+
+              
