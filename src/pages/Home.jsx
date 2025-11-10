@@ -68,63 +68,72 @@ function Home() {
             pageId: "bundle-registration",
             image: "assets/Home/bundle.avif",
             title: t("home.bundle_registration"),
-            description: "Order Registration"
+            description: "Order Registration",
+            version: '0',
           },
           {
             path: "/washing",
             pageId: "washing",
             image: "assets/Home/washing.jpg",
             title: t("home.washing"),
-            description: "Scan orders for Washing"
+            description: "Scan orders for Washing",
+           version: '0',
           },
           {
             path: "/opa",
             pageId: "opa",
             image: "assets/Home/dyeing.png",
             title: t("home.opa"),
-            description: "Scan orders in OPA"
+            description: "Scan orders in OPA",
+             version: '0',
           },
           {
             path: "/ironing",
             pageId: "ironing",
             image: "assets/Home/ironing.png",
             title: t("home.ironing"),
-            description: "Scan orders for Ironing"
+            description: "Scan orders for Ironing",
+            version: '0',
           },
           {
             path: "/qc2-inspection",
             pageId: "qc2-inspection",
             image: "assets/Home/qc2.png",
             title: t("home.qc2_inspection"),
-            description: "QC2 Inspection Point"
+            description: "QC2 Inspection Point",
+            version: '0',
           },
           {
             path: "/qc2-repair-tracking",
             pageId: "qc2-inspection",
             image: "assets/Home/repair.png",
             title: "Defect Tracking",
-            description: "QC2 Repair Tracking"
+            description: "QC2 Repair Tracking",
+            version: '0',
           },
           {
             path: "/packing",
             pageId: "packing",
             image: "assets/Home/packing.webp",
             title: t("home.packing"),
-            description: "Scan orders for Packing"
+            description: "Scan orders for Packing",
+            version: '0',
           },
           {
             path: "/b-grade-defect",
             pageId: "qc2-inspection",
             image: "assets/Home/bgrade.png",
             title: "B-Grade Defects",
-            description: "Record B-Grade defects"
+            description: "Record B-Grade defects",
+            version: '0',
           },
           {
             path: "/b-grade-stcok",
             pageId: "qc2-inspection",
             image: "assets/Home/bgrade.png",
             title: "B-Grade Stock",
-            description: "View B-Grade Stock"
+            description: "View B-Grade Stock",
+            version: '0',
           }
         ]
       },
@@ -139,77 +148,88 @@ function Home() {
             roles: ["Fabric"],
             image: "assets/Home/fabric-logo.png",
             title: t("home.fabric"),
-            description: "Fabric Inspection"
+            description: "Fabric Inspection",
+            version: '0',
           },
           {
             path: "/cutting",
             roles: ["Cutting"],
             image: "assets/Home/cutting.webp",
             title: t("home.cutting"),
-            description: "Cut Panel Inspection"
+            description: "Cut Panel Inspection",
+            version: '0.1',
           },
           {
             path: "/cutting-inline",
             roles: ["Cutting"],
             image: "assets/Home/cutting-inline.png",
             title: t("home.cutting-inline"),
-            description: "Cutting Inline Inspection"
+            description: "Cutting Inline Inspection",
+             version: '0.1',
           },
           {
             path: "/scc",
             roles: ["SCC"],
             image: "assets/Home/bundle.avif",
             title: t("SCC"),
-            description: "Spreading & Cutting"
+            description: "Spreading & Cutting",
+             version: '0.1',
           },
           {
             path: "/qcWashing",
             roles: ["QC Washing"],
             image: "assets/Home/qcWashing.png",
             title: t("home.qcWashing"),
-            description: "Washing Report"
+            description: "Washing Report",
+             version: '0.1',
           },
            {
             path: "/measurement",
             roles: ["QC Washing"],
             image: "assets/Home/measurement.png",
             title: t("home.Measurement"),
-            description: "All Style measurements"
+            description: "All Style measurements",
+             version: '0.1',
           },
           {
             path: "/upload-beforewash-specs",
             roles: ["Washing Clerk"],
             image: "assets/Home/uploadspecs.png",
             title: t("home.upload_beforewash_specs"),
-            description: "Upload Beforewash Specs"
+            description: "Upload Beforewash Specs",
+             version: '0.1',
           },
           {
             path: "/select-dt-specs",
             roles: ["Washing Clerk", "QA Clerk"],
             image: "assets/Home/select-specs.png",
             title: t("home.select_dt_specs"),
-            description: "Select After Wash DT Specs"
+            description: "Select After Wash DT Specs",
+             version: '0.1',
           },
           {
             path: "/anf-washing",
             roles: ["ANF QA"],
             image: "assets/Home/anf-washing.png",
             title: t("home.anf_washing"),
-            description: "QC After Wash Measurements"
+            description: "QC After Wash Measurements",
+             version: '0.1',
           },
           {
             path: "/anf-washing-ver2",
             roles: ["ANF QA"],
             image: "assets/Home/anf-washing-ver2.png",
             title: t("home.anf_washing_version2"),
-            description: "QC AW Measurements - Version 2"
+            description: "QC AW Measurements - Version 2",
+             version: '0.1',
           },
           {
             path: "/supplier-issues",
             roles: ["Supplier QC"],
             image: "assets/Home/supplier-issues.png",
             title: t("home.supplier-issues"),
-            description: "Supplier Issues Sub-Con Fty"
+            description: "Supplier Issues Sub-Con Fty",
+             version: '0.1',
           }
         ]
       },
@@ -224,28 +244,32 @@ function Home() {
             roles: ["QC Roving"],
             image: "assets/Home/qcinline.png",
             title: "QC Inline Roving",
-            description: "QC Inline Roving Point"
+            description: "QC Inline Roving Point",
+             version: '0.1',
           },
           {
             path: "/details",
             roles: ["QC1 Inspection"],
             image: "assets/Home/qcc.png",
             title: t("home.qc1_inspection"),
-            description: "QC1 Inspection Point"
+            description: "QC1 Inspection Point",
+             version: '0.1',
           },
           {
             path: "/sub-con-qc1",
             roles: ["QC1 Sub Con"],
             image: "assets/Home/sub-con-qc1.png",
             title: t("home.qc1_subcon_inspection"),
-            description: "QC1 Sub Con Inspection"
+            description: "QC1 Sub Con Inspection",
+             version: '0.1',
           },
           {
             path: "/inline-emp",
             roles: ["Printing"],
             image: "assets/Home/qc2.png",
             title: "Print QR",
-            description: "Sewing Worker QR Code"
+            description: "Sewing Worker QR Code",
+             version: '0.1',
           }
         ]
       },
@@ -260,70 +284,80 @@ function Home() {
             roles: ["QA Audit"],
             image: "assets/Home/qaa.png",
             title: "QMS Audit",
-            description: "QMS Audit Check Point"
+            description: "QMS Audit Check Point",
+             version: '0',
           },
           {
             path: "/qc2-upload-data",
             roles: ["Washing Clerk"],
             image: "assets/Home/qc2-workers-upload.png",
             title: t("home.qc2_upload_data"),
-            description: "QC2 Upload Data"
+            description: "QC2 Upload Data",
+             version: '0.1',
           },
           {
             path: "/qc2-washing-upload",
             roles: ["Washing Clerk"],
             image: "assets/Home/qc2WashingUpload.png",
             title: t("home.qc2_washing_data"),
-            description: "QC2 Washing Data"
+            description: "QC2 Washing Data",
+             version: '0.1',
           },
           {
             path: "/qc-accuracy",
             roles: ["QA"],
             image: "assets/Home/qc-accuracy.png",
             title: "QA Random Inspection",
-            description: "QA Random Checks"
+            description: "QA Random Checks",
+             version: '0.1',
           },
           {
             path: "/qc-accuracy-ver2",
             roles: ["QA"],
             image: "assets/Home/qc-accuracy.png",
             title: "QC Output",
-            description: "QC Output | Sunrise & Old Barcode System"
+            description: "QC Output | Sunrise & Old Barcode System",
+             version: '0.1',
           },
           {
             path: "/training",
             roles: ["System Administration"],
             image: "assets/Home/training.jpg",
             title: "YQMS Training",
-            description: "Training Schedule & Progress"
+            description: "Training Schedule & Progress",
+             version: '0',
           },
           {
             path: "/exam",
             roles: ["System Administration"],
             image: "assets/Home/exam.jpg",
             title: "YQMS Exam",
-            description: "Create Exam & Preview"
+            description: "Create Exam & Preview",
+             version: '0',
           },
           {
             path: "/qa-yorksys",
             roles: ["QA Clerk"],
             image: "assets/Home/upload-orders.png",
             title: "Upload Orders",
-            description: "Order data from York-sys"
+            description: "Order data from York-sys",
+             version: '0.1',
           },
           {
             path: "/packing-list",
             roles: ["QA Clerk"],
             image: "assets/Home/PackingList.png",
             title: "Upload Packing List",
-            description: "Packing List from Shipping Dept"
+            description: "Packing List from Shipping Dept",
+             version: '0',
           },
           {
             path: "/final-inspection",
             roles: ["QA"],
             image: "assets/Home/qafinal.png",
             title: "Final Inspection",
-            description: "QA Final Inspection"
+            description: "QA Final Inspection",
+             version: '0',
           }
         ]
       },
@@ -338,7 +372,8 @@ function Home() {
             roles: ["CE"],
             image: "assets/Home/masterlist.png",
             title: "Master List",
-            description: "View and manage the Master List"
+            description: "View and manage the Master List",
+             version: '0',
           }
         ]
       },
@@ -353,21 +388,24 @@ function Home() {
             roles: ["IE", "System Administration"],
             image: "assets/Home/ie.png",
             title: t("home.ieadmin"),
-            description: "IE System Admin"
+            description: "IE System Admin",
+             version: '0',
           },
           {
             path: "/sysadmin",
             roles: ["System Administration"],
             image: "assets/Home/sysadmin.jpg",
             title: t("home.systemadmin"),
-            description: "Modify Defects"
+            description: "Modify Defects",
+             version: '0.1',
           },
           {
             path: "/yqms",
             roles: ["YQMS"],
             image: "assets/Home/yqms.png",
             title: t("home.yqms"),
-            description: "Project Management"
+            description: "Project Management",
+             version: '0',
           }
         ]
       },
@@ -382,35 +420,40 @@ function Home() {
             roles: ["Download Data"],
             image: "assets/Home/download.jpg",
             title: t("home.download_data"),
-            description: "Download Raw Data"
+            description: "Download Raw Data",
+             version: '0',
           },
           {
             path: "/live-dashboard",
             roles: ["Live Dashboard"],
             image: "assets/Home/dash.png",
             title: t("home.live_dashboard"),
-            description: "QC2 Live Dashboard"
+            description: "QC2 Live Dashboard",
+             version: '0.1',
           },
           {
             path: "/powerbi",
             roles: ["Power BI"],
             image: "assets/Home/powerbi.png",
             title: "Power BI",
-            description: "View Power BI Reports"
+            description: "View Power BI Reports",
+             version: '0.1',
           },
           {
             path: "/qa-pivot",
             roles: ["QA Pivot"],
             image: "assets/Home/qalogo.png",
             title: "QA Evaluation",
-            description: "Upload & View Data"
+            description: "Upload & View Data",
+             version: '0',
           },
           {
             path: "/qc1-sunrise",
             roles: ["QC1 Sunrise"],
             image: "assets/Home/sunrise.png",
             title: "QC1 Sunrise",
-            description: "Upload Excel Data"
+            description: "Upload Excel Data",
+             version: '0.1',
           }
         ]
       }
@@ -603,25 +646,46 @@ function Home() {
                     gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
                   }}
                 >
-                  {section.items.map((item, itemIndex) => (
-                    <div
-                      key={itemIndex}
-                      onClick={() => handleNavigation(item)}
-                      className="group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1"
-                    >
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="w-14 h-14 object-contain mb-3"
-                      />
-                      <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
-                        {item.title}
-                      </h3>
-                      <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
-                        {item.description}
-                      </p>
-                    </div>
-                  ))}
+                  {section.items.map((item, itemIndex) => {
+                    const getVersionStyle = () => {
+                      if (item.version === '0') {
+                        return 'border-2 border-red-500';
+                      } else if (item.version === '0.1') {
+                        return 'border-2 border-green-500';
+                      }
+                      return '';
+                    };
+
+                    return (
+                      <div
+                        key={itemIndex}
+                        onClick={() => handleNavigation(item)}
+                        className={`group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1 ${getVersionStyle()}`}
+                      >
+                        <img
+                          src={item.image}
+                          alt={item.title}
+                          className="w-14 h-14 object-contain mb-3"
+                        />
+                        <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
+                          {item.description}
+                        </p>
+                        {/* {item.version === '0' && (
+                          <span className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                            Coming Soon
+                          </span>
+                        )}
+                        {item.version === '0.1' && (
+                          <span className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                            Active
+                          </span>
+                        )} */}
+                      </div>
+                    );
+                  })}
                 </div>
               </section>
             ))

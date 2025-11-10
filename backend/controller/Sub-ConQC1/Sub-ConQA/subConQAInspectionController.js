@@ -5,7 +5,6 @@ import {
 import path from "path";
 import { __backendDir } from "../../../Config/appConfig.js";
 import { sanitize } from "../../../helpers/helperFunctions.js";
-import { promises as fsPromises } from "fs";
 import sharp from "sharp";
 import { 
   generateSubconQAReportID,
@@ -104,21 +103,6 @@ export const saveQaImageUpload = async (req, res) => {
           .status(500)
           .json({ message: "Server error during image processing." });
       }
-};
-
-// --- FIX #2: NEW ENDPOINT TO FETCH STANDARD DEFECTS FOR THE FORM ---
-export const getStandardDefectsForForm = async (req, res) => {
-   try {
-      const defects = await QAStandardDefectsModel.find({})
-        .sort({ code: 1 })
-        .lean(); // Use lean for performance
-      res.json(defects);
-    } catch (error) {
-      console.error("Error fetching standard defects list:", error);
-      res
-        .status(500)
-        .json({ message: "Server error fetching standard defects list" });
-    }
 };
 
 // 3. ENDPOINT: Save a new QA Sample Report (MODIFIED)

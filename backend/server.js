@@ -1,29 +1,23 @@
 import axios from "axios";
 import { app, server, PORT} from "./Config/appConfig.js";
-
-import { 
-  SewingDefects,
-} from "./controller/MongoDB/dbConnectionController.js";
 /* -----------------------------
 Real Wash Qty Imports
 ------------------------------ */
 import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 /* -----------------------------
-AQL Imports
+Common File Imports
 ------------------------------ */
-import aql from "./routes/Common/AQL/AQLRoutes.js";
-/* -----------------------------
-Accessory Issue Imports
------------------------------- */
-import accessoryIssue from "./routes/AccessoryIssue/accessoryIssueRoutes.js";
+/*-------------AQL Imports --------------*/
+import aql from "./routes/Common/AQLRoutes.js";
+/*-------------Buyer Spec Imports --------------*/
+import buyerSpec from "./routes/Common/DTOrdersBuyerSpecRoutes.js";
+/*-------------DT-Orders Imports --------------*/
+import dtOrders from "./routes/Common/DTOrdersRoutes.js";
 /* -----------------------------
 Audit Imports
 ------------------------------ */
-import audit from "./routes/Audit/auditRoutes.js";
-/* -----------------------------
-Bundle Imports
------------------------------- */
-import bundle from "./routes/Bundle/bundelRoutes.js";
+import auditAdmin from "./routes/Audit/AuditAdminRoutes.js";
+import auditUploadImage from "./routes/Audit/AuditUploadImageRoutes.js";
 /* -----------------------------
 User Imports
 ------------------------------ */
@@ -31,56 +25,14 @@ import auth from "./routes/User/authRoutes.js";
 import roleManagement from "./routes/User/roleManagementRoutes.js";
 import user from "./routes/User/userRoutes.js";
 /* -----------------------------
-Sewing Defect Imports
------------------------------- */
-import sewingDefect from "./routes/Defects/sewingDefectRoutes.js";
-/* -----------------------------
 Digital Measurement Imports
 ------------------------------ */
-import digitalMeasurement from "./routes/DigitalMeasurement/digitalMeasurmentRoutes.js";
+import digitalMeasurement from "./routes/DigitalMeasurement/DigitalMeasurmentRoutes.js";
 /* -----------------------------
 Download Data Imports
 ------------------------------ */
 import downloadData from "./routes/DownloadData/downloaddataRoutes.js";
-/* -----------------------------
-Ironing Imports
------------------------------- */
-import ironing from "./routes/Ironing/ironingRoutes.js";
-import ironingDashboard from "./routes/LiveDashboard/ironingDashboardRoutes.js";
-/* -----------------------------
-OPA Imports
------------------------------- */
-import opaDashboard from "./routes/LiveDashboard/opaDashboardRoutes.js";
-import packingDashboard from "./routes/LiveDashboard/packingDashboardRoutes.js";
-/* -----------------------------
-Process Dashboard Imports
------------------------------- */
-import processDashboard from "./routes/LiveDashboard/processDashboardRoutes.js";
-/* -----------------------------
-QC1 Dashboard Imports
------------------------------- */
-import qc1Dashboard from "./routes/LiveDashboard/qc1DashboardRoutes.js";
-/* -----------------------------
-QC2 Dashboard Imports
------------------------------- */
-import qc2dashboard from "./routes/LiveDashboard/qc2DashboardRoutes.js";
-/* -----------------------------
-Washing Imports
------------------------------- */
-import washing from "./routes/Washing/washingRoutes.js";
-import washingDashboard from "./routes/LiveDashboard/washingDashboardRoutes.js";
-/* -----------------------------
-OPA Routes Imports
------------------------------- */
-import opa from "./routes/OPA/opaRoutes.js";
-/* -----------------------------
-Packing Routes Imports
------------------------------- */
-import packing from "./routes/Packing/packingRoutes.js";
-/* -----------------------------
-Paring Defects Imports
------------------------------- */
-import paringDefects from "./routes/ParingDefects/paringDefectRoutes.js";
+
 /* -----------------------------
 QC1 Inspection Imports
 ------------------------------ */
@@ -90,50 +42,21 @@ QC1 Sunrise Imports
 ------------------------------ */
 import QC1Sunrise from "./routes/QC1Sunrise/qc1SunriseRoutes.js";
 /* -----------------------------
-QC2 Inspection Imports
------------------------------- */
-import QC2Inspection from "./routes/QC2Inspection/qc2InspectionRoutes.js";
-/* -----------------------------
-QC2 Repair Tracking Imports
------------------------------- */
-import QC2repairTracking from "./routes/QC2RepairTracking/qc2RepairtrackingRoutes.js";
-/* -----------------------------
-QC Inline Roving Imports
------------------------------- */
-import QCInlineImageUpload from "./routes/QCInlineRoving/qcInineImageUploadRoutes.js";
-import QCInlineRoving from "./routes/QCInlineRoving/qcInlineRovingRoutes.js";
-import QCInlineWorker from "./routes/QCInlineRoving/qcInlineWorkersRoutes.js"
-import QCRovingParing from "./routes/QCInlineRoving/qcRovingParingRoutes.js";
-/* -----------------------------
-IE Imports
------------------------------- */
-import ie from "./routes/IE/ieRoutes.js";
-import ieRole from "./routes/IE/ieRolerRoutes.js";
-/* -----------------------------
 Roving Imports
 ------------------------------ */
-import roving from "./routes/Roving/rovingRoutes.js";
-import rovingParing from "./routes/Roving/paringRoutes.js";
-/* -----------------------------
-Washing Specs Imports
------------------------------- */
-import washingSpecs from "./routes/WashingSpecs/specRoutes.js";
-/* -----------------------------
-QC2 Workers Imports
------------------------------- */
-import qc2Workers from "./routes/QC2Workers/qc2WorkerRoutes.js";
-/* -----------------------------
-QA Defecect Imports
------------------------------- */
-import qaDefect from "./routes/QAAccuracy/qaDefectRoutes.js";
-/* -----------------------------
-QA Accuracy Imports
------------------------------- */
-import qaAccuracy from "./routes/QAAccuracy/accuracyRoutes.js";
-/* -----------------------------
-Buyer Spec Imports
------------------------------- */
-import buyerSpec from "./routes/DT Orders Buyer Specs/buyerSpecRoutes.js";
+import rovingDefects from "./routes/InlineRoving/Roving/RovingAdminDefectRoutes.js";
+import QCInlineImageUpload from "./routes/InlineRoving/Roving/RovingInineImageUploadRoutes.js";
+import QCInlineRoving from "./routes/InlineRoving/Roving/RovingInlineOrdersRoutes.js";
+import QCInlineWorker from "./routes/InlineRoving/Roving/RovingInspectionRoutes.js"
+import rovingDefectBuyerstatus from "./routes/InlineRoving/Roving/RovingAdminDefectBuyserStatusRoutes.js";
+import rovingReports from "./routes/InlineRoving/Roving/RovingReportRoutes.js";
+
+/*-------------Paring Imports --------------*/
+import pairingDefects from "./routes/InlineRoving/Pairing/ParingDefectRoutes.js";
+import rovingPairingInspection from "./routes/InlineRoving/Pairing/RovingPairingInspectionRoutes.js";
+import pairingAccessoryIssue from "./routes/InlineRoving/Pairing/PairingAccessoryIssueRoutes.js";
+import pairingReport from "./routes/InlineRoving/Pairing/PairingReportsRoutes.js";
+
 /* -----------------------------
 ANF Imports
 ------------------------------ */
@@ -202,7 +125,7 @@ import cuttingissue from "./routes/Cutting/CuttingInspection/cuttingIssueRoutes.
 import cuttingMeasurementPoints from "./routes/Cutting/Cutting_Admin_MeasurementPoint/cuttingMeasurementPointsRoutes.js";
 import cuttingMeasurementPointEdit from "./routes/Cutting/Cutting_Admin_MeasurementPoint/cuttingMeasurementPointEditRoutes.js";
 import cuttingInspectionReportManagemenrtt from "./routes/Cutting/Cutting_Admin_Inspection_Report/cuttingInspectionReportManageRoutes.js";
-import cuttingTrend from "./routes/Cutting//Cutting_Trend/cuttingTrendRoutes.js";
+import cuttingTrend from "./routes/Cutting/Cutting_Trend/cuttingTrendRoutes.js";
 import cuttingReport from "./routes/Cutting/CuttingReport/reportRoutes.js";
 /* -----------------------------
 QCWashing Imports
@@ -213,7 +136,59 @@ import qcWashingAdmin from "./routes/QCWashing/QCWashing Admin/qcWashingAdminRou
 import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReportRoutes.js";
 import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
 
+/* -----------------------------
+QA Random Inspection Imports
+------------------------------ */
+import qaDefect from "./routes/QARandomInspection/QAAdmin/QADefectRoutes.js";
+import qaDefectBuyerStatus from "./routes/QARandomInspection/QAAdmin/QADefectBuyerStatusRoutes.js";
+import qaStandardDefect from "./routes/QARandomInspection/QAAdmin/QAStandardDefectRoutes.js";
+import qaRandomInspectionSave from "./routes/QARandomInspection/QARandomInspectionData/QARandomInspectionSaveRoutes.js";
+import qaRandomInspection from "./routes/QARandomInspection/QARandomInspectionData/QARandomInspectionRoutes.js";
+import qaAccuracyDashboard from "./routes/QARandomInspection/QAaccuracyDashboard/QAAccuracyDashboardRoutes.js";
 
+/* -----------------------------
+  QC2 System Import
+------------------------------ */
+/* ------------Live Dashboard -----------------*/
+import washingLiveDashboard from "./routes/QC2System/Dashboard/WashingLiveDashboardRoutes.js";
+import ironingLiveDashboard from "./routes/QC2System/Dashboard/IroningLiveDashboardRoutes.js";
+import opaDashLiveboard from "./routes/QC2System/Dashboard/OPALiveDashboardRoutes.js";
+import packingLiveDashboard from "./routes/QC2System/Dashboard/PackingLiveDashboardRoutes.js";
+/* ------------IE Admin-----------------*/
+import ieQCRoleManagement from "./routes/QC2System/IEAdmin/IEQCRolerManagementRoutes.js";
+import ieTaskNoAllocation from "./routes/QC2System/IEAdmin/IEAdminTaskNoAllocationRoutes.js";
+import ieWorkerAssignement from "./routes/QC2System/IEAdmin/IEWorkerAssignmentRoutes.js";
+/* ------------System Admin-----------------*/
+import qc2SubConFactory from "./routes/QC2System/SystemAdmin/QC2SubConFactoryRoutes.js"; 
+import qc2Defects from "./routes/QC2System/SystemAdmin/QC2DefectsRoutes.js";
+/* ------------Bundle Registarion-----------------*/
+import bundleRegistrationInspection from "./routes/QC2System/BundleRegistration/bundelRestrationInspectionRoutes.js";
+import bundleRegistrationData from "./routes/QC2System/BundleRegistration/BundleRegistationDataRoutes.js";
+import bundleRegistationReprint from "./routes/QC2System/BundleRegistration/BundleRegistrationReprintRoutes.js";
+/* ------------Ironing-----------------*/
+import ironing from "./routes/QC2System/Ironing/IroningRoutes.js";
+/* ------------Washing-----------------*/
+import washing from "./routes/QC2System/Washing/WashingRoutes.js";
+/* ------------OPA-----------------*/
+import opa from "./routes/QC2System/OPA/OPARoutes.js";
+/* ------------Packing-----------------*/
+import packing from "./routes/QC2System/Packing/PackingRoutes.js";
+/* -----------QC2 Inspection-----------------*/
+import qc2InspectionDataCapture from "./routes/QC2System/QC2Inspection/QC2InspectionDataCaptureRoutes.js";
+import qc2InspectionWorkers from "./routes/QC2System/QC2Inspection/QC2InspectionWorkerRoutes.js";
+import qc2InspectionReport from "./routes/QC2System/QC2Inspection/QC2InspectionReportRoutes.js";
+import qc2InspectionDashboard from "./routes/QC2System/QC2Inspection/QC2InspectionDashboardRoutes.js";
+import qc2OrderDatadashboard from "./routes/QC2System/QC2Inspection/QC2OrderDataDashboardRoutes.js";
+import qc2WashIronOpaDashboard from "./routes/QC2System/QC2Inspection/QC2WashIronOpaDashboardRoutes.js";
+import qc2BGrade from "./routes/QC2System/QC2Inspection/QC2BGradeRoutes.js";
+import qc2RepairTracking from "./routes/QC2System/QC2Inspection/QC2RepairtrackingRoutes.js";
+import qc2DefectPrint from "./routes/QC2System/QC2Inspection/QC2DefectPrintRoutes.js";
+import qc2Rework from "./routes/QC2System/QC2Inspection/QC2ReworkRoutes.js";
+
+/* -----------------------------
+  AI Import
+------------------------------ */
+import AIChatBot from "./routes/AI/AIChatBotRoutes.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -233,24 +208,19 @@ Real Wash QTY Routes
 app.use(qcRealWashQty);
 
 /* -----------------------------
-Accessory Issue Routes
+Commin file  Routes
 ------------------------------ */
-app.use(accessoryIssue);
-
-/* -----------------------------
-AQL Routes
------------------------------- */
+/* -----------AQL -----------------*/
 app.use(aql);
-
+/* -----------Buyer Specs -----------------*/
+app.use(buyerSpec);
+/* ----------- DT_Orders -----------------*/
+app.use(dtOrders);
 /* -----------------------------
 Audit Routes
 ------------------------------ */
-app.use(audit);
-
-/* -----------------------------
-Bundle Routes
------------------------------- */
-app.use(bundle);
+app.use(auditAdmin);
+app.use(auditUploadImage);
 
 /* -----------------------------
 User Routes
@@ -258,11 +228,6 @@ User Routes
 app.use(auth);
 app.use(roleManagement);
 app.use(user);
-
-/* -----------------------------
-Sewing Defect Routes
------------------------------- */
-app.use(sewingDefect);
 
 /* -----------------------------
 Digital Measurement Routes
@@ -275,50 +240,6 @@ Download Data Routes
 app.use(downloadData);
 
 /* -----------------------------
-Ironing Routes
------------------------------- */
-app.use(ironing);
-app.use(ironingDashboard);
-
-/* -----------------------------
-OPA Routes
------------------------------- */
-app.use(opa);
-app.use(opaDashboard);
-
-/* -----------------------------
-Packing Routes
------------------------------- */
-app.use(packing);
-app.use(packingDashboard);
-
-/* -----------------------------
-Processing Routes
------------------------------- */
-app.use(processDashboard);
-
-/* -----------------------------
-QC1 Dashboard Routes
------------------------------- */
-app.use(qc1Dashboard);
-
-/* -----------------------------
-QC2 Dashboard Routes
------------------------------- */
-app.use(qc2dashboard);
-
-/* -----------------------------
-Washing Routes
------------------------------- */
-app.use(washing);
-app.use(washingDashboard);
-
-/* -----------------------------
-PAring Defects Routes
------------------------------- */
-app.use(paringDefects);
-
-/* -----------------------------
 QC1 Inspection Routes
 ------------------------------ */
 app.use(qc1Inspection);
@@ -329,64 +250,24 @@ QC1 Sunrise Routes
 app.use(QC1Sunrise);
 
 /* -----------------------------
-QC2 Inspection Routes
+Roving Routes
 ------------------------------ */
-app.use(QC2Inspection);
-
-/* -----------------------------
-QC2 Repair Tracking Routes
------------------------------- */
-app.use(QC2repairTracking);
-
-/* -----------------------------
-QC2 Inline Roving Routes
------------------------------- */
+/* -----------Roving -----------------*/
+app.use(rovingDefects);
 app.use(QCInlineImageUpload);
 app.use(QCInlineRoving);
 app.use(QCInlineWorker);
-app.use(QCRovingParing);
-
-/* -----------------------------
-IE Routes
------------------------------- */
-app.use(ie);
-app.use(ieRole);
-
-/* -----------------------------
-Roving Routes
------------------------------- */
-app.use(roving);
-app.use(rovingParing);
-
-/* -----------------------------
-Washing Specs Routes
------------------------------- */
-app.use(washingSpecs);
-
-/* -----------------------------
-QC2 Workers Routes
------------------------------- */
-app.use(qc2Workers);
-
-/* -----------------------------
-QC2 Defect Routes
------------------------------- */
-app.use(qaDefect);
-
-/* -----------------------------
-QC2 Accuracy Routes
------------------------------- */
-app.use(qaAccuracy);
-
+app.use(rovingDefectBuyerstatus);
+app.use(rovingReports);
+/* -----------Pairing-----------------*/
+app.use(pairingDefects);
+app.use(rovingPairingInspection);
+app.use(pairingAccessoryIssue);
+app.use(pairingReport);
 /* -----------------------------
 Cutting Dashboard Routes
 ------------------------------ */
 app.use(cuttingDashboard);
-
-/* -----------------------------
-Buyer Spec Routes
------------------------------- */
-app.use(buyerSpec);
 
 /* -----------------------------
 ANF Routes
@@ -474,6 +355,59 @@ app.use(qcWashingAdmin);
 app.use(qcWashingReport);
 app.use(qcWashingOldQty);
 
+/* -----------------------------
+  QA Random Inspection Routes
+------------------------------ */
+app.use(qaDefect);
+app.use(qaDefectBuyerStatus);
+app.use(qaStandardDefect);
+app.use(qaRandomInspectionSave);
+app.use(qaRandomInspection);
+app.use(qaAccuracyDashboard);
+
+/* -----------------------------
+  QC2 System Routes
+------------------------------ */
+/* ------------Live Dashboard -----------------*/
+app.use(washingLiveDashboard);
+app.use(ironingLiveDashboard);
+app.use(opaDashLiveboard);
+app.use(packingLiveDashboard);
+/* -----------IE Admin -----------------*/
+app.use(ieQCRoleManagement);
+app.use(ieTaskNoAllocation);
+app.use(ieWorkerAssignement);
+/* -----------System Admin -----------------*/
+app.use(qc2SubConFactory);
+app.use(qc2Defects);
+/* -----------Bundle Registration -----------------*/
+app.use(bundleRegistrationInspection);
+app.use(bundleRegistrationData);
+app.use(bundleRegistationReprint);
+/* -----------Ironing-----------------*/
+app.use(ironing);
+/* -----------Washing-----------------*/
+app.use(washing);
+/* -----------OPA-----------------*/
+app.use(opa);
+/* -----------Packing-----------------*/
+app.use(packing);
+/* -----------QC2 Inspection-----------------*/
+app.use(qc2InspectionDataCapture);
+app.use(qc2InspectionWorkers);
+app.use(qc2InspectionReport);
+app.use(qc2InspectionDashboard);
+app.use(qc2OrderDatadashboard);
+app.use(qc2WashIronOpaDashboard);
+app.use(qc2BGrade);
+app.use(qc2RepairTracking);
+app.use(qc2DefectPrint);
+app.use(qc2Rework);
+
+/* -----------------------------
+AI Routes
+------------------------------ */
+app.use(AIChatBot);
 
 // process.on("SIGINT", async () => {
 //   try {
@@ -491,230 +425,11 @@ app.get("/api/health", (req, res) => {
 });
 
 
-/* ------------------------------
-   End Points - Roving Sewing Defects
------------------------------- */
-
-// GET - Fetch all sewing defects with optional filtering (This is the better, more flexible version)
-app.get("/api/sewing-defects", async (req, res) => {
-  try {
-    const { categoryEnglish, type, isCommon } = req.query;
-    const filter = {};
-    if (categoryEnglish) filter.categoryEnglish = categoryEnglish;
-    if (type) filter.type = type;
-    if (isCommon) filter.isCommon = isCommon;
-
-    // Fetch defects, sort by code for consistent order, and use lean() for performance
-    const defects = await SewingDefects.find(filter).sort({ code: 1 }).lean();
-    res.json(defects);
-  } catch (error) {
-    console.error("Error fetching sewing defects:", error);
-    res.status(500).json({ message: "Server error fetching sewing defects" });
-  }
-});
-
-// GET - Fetch options for the 'Add Defect' form
-app.get("/api/sewing-defects/options", async (req, res) => {
-  try {
-    const [repairs, types, lastDefect, categoryGroups] = await Promise.all([
-      SewingDefects.distinct("repair"),
-      SewingDefects.distinct("type"),
-      SewingDefects.findOne().sort({ code: -1 }),
-      SewingDefects.aggregate([
-        {
-          $group: {
-            _id: {
-              english: "$categoryEnglish",
-              khmer: "$categoryKhmer",
-              chinese: "$categoryChinese"
-            }
-          }
-        },
-        {
-          $project: {
-            _id: 0,
-            english: "$_id.english",
-            khmer: "$_id.khmer",
-            chinese: "$_id.chinese"
-          }
-        },
-        { $match: { english: { $ne: null, $ne: "" } } },
-        { $sort: { english: 1 } }
-      ])
-    ]);
-
-    const nextCode = lastDefect ? lastDefect.code + 1 : 1001;
-
-    res.json({
-      repairs: repairs.filter(Boolean),
-      types: types.filter(Boolean),
-      categories: categoryGroups,
-      nextCode
-    });
-  } catch (error) {
-    console.error("Error fetching defect options:", error);
-    res.status(500).json({ message: "Server error fetching options" });
-  }
-});
-
-// POST - Add a new sewing defect
-app.post("/api/sewing-defects", async (req, res) => {
-  try {
-    const {
-      shortEng,
-      english,
-      khmer,
-      chinese,
-      repair,
-      categoryEnglish,
-      categoryKhmer,
-      categoryChinese,
-      type,
-      isCommon
-    } = req.body;
-
-    if (
-      !shortEng ||
-      !english ||
-      !khmer ||
-      !categoryEnglish ||
-      !repair ||
-      !type
-    ) {
-      return res.status(400).json({
-        message:
-          "Required fields are missing. Please fill out all fields marked with *."
-      });
-    }
-
-    const existingDefect = await SewingDefects.findOne({
-      $or: [{ shortEng }, { english }]
-    });
-    if (existingDefect) {
-      return res.status(409).json({
-        message: `Defect with name '${
-          existingDefect.shortEng === shortEng ? shortEng : english
-        }' already exists.`
-      });
-    }
-
-    const lastDefect = await SewingDefects.findOne().sort({ code: -1 });
-    const newCode = lastDefect ? lastDefect.code + 1 : 1001;
-
-    // *** FIX IS HERE ***
-    // Instead of querying a 'Buyer' model, we use the hardcoded list from your /api/buyers endpoint.
-    const allBuyers = ["Costco", "Aritzia", "Reitmans", "ANF", "MWW"];
-
-    // Now, we map this array of strings to the required object structure.
-    const statusByBuyer = allBuyers.map((buyerName) => ({
-      buyerName: buyerName, // The buyer's name from the array
-      defectStatus: ["Major"],
-      isCommon: "Major"
-    }));
-
-    const newSewingDefect = new SewingDefects({
-      code: newCode,
-      shortEng,
-      english,
-      khmer,
-      chinese: chinese || "",
-      image: "",
-      repair,
-      categoryEnglish,
-      categoryKhmer,
-      categoryChinese,
-      type,
-      isCommon,
-      statusByBuyer,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    });
-
-    await newSewingDefect.save();
-    res.status(201).json({
-      message: "Sewing defect added successfully",
-      defect: newSewingDefect
-    });
-  } catch (error) {
-    console.error("Error adding sewing defect:", error);
-    if (error.code === 11000) {
-      return res.status(409).json({
-        message: "Duplicate entry. Defect code or name might already exist."
-      });
-    }
-    res
-      .status(500)
-      .json({ message: "Failed to add sewing defect", error: error.message });
-  }
-});
-
-// DELETE - Delete a sewing defect by its code (This is the better, more robust version)
-app.delete("/api/sewing-defects/:code", async (req, res) => {
-  try {
-    const { code } = req.params;
-    const defectCode = parseInt(code, 10);
-    if (isNaN(defectCode)) {
-      return res.status(400).json({ message: "Invalid defect code format." });
-    }
-    const deletedDefect = await SewingDefects.findOneAndDelete({
-      code: defectCode
-    });
-    if (!deletedDefect) {
-      return res.status(404).json({ message: "Sewing Defect not found." });
-    }
-    res.status(200).json({ message: "Sewing defect deleted successfully" });
-  } catch (error) {
-    console.error("Error deleting sewing defect:", error);
-    res.status(500).json({
-      message: "Failed to delete sewing defect",
-      error: error.message
-    });
-  }
-});
-
-
-
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   next();
-});
-
-
-
-/* ------------------------------
-   AI Chatbot Proxy Route
------------------------------- */
-
-app.post("/api/ai/ask", async (req, res) => {
-  // Destructure both question and selectedModel from the request body
-  const { question, selectedModel } = req.body;
-
-  if (!question) {
-    return res.status(400).json({ error: "Question is required." });
-  }
-
-  try {
-    // Forward the request to the Python Flask AI service
-    // This URL must match where your Python service is running.
-    const aiServiceResponse = await axios.post("http://localhost:5002/ask", {
-      // Pass both pieces of data to the Python service
-      question: question,
-      selectedModel: selectedModel
-    });
-
-    // Send the response from the AI service back to the React client
-    res.json(aiServiceResponse.data);
-  } catch (error) {
-    console.error("Error proxying request to AI service:", error.message);
-
-    // Provide a user-friendly error message
-    res.status(502).json({
-      answer:
-        "Sorry, I'm having trouble connecting to my brain right now. Please try again later."
-    });
-  }
 });
 
 

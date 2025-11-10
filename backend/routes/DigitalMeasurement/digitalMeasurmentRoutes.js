@@ -8,7 +8,7 @@ import {
   getMeasurementDetailsByMono,
   updateMeasurementValue,
   deleteMeasurementRecord,
-} from '../../controller/DigitalMeasurement/digitalMeasurementCotroller.js';
+} from '../../controller/DigitalMeasurement/DigitalMeasurementCotroller.js';
 
 const router = express.Router();
 
