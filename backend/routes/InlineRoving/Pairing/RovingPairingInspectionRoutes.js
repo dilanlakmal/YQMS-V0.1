@@ -7,8 +7,6 @@ import {
   getRovingPairingData,
   // saveRovingPairingData,
   saveQCRovingPairingData,
-  getDynamicFilterOptions,
-  getRovingPairingReportData,
 } from '../../../controller/InlineRoving/Pairing/RovingPairingInspectionController.js';
 import { uploadRovingImage } from "../../../helpers/helperFunctions.js";
 
@@ -21,7 +19,5 @@ router.delete('/api/roving-pairing/delete-image', deleteImage);
 router.get('/api/roving-pairing/:id', getRovingPairingData);
 // router.post('/api/roving-pairing/save', saveRovingPairingData);
 router.post('/api/save-qc-roving-pairing', saveQCRovingPairingData);
-router.get('/api/roving-pairing/filters',  getDynamicFilterOptions );
-router.get('/api/roving-pairing/report-data',  getRovingPairingReportData );
 
 export default router;

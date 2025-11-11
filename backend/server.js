@@ -1,4 +1,3 @@
-import axios from "axios";
 import { app, server, PORT} from "./Config/appConfig.js";
 /* -----------------------------
 Real Wash Qty Imports
@@ -52,10 +51,11 @@ import rovingDefectBuyerstatus from "./routes/InlineRoving/Roving/RovingAdminDef
 import rovingReports from "./routes/InlineRoving/Roving/RovingReportRoutes.js";
 
 /*-------------Paring Imports --------------*/
+import pairingReport from "./routes/InlineRoving/Pairing/PairingReportsRoutes.js";
 import pairingDefects from "./routes/InlineRoving/Pairing/ParingDefectRoutes.js";
 import rovingPairingInspection from "./routes/InlineRoving/Pairing/RovingPairingInspectionRoutes.js";
 import pairingAccessoryIssue from "./routes/InlineRoving/Pairing/PairingAccessoryIssueRoutes.js";
-import pairingReport from "./routes/InlineRoving/Pairing/PairingReportsRoutes.js";
+
 
 /* -----------------------------
 ANF Imports
@@ -260,10 +260,11 @@ app.use(QCInlineWorker);
 app.use(rovingDefectBuyerstatus);
 app.use(rovingReports);
 /* -----------Pairing-----------------*/
+app.use(pairingReport);
 app.use(pairingDefects);
 app.use(rovingPairingInspection);
 app.use(pairingAccessoryIssue);
-app.use(pairingReport);
+
 /* -----------------------------
 Cutting Dashboard Routes
 ------------------------------ */
@@ -424,14 +425,11 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
 
-
-
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   next();
 });
-
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
