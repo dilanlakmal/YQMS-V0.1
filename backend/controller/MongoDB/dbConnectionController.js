@@ -74,6 +74,11 @@ import createIEWorkerTaskModel from "../../models/IEWorkerTask.js";
 import CuttingInlineOrdersModel from "../../models/Cutting/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 import createYorksysOrdersModel from "../../models/YorkSys/YorksysOrders.js";
+import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
+import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
+import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
+import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
+import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 
 
 //MongoDB Connections
@@ -172,6 +177,11 @@ export const SubconSewingQc1Report = createSubconSewingQc1ReportModel(ymProdConn
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
+export const QASectionsHome = createQASectionsHomeModel(ymProdConnection);
+export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
+export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
+export const QASectionsDefectCategory = createQASectionsDefectCategoryModel(ymProdConnection);
+export const QASectionsDefectList = createQASectionsDefectListModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

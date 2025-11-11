@@ -28,7 +28,7 @@ import {
   XAxis,
   YAxis
 } from "recharts";
-import { API_BASE_URL } from "../../../../../config";
+import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 import { useAuth } from "../../../authentication/AuthContext";
 import { useTheme } from "../../../context/ThemeContext";
 
@@ -154,10 +154,16 @@ const QAUserModal = ({ user, isLoading, onClose }) => {
 
 // --- NEW: Copied QAImageModal from Report Component ---
 const QAImageModal = ({ data, onClose }) => {
+  // data is the qaReport object
   if (!data) return null;
-  const defectsWithImages = data.defectList.filter(
-    (d) => d.images && d.images.length > 0
-  );
+
+  // MODIFICATION: Flatten the defects from the nested qcData structure
+  const defectsWithImages = data.qcData
+    ? data.qcData
+        .flatMap((qc) => qc.defectList) // Get all defects into one array
+        .filter((d) => d.images && d.images.length > 0)
+    : [];
+
   return (
     <div
       className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[100]"
@@ -170,7 +176,8 @@ const QAImageModal = ({ data, onClose }) => {
         <div className="flex justify-between items-center border-b pb-3 mb-4">
           <h2 className="text-xl font-bold">Defect Images</h2>
           <button onClick={onClose}>
-            <X size={24} />
+            {" "}
+            <X size={24} />{" "}
           </button>
         </div>
         <div className="space-y-4">
@@ -180,17 +187,18 @@ const QAImageModal = ({ data, onClose }) => {
                 <h4 className="font-bold text-lg text-indigo-600">
                   {defect.defectName}
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-2">
+                {/* 👇 MODIFIED: Change grid-cols-2 sm:grid-cols-3 md:grid-cols-4 to just grid-cols-2 */}
+                <div className="grid grid-cols-2 gap-4 mt-2">
                   {defect.images.map((img, idx) => (
                     <a
                       key={idx}
-                      href={`${API_BASE_URL}${img}`}
+                      href={`${PUBLIC_ASSET_URL}${img}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block overflow-hidden rounded-md shadow-lg group"
                     >
                       <img
-                        src={`${API_BASE_URL}${img}`}
+                        src={`${PUBLIC_ASSET_URL}${img}`}
                         alt={`Defect ${idx + 1}`}
                         className="w-full h-40 object-cover group-hover:scale-105 transition-transform"
                       />
@@ -861,13 +869,35 @@ const SubConQCDashboardDailyView = () => {
                         : 0;
                     const colorClass = getRateColorClass(defectRateOverall);
                     const qaReport = report.qaReport;
+                    // Use the correct fields from the QA schema
                     const qaDefectRate =
-                      qaReport && qaReport.checkedQty > 0
-                        ? (qaReport.totalDefectQty / qaReport.checkedQty) * 100
+                      qaReport && qaReport.totalCheckedQty > 0
+                        ? (qaReport.totalOverallDefectQty /
+                            qaReport.totalCheckedQty) *
+                          100
                         : 0;
-                    const hasImages = qaReport?.defectList?.some(
-                      (d) => d.images && d.images.length > 0
+
+                    // Check for images inside the nested qcData array
+                    const hasImages = qaReport?.qcData?.some((qc) =>
+                      qc.defectList.some((d) => d.images && d.images.length > 0)
                     );
+
+                    // Aggregate QA defects for a clean display
+                    const aggregatedQADefects = qaReport?.qcData
+                      ? qaReport.qcData
+                          .flatMap((qc) => qc.defectList)
+                          .reduce((acc, defect) => {
+                            const existing = acc.find(
+                              (d) => d.defectName === defect.defectName
+                            );
+                            if (existing) {
+                              existing.qty += defect.qty;
+                            } else {
+                              acc.push({ ...defect });
+                            }
+                            return acc;
+                          }, [])
+                      : [];
 
                     return (
                       <tr key={report._id}>
@@ -909,6 +939,7 @@ const SubConQCDashboardDailyView = () => {
                             ))}
                         </td>
 
+                        {/* QA ID */}
                         <td className="px-3 py-2 text-center">
                           {qaReport?.preparedBy?.empId && (
                             <button
@@ -921,12 +952,20 @@ const SubConQCDashboardDailyView = () => {
                             </button>
                           )}
                         </td>
+
+                        {/* QA Sample */}
                         <td className="px-3 py-2 text-center">
-                          {qaReport?.checkedQty || ""}
+                          {/* Use totalCheckedQty from qaReport */}
+                          {qaReport?.totalCheckedQty || ""}
                         </td>
+
+                        {/* QA Defects */}
                         <td className="px-3 py-2 text-center">
-                          {qaReport?.totalDefectQty || ""}
+                          {/* Use totalOverallDefectQty from qaReport */}
+                          {qaReport?.totalOverallDefectQty || ""}
                         </td>
+
+                        {/* QA Rate */}
                         <td
                           className={`px-3 py-2 text-center font-semibold ${getQARateColorClass(
                             qaDefectRate
@@ -934,6 +973,8 @@ const SubConQCDashboardDailyView = () => {
                         >
                           {qaReport ? `${qaDefectRate.toFixed(2)}%` : ""}
                         </td>
+
+                        {/* Images */}
                         <td className="px-3 py-2 text-center">
                           <button
                             onClick={() => handleShowImages(qaReport)}
@@ -950,23 +991,24 @@ const SubConQCDashboardDailyView = () => {
                             />
                           </button>
                         </td>
+
+                        {/* QA Defect Details */}
                         <td
                           className={`px-3 py-2 text-xs border-r-2 dark:border-gray-600 whitespace-normal ${getQARateColorClass(
                             qaDefectRate
                           )}`}
                         >
-                          {qaReport?.defectList &&
-                          qaReport.defectList.length > 0
-                            ? qaReport.defectList
-                                .sort((a, b) => b.qty - a.qty) // 1. Sort by highest qty first
+                          {aggregatedQADefects.length > 0
+                            ? aggregatedQADefects
+                                .sort((a, b) => b.qty - a.qty)
                                 .map((defect) => {
-                                  // 2. Calculate rate for each specific defect
                                   const defectSpecificRate =
-                                    qaReport.checkedQty > 0
-                                      ? (defect.qty / qaReport.checkedQty) * 100
+                                    qaReport.totalCheckedQty > 0
+                                      ? (defect.qty /
+                                          qaReport.totalCheckedQty) *
+                                        100
                                       : 0;
                                   return (
-                                    // 3. Render each defect in its own div
                                     <div key={defect.defectCode}>
                                       {defect.defectName} -{" "}
                                       <strong>{defect.qty}</strong> (

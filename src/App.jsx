@@ -52,6 +52,7 @@ import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurem
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
 import PackingList from "./pages/PackingList.jsx";
+import Measurement from "./pages/measurement.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -82,6 +83,8 @@ import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
 import Measurement from "./pages/measurement.jsx";
 
+
+import YPivotQASections from "./pages/YPivotQASections.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -466,6 +469,7 @@ function AppContent() {
               />
               <Route path="/packing-list" element={<PackingList />} />
               <Route path="/measurement" element={<Measurement />} />
+              <Route path="/qa-sections" element={<YPivotQASections />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

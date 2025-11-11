@@ -189,6 +189,16 @@ import qc2Rework from "./routes/QC2System/QC2Inspection/QC2ReworkRoutes.js";
   AI Import
 ------------------------------ */
 import AIChatBot from "./routes/AI/AIChatBotRoutes.js";
+
+/* ------------------------------
+  PivotY - QA Sections
+------------------------------ */
+
+import QASections_Home from "./routes/PivotY/QASections/QASections_Home_Route.js";
+import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Route.js";
+import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
+import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
+import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -404,6 +414,15 @@ app.use(qc2BGrade);
 app.use(qc2RepairTracking);
 app.use(qc2DefectPrint);
 app.use(qc2Rework);
+
+/* ------------------------------
+  PivotY - QA Sections routes
+------------------------------ */
+app.use(QASections_Home);
+app.use(QASections_Photos);
+app.use(QASections_Packing);
+app.use(QASections_DefectList);
+app.use(QASections_DefectCategory);
 
 /* -----------------------------
 AI Routes

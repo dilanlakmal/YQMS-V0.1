@@ -718,11 +718,6 @@ const syncQC1SunriseData = async () => {
     });
     console.log(`Prepared ${documents.length} documents for MongoDB`);
 
-    // Log a sample document
-    // if (documents.length > 0) {
-    //   console.log("Sample Document:", documents[0]);
-    // }
-
     // Fetch existing documents from MongoDB for comparison (only for the last 7 days)
     const existingDocs = await QC1Sunrise.find({
       inspectionDate: {
@@ -840,7 +835,7 @@ cron.schedule("0 0 * * *", async () => {
 ------------------------------ */
 
 async function syncInlineOrders() {
-  // MODIFICATION: Add connection status check
+  //MODIFICATION: Add connection status check
   if (!sqlConnectionStatus.YMCE_SYSTEM) {
     console.warn(
       "Skipping syncInlineOrders: YMCE_SYSTEM database is not connected."
@@ -987,13 +982,6 @@ export const getInlineOrdersSync = async (req, res) => {
 cron.schedule("0 11 * * *", async () => {
   console.log("Running scheduled inline_orders sync at 11 AM...");
   await syncInlineOrders();
-});
-
-// Run the sync immediately on server start (optional, for testing)
-syncInlineOrders().then(() => {
-  console.log(
-    "Initial inline_orders sync completed. Scheduler is now running..."
-  );
 });
 
 // New Endpoint for YMCE_SYSTEM Data
@@ -1542,68 +1530,146 @@ async function syncDTOrdersData() {
     // 2. Fetch Size Names for each order (FIXED query)
     // console.log("📏 Fetching size names for each order...");
     const sizeNamesQuery = `
-      SELECT DISTINCT
+    -- =================================================================
+    -- Query 1: Handle the special hard-coded case for a single Order_No
+    -- =================================================================
+    SELECT DISTINCT
         [Order_No],
-        CASE WHEN [Size_Seq10] IS NOT NULL AND [Size_Seq10] != '' THEN [Size_Seq10] END as Size_10_Name,
-        CASE WHEN [Size_Seq20] IS NOT NULL AND [Size_Seq20] != '' THEN [Size_Seq20] END as Size_20_Name,
-        CASE WHEN [Size_Seq30] IS NOT NULL AND [Size_Seq30] != '' THEN [Size_Seq30] END as Size_30_Name,
-        CASE WHEN [Size_Seq40] IS NOT NULL AND [Size_Seq40] != '' THEN [Size_Seq40] END as Size_40_Name,
-        CASE WHEN [Size_Seq50] IS NOT NULL AND [Size_Seq50] != '' THEN [Size_Seq50] END as Size_50_Name,
-        CASE WHEN [Size_Seq60] IS NOT NULL AND [Size_Seq60] != '' THEN [Size_Seq60] END as Size_60_Name,
-        CASE WHEN [Size_Seq70] IS NOT NULL AND [Size_Seq70] != '' THEN [Size_Seq70] END as Size_70_Name,
-        CASE WHEN [Size_Seq80] IS NOT NULL AND [Size_Seq80] != '' THEN [Size_Seq80] END as Size_80_Name,
-        CASE WHEN [Size_Seq90] IS NOT NULL AND [Size_Seq90] != '' THEN [Size_Seq90] END as Size_90_Name,
-        CASE WHEN [Size_Seq100] IS NOT NULL AND [Size_Seq100] != '' THEN [Size_Seq100] END as Size_100_Name,
-        CASE WHEN [Size_Seq110] IS NOT NULL AND [Size_Seq110] != '' THEN [Size_Seq110] END as Size_110_Name,
-        CASE WHEN [Size_Seq120] IS NOT NULL AND [Size_Seq120] != '' THEN [Size_Seq120] END as Size_120_Name,
-        CASE WHEN [Size_Seq130] IS NOT NULL AND [Size_Seq130] != '' THEN [Size_Seq130] END as Size_130_Name,
-        CASE WHEN [Size_Seq140] IS NOT NULL AND [Size_Seq140] != '' THEN [Size_Seq140] END as Size_140_Name,
-        CASE WHEN [Size_Seq150] IS NOT NULL AND [Size_Seq150] != '' THEN [Size_Seq150] END as Size_150_Name,
-        CASE WHEN [Size_Seq160] IS NOT NULL AND [Size_Seq160] != '' THEN [Size_Seq160] END as Size_160_Name,
-        CASE WHEN [Size_Seq170] IS NOT NULL AND [Size_Seq170] != '' THEN [Size_Seq170] END as Size_170_Name,
-        CASE WHEN [Size_Seq180] IS NOT NULL AND [Size_Seq180] != '' THEN [Size_Seq180] END as Size_180_Name,
-        CASE WHEN [Size_Seq190] IS NOT NULL AND [Size_Seq190] != '' THEN [Size_Seq190] END as Size_190_Name,
-        CASE WHEN [Size_Seq200] IS NOT NULL AND [Size_Seq200] != '' THEN [Size_Seq200] END as Size_200_Name,
-        CASE WHEN [Size_Seq210] IS NOT NULL AND [Size_Seq210] != '' THEN [Size_Seq210] END as Size_210_Name,
-        CASE WHEN [Size_Seq220] IS NOT NULL AND [Size_Seq220] != '' THEN [Size_Seq220] END as Size_220_Name,
-        CASE WHEN [Size_Seq230] IS NOT NULL AND [Size_Seq230] != '' THEN [Size_Seq230] END as Size_230_Name,
-        CASE WHEN [Size_Seq240] IS NOT NULL AND [Size_Seq240] != '' THEN [Size_Seq240] END as Size_240_Name,
-        CASE WHEN [Size_Seq250] IS NOT NULL AND [Size_Seq250] != '' THEN [Size_Seq250] END as Size_250_Name,
-        CASE WHEN [Size_Seq260] IS NOT NULL AND [Size_Seq260] != '' THEN [Size_Seq260] END as Size_260_Name,
-        CASE WHEN [Size_Seq270] IS NOT NULL AND [Size_Seq270] != '' THEN [Size_Seq270] END as Size_270_Name,
-        CASE WHEN [Size_Seq280] IS NOT NULL AND [Size_Seq280] != '' THEN [Size_Seq280] END as Size_280_Name,
-        CASE WHEN [Size_Seq290] IS NOT NULL AND [Size_Seq290] != '' THEN [Size_Seq290] END as Size_290_Name,
-        CASE WHEN [Size_Seq300] IS NOT NULL AND [Size_Seq300] != '' THEN [Size_Seq300] END as Size_300_Name,
-        CASE WHEN [Size_Seq310] IS NOT NULL AND [Size_Seq310] != '' THEN [Size_Seq310] END as Size_310_Name,
-        CASE WHEN [Size_Seq320] IS NOT NULL AND [Size_Seq320] != '' THEN [Size_Seq320] END as Size_320_Name,
-        CASE WHEN [Size_Seq330] IS NOT NULL AND [Size_Seq330] != '' THEN [Size_Seq330] END as Size_330_Name,
-        CASE WHEN [Size_Seq340] IS NOT NULL AND [Size_Seq340] != '' THEN [Size_Seq340] END as Size_340_Name,
-        CASE WHEN [Size_Seq350] IS NOT NULL AND [Size_Seq350] != '' THEN [Size_Seq350] END as Size_350_Name,
-        CASE WHEN [Size_Seq360] IS NOT NULL AND [Size_Seq360] != '' THEN [Size_Seq360] END as Size_360_Name,
-        CASE WHEN [Size_Seq370] IS NOT NULL AND [Size_Seq370] != '' THEN [Size_Seq370] END as Size_370_Name,
-        CASE WHEN [Size_Seq380] IS NOT NULL AND [Size_Seq380] != '' THEN [Size_Seq380] END as Size_380_Name,
-        CASE WHEN [Size_Seq390] IS NOT NULL AND [Size_Seq390] != '' THEN [Size_Seq390] END as Size_390_Name,
-        CASE WHEN [Size_Seq400] IS NOT NULL AND [Size_Seq400] != '' THEN [Size_Seq400] END as Size_400_Name
-      FROM [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
-      WHERE [Order_No] IS NOT NULL
-    `;
+        '2XS'    AS Size_10_Name,
+        'XS'     AS Size_20_Name,
+        'S'      AS Size_30_Name,
+        'M'      AS Size_40_Name,
+        'L'      AS Size_50_Name,
+        'XL'     AS Size_60_Name,
+        'XXL'    AS Size_70_Name,
+        'XXXL'   AS Size_80_Name,
+        -- For the remaining sizes, they are NULL for this specific order
+        NULL AS Size_90_Name,   NULL AS Size_100_Name,  NULL AS Size_110_Name,  NULL AS Size_120_Name,
+        NULL AS Size_130_Name,  NULL AS Size_140_Name,  NULL AS Size_150_Name,  NULL AS Size_160_Name,
+        NULL AS Size_170_Name,  NULL AS Size_180_Name,  NULL AS Size_190_Name,  NULL AS Size_200_Name,
+        NULL AS Size_210_Name,  NULL AS Size_220_Name,  NULL AS Size_230_Name,  NULL AS Size_240_Name,
+        NULL AS Size_250_Name,  NULL AS Size_260_Name,  NULL AS Size_270_Name,  NULL AS Size_280_Name,
+        NULL AS Size_290_Name,  NULL AS Size_300_Name,  NULL AS Size_310_Name,  NULL AS Size_320_Name,
+        NULL AS Size_330_Name,  NULL AS Size_340_Name,  NULL AS Size_350_Name,  NULL AS Size_360_Name,
+        NULL AS Size_370_Name,  NULL AS Size_380_Name,  NULL AS Size_390_Name,  NULL AS Size_400_Name
+    FROM 
+        [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+    WHERE 
+        [Order_No] = 'GPAF6117'
+
+    UNION ALL
+
+    -- =================================================================
+    -- Query 2: Handle all other orders using the original logic
+    -- =================================================================
+    SELECT DISTINCT
+        [Order_No],
+        NULLIF([Size_Seq10], '') AS Size_10_Name,
+        NULLIF([Size_Seq20], '') AS Size_20_Name,
+        NULLIF([Size_Seq30], '') AS Size_30_Name,
+        NULLIF([Size_Seq40], '') AS Size_40_Name,
+        NULLIF([Size_Seq50], '') AS Size_50_Name,
+        NULLIF([Size_Seq60], '') AS Size_60_Name,
+        NULLIF([Size_Seq70], '') AS Size_70_Name,
+        NULLIF([Size_Seq80], '') AS Size_80_Name,
+        NULLIF([Size_Seq90], '') AS Size_90_Name,
+        NULLIF([Size_Seq100], '') AS Size_100_Name,
+        NULLIF([Size_Seq110], '') AS Size_110_Name,
+        NULLIF([Size_Seq120], '') AS Size_120_Name,
+        NULLIF([Size_Seq130], '') AS Size_130_Name,
+        NULLIF([Size_Seq140], '') AS Size_140_Name,
+        NULLIF([Size_Seq150], '') AS Size_150_Name,
+        NULLIF([Size_Seq160], '') AS Size_160_Name,
+        NULLIF([Size_Seq170], '') AS Size_170_Name,
+        NULLIF([Size_Seq180], '') AS Size_180_Name,
+        NULLIF([Size_Seq190], '') AS Size_190_Name,
+        NULLIF([Size_Seq200], '') AS Size_200_Name,
+        NULLIF([Size_Seq210], '') AS Size_210_Name,
+        NULLIF([Size_Seq220], '') AS Size_220_Name,
+        NULLIF([Size_Seq230], '') AS Size_230_Name,
+        NULLIF([Size_Seq240], '') AS Size_240_Name,
+        NULLIF([Size_Seq250], '') AS Size_250_Name,
+        NULLIF([Size_Seq260], '') AS Size_260_Name,
+        NULLIF([Size_Seq270], '') AS Size_270_Name,
+        NULLIF([Size_Seq280], '') AS Size_280_Name,
+        NULLIF([Size_Seq290], '') AS Size_290_Name,
+        NULLIF([Size_Seq300], '') AS Size_300_Name,
+        NULLIF([Size_Seq310], '') AS Size_310_Name,
+        NULLIF([Size_Seq320], '') AS Size_320_Name,
+        NULLIF([Size_Seq330], '') AS Size_330_Name,
+        NULLIF([Size_Seq340], '') AS Size_340_Name,
+        NULLIF([Size_Seq350], '') AS Size_350_Name,
+        NULLIF([Size_Seq360], '') AS Size_360_Name,
+        NULLIF([Size_Seq370], '') AS Size_370_Name,
+        NULLIF([Size_Seq380], '') AS Size_380_Name,
+        NULLIF([Size_Seq390], '') AS Size_390_Name,
+        NULLIF([Size_Seq400], '') AS Size_400_Name
+    FROM 
+        [DTrade_CONN].[dbo].[vCustOrd_SzHdr]
+    WHERE 
+        [Order_No] <> 'GPAF6117'
+        AND [Order_No] IS NOT NULL;
+        `;
     const sizeNamesResult = await request.query(sizeNamesQuery);
 
     // 3. Fetch Order Colors and Shipping WITH Ship_ID
     // console.log("🎨 Fetching order colors and shipping data with Ship_ID...");
     const orderColorsQuery = `
+    -- ========================================================================================
+    -- Query 1: Handles ONLY the special case for Order_No = 'GPAF6117' by shifting the data
+    -- ========================================================================================
       SELECT 
-        [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
-        [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
-        [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
-        [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
-        [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
-        [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
-        [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
-        [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
-        [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400]
-      FROM [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
-      ORDER BY [Order_No], [ColorCode], [ship_seq_no]
+          -- Standard columns are selected as-is
+          [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
+          [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
+          
+          -- Here is the special data shifting logic
+          0 AS [Size_Seq10],              -- Becomes 0 as requested
+          [Size_Seq10] AS [Size_Seq20],   -- Original Seq10 value is now in Seq20
+          [Size_Seq20] AS [Size_Seq30],   -- Original Seq20 value is now in Seq30
+          [Size_Seq30] AS [Size_Seq40],   -- etc.
+          [Size_Seq40] AS [Size_Seq50],
+          [Size_Seq50] AS [Size_Seq60],
+          [Size_Seq60] AS [Size_Seq70],
+          0 AS [Size_Seq80],              -- Becomes 0/empty as requested
+          
+          -- All subsequent size columns are also set to 0
+          0 AS [Size_Seq90],   0 AS [Size_Seq100],  0 AS [Size_Seq110],  0 AS [Size_Seq120],
+          0 AS [Size_Seq130],  0 AS [Size_Seq140],  0 AS [Size_Seq150],  0 AS [Size_Seq160],
+          0 AS [Size_Seq170],  0 AS [Size_Seq180],  0 AS [Size_Seq190],  0 AS [Size_Seq200],
+          0 AS [Size_Seq210],  0 AS [Size_Seq220],  0 AS [Size_Seq230],  0 AS [Size_Seq240],
+          0 AS [Size_Seq250],  0 AS [Size_Seq260],  0 AS [Size_Seq270],  0 AS [Size_Seq280],
+          0 AS [Size_Seq290],  0 AS [Size_Seq300],  0 AS [Size_Seq310],  0 AS [Size_Seq320],
+          0 AS [Size_Seq330],  0 AS [Size_Seq340],  0 AS [Size_Seq350],  0 AS [Size_Seq360],
+          0 AS [Size_Seq370],  0 AS [Size_Seq380],  0 AS [Size_Seq390],  0 AS [Size_Seq400] 
+      FROM 
+          [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
+      WHERE 
+          [Order_No] = 'GPAF6117'
+
+      UNION ALL
+
+      -- =================================================================
+      -- Query 2: Handles all other orders, selecting data without changes
+      -- =================================================================
+      SELECT 
+          [Order_No], [ColorCode], [Color], [ChnColor], [Color_Seq], [ship_seq_no],
+          [Ship_ID], [Mode], [Country], [Origin], [CustPORef],
+          [Size_Seq10], [Size_Seq20], [Size_Seq30], [Size_Seq40], [Size_Seq50], [Size_Seq60],
+          [Size_Seq70], [Size_Seq80], [Size_Seq90], [Size_Seq100], [Size_Seq110], [Size_Seq120],
+          [Size_Seq130], [Size_Seq140], [Size_Seq150], [Size_Seq160], [Size_Seq170], [Size_Seq180],
+          [Size_Seq190], [Size_Seq200], [Size_Seq210], [Size_Seq220], [Size_Seq230], [Size_Seq240],
+          [Size_Seq250], [Size_Seq260], [Size_Seq270], [Size_Seq280], [Size_Seq290], [Size_Seq300],
+          [Size_Seq310], [Size_Seq320], [Size_Seq330], [Size_Seq340], [Size_Seq350], [Size_Seq360],
+          [Size_Seq370], [Size_Seq380], [Size_Seq390], [Size_Seq400] 
+      FROM 
+          [DTrade_CONN].[dbo].[vBuyerPOColQty_BySz]
+      WHERE 
+          [Order_No] <> 'GPAF6117'
+
+      -- The final ORDER BY is applied to the combined results of both queries
+      ORDER BY 
+          [Order_No], [ColorCode], [ship_seq_no];
     `;
     const orderColorsResult = await request.query(orderColorsQuery);
 
@@ -1704,13 +1770,43 @@ async function syncDTOrdersData() {
       ];
       allSizeColumns.forEach(seq => {
         const columnName = `${prefix}${seq}`;
-        if (record[columnName] && record[columnName] !== null && record[columnName] !== 0) {
-          // Use the actual size name from database mapping
-          const sizeName = sizeMapping[seq] || `Size${seq}`;
-          sizeObject[sizeName] = Number(record[columnName]);
+        const quantity = record[columnName];
+
+        // STEP 1: First, check if the column has any value at all (not null/undefined)
+        if (quantity === null || quantity === undefined) {
+          return; // Skip this size entirely if it's null or undefined
+        }
+
+        // STEP 2: Now, handle the zero-quantity logic
+        if (quantity === 0) {
+          // If the quantity is 0, we ONLY include it for our special order number
+          if (orderNo !== "GPAF6117") {
+            return; // For any other order, skip sizes with 0 quantity
+          }
+        }
+
+        // If we've reached this point, the size is valid and should be included.
+        const sizeName = sizeMapping[seq] || `Size${seq}`;
+
+        // An extra check to make sure we have a valid size name before adding it
+        if (sizeName) {
+          sizeObject[sizeName] = Number(quantity);
         }
       });
       return sizeObject;
+
+      //   const columnName = `${prefix}${seq}`;
+      //   if (
+      //     record[columnName] &&
+      //     record[columnName] !== null &&
+      //     (orderNo === "GPAF6117" || record[columnName] !== 0)
+      //   ) {
+      //     // Use the actual size name from database mapping
+      //     const sizeName = sizeMapping[seq] || `Size${seq}`;
+      //     sizeObject[sizeName] = Number(record[columnName]);
+      //   }
+      // });
+      // return sizeObject;
     }
 
     function convertSizeObjectToArray(sizeObject, orderNo) {

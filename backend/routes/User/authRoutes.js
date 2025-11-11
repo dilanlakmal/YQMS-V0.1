@@ -85,7 +85,6 @@ const upload = multer({
   }
 }).single("profile");
 
-
 const router = express.Router();
 
 // Public routes
@@ -99,4 +98,3 @@ router.put("/api/user-profile", authenticateUser, upload, updateUserProfile);
 router.get("/api/user-profile", authenticateUser, getUserProfile);
 
 export default router;
-

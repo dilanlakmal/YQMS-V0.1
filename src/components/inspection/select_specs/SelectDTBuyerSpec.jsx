@@ -66,7 +66,28 @@ const SelectDTBuyerSpec = () => {
             `${API_BASE_URL}/api/buyer-spec-order-details/${moNo.value}`,
             { withCredentials: true }
           );
-          const sortedSpec = response.data.buyerSpec.sort(
+          let fetchedData = response.data;
+
+          // -------------------------------------------------------------------------------------------
+          // Special handling for GPAF6117 to ensure zero-quantity sizes are displayed in the preview.
+          if (moNo.value === "GPAF6117") {
+            // Define the complete and correctly ordered list of sizes for this style.
+            const correctSizes = [
+              "2XS",
+              "XS",
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL",
+              "XXXL"
+            ];
+
+            // Overwrite the sizes array from the API response.
+            fetchedData.sizes = correctSizes;
+          }
+          // -------------------------------------------------------------------------------------------
+          const sortedSpec = fetchedData.buyerSpec.sort(
             (a, b) => a.seq - b.seq
           );
           setOrderData({ ...response.data, buyerSpec: sortedSpec });

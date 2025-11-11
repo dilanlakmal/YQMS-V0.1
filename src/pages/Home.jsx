@@ -170,7 +170,7 @@ function Home() {
           {
             path: "/scc",
             roles: ["SCC"],
-            image: "assets/Home/bundle.avif",
+            image: "assets/Home/SCCLogo.jpg",
             title: t("SCC"),
             description: "Spreading & Cutting",
              version: '0.1',
@@ -190,6 +190,13 @@ function Home() {
             title: t("home.Measurement"),
             description: "All Style measurements",
              version: '0.1',
+          },
+          {
+            path: "/measurement",
+            roles: ["QC Washing"],
+            image: "assets/Home/measurement.png",
+            title: t("home.Measurement"),
+            description: "All Style measurements"
           },
           {
             path: "/upload-beforewash-specs",
@@ -274,6 +281,35 @@ function Home() {
         ]
       },
       {
+        id: "y-pivot",
+        title: "Pivot Y",
+        icon: <Layers className="w-5 h-5 mr-2" />,
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        items: [
+          {
+            path: "/qa-sections",
+            pageId: "qa-sections",
+            image: "assets/Home/qasections.png",
+            title: t("home.qa_sections"),
+            description: "QA Inspection Sections"
+          },
+          {
+            path: "/qa-templates",
+            pageId: "qa-templates",
+            image: "assets/Home/qatemplates.png",
+            title: t("home.qa_templates"),
+            description: "QA Inspection Templates"
+          },
+          {
+            path: "/y-pivot-inspection",
+            pageId: "y-pivot-inspection",
+            image: "assets/Home/yPivotInspection.png",
+            title: t("home.y_pivot_inspection"),
+            description: "Pivot Y Inspections"
+          }
+        ]
+      },
+      {
         id: "qa-inspection",
         title: "QA Inspection",
         icon: <Shield className="w-5 h-5 mr-2" />,
@@ -314,7 +350,7 @@ function Home() {
           {
             path: "/qc-accuracy-ver2",
             roles: ["QA"],
-            image: "assets/Home/qc-accuracy.png",
+            image: "assets/Home/qcOutput.png",
             title: "QC Output",
             description: "QC Output | Sunrise & Old Barcode System",
              version: '0.1',
