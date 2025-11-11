@@ -520,6 +520,13 @@ function Home() {
             description: "Washing Report"
           },
           {
+            path: "/measurement",
+            roles: ["QC Washing"],
+            image: "assets/Home/measurement.png",
+            title: t("home.Measurement"),
+            description: "All Style measurements"
+          },
+          {
             path: "/upload-beforewash-specs",
             roles: ["Washing Clerk"],
             image: "assets/Home/uploadspecs.png",
@@ -591,6 +598,35 @@ function Home() {
             description: "Sewing Worker QR Code"
           }
         ]
+      },
+            {
+        id: "y-pivot",
+        title: "Pivot Y",
+        icon: <Layers className="w-5 h-5 mr-2" />,
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        items: [
+          {
+            path: "/qa-sections",
+            pageId: "qa-sections",
+            image: "assets/Home/qasections.png",
+            title: t("home.qa_sections"),
+            description: "QA Inspection Sections",
+          },
+          {
+            path: "/qa-templates",
+            pageId: "qa-templates",
+            image: "assets/Home/qatemplates.png",
+            title: t("home.qa_templates"),
+            description: "QA Inspection Templates",
+          },
+          {
+            path: "/y-pivot-inspection",
+            pageId: "y-pivot-inspection",
+            image: "assets/Home/yPivotInspection.png",
+            title: t("home.y_pivot_inspection"),
+            description: "Pivot Y Inspections",
+          },
+        ],
       },
       {
         id: "qa-inspection",

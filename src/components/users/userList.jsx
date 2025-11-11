@@ -30,7 +30,7 @@ const UserList = () => {
 
   const fetchUsers = async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/users-main`);
+      const response = await axios.get(`${API_BASE_URL}/api/users`);
       setUsers(response.data);
       setFilteredUsers(response.data);
       setError(null); // Clear any previous errors

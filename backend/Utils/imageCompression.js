@@ -1,6 +1,6 @@
-import sharp from "sharp";
-import path from "path";
-import fs from "fs";
+import sharp from 'sharp';
+import path from 'path';
+import fs from 'fs';
 
 /**
  * Compress and resize image
@@ -9,29 +9,34 @@ import fs from "fs";
  * @returns {Buffer} - Compressed image buffer
  */
 export const compressImage = async (imageBuffer, options = {}) => {
-  const { width = 800, height = 600, quality = 80, format = "jpeg" } = options;
+  const {
+    width = 800,
+    height = 600,
+    quality = 80,
+    format = 'jpeg'
+  } = options;
 
   try {
     let sharpInstance = sharp(imageBuffer);
 
     // Resize image while maintaining aspect ratio
     sharpInstance = sharpInstance.resize(width, height, {
-      fit: "inside",
+      fit: 'inside',
       withoutEnlargement: true
     });
 
     // Apply compression based on format
-    if (format === "jpeg") {
+    if (format === 'jpeg') {
       sharpInstance = sharpInstance.jpeg({ quality });
-    } else if (format === "png") {
+    } else if (format === 'png') {
       sharpInstance = sharpInstance.png({ quality });
-    } else if (format === "webp") {
+    } else if (format === 'webp') {
       sharpInstance = sharpInstance.webp({ quality });
     }
 
     return await sharpInstance.toBuffer();
   } catch (error) {
-    console.error("Error compressing image:", error);
+    console.error('Error compressing image:', error);
     throw error;
   }
 };
@@ -46,28 +51,21 @@ export const compressImage = async (imageBuffer, options = {}) => {
 export const saveCompressedImage = async (imageBuffer, filename, subfolder) => {
   try {
     // Create directory structure: public/storage/roving/{subfolder}/
-    const baseDir = path.join(
-      process.cwd(),
-      "backend",
-      "public",
-      "storage",
-      "roving",
-      subfolder
-    );
-
+    const baseDir = path.join(process.cwd(), 'backend', 'public', 'storage', 'roving', subfolder);
+    
     // Ensure directory exists
     if (!fs.existsSync(baseDir)) {
       fs.mkdirSync(baseDir, { recursive: true });
     }
 
     const filePath = path.join(baseDir, filename);
-
+    
     // Compress image before saving
     const compressedBuffer = await compressImage(imageBuffer, {
       width: 800,
       height: 600,
       quality: 85,
-      format: "jpeg"
+      format: 'jpeg'
     });
 
     // Save to disk
@@ -76,7 +74,7 @@ export const saveCompressedImage = async (imageBuffer, filename, subfolder) => {
     // Return relative path for database storage
     return `/storage/roving/${subfolder}/${filename}`;
   } catch (error) {
-    console.error("Error saving compressed image:", error);
+    console.error('Error saving compressed image:', error);
     throw error;
   }
 };
@@ -87,10 +85,10 @@ export const saveCompressedImage = async (imageBuffer, filename, subfolder) => {
  * @param {string} prefix - Prefix for filename
  * @returns {string} - Unique filename
  */
-export const generateUniqueFilename = (originalName, prefix = "img") => {
+export const generateUniqueFilename = (originalName, prefix = 'img') => {
   const timestamp = Date.now();
   const random = Math.round(Math.random() * 1e9);
-  const extension = path.extname(originalName) || ".jpg";
+  const extension = path.extname(originalName) || '.jpg';
   return `${prefix}-${timestamp}-${random}${extension}`;
 };
 
@@ -100,13 +98,13 @@ export const generateUniqueFilename = (originalName, prefix = "img") => {
  */
 export const deleteImage = (imagePath) => {
   try {
-    if (imagePath && imagePath.startsWith("/storage/")) {
-      const fullPath = path.join(process.cwd(), "backend", "public", imagePath);
+    if (imagePath && imagePath.startsWith('/storage/')) {
+      const fullPath = path.join(process.cwd(), 'backend', 'public', imagePath);
       if (fs.existsSync(fullPath)) {
         fs.unlinkSync(fullPath);
       }
     }
   } catch (error) {
-    console.error("Error deleting image:", error);
+    console.error('Error deleting image:', error);
   }
 };

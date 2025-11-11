@@ -5,15 +5,19 @@ import {
   FileUp,
   Loader,
   Save,
-  XCircle
+  XCircle,
+  UploadCloud,
+  View
 } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { read, utils } from "xlsx";
 import { API_BASE_URL } from "../../config";
 import { cleanYorksysOrderData } from "../components/inspection/qa-pivot/YorksysOrderClean";
 import YorksysOrderPreview from "../components/inspection/qa-pivot/YorksysOrderPreview";
+import YorksysOrdersView from "../components/inspection/qa-pivot/YorksysOrdersView";
 
 const UploadYorksysOrders = () => {
+  // --- State for Upload Tab ---
   const [selectedFile, setSelectedFile] = useState(null);
   const [orderData, setOrderData] = useState(null);
   const [error, setError] = useState("");
@@ -21,6 +25,9 @@ const UploadYorksysOrders = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState({ message: "", type: "" });
   const [isDragging, setIsDragging] = useState(false);
+
+  // --- State for Active Tab ---
+  const [activeTab, setActiveTab] = useState("upload");
 
   const resetState = () => {
     setOrderData(null);
@@ -255,7 +262,7 @@ const UploadYorksysOrders = () => {
   // ============================================================
 
   return (
-    <div className="container mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
+    <div className="mx-auto p-4 sm:p-6 lg:p-8 bg-gray-50 min-h-screen">
       <div className="text-center mb-6">
         <h1 className="text-2xl font-bold text-gray-800">
           Yorkmars (Cambodia) Garment MFG Co., LTD
@@ -263,98 +270,142 @@ const UploadYorksysOrders = () => {
         <p className="text-md text-gray-600">Yorksys Order Upload</p>
       </div>
 
-      <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
-        <div className="flex flex-col gap-4">
-          <label
-            htmlFor="file-upload"
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragEvents}
-            onDrop={handleDrop}
-            className={`flex flex-col items-center justify-center w-full px-4 py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
-              isDragging
-                ? "border-indigo-600 bg-indigo-50"
-                : "border-gray-300 hover:bg-gray-100"
-            }`}
-          >
-            <FileUp className="w-10 h-10 text-gray-400 mb-3" />
-            <span className="font-semibold text-gray-700">
-              Drag & drop your .xls file here
-            </span>
-            <span className="text-sm text-gray-500">or click to browse</span>
-            <input
-              id="file-upload"
-              type="file"
-              className="sr-only"
-              accept=".xls"
-              onChange={handleFileChange}
-            />
-          </label>
-          {selectedFile && (
-            <div className="text-center text-sm text-gray-600 bg-gray-100 p-2 rounded-md">
-              Selected File:{" "}
-              <span className="font-semibold">{selectedFile.name}</span>
-            </div>
-          )}
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-2">
+      {/* 🆕 Tab Navigation */}
+      <div className="max-w-4xl mx-auto mb-6">
+        <div className="border-b border-gray-200">
+          <nav className="-mb-px flex space-x-8" aria-label="Tabs">
             <button
-              onClick={handlePreview}
-              disabled={!selectedFile || isLoading || isSaving}
-              className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setActiveTab("upload")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === "upload"
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
             >
-              {isLoading ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin mr-2" /> Processing...
-                </>
-              ) : (
-                <>
-                  <FileText className="w-5 h-5 mr-2" /> Preview
-                </>
-              )}
+              <UploadCloud className="h-5 w-5" />
+              Upload Order
             </button>
             <button
-              onClick={handleSave}
-              disabled={!orderData || isLoading || isSaving}
-              className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+              onClick={() => setActiveTab("view")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === "view"
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
             >
-              {isSaving ? (
-                <>
-                  <Loader className="w-5 h-5 animate-spin mr-2" /> Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="w-5 h-5 mr-2" /> Save
-                </>
-              )}
+              <View className="h-5 w-5" />
+              View Orders
             </button>
-          </div>
+          </nav>
         </div>
-
-        {error && (
-          <div className="mt-4 flex items-center p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
-            <AlertTriangle className="w-5 h-5 mr-2" /> <span>{error}</span>
-          </div>
-        )}
-        {saveStatus.message && (
-          <div
-            className={`mt-4 flex items-center p-3 rounded-md border ${
-              saveStatus.type === "success"
-                ? "bg-green-50 text-green-700 border-green-200"
-                : "bg-red-50 text-red-700 border-red-200"
-            }`}
-          >
-            {saveStatus.type === "success" ? (
-              <CheckCircle className="w-5 h-5 mr-2" />
-            ) : (
-              <XCircle className="w-5 h-5 mr-2" />
-            )}
-            <span>{saveStatus.message}</span>
-          </div>
-        )}
       </div>
 
-      {orderData && <YorksysOrderPreview orderData={orderData} />}
+      {activeTab === "upload" && (
+        <>
+          <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+            <div className="flex flex-col gap-4">
+              <label
+                htmlFor="file-upload"
+                onDragEnter={handleDragEnter}
+                onDragLeave={handleDragLeave}
+                onDragOver={handleDragEvents}
+                onDrop={handleDrop}
+                className={`flex flex-col items-center justify-center w-full px-4 py-8 border-2 border-dashed rounded-md cursor-pointer transition-colors ${
+                  isDragging
+                    ? "border-indigo-600 bg-indigo-50"
+                    : "border-gray-300 hover:bg-gray-100"
+                }`}
+              >
+                <FileUp className="w-10 h-10 text-gray-400 mb-3" />
+                <span className="font-semibold text-gray-700">
+                  Drag & drop your .xls file here
+                </span>
+                <span className="text-sm text-gray-500">
+                  or click to browse
+                </span>
+                <input
+                  id="file-upload"
+                  type="file"
+                  className="sr-only"
+                  accept=".xls"
+                  onChange={handleFileChange}
+                />
+              </label>
+              {selectedFile && (
+                <div className="text-center text-sm text-gray-600 bg-gray-100 p-2 rounded-md">
+                  Selected File:{" "}
+                  <span className="font-semibold">{selectedFile.name}</span>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mt-2">
+                <button
+                  onClick={handlePreview}
+                  disabled={!selectedFile || isLoading || isSaving}
+                  className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin mr-2" />{" "}
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-5 h-5 mr-2" /> Preview
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={!orderData || isLoading || isSaving}
+                  className="w-full sm:w-auto flex items-center justify-center px-6 py-3 bg-green-600 text-white font-semibold rounded-md shadow-sm hover:bg-green-700 disabled:bg-green-300 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin mr-2" /> Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-5 h-5 mr-2" /> Save
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {error && (
+              <div className="mt-4 flex items-center p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
+                <AlertTriangle className="w-5 h-5 mr-2" /> <span>{error}</span>
+              </div>
+            )}
+            {saveStatus.message && (
+              <div
+                className={`mt-4 flex items-center p-3 rounded-md border ${
+                  saveStatus.type === "success"
+                    ? "bg-green-50 text-green-700 border-green-200"
+                    : "bg-red-50 text-red-700 border-red-200"
+                }`}
+              >
+                {saveStatus.type === "success" ? (
+                  <CheckCircle className="w-5 h-5 mr-2" />
+                ) : (
+                  <XCircle className="w-5 h-5 mr-2" />
+                )}
+                <span>{saveStatus.message}</span>
+              </div>
+            )}
+          </div>
+
+          {orderData && <YorksysOrderPreview orderData={orderData} />}
+        </>
+      )}
+      {activeTab === "view" && (
+        <div className="max-w-8xl mx-auto">
+          {" "}
+          {/* 👈 Add this wrapper div */}
+          <YorksysOrdersView />
+        </div>
+      )}
     </div>
   );
 };

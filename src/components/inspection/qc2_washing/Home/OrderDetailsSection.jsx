@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
+import { sanitize } from "../../../../utils/measurementHelperFunction";
 
 const OrderDetailsSection = ({
   formData,
@@ -708,7 +709,9 @@ const OrderDetailsSection = ({
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${encodeURIComponent(
+          sanitize(color)
+        )}`
       );
 
       if (!response.ok) {

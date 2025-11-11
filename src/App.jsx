@@ -52,6 +52,7 @@ import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFS
 import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
 import QCWashingPage from "./pages/QCWashing.jsx";
 import PackingList from "./pages/PackingList.jsx";
+import Measurement from "./pages/measurement.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -80,6 +81,8 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
+
+import YPivotQASections from "./pages/YPivotQASections.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -462,6 +465,8 @@ function AppContent() {
                 element={<QC2WashingUpload />}
               />
               <Route path="/packing-list" element={<PackingList />} />
+              <Route path="/measurement" element={<Measurement />} />
+              <Route path="/qa-sections" element={<YPivotQASections />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

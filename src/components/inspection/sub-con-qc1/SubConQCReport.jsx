@@ -16,10 +16,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import Select from "react-select";
-import { API_BASE_URL } from "../../../../config";
+import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
 
-// --- 👈 MODIFIED: SummaryCard component is now more flexible ---
+// --- SummaryCard component---
 const SummaryCard = ({ icon, title, children, bgColorClass }) => (
   <div
     className={`p-4 rounded-lg shadow-md flex items-start gap-4 ${
@@ -78,7 +78,7 @@ const ToggleButton = ({ label, value, activeValue, onClick }) => (
   </button>
 );
 
-// --- 👈 NEW: Modal component for displaying QA Inspector's Information ---
+// --- Modal component for displaying QA Inspector's Information ---
 const QAUserModal = ({ user, isLoading, onClose }) => {
   if (!user && !isLoading) return null;
 
@@ -125,7 +125,7 @@ const QAUserModal = ({ user, isLoading, onClose }) => {
   );
 };
 
-// --- 👈 NEW: Modal component for displaying defect images ---
+// --- Modal component for displaying defect images ---
 const QAImageModal = ({ data, onClose }) => {
   if (!data) return null;
 
@@ -167,13 +167,15 @@ const QAImageModal = ({ data, onClose }) => {
                   {defect.images.map((img, idx) => (
                     <a
                       key={idx}
-                      href={`${API_BASE_URL}${img}`}
+                      href={`${PUBLIC_ASSET_URL}${img}`}
+                      //href={`${API_BASE_URL}${img}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="block overflow-hidden rounded-md shadow-lg group"
                     >
                       <img
-                        src={`${API_BASE_URL}${img}`}
+                        //src={`${API_BASE_URL}${img}`}
+                        src={`${PUBLIC_ASSET_URL}${img}`}
                         alt={`Defect ${defect.defectCode} - ${idx + 1}`}
                         className="w-full h-40 object-cover group-hover:scale-105 transition-transform duration-300"
                       />
@@ -223,7 +225,7 @@ const SubConQCReport = () => {
   const [error, setError] = useState(null);
   const [displayMode, setDisplayMode] = useState("qty"); // 'qty' or 'rate'
 
-  // --- 👈 NEW: States for managing modals ---
+  // --- States for managing modals ---
   const [qaUserInfo, setQaUserInfo] = useState(null);
   const [isUserLoading, setIsUserLoading] = useState(false);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
@@ -260,7 +262,7 @@ const SubConQCReport = () => {
     fetchAllDefects();
   }, []);
 
-  // === NEW LOGIC: Automatically set the factory filter for a factory user ===
+  // === LOGIC: Automatically set the factory filter for a factory user ===
 
   useEffect(() => {
     // If we've identified the user's factory and the filter isn't already set,
@@ -452,7 +454,7 @@ const SubConQCReport = () => {
     return "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300";
   };
 
-  // --- 👈 NEW: Helper function for QA Defect Rate column color ---
+  // --- Helper function for QA Defect Rate column color ---
   const getQARateColorClass = (rate) => {
     if (rate >= 10)
       return "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300";
@@ -461,7 +463,7 @@ const SubConQCReport = () => {
     return "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300";
   };
 
-  // --- 👈 NEW: Calculate the overall QA rate from the summary data ---
+  // --- Calculate the overall QA rate from the summary data ---
   const overallQARate = useMemo(() => {
     if (
       !data.summary.totalQASampleSize ||
@@ -746,13 +748,32 @@ const SubConQCReport = () => {
 
                   // --- 👈 NEW: Get QA data and perform calculations ---
                   const qaReport = report.qaReport; // This object now comes directly from the backend
-                  const hasImages = qaReport?.defectList?.some(
-                    (d) => d.images && d.images.length > 0
+                  const hasImages = qaReport?.qcData?.some((qcItem) =>
+                    qcItem.defectList.some(
+                      (d) => d.images && d.images.length > 0
+                    )
                   );
                   const qaDefectRate =
-                    qaReport && qaReport.checkedQty > 0
-                      ? (qaReport.totalDefectQty / qaReport.checkedQty) * 100
+                    qaReport && qaReport.totalCheckedQty > 0
+                      ? (qaReport.totalOverallDefectQty /
+                          qaReport.totalCheckedQty) *
+                        100
                       : 0;
+                  const aggregatedQADefects = qaReport?.qcData
+                    ? qaReport.qcData
+                        .flatMap((qc) => qc.defectList)
+                        .reduce((acc, defect) => {
+                          const existing = acc.find(
+                            (d) => d.defectName === defect.defectName
+                          );
+                          if (existing) {
+                            existing.qty += defect.qty;
+                          } else {
+                            acc.push({ ...defect });
+                          }
+                          return acc;
+                        }, [])
+                    : [];
 
                   return (
                     <tr
@@ -790,13 +811,17 @@ const SubConQCReport = () => {
                         {defectRateOverall.toFixed(2)}%
                       </td>
 
-                      {/* --- 👈 NEW: New data columns rendered here --- */}
+                      {/* QA Sample Size */}
                       <td className="px-4 py-2 text-center border-l">
-                        {qaReport ? qaReport.checkedQty : ""}
+                        {qaReport ? qaReport.totalCheckedQty : ""}
                       </td>
+
+                      {/* QA Defect Qty */}
                       <td className="px-4 py-2 text-center border-l">
-                        {qaReport ? qaReport.totalDefectQty : ""}
+                        {qaReport ? qaReport.totalOverallDefectQty : ""}
                       </td>
+
+                      {/* QA ID*/}
                       <td className="px-4 py-2 text-center border-l">
                         {qaReport?.preparedBy?.empId && (
                           // Use a flex container to align the text and icon side-by-side
@@ -820,6 +845,7 @@ const SubConQCReport = () => {
                         )}
                       </td>
 
+                      {/* QA Defect Rate*/}
                       <td
                         className={`px-4 py-2 text-center font-semibold border-l ${getQARateColorClass(
                           qaDefectRate
@@ -827,24 +853,43 @@ const SubConQCReport = () => {
                       >
                         {qaReport ? `${qaDefectRate.toFixed(2)}%` : ""}
                       </td>
-                      {/* --- 👈 NEW: Data cell for the QA Defect Details --- */}
+
+                      {/* <td
+                        className={`px-4 py-2 text-center font-semibold border-l ${getQARateColorClass(
+                          qaDefectRate
+                        )}`}
+                      >
+                        {qaReport ? `${qaDefectRate.toFixed(2)}%` : ""}
+                      </td> */}
+
+                      {/* QA Defect Details */}
                       <td className="px-3 py-2 text-left border-l align-top">
-                        {
-                          qaReport?.defectList && qaReport.defectList.length > 0
-                            ? qaReport.defectList.map((defect) => (
-                                <div
-                                  key={defect.defectCode}
-                                  className="text-xs whitespace-normal break-words"
-                                >
-                                  {defect.defectName} ({defect.qty})
-                                </div>
-                              ))
-                            : "" // Render nothing if there are no defects
-                        }
+                        {/* MODIFICATION #6: Map over the new aggregatedQADefects */}
+                        {aggregatedQADefects.length > 0
+                          ? aggregatedQADefects.map((defect) => (
+                              <div
+                                key={defect.defectCode}
+                                className="text-xs whitespace-normal break-words"
+                              >
+                                {defect.defectName} ({defect.qty})
+                              </div>
+                            ))
+                          : ""}
                       </td>
+
                       <td className="px-4 py-2 text-center border-l border-r-2 border-gray-400 dark:border-gray-500">
                         <button
-                          onClick={() => handleShowImages(qaReport)}
+                          onClick={() => {
+                            // flatten the defect lists into the structure the modal expects
+                            const allDefects = qaReport.qcData.flatMap(
+                              (qc) => qc.defectList
+                            );
+                            const modalData = {
+                              ...qaReport,
+                              defectList: allDefects
+                            };
+                            handleShowImages(modalData);
+                          }}
                           disabled={!hasImages}
                           className="p-1 rounded-full disabled:cursor-not-allowed"
                         >
