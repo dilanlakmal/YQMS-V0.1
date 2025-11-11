@@ -5,3 +5,9 @@ export const sanitize = (input) => {
   if (sane === "." || sane === "..") return "_";
   return sane;
 };
+
+// New cleanup function that accepts all characters and symbols
+export const cleanup = (input) => {
+  if (typeof input !== "string") input = String(input);
+  return input;
+};
