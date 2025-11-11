@@ -81,7 +81,6 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
-import Measurement from "./pages/measurement.jsx";
 
 
 import YPivotQASections from "./pages/YPivotQASections.jsx";

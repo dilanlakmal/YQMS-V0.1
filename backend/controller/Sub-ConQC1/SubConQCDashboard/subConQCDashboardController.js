@@ -365,3 +365,103 @@ export const getDailyData = async (req, res) => {
       res.status(500).json({ error: "Failed to fetch dashboard data" });
     }
 };
+
+// --- CONTROLLER: DAILY TREND VIEW ---
+export const getDailyTrendData = async (req, res) => {
+  try {
+    const { startDate, endDate, factory, buyer } = req.query;
+
+    const matchQuery = {};
+    if (startDate && endDate) {
+      matchQuery.inspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(new Date(endDate).setHours(23, 59, 59, 999))
+      };
+    }
+    if (factory) matchQuery.factory = factory;
+    if (buyer) matchQuery.buyer = buyer;
+
+    const result = await SubconSewingQc1Report.aggregate([
+      { $match: matchQuery },
+
+      {
+        $facet: {
+          // Facet 1: Get the detailed trend data grouped by factory
+          trendDataByFactory: [
+            { $unwind: "$defectList" },
+            {
+              $project: {
+                _id: 0,
+                factory: "$factory",
+                lineNo: "$lineNo",
+                moNo: "$moNo",
+                defectName: "$defectList.defectName",
+                qty: "$defectList.qty",
+                date: {
+                  $dateToString: { format: "%Y-%m-%d", date: "$inspectionDate" }
+                },
+                checkedQty: "$checkedQty"
+              }
+            },
+            {
+              $group: {
+                _id: "$factory",
+                trends: { $push: "$$ROOT" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                factory: "$_id",
+                trends: "$trends"
+              }
+            },
+            { $sort: { factory: 1 } }
+          ],
+
+          // Facet 2: Get all unique filter options for the matched documents
+          filterOptions: [
+            {
+              $group: {
+                _id: null,
+                buyers: { $addToSet: "$buyer" },
+                lineNos: { $addToSet: "$lineNo" },
+                moNos: { $addToSet: "$moNo" }
+              }
+            },
+            {
+              $project: {
+                _id: 0,
+                buyers: { $sortArray: { input: "$buyers", sortBy: 1 } },
+                lineNos: { $sortArray: { input: "$lineNos", sortBy: 1 } }, // We will sort properly on the frontend
+                moNos: { $sortArray: { input: "$moNos", sortBy: 1 } }
+              }
+            }
+          ]
+        }
+      },
+      // Reshape the final output to be a single object
+      {
+        $project: {
+          trendData: "$trendDataByFactory",
+          filterOptions: { $arrayElemAt: ["$filterOptions", 0] }
+        }
+      }
+    ]);
+
+    // Ensure a safe response structure even if no data is found
+    const responseData = {
+      trendData: result[0]?.trendData || [],
+      filterOptions: result[0]?.filterOptions || {
+        buyers: [],
+        lineNos: [],
+        moNos: []
+      }
+    };
+
+    res.json(responseData);
+  } catch (error) {
+    console.error("Error fetching Sub-Con QC daily trend data:", error);
+    res.status(500).json({ error: "Failed to fetch daily trend data" });
+  }
+};
