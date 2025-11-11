@@ -87,6 +87,7 @@ import createPlanPackingListModel from "../../models/PlanPackingList.js";
 
 import createYorksysOrdersModel from "../../models/YorksysOrders.js";
 
+import createQASectionsProductType from "../../models/QA/QASectionsProductType.js";
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
 import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
@@ -212,6 +213,8 @@ export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
 
+export const QASectionsProductType =
+  createQASectionsProductType(ymProdConnection);
 export const QASectionsHome = createQASectionsHomeModel(ymProdConnection);
 export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);

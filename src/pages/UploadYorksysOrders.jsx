@@ -7,7 +7,9 @@ import {
   Save,
   XCircle,
   UploadCloud,
-  View
+  View,
+  Layers,
+  GitMerge
 } from "lucide-react";
 import React, { useCallback, useState } from "react";
 import { read, utils } from "xlsx";
@@ -15,6 +17,8 @@ import { API_BASE_URL } from "../../config";
 import { cleanYorksysOrderData } from "../components/inspection/qa-pivot/YorksysOrderClean";
 import YorksysOrderPreview from "../components/inspection/qa-pivot/YorksysOrderPreview";
 import YorksysOrdersView from "../components/inspection/qa-pivot/YorksysOrdersView";
+import YorksysProductTypeView from "../components/inspection/qa-pivot/YorksysProductTypeView";
+import YorksysCuttingSyncView from "../components/inspection/qa-pivot/YorksysCuttingSyncView";
 
 const UploadYorksysOrders = () => {
   // --- State for Upload Tab ---
@@ -296,6 +300,30 @@ const UploadYorksysOrders = () => {
               <View className="h-5 w-5" />
               View Orders
             </button>
+            {/* Product Type Tab */}
+            <button
+              onClick={() => setActiveTab("productType")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === "productType"
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <Layers className="h-5 w-5" />
+              Product Type
+            </button>
+            {/* Sync from Cutting Tab */}
+            <button
+              onClick={() => setActiveTab("cuttingSync")}
+              className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 ${
+                activeTab === "cuttingSync"
+                  ? "border-indigo-500 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+              }`}
+            >
+              <GitMerge className="h-5 w-5" />
+              Sync from Cutting
+            </button>
           </nav>
         </div>
       </div>
@@ -404,6 +432,20 @@ const UploadYorksysOrders = () => {
           {" "}
           {/* 👈 Add this wrapper div */}
           <YorksysOrdersView />
+        </div>
+      )}
+
+      {/* Render Product Type view when active */}
+      {activeTab === "productType" && (
+        <div className="max-w-8xl mx-auto">
+          <YorksysProductTypeView />
+        </div>
+      )}
+
+      {/* Render Cutting Sync view when active */}
+      {activeTab === "cuttingSync" && (
+        <div className="max-w-8xl mx-auto">
+          <YorksysCuttingSyncView />
         </div>
       )}
     </div>

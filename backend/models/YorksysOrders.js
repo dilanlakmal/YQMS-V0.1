@@ -70,6 +70,7 @@ const yorksysOrdersSchema = new mongoose.Schema(
     shipMode: { type: String, default: "N/A" },
     currency: { type: String, default: "N/A" },
     skuDescription: { type: String, default: "N/A" },
+    productType: { type: String },
 
     // Fabric Content array
     FabricContent: [fabricContentSchema],

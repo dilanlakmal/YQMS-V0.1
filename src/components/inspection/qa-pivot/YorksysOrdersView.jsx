@@ -15,7 +15,7 @@ import { API_BASE_URL } from "../../../../config";
 import AdditionalInfoModal from "./AdditionalInfoModal";
 
 // --- Custom Hook for Debouncing text input ---
-const useDebounce = (value, delay) => {
+export const useDebounce = (value, delay) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -27,7 +27,13 @@ const useDebounce = (value, delay) => {
 };
 
 // --- Reusable Searchable Select Component
-const SearchableSelect = ({ options, value, onChange, placeholder, name }) => {
+export const SearchableSelect = ({
+  options,
+  value,
+  onChange,
+  placeholder,
+  name
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const ref = useRef(null);

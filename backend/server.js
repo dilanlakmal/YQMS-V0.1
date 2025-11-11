@@ -155,6 +155,7 @@ import ANFResult from "./routes/ANF/ANFResultRoutes.js";
   PivotY - QA Sections
 ------------------------------ */
 
+import QASections_ProductType from "./routes/PivotY/QASections/QASections_ProductType_Route.js";
 import QASections_Home from "./routes/PivotY/QASections/QASections_Home_Route.js";
 import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Route.js";
 import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
@@ -375,6 +376,8 @@ app.use(ANFResult);
 /* ------------------------------
   PivotY - QA Sections routes
 ------------------------------ */
+
+app.use(QASections_ProductType);
 app.use(QASections_Home);
 app.use(QASections_Photos);
 app.use(QASections_Packing);

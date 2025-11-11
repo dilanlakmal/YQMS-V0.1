@@ -3,7 +3,10 @@ import {
   saveYorksysOrderData,
   getYorksysOrderFilterOptions,
   getYorksysOrdersPagination,
-  getYorksysOrder
+  getYorksysOrder,
+  updateYorksysOrderProductType,
+  previewBulkUpdateProductType,
+  bulkUpdateProductTypeFromCutting
 } from "../../controller//YorksysOrders/uploadOrderController.js";
 
 const router = express.Router();
@@ -17,5 +20,23 @@ router.get("/api/yorksys-orders/filters", getYorksysOrderFilterOptions);
 router.get("/api/yorksys-orders", getYorksysOrdersPagination);
 
 router.get("/api/yorksys-orders/:moNo", getYorksysOrder);
+
+// ROUTE: To update the product type of a specific order by its ID
+router.put(
+  "/api/yorksys-orders/:id/product-type",
+  updateYorksysOrderProductType
+);
+
+// ROUTE: Preview how many Yorksys orders will be updated
+router.post(
+  "/api/yorksys-orders/bulk-update-preview",
+  previewBulkUpdateProductType
+);
+
+// ROUTE: Perform the bulk update of product types from cutting data
+router.put(
+  "/api/yorksys-orders/bulk-update-product-type",
+  bulkUpdateProductTypeFromCutting
+);
 
 export default router;
