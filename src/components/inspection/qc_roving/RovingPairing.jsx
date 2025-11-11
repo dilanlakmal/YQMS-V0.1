@@ -35,12 +35,90 @@ import {
   Sticker
 } from "lucide-react";
 import Select from "react-select"; // Import react-select for multi-select dropdown
+import ImageUpload from "./ImageUpload";
+
+// --- Sub-component for Measurement Modal ---
+const MeasurementModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  measurement,
+  partIdentifier
+}) => {
+  const { t } = useTranslation();
+  const [measurements, setMeasurements] = useState(
+    measurement || { value: "", images: [] }
+  );
+
+  useEffect(() => {
+    setMeasurements(measurement || { value: "", images: [] });
+  }, [measurement]);
+
+  if (!isOpen) return null;
+
+  const handleImagesChange = (images) => {
+    setMeasurements((prev) => ({
+      ...prev,
+      images: images.map((img) =>
+        typeof img === "string" ? img : img.url || img
+      )
+    }));
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white p-5 rounded-lg shadow-xl w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-xl font-semibold mb-4">
+          Measurements for Part:{" "}
+          <span className="text-blue-600 font-mono">{partIdentifier}</span>
+        </h3>
+
+        <div className="space-y-4 mb-4">
+          <p className="text-lg">
+            Value:{" "}
+            <span className="font-mono bg-gray-100 px-2 py-1 rounded">
+              {measurements.value}
+            </span>
+          </p>
+          <ImageUpload
+            images={measurements.images || []}
+            onImagesChange={handleImagesChange}
+            uploadEndpoint="/api/roving-pairing/upload-measurement-images"
+            maxImages={3}
+            type="measurement"
+          />
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400 w-full"
+          >
+            {t("cancel", "Cancel")}
+          </button>
+          <button
+            onClick={() => onSave(measurements)} // Pass the whole object back
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 w-full"
+          >
+            Save Measurements
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // --- Sub-component for Measurement NumPad ---
 const MeasurementNumPad = ({ onClose, onSetValue, currentValue }) => {
   const [nValue, setNValue] = useState(0);
   const [isNegative, setIsNegative] = useState(
-    currentValue?.startsWith("-") || false
+    currentValue?.value?.startsWith("-") || false
   );
 
   const handleNClick = () => setNValue((prev) => (prev + 1) % 6);
@@ -161,7 +239,10 @@ const DefectModal = ({
   const addDefect = (defectId) => {
     const defectToAdd = allDefects.find((d) => d._id === defectId);
     if (defectToAdd)
-      setDefectsForPart((prev) => [...prev, { ...defectToAdd, count: 1 }]);
+      setDefectsForPart((prev) => [
+        ...prev,
+        { ...defectToAdd, count: 1, images: [] }
+      ]);
   };
 
   const updateCount = (defectId, change) =>
@@ -170,6 +251,21 @@ const DefectModal = ({
         d._id === defectId ? { ...d, count: Math.max(1, d.count + change) } : d
       )
     );
+
+  const updateDefectImages = (defectId, images) =>
+    setDefectsForPart((prev) =>
+      prev.map((d) =>
+        d._id === defectId
+          ? {
+              ...d,
+              images: images.map((img) =>
+                typeof img === "string" ? img : img.url || img
+              )
+            }
+          : d
+      )
+    );
+
   const removeDefect = (defectId) =>
     setDefectsForPart((prev) => prev.filter((d) => d._id !== defectId));
   const availableDefects = allDefects.filter(
@@ -189,39 +285,49 @@ const DefectModal = ({
           Defects for Part:{" "}
           <span className="text-blue-600 font-mono">{partIdentifier}</span>
         </h3>
-        <div className="space-y-2 mb-4 max-h-60 overflow-y-auto pr-2">
+        <div className="space-y-3 mb-4 max-h-96 overflow-y-auto pr-2">
           {defectsForPart.map((defect) => (
-            <div
-              key={defect._id}
-              className="flex items-center justify-between p-2 bg-gray-100 rounded-md text-sm"
-            >
-              <span className="flex-grow">{getDefectDisplayName(defect)}</span>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => updateCount(defect._id, -1)}
-                  className="p-1 bg-gray-300 rounded"
-                >
-                  <Minus size={14} />
-                </button>
-                <input
-                  type="text"
-                  readOnly
-                  value={defect.count}
-                  className="w-10 text-center border rounded"
-                />
-                <button
-                  onClick={() => updateCount(defect._id, 1)}
-                  className="p-1 bg-gray-300 rounded"
-                >
-                  <Plus size={14} />
-                </button>
-                <button
-                  onClick={() => removeDefect(defect._id)}
-                  className="p-1 text-red-500"
-                >
-                  <X size={16} />
-                </button>
+            <div key={defect._id} className="p-3 bg-gray-100 rounded-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="flex-grow text-sm font-medium">
+                  {getDefectDisplayName(defect)}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => updateCount(defect._id, -1)}
+                    className="p-1 bg-gray-300 rounded"
+                  >
+                    <Minus size={14} />
+                  </button>
+                  <input
+                    type="text"
+                    readOnly
+                    value={defect.count}
+                    className="w-10 text-center border rounded"
+                  />
+                  <button
+                    onClick={() => updateCount(defect._id, 1)}
+                    className="p-1 bg-gray-300 rounded"
+                  >
+                    <Plus size={14} />
+                  </button>
+                  <button
+                    onClick={() => removeDefect(defect._id)}
+                    className="p-1 text-red-500"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
               </div>
+              <ImageUpload
+                images={defect.images || []}
+                onImagesChange={(images) =>
+                  updateDefectImages(defect._id, images)
+                }
+                uploadEndpoint="/api/roving-pairing/upload-defect-images"
+                maxImages={3}
+                type="defect"
+              />
             </div>
           ))}
         </div>
@@ -262,6 +368,137 @@ const DefectModal = ({
   );
 };
 
+// --- Sub-component for Accessory Modal ---
+const AccessoryModal = ({
+  isOpen,
+  onClose,
+  onSave,
+  allAccessoryIssues,
+  currentAccessoryIssues
+}) => {
+  const { t, i18n } = useTranslation();
+  const [accessoryIssues, setAccessoryIssues] = useState(
+    currentAccessoryIssues || []
+  );
+
+  const getAccessoryDisplayName = (issue) => {
+    if (i18n.language.startsWith("kh")) return issue.issueKhmer;
+    if (i18n.language.startsWith("zh")) return issue.issueChi;
+    return issue.issueEng;
+  };
+
+  useEffect(() => {
+    setAccessoryIssues(currentAccessoryIssues || []);
+  }, [currentAccessoryIssues]);
+
+  if (!isOpen) return null;
+
+  const addAccessoryIssue = (issueId) => {
+    const issueToAdd = allAccessoryIssues.find((i) => i._id === issueId);
+    if (issueToAdd) {
+      setAccessoryIssues((prev) => [...prev, { ...issueToAdd, images: [] }]);
+    }
+  };
+
+  const updateAccessoryImages = (issueId, images) => {
+    setAccessoryIssues((prev) =>
+      prev.map((issue) =>
+        issue._id === issueId
+          ? {
+              ...issue,
+              images: images.map((img) =>
+                typeof img === "string" ? img : img.url || img
+              )
+            }
+          : issue
+      )
+    );
+  };
+
+  const removeAccessoryIssue = (issueId) => {
+    setAccessoryIssues((prev) => prev.filter((issue) => issue._id !== issueId));
+  };
+
+  const availableIssues = allAccessoryIssues.filter(
+    (issue) => !accessoryIssues.some((ai) => ai._id === issue._id)
+  );
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white p-5 rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="text-xl font-semibold mb-4">Accessory Issues</h3>
+
+        <div className="space-y-3 mb-4">
+          {accessoryIssues.map((issue) => (
+            <div key={issue._id} className="p-3 bg-gray-100 rounded-md">
+              <div className="flex items-center justify-between mb-2">
+                <span className="flex-grow text-sm font-medium">
+                  {getAccessoryDisplayName(issue)}
+                </span>
+                <button
+                  onClick={() => removeAccessoryIssue(issue._id)}
+                  className="p-1 text-red-500 hover:bg-red-100 rounded"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              <ImageUpload
+                images={issue.images || []}
+                onImagesChange={(images) =>
+                  updateAccessoryImages(issue._id, images)
+                }
+                uploadEndpoint="/api/roving-pairing/upload-accessory-images"
+                maxImages={3}
+                type="accessory"
+              />
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2 items-center mb-4">
+          <select
+            className="p-2 border rounded-md flex-grow"
+            onChange={(e) => {
+              if (e.target.value) {
+                addAccessoryIssue(e.target.value);
+                e.target.value = "";
+              }
+            }}
+          >
+            <option value="">Add an accessory issue...</option>
+            {availableIssues.map((issue) => (
+              <option key={issue._id} value={issue._id}>
+                {getAccessoryDisplayName(issue)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 bg-gray-300 rounded-md hover:bg-gray-400"
+          >
+            {t("cancel", "Cancel")}
+          </button>
+          <button
+            onClick={() => onSave(accessoryIssues)}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+          >
+            Save Accessory Issues
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- Main Pairing Component ---
 const RovingPairing = () => {
   const { t, i18n } = useTranslation();
@@ -293,6 +530,8 @@ const RovingPairing = () => {
   // Modal State
   const [showNumPad, setShowNumPad] = useState(false);
   const [isDefectModalOpen, setIsDefectModalOpen] = useState(false);
+  const [isMeasurementModalOpen, setIsMeasurementModalOpen] = useState(false);
+  const [isAccessoryModalOpen, setIsAccessoryModalOpen] = useState(false);
   const [activeCell, setActiveCell] = useState(null);
 
   // Refs
@@ -410,27 +649,46 @@ const RovingPairing = () => {
   };
 
   const handleSetMeasurement = (value) => {
-    if (activeCell)
+    if (activeCell) {
+      const key = `${activeCell.part}-${activeCell.index}`;
       setMeasurementData((prev) => ({
         ...prev,
-        [`${activeCell.part}-${activeCell.index}`]: value
+        [key]: { ...prev[key], value }
       }));
+    }
     setShowNumPad(false);
     setActiveCell(null);
   };
 
   const handleSaveDefects = (defects) => {
     const key = `${activeCell.part}-${activeCell.index}`;
-    if (defects.length > 0)
+    if (defects.length > 0) {
       setDefectData((prev) => ({ ...prev, [key]: defects }));
-    else {
-      setDefectData((prev) => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
+    } else {
+      const { [key]: _, ...rest } = defectData;
+      setDefectData(rest);
     }
     setIsDefectModalOpen(false);
+    setActiveCell(null);
+  };
+
+  const handleSaveAccessoryIssues = (issues) => {
+    setSelectedAccessoryIssues(issues);
+    setIsAccessoryModalOpen(false);
+  };
+
+  const handleMeasurementImageClick = (part, index) => {
+    setActiveCell({ type: "measure", part, index });
+    setIsMeasurementModalOpen(true);
+  };
+
+  const handleSaveMeasurementImages = (measurement) => {
+    const key = `${activeCell.part}-${activeCell.index}`;
+    setMeasurementData((prev) => ({
+      ...prev,
+      [key]: { ...prev[key], ...measurement }
+    }));
+    setIsMeasurementModalOpen(false);
     setActiveCell(null);
   };
 
@@ -490,9 +748,9 @@ const RovingPairing = () => {
       rejectedParts: new Set()
     };
     Object.entries(measurementData).forEach(([key, value]) => {
-      if (isOutOfTolerance(value)) {
+      if (isOutOfTolerance(value.value)) {
         stats.total++;
-        getFractionValue(value) > 0 ? stats.positive++ : stats.negative++;
+        getFractionValue(value.value) > 0 ? stats.positive++ : stats.negative++;
         stats.rejectedParts.add(key);
       }
     });
@@ -558,14 +816,19 @@ const RovingPairing = () => {
             ? selectedAccessoryIssues.map((issue) => ({
                 issueEng: issue.issueEng,
                 issueKhmer: issue.issueKhmer,
-                issueChi: issue.issueChi
+                issueChi: issue.issueChi,
+                images: issue.images || []
               }))
             : [],
         measurementData: Object.entries(quantities).map(([partType, qty]) => ({
           partType,
           measurements: Array.from({ length: qty }, (_, i) => ({
             partNo: i + 1,
-            value: measurementData[`${partType}-${i}`] || "✔"
+            value: measurementData[`${partType}-${i}`]?.value || "✔",
+            images:
+              measurementData[`${partType}-${i}`]?.images?.map((img) =>
+                typeof img === "string" ? img : img.url
+              ) || []
           }))
         })),
         defectSummary: {
@@ -581,7 +844,11 @@ const RovingPairing = () => {
                   defectNameEng: d.defectNameEng,
                   defectNameKhmer: d.defectNameKhmer,
                   defectNameChinese: d.defectNameChinese,
-                  count: d.count
+                  count: d.count,
+                  images:
+                    d.images?.map((img) =>
+                      typeof img === "string" ? img : img.url
+                    ) || []
                 })) || []
             })).filter((p) => p.defects.length > 0)
           }))
@@ -628,10 +895,11 @@ const RovingPairing = () => {
 
   // --- (NEW) Helper function to format measurement values with a + sign ---
   const formatMeasurementValue = (value) => {
-    if (!value || value === "✔") return "✔";
-    const numericValue = getFractionValue(value);
-    if (numericValue > 0 && !value.startsWith("+")) return `+${value}`;
-    return value;
+    if (!value?.value || value.value === "✔") return "✔";
+    const numericValue = getFractionValue(value.value);
+    if (numericValue > 0 && !value.value.startsWith("+"))
+      return `+${value.value}`;
+    return value.value;
   };
 
   return (
@@ -838,7 +1106,7 @@ const RovingPairing = () => {
             </label>
           </div>
           {accessoryComplete === "No" && (
-            <div className="flex-grow w-full">
+            <div className="flex-grow w-full flex gap-2">
               <Select
                 isMulti
                 options={accessoryOptions}
@@ -854,10 +1122,17 @@ const RovingPairing = () => {
                       : []
                   )
                 }
-                className="react-select-container text-sm"
+                className="react-select-container text-sm flex-grow"
                 classNamePrefix="react-select"
                 placeholder={t("qcPairing.accessoryRemarkPlaceholder")}
               />
+              <button
+                onClick={() => setIsAccessoryModalOpen(true)}
+                className="px-3 py-1 bg-green-500 text-white rounded-md hover:bg-green-600 text-sm flex items-center gap-1 whitespace-nowrap"
+              >
+                <Sticker size={14} />
+                Manage Images
+              </button>
             </div>
           )}
         </div>
@@ -898,7 +1173,7 @@ const RovingPairing = () => {
         </div>
 
         <div>
-          <h3 className="text-lg font-semibold mb-3 text-gray-800">
+          <h3 className="text-lg font-semibold text-gray-800 mb-3">
             {t("qcPairing.measurementDetails")}
           </h3>
           <div className="overflow-x-auto">
@@ -923,17 +1198,33 @@ const RovingPairing = () => {
                           <td key={i} className="border p-2 bg-gray-200"></td>
                         );
                       const cellValue = measurementData[`${part}-${i}`];
-                      const isReject = isOutOfTolerance(cellValue);
+                      const isReject = isOutOfTolerance(cellValue?.value);
                       const cellColor = isReject
                         ? "bg-red-200 text-red-800 font-bold"
                         : "bg-green-100";
                       return (
                         <td
                           key={i}
-                          className={`border p-2 cursor-pointer ${cellColor} hover:bg-blue-100 transition-colors duration-150`}
-                          onClick={() => handleMeasurementCellClick(part, i)}
+                          className={`border p-2 ${cellColor} transition-colors duration-150 relative group`}
                         >
-                          {formatMeasurementValue(cellValue)}
+                          <div className="flex justify-center items-center gap-2">
+                            <span
+                              className="cursor-pointer flex-grow"
+                              onClick={() =>
+                                handleMeasurementCellClick(part, i)
+                              }
+                            >
+                              {formatMeasurementValue(cellValue)}
+                            </span>
+                            <button
+                              onClick={() =>
+                                handleMeasurementImageClick(part, i)
+                              }
+                              className="p-1 rounded-full hover:bg-gray-300 opacity-50 group-hover:opacity-100 transition-opacity"
+                            >
+                              <Ruler size={14} />
+                            </button>
+                          </div>
                         </td>
                       );
                     })}
@@ -1107,7 +1398,7 @@ const RovingPairing = () => {
           onClose={() => setShowNumPad(false)}
           onSetValue={handleSetMeasurement}
           currentValue={
-            measurementData[`${activeCell.part}-${activeCell.index}`] || ""
+            measurementData[`${activeCell.part}-${activeCell.index}`]
           }
         />
       )}
@@ -1121,6 +1412,29 @@ const RovingPairing = () => {
             defectData[`${activeCell.part}-${activeCell.index}`] || []
           }
           partIdentifier={`${activeCell.part}-${activeCell.index + 1}`}
+        />
+      )}
+      {isMeasurementModalOpen && (
+        <MeasurementModal
+          isOpen={isMeasurementModalOpen}
+          onClose={() => setIsMeasurementModalOpen(false)}
+          onSave={handleSaveMeasurementImages}
+          measurement={
+            measurementData[`${activeCell?.part}-${activeCell?.index}`] || {
+              value: "",
+              images: []
+            }
+          }
+          partIdentifier={`${activeCell?.part}-${activeCell?.index + 1}`}
+        />
+      )}
+      {isAccessoryModalOpen && (
+        <AccessoryModal
+          isOpen={isAccessoryModalOpen}
+          onClose={() => setIsAccessoryModalOpen(false)}
+          onSave={handleSaveAccessoryIssues}
+          allAccessoryIssues={allAccessoryIssues}
+          currentAccessoryIssues={selectedAccessoryIssues}
         />
       )}
     </div>

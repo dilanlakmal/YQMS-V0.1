@@ -89,10 +89,10 @@ import rovingDefectBuyerstatus from "./routes/InlineRoving/Roving/RovingAdminDef
 import rovingReports from "./routes/InlineRoving/Roving/RovingReportRoutes.js";
 
 /*-------------Paring Imports --------------*/
+import pairingReport from "./routes/InlineRoving/Pairing/PairingReportsRoutes.js";
 import pairingDefects from "./routes/InlineRoving/Pairing/ParingDefectRoutes.js";
 import rovingPairingInspection from "./routes/InlineRoving/Pairing/RovingPairingInspectionRoutes.js";
 import pairingAccessoryIssue from "./routes/InlineRoving/Pairing/PairingAccessoryIssueRoutes.js";
-import pairingReport from "./routes/InlineRoving/Pairing/PairingReportsRoutes.js";
 
 /* -----------------------------
   QC2 System Import
@@ -271,10 +271,10 @@ app.use(QCInlineWorker);
 app.use(rovingDefectBuyerstatus);
 app.use(rovingReports);
 /* -----------Pairing-----------------*/
+app.use(pairingReport);
 app.use(pairingDefects);
 app.use(rovingPairingInspection);
 app.use(pairingAccessoryIssue);
-app.use(pairingReport);
 
 /* -----------------------------
 QC2 Upload Data Routes
