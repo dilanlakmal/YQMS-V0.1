@@ -84,6 +84,7 @@ import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQA
 
 
 import YPivotQASections from "./pages/YPivotQASections.jsx";
+import AfterIroning  from "./pages/AfterIroning.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -469,6 +470,8 @@ function AppContent() {
               <Route path="/packing-list" element={<PackingList />} />
               <Route path="/measurement" element={<Measurement />} />
               <Route path="/qa-sections" element={<YPivotQASections />} />
+              <Route path= "/afterIroning" element={<AfterIroning />} />
+
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

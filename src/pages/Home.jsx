@@ -182,6 +182,13 @@ function Home() {
             title: t("home.qcWashing"),
             description: "Washing Report",
              version: '0.1',
+          },{
+            path: "/afterIroning",
+            roles: ["QC Washing"],
+            image: "assets/Home/after_ironing.png",
+            title: t("home.afterIroning"),
+            description: "After Ironing Report",
+             version: '0',
           },
            {
             path: "/measurement",
@@ -190,13 +197,6 @@ function Home() {
             title: t("home.Measurement"),
             description: "All Style measurements",
              version: '0.1',
-          },
-          {
-            path: "/measurement",
-            roles: ["QC Washing"],
-            image: "assets/Home/measurement.png",
-            title: t("home.Measurement"),
-            description: "All Style measurements"
           },
           {
             path: "/upload-beforewash-specs",
@@ -291,21 +291,24 @@ function Home() {
             pageId: "qa-sections",
             image: "assets/Home/qasections.png",
             title: t("home.qa_sections"),
-            description: "QA Inspection Sections"
+            description: "QA Inspection Sections",
+            version: '0',
           },
           {
             path: "/qa-templates",
             pageId: "qa-templates",
             image: "assets/Home/qatemplates.png",
             title: t("home.qa_templates"),
-            description: "QA Inspection Templates"
+            description: "QA Inspection Templates",
+            version: '0',
           },
           {
             path: "/y-pivot-inspection",
             pageId: "y-pivot-inspection",
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),
-            description: "Pivot Y Inspections"
+            description: "Pivot Y Inspections",
+            version: '0',
           }
         ]
       },

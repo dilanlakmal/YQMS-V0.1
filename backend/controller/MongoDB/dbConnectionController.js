@@ -79,6 +79,7 @@ import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
+import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
 
 
 //MongoDB Connections
@@ -182,6 +183,7 @@ export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
 export const QASectionsDefectCategory = createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList = createQASectionsDefectListModel(ymProdConnection);
+export const AfterIroning = createAfterIroningModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

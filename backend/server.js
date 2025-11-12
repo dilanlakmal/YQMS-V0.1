@@ -199,6 +199,11 @@ import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Rout
 import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
 import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
 import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
+
+/* -----------------------------
+  After Ironing Import
+------------------------------ */
+import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -428,6 +433,11 @@ app.use(QASections_DefectCategory);
 AI Routes
 ------------------------------ */
 app.use(AIChatBot);
+
+/* -----------------------------
+After Ironing Routes
+------------------------------ */
+app.use(afterIroning);
 
 // process.on("SIGINT", async () => {
 //   try {
