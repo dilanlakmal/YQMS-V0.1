@@ -84,6 +84,9 @@ import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQA
 
 import YPivotQASections from "./pages/YPivotQASections.jsx";
 
+import QCOutput from "./pages/QCOutput.jsx";
+import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -447,6 +450,8 @@ function AppContent() {
                 path="/anf-washing-ver2"
                 element={<ANFMeasurementVer2 />}
               />
+              <Route path="/qc-output" element={<QCOutput />} />
+              <Route path="/qc-output/full-report" element={<QCFullReport />} />
               <Route path="/supplier-issues" element={<SupplierIssues />} />
               <Route path="/master-list" element={<CEMasterList />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />

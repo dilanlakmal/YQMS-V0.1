@@ -225,6 +225,11 @@ import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
 import PackingList from "./routes/PackingList/packingListRoutes.js";
 
 /* -----------------------------
+  QC Output Imports
+------------------------------ */
+import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
+
+/* -----------------------------
   User Routes
 ------------------------------ */
 app.use(auth);
@@ -444,6 +449,11 @@ app.use(YourksysOrders);
   Packing List
 ------------------------------ */
 app.use(PackingList);
+
+/* -----------------------------
+  QC Output Routes
+------------------------------ */
+app.use(QCOutputRoute);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {

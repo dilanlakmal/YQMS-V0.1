@@ -313,7 +313,7 @@ function Home() {
             description: "QA Random Checks"
           },
           {
-            path: "/qc-accuracy-ver2",
+            path: "/qc-output",
             roles: ["QA"],
             image: "assets/Home/qcOutput.png",
             title: "QC Output",
