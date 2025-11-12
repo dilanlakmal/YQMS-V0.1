@@ -50,6 +50,7 @@ import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import QCWashingPage from "./pages/QCWashing.jsx";
+import SystemTranslator from "./pages/SystemTranslator.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -299,6 +300,7 @@ function AppContent() {
           {isAuthenticated ? (
             <>
               <Route path="/home" element={<Home />} />
+              <Route path="/system-translator" element={<SystemTranslator />} />
               <Route
                 path="/details"
                 element={

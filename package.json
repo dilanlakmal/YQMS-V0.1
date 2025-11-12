@@ -16,6 +16,7 @@
   },
   "proxy": "https://192.167.12.162:5001",
   "dependencies": {
+    "@azure-rest/ai-translation-text": "^1.0.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@fortawesome/fontawesome-svg-core": "^6.7.2",

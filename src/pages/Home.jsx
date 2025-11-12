@@ -369,7 +369,8 @@ import {
   Shield,
   Sun,
   Moon,
-  ClipboardList
+  ClipboardList,
+  Languages
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
@@ -747,6 +748,21 @@ function Home() {
             image: "assets/Home/sunrise.png",
             title: "QC1 Sunrise",
             description: "Upload Excel Data"
+          }
+        ]
+      },
+      {
+        id: "translator-system",
+        title: "AI Agent",
+        icon: <Layers className="w-5 h-5 mr-2" />, // You can use a different icon like Globe, Languages, etc.
+        bgColor: "bg-green-50 dark:bg-green-900/20",
+        items: [
+          {
+            path: "/system-translator",
+            roles: ["Admin", "Translator"], // Adjust roles as needed
+            image: "assets/Home/translator.png", // You'll need to add this image
+            title: "System Translator",
+            description: "Translate text and files"
           }
         ]
       }
