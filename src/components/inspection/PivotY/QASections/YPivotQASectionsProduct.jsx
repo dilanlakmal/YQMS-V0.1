@@ -1,7 +1,8 @@
-import { FileText, Layers, Users } from "lucide-react";
+import { FileText, Layers, Users, MapPin } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import YPivotQASectionsProductCategory from "./YPivotQASectionsProductCategory";
 import YPivotQASectionsProductDefectManagement from "./YPivotQASectionsProductDefectManagement";
+import YPivotQASectionsLocationManagement from "./YPivotQASectionsLocationManagement";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -30,6 +31,12 @@ const YPivotQASectionsProduct = () => {
         label: "Category Management",
         icon: <Layers size={16} />,
         component: <YPivotQASectionsProductCategory />
+      },
+      {
+        id: "location",
+        label: "Location Management",
+        icon: <MapPin size={16} />,
+        component: <YPivotQASectionsLocationManagement />
       },
       {
         id: "defect",
