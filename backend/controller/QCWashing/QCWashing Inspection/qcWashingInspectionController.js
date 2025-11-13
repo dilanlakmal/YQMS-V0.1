@@ -979,17 +979,18 @@ export const savedMeasurementDataSpec = async (req, res) => {
 export const getqcwashingOrderSizes = async (req, res) => {
   const { orderNo, color } = req.params;
 
-  // Sanitizer function for color
+  // Sanitizer function for color - handles special characters for Ubuntu compatibility
   const sanitizeColor = (colorInput) => {
     if (!colorInput || typeof colorInput !== 'string') {
       return '';
     }
     
+    // For Ubuntu servers, we need to preserve special characters but normalize them
     return colorInput
       .trim()                    // Remove leading/trailing whitespace
-      .toLowerCase()             // Convert to lowercase for consistent comparison
-      .replace(/[^a-z0-9\s-]/gi, '') // Remove special characters, keep alphanumeric, spaces, and hyphens
-      .replace(/\s+/g, ' ');     // Replace multiple spaces with single space
+      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+      .replace(/\/+/g, '/')      // Replace multiple slashes with single slash
+      .replace(/\\+/g, '\\');   // Replace multiple backslashes with single backslash
   };
 
   // Apply sanitizer to color
@@ -1018,7 +1019,11 @@ export const getqcwashingOrderSizes = async (req, res) => {
     orders.forEach((order) => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
         const matchingColor = order.OrderColors.find(
-          (c) => sanitizeColor(c.Color) === sanitizedColor // Use sanitized comparison
+          (c) => {
+            const orderColor = sanitizeColor(c.Color);
+            // Case-insensitive comparison for better matching
+            return orderColor.toLowerCase() === sanitizedColor.toLowerCase();
+          }
         );
 
         if (matchingColor && matchingColor.OrderQty) {

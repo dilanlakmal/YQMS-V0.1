@@ -23,7 +23,18 @@ const MeasurementDetailsSection = ({
   formData = {}
 }) => {
   const sanitizeColor = (colorInput) => {
-    return cleanup(colorInput);
+    if (!colorInput || typeof colorInput !== 'string') {
+      return '';
+    }
+    
+    // Clean the color string and ensure proper encoding for Ubuntu servers
+    return colorInput
+      .trim()                    // Remove leading/trailing whitespace
+      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
+      .replace(/\/+/g, '/')      // Replace multiple slashes with single slash
+      .replace(/\\+/g, '\\')    // Replace multiple backslashes with single backslash
+      .replace(/:/g, ':')        // Keep colons as-is
+      .replace(/%/g, '%');       // Keep percent signs as-is
   };
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
