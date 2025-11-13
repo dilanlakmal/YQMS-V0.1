@@ -52,7 +52,7 @@ import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFS
 import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
 import QCWashingPage from "./pages/QCWashing.jsx";
 import PackingList from "./pages/PackingList.jsx";
-import Measurement from "./pages/measurement.jsx";
+import Measurement from "./pages/Measurement.jsx";
 
 //Languages
 import "../src/lang/i18n";
