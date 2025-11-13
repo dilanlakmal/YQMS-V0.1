@@ -5,7 +5,7 @@ import Swal from "sweetalert2";
 import MeasurementNumPad from "../../cutting/MeasurementNumPad";
 import SummaryCard from "../Home/SummaryCard";
 import PropTypes from "prop-types";
-import { sanitize } from "../../../../utils/measurementHelperFunction";
+import { cleanup } from "../../../../utils/measurementHelperFunction";
 
 const MeasurementDetailsSection = ({
   orderNo,
@@ -23,7 +23,7 @@ const MeasurementDetailsSection = ({
   formData = {}
 }) => {
   const sanitizeColor = (colorInput) => {
-    return sanitize(colorInput);
+    return cleanup(colorInput);
   };
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
