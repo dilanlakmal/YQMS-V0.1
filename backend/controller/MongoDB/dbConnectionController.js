@@ -20,7 +20,7 @@ import createQC2WorkersDataModel from "../../models/QC2WorkersData.js";
 import createQC2BGradeModel from "../../models/QC2BGrade.js";
 import createQC2TaskModel from "../../models/QC2Task.js";
 import createIEWorkerTaskModel from "../../models/IEWorkerTask.js";
-import createInlineOrdersModel from "../../models/InlineOrders.js"; // Import the new model
+import createInlineOrdersModel from "../../models/InlineOrders.js";
 import createLineSewingWorkerModel from "../../models/LineSewingWorkers.js";
 import createQCInlineRovingModel from "../../models/QC_Inline_Roving.js";
 import createPairingDefectModel from "../../models/PairingDefect.js";
@@ -28,14 +28,15 @@ import createAccessoryIssueModel from "../../models/AccessoryIssue.js";
 import createQCRovingPairingModel from "../../models/QCRovingPairing.js";
 import createSewingDefectsModel from "../../models/SewingDefects.js";
 
-import createCutPanelOrdersModel from "../../models/CutPanelOrders.js"; // New model import
-import createCuttingInspectionModel from "../../models/cutting_inspection.js"; // New model import
-import createCuttingMeasurementPointModel from "../../models/CuttingMeasurementPoints.js"; // New model import
+import createCutPanelOrdersModel from "../../models/CutPanelOrders.js";
+import createCuttingInspectionModel from "../../models/cutting_inspection.js";
+import createCuttingMeasurementPointModel from "../../models/CuttingMeasurementPoints.js";
 import createCuttingFabricDefectModel from "../../models/CuttingFabricDefects.js";
 import createCuttingIssueModel from "../../models/CuttingIssues.js";
 import createAQLChartModel from "../../models/AQLChart.js";
 
-import createQC1SunriseModel from "../../models/QC1Sunrise.js"; // New model import
+import createQC1SunriseModel from "../../models/QC1Sunrise.js";
+import createQC1SunriseSummaryModel from "../../models/QC1SunriseSummary.js";
 
 import createHTFirstOutputModel from "../../models/SCC/HTFirstOutput.js";
 import createFUFirstOutputModel from "../../models/SCC/FUFirstOutput.js";
@@ -157,7 +158,10 @@ export const CuttingFabricDefect =
   createCuttingFabricDefectModel(ymProdConnection);
 export const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 export const AQLChart = createAQLChartModel(ymProdConnection);
+
 export const QC1Sunrise = createQC1SunriseModel(ymProdConnection);
+export const QC1SunriseSummary = createQC1SunriseSummaryModel(ymProdConnection);
+
 export const HTFirstOutput = createHTFirstOutputModel(ymProdConnection);
 export const FUFirstOutput = createFUFirstOutputModel(ymProdConnection);
 export const SCCDailyTesting = createSCCDailyTestingModel(ymProdConnection);

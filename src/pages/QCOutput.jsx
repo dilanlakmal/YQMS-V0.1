@@ -1,7 +1,16 @@
 import React, { useState, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { BarChart, List, Factory, Users } from "lucide-react";
+import {
+  BarChart,
+  List,
+  Factory,
+  Users,
+  RefreshCw,
+  LayoutDashboard
+} from "lucide-react";
 import QCWorkersQCInspection from "../components/inspection/qcOutput/QCWorkersQCInspection";
+import SunriseDataSync from "../components/inspection/qcOutput/SunriseDataSync";
+import QC1Dashboard from "../components/inspection/qcOutput/QC1Dashboard";
 
 // Placeholder for other tabs
 const PlaceholderComponent = ({ title }) => (
@@ -26,6 +35,18 @@ const QCOutput = ({ user }) => {
         label: "QC1/QC2 Inspection",
         icon: <BarChart size={18} />,
         component: <QCWorkersQCInspection />
+      },
+      {
+        id: "dataSync",
+        label: "Sunrise Data Sync",
+        icon: <RefreshCw size={18} />,
+        component: <SunriseDataSync />
+      },
+      {
+        id: "qc1Dashboard",
+        label: "QC1 Dashboard",
+        icon: <LayoutDashboard size={18} />,
+        component: <QC1Dashboard />
       },
       {
         id: "qc1Summary",

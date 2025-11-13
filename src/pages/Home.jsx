@@ -171,7 +171,7 @@ function Home() {
           },
           {
             path: "/measurement",
-            roles: ["QC Washing"],
+            roles: ["QC Washing", "QA"],
             image: "assets/Home/measurement.png",
             title: t("home.Measurement"),
             description: "All Style measurements"

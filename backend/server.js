@@ -77,6 +77,8 @@ import downloadData from "./routes/DownloadData/downloadDataRoutes.js";
 QC1 Inspection Imports
 ------------------------------ */
 import qc1Inspection from "./routes/QC1Inspection/qc1InspectionRoutes.js";
+import QC1SunriseReportRoutes from "./routes/QC1Inspection/QCReportServer.js";
+import QC1SummaryDashboardRoutes from "./routes/QC1Inspection/QC1SummaryDashboard.js";
 
 /* -----------------------------
 QC1 Sunrise Imports
@@ -270,6 +272,8 @@ app.use(downloadData);
 QC1 Inspection Routes
 ------------------------------ */
 app.use(qc1Inspection);
+app.use(QC1SunriseReportRoutes);
+app.use(QC1SummaryDashboardRoutes);
 
 /* -----------------------------
 QC1 Sunrise Routes
