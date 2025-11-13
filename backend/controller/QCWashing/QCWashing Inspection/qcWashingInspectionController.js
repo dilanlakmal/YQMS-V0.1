@@ -464,33 +464,41 @@ export const saveQCWashingInspectionData = async (req, res) => {
     }
 };
 
- // Get saved size
- export const getqcwashingSavedColor = async (req, res) => {
-    try {
-        const { orderNo, color } = req.params;
-        const qcRecord = await QCWashing.findOne({
-          orderNo: orderNo,
-          colorName: color,
-          isAutoSave: true
-        });
+// Get saved sizes for a specific order and color
+export const getqcwashingSavedColor = async (req, res) => {
+  try {
+    const { orderNo, color } = req.params;
     
-        if (qcRecord && qcRecord.color && qcRecord.color.measurementDetails) {
-          const savedSizes = [];
-          qcRecord.color.measurementDetails.forEach((value, key) => {
-            if (key.startsWith("size_")) {
-              savedSizes.push(value.size);
-            }
-          });
-          res.json({ success: true, savedSizes: savedSizes });
-        } else {
-          res.json({ success: true, savedSizes: [] });
+    // Decode the color parameter from URL
+    const decodedColor = decodeURIComponent(color);
+    
+    // Try to find record with exact color match (case-insensitive)
+    const qcRecord = await QCWashing.findOne({
+      orderNo: orderNo,
+      $or: [
+        { colorName: { $regex: new RegExp(`^${decodedColor}$`, 'i') } },
+        { color: { $regex: new RegExp(`^${decodedColor}$`, 'i') } }
+      ],
+      isAutoSave: true
+    });
+
+    if (qcRecord && qcRecord.color && qcRecord.color.measurementDetails) {
+      const savedSizes = [];
+      qcRecord.color.measurementDetails.forEach((value, key) => {
+        if (key.startsWith("size_")) {
+          savedSizes.push(value.size);
         }
-      } catch (error) {
-        console.error("Get saved sizes error:", error);
-        res
-          .status(500)
-          .json({ success: false, message: "Failed to get saved sizes" });
-      }
+      });
+      res.json({ success: true, savedSizes: savedSizes });
+    } else {
+      res.json({ success: true, savedSizes: [] });
+    }
+  } catch (error) {
+    console.error("Get saved sizes error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get saved sizes" });
+  }
 };
 
 // Updated inspection-update endpoint
@@ -1549,6 +1557,7 @@ export const getqcwashingOverAllSummary = async (req, res) => {
 // GET - Get total order qty for a specific orderNo and color
 export const getqcwashingOrderColorQty = async (req, res) => {
   const { orderNo, color } = req.params;
+   const decodedColor = decodeURIComponent(color);
   const collection = ymProdConnection.db.collection("dt_orders");
   try {
     const orders = await collection.find({ Order_No: orderNo }).toArray();
@@ -1561,7 +1570,7 @@ export const getqcwashingOrderColorQty = async (req, res) => {
     orders.forEach((order) => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
         const colorObj = order.OrderColors.find(
-          (c) => c.Color.toLowerCase() === color.toLowerCase()
+          (c) => c.Color.toLowerCase() === decodedColor.toLowerCase()
         );
         if (colorObj && Array.isArray(colorObj.OrderQty)) {
           colorObj.OrderQty.forEach((sizeObj) => {
@@ -1573,10 +1582,10 @@ export const getqcwashingOrderColorQty = async (req, res) => {
         }
       }
     });
-    res.json({ success: true, orderNo, color, colorOrderQty: totalQty });
+    res.json({ success: true, orderNo, color: decodedColor, colorOrderQty: totalQty });
   } catch (error) {
     console.error(
-      `Error fetching color order qty for ${orderNo} / ${color}:`,
+      `Error fetching color order qty for ${orderNo} / ${decodedColor}:`,
       error
     );
     res.status(500).json({

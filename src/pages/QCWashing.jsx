@@ -12,6 +12,7 @@ import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
 import { cleanup } from "../utils/measurementHelperFunction";
+import { encodeColorForUrl } from "../utils/colorUtils";
 
 const normalizeImageSrc = (src) => {    
   if (!src) return "";
@@ -714,18 +715,28 @@ const QCWashingPage = () => {
         return;
       }
       try {
+        // Clean and encode the color parameter properly
+        const encodedColor = encodeColorForUrl(formData.color);
+        
         const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
-            formData.orderNo
-          }/${encodeURIComponent(formData.color)}`
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`
         );
+        
+        if (!response.ok) {
+          console.warn(`Failed to fetch color order qty: ${response.status} ${response.statusText}`);
+          setColorOrderQty(null);
+          return;
+        }
+        
         const data = await response.json();
         if (data.success) {
           setColorOrderQty(data.colorOrderQty);
         } else {
+          console.warn('Color order qty fetch unsuccessful:', data.message);
           setColorOrderQty(null);
         }
       } catch (error) {
+        console.error('Error fetching color order qty:', error);
         setColorOrderQty(null);
       }
     };
