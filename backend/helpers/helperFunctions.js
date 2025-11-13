@@ -92,6 +92,11 @@ export const sanitize = (input) => {
   return sane;
 };
 
+export const cleanup = (input) => {
+  if (typeof input !== "string") input = String(input);
+  return input;
+};
+
 export const formatDate = (date) => {
   const d = new Date(date);
   return `${(d.getMonth() + 1).toString().padStart(2, "0")}/${d

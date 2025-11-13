@@ -11,7 +11,6 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
-import { sanitize } from "../utils/measurementHelperFunction";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
@@ -723,7 +722,7 @@ const QCWashingPage = () => {
         const response = await fetch(
           `${API_BASE_URL}/api/qc-washing/order-color-qty/${
             formData.orderNo
-          }/${encodeURIComponent(sanitize(formData.color))}`
+          }/${encodeURIComponent(formData.color)}`
         );
         const data = await response.json();
         if (data.success) {
@@ -1984,6 +1983,34 @@ const QCWashingPage = () => {
     }
   };
 
+  const autoSaveOverallSummary = async (summary, recordId) => {
+    if (!recordId || !summary) return;
+    try {
+      await fetch(
+        `${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ summary })
+        }
+      );
+    } catch (error) {
+      console.error("Failed to auto-save overall summary:", error);
+    }
+  };
+
+  // Function to calculate and update summary data (NEW/MODIFIED)
+  const updateSummaryData = (currentFormData) => {
+    const summary = calculateSummaryData(currentFormData);
+    setFormData((prevData) => ({
+      ...prevData,
+      ...summary
+    }));
+    if (recordId) {
+      autoSaveSummary(summary, recordId);
+    }
+  };
+
   const clearFormData = () => {
     // Reset form data to initial state
     setFormData({
@@ -2201,9 +2228,7 @@ const QCWashingPage = () => {
     setIsDataLoading(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${encodeURIComponent(
-          sanitize(color)
-        )}`
+        `${API_BASE_URL}/api/qc-washing/load-color-data/${orderNo}/${color}`
       );
 
       if (response.ok) {
@@ -2430,9 +2455,7 @@ const QCWashingPage = () => {
   const loadSavedSizes = async (orderNo, color) => {
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${encodeURIComponent(
-          sanitize(color)
-        )}`
+        `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${color}`
       );
 
       if (!response.ok) {

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import PropTypes from "prop-types";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
-import { sanitize } from "../../../../utils/measurementHelperFunction";
+import { cleanup } from "../../../../utils/measurementHelperFunction";
 
 const OrderDetailsSection = ({
   formData,
@@ -710,7 +710,7 @@ const OrderDetailsSection = ({
     try {
       const response = await fetch(
         `${API_BASE_URL}/api/qc-washing/saved-sizes/${orderNo}/${encodeURIComponent(
-          sanitize(color)
+          color
         )}`
       );
 
@@ -813,7 +813,9 @@ const OrderDetailsSection = ({
             </label>
             <select
               value={formData.color}
-              onChange={(e) => handleInputChange("color", e.target.value)}
+              onChange={(e) => {
+                handleInputChange("color", e.target.value);
+              }}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
               disabled={isSaved}
             >
@@ -825,7 +827,7 @@ const OrderDetailsSection = ({
                   </option>
                 ))}
             </select>
-            {colorOrderQty !== null && (
+            {colorOrderQty !== null && colorOrderQty !== undefined && (
               <span
                 className="ml-2 flex items-center px-3 py-1 rounded-full font-semibold text-gray-800 bg-yellow-100 border border-yellow-300 dark:bg-yellow-700 dark:text-yellow-100 dark:border-yellow-600"
                 style={{ minWidth: 60 }}

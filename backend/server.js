@@ -15,8 +15,8 @@ import user from "./routes/User/userRoutes.js";
    SQL Query Import
 /------------------------------ */
 
-import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Cutting
@@ -62,6 +62,11 @@ import aql from "./routes/Common/AQLRoutes.js";
 import buyerSpec from "./routes/Common/DTOrdersBuyerSpecRoutes.js";
 /*-------------DT-Orders Imports --------------*/
 import dtOrders from "./routes/Common/DTOrdersRoutes.js";
+
+/* -----------------------------
+Measurement Imports
+------------------------------ */
+import measurement from "./routes/Measurement/measurementRoutes.js";
 
 /* -----------------------------
 Download Data Imports
@@ -239,7 +244,7 @@ app.use(user);
 /* ------------------------------
   SQL Query routes start
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 
 /* -----------------------------
 Commin file  Routes
@@ -250,6 +255,11 @@ app.use(aql);
 app.use(buyerSpec);
 /* ----------- DT_Orders -----------------*/
 app.use(dtOrders);
+
+/* -----------------------------
+Measurement Routes
+------------------------------ */
+app.use(measurement);
 
 /* -----------------------------
 Download Data Routes

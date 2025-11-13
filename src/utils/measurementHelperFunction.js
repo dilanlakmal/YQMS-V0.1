@@ -5,3 +5,8 @@ export const sanitize = (input) => {
   if (sane === "." || sane === "..") return "_";
   return sane;
 };
+
+export const cleanup = (input) => {
+  if (typeof input !== "string") input = String(input);
+  return input;
+};
