@@ -273,7 +273,8 @@ export default function RoleManagement() {
     "QA Clerk",
     "ANF QA",
     "QC Washing",
-    "QC1 Sub Con"
+    "QC1 Sub Con",
+    "Measurement"
   ];
 
   // Prepare sorted table data for rendering
@@ -461,9 +462,19 @@ export default function RoleManagement() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Users ({selectedUsers.length} selected)
-              </label>
+              <div className="flex justify-between items-center">
+                <label className="block text-sm font-medium text-gray-700">
+                  Users ({selectedUsers.length} selected)
+                </label>
+                {matchingUsers.length > 0 && (
+                  <button
+                    onClick={() => setSelectedUsers(matchingUsers.map(user => user.emp_id))}
+                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                  >
+                    Add All ({matchingUsers.length})
+                  </button>
+                )}
+              </div>
               <div className="mt-1 border rounded-md p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
                 <div className="flex flex-wrap gap-4">
                   {matchingUsers.map((user) => (
