@@ -4,7 +4,7 @@ import {
   saveManualqc2UploadData,
   getQC2WorkerData,
   getQCWashingOldData
-} from "../../controller/QC2_Upload_data/qc2uploadController.js";
+} from "../../controller/QC2_Upload_Data/qc2UploadController.js";
 
 const router = express.Router();
 
