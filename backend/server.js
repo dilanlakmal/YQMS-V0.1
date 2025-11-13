@@ -28,7 +28,7 @@ import cuttinginspection from "./routes/Cutting/CuttingInspection/cuttingInspect
 import cuttingissue from "./routes/Cutting/CuttingInspection/cuttingIssueRoutes.js";
 import cuttingMeasurementPoints from "./routes/Cutting/Cutting_Admin_MeasurementPoint/cuttingMeasurementPointsRoutes.js";
 import cuttingMeasurementPointEdit from "./routes/Cutting/Cutting_Admin_MeasurementPoint/cuttingMeasurementPointEditRoutes.js";
-import cuttingInspectionReportManagemenrtt from "./routes/Cutting/Cutting_Admin_Inspection_Report/cuttingInspectionReportManageRoutes.js";
+import cuttingInspectionReportManagemenrtt from "./routes/Cutting/Cutting_Admin_Inspection_Report/cuttinginspectionReportManageRoutes.js";
 import cuttingTrend from "./routes/Cutting//Cutting_Trend/cuttingTrendRoutes.js";
 import cuttingReport from "./routes/Cutting/CuttingReport/reportRoutes.js";
 import cuttingDashboard from "./routes/Cutting/CuttingDashboard/cuttingDashboardRoutes.js";
@@ -71,7 +71,7 @@ import measurement from "./routes/Measurement/measurementRoutes.js";
 /* -----------------------------
 Download Data Imports
 ------------------------------ */
-import downloadData from "./routes/DownloadData/downloaddataRoutes.js";
+import downloadData from "./routes/DownloadData/downloadDataRoutes.js";
 
 /* -----------------------------
 QC1 Inspection Imports
@@ -115,7 +115,7 @@ import ieWorkerAssignement from "./routes/QC2System/IEAdmin/IEWorkerAssignmentRo
 import qc2SubConFactory from "./routes/QC2System/SystemAdmin/QC2SubConFactoryRoutes.js";
 import qc2Defects from "./routes/QC2System/SystemAdmin/QC2DefectsRoutes.js";
 /* ------------Bundle Registarion-----------------*/
-import bundleRegistrationInspection from "./routes/QC2System/BundleRegistration/bundelRestrationInspectionRoutes.js";
+import bundleRegistrationInspection from "./routes/QC2System/BundleRegistration/BundelRestrationInspectionRoutes.js";
 import bundleRegistrationData from "./routes/QC2System/BundleRegistration/BundleRegistationDataRoutes.js";
 import bundleRegistationReprint from "./routes/QC2System/BundleRegistration/BundleRegistrationReprintRoutes.js";
 /* ------------Ironing-----------------*/
