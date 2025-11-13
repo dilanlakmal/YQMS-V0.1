@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
@@ -103,6 +103,12 @@ const QCWorkersQCInspection = () => {
 
   const topNOptions = [3, 5, 7, 10];
 
+  // Create a memoized Set for quick filtering of selected defects ---
+  const selectedDefectNames = useMemo(() => {
+    // Create a Set of the selected defect values (e.g., ['Uneven Seam', 'Broken Stitch']) for fast lookups.
+    return new Set(filters.selectedDefects.map((d) => d.value));
+  }, [filters.selectedDefects]);
+
   const fetchFilterOptions = useCallback(async () => {
     try {
       const params = {
@@ -114,7 +120,7 @@ const QCWorkersQCInspection = () => {
         `${API_BASE_URL}/api/qc-output/filters`,
         { params }
       );
-      // --- FIX: Set options for both QC ID and Defect Name dropdowns ---
+      //  Set options for both QC ID and Defect Name dropdowns ---
       setQcIdOptions(
         response.data.qcIds.map((id) => ({ value: id, label: id }))
       );
@@ -128,7 +134,7 @@ const QCWorkersQCInspection = () => {
 
   useEffect(() => {
     if (filters.startDate && filters.endDate && filters.reportType) {
-      // --- FIX: Call the renamed function ---
+      //  Call the renamed function ---
       fetchFilterOptions();
     }
   }, [fetchFilterOptions]);
@@ -137,7 +143,7 @@ const QCWorkersQCInspection = () => {
     setIsLoading(true);
     setError(null);
     try {
-      // --- FIX: Transform the selectedDefects array into a comma-separated string for the API query ---
+      //  Transform the selectedDefects array into a comma-separated string for the API query ---
       const defectNamesParam = filters.selectedDefects
         .map((d) => d.value)
         .join(",");
@@ -147,7 +153,7 @@ const QCWorkersQCInspection = () => {
         endDate: filters.endDate.toISOString().split("T")[0],
         reportType: filters.reportType?.value,
         qcId: filters.qcId?.value,
-        // --- FIX: Add the new parameter to the request if it exists ---
+        //  Add the new parameter to the request if it exists ---
         ...(defectNamesParam && { defectNames: defectNamesParam })
       };
       const response = await axios.get(
@@ -167,7 +173,7 @@ const QCWorkersQCInspection = () => {
     setFilters((f) => ({
       ...f,
       [name]: value,
-      // --- FIX: Reset dependent filters when a primary filter changes ---
+      //  Reset dependent filters when a primary filter changes ---
       ...(name === "reportType" && { qcId: null, selectedDefects: [] })
     }));
   };
@@ -178,7 +184,7 @@ const QCWorkersQCInspection = () => {
       endDate: new Date(),
       reportType: { value: "QC1-Inside", label: "QC1-Inside (Seq 39)" },
       qcId: null,
-      // --- FIX: Reset the new defect filter state as well ---
+      //  Reset the new defect filter state as well ---
       selectedDefects: []
     });
     setResultsData([]);
@@ -234,7 +240,7 @@ const QCWorkersQCInspection = () => {
             styles={reactSelectStyles}
           />
         </FilterField>
-        {/* --- FIX: Add new multi-select filter for Defect Names --- */}
+        {/*  Add new multi-select filter for Defect Names --- */}
         <FilterField label="Defect Name">
           <Select
             isMulti
@@ -280,117 +286,127 @@ const QCWorkersQCInspection = () => {
 
       {!isLoading && !error && resultsData.length > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-          {resultsData.map((qc) => (
-            <div
-              key={qc.qcId}
-              className="bg-white dark:bg-gray-800/50 rounded-xl shadow-lg border dark:border-gray-700 flex flex-col"
-            >
-              {/* Header */}
-              <div className="p-4 flex items-center border-b dark:border-gray-700">
-                <img
-                  src={
-                    qc.facePhoto ||
-                    `https://ui-avatars.com/api/?name=${qc.qcName}&background=random`
-                  }
-                  alt={qc.qcName}
-                  className="w-16 h-16 rounded-full object-cover mr-4"
-                />
-                <div>
-                  <h3 className="font-bold text-lg">{qc.qcName}</h3>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
-                    {qc.qcId}
-                  </p>
+          {resultsData.map((qc) => {
+            // Filter the defects for display based on the filter selection ---
+            const defectsToDisplay =
+              selectedDefectNames.size > 0
+                ? qc.topDefects.filter((defect) =>
+                    selectedDefectNames.has(defect.defectName)
+                  )
+                : qc.topDefects;
+
+            return (
+              <div
+                key={qc.qcId}
+                className="bg-white dark:bg-gray-800/50 rounded-xl shadow-lg border dark:border-gray-700 flex flex-col"
+              >
+                {/* Header */}
+                <div className="p-4 flex items-center border-b dark:border-gray-700">
+                  <img
+                    src={
+                      qc.facePhoto ||
+                      `https://ui-avatars.com/api/?name=${qc.qcName}&background=random`
+                    }
+                    alt={qc.qcName}
+                    className="w-16 h-16 rounded-full object-cover mr-4"
+                  />
+                  <div>
+                    <h3 className="font-bold text-lg">{qc.qcName}</h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-mono">
+                      {qc.qcId}
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              {/* Stats */}
-              <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-                <StatCard
-                  icon={<Package />}
-                  label="Total Output"
-                  value={qc.totalOutput.toLocaleString()}
-                />
-                <StatCard
-                  icon={<AlertCircle />}
-                  label="Total Defects"
-                  value={qc.totalDefect.toLocaleString()}
-                  colorClass="text-orange-500"
-                />
-                <StatCard
-                  icon={<Percent />}
-                  label="Defect Rate"
-                  value={`${qc.defectRate.toFixed(2)}%`}
-                  colorClass="text-red-500"
-                />
-              </div>
+                {/* Stats */}
+                <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <StatCard
+                    icon={<Package />}
+                    label="Total Output"
+                    value={qc.totalOutput.toLocaleString()}
+                  />
+                  <StatCard
+                    icon={<AlertCircle />}
+                    label="Total Defects"
+                    value={qc.totalDefect.toLocaleString()}
+                    colorClass="text-orange-500"
+                  />
+                  <StatCard
+                    icon={<Percent />}
+                    label="Defect Rate"
+                    value={`${qc.defectRate.toFixed(2)}%`}
+                    colorClass="text-red-500"
+                  />
+                </div>
 
-              {/* Top Defects */}
-              <div className="p-4 border-t dark:border-gray-700">
-                <div className="flex justify-between items-center mb-3">
-                  <h4 className="text-md font-semibold">Top Defects</h4>
-                  <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-full text-xs">
-                    {topNOptions.map((n) => (
+                {/* Top Defects */}
+                <div className="p-4 border-t dark:border-gray-700">
+                  <div className="flex justify-between items-center mb-3">
+                    <h4 className="text-md font-semibold">Top Defects</h4>
+                    <div className="flex items-center border border-gray-300 dark:border-gray-600 rounded-full text-xs">
+                      {topNOptions.map((n) => (
+                        <button
+                          key={n}
+                          onClick={() => setTopN(n)}
+                          className={`px-3 py-1 rounded-full transition-colors duration-200 ${
+                            topN === n
+                              ? "bg-indigo-600 text-white"
+                              : "hover:bg-gray-100 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          {n}
+                        </button>
+                      ))}
                       <button
-                        key={n}
-                        onClick={() => setTopN(n)}
+                        onClick={() => setTopN(Infinity)}
                         className={`px-3 py-1 rounded-full transition-colors duration-200 ${
-                          topN === n
+                          topN === Infinity
                             ? "bg-indigo-600 text-white"
                             : "hover:bg-gray-100 dark:hover:bg-gray-700"
                         }`}
                       >
-                        {n}
+                        All
                       </button>
-                    ))}
-                    <button
-                      onClick={() => setTopN(Infinity)}
-                      className={`px-3 py-1 rounded-full transition-colors duration-200 ${
-                        topN === Infinity
-                          ? "bg-indigo-600 text-white"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-700"
-                      }`}
-                    >
-                      All
-                    </button>
+                    </div>
                   </div>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-100 dark:bg-gray-700/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
-                      <tr>
-                        <th className="p-2 text-left">Defect Name</th>
-                        <th className="p-2 text-center">Qty</th>
-                        <th className="p-2 text-right">Rate</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y dark:divide-gray-700">
-                      {qc.topDefects.slice(0, topN).map((defect) => (
-                        <tr key={defect.defectName}>
-                          <td className="p-2 whitespace-nowrap">
-                            {defect.defectName}
-                          </td>
-                          <td className="p-2 text-center font-semibold">
-                            {defect.qty}
-                          </td>
-                          <td className="p-2 text-right font-mono text-red-500">
-                            {defect.defectRate.toFixed(2)}%
-                          </td>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-100 dark:bg-gray-700/50 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                        <tr>
+                          <th className="p-2 text-left">Defect Name</th>
+                          <th className="p-2 text-center">Qty</th>
+                          <th className="p-2 text-right">Rate</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody className="divide-y dark:divide-gray-700">
+                        {defectsToDisplay.slice(0, topN).map((defect) => (
+                          <tr key={defect.defectName}>
+                            <td className="p-2 whitespace-nowrap">
+                              {defect.defectName}
+                            </td>
+                            <td className="p-2 text-center font-semibold">
+                              {defect.qty}
+                            </td>
+                            <td className="p-2 text-right font-mono text-red-500">
+                              {defect.defectRate.toFixed(2)}%
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <Link
+                    to={buildSeeMoreLink(qc.qcId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-sm text-indigo-600 dark:text-indigo-400 hover:underline mt-4"
+                  >
+                    See more details...
+                  </Link>
                 </div>
-                <Link
-                  to={buildSeeMoreLink(qc.qcId)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-block text-sm text-indigo-600 dark:text-indigo-400 hover:underline mt-4"
-                >
-                  See more details...
-                </Link>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
       {!isLoading && !error && resultsData.length === 0 && (
