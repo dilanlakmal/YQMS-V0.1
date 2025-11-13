@@ -52,8 +52,7 @@ import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurem
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
 import PackingList from "./pages/PackingList.jsx";
-import Measurement from "./pages/measurement.jsx";
-
+import Measurement from "./pages/Measurement.jsx";
 //Languages
 import "../src/lang/i18n";
 

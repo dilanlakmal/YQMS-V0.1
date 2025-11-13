@@ -1,21 +1,21 @@
-import {
+import { 
   QC2OrderData,
   ymProdConnection,
   SCCHTOperator,
   SCCFUOperator,
   SCCElasticOperator,
   SubconSewingQc1Report,
-  SubconSewingQAReport
-} from "../controller/MongoDB/dbConnectionController.js";
-import multer from "multer";
-import path from "path";
-import {
-  // __dirname,
-  __backendDir
-} from "../Config/appConfig.js";
+  SubconSewingQAReport,
+ } from "../controller/MongoDB/dbConnectionController.js";
+ import multer from "multer";
+ import path from "path";
+ import {
+  //  __dirname, 
+   __backendDir
+  } from "../Config/appConfig.js";
 
 export const normalizeDateString = (dateStr) => {
-  if (!dateStr) return null;
+   if (!dateStr) return null;
   try {
     const date = new Date(dateStr);
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -54,6 +54,7 @@ export const normalizeDateString = (dateStr) => {
 //   }
 // };
 
+
 export const getResult = (bundleQtyCheck, totalReject) => {
   if (bundleQtyCheck === 5) return totalReject > 1 ? "Fail" : "Pass";
   if (bundleQtyCheck === 9) return totalReject > 3 ? "Fail" : "Pass";
@@ -63,7 +64,7 @@ export const getResult = (bundleQtyCheck, totalReject) => {
 };
 
 export const formatDateToMMDDYYYY = (dateInput) => {
-  if (!dateInput) return null;
+   if (!dateInput) return null;
   const d = new Date(dateInput); // Handles ISO string or Date object
   const month = d.getMonth() + 1; // No padding
   const day = d.getDate(); // No padding
@@ -92,11 +93,18 @@ export const sanitize = (input) => {
   return sane;
 };
 
-// New cleanup function that accepts all characters and symbols
 export const cleanup = (input) => {
   if (typeof input !== "string") input = String(input);
   return input;
 };
+
+
+// export const getOrdinal = (n) => {
+//   if (n <= 0) return String(n);
+//   const s = ["th", "st", "nd", "rd"];
+//   const v = n % 100;
+//   return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
+// }
 
 export const formatDate = (date) => {
   const d = new Date(date);
@@ -107,7 +115,7 @@ export const formatDate = (date) => {
 };
 
 export const escapeRegExp = (string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); 
 };
 
 // This endpoint is unused
@@ -151,16 +159,17 @@ export async function fetchOrderDetails(mono) {
 // Helper function to get the correct operator model
 export const getOperatorModel = (type) => {
   switch (type.toLowerCase()) {
-    case "ht":
-      return SCCHTOperator;
-    case "fu":
-      return SCCFUOperator;
-    case "elastic":
-      return SCCElasticOperator;
-    default:
-      return null;
-  }
+      case "ht":
+        return SCCHTOperator;
+      case "fu":
+        return SCCFUOperator;
+      case "elastic":
+        return SCCElasticOperator;
+      default:
+        return null;
+    }
 };
+
 
 //washing live dashboard
 export const getDayRange = (date) => {
@@ -174,12 +183,12 @@ export const getDayRange = (date) => {
 //Roving Buyer selection
 
 const BUYER_MAPPINGS = [
-  { pattern: "COM", name: "MWW" }, // "COM" is intentionally first to be checked before "CO"
+  { pattern: "COM", name: "MWW" },    // "COM" is intentionally first to be checked before "CO"
   { pattern: "CO", name: "Costco" },
   { pattern: "AR", name: "Aritzia" },
   { pattern: "RT", name: "Reitmans" },
   { pattern: "AF", name: "ANF" },
-  { pattern: "NT", name: "STORI" }
+  { pattern: "NT", name: "STORI" },
   // Add more mappings here as needed
 ];
 
@@ -296,6 +305,7 @@ export const buildReportMatchPipeline = (filters) => {
   return pipeline;
 };
 
+
 // Use memoryStorage to handle the file as a buffer in memory first.
 const qc2MemoryStorage = multer.memoryStorage();
 
@@ -312,6 +322,7 @@ export const uploadQc2Image = multer({
     }
   }
 });
+
 
 const rovingStorage = multer.memoryStorage();
 
@@ -333,7 +344,7 @@ export const rovingUpload = multer({
       );
       cb(new Error("Error: Images Only! (jpeg, jpg, png, gif)"));
     }
-  }
+  },
 });
 
 export const getBuyerFromMoNumber = (moNo) => {
@@ -355,12 +366,7 @@ export const getBuyerFromMoNumber = (moNo) => {
   return "Other";
 };
 
-export const sccUploadPath = path.join(
-  __backendDir,
-  "public",
-  "storage",
-  "scc_images"
-);
+export const sccUploadPath = path.join(__backendDir, "public", "storage", "scc_images");
 //fs.mkdirSync(sccUploadPath, { recursive: true }); // Make sure directory exists
 
 // 2. MODIFIED: Use memoryStorage to process the image buffer in RAM before saving
@@ -471,6 +477,7 @@ export const generateSubconReportID = async () => {
   return reportID;
 };
 
+
 // QA Standered defect Imagers//
 const qaImageStorage = multer.memoryStorage();
 export const qaImageUpload = multer({
@@ -479,7 +486,7 @@ export const qaImageUpload = multer({
 });
 
 // Helper function to generate a unique Report ID for QA
-export const generateSubconQAReportID = async () => {
+ export const generateSubconQAReportID = async () => {
   const date = new Date();
   const year = date.getFullYear().toString().slice(-2);
   const month = (date.getMonth() + 1).toString().padStart(2, "0");
@@ -510,21 +517,22 @@ export const uploadRovingImage = multer({
   storage: rovingImageStorage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+      cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed'), false);
     }
   }
 });
 
 // MODIFIED: Use memoryStorage to handle the file in memory for processing.
 const cuttingMemoryStorage = multer.memoryStorage();
-export const cutting_upload = multer({
+ export const cutting_upload = multer({
   storage: cuttingMemoryStorage,
   limits: { fileSize: 25 * 1024 * 1024 } // Increased limit to 25MB to handle uncompressed files from client
 });
+
 
 // Helper to parse pressure string to number (if needed, but schema now enforces Number)
 export const parsePressureToNumber = (pressureStr) => {
@@ -533,6 +541,7 @@ export const parsePressureToNumber = (pressureStr) => {
   const num = parseFloat(pressureStr);
   return isNaN(num) ? null : num;
 };
+
 
 // Helper function to generate all necessary date formats from a single input
 export const getConsolidatedDateFormats = (dateInput) => {
@@ -564,6 +573,7 @@ export const getConsolidatedDateFormats = (dateInput) => {
     isoEndDate: endOfDay
   };
 };
+
 
 // 1. Define the absolute destination path and ensure the directory exists
 const auditUploadPath = path.join(
@@ -604,6 +614,7 @@ export const audit_image_upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB limit
 });
 
+
 // Helper function to map page identifiers to keywords in processName
 export const getProcessKeywordForPage = (pageIdentifier) => {
   const keywordMap = {
@@ -623,6 +634,7 @@ export const qaAccuracyUpload = multer({
   storage: qaAccuracyStorage,
   limits: { fileSize: 25 * 1024 * 1024 }
 });
+
 
 // Helper function to generate date strings in M/D/YYYY format for filtering
 export const generateDateStringsCuttingDashboard = (startDate, endDate) => {
@@ -668,3 +680,8 @@ export const derivedBuyerLogic = {
     default: "Other"
   }
 };
+
+
+
+
+

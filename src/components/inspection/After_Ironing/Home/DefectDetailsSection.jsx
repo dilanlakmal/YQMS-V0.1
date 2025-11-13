@@ -21,6 +21,8 @@ const DefectDetailsSection = ({
   comment,
   setComment,
   defectsByPc,
+
+  
   setDefectsByPc,
   normalizeImageSrc,
 }) => {
@@ -84,7 +86,7 @@ const DefectDetailsSection = ({
   const handleAddPc = () => {
     setDefectsByPc(prev => ({
       ...prev,
-      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectName: '', defectQty: 1,  defectImages: [], isBodyVisible: true }],
+      [(Object.keys(prev).length || 0) + 1]: [{ id: 1, selectedDefect: '', defectName: '', defectQty: 1, defectImages: [], isBodyVisible: true }],
     }));
   };
   
@@ -153,7 +155,7 @@ const DefectDetailsSection = ({
       try {
         const compressedFile = await imageCompression(file, options);
         const preview = URL.createObjectURL(compressedFile);
-        setUploadedImages(prev => [...prev, { file: compressedFile, preview, name: compressedFile.name }]);
+        setUploadedImages(prev => [...prev, { file: compressedFile, preview, name: compressedFile.name, isExisting: false }]);
       } catch (error) {
         console.error('Image compression failed:', error);
         Swal.fire('Error', 'Failed to compress image.', 'error');
@@ -219,7 +221,7 @@ const DefectDetailsSection = ({
         ...prev,
         [pc]: prev[pc].map(d =>
           d.id === defectId
-            ? { ...d, defectImages: [...(d.defectImages || []), ...validImages] }
+            ? { ...d, defectImages: [...(d.defectImages || []), ...validImages.map(img => ({ ...img, isExisting: false }))] }
             : d
         )
       }));
@@ -308,7 +310,7 @@ const DefectDetailsSection = ({
           ...prev,
           [pc]: prev[pc].map(d =>
             d.id === defectId
-              ? { ...d, defectImages: [...(d.defectImages || []), capturedImage] }
+              ? { ...d, defectImages: [...(d.defectImages || []), { ...capturedImage, isExisting: false }] }
               : d
           )
         }));
@@ -329,7 +331,7 @@ const DefectDetailsSection = ({
     try {
       const capturedImage = await startCamera();
       if (capturedImage) {
-        setUploadedImages(prev => [...prev, capturedImage]);
+        setUploadedImages(prev => [...prev, { ...capturedImage, isExisting: false }]);
         Swal.fire({
           icon: 'success',
           title: 'Image captured successfully!',

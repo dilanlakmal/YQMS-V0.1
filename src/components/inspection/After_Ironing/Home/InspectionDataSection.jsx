@@ -478,6 +478,7 @@ const handleCheckpointDecisionChange = (index, value) => {
       );
     }
   }, [recordId]);
+  
 
   const colorShadeRows = defectData.filter(
     (d) => d.parameter && d.parameter.startsWith(PARAM_COLOR_SHADE)
@@ -736,14 +737,14 @@ const handleCheckpointDecisionChange = (index, value) => {
                           <td className="border px-4 py-2 dark:text-white">
                             <input
                               type="text"
-                              value={item.remark}
+                              value={item.remark || ''}
                               onChange={(e) => handleCheckpointRemarkChange(idx, e.target.value)}
                               className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
                               disabled={!isEditing}
                               placeholder={
                                 item.decision && item.options.find(opt => opt.name === item.decision)?.hasRemark
                                   ? `Auto-filled (${getCurrentLanguageCode(i18n).toUpperCase()})...`
-                                  : ""
+                                  : "Enter remark..."
                               }
                             />
                           </td>
@@ -945,7 +946,7 @@ const handleCheckpointDecisionChange = (index, value) => {
                           <td className="border border-gray-300 dark:bg-gray-700 dark:text-white dark:border-gray-600 px-4 py-2">
                             <input
                               type="text"
-                              value={item.remark}
+                              value={item.remark || ''}
                               onChange={(e) =>
                                 handleParamInputChange(
                                   rowIdx,
@@ -955,6 +956,7 @@ const handleCheckpointDecisionChange = (index, value) => {
                               }
                               className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
                               disabled={!isEditing}
+                              placeholder="Enter remark..."
                             />
                           </td>
                         </tr>

@@ -16,7 +16,7 @@ const OrderDetailsSection = ({
   onToggle,
   orderNoSuggestions,
   showOrderNoSuggestions,
-  setShowOrderNoSuggestions, 
+  setShowOrderNoSuggestions,
   colorOrderQty,
   activateNextSection,
   setRecordId,
@@ -24,6 +24,101 @@ const OrderDetailsSection = ({
   onLoadSavedDataById,
   onWashingValidationChange,
 }) => {
+  const [isChecking, setIsChecking] = useState(false);
+
+  // Effect to check for an existing record when key details change
+  useEffect(() => {
+    // Don't run the check if essential details are missing
+    if (isChecking || !formData.orderNo || !formData.color || !formData.date || !user?.emp_id) {
+      return;
+    }
+
+    const checkForExistingRecord = async () => {
+      setIsChecking(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/after-ironing/find-existing`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderNo: formData.orderNo,
+            date: formData.date,
+            color: formData.color,
+            factoryName: formData.factoryName,
+            reportType: formData.reportType,
+            before_after_wash: formData.before_after_wash,
+            ironingType: "Normal", // Hardcoded as per the form
+            inspectorId: user.emp_id,
+          }),
+        });
+        const data = await response.json();
+
+        if (data.exists && data.record) {
+          const result = await Swal.fire({
+            title: 'Existing Record Found',
+            text: 'A record with these details already exists for today. Do you want to load it?',
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, load it!',
+            cancelButtonText: 'No, start new',
+          });
+
+          if (result.isConfirmed) {
+            onLoadSavedDataById(data.record._id);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for existing record:', error);
+      }
+      setIsChecking(false);
+    };
+    
+    // Debounce the check to avoid rapid firing
+    const timer = setTimeout(checkForExistingRecord, 500);
+    return () => clearTimeout(timer);
+  }, [formData.orderNo, formData.color, formData.date, formData.factoryName, formData.reportType, user?.emp_id]);
+
+  // Effect to check for a SUBMITTED record when orderNo and color change
+  useEffect(() => {
+    if (isChecking || !formData.orderNo || !formData.color) {
+      return;
+    }
+
+    const checkSubmittedRecord = async () => {
+      // Prevent this check if the other one is running
+      if (isChecking) return;
+      setIsChecking(true);
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/after-ironing/check-submitted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderNo: formData.orderNo,
+            color: formData.color,
+          }),
+        });
+        const data = await response.json();
+
+        if (data.exists && data.record) {
+          const result = await Swal.fire({
+            title: 'Submitted Report Found',
+            text: 'A submitted report for this Order and Color already exists. Do you want to load and edit it?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes, edit it!',
+            cancelButtonText: 'No, create a new report',
+          });
+
+          if (result.isConfirmed) {
+            onLoadSavedDataById(data.record._id);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for submitted record:', error);
+      }
+      setIsChecking(false);
+    };
+    checkSubmittedRecord();
+  }, [formData.orderNo, formData.color]);
 
   const handleReportTypeChange = async (value) => {
     // Handle unchecking SOP or selecting other types
@@ -88,16 +183,7 @@ const OrderDetailsSection = ({
   }, [formData.factoryName, formData.reportType, setFormData]);
 
   const handleOrderNoChange = (e) => {
-    const newOrderNo = e.target.value;
-    handleInputChange("orderNo", newOrderNo);
-    // Check for existing record if color is already selected and order number is complete
-    if (formData.color && newOrderNo && newOrderNo.length >= 3) {
-      // Debounce the check to avoid too many API calls while typing
-      clearTimeout(window.orderNoCheckTimeout);
-      window.orderNoCheckTimeout = setTimeout(() => {
-        checkExistingRecord(newOrderNo, formData.color);
-      }, 1000);
-    }
+    handleInputChange("orderNo", e.target.value);
   };
 
   const handleOrderNoBlur = () => {
@@ -108,68 +194,8 @@ const OrderDetailsSection = ({
       if (formData.orderNo && formData.reportType === 'SOP') {
         handleReportTypeChange('SOP');
       }
-      // Check for existing record if both order and color are available
-      if (formData.orderNo && formData.color) {
-        setTimeout(() => checkExistingRecord(formData.orderNo, formData.color), 300);
-      }
-    }, 150);
-  };
 
-  const checkExistingRecord = async (orderNo, color) => {
-    if (!orderNo || !color || !user?.emp_id || isCheckingExistingRecord) return;
-    
-    // Don't check if we're already loading data or if washing validation is in progress
-    if (document.querySelector('.swal2-container')) return;
-    
-    setIsCheckingExistingRecord(true);
-    
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/after-ironing/find-existing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderNo: orderNo,
-          color: color,
-          factoryName: 'YM',
-          reportType: 'SOP',
-          before_after_wash: 'After Ironing',
-          inspectorId: user.emp_id
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success && data.exists && data.record) {
-        const result = await Swal.fire({
-          title: 'Record Already Exists',
-          text: `This record is already saved in the After Ironing collection. Do you want to edit this existing record?`,
-          icon: 'question',
-          showCancelButton: true,
-          confirmButtonColor: '#3085d6',
-          cancelButtonColor: '#d33',
-          confirmButtonText: 'Yes, Edit Record',
-          cancelButtonText: 'No, Clear Fields',
-          allowOutsideClick: false,
-          allowEscapeKey: false
-        });
-        
-        if (result.isConfirmed) {
-          // Load the existing record data
-          if (onLoadSavedDataById && data.record._id) {
-            onLoadSavedDataById(data.record._id);
-          }
-        } else if (result.isDismissed) {
-          // Clear order number and color
-          handleInputChange("orderNo", "");
-          handleInputChange("color", "");
-        }
-      }
-    } catch (error) {
-      console.error('Error checking existing record:', error);
-      // Don't show error to user as this is a background check
-    } finally {
-      setIsCheckingExistingRecord(false);
-    }
+    }, 150);
   };
 
   const handleOrderNoFocus = () => {
@@ -188,14 +214,10 @@ const OrderDetailsSection = ({
         handleReportTypeChange('SOP');
       }, 100);
     }
-    // Check for existing record if color is already selected
-    if (formData.color) {
-      setTimeout(() => checkExistingRecord(selectedOrder, formData.color), 200);
-    }
+
   };
 
   const [washingValidationPassed, setWashingValidationPassed] = useState(true);
-  const [isCheckingExistingRecord, setIsCheckingExistingRecord] = useState(false);
 
   // Handle QC Washing validation result
   const handleValidationResult = (isValid, record) => {
@@ -241,15 +263,6 @@ const OrderDetailsSection = ({
       handleReportTypeChange('SOP');
     }
   }, [formData.orderNo, formData.reportType]);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (window.orderNoCheckTimeout) {
-        clearTimeout(window.orderNoCheckTimeout);
-      }
-    };
-  }, []);
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
@@ -316,14 +329,7 @@ const OrderDetailsSection = ({
             <label className="w-20 text-sm font-medium dark:text-gray-300">Color:</label>
             <select
               value={formData.color}
-              onChange={(e) => {
-                const newColor = e.target.value;
-                handleInputChange('color', newColor);
-                // Check for existing record when both order and color are selected
-                if (formData.orderNo && newColor) {
-                  setTimeout(() => checkExistingRecord(formData.orderNo, newColor), 100);
-                }
-              }}
+              onChange={(e) => handleInputChange('color', e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">-- Select Color --</option>

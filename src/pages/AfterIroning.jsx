@@ -14,32 +14,50 @@ import { useTranslation } from "react-i18next";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
+  
+  // Handle data URLs and blob URLs
   if (typeof src === "string" && src.startsWith("data:")) return src;
   if (typeof src === "string" && src.startsWith("blob:")) return src;
+  
+  // Handle full HTTP URLs
+  if (typeof src === "string" && (src.startsWith("http://") || src.startsWith("https://"))) {
+    return src;
+  }
+  
+  // Handle relative paths starting with ./public/
   if (typeof src === "string" && src.startsWith("./public/")) {
     return `${API_BASE_URL}${src.replace("./public", "")}`;
   }
+  
+  // Handle paths starting with /public/
   if (typeof src === "string" && src.startsWith("/public/")) {
     return `${API_BASE_URL}${src}`;
   }
+  
+  // Handle storage paths - FIXED
   if (typeof src === "string" && src.startsWith("/storage/")) {
-    return `${API_BASE_URL}/public${src}`;
+    return `${API_BASE_URL}${src}`;  // Remove the /public prefix
   }
-  if (
-    typeof src === "string" &&
-    (src.startsWith("http://") || src.startsWith("https://"))
-  ) {
-    return src;
+  
+  // Handle storage paths without leading slash
+  if (typeof src === "string" && src.startsWith("storage/")) {
+    return `${API_BASE_URL}/${src}`;
   }
-  if (
-    typeof src === "string" &&
-    /^[A-Za-z0-9+/=]+$/.test(src) &&
-    src.length > 100
-  ) {
+  
+  // Handle base64 encoded images
+  if (typeof src === "string" && /^[A-Za-z0-9+/=]+$/.test(src) && src.length > 100) {
     return `data:image/jpeg;base64,${src}`;
   }
+  
+  // Default case - assume it's a relative path that needs the API base URL
+  if (typeof src === "string" && src.trim() !== "") {
+    const cleanPath = src.startsWith("/") ? src : `/${src}`;
+    return `${API_BASE_URL}${cleanPath}`;
+  }
+  
   return src;
 };
+
 
 function transformDefectsByPc(savedDefectsByPc) {
   if (Array.isArray(savedDefectsByPc)) {
@@ -55,7 +73,8 @@ function transformDefectsByPc(savedDefectsByPc) {
           defectImages: (defect.defectImages || []).map((imgStr) => ({
             file: null,
             preview: normalizeImageSrc(imgStr),
-            name: "image.jpg"
+            name: "image.jpg",
+            isExisting: true // Mark as existing to preserve during save
           }))
         }));
       }
@@ -76,7 +95,8 @@ function transformDefectsByPc(savedDefectsByPc) {
         defectImages: (defect.defectImages || []).map((imgStr) => ({
           file: null,
           preview: normalizeImageSrc(imgStr),
-          name: "image.jpg"
+          name: "image.jpg",
+          isExisting: true // Mark as existing to preserve during save
         }))
       }));
     });
@@ -839,134 +859,256 @@ const AfterIroning = () => {
   };
 
   const loadSavedDataById = async (id) => {
-    if (!id) return;
+  if (!id) return;
 
-    setIsDataLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/after-ironing/load-saved-by-id/${id}`
-      );
-      const data = await response.json();
+  setIsDataLoading(true);
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/after-ironing/load-saved-by-id/${id}`
+    );
+    const data = await response.json();
 
-      if (!data.success || !data.savedData) {
-        Swal.fire("No saved data found", "", "info");
-        setIsDataLoading(false);
-        return;
-      }
-
-      const saved = data.savedData;
-
-      setFormData((prev) => ({
-        ...prev,
-        ...saved,
-        date: saved.date ? saved.date.split("T")[0] : prev.date,
-        before_after_wash: saved.before_after_wash || prev.before_after_wash,
-        orderQty: saved.orderQty || prev.orderQty,
-        buyer: saved.buyer || prev.buyer,
-        aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
-      }));
-
-      if (
-        saved.inspectionDetails?.checkpointInspectionData &&
-        saved.inspectionDetails.checkpointInspectionData.length > 0
-      ) {
-        // Logic to load checkpoint data
-      } else {
-        initializeDefaultCheckpointData(setCheckpointInspectionData);
-      }
-
-      if (
-        saved.inspectionDetails?.parameters &&
-        saved.inspectionDetails.parameters.length > 0
-      ) {
-        setDefectData(
-          saved.inspectionDetails.parameters.map((param) => ({
-            parameter: param.parameterName || param.parameter || "",
-            checkedQty: param.checkedQty || 0,
-            failedQty: param.defectQty || param.failedQty || 0,
-            passRate: param.passRate || "",
-            result: param.result || "",
-            remark: param.remark || "",
-            ok: param.ok !== undefined ? param.ok : true,
-            no: param.no !== undefined ? param.no : false,
-            acceptedDefect: param.aqlAcceptedDefect || "",
-            checkboxes: param.checkboxes || {}
-          }))
-        );
-      } else {
-        setDefectData(normalizeDefectData(defaultDefectData));
-      }
-
-      setAddedDefects(saved.addedDefects || []);
-      setDefectsByPc(
-        transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
-      );
-
-      setUploadedImages(
-        (saved.defectDetails?.additionalImages || [])
-          .filter(Boolean)
-          .map((img) => {
-            if (typeof img === "object" && img !== null) {
-              return {
-                file: null,
-                preview: normalizeImageSrc(img.preview || img),
-                name: img.name || "image.jpg"
-              };
-            }
-            if (typeof img === "string") {
-              return {
-                file: null,
-                preview: normalizeImageSrc(img),
-                name: img.split("/").pop() || "image.jpg"
-              };
-            }
-            return { file: null, preview: "", name: "image.jpg" };
-          })
-      );
-
-      setComment(saved.defectDetails?.comment || "");
-
-      setMeasurementData({
-        beforeIroning: (saved.measurementDetails?.measurement || []).filter(
-          (m) => m.before_after_wash === "beforeIroning"
-        ),
-        afterIroning: (saved.measurementDetails?.measurement || []).filter(
-          (m) => m.before_after_wash === "afterIroning"
-        )
-      });
-
-      let sizes = [];
-      if (saved.measurementDetails) {
-        if (Array.isArray(saved.measurementDetails)) {
-          sizes = saved.measurementDetails.map((m) => m.size);
-        } else if (
-          typeof saved.measurementDetails === "object" &&
-          Array.isArray(saved.measurementDetails.measurement)
-        ) {
-          sizes = saved.measurementDetails.measurement.map((m) => m.size);
-        }
-      }
-
-      setSavedSizes(sizes);
-      setRecordId(saved._id);
-      if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
-
-      Swal.fire({
-        icon: "success",
-        title: "Saved data loaded!",
-        timer: 1200,
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false
-      });
-
-    } catch (error) {
-      Swal.fire("Error loading saved data", error.message, "error");
-      console.error("Error loading saved data:", error);
-    } finally {
+    if (!data.success || !data.savedData) {
+      Swal.fire("No saved data found", "", "info");
       setIsDataLoading(false);
+      return;
     }
-  };
+
+    const saved = data.savedData;
+
+    setFormData((prev) => ({
+      ...prev,
+      ...saved,
+      date: saved.date ? saved.date.split("T")[0] : prev.date,
+      before_after_wash: saved.before_after_wash || prev.before_after_wash,
+      orderQty: saved.orderQty || prev.orderQty,
+      buyer: saved.buyer || prev.buyer,
+      aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
+    }));
+
+    // FIXED: Load checkpoint inspection data with proper image handling
+    if (
+      saved.inspectionDetails?.checkpointInspectionData &&
+      saved.inspectionDetails.checkpointInspectionData.length > 0
+    ) {
+      console.log('Loading saved checkpoint data:', saved.inspectionDetails.checkpointInspectionData);
+      
+      const transformedCheckpointData = [];
+      
+      saved.inspectionDetails.checkpointInspectionData.forEach(checkpoint => {
+        // Process main checkpoint comparison images
+        const mainComparisonImages = (checkpoint.comparisonImages || []).map(img => {
+          console.log('Processing main checkpoint image:', img);
+          
+          if (typeof img === 'string') {
+            return {
+              file: null,
+              preview: normalizeImageSrc(img),
+              name: img.split("/").pop() || "comparison.jpg"
+            };
+          } else if (typeof img === 'object' && img !== null) {
+            // Handle object format
+            const imageUrl = img.preview || img.url || img.src || img;
+            return {
+              file: null,
+              preview: normalizeImageSrc(imageUrl),
+              name: img.name || imageUrl.split("/").pop() || "comparison.jpg"
+            };
+          }
+          return null;
+        }).filter(Boolean);
+
+        console.log('Main checkpoint processed images:', mainComparisonImages);
+
+        // Add main checkpoint
+        transformedCheckpointData.push({
+          id: `main_${checkpoint.checkpointId}`,
+          checkpointId: checkpoint.checkpointId,
+          type: 'main',
+          name: checkpoint.name,
+          optionType: checkpoint.optionType,
+          options: checkpoint.options || [],
+          decision: checkpoint.decision || '',
+          remark: checkpoint.remark || '',
+          comparisonImages: mainComparisonImages
+        });
+
+        // Add sub-points if they exist
+        if (checkpoint.subPoints && Array.isArray(checkpoint.subPoints)) {
+          checkpoint.subPoints.forEach(subPoint => {
+            // Process sub-point comparison images
+            const subComparisonImages = (subPoint.comparisonImages || []).map(img => {
+              console.log('Processing sub-point image:', img);
+              
+              if (typeof img === 'string') {
+                return {
+                  file: null,
+                  preview: normalizeImageSrc(img),
+                  name: img.split("/").pop() || "comparison.jpg"
+                };
+              } else if (typeof img === 'object' && img !== null) {
+                const imageUrl = img.preview || img.url || img.src || img;
+                return {
+                  file: null,
+                  preview: normalizeImageSrc(imageUrl),
+                  name: img.name || imageUrl.split("/").pop() || "comparison.jpg"
+                };
+              }
+              return null;
+            }).filter(Boolean);
+
+            console.log('Sub-point processed images:', subComparisonImages);
+
+            transformedCheckpointData.push({
+              id: `sub_${checkpoint.checkpointId}_${subPoint.subPointId}`,
+              checkpointId: checkpoint.checkpointId,
+              subPointId: subPoint.subPointId,
+              type: 'sub',
+              name: subPoint.name,
+              parentName: checkpoint.name,
+              optionType: subPoint.optionType,
+              options: subPoint.options || [],
+              decision: subPoint.decision || '',
+              remark: subPoint.remark || '',
+              comparisonImages: subComparisonImages
+            });
+          });
+        }
+      });
+
+      // Merge with checkpoint definitions to get complete options
+      const mergedCheckpointData = transformedCheckpointData.map(savedItem => {
+        const definition = checkpointDefinitions.find(def => def._id === savedItem.checkpointId);
+        
+        if (definition) {
+          if (savedItem.type === 'main') {
+            return {
+              ...savedItem,
+              options: definition.options || savedItem.options || []
+            };
+          } else if (savedItem.type === 'sub') {
+            const subPointDef = definition.subPoints?.find(sp => sp.id === savedItem.subPointId);
+            return {
+              ...savedItem,
+              options: subPointDef?.options || savedItem.options || []
+            };
+          }
+        }
+        
+        return savedItem;
+      });
+
+      setCheckpointInspectionData(mergedCheckpointData);
+      console.log('Final transformed checkpoint data with images:', mergedCheckpointData);
+    } else {
+      console.log('No saved checkpoint data, initializing defaults');
+      initializeDefaultCheckpointData(setCheckpointInspectionData);
+    }
+
+    // FIXED: Load defect analysis parameters
+    if (
+      saved.inspectionDetails?.parameters &&
+      saved.inspectionDetails.parameters.length > 0
+    ) {
+      console.log('Loading saved parameters:', saved.inspectionDetails.parameters);
+      
+      setDefectData(
+        saved.inspectionDetails.parameters.map((param) => ({
+          parameter: param.parameterName || param.parameter || "",
+          checkedQty: param.checkedQty || 0,
+          failedQty: param.defectQty || param.failedQty || 0,
+          passRate: param.passRate || "",
+          result: param.result || "",
+          remark: param.remark || "",
+          ok: param.ok !== undefined ? param.ok : true,
+          no: param.no !== undefined ? param.no : false,
+          acceptedDefect: param.aqlAcceptedDefect || "",
+          checkboxes: param.checkboxes || {}
+        }))
+      );
+    } else {
+      // Initialize with default defect data
+      console.log('No saved parameters, initializing defaults');
+      setDefectData(normalizeDefectData(defaultDefectData));
+    }
+
+    setAddedDefects(saved.addedDefects || []);
+
+    setDefectsByPc(
+      transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
+    );
+
+    // Preserve existing additional images properly
+    const existingAdditionalImages = (saved.defectDetails?.additionalImages || [])
+      .filter(Boolean)
+      .map((img) => {
+        if (typeof img === "object" && img !== null) {
+          return {
+            file: null,
+            preview: normalizeImageSrc(img.preview || img),
+            name: img.name || "image.jpg",
+            isExisting: true
+          };
+        }
+
+        if (typeof img === "string") {
+          return {
+            file: null,
+            preview: normalizeImageSrc(img),
+            name: img.split("/").pop() || "image.jpg",
+            isExisting: true
+          };
+        }
+
+        return { file: null, preview: "", name: "image.jpg", isExisting: true };
+      });
+
+    setUploadedImages(existingAdditionalImages);
+    setComment(saved.defectDetails?.comment || "");
+
+    setMeasurementData({
+      beforeIroning: (saved.measurementDetails?.measurement || []).filter(
+        (m) => m.before_after_wash === "beforeIroning"
+      ),
+      afterIroning: (saved.measurementDetails?.measurement || []).filter(
+        (m) => m.before_after_wash === "afterIroning"
+      )
+    });
+
+    let sizes = [];
+    if (saved.measurementDetails) {
+      if (Array.isArray(saved.measurementDetails)) {
+        sizes = saved.measurementDetails.map((m) => m.size);
+      } else if (
+        typeof saved.measurementDetails === "object" &&
+        Array.isArray(saved.measurementDetails.measurement)
+      ) {
+        sizes = saved.measurementDetails.measurement.map((m) => m.size);
+      }
+    }
+
+    setSavedSizes(sizes);
+    setRecordId(saved._id);
+
+    if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
+
+    Swal.fire({
+      icon: "success",
+      title: "Saved data loaded!",
+      timer: 1200,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false
+    });
+
+  } catch (error) {
+    Swal.fire("Error loading saved data", error.message, "error");
+    console.error("Error loading saved data:", error);
+  } finally {
+    setIsDataLoading(false);
+  }
+};
+
 
   const handleInputChange = (field, value) => {
     if (field === "orderNo") {
@@ -1537,6 +1679,33 @@ const AfterIroning = () => {
     }
   }, [recordId, masterChecklist.length]);
 
+useEffect(() => {
+  if (recordId && checkpointDefinitions.length > 0) {
+    // Only reload if we haven't loaded checkpoint data yet
+    if (checkpointInspectionData.length === 0 || 
+        !checkpointInspectionData.some(item => item.decision)) {
+      console.log('Reloading data with definitions available');
+      loadSavedDataById(recordId);
+    }
+  }
+}, [recordId, checkpointDefinitions.length]);
+
+useEffect(() => {
+  if (checkpointInspectionData.length > 0) {
+    console.log('Checkpoint data received in InspectionDataSection:', checkpointInspectionData);
+    
+    // Log images specifically
+    checkpointInspectionData.forEach((item, idx) => {
+      if (item.comparisonImages && item.comparisonImages.length > 0) {
+        console.log(`${item.type} checkpoint "${item.name}" has ${item.comparisonImages.length} images:`, item.comparisonImages);
+        item.comparisonImages.forEach((img, imgIdx) => {
+          console.log(`  Image ${imgIdx}:`, img.preview);
+        });
+      }
+    });
+  }
+}, [checkpointInspectionData]);
+
   const PageTitle = () => (
     <div className="text-center">
       <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
@@ -1808,10 +1977,38 @@ const AfterIroning = () => {
                       if (Object.keys(defectsByPc).length > 0 || uploadedImages.length > 0 || comment) {
                         const defectFormData = new FormData();
                         defectFormData.append('recordId', currentRecordId);
+                        
+                        // Separate existing and new additional images
+                        const existingAdditionalImages = [];
+                        uploadedImages.forEach((img, imgIdx) => {
+                          if (img.file && !img.isExisting) {
+                            defectFormData.append(`additionalImages_${imgIdx}`, img.file, img.name);
+                          } else if (img.isExisting) {
+                            existingAdditionalImages.push(img.preview);
+                          }
+                        });
+                        
+                        // Prepare defect data with existing images preserved
+                        const sanitizedDefectsByPc = Object.entries(defectsByPc).map(([pcNumber, pcDefects], pcIdx) => ({
+                          pcNumber,
+                          pcDefects: pcDefects.map((defect, defectIdx) => {
+                            const newDefect = { ...defect, defectImages: [] };
+                            (defect.defectImages || []).forEach((img, imgIdx) => {
+                              if (img.file && !img.isExisting) {
+                                const fieldName = `defectImages_${pcIdx}_${defectIdx}_${imgIdx}`;
+                                defectFormData.append(fieldName, img.file, img.name);
+                              } else if (img.isExisting) {
+                                newDefect.defectImages.push(img.preview);
+                              }
+                            });
+                            return newDefect;
+                          })
+                        }));
+                        
                         defectFormData.append('defectDetails', JSON.stringify({
-                          defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({ pcNumber, pcDefects })),
-                          additionalImages: uploadedImages.map(img => img.preview),
-                          comment
+                          defectsByPc: sanitizedDefectsByPc,
+                          comment,
+                          existingAdditionalImages
                         }));
                         
                         await fetch(`${API_BASE_URL}/api/after-ironing/defect-details-save`, {

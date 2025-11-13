@@ -13,6 +13,43 @@ import {
 } from "../../../Config/appConfig.js";
 import path from "path";
 
+function getServerBaseUrl(req) {
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost:5001";
+  return `${protocol}://${host}`;
+}
+
+function normalizeInspectionImagePath(img) {
+  if (!img) return "";
+  if (img.preview && typeof img.preview === "string") {
+    if (img.preview.startsWith("http")) return img.preview;
+    if (img.preview.startsWith("./public/storage/")) {
+      const relativePath = img.preview.replace("./public/storage/", "");
+      return `${process.env.BASE_URL || "http://localhost:5001"}/storage/${relativePath}`;
+    }
+    // ... other path normalizations
+  }
+  return "";
+}
+
+function groupCheckpointData(checkpointInspectionData) {
+  const mainCheckpoints = new Map();
+  checkpointInspectionData.forEach(item => {
+    if (item.type === 'main') {
+      mainCheckpoints.set(item.checkpointId, { ...item, subPoints: [] });
+    }
+  });
+  checkpointInspectionData.forEach(item => {
+    if (item.type === 'sub') {
+      const mainCheckpoint = mainCheckpoints.get(item.checkpointId);
+      if (mainCheckpoint) {
+        mainCheckpoint.subPoints.push(item);
+      }
+    }
+  });
+  return Array.from(mainCheckpoints.values());
+}
+
 export const saveqcwashingFirstOutput = async (req, res) => {
   try {
       const { orderNo } = req.body;
@@ -179,10 +216,10 @@ export const findAfterIroningExistingRecord = async (req, res) => {
         orderNo,
         date,
         color,
-        washType,
-        before_after_wash,
         factoryName,
         reportType,
+        before_after_wash,
+        ironingType, // Added for After Ironing
         inspectorId
       } = req.body;
   
@@ -195,10 +232,10 @@ export const findAfterIroningExistingRecord = async (req, res) => {
         orderNo,
         date: dateValue,
         color,
-        washType,
-        before_after_wash,
         factoryName,
         reportType,
+        before_after_wash,
+        ironingType,
         "inspector.empId": inspectorId 
       };
   
@@ -215,10 +252,40 @@ export const findAfterIroningExistingRecord = async (req, res) => {
         res.json({ success: true, exists: false });
       }
     } catch (err) {
-      console.error("Find-existing error:", err);
+      console.error("Find-existing After Ironing error:", err);
       res.status(500).json({ success: false, message: "Server error." });
     }
 };
+
+export const checkAfterIroningSubmittedRecord = async (req, res) => {
+  try {
+    const { orderNo, color } = req.body;
+
+    if (!orderNo || !color) {
+      return res.status(400).json({ success: false, message: "Order number and color are required." });
+    }
+
+    // Find the most recent submitted record for this order and color
+    const record = await AfterIroning.findOne({
+      orderNo: orderNo,
+      color: color,
+      status: 'submitted'
+    }).sort({ submittedAt: -1 });
+
+    if (record) {
+      res.json({ success: true, exists: true, record });
+    } else {
+      res.json({ success: true, exists: false });
+    }
+  } catch (err) {
+    console.error("Error checking for submitted After Ironing record:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Server error while checking for submitted records." 
+    });
+  }
+};
+
 
 //New After Ironing Endpoints
 export const saveAfterIroningOrderData = async (req, res) => {
@@ -239,15 +306,46 @@ export const saveAfterIroningOrderData = async (req, res) => {
           )
         : undefined;
   
+      // Clean up defectDetails to prevent casting errors on save
+      if (formData.defectDetails && Array.isArray(formData.defectDetails.defectsByPc)) {
+        formData.defectDetails.defectsByPc.forEach(pc => {
+          if (Array.isArray(pc.pcDefects)) {
+            pc.pcDefects.forEach(defect => {
+              if (defect.defectImages && defect.defectImages.some(img => typeof img === 'object')) {
+                defect.defectImages = defect.defectImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
+              }
+            });
+          }
+        });
+      }
+
+      // Clean up inspectionDetails to prevent casting errors on save
+      if (formData.inspectionDetails && Array.isArray(formData.inspectionDetails.checkpointInspectionData)) {
+        formData.inspectionDetails.checkpointInspectionData.forEach(checkpoint => {
+          // Clean up main checkpoint images
+          if (checkpoint.comparisonImages && checkpoint.comparisonImages.some(img => typeof img === 'object')) {
+            checkpoint.comparisonImages = checkpoint.comparisonImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
+          }
+          // Clean up sub-point images
+          if (Array.isArray(checkpoint.subPoints)) {
+            checkpoint.subPoints.forEach(subPoint => {
+              if (subPoint.comparisonImages && subPoint.comparisonImages.some(img => typeof img === 'object')) {
+                subPoint.comparisonImages = subPoint.comparisonImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
+              }
+            });
+          }
+        });
+      }
+
       // Build the query for uniqueness - same as find-existing
       const query = {
         orderNo: formData.orderNo,
         date: dateValue,
         color: formData.color,
-        washType: formData.washType,
-        before_after_wash: formData.before_after_wash,
         factoryName: formData.factoryName,
         reportType: formData.reportType,
+        before_after_wash: formData.before_after_wash,
+        ironingType: formData.ironingType,
         "inspector.empId": userId
       };
   
@@ -291,178 +389,185 @@ export const saveAfterIroningOrderData = async (req, res) => {
 };
 
 export const saveAfterIroningInspectionData = async (req, res) => {
-  const standardValues = JSON.parse(req.body.standardValues || "{}");
-    const actualValues = JSON.parse(req.body.actualValues || "{}");
-    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
-    
-    try {
-      const { recordId } = req.body;
-      const inspectionData = JSON.parse(req.body.inspectionData || "[]");
-      const processData = JSON.parse(req.body.processData || "{}");
-      const defectData = JSON.parse(req.body.defectData || "[]");
-      const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
-      const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
-      const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
+  try {
+    const { recordId } = req.body;
+    const inspectionData = JSON.parse(req.body.inspectionData || "[]");
+    const processData = JSON.parse(req.body.processData || "{}");
+    const defectData = JSON.parse(req.body.defectData || "[]");
+    const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
+    const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
+    const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
 
-      if (!recordId) {
-        return res
-          .status(400)
-          .json({ success: false, message: "recordId is required" });
-      }
-
-      // Get server base URL
-      const serverBaseUrl = getServerBaseUrl(req);
-
-      // Handle file uploads for both regular inspection and checkpoint images
-      const uploadDir = path.join(
-        __backendDir,
-        "./public/storage/After_Irorning_images/inspection"
-      );
-      const fileMap = {};
-      
-      for (const file of req.files || []) {
-        const fileExtension = path.extname(file.originalname);
-        const newFilename = `inspection-${Date.now()}-${Math.round(
-          Math.random() * 1e9
-        )}${fileExtension}`;
-        const fullFilePath = path.join(uploadDir, newFilename);
-        await fs.promises.writeFile(fullFilePath, file.buffer);
-        fileMap[
-          file.fieldname
-        ] = `${serverBaseUrl}/storage/After_Ironing_images/inspection/${newFilename}`;
-      }
-
-      // Find or create the record
-      let record = await AfterIroning.findById(recordId);
-      if (!record) {
-        record = new AfterIroning({ _id: recordId });
-      }
-
-      // const machineProcesses = [];
-      // const machineTypes = {
-      //   "Washing Machine": ["temperature", "time", "silicon", "softener"],
-      //   "Tumble Dry": ["temperature", "timeCool", "timeHot"]
-      // };
-
-      // Object.entries(machineTypes).forEach(([machineType, parameters]) => {
-      //   const machineProcess = { machineType };
-      //   parameters.forEach((param) => {
-      //     const actualVal = actualValues[machineType]?.[param];
-      //     const standardVal = standardValues[machineType]?.[param];
-      //     machineProcess[param] = {
-      //       actualValue:
-      //         actualVal === null || actualVal === undefined ? "" : actualVal,
-      //       standardValue:
-      //         standardVal === null || standardVal === undefined
-      //           ? ""
-      //           : standardVal,
-      //       status: {
-      //         ok: machineStatus[machineType]?.[param]?.ok || false,
-      //         no: machineStatus[machineType]?.[param]?.no || false
-      //       }
-      //     };
-      //   });
-      //   machineProcesses.push(machineProcess);
-      // });
-
-      // Handle inspection images with full server URLs
-      if (inspectionData) {
-        inspectionData.forEach((item, idx) => {
-          if (item.comparisonImages) {
-            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
-              }
-              if (
-                typeof img === "string" &&
-                (img.startsWith("http://") || img.startsWith("https://"))
-              ) {
-                return img;
-              }
-              if (typeof img === "string" && img.startsWith("./")) {
-                return `${serverBaseUrl}${img.replace("./", "/")}`;
-              }
-              if (typeof img === "object" && img !== null && img.name) {
-                if (
-                  img.name.startsWith("http://") ||
-                  img.name.startsWith("https://")
-                ) {
-                  return img.name;
-                }
-                if (img.name.startsWith("./")) {
-                  return `${serverBaseUrl}${img.name.replace("./", "/")}`;
-                }
-                return img.name;
-              }
-              return img || "";
-            });
-          }
-        });
-      }
-
-      // Handle checkpoint images and group the data
-      if (checkpointInspectionData) {
-        checkpointInspectionData.forEach((item, idx) => {
-          if (item.comparisonImages) {
-            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-              const newImageUrl = fileMap[`checkpointImages_${idx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
-              }
-              return normalizeInspectionImagePath(img);
-            });
-          }
-        });
-      }
-
-      // Group checkpoint data with sub-points nested under main checkpoints
-      const groupedCheckpointData = groupCheckpointData(checkpointInspectionData);
-
-      // Build the inspection details
-      record.inspectionDetails = {
-        ...record.inspectionDetails,
-        checkedPoints: (inspectionData || []).map((item, idx) => ({
-          pointName: item.checkedList,
-          decision: item.decision,
-          comparison: (item.comparisonImages || []).map((img, imgIdx) => {
-            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
-            }
-            return normalizeInspectionImagePath(img);
-          }),
-          remark: item.remark
-        })),
-        // Use grouped checkpoint data instead of flat array
-        checkpointInspectionData: groupedCheckpointData,
-        // machineProcesses: machineProcesses,
-        parameters: (defectData || []).map((item) => ({
-          parameterName: item.parameter,
-          checkedQty: item.checkedQty,
-          defectQty: item.failedQty,
-          passRate: item.passRate,
-          result: item.result,
-          remark: item.remark
-        })),
-        // Add machine settings
-        timeCoolEnabled,
-        timeHotEnabled
-      };
-
-      record.savedAt = new Date();
-      record.status = "processing";
-
-      await record.save();
-
-      res.json({
-        success: true,
-        message: "Inspection data saved",
-        data: record
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ success: false, message: "Server error" });
+    if (!recordId) {
+      return res.status(400).json({ success: false, message: "recordId is required" });
     }
+
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
+    
+    // Define and ensure the upload directory exists
+    const uploadDir = path.join(__backendDir, "public", "storage", "after_ironing_images", "inspection");
+    try {
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+    } catch (mkdirError) {
+      console.error("Failed to create inspection image directory:", mkdirError);
+      return res.status(500).json({ success: false, message: "Failed to create image directory." });
+    }
+
+    // Process uploaded files and create file mapping
+    const fileMap = {};
+    for (const file of req.files || []) {
+      const fileExtension = path.extname(file.originalname) || '.jpg';
+      const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      
+      // Save file to disk
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      
+      // Create URL for database storage
+      const imageUrl = `${serverBaseUrl}/storage/after_ironing_images/inspection/${newFilename}`;
+      fileMap[file.fieldname] = imageUrl;
+      
+      console.log(`Saved image: ${file.fieldname} -> ${imageUrl}`);
+    }
+
+    console.log('FileMap:', fileMap);
+
+    // Find or create the record
+    let record = await AfterIroning.findById(recordId);
+    if (!record) {
+      record = new AfterIroning({ _id: recordId });
+    }
+
+    // Process checkpoint images - FIXED LOGIC
+    if (checkpointInspectionData && Array.isArray(checkpointInspectionData)) {
+      checkpointInspectionData.forEach((item, idx) => {
+        // Initialize comparisonImages array if it doesn't exist
+        if (!item.comparisonImages) {
+          item.comparisonImages = [];
+        }
+
+        // Look for uploaded images for this main checkpoint
+        const mainCheckpointImages = [];
+        Object.keys(fileMap).forEach(fieldName => {
+          // Match pattern: checkpointImages_${idx}_${imgIdx}
+          const mainPattern = new RegExp(`^checkpointImages_${idx}_\\d+$`);
+          if (mainPattern.test(fieldName)) {
+            mainCheckpointImages.push(fileMap[fieldName]);
+            console.log(`Found main checkpoint image: ${fieldName} -> ${fileMap[fieldName]}`);
+          }
+        });
+
+        // Add existing images from the array
+        if (Array.isArray(item.comparisonImages)) {
+          item.comparisonImages.forEach(img => {
+            if (typeof img === 'string' && img.trim() !== '') {
+              if (img.startsWith('http') || img.startsWith('/storage')) {
+                mainCheckpointImages.push(img);
+              } else if (img.startsWith('./public/storage/')) {
+                const relativePath = img.replace('./public/storage/', '');
+                mainCheckpointImages.push(`${serverBaseUrl}/storage/${relativePath}`);
+              }
+            } else if (typeof img === 'object' && img.preview) {
+              if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+                mainCheckpointImages.push(img.preview);
+              } else if (img.preview.startsWith('./public/storage/')) {
+                const relativePath = img.preview.replace('./public/storage/', '');
+                mainCheckpointImages.push(`${serverBaseUrl}/storage/${relativePath}`);
+              }
+            }
+          });
+        }
+
+        // Update the main checkpoint images
+        item.comparisonImages = mainCheckpointImages;
+        console.log(`Main checkpoint ${idx} final images:`, mainCheckpointImages);
+
+        // Handle sub-point comparison images
+        if (item.subPoints && Array.isArray(item.subPoints)) {
+          item.subPoints.forEach((subPoint, subIdx) => {
+            // Initialize comparisonImages array if it doesn't exist
+            if (!subPoint.comparisonImages) {
+              subPoint.comparisonImages = [];
+            }
+
+            // Look for uploaded images for this sub-point
+            const subPointImages = [];
+            Object.keys(fileMap).forEach(fieldName => {
+              // Match pattern: checkpointImages_${idx}_sub_${subIdx}_${imgIdx}
+              const subPattern = new RegExp(`^checkpointImages_${idx}_sub_${subIdx}_\\d+$`);
+              if (subPattern.test(fieldName)) {
+                subPointImages.push(fileMap[fieldName]);
+                console.log(`Found sub-point image: ${fieldName} -> ${fileMap[fieldName]}`);
+              }
+            });
+
+            // Add existing images from the array
+            if (Array.isArray(subPoint.comparisonImages)) {
+              subPoint.comparisonImages.forEach(img => {
+                if (typeof img === 'string' && img.trim() !== '') {
+                  if (img.startsWith('http') || img.startsWith('/storage')) {
+                    subPointImages.push(img);
+                  } else if (img.startsWith('./public/storage/')) {
+                    const relativePath = img.replace('./public/storage/', '');
+                    subPointImages.push(`${serverBaseUrl}/storage/${relativePath}`);
+                  }
+                } else if (typeof img === 'object' && img.preview) {
+                  if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+                    subPointImages.push(img.preview);
+                  } else if (img.preview.startsWith('./public/storage/')) {
+                    const relativePath = img.preview.replace('./public/storage/', '');
+                    subPointImages.push(`${serverBaseUrl}/storage/${relativePath}`);
+                  }
+                }
+              });
+            }
+
+            // Update the sub-point images
+            subPoint.comparisonImages = subPointImages;
+            console.log(`Sub-point ${idx}-${subIdx} final images:`, subPointImages);
+          });
+        }
+      });
+    }
+
+    // Group checkpoint data with sub-points nested under main checkpoints
+    const groupedCheckpointData = groupCheckpointData(checkpointInspectionData);
+
+    // Build the inspection details
+    record.inspectionDetails = {
+      ...record.inspectionDetails,
+      checkpointInspectionData: groupedCheckpointData,
+      parameters: (defectData || []).map((item) => ({
+        parameterName: item.parameter,
+        checkedQty: item.checkedQty,
+        defectQty: item.failedQty,
+        passRate: item.passRate,
+        result: item.result,
+        remark: item.remark
+      })),
+      timeCoolEnabled,
+      timeHotEnabled
+    };
+
+    record.savedAt = new Date();
+    record.status = "processing";
+    
+    // Save and log the final data
+    await record.save();
+    
+    console.log('Final checkpoint data saved:', JSON.stringify(groupedCheckpointData, null, 2));
+
+    res.json({
+      success: true,
+      message: "Inspection data saved",
+      data: record
+    });
+
+  } catch (err) {
+    console.error("Inspection save error:", err);
+    res.status(500).json({ success: false, message: "Server error", error: err.message });
+  }
 };
 
  // Get saved size
@@ -496,18 +601,11 @@ export const saveAfterIroningInspectionData = async (req, res) => {
 
 // Updated inspection-update endpoint
 export const updateAfterIroningInspectionData = async (req, res) => {
-  const standardValues = JSON.parse(req.body.standardValues || "{}");
-    const actualValues = JSON.parse(req.body.actualValues || "{}");
-    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
     
     try {
       const { recordId } = req.body;
-      const inspectionData = JSON.parse(req.body.inspectionData || "[]");
-      const processData = JSON.parse(req.body.processData || "{}");
       const defectData = JSON.parse(req.body.defectData || "[]");
       const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
-      const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
-      const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
 
       if (!recordId) {
         return res
@@ -517,12 +615,15 @@ export const updateAfterIroningInspectionData = async (req, res) => {
 
       // Get server base URL
       const serverBaseUrl = getServerBaseUrl(req);
-
-      // Handle file uploads
-      const uploadDir = path.join( 
-        __backendDir,
-        "./public/storage/After_Irorning_images/inspection"
-      );
+      
+      // Define and ensure the upload directory exists
+      const uploadDir = path.join(__backendDir, "public", "storage", "after_ironing_images", "inspection");
+      try {
+        await fs.promises.mkdir(uploadDir, { recursive: true });
+      } catch (mkdirError) {
+        console.error("Failed to create inspection image directory:", mkdirError);
+        return res.status(500).json({ success: false, message: "Failed to create image directory." });
+      }
       const fileMap = {};
       
       for (const file of req.files || []) {
@@ -532,7 +633,7 @@ export const updateAfterIroningInspectionData = async (req, res) => {
         await fs.promises.writeFile(fullFilePath, file.buffer);
         fileMap[
           file.fieldname
-        ] = `${serverBaseUrl}/storage/After_Irorning_images/inspection/${newFilename}`;
+        ] = `${serverBaseUrl}/storage/after_ironing_images/inspection/${newFilename}`;
       }
 
       // Find the record
@@ -543,59 +644,47 @@ export const updateAfterIroningInspectionData = async (req, res) => {
           .json({ success: false, message: "Record not found for update" });
       }
 
-      // Build machine processes with the new structure
-      // const machineProcesses = [];
-      // const machineTypes = {
-      //   "Washing Machine": ["temperature", "time", "silicon", "softener"],
-      //   "Tumble Dry": ["temperature", "timeCool", "timeHot"]
-      // };
-
-      // Object.entries(machineTypes).forEach(([machineType, parameters]) => {
-      //   const machineProcess = { machineType };
-      //   parameters.forEach((param) => {
-      //     const actualVal = actualValues[machineType]?.[param];
-      //     const standardVal = standardValues[machineType]?.[param];
-      //     machineProcess[param] = {
-      //       actualValue:
-      //         actualVal === null || actualVal === undefined ? "" : actualVal,
-      //       standardValue:
-      //         standardVal === null || standardVal === undefined
-      //           ? ""
-      //           : standardVal,
-      //       status: {
-      //         ok: machineStatus[machineType]?.[param]?.ok || false,
-      //         no: machineStatus[machineType]?.[param]?.no || false
-      //       }
-      //     };
-      //   });
-      //   machineProcesses.push(machineProcess);
-      // });
-
-      // Handle inspection images with full server URLs (same logic as save)
-      if (inspectionData) {
-        inspectionData.forEach((item, idx) => {
-          if (item.comparisonImages) {
-            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
-              }
-              return img;
-            });
-          }
-        });
-      }
-
       // Handle checkpoint images
       if (checkpointInspectionData) {
         checkpointInspectionData.forEach((item, idx) => {
+          // Handle main checkpoint comparison images
           if (item.comparisonImages) {
             item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
               const newImageUrl = fileMap[`checkpointImages_${idx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
+              if (newImageUrl) return newImageUrl;
+              
+              // Handle existing images properly
+              if (typeof img === 'string') {
+                if (img.startsWith('http') || img.startsWith('/storage')) return img;
+                // Convert relative paths to full URLs
+                if (img.startsWith('./public/storage/')) {
+                  const relativePath = img.replace('./public/storage/', '');
+                  return `${serverBaseUrl}/storage/${relativePath}`;
+                }
               }
-              return img;
+              
+              // Handle object format (from frontend)
+              if (typeof img === 'object' && img.preview) {
+                if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+                  return img.preview;
+                }
+              }
+              
+              return null;
+            }).filter(Boolean);
+          }
+
+          // Handle sub-point comparison images
+          if (item.subPoints && Array.isArray(item.subPoints)) {
+            item.subPoints.forEach((subPoint, subIdx) => {
+              if (subPoint.comparisonImages) {
+                subPoint.comparisonImages = subPoint.comparisonImages.map((img, imgIdx) => {
+                  const newImageUrl = fileMap[`checkpointImages_${idx}_sub_${subIdx}_${imgIdx}`];
+                  if (newImageUrl) return newImageUrl;
+                  if (typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage'))) return img;
+                  return null;
+                }).filter(Boolean);
+              }
             });
           }
         });
@@ -607,24 +696,8 @@ export const updateAfterIroningInspectionData = async (req, res) => {
       // Build the inspection details
       record.inspectionDetails = {
         ...record.inspectionDetails,
-        checkedPoints: (inspectionData || []).map((item, idx) => {
-          const images = (item.comparisonImages || []).map((img, imgIdx) => {
-            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
-            }
-            return normalizeInspectionImagePath(img);
-          });
-
-          return {
-            pointName: item.checkedList,
-            decision: item.decision,
-            comparison: images,
-            remark: item.remark
-          };
-        }),
         // Use grouped checkpoint data instead of flat array
         checkpointInspectionData: groupedCheckpointData,
-        // machineProcesses: machineProcesses,
         parameters: (defectData || []).map((item) => ({
           parameterName: item.parameter,
           checkedQty: item.checkedQty,
@@ -633,9 +706,6 @@ export const updateAfterIroningInspectionData = async (req, res) => {
           result: item.result,
           remark: item.remark
         })),
-        // Update machine settings
-        timeCoolEnabled,
-        timeHotEnabled
       };
 
       record.savedAt = new Date();
@@ -652,215 +722,317 @@ export const updateAfterIroningInspectionData = async (req, res) => {
     }
 };
 
+
 // Save defect details with images
 export const saveAfterIroningDefectData = async (req, res) => {
   try {
-      const { recordId } = req.body;
-      const defectDetails = JSON.parse(req.body.defectDetails || "{}");
+    const { recordId } = req.body;
+    const defectDetails = JSON.parse(req.body.defectDetails || "{}");
 
-      if (!recordId)
-        return res
-          .status(400)
-          .json({ success: false, message: "Missing recordId" });
-      // Get server base URL
-      const serverBaseUrl = getServerBaseUrl(req);
+    if (!recordId) {
+      return res.status(400).json({ success: false, message: "Missing recordId" });
+    }
 
-      // Ensure upload directory exists
-      const uploadDir = path.join(__backendDir, 
-        "./public/storage/After_Irorning_images/defect"
-      ); 
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
 
-      // Map uploaded files by fieldname and write them to disk
-      const fileMap = {};
-      for (const file of req.files || []) {
-        let fileExtension = path.extname(file.originalname);
-        if (!fileExtension) {
-          fileExtension = ".jpg";
-        }
-        const newFilename = `defect-${Date.now()}-${Math.round(
-          Math.random() * 1e9
-        )}${fileExtension}`;
-        const fullFilePath = path.join(uploadDir, newFilename);
-        await fs.promises.writeFile(fullFilePath, file.buffer);
-        fileMap[
-          file.fieldname
-        ] = `${serverBaseUrl}/storage/After_Irorning_images/defect/${newFilename}`;
-      }
+    // Define and ensure the upload directory exists
+    const uploadDir = path.join(__backendDir, "public", "storage", "after_ironing_images", "defect");
+    try {
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+    } catch (mkdirError) {
+      console.error("Failed to create defect image directory:", mkdirError);
+      return res.status(500).json({ success: false, message: "Failed to create image directory." });
+    }
 
-      // Attach image URLs to defectDetails.defectsByPc and additionalImages
-      if (defectDetails.defectsByPc) {
-        defectDetails.defectsByPc.forEach((pc, pcIdx) => {
-          (pc.pcDefects || []).forEach((defect, defectIdx) => {
-            if (defect.defectImages) {
-              defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-                // Return new uploaded image URL
-                const newImageUrl =
-                  fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`];
-                if (newImageUrl) {
-                  return newImageUrl;
-                }
+    // Map uploaded files by fieldname and write them to disk
+    const fileMap = {};
+    for (const file of req.files || []) {
+      let fileExtension = path.extname(file.originalname) || '.jpg';
+      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      const imageUrl = `${serverBaseUrl}/storage/after_ironing_images/defect/${newFilename}`;
+      fileMap[file.fieldname] = imageUrl;
+      
+      console.log(`Saved defect image: ${file.fieldname} -> ${imageUrl}`);
+    }
 
-                // Handle existing images
-                if (
-                  typeof img === "string" &&
-                  (img.startsWith("http://") || img.startsWith("https://"))
-                ) {
-                  return img; // Already a full URL
-                }
+    console.log('Defect FileMap:', fileMap);
 
-                if (typeof img === "string" && img.startsWith("./")) {
-                  return `${serverBaseUrl}${img.replace("./", "/")}`;
-                }
+    // CRITICAL FIX: Initialize additionalImages array if it doesn't exist
+    if (!defectDetails.additionalImages) {
+      defectDetails.additionalImages = [];
+    }
 
-                if (typeof img === "object" && img !== null && img.name) {
-                  if (
-                    img.name.startsWith("http://") ||
-                    img.name.startsWith("https://")
-                  ) {
-                    return img.name;
+    // Process defect images - FIXED LOGIC WITH DEFECT ID PRESERVATION
+    if (defectDetails.defectsByPc && Array.isArray(defectDetails.defectsByPc)) {
+      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+        if (pc.pcDefects && Array.isArray(pc.pcDefects)) {
+          pc.pcDefects.forEach((defect, defectIdx) => {
+            // Initialize defectImages array if it doesn't exist
+            if (!defect.defectImages) {
+              defect.defectImages = [];
+            }
+
+            // CRITICAL FIX: Preserve both defectId and defectName
+            const processedDefect = {
+              defectId: defect.selectedDefect || defect.defectId || "", // Save the defect ID
+              defectName: defect.defectName || "",
+              defectQty: defect.defectQty || 0,
+              defectImages: []
+            };
+
+            // Look for uploaded images for this defect
+            const defectImages = [];
+            
+            // Add new uploaded images
+            Object.keys(fileMap).forEach(fieldName => {
+              const defectPattern = new RegExp(`^defectImages_${pcIdx}_${defectIdx}_\\d+$`);
+              if (defectPattern.test(fieldName)) {
+                defectImages.push(fileMap[fieldName]);
+                console.log(`Found defect image: ${fieldName} -> ${fileMap[fieldName]}`);
+              }
+            });
+
+            // Add existing images from the array
+            if (Array.isArray(defect.defectImages)) {
+              defect.defectImages.forEach(img => {
+                if (typeof img === 'string' && img.trim() !== '') {
+                  if (img.startsWith('http') || img.startsWith('/storage')) {
+                    defectImages.push(img);
+                  } else if (img.startsWith('./public/storage/')) {
+                    const relativePath = img.replace('./public/storage/', '');
+                    defectImages.push(`${serverBaseUrl}/storage/${relativePath}`);
                   }
-                  if (img.name.startsWith("./")) {
-                    return `${serverBaseUrl}${img.name.replace("./", "/")}`;
+                } else if (typeof img === 'object' && img.preview) {
+                  if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+                    defectImages.push(img.preview);
+                  } else if (img.preview.startsWith('./public/storage/')) {
+                    const relativePath = img.preview.replace('./public/storage/', '');
+                    defectImages.push(`${serverBaseUrl}/storage/${relativePath}`);
                   }
-                  return img.name;
                 }
-
-                return img || "";
               });
             }
+
+            // Update the processed defect with images
+            processedDefect.defectImages = defectImages;
+            
+            // Replace the original defect with the processed one
+            pc.pcDefects[defectIdx] = processedDefect;
+            
+            console.log(`Defect ${pcIdx}-${defectIdx} final data:`, processedDefect);
           });
-        });
-      }
-
-      if (defectDetails.additionalImages) {
-        defectDetails.additionalImages = defectDetails.additionalImages.map(
-          (img, imgIdx) => {
-            // Return new uploaded image URL
-            const newImageUrl = fileMap[`additionalImages_${imgIdx}`];
-            if (newImageUrl) {
-              return newImageUrl;
-            }
-
-            // Handle existing images
-            if (
-              typeof img === "string" &&
-              (img.startsWith("http://") || img.startsWith("https://"))
-            ) {
-              return img; // Already a full URL
-            }
-
-            if (typeof img === "string" && img.startsWith("./")) {
-              return `${serverBaseUrl}${img.replace("./", "/")}`;
-            }
-
-            if (typeof img === "object" && img !== null && img.name) {
-              if (
-                img.name.startsWith("http://") ||
-                img.name.startsWith("https://")
-              ) {
-                return img.name;
-              }
-              if (img.name.startsWith("./")) {
-                return `${serverBaseUrl}${img.name.replace("./", "/")}`;
-              }
-              return img.name;
-            }
-
-            return img || "";
-          }
-        );
-      }
-
-      // Save to DB
-      const doc = await AfterIroning.findByIdAndUpdate(
-        recordId,
-        { defectDetails: defectDetails, updatedAt: new Date() },
-        { new: true }
-      );
-
-      if (!doc)
-        return res
-          .status(404)
-          .json({ success: false, message: "Record not found" });
-
-      res.json({ success: true, data: doc.defectDetails });
-    } catch (err) {
-      console.error("Defect details save error:", err);
-      res.status(500).json({ success: false, message: err.message });
+        }
+      });
     }
+
+    // Process additional images - ENHANCED LOGIC
+    console.log('Processing additional images...');
+    
+    const additionalImages = [...(defectDetails.additionalImages || [])];
+    
+    // Look for uploaded additional images
+    Object.keys(fileMap).forEach(fieldName => {
+      const additionalPattern = /^additionalImages_\d+$/;
+      if (additionalPattern.test(fieldName)) {
+        additionalImages.push(fileMap[fieldName]);
+        console.log(`Found additional image: ${fieldName} -> ${fileMap[fieldName]}`);
+      }
+    });
+
+    // Process existing images
+    const processedAdditionalImages = additionalImages.map(img => {
+      if (typeof img === 'string' && img.trim() !== '') {
+        if (img.startsWith('http') || img.startsWith('/storage')) {
+          return img;
+        } else if (img.startsWith('./public/storage/')) {
+          const relativePath = img.replace('./public/storage/', '');
+          return `${serverBaseUrl}/storage/${relativePath}`;
+        }
+      } else if (typeof img === 'object' && img.preview) {
+        if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+          return img.preview;
+        } else if (img.preview.startsWith('./public/storage/')) {
+          const relativePath = img.preview.replace('./public/storage/', '');
+          return `${serverBaseUrl}/storage/${relativePath}`;
+        }
+      }
+      return img;
+    }).filter(img => img && typeof img === 'string' && img.trim() !== '');
+
+    defectDetails.additionalImages = processedAdditionalImages;
+
+    // Save to DB
+    const doc = await AfterIroning.findByIdAndUpdate(
+      recordId,
+      { defectDetails: defectDetails, updatedAt: new Date() },
+      { new: true }
+    );
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Record not found" });
+    }
+
+    console.log('Final defect details saved:', JSON.stringify(defectDetails, null, 2));
+
+    res.json({ success: true, data: doc.defectDetails });
+
+  } catch (err) {
+    console.error("Defect details save error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 export const updateAfterIroningDefectData = async (req, res) => {
   try {
-      const { recordId } = req.body;
-      const defectDetails = JSON.parse(req.body.defectDetails || "{}");
-      if (!recordId)
-        return res
-          .status(400)
-          .json({ success: false, message: "Missing recordId" });
+    const { recordId } = req.body;
+    const defectDetails = JSON.parse(req.body.defectDetails || "{}");
 
-      // Get server base URL
-      const serverBaseUrl = getServerBaseUrl(req);
+    if (!recordId) {
+      return res.status(400).json({ success: false, message: "Missing recordId" });
+    }
 
-      // Ensure upload directory exists
-      const uploadDir = path.join(__backendDir, 
-        "./public/storage/After_Irorning_images/defect"
-      ); 
+    // Get server base URL
+    const serverBaseUrl = getServerBaseUrl(req);
 
-      // Map uploaded files by fieldname and write them to disk
-      const fileMap = {};
-      for (const file of req.files || []) {
-        let fileExtension = path.extname(file.originalname);
-        if (!fileExtension) {
-          // fallback to .jpg if no extension is found
-          fileExtension = ".jpg";
-        }
-        const newFilename = `defect-${Date.now()}-${Math.round(
-          Math.random() * 1e9
-        )}${fileExtension}`;
-        const fullFilePath = path.join(uploadDir, newFilename);
-        await fs.promises.writeFile(fullFilePath, file.buffer);
-        fileMap[
-          file.fieldname
-        ] = `${serverBaseUrl}/storage/After_Irorning_images/defect/${newFilename}`;
-      }
+    // Define and ensure the upload directory exists
+    const uploadDir = path.join(__backendDir, "public", "storage", "after_ironing_images", "defect");
+    try {
+      await fs.promises.mkdir(uploadDir, { recursive: true });
+    } catch (mkdirError) {
+      console.error("Failed to create defect image directory:", mkdirError);
+      return res.status(500).json({ success: false, message: "Failed to create image directory." });
+    }
 
-      // Attach image URLs to defectDetails.defectsByPc and additionalImages
-      if (defectDetails.defectsByPc) {
-        defectDetails.defectsByPc.forEach((pc, pcIdx) => {
-          (pc.pcDefects || []).forEach((defect, defectIdx) => {
-            if (defect.defectImages) {
-              defect.defectImages = defect.defectImages.map((img, imgIdx) => {
-                return (
-                  fileMap[`defectImages_${pcIdx}_${defectIdx}_${imgIdx}`] || img
-                );
+    // Map uploaded files by fieldname and write them to disk
+    const fileMap = {};
+    for (const file of req.files || []) {
+      let fileExtension = path.extname(file.originalname) || '.jpg';
+      const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      
+      await fs.promises.writeFile(fullFilePath, file.buffer);
+      const imageUrl = `${serverBaseUrl}/storage/after_ironing_images/defect/${newFilename}`;
+      fileMap[file.fieldname] = imageUrl;
+      
+      console.log(`Updated defect image: ${file.fieldname} -> ${imageUrl}`);
+    }
+
+    // CRITICAL FIX: Initialize additionalImages array if it doesn't exist
+    if (!defectDetails.additionalImages) {
+      defectDetails.additionalImages = [];
+    }
+
+    // Process defect images - FIXED LOGIC WITH DEFECT ID PRESERVATION
+    if (defectDetails.defectsByPc && Array.isArray(defectDetails.defectsByPc)) {
+      defectDetails.defectsByPc.forEach((pc, pcIdx) => {
+        if (pc.pcDefects && Array.isArray(pc.pcDefects)) {
+          pc.pcDefects.forEach((defect, defectIdx) => {
+            if (!defect.defectImages) {
+              defect.defectImages = [];
+            }
+
+            // CRITICAL FIX: Preserve both defectId and defectName
+            const processedDefect = {
+              defectId: defect.selectedDefect || defect.defectId || "", // Save the defect ID
+              defectName: defect.defectName || "",
+              defectQty: defect.defectQty || 0,
+              defectImages: []
+            };
+
+            const defectImages = [];
+            
+            Object.keys(fileMap).forEach(fieldName => {
+              const defectPattern = new RegExp(`^defectImages_${pcIdx}_${defectIdx}_\\d+$`);
+              if (defectPattern.test(fieldName)) {
+                defectImages.push(fileMap[fieldName]);
+                console.log(`Found updated defect image: ${fieldName} -> ${fileMap[fieldName]}`);
+              }
+            });
+
+            if (Array.isArray(defect.defectImages)) {
+              defect.defectImages.forEach(img => {
+                if (typeof img === 'string' && img.trim() !== '') {
+                  if (img.startsWith('http') || img.startsWith('/storage')) {
+                    defectImages.push(img);
+                  } else if (img.startsWith('./public/storage/')) {
+                    const relativePath = img.replace('./public/storage/', '');
+                    defectImages.push(`${serverBaseUrl}/storage/${relativePath}`);
+                  }
+                } else if (typeof img === 'object' && img.preview) {
+                  if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+                    defectImages.push(img.preview);
+                  } else if (img.preview.startsWith('./public/storage/')) {
+                    const relativePath = img.preview.replace('./public/storage/', '');
+                    defectImages.push(`${serverBaseUrl}/storage/${relativePath}`);
+                  }
+                }
               });
             }
-          });
-        });
-      }
-      if (defectDetails.additionalImages) {
-        defectDetails.additionalImages = defectDetails.additionalImages.map(
-          (img, imgIdx) => {
-            return fileMap[`additionalImages_${imgIdx}`] || img;
-          }
-        );
-      }
 
-      // Save to DB
-      const doc = await AfterIroning.findByIdAndUpdate(
-        recordId,
-        { defectDetails: defectDetails, updatedAt: new Date() },
-        { new: true }
-      );
-      if (!doc)
-        return res
-          .status(404)
-          .json({ success: false, message: "Record not found" });
-      res.json({ success: true, data: doc.defectDetails });
-    } catch (err) {
-      res.status(500).json({ success: false, message: err.message });
+            processedDefect.defectImages = defectImages;
+            pc.pcDefects[defectIdx] = processedDefect;
+            
+            console.log(`Updated defect ${pcIdx}-${defectIdx} final data:`, processedDefect);
+          });
+        }
+      });
     }
+
+    // Process additional images - same logic as save function
+    const additionalImages = [...(defectDetails.additionalImages || [])];
+    
+    Object.keys(fileMap).forEach(fieldName => {
+      const additionalPattern = /^additionalImages_\d+$/;
+      if (additionalPattern.test(fieldName)) {
+        additionalImages.push(fileMap[fieldName]);
+        console.log(`Found updated additional image: ${fieldName} -> ${fileMap[fieldName]}`);
+      }
+    });
+
+    const processedAdditionalImages = additionalImages.map(img => {
+      if (typeof img === 'string' && img.trim() !== '') {
+        if (img.startsWith('http') || img.startsWith('/storage')) {
+          return img;
+        } else if (img.startsWith('./public/storage/')) {
+          const relativePath = img.replace('./public/storage/', '');
+          return `${serverBaseUrl}/storage/${relativePath}`;
+        }
+      } else if (typeof img === 'object' && img.preview) {
+        if (img.preview.startsWith('http') || img.preview.startsWith('/storage')) {
+          return img.preview;
+        } else if (img.preview.startsWith('./public/storage/')) {
+          const relativePath = img.replace('./public/storage/', '');
+          return `${serverBaseUrl}/storage/${relativePath}`;
+        }
+      }
+      return img;
+    }).filter(img => img && typeof img === 'string' && img.trim() !== '');
+
+    defectDetails.additionalImages = processedAdditionalImages;
+
+    // Save to DB
+    const doc = await AfterIroning.findByIdAndUpdate(
+      recordId,
+      { defectDetails: defectDetails, updatedAt: new Date() },
+      { new: true }
+    );
+
+    if (!doc) {
+      return res.status(404).json({ success: false, message: "Record not found" });
+    }
+
+    console.log('Final updated defect details saved:', JSON.stringify(defectDetails, null, 2));
+
+    res.json({ success: true, data: doc.defectDetails });
+
+  } catch (err) {
+    console.error("Defect details update error:", err);
+    res.status(500).json({ success: false, message: err.message });
+  }
 };
 
 export const savedMeasurementDataSpec = async (req, res) => {
@@ -2099,115 +2271,115 @@ try {
   }
 };
 
-function normalizeInspectionImagePath(img) {
-  if (!img) return "";
+// function normalizeInspectionImagePath(img) {
+//   if (!img) return "";
 
-  // If new upload, img.file will be handled by fileMap logic in your code
+//   // If new upload, img.file will be handled by fileMap logic in your code
 
-  if (img.preview && typeof img.preview === "string") {
-    // If it's already a full URL, return as-is
-    if (img.preview.startsWith("http")) {
-      return img.preview;
-    }
+//   if (img.preview && typeof img.preview === "string") {
+//     // If it's already a full URL, return as-is
+//     if (img.preview.startsWith("http")) {
+//       return img.preview;
+//     }
 
-    // Convert relative paths to full URLs
-    if (img.preview.startsWith("./public/storage/")) {
-      const relativePath = img.preview.replace("./public/storage/", "");
-      return `${
-        process.env.BASE_URL || "http://localhost:3000"
-      }/storage/${relativePath}`;
-    }
+//     // Convert relative paths to full URLs
+//     if (img.preview.startsWith("./public/storage/")) {
+//       const relativePath = img.preview.replace("./public/storage/", "");
+//       return `${
+//         process.env.BASE_URL || "http://localhost:3000"
+//       }/storage/${relativePath}`;
+//     }
 
-    if (img.preview.startsWith("/storage/")) {
-      return `${process.env.BASE_URL || "http://localhost:3000"}${img.preview}`;
-    }
+//     if (img.preview.startsWith("/storage/")) {
+//       return `${process.env.BASE_URL || "http://localhost:3000"}${img.preview}`;
+//     }
 
-    if (img.preview.startsWith("./public/")) {
-      return img.preview;
-    }
-    if (img.preview.startsWith("/public/")) {
-      return "." + img.preview;
-    }
-    if (img.preview.startsWith("/storage/")) {
-      return "./public" + img.preview; 
-    }
-    if (img.preview.startsWith("http")) {
-      try {
-        const url = new URL(img.preview);
-        return "./public" + url.pathname;
-      } catch (e) {
-        return img.preview;
-      }
-    }
+//     if (img.preview.startsWith("./public/")) {
+//       return img.preview;
+//     }
+//     if (img.preview.startsWith("/public/")) {
+//       return "." + img.preview;
+//     }
+//     if (img.preview.startsWith("/storage/")) {
+//       return "./public" + img.preview; 
+//     }
+//     if (img.preview.startsWith("http")) {
+//       try {
+//         const url = new URL(img.preview);
+//         return "./public" + url.pathname;
+//       } catch (e) {
+//         return img.preview;
+//       }
+//     }
 
-    if (!img.preview.includes("/")) {
-      return `./public/storage/Aftre_Irorning_images/inspection/${img.preview}`;
-    }
+//     if (!img.preview.includes("/")) {
+//       return `./public/storage/Aftre_Irorning_images/inspection/${img.preview}`;
+//     }
 
-    if (img.preview[0] !== "/") {
-      return `./public/storage/After_Irorning_images/inspection/${img.preview}`;
-    }
+//     if (img.preview[0] !== "/") {
+//       return `./public/storage/After_Irorning_images/inspection/${img.preview}`;
+//     }
 
-    // Fallback
-    return img.preview;
-  }
+//     // Fallback
+//     return img.preview;
+//   }
 
-  if (img.name && !img.name.includes("/")) {
-    return `./public/storage/After_Iroring_images/inspection/${img.name}`;
-  }
+//   if (img.name && !img.name.includes("/")) {
+//     return `./public/storage/After_Iroring_images/inspection/${img.name}`;
+//   }
 
-  return "";
-}
+//   return "";
+// }
 
-// Add this helper function at the top of your file to get the server base URL
-function getServerBaseUrl(req) {
-  const protocol = req.protocol || "http";
-  const host = req.get("host") || "localhost:3000";
-  return `${protocol}://${host}`;
-}
+// // Add this helper function at the top of your file to get the server base URL
+// function getServerBaseUrl(req) {
+//   const protocol = req.protocol || "http";
+//   const host = req.get("host") || "localhost:3000";
+//   return `${protocol}://${host}`;
+// }
 
-// Helper function to group checkpoint data
-function groupCheckpointData(checkpointInspectionData) {
-  const groupedData = [];
-  const mainCheckpoints = new Map();
+// // Helper function to group checkpoint data
+// function groupCheckpointData(checkpointInspectionData) {
+//   const groupedData = [];
+//   const mainCheckpoints = new Map();
   
-  // First pass: collect all main checkpoints
-  checkpointInspectionData.forEach(item => {
-    if (item.type === 'main') {
-      mainCheckpoints.set(item.checkpointId, {
-        id: item.id,
-        checkpointId: item.checkpointId,
-        name: item.name,
-        optionType: item.optionType,
-        decision: item.decision,
-        remark: item.remark,
-        comparisonImages: item.comparisonImages || [],
-        subPoints: [] // Initialize empty sub-points array
-      });
-    }
-  });
+//   // First pass: collect all main checkpoints
+//   checkpointInspectionData.forEach(item => {
+//     if (item.type === 'main') {
+//       mainCheckpoints.set(item.checkpointId, {
+//         id: item.id,
+//         checkpointId: item.checkpointId,
+//         name: item.name,
+//         optionType: item.optionType,
+//         decision: item.decision,
+//         remark: item.remark,
+//         comparisonImages: item.comparisonImages || [],
+//         subPoints: [] // Initialize empty sub-points array
+//       });
+//     }
+//   });
   
-  // Second pass: add sub-points to their parent main checkpoints
-  checkpointInspectionData.forEach(item => {
-    if (item.type === 'sub') {
-      const mainCheckpoint = mainCheckpoints.get(item.checkpointId);
-      if (mainCheckpoint) {
-        mainCheckpoint.subPoints.push({
-          id: item.id,
-          subPointId: item.subPointId,
-          name: item.name,
-          optionType: item.optionType,
-          decision: item.decision,
-          remark: item.remark,
-          comparisonImages: item.comparisonImages || []
-        });
-      }
-    }
-  });
+//   // Second pass: add sub-points to their parent main checkpoints
+//   checkpointInspectionData.forEach(item => {
+//     if (item.type === 'sub') {
+//       const mainCheckpoint = mainCheckpoints.get(item.checkpointId);
+//       if (mainCheckpoint) {
+//         mainCheckpoint.subPoints.push({
+//           id: item.id,
+//           subPointId: item.subPointId,
+//           name: item.name,
+//           optionType: item.optionType,
+//           decision: item.decision,
+//           remark: item.remark,
+//           comparisonImages: item.comparisonImages || []
+//         });
+//       }
+//     }
+//   });
   
-  // Convert map to array
-  return Array.from(mainCheckpoints.values());
-}
+//   // Convert map to array
+//   return Array.from(mainCheckpoints.values());
+// }
 
 // Get After Ironing Defects
 export const getAfterIroningDefects = async (req, res) => {

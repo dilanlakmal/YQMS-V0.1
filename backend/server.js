@@ -84,7 +84,7 @@ import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
 /* -----------------------------
 Measurement Imports
 ------------------------------ */
-import measurementRoutes from "./routes/Measurement/measurementRoutes.js";
+import measurement from "./routes/Measurement/measurementRoutes.js";
 /* -----------------------------
 SCC Imports
 ------------------------------ */
@@ -335,7 +335,7 @@ app.use(YourksysOrders);
 /* -----------------------------
 measurement Routes
 ------------------------------ */
-app.use(measurementRoutes);
+app.use(measurement);
 
 /* -----------------------------
 Sub Con QC Routes
