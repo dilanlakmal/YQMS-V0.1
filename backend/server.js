@@ -475,16 +475,16 @@ app.use((req, res, next) => {
    Graceful Shutdown
 ------------------------------ */
 
-process.on("SIGINT", async () => {
-  try {
-    await closeSQLPools();
-    console.log("SQL connection pools closed.");
-  } catch (err) {
-    console.error("Error closing SQL connection pools:", err);
-  } finally {
-    process.exit(0);
-  }
-});
+// process.on("SIGINT", async () => {
+//   try {
+//     await closeSQLPools();
+//     console.log("SQL connection pools closed.");
+//   } catch (err) {
+//     console.error("Error closing SQL connection pools:", err);
+//   } finally {
+//     process.exit(0);
+//   }
+// });
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
