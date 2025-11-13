@@ -466,14 +466,24 @@ export default function RoleManagement() {
                 <label className="block text-sm font-medium text-gray-700">
                   Users ({selectedUsers.length} selected)
                 </label>
-                {matchingUsers.length > 0 && (
-                  <button
-                    onClick={() => setSelectedUsers(matchingUsers.map(user => user.emp_id))}
-                    className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
-                  >
-                    Add All ({matchingUsers.length})
-                  </button>
-                )}
+                <div className="flex gap-2 mb-2">
+                  {matchingUsers.length > 0 && (
+                    <button
+                      onClick={() => setSelectedUsers(matchingUsers.map(user => user.emp_id))}
+                      className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600"
+                    >
+                      Add All
+                    </button>
+                  )}
+                  {selectedUsers.length > 0 && (
+                    <button
+                      onClick={() => setSelectedUsers([])}
+                      className="px-3 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="mt-1 border rounded-md p-4 min-h-[200px] max-h-[400px] overflow-y-auto">
                 <div className="flex flex-wrap gap-4">
