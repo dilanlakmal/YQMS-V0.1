@@ -35,7 +35,8 @@ const reactSelectStyles = {
     ...provided,
     borderRadius: "0.75rem",
     overflow: "hidden",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.1)"
+    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.1)",
+    zIndex: 50
   }),
   option: (provided, state) => ({
     ...provided,
@@ -244,6 +245,8 @@ const QC1Dashboard = () => {
                 endDate={endDate}
                 onChange={(update) => setDateRange(update)}
                 className="bg-transparent text-white font-medium outline-none w-64 placeholder-white/70"
+                popperClassName="react-datepicker-popper-z-50"
+                portalId="root-portal"
               />
             </div>
           </div>
