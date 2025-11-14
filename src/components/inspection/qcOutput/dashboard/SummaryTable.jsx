@@ -1,6 +1,6 @@
 // ===== SummaryTable.jsx =====
-import React, { useMemo } from "react";
-import { BarChart3 } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { BarChart3, Eye, EyeOff } from "lucide-react";
 import { getDefectRateColor } from "./utils";
 
 const ModernButton = ({ label, active, onClick }) => {
@@ -17,7 +17,26 @@ const ModernButton = ({ label, active, onClick }) => {
   );
 };
 
+// --- New component for the details toggle button ---
+const DetailsToggleButton = ({ showDetails, onToggle }) => {
+  const baseClasses =
+    "flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200";
+  const variantClasses = showDetails
+    ? "bg-white/20 text-white hover:bg-white/30"
+    : "bg-white/10 text-indigo-200 hover:bg-white/20";
+
+  return (
+    <button onClick={onToggle} className={`${baseClasses} ${variantClasses}`}>
+      {showDetails ? <EyeOff size={16} /> : <Eye size={16} />}
+      <span>{showDetails ? "Hide Details" : "Show Details"}</span>
+    </button>
+  );
+};
+
 const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
+  // Add state to control the visibility of the details column ---
+  const [showDetails, setShowDetails] = useState(true);
+
   const tableData = useMemo(() => {
     let items = [];
     const sourceMap = {
@@ -51,49 +70,40 @@ const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
     return items.sort((a, b) => b.defectRate - a.defectRate);
   }, [data, activeView, filters]);
 
-  const headers = {
-    "Line-MO": [
-      "Date",
-      "Line",
-      "MO",
-      "Checked",
-      "Inside",
-      "Outside",
-      "Defects",
-      "Rate",
-      "Details"
-    ],
-    Line: [
-      "Date",
-      "Line",
-      "Checked",
-      "Inside",
-      "Outside",
-      "Defects",
-      "Rate",
-      "Details"
-    ],
-    MO: [
-      "Date",
-      "MO",
-      "Checked",
-      "Inside",
-      "Outside",
-      "Defects",
-      "Rate",
-      "Details"
-    ],
-    Buyer: [
-      "Date",
-      "Buyer",
-      "Checked",
-      "Inside",
-      "Outside",
-      "Defects",
-      "Rate",
-      "Details"
-    ]
-  };
+  const headers = useMemo(() => {
+    const baseHeaders = {
+      "Line-MO": [
+        "Date",
+        "Line",
+        "MO",
+        "Checked",
+        "Inside",
+        "Outside",
+        "Defects",
+        "Rate"
+      ],
+      Line: ["Date", "Line", "Checked", "Inside", "Outside", "Defects", "Rate"],
+      MO: ["Date", "MO", "Checked", "Inside", "Outside", "Defects", "Rate"],
+      Buyer: [
+        "Date",
+        "Buyer",
+        "Checked",
+        "Inside",
+        "Outside",
+        "Defects",
+        "Rate"
+      ]
+    };
+
+    // --- Conditionally add the 'Details' header based on state ---
+    if (showDetails) {
+      Object.keys(baseHeaders).forEach((key) => {
+        baseHeaders[key].push("Details");
+      });
+    }
+
+    return baseHeaders;
+  }, [showDetails]); // Recalculate headers when showDetails changes
 
   return (
     <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl overflow-hidden">
@@ -103,7 +113,7 @@ const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
             <BarChart3 className="w-6 h-6 text-white" />
             <h2 className="text-xl font-bold text-white">Daily Summary View</h2>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {["Line-MO", "Line", "MO", "Buyer"].map((view) => (
               <ModernButton
                 key={view}
@@ -112,6 +122,11 @@ const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
                 onClick={() => setActiveView(view)}
               />
             ))}
+            {/* --- Add the new toggle button to the header --- */}
+            <DetailsToggleButton
+              showDetails={showDetails}
+              onToggle={() => setShowDetails((prev) => !prev)}
+            />
           </div>
         </div>
       </div>
@@ -183,32 +198,36 @@ const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
                     {row.defectRate.toFixed(2)}%
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <div className="space-y-1">
-                    {(row.DefectArray || []).map((d) => {
-                      const individualRate =
-                        row.checkedQty > 0
-                          ? (d.defectQty / row.checkedQty) * 100
-                          : 0;
-                      return (
-                        <div
-                          key={d.defectCode}
-                          className="flex items-center justify-between gap-2 text-xs bg-gray-50 dark:bg-gray-900/50 px-2 py-1 rounded"
-                        >
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {d.defectName}{" "}
-                            <span className="font-semibold">
-                              (×{d.defectQty})
+
+                {/* --- Conditionally render the entire details column based on state --- */}
+                {showDetails && (
+                  <td className="px-4 py-3">
+                    <div className="space-y-1">
+                      {(row.DefectArray || []).map((d) => {
+                        const individualRate =
+                          row.checkedQty > 0
+                            ? (d.defectQty / row.checkedQty) * 100
+                            : 0;
+                        return (
+                          <div
+                            key={d.defectCode}
+                            className="flex items-center justify-between gap-2 text-xs bg-gray-50 dark:bg-gray-900/50 px-2 py-1 rounded"
+                          >
+                            <span className="text-gray-700 dark:text-gray-300">
+                              {d.defectName}{" "}
+                              <span className="font-semibold">
+                                (×{d.defectQty})
+                              </span>
                             </span>
-                          </span>
-                          <span className="font-mono font-semibold text-red-600 dark:text-red-400">
-                            {individualRate.toFixed(2)}%
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </td>
+                            <span className="font-mono font-semibold text-red-600 dark:text-red-400">
+                              {individualRate.toFixed(2)}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

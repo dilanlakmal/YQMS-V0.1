@@ -60,6 +60,7 @@ const QC1Dashboard = () => {
   const [startDate, endDate] = dateRange;
 
   const [data, setData] = useState([]);
+  const [trendData, setTrendData] = useState([]); // State for previous 5 days
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -80,17 +81,32 @@ const QC1Dashboard = () => {
     if (!startDate || !endDate) return;
     setLoading(true);
     setError(null);
+
+    // Calculate the date range for the preceding trend data
+    const trendEndDate = new Date(startDate);
+    trendEndDate.setDate(trendEndDate.getDate() - 1);
+    const trendStartDate = new Date(trendEndDate);
+    trendStartDate.setDate(trendEndDate.getDate() - 6); // Fetch 7 days to find 5 working days
+
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qc1-summary/dashboard-data`,
-        {
+      // Fetch both main data and trend data in parallel for efficiency
+      const [mainResponse, trendResponse] = await Promise.all([
+        axios.get(`${API_BASE_URL}/api/qc1-summary/dashboard-data`, {
           params: {
             startDate: startDate.toISOString().split("T")[0],
             endDate: endDate.toISOString().split("T")[0]
           }
-        }
-      );
-      setData(response.data);
+        }),
+        axios.get(`${API_BASE_URL}/api/qc1-summary/dashboard-data`, {
+          params: {
+            startDate: trendStartDate.toISOString().split("T")[0],
+            endDate: trendEndDate.toISOString().split("T")[0]
+          }
+        })
+      ]);
+
+      setData(mainResponse.data);
+      setTrendData(trendResponse.data);
     } catch (err) {
       setError("Failed to fetch dashboard data. Please try again.");
       console.error(err);
@@ -104,90 +120,182 @@ const QC1Dashboard = () => {
   }, [fetchData]);
 
   const processedData = useMemo(() => {
-    if (!data || data.length === 0) return null;
-
-    const lines = new Set(),
-      mos = new Set(),
-      buyers = new Set();
-    data.forEach((day) => {
-      (day.daily_line_summary || []).forEach((item) => lines.add(item.lineNo));
-      (day.daily_mo_summary || []).forEach((item) => mos.add(item.MONo));
-      (day.daily_buyer_summary || []).forEach((item) => buyers.add(item.Buyer));
-    });
-    const newFilterOptions = {
-      lines: [...lines].sort().map((l) => ({ value: l, label: l })),
-      mos: [...mos].sort().map((m) => ({ value: m, label: m })),
-      buyers: [...buyers].sort().map((b) => ({ value: b, label: b }))
+    const defaultData = {
+      stats: {
+        totalOutput: 0,
+        totalOutputT38: 0,
+        totalOutputT39: 0,
+        totalDefects: 0,
+        defectRate: 0
+      },
+      topDefects: [],
+      chartData: { lineSummary: {}, moSummary: {}, buyerSummary: {} },
+      tableData: [],
+      filterOptions: { lines: [], mos: [], buyers: [] },
+      trends: { output: [], defects: [], defectRate: [] }
     };
 
-    let totalOutputT38 = 0,
-      totalOutputT39 = 0,
-      totalDefects = 0;
-    const lineSummary = {},
-      moSummary = {},
-      buyerSummary = {};
-    const defectMap = new Map();
+    // Main dashboard data processing
+    let mainDataProcessed = { ...defaultData };
+    if (data && data.length > 0) {
+      const lines = new Set(),
+        mos = new Set(),
+        buyers = new Set();
+      let totalOutputT38 = 0,
+        totalOutputT39 = 0,
+        totalDefects = 0;
+      const lineSummary = {},
+        moSummary = {},
+        buyerSummary = {};
+      const defectMap = new Map();
 
-    data.forEach((day) => {
-      const filteredLineMo = (day.daily_line_MO_summary || []).filter(
+      data.forEach((day) => {
+        (day.daily_line_summary || []).forEach(
+          (item) => item.lineNo && lines.add(item.lineNo)
+        );
+        (day.daily_mo_summary || []).forEach(
+          (item) => item.MONo && mos.add(item.MONo)
+        );
+        (day.daily_buyer_summary || []).forEach(
+          (item) => item.Buyer && buyers.add(item.Buyer)
+        );
+
+        const filteredFullSummary = (day.daily_full_summary || []).filter(
+          (item) =>
+            (!filters.lineNo || item.lineNo === filters.lineNo.value) &&
+            (!filters.moNo || item.MONo === filters.moNo.value) &&
+            (!filters.buyer || item.Buyer === filters.buyer.value)
+        );
+
+        filteredFullSummary.forEach((item) => {
+          totalOutputT38 += item.CheckedQtyT38;
+          totalOutputT39 += item.CheckedQtyT39;
+          totalDefects += item.totalDefectsQty;
+
+          (item.DefectArray || []).forEach((defect) => {
+            defectMap.set(
+              defect.defectName,
+              (defectMap.get(defect.defectName) || 0) + defect.defectQty
+            );
+          });
+
+          const updateSummary = (summaryObj, key, dataItem) => {
+            if (!key) return;
+            if (!summaryObj[key]) summaryObj[key] = { checked: 0, defects: 0 };
+            summaryObj[key].checked += Math.max(
+              dataItem.CheckedQtyT38,
+              dataItem.CheckedQtyT39
+            );
+            summaryObj[key].defects += dataItem.totalDefectsQty;
+          };
+
+          updateSummary(lineSummary, item.lineNo, item);
+          updateSummary(moSummary, item.MONo, item);
+          updateSummary(buyerSummary, item.Buyer, item);
+        });
+      });
+
+      const totalOutput = Math.max(totalOutputT38, totalOutputT39);
+      const defectRate =
+        totalOutput > 0 ? (totalDefects / totalOutput) * 100 : 0;
+      const topDefects = Array.from(defectMap.entries())
+        .map(([name, qty]) => ({
+          name,
+          qty,
+          rate: totalOutput > 0 ? (qty / totalOutput) * 100 : 0
+        }))
+        .sort((a, b) => b.qty - a.qty);
+
+      const filterValidKeys = (summaryObj) =>
+        Object.entries(summaryObj)
+          .filter(([key]) => key && key !== "undefined" && key !== "null")
+          .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+
+      mainDataProcessed = {
+        stats: {
+          totalOutput,
+          totalOutputT38,
+          totalOutputT39,
+          totalDefects,
+          defectRate
+        },
+        topDefects,
+        chartData: {
+          lineSummary: filterValidKeys(lineSummary),
+          moSummary: filterValidKeys(moSummary),
+          buyerSummary: filterValidKeys(buyerSummary)
+        },
+        tableData: data,
+        filterOptions: {
+          lines: [...lines].sort().map((l) => ({ value: l, label: l })),
+          mos: [...mos].sort().map((m) => ({ value: m, label: m })),
+          buyers: [...buyers].sort().map((b) => ({ value: b, label: b }))
+        }
+      };
+    }
+
+    // --- FIX: Apply filters to trend data processing ---
+    const dailyTrends = new Map();
+    (trendData || []).forEach((day) => {
+      const dateStr = day.inspectionDate.split("T")[0];
+
+      // Apply the same filters to trend data
+      const filteredFullSummary = (day.daily_full_summary || []).filter(
         (item) =>
           (!filters.lineNo || item.lineNo === filters.lineNo.value) &&
           (!filters.moNo || item.MONo === filters.moNo.value) &&
           (!filters.buyer || item.Buyer === filters.buyer.value)
       );
 
-      filteredLineMo.forEach((item) => {
-        totalOutputT38 += item.CheckedQtyT38;
-        totalOutputT39 += item.CheckedQtyT39;
-        totalDefects += item.totalDefectsQty;
+      // Calculate daily totals from filtered data
+      let dailyOutputT38 = 0;
+      let dailyOutputT39 = 0;
+      let dailyDefects = 0;
 
-        (item.DefectArray || []).forEach((defect) => {
-          defectMap.set(
-            defect.defectName,
-            (defectMap.get(defect.defectName) || 0) + defect.defectQty
-          );
-        });
-
-        const updateSummary = (summaryObj, key, dataItem) => {
-          if (!summaryObj[key]) summaryObj[key] = { checked: 0, defects: 0 };
-          summaryObj[key].checked += Math.max(
-            dataItem.CheckedQtyT38,
-            dataItem.CheckedQtyT39
-          );
-          summaryObj[key].defects += dataItem.totalDefectsQty;
-        };
-
-        updateSummary(lineSummary, item.lineNo, item);
-        updateSummary(moSummary, item.MONo, item);
-        updateSummary(buyerSummary, item.Buyer, item);
+      filteredFullSummary.forEach((item) => {
+        dailyOutputT38 += item.CheckedQtyT38 || 0;
+        dailyOutputT39 += item.CheckedQtyT39 || 0;
+        dailyDefects += item.totalDefectsQty || 0;
       });
+
+      const dailyOutput = Math.max(dailyOutputT38, dailyOutputT39);
+
+      if (dailyOutput > 0 || dailyDefects > 0) {
+        dailyTrends.set(dateStr, {
+          output: dailyOutput,
+          outputT38: dailyOutputT38,
+          outputT39: dailyOutputT39,
+          defects: dailyDefects,
+          rate: dailyOutput > 0 ? (dailyDefects / dailyOutput) * 100 : 0
+        });
+      }
     });
 
-    const totalOutput = Math.max(totalOutputT38, totalOutputT39);
-    const defectRate = totalOutput > 0 ? (totalDefects / totalOutput) * 100 : 0;
+    const lastFiveDaysData = Array.from(dailyTrends.entries())
+      .map(([date, values]) => ({ date, ...values }))
+      .filter((day) => new Date(day.date).getDay() !== 0) // Exclude Sundays
+      .sort((a, b) => new Date(a.date) - new Date(b.date)) // Ensure chronological order
+      .slice(-5);
 
-    const topDefects = Array.from(defectMap.entries())
-      .map(([name, qty]) => ({
-        name,
-        qty,
-        rate: totalOutput > 0 ? (qty / totalOutput) * 100 : 0
-      }))
-      .sort((a, b) => b.qty - a.qty);
+    const outputTrend = lastFiveDaysData.map((d) => ({
+      date: d.date,
+      value: d.output
+    }));
+    const defectTrend = lastFiveDaysData.map((d) => ({
+      date: d.date,
+      value: d.defects
+    }));
 
+    // --- Combine the results ---
     return {
-      stats: {
-        totalOutput,
-        totalOutputT38,
-        totalOutputT39,
-        totalDefects,
-        defectRate
-      },
-      topDefects,
-      chartData: { lineSummary, moSummary, buyerSummary },
-      tableData: data,
-      filterOptions: newFilterOptions
+      ...mainDataProcessed,
+      trends: {
+        output: outputTrend,
+        defects: defectTrend,
+        defectRate: lastFiveDaysData
+      }
     };
-  }, [data, filters]);
+  }, [data, trendData, filters]); // <-- filters is already a dependency
 
   useEffect(() => {
     if (processedData?.filterOptions) {
@@ -210,13 +318,6 @@ const QC1Dashboard = () => {
       <div className="text-center text-red-500 p-8">
         <AlertTriangle className="mx-auto mb-2" />
         {error}
-      </div>
-    );
-  if (!processedData)
-    return (
-      <div className="text-center text-gray-500 p-8">
-        No data available for the selected date range. Please try syncing the
-        data or selecting a different range.
       </div>
     );
 
@@ -260,18 +361,24 @@ const QC1Dashboard = () => {
             rate={null}
             subValue={`Inside: ${processedData.stats.totalOutputT39.toLocaleString()} | Outside: ${processedData.stats.totalOutputT38.toLocaleString()}`}
             icon={BarChart3}
+            trendData={processedData.trends.output}
+            insideQty={processedData.stats.totalOutputT39}
+            outsideQty={processedData.stats.totalOutputT38}
           />
           <DashboardStatCard
             title="Total Defects"
             value={processedData.stats.totalDefects.toLocaleString()}
             rate={null}
             icon={AlertTriangle}
+            trendData={processedData.trends.defects}
           />
           <DashboardStatCard
             title="Overall Defect Rate"
             value={`${processedData.stats.defectRate.toFixed(2)}%`}
             rate={processedData.stats.defectRate}
             icon={Activity}
+            trendData={processedData.trends.defectRate}
+            isTrendChart={true}
           />
         </div>
 

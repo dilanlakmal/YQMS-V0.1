@@ -35,12 +35,16 @@ const DefectRateChart = ({ chartData }) => {
     };
     const source = sourceMap[activeView] || {};
 
-    return Object.entries(source)
-      .map(([label, values]) => ({
-        label,
-        rate: values.checked > 0 ? (values.defects / values.checked) * 100 : 0
-      }))
-      .sort((a, b) => b.rate - a.rate);
+    return (
+      Object.entries(source)
+        // --- FIX: Filter out invalid labels and provide a fallback ---
+        .filter(([label]) => label && label !== "undefined" && label !== "null")
+        .map(([label, values]) => ({
+          label: label || "N/A", // Use 'N/A' if the label is still empty
+          rate: values.checked > 0 ? (values.defects / values.checked) * 100 : 0
+        }))
+        .sort((a, b) => b.rate - a.rate)
+    );
   }, [chartData, activeView]);
 
   const chartOptions = {
@@ -52,6 +56,9 @@ const DefectRateChart = ({ chartData }) => {
         display: true,
         text: `Defect Rate Analysis by ${activeView}`,
         font: { size: 16, weight: "bold" },
+        color: document.documentElement.classList.contains("dark")
+          ? "#E5E7EB"
+          : "#1F2937",
         padding: 20
       },
       datalabels: {
@@ -59,7 +66,9 @@ const DefectRateChart = ({ chartData }) => {
         align: "top",
         formatter: (value) => `${value.toFixed(2)}%`,
         font: { weight: "bold", size: 11 },
-        color: "#4B5563"
+        color: document.documentElement.classList.contains("dark")
+          ? "#D1D5DB"
+          : "#4B5563"
       }
     },
     scales: {
@@ -68,12 +77,29 @@ const DefectRateChart = ({ chartData }) => {
         title: {
           display: true,
           text: "Defect Rate (%)",
-          font: { size: 12, weight: "bold" }
+          font: { size: 12, weight: "bold" },
+          color: document.documentElement.classList.contains("dark")
+            ? "#9CA3AF"
+            : "#4B5563"
         },
-        grid: { color: "rgba(0,0,0,0.05)" }
+        grid: {
+          color: document.documentElement.classList.contains("dark")
+            ? "rgba(255,255,255,0.1)"
+            : "rgba(0,0,0,0.05)"
+        },
+        ticks: {
+          color: document.documentElement.classList.contains("dark")
+            ? "#9CA3AF"
+            : "#4B5563"
+        }
       },
       x: {
-        grid: { display: false }
+        grid: { display: false },
+        ticks: {
+          color: document.documentElement.classList.contains("dark")
+            ? "#9CA3AF"
+            : "#4B5563"
+        }
       }
     }
   };
