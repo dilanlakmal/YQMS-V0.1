@@ -1058,174 +1058,163 @@ export const getqcwashingOrderSizes = async (req, res) => {
 };
 
 export const getmeasurmentSpec = async (req, res) => {
-  const { orderNo, color } = req.params;
-    const collection = ymProdConnection.db.collection("dt_orders");
-    const buyerSpecCollection = ymProdConnection.db.collection("buyerspectemplates");
+  const { orderNo } = req.params; // Remove color from destructuring
+  const collection = ymProdConnection.db.collection("dt_orders");
+  const buyerSpecCollection = ymProdConnection.db.collection("buyerspectemplates");
 
-    try {
-      const orders = await collection.find({ Order_No: orderNo }).toArray();
+  try {
+    const orders = await collection.find({ Order_No: orderNo }).toArray();
 
-      if (!orders || orders.length === 0) {
-        return res
-          .status(404)
-          .json({ success: false, message: `Order '${orderNo}' not found.` });
-      }
+    if (!orders || orders.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: `Order '${orderNo}' not found.` });
+    }
 
-      const order = orders[0];
+    const order = orders[0];
 
-      // Extract measurement specifications from different possible locations
-      let measurementSpecs = [];
-      
-      // Check various possible locations for measurement data
+    // Extract measurement specifications - REMOVED color-specific logic
+    let measurementSpecs = [];
+    
+    // Check various possible locations for measurement data
+    if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
+      measurementSpecs = order.MeasurementSpecs;
+    } else if (order.Specs && Array.isArray(order.Specs)) {
+      measurementSpecs = order.Specs;
+    }
+    // REMOVED: Color-specific measurement specs lookup from OrderColors
 
-      // Check various possible locations for measurement data
-      if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
-        measurementSpecs = order.MeasurementSpecs;
-      } else if (order.Specs && Array.isArray(order.Specs)) {
-        measurementSpecs = order.Specs;
-      } else if (order.OrderColors) {
-        const colorObj = order.OrderColors.find(
-          (c) => c.Color.toLowerCase() === color.toLowerCase()
-        );
-        if (colorObj && colorObj.MeasurementSpecs) {
-          measurementSpecs = colorObj.MeasurementSpecs;
-        } else if (colorObj && colorObj.Specs) {
-          measurementSpecs = colorObj.Specs;
-        }
-      }
+    const beforeWashSpecs = [];
+    const afterWashSpecs = [];
+    const beforeWashByK = {};
+    const afterWashByK = {};
 
-      const beforeWashSpecs = [];
-      const afterWashSpecs = [];
-      const beforeWashByK = {};
-      const afterWashByK = {};
-
-      // Process BeforeWashSpecs and AfterWashSpecs arrays
-      if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
-        order.BeforeWashSpecs.forEach((spec) => {
-          if (
-            spec.MeasurementPointEngName &&
-            spec.Specs &&
-            Array.isArray(spec.Specs)
-          ) {
-            const kValue = spec.kValue || "NA";
-            const pointName = spec.MeasurementPointEngName;
-            if (!beforeWashByK[kValue]) {
-              beforeWashByK[kValue] = new Map();
-            }
-            if (!beforeWashByK[kValue].has(pointName)) {
-              beforeWashByK[kValue].set(pointName, {
-                MeasurementPointEngName: pointName,
-                Specs: spec.Specs,
-                ToleranceMinus: spec.TolMinus,
-                TolerancePlus: spec.TolPlus,
-                kValue: kValue
-              });
-            }
+    // Process BeforeWashSpecs and AfterWashSpecs arrays
+    if (order.BeforeWashSpecs && Array.isArray(order.BeforeWashSpecs)) {
+      order.BeforeWashSpecs.forEach((spec) => {
+        if (
+          spec.MeasurementPointEngName &&
+          spec.Specs &&
+          Array.isArray(spec.Specs)
+        ) {
+          const kValue = spec.kValue || "NA";
+          const pointName = spec.MeasurementPointEngName;
+          if (!beforeWashByK[kValue]) {
+            beforeWashByK[kValue] = new Map();
           }
-        });
-      }
-
-      if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
-        order.AfterWashSpecs.forEach((spec) => {
-          if (
-            spec.MeasurementPointEngName &&
-            spec.Specs &&
-            Array.isArray(spec.Specs)
-          ) {
-            const kValue = spec.kValue || "NA";
-            const pointName = spec.MeasurementPointEngName;
-            if (!afterWashByK[kValue]) {
-              afterWashByK[kValue] = new Map();
-            }
-            if (!afterWashByK[kValue].has(pointName)) {
-              afterWashByK[kValue].set(pointName, {
-                MeasurementPointEngName: pointName,
-                Specs: spec.Specs,
-                ToleranceMinus: spec.TolMinus,
-                TolerancePlus: spec.TolPlus,
-                kValue: kValue
-              });
-            }
+          if (!beforeWashByK[kValue].has(pointName)) {
+            beforeWashByK[kValue].set(pointName, {
+              MeasurementPointEngName: pointName,
+              Specs: spec.Specs,
+              ToleranceMinus: spec.TolMinus,
+              TolerancePlus: spec.TolPlus,
+              kValue: kValue
+            });
           }
-        });
-      }
-
-      // Convert to grouped arrays
-      const beforeWashGrouped = {};
-      const afterWashGrouped = {};
-
-      Object.keys(beforeWashByK).forEach((kValue) => {
-        beforeWashGrouped[kValue] = Array.from(beforeWashByK[kValue].values());
-      });
-
-      Object.keys(afterWashByK).forEach((kValue) => {
-        afterWashGrouped[kValue] = Array.from(afterWashByK[kValue].values());
-      });
-
-      // For backward compatibility, also provide flat arrays
-      Object.values(beforeWashGrouped).forEach((group) => {
-        beforeWashSpecs.push(...group);
-      });
-
-      Object.values(afterWashGrouped).forEach((group) => {
-        afterWashSpecs.push(...group);
-      });
-
-      // FIXED: Fetch buyerspectemplate data for default measurement points
-      let buyerSpecData = null;
-      try {
-        // Use orderNo directly since moNo in buyerspectemplates corresponds to order number
-        buyerSpecData = await buyerSpecCollection.findOne({ 
-          moNo: orderNo  // Changed from styleNo to orderNo
-        });
-        
-        // If not found with orderNo, try with Style field as fallback
-        if (!buyerSpecData && order.Style) {
-          buyerSpecData = await buyerSpecCollection.findOne({ 
-            moNo: order.Style 
-          });
         }
-        
-        
-      } catch (error) {
-        console.log("Error fetching buyerspectemplate for orderNo:", orderNo, error);
-      }
-
-      // If no measurement data found, provide default specifications
-      if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
-        return res.json({
-          success: true,
-          beforeWashSpecs: [],
-          afterWashSpecs: [],
-          beforeWashGrouped: {},
-          afterWashGrouped: {},
-          buyerSpecData: buyerSpecData, // Include buyer spec data
-          isDefault: true,
-          message: "No measurement points available for this Mono."
-        });
-      } else {
-        return res.json({
-          success: true,
-          beforeWashSpecs: beforeWashSpecs,
-          afterWashSpecs: afterWashSpecs,
-          beforeWashGrouped: beforeWashGrouped,
-          afterWashGrouped: afterWashGrouped,
-          buyerSpecData: buyerSpecData, // Include buyer spec data
-          isDefault: false
-        });
-      }
-
-    } catch (error) {
-      console.error(
-        `Error fetching measurement specs for Mono ${orderNo} :`,
-        error
-      );
-      res.status(500).json({
-        success: false,
-        message: "Server error while fetching measurement specs."
       });
     }
+
+    if (order.AfterWashSpecs && Array.isArray(order.AfterWashSpecs)) {
+      order.AfterWashSpecs.forEach((spec) => {
+        if (
+          spec.MeasurementPointEngName &&
+          spec.Specs &&
+          Array.isArray(spec.Specs)
+        ) {
+          const kValue = spec.kValue || "NA";
+          const pointName = spec.MeasurementPointEngName;
+          if (!afterWashByK[kValue]) {
+            afterWashByK[kValue] = new Map();
+          }
+          if (!afterWashByK[kValue].has(pointName)) {
+            afterWashByK[kValue].set(pointName, {
+              MeasurementPointEngName: pointName,
+              Specs: spec.Specs,
+              ToleranceMinus: spec.TolMinus,
+              TolerancePlus: spec.TolPlus,
+              kValue: kValue
+            });
+          }
+        }
+      });
+    }
+
+    // Convert to grouped arrays
+    const beforeWashGrouped = {};
+    const afterWashGrouped = {};
+
+    Object.keys(beforeWashByK).forEach((kValue) => {
+      beforeWashGrouped[kValue] = Array.from(beforeWashByK[kValue].values());
+    });
+
+    Object.keys(afterWashByK).forEach((kValue) => {
+      afterWashGrouped[kValue] = Array.from(afterWashByK[kValue].values());
+    });
+
+    // For backward compatibility, also provide flat arrays
+    Object.values(beforeWashGrouped).forEach((group) => {
+      beforeWashSpecs.push(...group);
+    });
+
+    Object.values(afterWashGrouped).forEach((group) => {
+      afterWashSpecs.push(...group);
+    });
+
+    // Fetch buyerspectemplate data for default measurement points
+    let buyerSpecData = null;
+    try {
+      // Use orderNo directly since moNo in buyerspectemplates corresponds to order number
+      buyerSpecData = await buyerSpecCollection.findOne({ 
+        moNo: orderNo  // Changed from styleNo to orderNo
+      });
+      
+      // If not found with orderNo, try with Style field as fallback
+      if (!buyerSpecData && order.Style) {
+        buyerSpecData = await buyerSpecCollection.findOne({ 
+          moNo: order.Style 
+        });
+      }
+    } catch (error) {
+      console.log("Error fetching buyerspectemplate for orderNo:", orderNo, error);
+    }
+
+    // If no measurement data found, provide default specifications
+    if (beforeWashSpecs.length === 0 && afterWashSpecs.length === 0) {
+      return res.json({
+        success: true,
+        beforeWashSpecs: [],
+        afterWashSpecs: [],
+        beforeWashGrouped: {},
+        afterWashGrouped: {},
+        buyerSpecData: buyerSpecData, // Include buyer spec data
+        isDefault: true,
+        message: "No measurement points available for this Mono."
+      });
+    } else {
+      return res.json({
+        success: true,
+        beforeWashSpecs: beforeWashSpecs,
+        afterWashSpecs: afterWashSpecs,
+        beforeWashGrouped: beforeWashGrouped,
+        afterWashGrouped: afterWashGrouped,
+        buyerSpecData: buyerSpecData, // Include buyer spec data
+        isDefault: false
+      });
+    }
+
+  } catch (error) {
+    console.error(
+      `Error fetching measurement specs for Mono ${orderNo} :`,
+      error
+    );
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching measurement specs."
+    });
+  }
 };
+
 
 export const saveqwashingSummary = async (req, res) => {
     try {

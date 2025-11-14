@@ -879,7 +879,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`);
       const data = await response.json();
       
       if (response.ok && data.success) {
