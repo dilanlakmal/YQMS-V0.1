@@ -1066,7 +1066,7 @@ export const getqcwashingOrderSizes = async (req, res) => {
 };
 
 export const getmeasurmentSpec = async (req, res) => {
-  const { orderNo, color } = req.params;
+  const { orderNo } = req.params; // Remove color from destructuring
   const collection = ymProdConnection.db.collection("dt_orders");
   const buyerSpecCollection =
     ymProdConnection.db.collection("buyerspectemplates");
@@ -1082,26 +1082,16 @@ export const getmeasurmentSpec = async (req, res) => {
 
     const order = orders[0];
 
-    // Extract measurement specifications from different possible locations
+    // Extract measurement specifications - REMOVED color-specific logic
     let measurementSpecs = [];
-
-    // Check various possible locations for measurement data
 
     // Check various possible locations for measurement data
     if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
       measurementSpecs = order.MeasurementSpecs;
     } else if (order.Specs && Array.isArray(order.Specs)) {
       measurementSpecs = order.Specs;
-    } else if (order.OrderColors) {
-      const colorObj = order.OrderColors.find(
-        (c) => c.Color.toLowerCase() === color.toLowerCase()
-      );
-      if (colorObj && colorObj.MeasurementSpecs) {
-        measurementSpecs = colorObj.MeasurementSpecs;
-      } else if (colorObj && colorObj.Specs) {
-        measurementSpecs = colorObj.Specs;
-      }
     }
+    // REMOVED: Color-specific measurement specs lookup from OrderColors
 
     const beforeWashSpecs = [];
     const afterWashSpecs = [];
@@ -1180,7 +1170,7 @@ export const getmeasurmentSpec = async (req, res) => {
       afterWashSpecs.push(...group);
     });
 
-    // FIXED: Fetch buyerspectemplate data for default measurement points
+    // Fetch buyerspectemplate data for default measurement points
     let buyerSpecData = null;
     try {
       // Use orderNo directly since moNo in buyerspectemplates corresponds to order number

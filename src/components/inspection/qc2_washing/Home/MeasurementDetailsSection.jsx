@@ -1099,9 +1099,7 @@ const MeasurementDetailsSection = ({
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(
-          sanitizedColor
-        )}`
+        `${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`
       );
       const data = await response.json();
 
