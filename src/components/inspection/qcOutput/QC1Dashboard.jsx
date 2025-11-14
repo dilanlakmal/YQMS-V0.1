@@ -10,13 +10,19 @@ import {
   Calendar,
   Filter,
   BarChart3,
-  Activity
+  Activity,
+  View,
+  TrendingUp,
+  CalendarDays,
+  CalendarClock,
+  CalendarHeart
 } from "lucide-react";
 
 import DashboardStatCard from "./dashboard/DashboardStatCard";
 import SummaryTable from "./dashboard/SummaryTable";
 import DefectRateChart from "./dashboard/DefectRateChart";
 import TopDefectsTable from "./dashboard/TopDefectsTable";
+import DailyTrendView from "./dashboard/DailyTrendView";
 
 const reactSelectStyles = {
   control: (provided, state) => ({
@@ -52,12 +58,32 @@ const reactSelectStyles = {
   })
 };
 
+const HeaderButton = ({ label, icon: Icon, active, onClick }) => {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-2 w-28 h-20 rounded-xl transition-all duration-300 transform hover:-translate-y-1 ${
+        active
+          ? "bg-white/30 backdrop-blur-lg shadow-xl"
+          : "bg-white/10 hover:bg-white/20"
+      }`}
+    >
+      <Icon className="w-6 h-6 text-white" />
+      <span className="text-xs font-bold text-white tracking-wide">
+        {label}
+      </span>
+    </button>
+  );
+};
+
 const QC1Dashboard = () => {
   const [dateRange, setDateRange] = useState([
     new Date(new Date().setDate(new Date().getDate() - 6)),
     new Date()
   ]);
   const [startDate, endDate] = dateRange;
+  // --- new state for the active dashboard view ---
+  const [activeDashboardView, setActiveDashboardView] = useState("Daily View");
 
   const [data, setData] = useState([]);
   const [trendData, setTrendData] = useState([]); // State for previous 5 days
@@ -348,116 +374,178 @@ const QC1Dashboard = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-gray-900 dark:to-indigo-950 p-6">
       <div className="max-w-full mx-auto space-y-6">
         {/* Header */}
-        <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-8 shadow-2xl">
+        <header className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-6 shadow-2xl">
           <div className="absolute top-0 right-0 w-48 h-48 bg-white/10 rounded-full -mr-32 -mt-32"></div>
           <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/10 rounded-full -ml-24 -mb-24"></div>
 
-          <div className="relative flex flex-wrap justify-between items-center gap-4">
-            <div>
-              <h1 className="text-4xl font-bold text-white mb-2">
-                QC1 Sunrise Dashboard
-              </h1>
-              <p className="text-indigo-100">
-                Daily / Weekly / Monthly Quality Control Summary and Analysis
-              </p>
+          <div className="relative space-y-6">
+            {/* Top Row: Title and Date Picker */}
+            <div className="flex flex-wrap justify-between items-center gap-4">
+              <div>
+                <h1 className="text-4xl font-bold text-white mb-1">
+                  QC1 Sunrise Dashboard
+                </h1>
+                <p className="text-indigo-100">
+                  QC1 Inspection Quality Control Summary and Analysis
+                </p>
+              </div>
+
+              <div className="flex items-center justify-center gap-4 pt-4 border-t border-white/20">
+                <HeaderButton
+                  label="Daily View"
+                  icon={View}
+                  active={activeDashboardView === "Daily View"}
+                  onClick={() => setActiveDashboardView("Daily View")}
+                />
+                <HeaderButton
+                  label="Weekly View"
+                  icon={CalendarDays}
+                  active={activeDashboardView === "Weekly View"}
+                  onClick={() => setActiveDashboardView("Weekly View")}
+                />
+                <HeaderButton
+                  label="Monthly View"
+                  icon={CalendarHeart}
+                  active={activeDashboardView === "Monthly View"}
+                  onClick={() => setActiveDashboardView("Monthly View")}
+                />
+                <HeaderButton
+                  label="Daily Trend"
+                  icon={TrendingUp}
+                  active={activeDashboardView === "Daily Trend"}
+                  onClick={() => setActiveDashboardView("Daily Trend")}
+                />
+                <HeaderButton
+                  label="Weekly Trend"
+                  icon={TrendingUp}
+                  active={activeDashboardView === "Weekly Trend"}
+                  onClick={() => setActiveDashboardView("Weekly Trend")}
+                />
+                <HeaderButton
+                  label="Monthly Trend"
+                  icon={CalendarClock}
+                  active={activeDashboardView === "Monthly Trend"}
+                  onClick={() => setActiveDashboardView("Monthly Trend")}
+                />
+              </div>
+
+              <div className="flex items-center gap-3 bg-white/20 backdrop-blur-md rounded-xl px-4 py-3">
+                <Calendar className="text-white" size={20} />
+                <DatePicker
+                  selectsRange={true}
+                  startDate={startDate}
+                  endDate={endDate}
+                  onChange={(update) => setDateRange(update)}
+                  className="bg-transparent text-white font-medium outline-none w-64 placeholder-white/70"
+                  popperClassName="react-datepicker-popper-z-50"
+                  portalId="root-portal"
+                />
+              </div>
             </div>
-            <div className="flex items-center gap-3 bg-white/20 backdrop-blur-md rounded-xl px-4 py-3">
-              <Calendar className="text-white" size={20} />
-              <DatePicker
-                selectsRange={true}
-                startDate={startDate}
-                endDate={endDate}
-                onChange={(update) => setDateRange(update)}
-                className="bg-transparent text-white font-medium outline-none w-64 placeholder-white/70"
-                popperClassName="react-datepicker-popper-z-50"
-                portalId="root-portal"
-              />
-            </div>
+
+            {/* Bottom Row: Navigation Buttons */}
           </div>
         </header>
 
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <DashboardStatCard
-            title="Total Output"
-            value={processedData.stats.totalOutput.toLocaleString()}
-            rate={null}
-            subValue={`Inside: ${processedData.stats.totalOutputT39.toLocaleString()} | Outside: ${processedData.stats.totalOutputT38.toLocaleString()}`}
-            icon={BarChart3}
-            trendData={processedData.trends.output}
-            insideQty={processedData.stats.totalOutputT39}
-            outsideQty={processedData.stats.totalOutputT38}
-          />
-          <DashboardStatCard
-            title="Total Defects"
-            value={processedData.stats.totalDefects.toLocaleString()}
-            rate={null}
-            icon={AlertTriangle}
-            trendData={processedData.trends.defects}
-          />
-          <DashboardStatCard
-            title="Overall Defect Rate"
-            value={`${processedData.stats.defectRate.toFixed(2)}%`}
-            rate={processedData.stats.defectRate}
-            icon={Activity}
-            trendData={processedData.trends.defectRate}
-            isTrendChart={true}
-          />
-        </div>
-
-        {/* Filters */}
-        <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600">
-              <Filter className="text-white" size={20} />
+        {activeDashboardView === "Daily View" ? (
+          <>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <DashboardStatCard
+                title="Total Output"
+                value={processedData.stats.totalOutput.toLocaleString()}
+                rate={null}
+                subValue={`Inside: ${processedData.stats.totalOutputT39.toLocaleString()} | Outside: ${processedData.stats.totalOutputT38.toLocaleString()}`}
+                icon={BarChart3}
+                trendData={processedData.trends.output}
+                insideQty={processedData.stats.totalOutputT39}
+                outsideQty={processedData.stats.totalOutputT38}
+              />
+              <DashboardStatCard
+                title="Total Defects"
+                value={processedData.stats.totalDefects.toLocaleString()}
+                rate={null}
+                icon={AlertTriangle}
+                trendData={processedData.trends.defects}
+              />
+              <DashboardStatCard
+                title="Overall Defect Rate"
+                value={`${processedData.stats.defectRate.toFixed(2)}%`}
+                rate={processedData.stats.defectRate}
+                icon={Activity}
+                trendData={processedData.trends.defectRate}
+                isTrendChart={true}
+              />
             </div>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white">
-              Filters
-            </h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Select
-              placeholder="Filter by Line..."
-              options={filterOptions.lines}
-              value={filters.lineNo}
-              onChange={(val) => handleFilterChange("lineNo", val)}
-              styles={reactSelectStyles}
-              isClearable
-            />
-            <Select
-              placeholder="Filter by MO..."
-              options={filterOptions.mos}
-              value={filters.moNo}
-              onChange={(val) => handleFilterChange("moNo", val)}
-              styles={reactSelectStyles}
-              isClearable
-            />
-            <Select
-              placeholder="Filter by Buyer..."
-              options={filterOptions.buyers}
-              value={filters.buyer}
-              onChange={(val) => handleFilterChange("buyer", val)}
-              styles={reactSelectStyles}
-              isClearable
-            />
-          </div>
-        </div>
 
-        {/* Main Content Area */}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-          <div className="xl:col-span-2 space-y-6">
-            <SummaryTable
-              data={processedData.tableData}
-              activeView={activeView}
-              setActiveView={setActiveView}
-              filters={filters}
-            />
-            <DefectRateChart chartData={processedData.chartData} />
+            {/* Filters */}
+            <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600">
+                  <Filter className="text-white" size={20} />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                  Filters
+                </h2>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Select
+                  placeholder="Filter by Line..."
+                  options={filterOptions.lines}
+                  value={filters.lineNo}
+                  onChange={(val) => handleFilterChange("lineNo", val)}
+                  styles={reactSelectStyles}
+                  isClearable
+                />
+                <Select
+                  placeholder="Filter by MO..."
+                  options={filterOptions.mos}
+                  value={filters.moNo}
+                  onChange={(val) => handleFilterChange("moNo", val)}
+                  styles={reactSelectStyles}
+                  isClearable
+                />
+                <Select
+                  placeholder="Filter by Buyer..."
+                  options={filterOptions.buyers}
+                  value={filters.buyer}
+                  onChange={(val) => handleFilterChange("buyer", val)}
+                  styles={reactSelectStyles}
+                  isClearable
+                />
+              </div>
+            </div>
+
+            {/* Main Content Area */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <div className="xl:col-span-2 space-y-6">
+                <SummaryTable
+                  data={processedData.tableData}
+                  activeView={activeView}
+                  setActiveView={setActiveView}
+                  filters={filters}
+                />
+                <DefectRateChart chartData={processedData.chartData} />
+              </div>
+              <div className="xl:col-span-1">
+                <TopDefectsTable topDefects={processedData.topDefects} />
+              </div>
+            </div>
+          </>
+        ) : activeDashboardView === "Daily Trend" ? (
+          // --- This is the new block for the Daily Trend view ---
+          <DailyTrendView data={data} loading={loading} error={error} />
+        ) : (
+          // This is the placeholder for the other views
+          <div className="rounded-2xl bg-white dark:bg-gray-800 shadow-xl p-12 text-center">
+            <h3 className="text-xl font-bold text-gray-700 dark:text-gray-200">
+              {activeDashboardView} is Under Development
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 mt-2">
+              This section will be available in a future update.
+            </p>
           </div>
-          <div className="xl:col-span-1">
-            <TopDefectsTable topDefects={processedData.topDefects} />
-          </div>
-        </div>
+        )}
       </div>
     </div>
   );
