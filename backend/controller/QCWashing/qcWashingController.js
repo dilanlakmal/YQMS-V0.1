@@ -2512,14 +2512,11 @@ export const updateqcwashingRecalculater = async (req, res) => {
         ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
         : 100;
   
-      // Use 95% threshold for measurement result
-      const measurementResult = totalMeasurementPoints === 0 
-        ? "Pass" 
-        : (passRate >= 95 ? "Pass" : "Fail");
-  
-      const defectResult = qcRecord.defectDetails?.result || "Pass";
+      // SIMPLIFIED LOGIC: Only consider defectDetails.result and pass rate >= 95%
+      const savedDefectResult = qcRecord.defectDetails?.result || "Pass";
       
-      const newOverallResult = (measurementResult === "Pass" && defectResult === "Pass") 
+      // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+      const newOverallResult = (savedDefectResult === "Pass" && passRate >= 95.0) 
         ? "Pass" 
         : "Fail";
   
@@ -2541,15 +2538,13 @@ export const updateqcwashingRecalculater = async (req, res) => {
         newResult: newOverallResult,
         result: {
           overallResult: newOverallResult,
-          measurementResult,
-          defectResult,
+          savedDefectResult,
           passRate,
           passRateThreshold: 95,
           totalMeasurementPoints,
-          
           totalMeasurementPass,
           totalMeasurementFail,
-          logic: `${passRate}% >= 95% = ${measurementResult}`
+          logic: `Simplified Logic: (defectDetails.result='${savedDefectResult}' AND passRate=${passRate}% >= 95%) = ${newOverallResult}`
         }
       });
   

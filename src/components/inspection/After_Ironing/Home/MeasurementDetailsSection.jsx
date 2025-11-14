@@ -596,23 +596,15 @@ const setKValueForSize = async (size, kValue) => {
   };
 
   useEffect(() => {
-    if (orderNo && color) {
-      const sanitizedColor = sanitizeColor(color);
-      if (sanitizedColor) {
-      fetchSizes();
-      fetchMeasurementSpecs();
-    } else {
-      setError('Invalid color parameter provided');
-      setSizes([]);
-      setSelectedSizes([]);
-      setMeasurementSpecs({ afterWash: [], afterWashGrouped: {} });
-    }
-    } else {
-      setSizes([]);
-      setSelectedSizes([]);
-      setMeasurementSpecs({ afterWash: [], afterWashGrouped: {} });
-    }
-  }, [orderNo, color]);
+  if (orderNo) { 
+    fetchSizes();
+    fetchMeasurementSpecs();
+  } else {
+    setSizes([]);
+    setSelectedSizes([]);
+    setMeasurementSpecs({ afterWash: [], afterWashGrouped: {} });
+  }
+}, [orderNo]);
 
   const getDisplayColor = () => {
     return sanitizeColor(color) || color;
@@ -709,7 +701,7 @@ const setKValueForSize = async (size, kValue) => {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`);
       const data = await response.json();
       
       if (response.ok && data.success) {

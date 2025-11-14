@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Plus, Minus } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import Swal from "sweetalert2";
@@ -12,8 +12,6 @@ const MeasurementDetailsSection = ({
   color,
   isVisible = false,
   onToggle,
-  savedSizes = [],
-  setSavedSizes,
   onSizeSubmit,
   measurementData = { beforeWash: [], afterWash: [] },
   showMeasurementTable = true,
@@ -23,19 +21,9 @@ const MeasurementDetailsSection = ({
   formData = {}
 }) => {
   const sanitizeColor = (colorInput) => {
-    if (!colorInput || typeof colorInput !== 'string') {
-      return '';
-    }
-    
-    // Clean the color string and ensure proper encoding for Ubuntu servers
-    return colorInput
-      .trim()                    // Remove leading/trailing whitespace
-      .replace(/\s+/g, ' ')      // Replace multiple spaces with single space
-      .replace(/\/+/g, '/')      // Replace multiple slashes with single slash
-      .replace(/\\+/g, '\\')    // Replace multiple backslashes with single backslash
-      .replace(/:/g, ':')        // Keep colons as-is
-      .replace(/%/g, '%');       // Keep percent signs as-is
+    return cleanup(colorInput);
   };
+  
   const [sizes, setSizes] = useState([]);
   const [selectedSizes, setSelectedSizes] = useState([]);
   const [measurementSpecs, setMeasurementSpecs] = useState({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
@@ -155,7 +143,6 @@ const setKValueForSize = async (size, washType, kValue) => {
         // 1. First priority: Check for saved Before Wash data with same criteria
         const savedBeforeWashData = await findSavedMeasurementData(
           formData.orderNo || orderNo,
-          formData.color || color,
           formData.reportType || 'First Output', // Use a default or get from current record
           'Before Wash',
           formData.factoryName || 'YM' // Use a default or get from current record
@@ -311,18 +298,12 @@ const getSelectedRowsFromSavedData = (savedMeasurementData, size, currentSpecs) 
   };
 
 // Helper function to find saved measurement data for reference
-const findSavedMeasurementData = async (styleNo, color, reportType, washType, factory) => {
+const findSavedMeasurementData = async (styleNo, reportType, washType, factory) => {
   
   try {
-    const sanitizedColor = sanitizeColor(color);
-
-    if (!sanitizedColor) {
-        console.error('Invalid color parameter for finding saved measurement data');
-        return null;
-      }
+    
     const requestBody = {
       styleNo,
-       color: sanitizedColor,
       reportType: reportType || undefined, // Ensure it's undefined if empty
       washType,
       factory: factory || undefined // Ensure it's undefined if empty
@@ -422,7 +403,6 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
         try {
           const savedBeforeWashData = await findSavedMeasurementData(
             formData.orderNo || orderNo,
-            formData.color || color,
             formData.reportType || 'First Output',
             'Before Wash',
             formData.factoryName || 'YM'
@@ -764,47 +744,23 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
   };
 
   useEffect(() => {
-    if (orderNo && color) {
-      const sanitizedColor = sanitizeColor(color);
-      if (sanitizedColor) {
+    if (orderNo) {
       fetchSizes();
       fetchMeasurementSpecs();
-    } else {
-      setError('Invalid color parameter provided');
-      setSizes([]);
-      setSelectedSizes([]);
-      setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
-    }
+    
     } else {
       setSizes([]);
       setSelectedSizes([]);
       setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
     }
-  }, [orderNo, color]);
-
-  const getDisplayColor = () => {
-    return sanitizeColor(color) || color;
-  };
+  }, [orderNo]);
 
     const fetchSizes = async () => {
     try {
       setLoading(true);
       setError(null);
-
-
-      // Sanitize the color before making the API call
-      const sanitizedColor = sanitizeColor(color);
       
-      // Validate sanitized color
-      if (!sanitizedColor) {
-        setError('Invalid color parameter provided');
-        setSizes([]);
-        setSelectedSizes([]);
-        return;
-      }
-
-
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/order-sizes/${orderNo}`);
       const data = await response.json();
       
       if (data.success) {
@@ -817,7 +773,6 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
         setSelectedSizes([]);
       }
     } catch (error) {
-      console.error('Error fetching sizes:', error);
       setError('Error fetching sizes');
       setSizes([]);
       setSelectedSizes([]);
@@ -827,58 +782,41 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
   };
 
   function hydrateMeasurementUIFromSavedData(dataArr, tableType) {
-    dataArr.forEach((data) => {
-      const { size, qty, pcs, selectedRows, fullColumns } = data;
-      if (!size || !pcs) return;
-
-      // Find the number of measurement points (rows)
-      const numRows = pcs[0]?.measurementPoints?.length || 0;
-      // Find the number of columns (pcs)
-      const numCols = pcs.length;
-
+    let newMeasurementValues = {};
+    let newSelectedRowsBySize = {};
+    let newFullColumnsBySize = {};
+  
+    dataArr.forEach(data => {
+      const { size, pcs, selectedRows, fullColumns, kvalue } = data;
       // 1. Build measurementValues
-      let newMeasurementValues = {};
-
-      // 2. Use selectedRows from saved data, or default to all false
-      let newSelectedRows = Array.isArray(selectedRows)
-        ? [...selectedRows]
-        : Array(numRows).fill(false);
-
-      // 3. Use fullColumns from saved data, or default to all false
-      let newFullColumns = Array.isArray(fullColumns)
-        ? [...fullColumns]
-        : Array(numCols).fill(false);
-
-      // 4. Set measurement values for all points
-      for (let colIndex = 0; colIndex < numCols; colIndex++) {
-        pcs[colIndex].measurementPoints.forEach((point) => {
-          const rowIndex = point.rowNo;
-          const cellKey = `${size}-${tableType}-${data.kvalue}-${rowIndex}-${colIndex}`;
+      pcs.forEach((pc, pcIndex) => {
+        pc.measurementPoints.forEach(point => {
+          const cellKey = `${size}-${tableType}-${kvalue}-${point.rowNo}-${pcIndex}`;
           newMeasurementValues[cellKey] = {
             decimal: point.measured_value_decimal,
             fraction: point.measured_value_fraction
           };
         });
+      });
+
+      // 2. Set selected rows
+      if (selectedRows) {
+        newSelectedRowsBySize[size] = selectedRows;
       }
 
-      setMeasurementValues(prev => ({ ...prev, ...newMeasurementValues }));
-      setSelectedRowsBySize(prev => ({ ...prev, [size]: newSelectedRows }));
-      setFullColumnsBySize(prev => ({ ...prev, [size]: newFullColumns }));
+      // 3. Set full columns
+      if (fullColumns) {
+        newFullColumnsBySize[size] = fullColumns;
+      }
     });
+
+    setMeasurementValues(prev => ({ ...prev, ...newMeasurementValues }));
+    setSelectedRowsBySize(prev => ({ ...prev, ...newSelectedRowsBySize }));
+    setFullColumnsBySize(prev => ({ ...prev, ...newFullColumnsBySize }));
   }
 
   const fetchMeasurementSpecs = async () => {
     try {
-     // Sanitize the color before making the API call
-      const sanitizedColor = sanitizeColor(color);
-      
-      // Validate sanitized color
-      if (!sanitizedColor) {
-        setNoMeasurementData(false);
-        setMeasurementSpecs({ beforeWash: [], afterWash: [], beforeWashGrouped: {}, afterWashGrouped: {} });
-        return;
-      }
-
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/measurement-specs/${orderNo}`);
       const data = await response.json();
       
@@ -1543,7 +1481,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
       {noMeasurementData ? (
         <div className="mb-8">
           <h4 className="text-lg font-semibold mb-4 text-gray-800 border-b pb-2">
-            Measurement Details {color && `- ${getDisplayColor()}`}
+            Measurement Details 
           </h4>
           <div className="text-sm text-gray-500 p-4 border border-gray-300 rounded">
             No measurement data are available for this style.
@@ -1552,9 +1490,9 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
       ) : (
         isVisible && (
           <div className="space-y-6">
-            {!orderNo || !color ? (
+            {!orderNo ? (
               <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3">
-                <div className="text-sm text-yellow-700">Please select Order No and Color from Order Details section first.</div>
+                <div className="text-sm text-yellow-700">Please select Order No from Order Details section first.</div>
               </div>
             ) : (
               <>
@@ -1625,7 +1563,7 @@ const findSavedMeasurementData = async (styleNo, color, reportType, washType, fa
                       </div>
                     ) : (
                       <div className="text-sm text-gray-500 p-4 border border-gray-200 rounded-md">
-                        No sizes available for this order and color
+                        No sizes available for this order 
                       </div>
                     )}
                   </div>

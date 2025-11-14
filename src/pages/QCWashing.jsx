@@ -207,24 +207,33 @@ function calculateSummaryData(currentFormData) {
     totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
   }
 
-  // 2. Calculate measurement points and passes (for measurement statistics only)
+  // 2. Calculate measurement points and passes using measurementSizeSummary if available
   let measurementPoints = 0;
   let measurementPass = 0;
 
-  measurementArray.forEach((data) => {
-    if (Array.isArray(data.pcs)) {
-      data.pcs.forEach((pc) => {
-        if (Array.isArray(pc.measurementPoints)) {
-          pc.measurementPoints.forEach((point) => {
-            if (point.result === "pass" || point.result === "fail") {
-              measurementPoints++;
-              if (point.result === "pass") measurementPass++;
-            }
-          });
-        }
-      });
-    }
-  });
+  // Check if measurementSizeSummary exists (same as backend logic)
+  if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
+    currentMeasurementDetails.measurementSizeSummary.forEach(sizeData => {
+      measurementPoints += (sizeData.checkedPoints || 0);
+      measurementPass += (sizeData.totalPass || 0);
+    });
+  } else {
+    // Fallback: Calculate from measurement array
+    measurementArray.forEach((data) => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === "pass" || point.result === "fail") {
+                measurementPoints++;
+                if (point.result === "pass") measurementPass++;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 
   // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
@@ -257,49 +266,21 @@ function calculateSummaryData(currentFormData) {
       ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
-  // 5. Result logic - handle SOP differently
+  // 5. SIMPLIFIED LOGIC - only consider defectDetails.result and pass rate >= 95%
   let overallResult = "Pending";
-  const measurementOverallResult =
-    measurementPoints === 0
-      ? "Pending"
-      : measurementPoints - measurementPass > 0
-      ? "Fail"
-      : "Pass";
-  const defectOverallResult = currentDefectDetails?.result || "Pending";
+  const savedDefectResult = currentDefectDetails?.result || "Pending";
 
-  // Check if this is SOP report type
-  const isSOP =
-    currentFormData.reportType === "SOP" ||
-    currentFormData.reportType === "sop" ||
-    (currentFormData.reportType === "" &&
-      currentFormData.inline === "" &&
-      currentFormData.firstOutput === "");
+  // Calculate measurement pass rate - default to 100% when no measurement points
+  const measurementPassRate =
+    measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
 
-  if (isSOP) {
-    // For SOP, both measurement and defect results must be "Pass"
-    // The measurement result is based on a 95% pass rate threshold.
-    const measurementPassRate =
-      measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-    const isMeasurementPass = measurementPassRate >= 95;
-    const isDefectPass = defectCount === 0 && rejectedDefectPcs === 0;
-
-    if (isMeasurementPass && isDefectPass) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Fail";
-    }
+  // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+  if (savedDefectResult === "Pass" && measurementPassRate >= 95.0) {
+    overallResult = "Pass";
+  } else if (savedDefectResult === "Fail" || (measurementPoints > 0 && measurementPassRate < 95.0)) {
+    overallResult = "Fail";
   } else {
-    // For Inline/First Output: Use measurement + defect logic
-    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-      overallResult = "Fail";
-    } else if (
-      measurementOverallResult === "Pass" &&
-      defectOverallResult === "Pass"
-    ) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Pending";
-    }
+    overallResult = "Pending";
   }
 
   return {

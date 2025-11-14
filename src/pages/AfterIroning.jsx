@@ -1976,12 +1976,66 @@ useEffect(() => {
                         inspectionFormData.append('recordId', currentRecordId);
                         inspectionFormData.append('inspectionData', JSON.stringify(inspectionData));
                         inspectionFormData.append('defectData', JSON.stringify(defectData));
-                        inspectionFormData.append('checkpointInspectionData', JSON.stringify(checkpointInspectionData));
                         
-                        await fetch(`${API_BASE_URL}/api/after-ironing/inspection-save`, {
+                        // Process checkpoint images
+                        const sanitizedCheckpointData = checkpointInspectionData.map((item, idx) => {
+                          const existingImages = [];
+                          let imageIndex = 0;
+                          
+                          // Process main checkpoint images
+                          (item.comparisonImages || []).forEach((img) => {
+                            if (img.file && !img.isExisting) {
+                              const fieldName = `checkpointImages_${idx}_${imageIndex}`;
+                              inspectionFormData.append(fieldName, img.file, img.name);
+                              imageIndex++;
+                            } else if (img.preview && (img.isExisting || typeof img.preview === 'string')) {
+                              existingImages.push(img.preview);
+                            }
+                          });
+                          
+                          const processedItem = {
+                            ...item,
+                            comparisonImages: existingImages
+                          };
+                          
+                          // Process sub-point images if they exist
+                          if (item.subPoints && Array.isArray(item.subPoints)) {
+                            processedItem.subPoints = item.subPoints.map((subPoint, subIdx) => {
+                              const existingSubImages = [];
+                              let subImageIndex = 0;
+                              
+                              (subPoint.comparisonImages || []).forEach((img) => {
+                                if (img.file && !img.isExisting) {
+                                  const fieldName = `checkpointImages_${idx}_sub_${subIdx}_${subImageIndex}`;
+                                  inspectionFormData.append(fieldName, img.file, img.name);
+                                  subImageIndex++;
+                                } else if (img.preview && (img.isExisting || typeof img.preview === 'string')) {
+                                  existingSubImages.push(img.preview);
+                                }
+                              });
+                              
+                              return {
+                                ...subPoint,
+                                comparisonImages: existingSubImages
+                              };
+                            });
+                          }
+                          
+                          return processedItem;
+                        });
+                        
+                        inspectionFormData.append('checkpointInspectionData', JSON.stringify(sanitizedCheckpointData));
+                        
+                        console.log('Submitting inspection data with images...');
+                        const inspectionResponse = await fetch(`${API_BASE_URL}/api/after-ironing/inspection-save`, {
                           method: "POST",
                           body: inspectionFormData
                         });
+                        
+                        const inspectionResult = await inspectionResponse.json();
+                        if (!inspectionResult.success) {
+                          console.error('Inspection save failed:', inspectionResult.message);
+                        }
                       }
 
                       // Save defect data if exists
@@ -1989,43 +2043,62 @@ useEffect(() => {
                         const defectFormData = new FormData();
                         defectFormData.append('recordId', currentRecordId);
                         
-                        // Separate existing and new additional images
+                        // Process additional images
                         const existingAdditionalImages = [];
-                        uploadedImages.forEach((img, imgIdx) => {
+                        let additionalImageIndex = 0;
+                        
+                        uploadedImages.forEach((img) => {
                           if (img.file && !img.isExisting) {
-                            defectFormData.append(`additionalImages_${imgIdx}`, img.file, img.name);
-                          } else if (img.isExisting) {
+                            defectFormData.append(`additionalImages_${additionalImageIndex}`, img.file, img.name);
+                            additionalImageIndex++;
+                          } else if (img.isExisting && img.preview) {
                             existingAdditionalImages.push(img.preview);
                           }
                         });
                         
-                        // Prepare defect data with existing images preserved
+                        // Process defect images and prepare defect data
                         const sanitizedDefectsByPc = Object.entries(defectsByPc).map(([pcNumber, pcDefects], pcIdx) => ({
                           pcNumber,
                           pcDefects: pcDefects.map((defect, defectIdx) => {
-                            const newDefect = { ...defect, defectImages: [] };
-                            (defect.defectImages || []).forEach((img, imgIdx) => {
+                            const existingDefectImages = [];
+                            let defectImageIndex = 0;
+                            
+                            // Process defect images
+                            (defect.defectImages || []).forEach((img) => {
                               if (img.file && !img.isExisting) {
-                                const fieldName = `defectImages_${pcIdx}_${defectIdx}_${imgIdx}`;
+                                const fieldName = `defectImages_${pcIdx}_${defectIdx}_${defectImageIndex}`;
                                 defectFormData.append(fieldName, img.file, img.name);
-                              } else if (img.isExisting) {
-                                newDefect.defectImages.push(img.preview);
+                                defectImageIndex++;
+                              } else if (img.isExisting && img.preview) {
+                                existingDefectImages.push(img.preview);
                               }
                             });
-                            return newDefect;
+                            
+                            return {
+                              selectedDefect: defect.selectedDefect || defect.defectId || '',
+                              defectName: defect.defectName || '',
+                              defectQty: defect.defectQty || 0,
+                              defectImages: existingDefectImages
+                            };
                           })
                         }));
                         
                         defectFormData.append('defectDetails', JSON.stringify({
                           defectsByPc: sanitizedDefectsByPc,
-                          comment,
-                          existingAdditionalImages
+                          comment: comment || '',
+                          additionalImages: existingAdditionalImages
                         }));
                         
-                        await fetch(`${API_BASE_URL}/api/after-ironing/defect-details-save`, {
+                        console.log('Submitting defect data with images...');
+                        const defectResponse = await fetch(`${API_BASE_URL}/api/after-ironing/defect-details-save`, {
                           method: "POST",
                           body: defectFormData
                         });
+                        
+                        const defectResult = await defectResponse.json();
+                        if (!defectResult.success) {
+                          console.error('Defect save failed:', defectResult.message);
+                        }
                       }
                     }
 

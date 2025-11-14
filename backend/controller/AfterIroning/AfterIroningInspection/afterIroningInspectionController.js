@@ -1218,7 +1218,7 @@ export const getAfterIroningOrderSizes = async (req, res) => {
 };
 
 export const getmeasurmentSpec = async (req, res) => {
-  const { orderNo, color } = req.params;
+  const { orderNo } = req.params;
     const collection = ymProdConnection.db.collection("dt_orders");
     const buyerSpecCollection = ymProdConnection.db.collection("buyerspectemplates");
 
@@ -1236,22 +1236,11 @@ export const getmeasurmentSpec = async (req, res) => {
       // Extract measurement specifications from different possible locations
       let measurementSpecs = [];
       
-      // Check various possible locations for measurement data
-
-      // Check various possible locations for measurement data
+      // Check various possible locations for measurement data (removed color dependency)
       if (order.MeasurementSpecs && Array.isArray(order.MeasurementSpecs)) {
         measurementSpecs = order.MeasurementSpecs;
       } else if (order.Specs && Array.isArray(order.Specs)) {
         measurementSpecs = order.Specs;
-      } else if (order.OrderColors) {
-        const colorObj = order.OrderColors.find(
-          (c) => c.Color.toLowerCase() === color.toLowerCase()
-        );
-        if (colorObj && colorObj.MeasurementSpecs) {
-          measurementSpecs = colorObj.MeasurementSpecs;
-        } else if (colorObj && colorObj.Specs) {
-          measurementSpecs = colorObj.Specs;
-        }
       }
 
       const beforeWashSpecs = [];
