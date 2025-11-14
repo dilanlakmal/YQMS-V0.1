@@ -1,25 +1,32 @@
-/**
- * Color utility functions for frontend
- * Handles color name cleaning and URL encoding
- */
+// Utility function to properly encode color parameters for URL compatibility
+// This ensures the color parameter works correctly on both Windows and Ubuntu servers
 
-/**
- * Safely encode color for URL without modifying the original name
- * @param {string} colorName - The color name to encode
- * @returns {string} - URL-encoded color name
- */
-export const encodeColorForUrl = (colorName) => {
-  if (!colorName || typeof colorName !== "string") {
+export const encodeColorForUrl = (color) => {
+  if (!color || typeof color !== "string") {
     return "";
   }
-  return encodeURIComponent(colorName);
+
+  // Clean the color string first
+  const cleanedColor = color
+    .trim() // Remove leading/trailing whitespace
+    .replace(/\s+/g, " ") // Replace multiple spaces with single space
+    .replace(/\/+/g, "/") // Replace multiple slashes with single slash
+    .replace(/\\+/g, "\\") // Replace multiple backslashes with single backslash
+    .replace(/:/g, ":") // Keep colons as-is
+    .replace(/%/g, "%"); // Keep percent signs as-is
+
+  // Use encodeURIComponent for proper URL encoding
+  // This handles special characters like spaces, slashes, colons, etc.
+  return encodeURIComponent(cleanedColor);
 };
 
-/**
- * Decode color from URL parameter
- * @param {string} encodedColor - URL-encoded color name
- * @returns {string} - Decoded color name
- */
+// Alternative function for cases where double encoding might be needed
+export const doubleEncodeColorForUrl = (color) => {
+  const singleEncoded = encodeColorForUrl(color);
+  return encodeURIComponent(singleEncoded);
+};
+
+// Function to decode color from URL
 export const decodeColorFromUrl = (encodedColor) => {
   if (!encodedColor || typeof encodedColor !== "string") {
     return "";
@@ -28,7 +35,7 @@ export const decodeColorFromUrl = (encodedColor) => {
   try {
     return decodeURIComponent(encodedColor);
   } catch (error) {
-    console.warn("Failed to decode color from URL:", encodedColor, error);
-    return encodedColor;
+    console.error("Error decoding color from URL:", error);
+    return encodedColor; // Return original if decoding fails
   }
 };

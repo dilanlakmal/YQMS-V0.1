@@ -15,8 +15,8 @@ import user from "./routes/User/userRoutes.js";
    SQL Query Import
 /------------------------------ */
 
-import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Cutting
@@ -151,6 +151,11 @@ import AIChatBot from "./routes/AI/AIChatBotRoutes.js";
 import qc2UploadData from "./routes/QC2_Upload_Data/qc2UploadRoutes.js";
 
 /* ------------------------------
+  QC2 Data Upload
+------------------------------ */
+import qc_real_wash_qty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
+
+/* ------------------------------
   ANF Washing
 ------------------------------ */
 
@@ -246,7 +251,7 @@ app.use(user);
 /* ------------------------------
   SQL Query routes start
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 
 /* -----------------------------
 Commin file  Routes
@@ -383,6 +388,11 @@ app.use(sccScratchedDefect);
   QC2 Data Upload
 ------------------------------ */
 app.use(qc2UploadData);
+
+/* ------------------------------
+  QC Real Wash Qty routes
+------------------------------ */
+app.use(qc_real_wash_qty);
 
 /* ------------------------------
   ANF Washing routes
