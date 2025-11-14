@@ -115,9 +115,54 @@ const QC1Dashboard = () => {
     }
   }, [startDate, endDate]);
 
+  // Create a new useCallback for fetching dynamic filter options ---
+  const fetchFilterOptions = useCallback(async () => {
+    if (!startDate || !endDate) return;
+    try {
+      const params = {
+        startDate: startDate.toISOString().split("T")[0],
+        endDate: endDate.toISOString().split("T")[0],
+        lineNo: filters.lineNo?.value,
+        moNo: filters.moNo?.value,
+        buyer: filters.buyer?.value
+      };
+
+      const response = await axios.get(
+        `${API_BASE_URL}/api/qc1-summary/filter-options`,
+        { params }
+      );
+
+      const { lines, mos, buyers } = response.data;
+
+      setFilterOptions({
+        lines: lines.map((l) => ({ value: l, label: l })),
+        mos: mos.map((m) => ({ value: m, label: m })),
+        buyers: buyers.map((b) => ({ value: b, label: b }))
+      });
+
+      // --- Logic to reset filters if their selected value is no longer in the options ---
+      if (filters.lineNo && !lines.includes(filters.lineNo.value)) {
+        setFilters((prev) => ({ ...prev, lineNo: null }));
+      }
+      if (filters.moNo && !mos.includes(filters.moNo.value)) {
+        setFilters((prev) => ({ ...prev, moNo: null }));
+      }
+      if (filters.buyer && !buyers.includes(filters.buyer.value)) {
+        setFilters((prev) => ({ ...prev, buyer: null }));
+      }
+    } catch (err) {
+      console.error("Failed to fetch dynamic filter options:", err);
+    }
+  }, [startDate, endDate, filters.lineNo, filters.moNo, filters.buyer]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // This one fetches the dynamic filter options whenever the date or filters change.
+  useEffect(() => {
+    fetchFilterOptions();
+  }, [fetchFilterOptions]);
 
   const processedData = useMemo(() => {
     const defaultData = {
@@ -131,16 +176,13 @@ const QC1Dashboard = () => {
       topDefects: [],
       chartData: { lineSummary: {}, moSummary: {}, buyerSummary: {} },
       tableData: [],
-      filterOptions: { lines: [], mos: [], buyers: [] },
+      // filterOptions are now managed by state, so we don't need them in the default object
       trends: { output: [], defects: [], defectRate: [] }
     };
 
-    // Main dashboard data processing
-    let mainDataProcessed = { ...defaultData };
+    // The main processing logic starts here
+    let mainDataProcessed = defaultData;
     if (data && data.length > 0) {
-      const lines = new Set(),
-        mos = new Set(),
-        buyers = new Set();
       let totalOutputT38 = 0,
         totalOutputT39 = 0,
         totalDefects = 0;
@@ -150,16 +192,6 @@ const QC1Dashboard = () => {
       const defectMap = new Map();
 
       data.forEach((day) => {
-        (day.daily_line_summary || []).forEach(
-          (item) => item.lineNo && lines.add(item.lineNo)
-        );
-        (day.daily_mo_summary || []).forEach(
-          (item) => item.MONo && mos.add(item.MONo)
-        );
-        (day.daily_buyer_summary || []).forEach(
-          (item) => item.Buyer && buyers.add(item.Buyer)
-        );
-
         const filteredFullSummary = (day.daily_full_summary || []).filter(
           (item) =>
             (!filters.lineNo || item.lineNo === filters.lineNo.value) &&
@@ -225,21 +257,14 @@ const QC1Dashboard = () => {
           moSummary: filterValidKeys(moSummary),
           buyerSummary: filterValidKeys(buyerSummary)
         },
-        tableData: data,
-        filterOptions: {
-          lines: [...lines].sort().map((l) => ({ value: l, label: l })),
-          mos: [...mos].sort().map((m) => ({ value: m, label: m })),
-          buyers: [...buyers].sort().map((b) => ({ value: b, label: b }))
-        }
+        tableData: data
       };
     }
 
-    // --- FIX: Apply filters to trend data processing ---
+    // Trend data processing (this part is unchanged from before)
     const dailyTrends = new Map();
     (trendData || []).forEach((day) => {
       const dateStr = day.inspectionDate.split("T")[0];
-
-      // Apply the same filters to trend data
       const filteredFullSummary = (day.daily_full_summary || []).filter(
         (item) =>
           (!filters.lineNo || item.lineNo === filters.lineNo.value) &&
@@ -247,7 +272,6 @@ const QC1Dashboard = () => {
           (!filters.buyer || item.Buyer === filters.buyer.value)
       );
 
-      // Calculate daily totals from filtered data
       let dailyOutputT38 = 0;
       let dailyOutputT39 = 0;
       let dailyDefects = 0;
@@ -273,8 +297,8 @@ const QC1Dashboard = () => {
 
     const lastFiveDaysData = Array.from(dailyTrends.entries())
       .map(([date, values]) => ({ date, ...values }))
-      .filter((day) => new Date(day.date).getDay() !== 0) // Exclude Sundays
-      .sort((a, b) => new Date(a.date) - new Date(b.date)) // Ensure chronological order
+      .filter((day) => new Date(day.date).getDay() !== 0)
+      .sort((a, b) => new Date(a.date) - new Date(b.date))
       .slice(-5);
 
     const outputTrend = lastFiveDaysData.map((d) => ({
@@ -286,7 +310,6 @@ const QC1Dashboard = () => {
       value: d.defects
     }));
 
-    // --- Combine the results ---
     return {
       ...mainDataProcessed,
       trends: {
@@ -295,7 +318,7 @@ const QC1Dashboard = () => {
         defectRate: lastFiveDaysData
       }
     };
-  }, [data, trendData, filters]); // <-- filters is already a dependency
+  }, [data, trendData, filters]);
 
   useEffect(() => {
     if (processedData?.filterOptions) {
