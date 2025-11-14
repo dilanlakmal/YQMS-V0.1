@@ -452,10 +452,12 @@ const AfterIroning = () => {
   const [measurementContentVisible, setMeasurementContentVisible] =
     useState(true);
   const [washingValidationPassed, setWashingValidationPassed] = useState(false);
-
-  const handleWashingValidationChange = (isValid) => {
-    setWashingValidationPassed(isValid);
-    if (isValid) {
+  
+  const handleWashingValidationChange = (isValid, isExisting) => {
+    // If it's an existing record, we bypass the washing validation check.
+    const validationResult = isExisting ? true : isValid;
+    setWashingValidationPassed(validationResult);
+    if (validationResult) {
       activateAllSections();
     } else {
       hideAllSections();
@@ -876,6 +878,15 @@ const AfterIroning = () => {
 
     const saved = data.savedData;
 
+    // Force washing validation to pass for existing data
+    setWashingValidationPassed(true);
+    activateAllSections();
+    
+    // Ensure the validation change is propagated
+    setTimeout(() => {
+      setWashingValidationPassed(true);
+    }, 100); 
+
     setFormData((prev) => ({
       ...prev,
       ...saved,
@@ -883,10 +894,10 @@ const AfterIroning = () => {
       before_after_wash: saved.before_after_wash || prev.before_after_wash,
       orderQty: saved.orderQty || prev.orderQty,
       buyer: saved.buyer || prev.buyer,
-      aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
+      aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql,
+      isExistingData: true
     }));
 
-    // FIXED: Load checkpoint inspection data with proper image handling
     if (
       saved.inspectionDetails?.checkpointInspectionData &&
       saved.inspectionDetails.checkpointInspectionData.length > 0
@@ -1005,7 +1016,6 @@ const AfterIroning = () => {
       initializeDefaultCheckpointData(setCheckpointInspectionData);
     }
 
-    // FIXED: Load defect analysis parameters
     if (
       saved.inspectionDetails?.parameters &&
       saved.inspectionDetails.parameters.length > 0
@@ -1814,6 +1824,7 @@ useEffect(() => {
               setSavedSizes={setSavedSizes}
               onLoadSavedDataById={loadSavedDataById}
               onWashingValidationChange={handleWashingValidationChange}
+              isExistingData={formData.isExistingData}
             />
 
             {inspectionSectionVisible && (

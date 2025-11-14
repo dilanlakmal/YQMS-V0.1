@@ -2,13 +2,24 @@ import { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { API_BASE_URL } from '../../../../../config';
 
-const QCWashingValidation = ({ orderNo, color, onValidationResult }) => {
+const QCWashingValidation = ({ orderNo, color, onValidationResult, isExistingData = false }) => {
   const [validationStatus, setValidationStatus] = useState(null);
   const [isChecking, setIsChecking] = useState(false);
 
   const checkQCWashingRecord = async () => {
     if (!orderNo) {
       setValidationStatus(null);
+      return;
+    }
+
+    // If this is existing data, skip validation and show success
+    if (isExistingData) {
+      setValidationStatus({
+        type: 'success',
+        message: 'Existing After Ironing data loaded - Ready to continue',
+        isExistingData: true
+      });
+      onValidationResult?.(true, null, isExistingData);
       return;
     }
 
@@ -34,9 +45,10 @@ const QCWashingValidation = ({ orderNo, color, onValidationResult }) => {
         setValidationStatus({
           type: 'success',
           message: 'QC Washing completed - Ready for After Ironing',
-          record: data.record
+          record: data.record,
+          isExistingData: true
         });
-        onValidationResult?.(true, data.record);
+        onValidationResult?.(true, data.record, isExistingData);
       } else if (data.error === 'WASHING_NOT_COMPLETED') {
         setValidationStatus({
           type: 'error',
@@ -72,12 +84,23 @@ const QCWashingValidation = ({ orderNo, color, onValidationResult }) => {
       return;
     }
 
+    // If this is existing data, don't run the validation check
+    if (isExistingData) {
+      setValidationStatus({
+        type: 'success',
+        message: 'Existing After Ironing data loaded - Ready to continue',
+        isExistingData: true
+      });
+      onValidationResult?.(true, null, true);
+      return;
+    }
+
     const timeoutId = setTimeout(() => {
       checkQCWashingRecord();
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [orderNo, color]);
+  }, [orderNo, color, isExistingData]);
 
   if (!orderNo) {
     return (
@@ -146,7 +169,8 @@ const QCWashingValidation = ({ orderNo, color, onValidationResult }) => {
 QCWashingValidation.propTypes = {
   orderNo: PropTypes.string,
   color: PropTypes.string,
-  onValidationResult: PropTypes.func
+  onValidationResult: PropTypes.func,
+  isExistingData: PropTypes.bool
 };
 
 export default QCWashingValidation;

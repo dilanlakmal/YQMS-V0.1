@@ -220,13 +220,13 @@ const OrderDetailsSection = ({
   const [washingValidationPassed, setWashingValidationPassed] = useState(true);
 
   // Handle QC Washing validation result
-  const handleValidationResult = (isValid, record) => {
+  const handleValidationResult = (isValid, record, isExistingData = false) => {
     const isWashingNotCompleted = record?.error === 'WASHING_NOT_COMPLETED';
     setWashingValidationPassed(isValid);
-    onWashingValidationChange?.(isValid);
+    onWashingValidationChange?.(isValid, isExistingData);
 
-    if (!isValid && isWashingNotCompleted) {
-      // Clear order and color if washing is not completed
+    if (!isValid && isWashingNotCompleted && !isExistingData) {
+      // Clear order and color if washing is not completed (but not for existing data)
       handleInputChange("orderNo", "");
       handleInputChange("color", "");
     }
@@ -421,6 +421,7 @@ const OrderDetailsSection = ({
           orderNo={formData.orderNo}
           color={formData.color}
           onValidationResult={handleValidationResult}
+          isExistingData={formData.isExistingData}
         />
       )}
       
