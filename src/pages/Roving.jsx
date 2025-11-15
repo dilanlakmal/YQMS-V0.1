@@ -267,7 +267,7 @@ const RovingPage = () => {
       setIsSearchingWorkerId(true);
       try {
         const response = await axios.get(
-          `${API_BASE_URL}/api/users/search-by-empid`,
+          `${API_BASE_URL}/api/roving-users/search-by-empid`,
           {
             params: { term: manualWorkerIdSearch }
           }

@@ -50,11 +50,14 @@ export const saveRovingImage = async (req, res) => {
           // --- File Saving Logic with Sharp ---
           const qcinlineUploadPath = path.join(
             __backendDir,
+            "..",
+            "..",
+            "..", 
             "public",
             "storage",
-            "qcinline" // existing path is preserved
+            "qcinline"
           );
-          // await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
+          await fsPromises.mkdir(qcinlineUploadPath, { recursive: true });
     
           // Sanitize metadata for the filename (existing logic is good)
           const sanitizedImageType = sanitize(imageType.toUpperCase());
@@ -74,7 +77,7 @@ export const saveRovingImage = async (req, res) => {
           const imageIndex = existingImageCount + 1;
     
           // Create the new filename with a .webp extension
-          const newFilename = `${imagePrefix}${imageIndex}.webp`;fc   
+          const newFilename = `${imagePrefix}${imageIndex}.webp`;
           const finalDiskPath = path.join(qcinlineUploadPath, newFilename);
     
           // Process the image from memory buffer with sharp and save to disk
