@@ -11,7 +11,6 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
-import { cleanup } from "../utils/measurementHelperFunction";
 import { encodeColorForUrl } from "../utils/colorUtils";
 
 const normalizeImageSrc = (src) => {    
@@ -203,6 +202,7 @@ function calculateSummaryData(currentFormData) {
   });
 
   // If no measurement data, fallback to checkedQty from form
+  const checkedQty = parseInt(currentFormData.checkedQty, 10) || 0;
   if (totalCheckedPcs === 0) {
     totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
   }
@@ -284,6 +284,7 @@ function calculateSummaryData(currentFormData) {
   }
 
   return {
+    checkedQty: checkedQty, // Ensure checkedQty is a number
     totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
@@ -316,30 +317,6 @@ function machineProcessesToObject(machineProcesses) {
     }
   });
   return obj;
-}
-
-function fractionToDecimal(fraction) {
-  if (typeof fraction === "number") return fraction;
-  if (!fraction || typeof fraction !== "string") return 0;
-  // Remove + or - for parsing, but keep sign
-  let sign = 1;
-  let str = fraction.trim();
-  if (str.startsWith("-")) {
-    sign = -1;
-    str = str.slice(1);
-  }
-  if (str.startsWith("+")) {
-    str = str.slice(1);
-  }
-  if (str === "" || str === "-") return 0;
-  if (str.includes("/")) {
-    const [num, den] = str.split("/").map(Number);
-    if (!isNaN(num) && !isNaN(den) && den !== 0) {
-      return sign * (num / den);
-    }
-  }
-  const parsed = parseFloat(str);
-  return isNaN(parsed) ? 0 : sign * parsed;
 }
 
 const QCWashingPage = () => {
@@ -548,17 +525,6 @@ const QCWashingPage = () => {
     }
   });
 
-  // Helper function to get English fiber remarks
-  const getFiberRemarkInEnglish = (decision) => {
-    const englishRemarks = {
-      1: "Cleaning must be done by fabric mill.",
-      2: "YM doing the cleaning, front & back side.",
-      3: "Randomly 2-3 pcs back side hairly can acceptable."
-    };
-
-    return englishRemarks[decision] || "";
-  };
-
   // Helper function to convert English fiber remarks to current language
   const convertEnglishToCurrentLanguage = (englishRemark, t) => {
     const englishToDecisionMap = {
@@ -649,7 +615,7 @@ const QCWashingPage = () => {
       (formData.inline === "Inline" ||
         formData.reportType === "Inline" ||
         formData.firstOutput === "First Output" ||
-        formData.reportType === "First Output") &&
+        formData.reportType === "First Output" || formData.reportType === "SOP") &&
       aql?.acceptedDefect !== undefined
     ) {
       const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
@@ -983,12 +949,8 @@ const QCWashingPage = () => {
           ...prev,
           orderQty: orderData.orderQty || "",
           buyer: orderData.buyer || "",
-          color:
-            prev.color ||
-            (orderData.colors && orderData.colors.length > 0
-              ? orderData.colors[0]
-              : "")
-        }));
+          color:""
+      }));
       } else {
         throw new Error(
           orderData.message || "Style/Order not found in master records."
@@ -2092,6 +2054,8 @@ if (
         )
       };
 
+      
+
       const measurementDetails = {
         measurement: [
           ...measurementData.beforeWash.map((item) => ({
@@ -2487,35 +2451,7 @@ if (
       >
         {activeTab === "newInspection" && (
           <>
-            <OverAllSummaryCard
-              summary={{
-                ...formData,
-                checkedQty: Number(formData.checkedQty) || 0,
-                washQty: Number(formData.washQty) || 0,
-                // Include inspection details for proper calculation
-                inspectionDetails: {
-                  checkpointInspectionData: checkpointInspectionData
-                }
-              }}
-              recordId={recordId}
-              onSummaryUpdate={(updatedSummary) => {
-                setFormData(prev => ({ 
-                  ...prev, 
-                  ...updatedSummary,
-                  // Ensure these critical fields are updated
-                  overallFinalResult: updatedSummary.overallFinalResult,
-                  totalCheckedPcs: updatedSummary.totalCheckedPcs,
-                  rejectedDefectPcs: updatedSummary.rejectedDefectPcs,
-                  totalDefectCount: updatedSummary.totalDefectCount,
-                  defectRate: updatedSummary.defectRate,
-                  defectRatio: updatedSummary.defectRatio
-                }));
-              }}
-              measurementData={formData.measurementDetails}
-              defectDetails={formData.defectDetails}
-              before_after_wash={formData.before_after_wash}
-              showMeasurementTable={showMeasurementTable}
-            />
+            <OverAllSummaryCard summary={formData} />
             <OrderDetailsSection
               onLoadSavedDataById={loadSavedDataById}
               setSavedSizes={setSavedSizes}
