@@ -53,7 +53,7 @@ const SummaryCard = ({
   const autoSaveMeasurementSummary = async (summary, recordId) => {
     if (!recordId || !summary) return;
     try {
-      await fetch(`${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`, {
+      await fetch(`${API_BASE_URL}/api/after-ironing/measurement-summary-autosave/${recordId}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ summary }),

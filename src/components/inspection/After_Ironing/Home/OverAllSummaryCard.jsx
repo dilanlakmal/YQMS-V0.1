@@ -1,9 +1,8 @@
-import React, { useEffect } from "react";
+import React from "react";
 import PropTypes from "prop-types";
 import { WashingMachine, ClipboardCheck } from "lucide-react";
-import { API_BASE_URL } from '../../../../../config';
 
-const OverAllSummaryCard = ({ summary, recordId, onSummaryUpdate }) => {
+const OverAllSummaryCard = ({ summary }) => {
   if (!summary) {
     return (
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg p-6 mb-8 border border-gray-200 dark:border-gray-700">
@@ -23,174 +22,10 @@ const OverAllSummaryCard = ({ summary, recordId, onSummaryUpdate }) => {
     totalDefectCount,
     defectRate,
     defectRatio,
-    defectDetails,
-    measurementDetails,
+    overallFinalResult,
   } = summary;
 
-  // Calculate overall result dynamically based on current data
-  const calculateOverallResult = () => {
-    const defectResult = defectDetails?.result || "Pending";
-    
-    // Check inspection checkpoints for failures
-    let inspectionResult = "Pass";
-    if (summary.inspectionDetails?.checkpointInspectionData) {
-      const hasInspectionFail = summary.inspectionDetails.checkpointInspectionData.some(
-        checkpoint => checkpoint.decision === 'Fail'
-      );
-      if (hasInspectionFail) inspectionResult = "Fail";
-    }
-    
-    // Calculate overall measurement result from measurementSizeSummary
-    let measurementResult = "Pass";
-    let calculatedPassRate = 100;
-    let totalPassPoints = 0;
-    let totalFailPoints = 0;
-    
-    // Check if measurementSizeSummary exists in the data structure
-    if (measurementDetails?.measurementSizeSummary?.length > 0) {
-      // Use the measurementSizeSummary data directly
-      measurementDetails.measurementSizeSummary.forEach(sizeData => {
-        totalPassPoints += (sizeData.totalPass || 0);
-        totalFailPoints += (sizeData.totalFail || 0);
-      });
-    } else if (measurementDetails?.measurement?.length > 0) {
-      // Fallback: Calculate from measurement array if measurementSizeSummary doesn't exist
-      measurementDetails.measurement.forEach((data) => {
-        if (data.pcs && Array.isArray(data.pcs)) {
-          data.pcs.forEach((pc) => {
-            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
-              pc.measurementPoints.forEach((point) => {
-                if (point.result === "pass") {
-                  totalPassPoints++;
-                } else if (point.result === "fail") {
-                  totalFailPoints++;
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-    
-    const totalPoints = totalPassPoints + totalFailPoints;
-    
-    if (totalPoints > 0) {
-      calculatedPassRate = (totalPassPoints / totalPoints) * 100;
-      measurementResult = calculatedPassRate >= 95 ? "Pass" : "Fail";
-    } else {
-      // If no measurement points, consider it as pending rather than pass
-      measurementResult = "Pending";
-      calculatedPassRate = 0;
-    }
-    
-    // Overall result logic - handle SOP differently
-    let overallResult = "Pending";
-    
-    // Check if this is SOP report type
-    const isSOP = summary.reportType === "SOP" || 
-                  summary.reportType === "sop" ||
-                  (summary.reportType === "" && 
-                   summary.inline === "" && 
-                   summary.firstOutput === "");
-    
-    if (isSOP) {
-      // For SOP: Overall result is Pass only if there are no defects
-      if ((summary.totalDefectCount || 0) === 0 && (summary.rejectedDefectPcs || 0) === 0) {
-        overallResult = "Pass";
-      } else {
-        overallResult = "Fail";
-      }
-    } else {
-      // For Inline/First Output: Use measurement + defect + inspection logic
-      if (defectResult === "Fail" || measurementResult === "Fail" || inspectionResult === "Fail") {
-        overallResult = "Fail";
-      } else if (defectResult === "Pass" && measurementResult === "Pass" && inspectionResult === "Pass") {
-        overallResult = "Pass";
-      } else {
-        overallResult = "Pending";
-      }
-    }
-    
-    return {
-      overallResult,
-      calculatedPassRate: Number(calculatedPassRate.toFixed(1)),
-      measurementResult,
-      defectResult,
-      inspectionResult,
-      totalMeasurementPoints: totalPoints,
-      totalMeasurementPass: totalPassPoints,
-      totalMeasurementFail: totalFailPoints
-    };
-  };
-
-  const { 
-    overallResult, 
-    calculatedPassRate, 
-    measurementResult, 
-    defectResult,
-    inspectionResult,
-    totalMeasurementPoints,
-    totalMeasurementPass,
-    totalMeasurementFail
-  } = calculateOverallResult();
-
-  // Save updated summary to database when it changes
-  useEffect(() => {
-    const saveUpdatedSummary = async () => {
-      if (!recordId || !summary) return;
-      
-      const updatedSummary = {
-        ...summary,
-        overallFinalResult: overallResult,
-        passRate: calculatedPassRate,
-        totalCheckedPoint: totalMeasurementPoints,
-        totalPass: totalMeasurementPass,
-        totalFail: totalMeasurementFail,
-        totalCheckedPcs: summary.totalCheckedPcs || 0,
-        rejectedDefectPcs: summary.rejectedDefectPcs || 0,
-        totalDefectCount: summary.totalDefectCount || 0,
-        defectRate: summary.defectRate || 0,
-        defectRatio: summary.defectRatio || 0
-      };
-      
-      // Check if there are actual changes before making API call
-      const hasChanges = 
-        updatedSummary.overallFinalResult !== summary.overallFinalResult ||
-        updatedSummary.passRate !== summary.passRate ||
-        updatedSummary.totalCheckedPoint !== summary.totalCheckedPoint ||
-        updatedSummary.totalPass !== summary.totalPass ||
-        updatedSummary.totalFail !== summary.totalFail;
-      
-      if (!hasChanges) return;
-      
-      try {
-        
-        // Use the correct endpoint for After Ironing summary saving
-        const response = await fetch(`${API_BASE_URL}/api/after-ironing/save-summary/${recordId}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ summary: updatedSummary })
-        });
-        
-        if (response.ok) {
-          if (onSummaryUpdate) {
-            onSummaryUpdate(updatedSummary);
-          }
-        } else {
-          console.error('Failed to save summary:', response.status, response.statusText);
-        }
-      } catch (error) {
-        console.error('Failed to save updated summary:', error);
-      }
-    };
-    
-    // Add a small delay to prevent too frequent API calls
-    const timeoutId = setTimeout(saveUpdatedSummary, 300);
-    return () => clearTimeout(timeoutId);
-  }, [overallResult, calculatedPassRate, totalMeasurementPoints, totalMeasurementPass, totalMeasurementFail, recordId, summary?.orderNo, summary?.color, summary?.totalCheckedPcs, summary?.rejectedDefectPcs, summary?.totalDefectCount, summary?.defectRate, summary?.defectRatio, onSummaryUpdate]);
-
-  // Use calculated pass rate instead of saved one
-  const displayPassRate = calculatedPassRate;
+  const overallResult = overallFinalResult || "Pending";
 
   let resultColor = "text-green-600 dark:text-green-400";
   let resultBgColor = "bg-green-50 dark:bg-green-900/50";
@@ -293,10 +128,8 @@ OverAllSummaryCard.propTypes = {
     defectRatio: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     overallFinalResult: PropTypes.string,
     defectDetails: PropTypes.object,
-    measurementDetails: PropTypes.oneOfType([PropTypes.object, PropTypes.array]),
+    measurementDetails: PropTypes.oneOfType([PropTypes.object, PropTypes.array])
   }),
-  recordId: PropTypes.string,
-  onSummaryUpdate: PropTypes.func,
 };
 
 export default OverAllSummaryCard;

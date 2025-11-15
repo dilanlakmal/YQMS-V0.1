@@ -20,7 +20,7 @@ const SubmittedWashingDataFilter = ({
     orderNo: '',
     color: '',
     qcId: '',
-    before_after_wash: '',
+    ironingType: '',
     buyer: '',
     factoryName: '',
     reportType: '',
@@ -60,8 +60,8 @@ const SubmittedWashingDataFilter = ({
         switch (field) {
           case 'color':
             return item.color;
-          case 'before_after_wash':
-            return item.before_after_wash;
+          case 'ironingType':
+            return item.ironingType || item.washType;
           case 'buyer':
             return item.buyer;
           case 'factoryName':
@@ -165,7 +165,7 @@ const SubmittedWashingDataFilter = ({
       orderNo: '',
       color: '',
       qcId: '',
-      before_after_wash: '',
+      ironingType: '',
       buyer: '',
       factoryName: '',
       reportType: '',
@@ -192,7 +192,7 @@ const SubmittedWashingDataFilter = ({
       filters.orderNo ||
       filters.color ||
       filters.qcId ||
-      filters.before_after_wash ||
+      filters.ironingType ||
       filters.buyer ||
       filters.factoryName ||
       filters.reportType ||
@@ -398,17 +398,17 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Before/After
+                Ironing Type
               </label>
               <div className="relative">
                 <select
-                  value={filters.before_after_wash}
-                  onChange={(e) => handleFilterChange('before_after_wash', e.target.value)}
+                  value={filters.ironingType}
+                  onChange={(e) => handleFilterChange('ironingType', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
-                  <option value="">All</option>
-                  {getUniqueValues('before_after_wash', filteredData && filteredData.length !== data.length).map(before_after_wash => (
-                    <option key={before_after_wash} value={before_after_wash}>{before_after_wash}</option>
+                  <option value="">All Types</option>
+                  {getUniqueValues('ironingType', filteredData && filteredData.length !== data.length).map(ironingType => (
+                    <option key={ironingType} value={ironingType}>{ironingType}</option>
                   ))}
                 </select>
                 <CheckCircle className="absolute left-3 top-3 w-4 h-4 text-gray-400" />

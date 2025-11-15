@@ -28,7 +28,11 @@ import {
   saveAfterIroning,
   getAfterIroningDefects,
   getAfterIroningChecklist,
+  getAfterIroningCheckpointDefinitions,
+  getAllSubmittedAfterIroningData,
+  deleteAfterIroningRecord,
   checkAfterIroningRecord,
+  getQCWashingMeasurementData,
 } from '../../../controller/AfterIroning/AfterIroningInspection/afterIroningInspectionController.js';
 import express from 'express';
 import { 
@@ -113,5 +117,13 @@ router.post('/api/after-ironing/submit', saveAfterIroning);
 // Routes for defects and checklist
 router.get('/api/after-ironing-defects', getAfterIroningDefects);
 router.get('/api/after-ironing-checklist', getAfterIroningChecklist);
+router.get('/api/after-ironing-checkpoint-definitions', getAfterIroningCheckpointDefinitions);
+
+// Routes for submitted data management
+router.get('/api/after-ironing/all-submitted', getAllSubmittedAfterIroningData);
+router.delete('/api/after-ironing/delete/:id', deleteAfterIroningRecord);
+
+// Route for QC Washing measurement comparison
+router.get('/api/after-ironing/qc-washing-measurement', getQCWashingMeasurementData);
 
 export default router;

@@ -865,6 +865,29 @@ export const saveAfterIroningDefectData = async (req, res) => {
 
     defectDetails.additionalImages = processedAdditionalImages;
 
+    // Add missing fields to defectDetails before saving
+    if (!defectDetails.checkedQty && !defectDetails.washQty && !defectDetails.result) {
+      // Get the record to extract checkedQty and washQty
+      const currentRecord = await AfterIroning.findById(recordId);
+      if (currentRecord) {
+        defectDetails.checkedQty = currentRecord.checkedQty || 0;
+        defectDetails.washQty = currentRecord.washQty || 0;
+        
+        // Calculate result based on defects
+        const totalDefectCount = defectDetails.defectsByPc?.reduce((sum, pc) => 
+          sum + (pc.pcDefects?.reduce((defSum, defect) => 
+            defSum + (parseInt(defect.defectQty) || 0), 0) || 0), 0) || 0;
+        
+        // Use AQL logic if available
+        const aql = currentRecord.aql?.[0];
+        if (aql && typeof aql.acceptedDefect === 'number') {
+          defectDetails.result = totalDefectCount <= aql.acceptedDefect ? 'Pass' : 'Fail';
+        } else {
+          defectDetails.result = totalDefectCount === 0 ? 'Pass' : 'Fail';
+        }
+      }
+    }
+
     // Save to DB
     const doc = await AfterIroning.findByIdAndUpdate(
       recordId,
@@ -1013,6 +1036,29 @@ export const updateAfterIroningDefectData = async (req, res) => {
     }).filter(img => img && typeof img === 'string' && img.trim() !== '');
 
     defectDetails.additionalImages = processedAdditionalImages;
+
+    // Add missing fields to defectDetails before saving (for update function)
+    if (!defectDetails.checkedQty && !defectDetails.washQty && !defectDetails.result) {
+      // Get the record to extract checkedQty and washQty
+      const currentRecord = await AfterIroning.findById(recordId);
+      if (currentRecord) {
+        defectDetails.checkedQty = currentRecord.checkedQty || 0;
+        defectDetails.washQty = currentRecord.washQty || 0;
+        
+        // Calculate result based on defects
+        const totalDefectCount = defectDetails.defectsByPc?.reduce((sum, pc) => 
+          sum + (pc.pcDefects?.reduce((defSum, defect) => 
+            defSum + (parseInt(defect.defectQty) || 0), 0) || 0), 0) || 0;
+        
+        // Use AQL logic if available
+        const aql = currentRecord.aql?.[0];
+        if (aql && typeof aql.acceptedDefect === 'number') {
+          defectDetails.result = totalDefectCount <= aql.acceptedDefect ? 'Pass' : 'Fail';
+        } else {
+          defectDetails.result = totalDefectCount === 0 ? 'Pass' : 'Fail';
+        }
+      }
+    }
 
     // Save to DB
     const doc = await AfterIroning.findByIdAndUpdate(
@@ -2373,6 +2419,53 @@ export const getAfterIroningChecklist = async (req, res) => {
   }
 };
 
+// Get After Ironing checkpoint definitions
+export const getAfterIroningCheckpointDefinitions = async (req, res) => {
+  try {
+    // For now, return empty array - this should be replaced with actual checkpoint definitions
+    const checkpointDefinitions = [];
+    res.json(checkpointDefinitions);
+  } catch (error) {
+    console.error("Failed to fetch After Ironing checkpoint definitions:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch checkpoint definitions" });
+  }
+};
+
+// Delete After Ironing record
+export const deleteAfterIroningRecord = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: "Record ID is required"
+      });
+    }
+
+    const deletedRecord = await AfterIroning.findByIdAndDelete(id);
+    
+    if (!deletedRecord) {
+      return res.status(404).json({
+        success: false,
+        message: "Record not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "After Ironing record deleted successfully"
+    });
+  } catch (error) {
+    console.error("Error deleting After Ironing record:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while deleting record",
+      error: error.message
+    });
+  }
+};
+
 export const checkAfterIroningRecord = async (req, res) => {
   try {
     const { orderNo, color, factoryName, reportType } = req.body;
@@ -2437,6 +2530,112 @@ export const checkAfterIroningRecord = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while checking QC Washing record",
+      error: error.message
+    });
+  }
+};
+
+// Get all submitted After Ironing data
+export const getAllSubmittedAfterIroningData = async (req, res) => {
+  try {
+    const submittedRecords = await AfterIroning.find({
+      status: { $in: ['submitted', 'approved'] }
+    })
+    .sort({ submittedAt: -1, createdAt: -1 })
+    .lean();
+
+    res.json({
+      success: true,
+      data: submittedRecords,
+      count: submittedRecords.length
+    });
+  } catch (error) {
+    console.error("Error fetching submitted After Ironing data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching submitted After Ironing data",
+      error: error.message
+    });
+  }
+};
+
+// Get QC Washing measurement data for comparison
+export const getQCWashingMeasurementData = async (req, res) => {
+  try {
+    const { orderNo, color, date, reportType, factoryName } = req.query;
+
+    if (!orderNo || !color) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number and color are required"
+      });
+    }
+
+    // Build query to find matching QC Washing record
+    const query = {
+      orderNo: orderNo,
+      color: color,
+      status: { $in: ['submitted', 'approved'] }
+    };
+
+    // Add optional filters if provided
+    if (date) {
+      const dateValue = new Date(date.length === 10 ? date + "T00:00:00.000Z" : date);
+      query.date = dateValue;
+    }
+    if (reportType) {
+      query.reportType = reportType;
+    }
+    if (factoryName) {
+      query.factoryName = factoryName;
+    }
+
+    // Find the most recent matching QC Washing record
+    const qcWashingRecord = await QCWashing.findOne(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!qcWashingRecord) {
+      return res.json({
+        success: false,
+        message: "No matching QC Washing record found",
+        data: null
+      });
+    }
+
+    // Extract measurement data for Before Wash and After Wash
+    const measurementData = {
+      beforeWash: [],
+      afterWash: []
+    };
+
+    if (qcWashingRecord.measurementDetails?.measurement) {
+      qcWashingRecord.measurementDetails.measurement.forEach(measurement => {
+        if (measurement.before_after_wash === 'beforeWash' || measurement.before_after_wash === 'Before Wash') {
+          measurementData.beforeWash.push(measurement);
+        } else if (measurement.before_after_wash === 'afterWash' || measurement.before_after_wash === 'After Wash') {
+          measurementData.afterWash.push(measurement);
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: measurementData,
+      recordInfo: {
+        id: qcWashingRecord._id,
+        orderNo: qcWashingRecord.orderNo,
+        color: qcWashingRecord.color,
+        date: qcWashingRecord.date,
+        reportType: qcWashingRecord.reportType,
+        factoryName: qcWashingRecord.factoryName
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching QC Washing measurement data:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching QC Washing measurement data",
       error: error.message
     });
   }

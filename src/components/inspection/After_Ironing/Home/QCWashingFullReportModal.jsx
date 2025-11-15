@@ -2334,69 +2334,79 @@ const getImageUrl = (imagePath) => {
                                               return (
                                                 <>
                                                   {/* Before Wash Value Counts */}
-                                                  {sortedValues.map(value => {
-                                                    const count = beforeValueCount[value] || 0;
-                                                    const passCount = (() => {
-                                                      let pass = 0;
-                                                      beforeSizeData?.pcs?.forEach(pc => {
-                                                        const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
-                                                        if (measurement && measurement.measured_value_fraction === value && measurement.result === 'pass') {
-                                                          pass++;
-                                                        }
-                                                      });
-                                                      return pass;
-                                                    })();
-                                                    const failCount = count - passCount;
+                                                    {sortedValues.map(value => {
+                                                      const count = beforeValueCount[value] || 0;
+                                                      const passCount = (() => {
+                                                        let pass = 0;
+                                                        beforeSizeData?.pcs?.forEach(pc => {
+                                                          const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
+                                                          if (measurement && measurement.measured_value_fraction === value && measurement.result === 'pass') {
+                                                            pass++;
+                                                          }
+                                                        });
+                                                        return pass;
+                                                      })();
+                                                      const failCount = count - passCount;
+                                                      
+                                                      return (
+                                                        <td key={`before-${value}`} className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20">
+                                                          {count === 0 ? (
+                                                            <span className="font-bold text-gray-400">-</span>
+                                                          ) : (
+                                                            <div className="flex flex-col items-center space-y-1">
+                                                              {passCount > 0 && (
+                                                                <div className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-md">
+                                                                  <span className="font-bold text-green-700 dark:text-green-300">{passCount}</span>
+                                                                </div>
+                                                              )}
+                                                              {failCount > 0 && (
+                                                                <div className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-md">
+                                                                  <span className="font-bold text-red-700 dark:text-red-300">{failCount}</span>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          )}
+                                                        </td>
+                                                      );
+                                                    })}
                                                     
-                                                    return (
-                                                      <td key={`before-${value}`} className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20">
-                                                        {count === 0 ? (
-                                                          <span className="font-bold text-gray-400">-</span>
-                                                        ) : (
-                                                          <div className="flex flex-col items-center">
-                                                            {passCount > 0 && (
-                                                              <span className="font-bold text-green-600 dark:text-green-400">{passCount}</span>
-                                                            )}
-                                                            {failCount > 0 && (
-                                                              <span className="font-bold text-red-600 dark:text-red-400">{failCount}</span>
-                                                            )}
-                                                          </div>
-                                                        )}
-                                                      </td>
-                                                    );
-                                                  })}
                                                   {/* After Wash Value Counts */}
-                                                  {sortedValues.map(value => {
-                                                    const count = afterValueCount[value] || 0;
-                                                    const passCount = (() => {
-                                                      let pass = 0;
-                                                      afterSizeData?.pcs?.forEach(pc => {
-                                                        const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
-                                                        if (measurement && measurement.measured_value_fraction === value && measurement.result === 'pass') {
-                                                          pass++;
-                                                        }
-                                                      });
-                                                      return pass;
-                                                    })();
-                                                    const failCount = count - passCount;
-                                                    
-                                                    return (
-                                                      <td key={`after-${value}`} className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
-                                                        {count === 0 ? (
-                                                          <span className="font-bold text-gray-400">-</span>
-                                                        ) : (
-                                                          <div className="flex flex-col items-center">
-                                                            {passCount > 0 && (
-                                                              <span className="font-bold text-green-600 dark:text-green-400">{passCount}</span>
-                                                            )}
-                                                            {failCount > 0 && (
-                                                              <span className="font-bold text-red-600 dark:text-red-400">{failCount}</span>
-                                                            )}
-                                                          </div>
-                                                        )}
-                                                      </td>
-                                                    );
-                                                  })}
+                                                    {sortedValues.map(value => {
+                                                      const count = afterValueCount[value] || 0;
+                                                      const passCount = (() => {
+                                                        let pass = 0;
+                                                        afterSizeData?.pcs?.forEach(pc => {
+                                                          const measurement = pc.measurementPoints?.find(mp => mp.pointName === pointName);
+                                                          if (measurement && measurement.measured_value_fraction === value && measurement.result === 'pass') {
+                                                            pass++;
+                                                          }
+                                                        });
+                                                        return pass;
+                                                      })();
+                                                      const failCount = count - passCount;
+                                                      
+                                                      return (
+                                                        <td key={`after-${value}`} className="px-2 py-3 text-center text-sm font-medium border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
+                                                          {count === 0 ? (
+                                                            <span className="font-bold text-gray-400">-</span>
+                                                          ) : (
+                                                            <div className="flex flex-col items-center space-y-1">
+                                                              {passCount > 0 && (
+                                                                <div className="bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-md">
+                                                                  <span className="font-bold text-green-700 dark:text-green-300">{passCount}</span>
+                                                                </div>
+                                                              )}
+                                                              {failCount > 0 && (
+                                                                <div className="bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded-md">
+                                                                  <span className="font-bold text-red-700 dark:text-red-300">{failCount}</span>
+                                                                </div>
+                                                              )}
+                                                            </div>
+                                                          )}
+                                                        </td>
+                                                      );
+                                                    })}
+
                                                 </>
                                               );
                                             })()}

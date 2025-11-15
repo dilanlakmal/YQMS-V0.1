@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../../../../../config';
 import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
-import QCWashingFullReportModal from './QCWashingFullReportModal';
+import AfterIroningFullReportModal from './AfterIroningFullReportModal';
 import { PDFDownloadLink} from '@react-pdf/renderer';
 import Swal from 'sweetalert2';
 
@@ -17,12 +17,11 @@ const SubmittedWashingDataPage = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [viewMode, setViewMode] = useState('actual'); // 'estimated' or 'actual'
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [aqlEndpointAvailable, setAqlEndpointAvailable] = useState(true);
+
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -75,7 +74,7 @@ const fetchSubmittedData = async (showLoading = true) => {
     setError(null);
     
     const response = await fetch(
-      `${API_BASE_URL}/api/qc-washing/all-submitted`
+      `${API_BASE_URL}/api/after-ironing/all-submitted`
     );
     
     if (!response.ok) {
@@ -114,7 +113,7 @@ const fetchSubmittedData = async (showLoading = true) => {
   useEffect(() => {
     const fetchDefinitions = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
+        const response = await fetch(`${API_BASE_URL}/api/after-ironing-checkpoint-definitions`);
         const data = await response.json();
         if (Array.isArray(data)) {
           setCheckpointDefinitions(data);
@@ -149,158 +148,12 @@ const fetchSubmittedData = async (showLoading = true) => {
   }, []);
 
   useEffect(() => {
-    const processDataForView = async () => {
-      if (isLoading) return;
-
-      if (viewMode === 'estimated') {
-        const dataToProcess = submittedData.map(record => ({
-          ...record,
-          displayWashQty: record.washQty,
-          isActualWashQty: false,
-        }));
-        applyFilters(currentFilters || {}, false, dataToProcess);
-      } else {
-        // Show estimated data immediately, then process actual data in background
-        const estimatedData = submittedData.map(record => ({
-          ...record,
-          displayWashQty: record.washQty,
-          isActualWashQty: false,
-        }));
-        applyFilters(currentFilters || {}, false, estimatedData);
-        
-        setIsProcessing(true);
-        
-        // Process actual data in background
-        setTimeout(async () => {
-          const BATCH_SIZE = 10;
-          let actualData = [];
-          
-          for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
-            const batch = submittedData.slice(i, i + BATCH_SIZE);
-            const batchResults = await Promise.all(
-              batch.map(async (record) => {
-                const washQtyData = await fetchRealWashQty(record);
-                let finalRecord = { ...record, ...washQtyData };
-
-                // If we have an actual wash quantity, fetch the corresponding AQL sample size for display.
-                if (
-                  finalRecord.isActualWashQty &&
-                  finalRecord.displayWashQty > 0 &&
-                  aqlEndpointAvailable &&
-                  record.reportType?.toLowerCase() === 'inline' // Only update for 'inline' reports
-                ) {
-                  try {
-                    const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ lotSize: finalRecord.displayWashQty, orderNo: record.orderNo })
-                    });
-
-                    if (aqlResponse.ok) {
-                      const aqlResult = await aqlResponse.json();
-                      if (aqlResult.success && aqlResult.aqlData) {
-                        // Temporarily override checkedQty for display purposes only.
-                        finalRecord.checkedQty = aqlResult.aqlData.sampleSize;
-                      }
-                    }
-                  } catch (e) { console.error("AQL fetch for display failed:", e); }
-                }
-
-                return finalRecord;
-              })
-            );
-            actualData.push(...batchResults);
-            
-            // Update UI progressively
-            if (actualData.length % 20 === 0) {
-              applyFilters(currentFilters || {}, false, [...actualData, ...submittedData.slice(actualData.length).map(r => ({ ...r, displayWashQty: r.washQty, isActualWashQty: false }))]);
-            }
-          }
-          
-          applyFilters(currentFilters || {}, false, actualData);
-          setIsProcessing(false);
-        }, 100);
-      }
-    };
-
-    processDataForView();
-  }, [viewMode, submittedData, currentFilters, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchRealWashQty = async (record) => {
-    try {
-      if (record.reportType && (record.reportType.toLowerCase() === 'first output' || record.reportType.toLowerCase() === 'sop')) {
-        const isSOP = record.reportType.toLowerCase() === 'sop';
-        return { 
-          displayWashQty: record.washQty || 0, 
-          isActualWashQty: true, 
-          isFirstOutput: !isSOP, 
-          isSOP: isSOP,
-          originalWashQty: record.washQty || 0, 
-          source: isSOP ? 'sop' : 'first_output' 
-        };
-      }
-
-      if (!record.reportType || record.reportType.toLowerCase() !== 'inline') {
-        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
-      }
-
-      const factoryName = record.factoryName || '';
-
-      if (factoryName.toUpperCase() === 'YM') {
-        const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
-        const styleNo = record.orderNo || '';
-        let color = record.color || '';
-
-        if (!dateStr || !styleNo || !color) {
-          return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
-        }
-
-        const colorMatch = color.match(/\[([^\]]+)\]/);
-        if (colorMatch) {
-          color = colorMatch[1];
-        }
-
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
-          
-          const response = await fetch(`${API_BASE_URL}/api/qc-real-washing-qty/search?` + new URLSearchParams({ inspectionDate: dateStr, styleNo: styleNo, color: color }), {
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          
-          if (response.ok) {
-            const data = await response.json();
-            if (data.success && data.found && data.washQty > 0) {
-              return { displayWashQty: data.washQty, isActualWashQty: true, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'qc_real_wash_qty_ym', details: data.details };
-            }
-          }
-        } catch (error) {
-          if (error.name === 'AbortError') {
-            console.warn('Real wash qty request timed out for:', record.orderNo);
-          } else {
-            console.error('Error fetching real wash qty from qc_real_washing_qty:', error);
-          }
-        }
-        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
-      } else {
-        if (record.editedActualWashQty !== null && record.editedActualWashQty !== undefined) {
-          return {
-            displayWashQty: record.editedActualWashQty,
-            isActualWashQty: true,
-            isFirstOutput: false,
-            originalWashQty: record.washQty || 0,
-            source: 'edited_actual_wash_qty',
-            details: { recordId: record._id, editedValue: record.editedActualWashQty, lastEditedAt: record.lastEditedAt }
-          };
-        }
-        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
-      }
-    } catch (error) {
-      console.error('Error in fetchRealWashQty:', error);
-      return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'error' };
+    if (!isLoading) {
+      applyFilters(currentFilters || {}, false, submittedData);
     }
-  };
+  }, [submittedData, currentFilters, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+
+
 
 
   // Helper function to extract defect details
@@ -579,6 +432,50 @@ const processImageToBase64 = async (imagePath) => {
   }
 };
 
+// Add delete function
+const handleDelete = async (record) => {
+  try {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: `Delete After Ironing record for ${record.orderNo} - ${record.color}?`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed) {
+      const response = await fetch(`${API_BASE_URL}/api/after-ironing/delete/${record._id}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        await Swal.fire({
+          title: 'Deleted!',
+          text: 'After Ironing record has been deleted.',
+          icon: 'success',
+          timer: 2000,
+          showConfirmButton: false
+        });
+        
+        // Refresh the data
+        fetchSubmittedData(false);
+      } else {
+        throw new Error('Failed to delete record');
+      }
+    }
+  } catch (error) {
+    Swal.fire({
+      title: 'Error!',
+      text: `Failed to delete record: ${error.message}`,
+      icon: 'error',
+      timer: 3000,
+      showConfirmButton: false
+    });
+  }
+};
+
 const handleDownloadPDF = async (record) => {
   try {
     setIsQcWashingPDF(true);
@@ -807,6 +704,7 @@ const handleDownloadPDF = async (record) => {
         checkpointDefinitions,
         preloadedImages,
         inspectorDetails,
+        reportTitle: "After Ironing Report"
       })
     ).toBlob();
     
@@ -814,7 +712,7 @@ const handleDownloadPDF = async (record) => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `QC_Washing_Report_${record.orderNo}_${record.color}_${new Date().toISOString().split('T')[0]}.pdf`;
+    link.download = `After_Ironing_Report_${record.orderNo}_${record.color}_${new Date().toISOString().split('T')[0]}.pdf`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -822,7 +720,7 @@ const handleDownloadPDF = async (record) => {
     
     Swal.fire({
       title: "Success!",
-      text: "PDF downloaded successfully!",
+      text: "After Ironing PDF downloaded successfully!",
       icon: "success",
       timer: 3000,
       showConfirmButton: false,
@@ -831,7 +729,7 @@ const handleDownloadPDF = async (record) => {
   } catch (error) {
     Swal.fire({
       title: "Error!",
-      text: `Failed to generate PDF: ${error.message}`,
+      text: `Failed to generate After Ironing PDF: ${error.message}`,
       icon: "error",
       timer: 5000,
       showConfirmButton: false,
@@ -926,9 +824,12 @@ const handleDownloadPDF = async (record) => {
       filtered = filtered.filter(item => item.washType === filters.washType);
     }
 
-    // Before/After wash filter
-    if (filters.before_after_wash) {
-      filtered = filtered.filter(item => item.before_after_wash === filters.before_after_wash);
+    // Ironing type filter
+    if (filters.ironingType) {
+      filtered = filtered.filter(item => 
+        (item.ironingType === filters.ironingType) || 
+        (item.washType === filters.ironingType)
+      );
     }
 
     setFilteredData(filtered);
@@ -1039,31 +940,8 @@ const handleDownloadPDF = async (record) => {
         <div className="flex justify-between items-center mb-6">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200">
-              QC Washing Final Reports
-              {isProcessing && (
-                <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
-                  (Processing actual data...)
-                </span>
-              )}
+              After Ironing Final Reports
             </h2>
-             <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
-              <button
-                onClick={() => setViewMode('estimated')}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
-                  viewMode === 'estimated' ? 'bg-white dark:bg-gray-800 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50'
-                }`}
-              >
-                Estimated
-              </button>
-              <button
-                onClick={() => setViewMode('actual')}
-                className={`px-4 py-1 text-sm font-medium rounded-full transition-colors ${
-                  viewMode === 'actual' ? 'bg-white dark:bg-gray-800 shadow text-indigo-600 dark:text-indigo-400' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-300/50'
-                }`}
-              >
-                Actual
-              </button>
-            </div>
           </div>
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-4">
@@ -1100,7 +978,7 @@ const handleDownloadPDF = async (record) => {
             </div>
             <div className="text-sm text-gray-500 dark:text-gray-400">
               {submittedData.length === 0 
-                ? 'Submit some QC washing data to see reports here.' 
+                ? 'Submit some After Ironing data to see reports here.' 
                 : 'Try adjusting your filter criteria.'}
             </div>
           </div>
@@ -1126,7 +1004,7 @@ const handleDownloadPDF = async (record) => {
                  Report Type
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
-                   Before/After Wash
+                   Ironing Type
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                     MO No
@@ -1144,7 +1022,7 @@ const handleDownloadPDF = async (record) => {
                     Color Order Qty
                   </th> */}
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
-                   Wash Qty
+                   Ironing Qty
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                    Checked Qty (AQL)
@@ -1242,7 +1120,7 @@ const handleDownloadPDF = async (record) => {
                         {record.reportType || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {(record.before_after_wash || 'N/A').replace(' Wash', '')}
+                        {record.ironingType || record.washType || 'N/A'}
                       </td>
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.orderNo || 'N/A'}
@@ -1260,25 +1138,7 @@ const handleDownloadPDF = async (record) => {
                         {record.colorOrderQty || 'N/A'}
                       </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        <div className="flex flex-col">
-                          <span className={`font-medium ${
-                            record.isActualWashQty ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'
-                          }`}>
-                            {record.displayWashQty ?? 'N/A'}
-                          </span>
-                          {/* <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {viewMode === 'actual' && (record.isFirstOutput
-                              ? 'Actual (First Output)'
-                              : record.isActualWashQty
-                                ? record.washQtySource === 'qc_real_wash_qty_ym'
-                                  ? 'Actual (YM Real)'
-                                  : record.washQtySource === 'edited_actual_wash_qty'
-                                  ? 'Actual'
-                                  : 'Actual'
-                                : 'Estimated')}
-                          </span> */}
-                         
-                        </div>
+                        {record.washQty || 'N/A'}
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
@@ -1425,7 +1285,7 @@ const handleDownloadPDF = async (record) => {
                                 {isqcWashingPDF ? 'Generating PDF...' : 'Download PDF'}
                               </button>
                               <hr className="my-1 border-gray-200 dark:border-gray-600" />
-                              {/* <button
+                              <button
                                 onClick={() => {
                                   handleDelete(record);
                                   setOpenDropdown(null);
@@ -1434,7 +1294,7 @@ const handleDownloadPDF = async (record) => {
                               >
                                 <Trash2 size={16} className="mr-3" />
                                 Delete
-                              </button> */}
+                              </button>
                             </div>
                           </div>
                         )}
@@ -1512,7 +1372,7 @@ const handleDownloadPDF = async (record) => {
       />
 
       {/* Full Report Modal - ADD THIS */}
-    <QCWashingFullReportModal
+    <AfterIroningFullReportModal
       isOpen={fullReportModal.isOpen}
       onClose={handleCloseFullReport}
         recordData={fullReportModal.recordData}

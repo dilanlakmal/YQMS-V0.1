@@ -182,35 +182,50 @@ function calculateSummaryData(currentFormData) {
     measurementArray = currentMeasurementDetails;
   }
 
+  // 1. Calculate totalCheckedPcs from measurement data qty (FIXED)
   let totalCheckedPcs = 0;
   measurementArray.forEach((data) => {
+    // Use qty field which represents the number of pieces checked for each size
     if (typeof data.qty === "number" && data.qty > 0) {
       totalCheckedPcs += data.qty;
     }
   });
 
+  // If no measurement data, fallback to checkedQty from form
+  const checkedQty = parseInt(currentFormData.checkedQty, 10) || 0;
   if (totalCheckedPcs === 0) {
     totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
   }
 
+  // 2. Calculate measurement points and passes using measurementSizeSummary if available
   let measurementPoints = 0;
   let measurementPass = 0;
 
-  measurementArray.forEach((data) => {
-    if (Array.isArray(data.pcs)) {
-      data.pcs.forEach((pc) => {
-        if (Array.isArray(pc.measurementPoints)) {
-          pc.measurementPoints.forEach((point) => {
-            if (point.result === "pass" || point.result === "fail") {
-              measurementPoints++;
-              if (point.result === "pass") measurementPass++;
-            }
-          });
-        }
-      });
-    }
-  });
+  // Check if measurementSizeSummary exists (same as backend logic)
+  if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
+    currentMeasurementDetails.measurementSizeSummary.forEach(sizeData => {
+      measurementPoints += (sizeData.checkedPoints || 0);
+      measurementPass += (sizeData.totalPass || 0);
+    });
+  } else {
+    // Fallback: Calculate from measurement array
+    measurementArray.forEach((data) => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === "pass" || point.result === "fail") {
+                measurementPoints++;
+                if (point.result === "pass") measurementPass++;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 
+  // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
     ? currentDefectDetails.defectsByPc.length
     : 0;
@@ -230,6 +245,7 @@ function calculateSummaryData(currentFormData) {
       }, 0)
     : 0;
 
+  // 4. Defect rate and ratio (use totalCheckedPcs, not measurementPoints)
   const defectRate =
     totalCheckedPcs > 0
       ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
@@ -240,54 +256,33 @@ function calculateSummaryData(currentFormData) {
       ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
+  // 5. SIMPLIFIED LOGIC - only consider defectDetails.result and pass rate >= 95%
   let overallResult = "Pending";
-  const measurementOverallResult =
-    measurementPoints === 0
-      ? "Pending"
-      : measurementPoints - measurementPass > 0
-      ? "Fail"
-      : "Pass";
-  const defectOverallResult = currentDefectDetails?.result || "Pending";
+  const savedDefectResult = currentDefectDetails?.result || "Pending";
 
-  const isSOP =
-    currentFormData.reportType === "SOP" ||
-    currentFormData.reportType === "sop" ||
-    (currentFormData.reportType === "" &&
-      currentFormData.inline === "" &&
-      currentFormData.firstOutput === "");
+  // Calculate measurement pass rate - default to 100% when no measurement points
+  const measurementPassRate =
+    measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
 
-  if (isSOP) {
-    const measurementPassRate =
-      measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-    const isMeasurementPass = measurementPassRate >= 95;
-    const isDefectPass = defectCount === 0 && rejectedDefectPcs === 0;
-
-    if (isMeasurementPass && isDefectPass) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Fail";
-    }
+  // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+  if (savedDefectResult === "Pass" && measurementPassRate >= 95.0) {
+    overallResult = "Pass";
+  } else if (savedDefectResult === "Fail" || (measurementPoints > 0 && measurementPassRate < 95.0)) {
+    overallResult = "Fail";
   } else {
-    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-      overallResult = "Fail";
-    } else if (
-      measurementOverallResult === "Pass" &&
-      defectOverallResult === "Pass"
-    ) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Pending";
-    }
+    overallResult = "Pending";
   }
 
   return {
-    totalCheckedPcs: totalCheckedPcs || 0,
+    checkedQty: checkedQty, // Ensure checkedQty is a number
+    totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
     defectRate,
     defectRatio,
     overallFinalResult: overallResult || "Pending",
     overallResult,
+    // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
     measurementPass: measurementPass || 0
   };
@@ -551,7 +546,8 @@ const AfterIroning = () => {
       (formData.inline === "Inline" ||
         formData.reportType === "Inline" ||
         formData.firstOutput === "First Output" ||
-        formData.reportType === "First Output") &&
+        formData.reportType === "First Output" ||
+       formData.reportType === "SOP") &&
       aql?.acceptedDefect !== undefined
     ) {
       const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
@@ -902,14 +898,12 @@ const AfterIroning = () => {
       saved.inspectionDetails?.checkpointInspectionData &&
       saved.inspectionDetails.checkpointInspectionData.length > 0
     ) {
-      console.log('Loading saved checkpoint data:', saved.inspectionDetails.checkpointInspectionData);
       
       const transformedCheckpointData = [];
       
       saved.inspectionDetails.checkpointInspectionData.forEach(checkpoint => {
         // Process main checkpoint comparison images
         const mainComparisonImages = (checkpoint.comparisonImages || []).map(img => {
-          console.log('Processing main checkpoint image:', img);
           
           if (typeof img === 'string') {
             return {
@@ -929,7 +923,6 @@ const AfterIroning = () => {
           return null;
         }).filter(Boolean);
 
-        console.log('Main checkpoint processed images:', mainComparisonImages);
 
         // Add main checkpoint
         transformedCheckpointData.push({
@@ -949,7 +942,6 @@ const AfterIroning = () => {
           checkpoint.subPoints.forEach(subPoint => {
             // Process sub-point comparison images
             const subComparisonImages = (subPoint.comparisonImages || []).map(img => {
-              console.log('Processing sub-point image:', img);
               
               if (typeof img === 'string') {
                 return {
@@ -968,7 +960,6 @@ const AfterIroning = () => {
               return null;
             }).filter(Boolean);
 
-            console.log('Sub-point processed images:', subComparisonImages);
 
             transformedCheckpointData.push({
               id: `sub_${checkpoint.checkpointId}_${subPoint.subPointId}`,
@@ -1010,7 +1001,6 @@ const AfterIroning = () => {
       });
 
       setCheckpointInspectionData(mergedCheckpointData);
-      console.log('Final transformed checkpoint data with images:', mergedCheckpointData);
     } else {
       console.log('No saved checkpoint data, initializing defaults');
       initializeDefaultCheckpointData(setCheckpointInspectionData);
@@ -1020,7 +1010,6 @@ const AfterIroning = () => {
       saved.inspectionDetails?.parameters &&
       saved.inspectionDetails.parameters.length > 0
     ) {
-      console.log('Loading saved parameters:', saved.inspectionDetails.parameters);
       
       setDefectData(
         saved.inspectionDetails.parameters.map((param) => ({
@@ -1694,7 +1683,6 @@ useEffect(() => {
     // Only reload if we haven't loaded checkpoint data yet
     if (checkpointInspectionData.length === 0 || 
         !checkpointInspectionData.some(item => item.decision)) {
-      console.log('Reloading data with definitions available');
       loadSavedDataById(recordId);
     }
   }
@@ -1702,14 +1690,11 @@ useEffect(() => {
 
 useEffect(() => {
   if (checkpointInspectionData.length > 0) {
-    console.log('Checkpoint data received in InspectionDataSection:', checkpointInspectionData);
     
     // Log images specifically
     checkpointInspectionData.forEach((item, idx) => {
       if (item.comparisonImages && item.comparisonImages.length > 0) {
-        console.log(`${item.type} checkpoint "${item.name}" has ${item.comparisonImages.length} images:`, item.comparisonImages);
         item.comparisonImages.forEach((img, imgIdx) => {
-          console.log(`  Image ${imgIdx}:`, img.preview);
         });
       }
     });
@@ -2026,7 +2011,6 @@ useEffect(() => {
                         
                         inspectionFormData.append('checkpointInspectionData', JSON.stringify(sanitizedCheckpointData));
                         
-                        console.log('Submitting inspection data with images...');
                         const inspectionResponse = await fetch(`${API_BASE_URL}/api/after-ironing/inspection-save`, {
                           method: "POST",
                           body: inspectionFormData
@@ -2089,7 +2073,6 @@ useEffect(() => {
                           additionalImages: existingAdditionalImages
                         }));
                         
-                        console.log('Submitting defect data with images...');
                         const defectResponse = await fetch(`${API_BASE_URL}/api/after-ironing/defect-details-save`, {
                           method: "POST",
                           body: defectFormData
