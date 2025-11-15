@@ -1142,30 +1142,7 @@ export const savedMeasurementDataSpec = async (req, res) => {
 
 // Get sizes for a specific order and color
 export const getAfterIroningOrderSizes = async (req, res) => {
-  const { orderNo, color } = req.params;
-
-  // Sanitizer function for color
-  const sanitizeColor = (colorInput) => {
-    if (!colorInput || typeof colorInput !== 'string') {
-      return '';
-    }
-    
-    return colorInput
-      .trim()                    // Remove leading/trailing whitespace
-      .toLowerCase()             // Convert to lowercase for consistent comparison
-      .replace(/[^a-z0-9\s-]/gi, '') // Remove special characters, keep alphanumeric, spaces, and hyphens
-      .replace(/\s+/g, ' ');     // Replace multiple spaces with single space
-  };
-
-  // Apply sanitizer to color
-  const sanitizedColor = sanitizeColor(color);
-
-  // Validate sanitized color
-  if (!sanitizedColor) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Invalid color parameter provided." });
-  }
+  const { orderNo } = req.params;
 
   const collection = ymProdConnection.db.collection("dt_orders");
 
@@ -1182,21 +1159,19 @@ export const getAfterIroningOrderSizes = async (req, res) => {
 
     orders.forEach((order) => {
       if (order.OrderColors && Array.isArray(order.OrderColors)) {
-        const matchingColor = order.OrderColors.find(
-          (c) => sanitizeColor(c.Color) === sanitizedColor // Use sanitized comparison
-        );
+        order.OrderColors.forEach((colorObj) => {
+          if (colorObj && colorObj.OrderQty && Array.isArray(colorObj.OrderQty)) {
+            colorObj.OrderQty.forEach((entry) => {
+              const sizeName = Object.keys(entry)[0];
+              const quantity = entry[sizeName];
 
-        if (matchingColor && matchingColor.OrderQty) {
-          matchingColor.OrderQty.forEach((entry) => {
-            const sizeName = Object.keys(entry)[0];
-            const quantity = entry[sizeName];
-
-            if (quantity > 0) {
-              const cleanSize = sizeName.split(";")[0].trim();
-              sizes.add(cleanSize);
-            }
-          });
-        }
+              if (quantity > 0) {
+                const cleanSize = sizeName.split(";")[0].trim();
+                sizes.add(cleanSize);
+              }
+            });
+          }
+        });
       }
     });
 
@@ -1204,7 +1179,6 @@ export const getAfterIroningOrderSizes = async (req, res) => {
     return res.status(200).json({
       success: true,
       orderNo,
-      color: sanitizedColor,
       sizes: Array.from(sizes)
     });
 

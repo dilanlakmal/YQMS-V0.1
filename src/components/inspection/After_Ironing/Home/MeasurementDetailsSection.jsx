@@ -626,7 +626,7 @@ const setKValueForSize = async (size, kValue) => {
     }
     
     // Use the correct API endpoint for After Ironing
-    const response = await fetch(`${API_BASE_URL}/api/after-ironing/order-sizes/${orderNo}/${encodeURIComponent(sanitizedColor)}`);
+    const response = await fetch(`${API_BASE_URL}/api/after-ironing/order-sizes/${orderNo}`);
     const data = await response.json();
     
     if (data.success) {

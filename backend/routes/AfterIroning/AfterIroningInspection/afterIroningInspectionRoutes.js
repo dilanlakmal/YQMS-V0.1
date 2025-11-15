@@ -79,7 +79,7 @@ router.post('/api/after-ironing/defect-details-update', uploadDefectImage.any(),
 ------------------------------ */
 
 router.post('/api/after-ironing/find-saved-measurement', savedMeasurementDataSpec);
-router.get('/api/after-ironing/order-sizes/:orderNo/:color(*)',  cleanupColor, getAfterIroningOrderSizes);
+router.get('/api/after-ironing/order-sizes/:orderNo',  getAfterIroningOrderSizes);
 router.get('/api/after-ironing/measurement-specs/:orderNo', getmeasurmentSpec);
 
 /* ------------------------------
