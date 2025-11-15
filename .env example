@@ -1,0 +1,22 @@
+# .env
+VITE_API_BASE_URL=http://localhost:5001
+AZURE_TRANSLATOR_KEY="CHd7nRYCtwDgre9HVWmTJ4JLbCG62slL6gjVHgRPcf3j34VhUhz0JQQJ99BJACqBBLyXJ3w3AAAbACOGuQkc"
+AZURE_TRANSLATOR_ENDPOINT="https://api.cognitive.microsofttranslator.com"
+AZURE_TRANSLATOR_REGION="southeastasia"
+
+AZURE_TRANSLATOR_KEY_FILE="4GbCMWuMFilguP7TK74bxMAzjVQVQjRm28XTx1ExgU7ZkmuhOb71JQQJ99BKACqBBLyXJ3w3AAAbACOGr3Ck"
+AZURE_TRANSLATOR_ENDPOINT_FILE="https://phy-docs-translator.cognitiveservices.azure.com"
+
+
+# Azure Blob Storage
+AZURE_STORAGE_ACCOUNT_NAME=sophystorage
+AZURE_STORAGE_ACCOUNT_KEY=faqAHUy5LsxPPvMDsOJOdVmGoSp69Cvm+9v+hfFbMZ7k37SC9OFW5KlieJ5c5FZxklTL9xUk48ns+AStv2efLg==
+AZURE_STORAGE_SOURCE_CONTAINER=inputdocuments
+SOURCE_BLOB_SAS_URL=https://sophystorage.blob.core.windows.net/inputdocuments?sp=rl&st=2025-11-14T01:29:34Z&se=2025-11-14T09:44:34Z&spr=https&sv=2024-11-04&sr=c&sig=8KgcIP7AxuClpKE8U6i7QAE1nSk2M3m8QlkJ%2BOTI8d8%3D
+AZURE_STORAGE_TARGET_CONTAINER=documentstraslated
+TARGET_BLOB_SAS_URL=https://sophystorage.blob.core.windows.net/documentstraslated?sp=rwl&st=2025-11-14T03:10:15Z&se=2025-11-14T11:25:15Z&spr=https&sv=2024-11-04&sr=c&sig=9CvV8SxpVmNVvpkC0qP1pE3SXT5QfmO4aI%2Fu9H82%2F50%3D
+
+
+
+
+
