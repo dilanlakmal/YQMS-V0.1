@@ -94,6 +94,7 @@ import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
+import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
@@ -226,6 +227,8 @@ export const QASectionsDefectCategory =
   createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList =
   createQASectionsDefectListModel(ymProdConnection);
+export const QASectionsProductLocation =
+  createQASectionsProductLocationModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

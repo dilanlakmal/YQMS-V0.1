@@ -3,6 +3,7 @@ import React, { useMemo, useState } from "react";
 import YPivotQASectionsProductCategory from "./YPivotQASectionsProductCategory";
 import YPivotQASectionsProductDefectManagement from "./YPivotQASectionsProductDefectManagement";
 import YPivotQASectionsLocationManagement from "./YPivotQASectionsLocationManagement";
+import YPivotQASectionsProductLocationManagement from "./YPivotQASectionsProductLocationManagement";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -37,6 +38,12 @@ const YPivotQASectionsProduct = () => {
         label: "Location Management",
         icon: <MapPin size={16} />,
         component: <YPivotQASectionsLocationManagement />
+      },
+      {
+        id: "product-location",
+        label: "Product Location",
+        icon: <MapPin size={16} />,
+        component: <YPivotQASectionsProductLocationManagement />
       },
       {
         id: "defect",

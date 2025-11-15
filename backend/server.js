@@ -173,6 +173,7 @@ import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Rout
 import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
 import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
 import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
+import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -412,6 +413,7 @@ app.use(QASections_Photos);
 app.use(QASections_Packing);
 app.use(QASections_DefectList);
 app.use(QASections_DefectCategory);
+app.use(QASections_ProductLocation);
 
 /* -----------------------------
   QA Random Inspection Routes
