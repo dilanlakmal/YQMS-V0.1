@@ -21,7 +21,7 @@ export default function FileTranslator() {
   const [uploadedFiles, setUploadedFiles] = useState([]) // Files uploaded via file input
   const [selectedBlobFiles, setSelectedBlobFiles] = useState([]) // Files selected from blob storage
   const [targetLanguage, setTargetLanguage] = useState("km")
-  const [sourceLanguage, setSourceLanguage] = useState("en")
+  const [sourceLanguage, setSourceLanguage] = useState("auto") // Change from "en" to "auto"
   const [isLoading, setIsLoading] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState("")
@@ -31,6 +31,9 @@ export default function FileTranslator() {
   const [blobFiles, setBlobFiles] = useState({ source: [], target: [] })
   const [loadingFiles, setLoadingFiles] = useState(false)
   const fileInputRef = useRef(null)
+  const [characterCount, setCharacterCount] = useState(null);
+  const [estimatedCost, setEstimatedCost] = useState(null);
+  const [countingCharacters, setCountingCharacters] = useState(false);
 
   // Load files from blob storage
   const loadBlobFiles = async () => {
@@ -161,7 +164,9 @@ export default function FileTranslator() {
       return
     }
 
-    setUploadedFiles((prev) => [...prev, ...newFiles])
+    const updatedFiles = [...uploadedFiles, ...newFiles];
+    setUploadedFiles(updatedFiles);
+    countCharacters(updatedFiles); // Count characters
   }
 
   const handleFileSelect = (e) => {
@@ -175,14 +180,50 @@ export default function FileTranslator() {
         return
       }
 
-      setUploadedFiles((prev) => [...prev, ...newFiles])
+      const updatedFiles = [...uploadedFiles, ...newFiles];
+      setUploadedFiles(updatedFiles);
+      countCharacters(updatedFiles); // Count characters
     }
     e.target.value = ""
   }
 
   const removeUploadedFile = (index) => {
-    setUploadedFiles((prev) => prev.filter((_, i) => i !== index))
+    const updatedFiles = uploadedFiles.filter((_, i) => i !== index);
+    setUploadedFiles(updatedFiles);
+    countCharacters(updatedFiles); // Re-count after removal
   }
+
+  const countCharacters = async (files) => {
+    if (files.length === 0) {
+      setCharacterCount(null);
+      setEstimatedCost(null);
+      return;
+    }
+
+    setCountingCharacters(true);
+    try {
+      const formData = new FormData();
+      files.forEach((file) => formData.append("files", file));
+
+      const response = await fetch(`${API_BASE_URL}/api/translate-files/character-count`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.success) {
+        setCharacterCount(data.total.characterCount);
+        setEstimatedCost(data.total.estimatedCost);
+      } else {
+        console.warn("Failed to count characters:", data.error);
+      }
+    } catch (err) {
+      console.error("Error counting characters:", err);
+    } finally {
+      setCountingCharacters(false);
+    }
+  };
 
   const handleTranslate = async () => {
     const totalFiles = uploadedFiles.length + selectedBlobFiles.length
@@ -203,8 +244,7 @@ export default function FileTranslator() {
       // Add uploaded files
       uploadedFiles.forEach((file) => formData.append("files", file))
       
-      // Add selected blob files (we'll need to download them first or send their names)
-      // For now, we'll send blob file names as a separate field
+      // Add selected blob files
       if (selectedBlobFiles.length > 0) {
         formData.append("blobFileNames", JSON.stringify(
           selectedBlobFiles.map(f => ({ 
@@ -215,7 +255,11 @@ export default function FileTranslator() {
       }
       
       formData.append("targetLanguage", targetLanguage)
-      formData.append("sourceLanguage", sourceLanguage)
+      // Only send sourceLanguage if it's not "auto"
+      if (sourceLanguage && sourceLanguage !== "auto") {
+        formData.append("sourceLanguage", sourceLanguage)
+      }
+      // If sourceLanguage is "auto" or null, don't send it - Azure will auto-detect
 
       setProgress("Submitting translation job to Azure...")
 
@@ -343,8 +387,9 @@ export default function FileTranslator() {
               <label className="text-sm font-semibold translator-text-foreground">Source Language</label>
               <LanguageSelector 
                 value={sourceLanguage} 
-                onChange={setSourceLanguage} 
-                label="From:" 
+                onChange={setSourceLanguage}
+                includeAuto={true}  // Add this prop to enable auto-detect option
+                label=""  // Optional: hide label since it's already shown above
               />
             </div>
             <div className="space-y-2">
@@ -669,6 +714,26 @@ export default function FileTranslator() {
           </div>
         </div>
       )}
+      {characterCount !== null && (
+    <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+      <div className="flex justify-between items-center">
+        <div>
+          <p className="text-sm text-gray-600">
+            Total Characters: <span className="font-semibold">{characterCount.toLocaleString()}</span>
+          </p>
+          <p className="text-sm text-gray-600 mt-1">
+            Estimated Cost: <span className="font-semibold text-blue-600">${estimatedCost} USD</span>
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            (Document Translation: $15 per million characters)
+          </p>
+        </div>
+        {countingCharacters && (
+          <div className="text-sm text-gray-500">Counting...</div>
+        )}
+      </div>
+    </div>
+  )}
     </div>
   )
 }

@@ -15,6 +15,8 @@ import { BlobSASPermissions, ContainerSASPermissions } from "@azure/storage-blob
 import fs from 'fs';
 import { promisify } from 'util';
 const unlink = promisify(fs.unlink);
+import { countDocumentCharacters, calculateTranslationCost } from "../../utils/documentHelper.js";
+import { logTranslationCost } from "../../utils/translationCostLogger.js";
 
 // Create temp directory if it doesn't exist
 const tempUploadDir = path.join(process.cwd(), 'temp', 'uploads');
@@ -115,7 +117,8 @@ const translateFiles = async (req, res) => {
   try {
     const uploadedFiles = req.files && req.files["files"] ? req.files["files"] : [];
     const targetLanguage = req.body.targetLanguage;
-    const sourceLanguage = req.body.sourceLanguage || "en"; // Default to English
+    // Remove sourceLanguage requirement - let Azure auto-detect
+    const sourceLanguage = req.body.sourceLanguage || null; // null = auto-detect
 
     let selectedBlobFiles = [];
     if (req.body.blobFileNames) {
@@ -288,13 +291,20 @@ const translateFiles = async (req, res) => {
       // Construct target URL correctly: baseUrl/blobName?sasToken
       const targetUrl = `${targetBaseUrl}/${translatedBlobName}?${targetSasToken}`;
 
+      // Build source object - omit language field for auto-detection
+      const sourceObject = {
+        sourceUrl: sourceBlobSas,
+        storageSource: "AzureBlob"
+      };
+      
+      // Only add language if explicitly provided (not auto-detect)
+      if (sourceLanguage) {
+        sourceObject.language = sourceLanguage;
+      }
+
       inputs.push({
         storageType: "File",
-        source: {
-          sourceUrl: sourceBlobSas,
-          storageSource: "AzureBlob",
-          language: sourceLanguage
-        },
+        source: sourceObject,
         targets: [
           {
             targetUrl,
@@ -360,17 +370,105 @@ const translateFiles = async (req, res) => {
       throw new Error(statusResult.error || "Translation job failed");
     }
 
+    // Extract cost information from Azure response
+    const azureResponse = statusResult.data;
+    
+    // Log full Azure response for verification
+    console.log('=== Azure Translation Response ===');
+    console.log('Full Azure response:', JSON.stringify(azureResponse, null, 2));
+    console.log('Summary object:', JSON.stringify(azureResponse.summary, null, 2));
+    
+    const summary = azureResponse.summary || {};
+    const totalCharacterCharged = summary.totalCharacterCharged || 0;
+    
+    // Verify the field exists
+    if (!summary.totalCharacterCharged) {
+      console.warn('⚠️ WARNING: totalCharacterCharged not found in Azure response summary!');
+      console.warn('Available summary fields:', Object.keys(summary));
+    }
+    
+    const cost = (totalCharacterCharged / 1_000_000) * 15; // Document Translation: $15 per million
+    
     console.log(`Translation completed successfully for ${processedFiles.length} file(s).`);
+    console.log(`Total characters charged (from Azure): ${totalCharacterCharged.toLocaleString()}`);
+    console.log(`Estimated cost: $${cost.toFixed(4)} USD`);
+    console.log('===================================');
+
+    // Log cost information to CSV for each file
+    const costLogResults = [];
+    for (const fileInfo of processedFiles) {
+      // Distribute characters proportionally (or use actual if available per file)
+      // For now, we'll log the total for the job, but you can enhance this to track per-file
+      const fileCharacters = totalCharacterCharged / processedFiles.length; // Simple division
+      const fileCost = cost / processedFiles.length;
+      
+      const logResult = await logTranslationCost({
+        jobId,
+        fileName: fileInfo.original,
+        sourceLanguage: sourceLanguage || 'auto-detected',
+        targetLanguage,
+        charactersCharged: Math.round(fileCharacters),
+        cost: fileCost,
+        status: 'Succeeded',
+        notes: `Translated blob: ${fileInfo.translatedBlob}`
+      });
+      
+      costLogResults.push({
+        fileName: fileInfo.original,
+        charactersCharged: Math.round(fileCharacters),
+        cost: fileCost,
+        logged: logResult.success
+      });
+    }
+
+    // If there's only one file or we want to log the total, also log a summary
+    if (processedFiles.length > 0) {
+      await logTranslationCost({
+        jobId,
+        fileName: `${processedFiles.length} file(s) - Total`,
+        sourceLanguage: sourceLanguage || 'auto-detected',
+        targetLanguage,
+        charactersCharged: totalCharacterCharged,
+        cost: cost,
+        status: 'Succeeded',
+        notes: `Job summary: ${processedFiles.length} files translated`
+      });
+    }
 
     return res.status(200).json({
       success: true,
       message: `${processedFiles.length} file(s) translated successfully.`,
       jobId,
-      files: processedFiles
+      files: processedFiles,
+      cost: {
+        totalCharactersCharged: totalCharacterCharged,
+        estimatedCost: cost.toFixed(4),
+        currency: 'USD',
+        costPerMillion: 15,
+        costLogPath: path.join(process.cwd(), 'logs', 'translation-costs', 'translation-costs.csv')
+      },
+      costLogs: costLogResults
     });
 
   } catch (error) {
     console.error("File translation error:", error);
+    
+    // Try to log failed translation attempt
+    try {
+      await logTranslationCost({
+        jobId: 'unknown',
+        fileName: 'Translation Failed',
+        sourceLanguage: sourceLanguage || 'unknown',
+        targetLanguage: targetLanguage || 'unknown',
+        charactersCharged: 0,
+        cost: 0,
+        status: 'Failed',
+        notes: `Error: ${error.message}`
+      });
+    } catch (logError) {
+      console.error('Failed to log error to CSV:', logError);
+    }
+    
     return res.status(500).json({ 
       error: "File translation failed", 
       details: error.message 
@@ -544,6 +642,68 @@ export const deleteFile = async (req, res) => {
     console.error("Delete file error:", error);
     return res.status(500).json({ 
       error: "Failed to delete file", 
+      details: error.message 
+    });
+  }
+};
+
+export const getCharacterCount = async (req, res) => {
+  try {
+    const uploadedFiles = req.files && req.files["files"] ? req.files["files"] : [];
+    
+    if (!uploadedFiles || uploadedFiles.length === 0) {
+      return res.status(400).json({ error: "No files provided" });
+    }
+
+    const results = [];
+    let totalCharacters = 0;
+
+    for (const file of uploadedFiles) {
+      let fileBuffer;
+      
+      // Get file buffer
+      if (file.path) {
+        fileBuffer = fs.readFileSync(file.path);
+      } else if (file.buffer) {
+        fileBuffer = file.buffer;
+      } else {
+        results.push({
+          fileName: file.originalname,
+          error: "Could not read file"
+        });
+        continue;
+      }
+
+      const countResult = await countDocumentCharacters(fileBuffer, file.originalname);
+      const costEstimate = calculateTranslationCost(countResult.characterCount, true);
+      
+      totalCharacters += countResult.characterCount;
+      
+      results.push({
+        fileName: file.originalname,
+        characterCount: countResult.characterCount,
+        estimated: countResult.estimated,
+        message: countResult.message,
+        costEstimate: costEstimate.cost,
+        fileSize: file.size
+      });
+    }
+
+    const totalCost = calculateTranslationCost(totalCharacters, true);
+
+    return res.status(200).json({
+      success: true,
+      files: results,
+      total: {
+        characterCount: totalCharacters,
+        estimatedCost: totalCost.cost,
+        currency: 'USD'
+      }
+    });
+  } catch (error) {
+    console.error("Character count error:", error);
+    return res.status(500).json({ 
+      error: "Failed to count characters", 
       details: error.message 
     });
   }
