@@ -154,7 +154,7 @@ const SCCOperatorsManage = () => {
         }
         try {
           const response = await axios.get(
-            `${API_BASE_URL}/api/users/search-by-empid?term=${searchTerm}`
+            `${API_BASE_URL}/api/roving-users/search-by-empid?term=${searchTerm}`
           );
           setCurrentEditing((prev) => ({
             ...prev,
@@ -222,7 +222,7 @@ const SCCOperatorsManage = () => {
     } else {
       try {
         const response = await axios.get(
-          `${API_BASE_URL}/api/users/search-by-empid?term=${currentEmpIdSearch}`
+          `${API_BASE_URL}/api/roving-users/search-by-empid?term=${currentEmpIdSearch}`
         );
         const usersFound = Array.isArray(response.data) ? response.data : [];
         const exactMatchUser = usersFound.find(

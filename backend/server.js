@@ -15,8 +15,8 @@ import user from "./routes/User/userRoutes.js";
    SQL Query Import
 /------------------------------ */
 
-import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 
 /* ------------------------------
    Cutting
@@ -251,7 +251,7 @@ app.use(user);
 /* ------------------------------
   SQL Query routes start
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 
 /* -----------------------------
 Commin file  Routes

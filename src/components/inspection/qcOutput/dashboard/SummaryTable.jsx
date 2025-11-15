@@ -93,6 +93,7 @@ const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
 
   const tableData = useMemo(() => {
     let items = [];
+
     const sourceMap = {
       "Line-MO": "daily_line_MO_summary",
       Line: "daily_line_summary",

@@ -23,6 +23,8 @@ import SummaryTable from "./dashboard/SummaryTable";
 import DefectRateChart from "./dashboard/DefectRateChart";
 import TopDefectsTable from "./dashboard/TopDefectsTable";
 import DailyTrendView from "./dashboard/DailyTrendView";
+import WeeklyView from "./dashboard/WeeklyView";
+import { getStartOfWeek, getEndOfWeek } from "./dashboard/dateUtils";
 
 const reactSelectStyles = {
   control: (provided, state) => ({
@@ -111,6 +113,7 @@ const QC1Dashboard = () => {
     // Calculate the date range for the preceding trend data
     const trendEndDate = new Date(startDate);
     trendEndDate.setDate(trendEndDate.getDate() - 1);
+
     const trendStartDate = new Date(trendEndDate);
     trendStartDate.setDate(trendEndDate.getDate() - 6); // Fetch 7 days to find 5 working days
 
