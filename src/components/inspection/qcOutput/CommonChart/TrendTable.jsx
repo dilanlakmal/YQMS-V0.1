@@ -22,7 +22,7 @@ const TopNButton = ({ n, activeN, setTopN }) => (
   </button>
 );
 
-const DailyTrendTable = ({ data, view, filters, topN, setTopN }) => {
+const TrendTable = ({ data, view, filters, topN, setTopN }) => {
   const { headers, rows, dates } = useMemo(() => {
     if (!data || data.length === 0) return { headers: [], rows: [], dates: [] };
 
@@ -285,4 +285,4 @@ const DailyTrendTable = ({ data, view, filters, topN, setTopN }) => {
   );
 };
 
-export default DailyTrendTable;
+export default TrendTable;

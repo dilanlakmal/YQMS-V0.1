@@ -12,7 +12,7 @@ import {
 } from "chart.js";
 import ChartDataLabels from "chartjs-plugin-datalabels";
 import { Activity } from "lucide-react";
-import { getDefectRateColor } from "./utils";
+import { getDefectRateColor } from "../CommonUI/defectRateutils";
 
 ChartJS.register(
   CategoryScale,

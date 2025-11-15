@@ -1,11 +1,11 @@
 import React, { useMemo } from "react";
 import { BarChart3, Activity, AlertTriangle } from "lucide-react";
 
-import DashboardStatCard from "./DashboardStatCard";
-import SummaryTable from "./SummaryTable";
-import DefectRateChart from "./DefectRateChart";
-import TopDefectsTable from "./TopDefectsTable";
-import { getWeekNumber } from "./dateUtils";
+import DashboardStatCard from "../CommonChart/DashboardStatCard";
+import SummaryTable from "../CommonChart/SummaryTable";
+import DefectRateChart from "../CommonChart/DefectRateChart";
+import TopDefectsTable from "../CommonChart/TopDefectsTable";
+import { getWeekNumber } from "../CommonUI/weeklydateUtils";
 
 // A helper function to perform the final aggregation of merged weekly data
 const aggregateWeeklyGroup = (items, keyFields) => {

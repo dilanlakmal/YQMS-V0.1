@@ -1,81 +1,11 @@
 import React, { useMemo, useState } from "react";
-import {
-  BarChart3,
-  Eye,
-  EyeOff,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown
-} from "lucide-react";
-import { getDefectRateColor } from "./utils";
+import { BarChart3 } from "lucide-react";
+import { getDefectRateColor } from "../CommonUI/defectRateutils";
 
-const ModernButton = ({ label, active, onClick }) => {
-  const baseClasses =
-    "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 transform hover:scale-105";
-  const variantClasses = active
-    ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50"
-    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600";
-
-  return (
-    <button onClick={onClick} className={`${baseClasses} ${variantClasses}`}>
-      {label}
-    </button>
-  );
-};
-
-const DetailsToggleButton = ({ showDetails, onToggle }) => {
-  const baseClasses =
-    "flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200";
-  const variantClasses = showDetails
-    ? "bg-white/20 text-white hover:bg-white/30"
-    : "bg-white/10 text-indigo-200 hover:bg-white/20";
-
-  return (
-    <button onClick={onToggle} className={`${baseClasses} ${variantClasses}`}>
-      {showDetails ? <EyeOff size={16} /> : <Eye size={16} />}
-      <span>{showDetails ? "Hide Details" : "Show Details"}</span>
-    </button>
-  );
-};
-
-const SortButton = ({ sortType, currentSort, order, onSort }) => {
-  const isActive = currentSort === sortType;
-  const baseClasses =
-    "flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-all duration-200 transform hover:scale-105";
-  const variantClasses = isActive
-    ? "bg-white text-indigo-600 shadow-lg"
-    : "bg-white/10 text-white hover:bg-white/20";
-
-  const getSortIcon = () => {
-    if (!isActive) return <ArrowUpDown size={16} />;
-    return order === "asc" ? <ArrowUp size={16} /> : <ArrowDown size={16} />;
-  };
-
-  const getSortLabel = () => {
-    const labels = {
-      date: "Date",
-      "date-line": "Date-Line",
-      "date-mo": "Date-MO",
-      defect: "Defect Rate"
-    };
-    return labels[sortType] || sortType;
-  };
-
-  return (
-    <button
-      onClick={() => onSort(sortType)}
-      className={`${baseClasses} ${variantClasses}`}
-    >
-      {getSortIcon()}
-      <span>{getSortLabel()}</span>
-      {isActive && (
-        <span className="text-xs opacity-75">
-          ({order === "asc" ? "ASC" : "DESC"})
-        </span>
-      )}
-    </button>
-  );
-};
+// --- IMPORT DECORATED COMPONENTS ---
+import ModernButton from "../CommonChartDecoration/ModernButton";
+import DetailsToggleButton from "../CommonChartDecoration/DetailsToggleButton";
+import SortButton from "../CommonChartDecoration/SortButton";
 
 const SummaryTable = ({ data, activeView, setActiveView, filters }) => {
   const [showDetails, setShowDetails] = useState(true);

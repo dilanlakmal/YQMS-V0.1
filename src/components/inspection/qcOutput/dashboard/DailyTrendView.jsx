@@ -3,56 +3,19 @@ import axios from "axios";
 import Select from "react-select";
 import { API_BASE_URL } from "../../../../../config";
 import { Filter, Loader2, AlertTriangle, BarChart3 } from "lucide-react";
-import DailyTrendTable from "./DailyTrendTable"; // The main table component
 
-const reactSelectStyles = {
-  control: (provided, state) => ({
-    ...provided,
-    borderRadius: "0.75rem",
-    border: "2px solid",
-    borderColor: state.isFocused ? "#6366f1" : "#e5e7eb",
-    boxShadow: state.isFocused ? "0 0 0 3px rgba(99, 102, 241, 0.1)" : "none",
-    padding: "0.25rem",
-    backgroundColor: "var(--color-bg-secondary)",
-    "&:hover": {
-      borderColor: "#6366f1"
-    }
-  }),
-  menu: (provided) => ({
-    ...provided,
-    borderRadius: "0.75rem",
-    overflow: "hidden",
-    boxShadow: "0 10px 25px rgba(0, 0, 0, 0.1)",
-    zIndex: 50
-  }),
-  option: (provided, state) => ({
-    ...provided,
-    backgroundColor: state.isSelected
-      ? "#6366f1"
-      : state.isFocused
-      ? "#eef2ff"
-      : "transparent",
-    color: state.isSelected ? "#ffffff" : "#1f2937",
-    "&:hover": {
-      backgroundColor: state.isSelected ? "#6366f1" : "#eef2ff"
-    }
-  })
-};
+// --- IMPORT SHARED/COMMON COMPONENTS AND UTILS ---
+import TrendTable from "../CommonChart/TrendTable";
+import { reactSelectStyles } from "../CommonUI/reactSelectStyles";
+import ModernButton from "../CommonChartDecoration/ModernButton";
+import { formatDateForAPI } from "../CommonUI/dateFormatUtils";
 
-const ModernButton = ({ label, active, onClick }) => {
-  const baseClasses =
-    "px-4 py-2 rounded-lg font-medium text-sm transition-all duration-200 transform hover:scale-105";
-  const variantClasses = active
-    ? "bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-lg shadow-indigo-500/50"
-    : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600";
-  return (
-    <button onClick={onClick} className={`${baseClasses} ${variantClasses}`}>
-      {label}
-    </button>
-  );
-};
+const DailyTrendView = ({ startDate, endDate }) => {
+  // --- ADD: State for data, loading, and error ---
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-const DailyTrendView = ({ data, loading, error }) => {
   const [filters, setFilters] = useState({
     lineNo: null,
     moNo: null,
@@ -68,6 +31,35 @@ const DailyTrendView = ({ data, loading, error }) => {
   const [topN, setTopN] = useState(3);
   const [tableView, setTableView] = useState("Line-MO");
 
+  // --- ADD: Data fetching logic ---
+  const fetchData = useCallback(async () => {
+    if (!startDate || !endDate) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axios.get(
+        `${API_BASE_URL}/api/qc1-summary/dashboard-data`,
+        {
+          params: {
+            startDate: formatDateForAPI(startDate),
+            endDate: formatDateForAPI(endDate)
+          }
+        }
+      );
+      setData(response.data);
+    } catch (err) {
+      setError("Failed to fetch trend data. Please try again.");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [startDate, endDate]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // This useEffect now works correctly because `data` is a state variable
   useEffect(() => {
     if (!data || data.length === 0) return;
 
@@ -76,7 +68,6 @@ const DailyTrendView = ({ data, loading, error }) => {
       buyers = new Set(),
       defects = new Set();
 
-    // Use the most granular data for populating all possible filter options
     data.forEach((day) => {
       (day.daily_full_summary || []).forEach((item) => {
         if (item.lineNo) lines.add(item.lineNo);
@@ -98,11 +89,11 @@ const DailyTrendView = ({ data, loading, error }) => {
     setFilters((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Clear all filters
   const clearFilters = () => {
     setFilters({ lineNo: null, moNo: null, buyer: null, defectName: null });
   };
 
+  // --- These loading/error checks now work within this component ---
   if (loading)
     return (
       <div className="flex justify-center items-center h-[60vh]">
@@ -193,7 +184,7 @@ const DailyTrendView = ({ data, loading, error }) => {
             </div>
           </div>
         </div>
-        <DailyTrendTable
+        <TrendTable
           data={data}
           view={tableView}
           filters={filters}
