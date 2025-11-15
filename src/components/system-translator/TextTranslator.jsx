@@ -33,6 +33,13 @@ export default function TextTranslator() {
         const translated =
           data.data?.[0]?.translations?.[0]?.text ?? "";
         setTranslatedText(translated);
+
+        if (
+          sourceLanguage === "auto" &&
+          data.data?.[0]?.detectedLanguage?.language
+        ) {
+          setSourceLanguage(data.data[0].detectedLanguage.language);
+        }
       } else {
         const details =
           data.error ||

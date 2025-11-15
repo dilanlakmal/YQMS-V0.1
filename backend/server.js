@@ -126,6 +126,7 @@ import {
 } from "./controller/MongoDB/dbConnectionController.js";
 import qcRealWashQty from "./route/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 import translateTextRoute from "./route/translate-text/translateTextRoute.js";
+import translateFilesRoute from "./route/translate-files/translateFilesRoute.js";
 
 /* ------------------------------
    Connection String
@@ -335,6 +336,8 @@ app.use(sqlQuery);
 
 // Translate text routes start
 app.use(translateTextRoute);
+// Translate files routes start
+app.use(translateFilesRoute);
 
 /* ------------------------------
   Functional routs
