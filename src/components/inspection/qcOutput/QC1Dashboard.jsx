@@ -23,8 +23,6 @@ import SummaryTable from "./dashboard/SummaryTable";
 import DefectRateChart from "./dashboard/DefectRateChart";
 import TopDefectsTable from "./dashboard/TopDefectsTable";
 import DailyTrendView from "./dashboard/DailyTrendView";
-import WeeklyView from "./dashboard/WeeklyView";
-import { getStartOfWeek, getEndOfWeek } from "./dashboard/dateUtils";
 
 const reactSelectStyles = {
   control: (provided, state) => ({
@@ -78,6 +76,14 @@ const HeaderButton = ({ label, icon: Icon, active, onClick }) => {
   );
 };
 
+const formatDateForAPI = (date) => {
+  if (!date) return null;
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are 0-indexed
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const QC1Dashboard = () => {
   const [dateRange, setDateRange] = useState([
     new Date(new Date().setDate(new Date().getDate() - 6)),
@@ -122,14 +128,14 @@ const QC1Dashboard = () => {
       const [mainResponse, trendResponse] = await Promise.all([
         axios.get(`${API_BASE_URL}/api/qc1-summary/dashboard-data`, {
           params: {
-            startDate: startDate.toISOString().split("T")[0],
-            endDate: endDate.toISOString().split("T")[0]
+            startDate: formatDateForAPI(startDate),
+            endDate: formatDateForAPI(endDate)
           }
         }),
         axios.get(`${API_BASE_URL}/api/qc1-summary/dashboard-data`, {
           params: {
-            startDate: trendStartDate.toISOString().split("T")[0],
-            endDate: trendEndDate.toISOString().split("T")[0]
+            startDate: formatDateForAPI(trendStartDate),
+            endDate: formatDateForAPI(trendEndDate)
           }
         })
       ]);
@@ -149,8 +155,8 @@ const QC1Dashboard = () => {
     if (!startDate || !endDate) return;
     try {
       const params = {
-        startDate: startDate.toISOString().split("T")[0],
-        endDate: endDate.toISOString().split("T")[0],
+        startDate: formatDateForAPI(startDate),
+        endDate: formatDateForAPI(endDate),
         lineNo: filters.lineNo?.value,
         moNo: filters.moNo?.value,
         buyer: filters.buyer?.value
