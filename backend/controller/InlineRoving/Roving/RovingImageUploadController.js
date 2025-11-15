@@ -61,7 +61,7 @@ export const saveRovingImage = async (req, res) => {
 
     // Create the new filename with a .webp extension
     const newFilename = `${imagePrefix}${imageIndex}.webp`;
-    fc;
+
     const finalDiskPath = path.join(qcinlineUploadPath, newFilename);
 
     // Process the image from memory buffer with sharp and save to disk
