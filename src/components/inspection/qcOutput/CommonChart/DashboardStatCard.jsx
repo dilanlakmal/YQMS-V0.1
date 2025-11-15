@@ -56,7 +56,8 @@ const DashboardStatCard = ({
   trendData = [],
   isTrendChart = false,
   insideQty,
-  outsideQty
+  outsideQty,
+  isWeekly = false
 }) => {
   const { gradient, line, bg } = getDefectRateColorClasses(rate);
   const isTrendAvailable = trendData && trendData.length > 0;
@@ -104,7 +105,12 @@ const DashboardStatCard = ({
         titleFont: { size: 12, weight: "600" },
         bodyFont: { size: 13, weight: "500" },
         callbacks: {
-          title: (context) => trendData[context[0].dataIndex]?.date || "",
+          title: (context) => {
+            const dataPoint = trendData[context[0].dataIndex];
+            return isWeekly
+              ? dataPoint?.weekLabel || `W${dataPoint?.weekNo}` || ""
+              : dataPoint?.date || "";
+          },
           label: (context) => `Rate: ${context.raw.toFixed(2)}%`
         }
       },
@@ -161,7 +167,9 @@ const DashboardStatCard = ({
   };
 
   const lineChartData = {
-    labels: isTrendAvailable ? trendData.map((d) => d.date.slice(5)) : [],
+    labels: isTrendAvailable
+      ? trendData.map((d) => (isWeekly ? `W${d.weekNo}` : d.date.slice(5)))
+      : [],
     datasets: [
       {
         label: "Rate",
@@ -246,7 +254,9 @@ const DashboardStatCard = ({
   };
 
   const areaChartData = {
-    labels: isTrendAvailable ? trendData.map((d) => d.date) : [],
+    labels: isTrendAvailable
+      ? trendData.map((d) => (isWeekly ? `W${d.weekNo}` : d.date))
+      : [],
     datasets: [
       {
         data: isTrendAvailable ? trendData.map((d) => d.value) : [],
@@ -376,7 +386,7 @@ const DashboardStatCard = ({
         )}
       </div>
 
-      {/* Bottom Section - Trend Chart or Daily Values */}
+      {/* Bottom Section - Trend Chart or Daily/Weekly Values */}
       <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-3 bg-gray-50/50 dark:bg-gray-800/50">
         {isTrendChart ? (
           // Line chart for Defect Rate - INCREASED HEIGHT
@@ -390,22 +400,29 @@ const DashboardStatCard = ({
             </div>
           )
         ) : isTrendAvailable ? (
-          // Last 5 days values display
+          // Last 5 days/weeks values display
           <div>
             <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2.5 flex items-center gap-1">
               <span className="w-1 h-1 rounded-full bg-gray-400"></span>
-              Last 5 Days
+              {isWeekly ? "Last 5 Weeks" : "Last 5 Days"}
             </p>
             <div className="flex items-end justify-between gap-1.5">
               {trendData.map((day, idx) => {
                 const isLatest = idx === trendData.length - 1;
-                const val = day.value || 0;
-                const maxVal = Math.max(...trendData.map((d) => d.value || 0));
+                const val = day.value || day.rate || 0;
+                const maxVal = Math.max(
+                  ...trendData.map((d) => d.value || d.rate || 0)
+                );
                 const heightPercent = maxVal > 0 ? (val / maxVal) * 100 : 0;
+
+                // Generate unique key based on available data
+                const itemKey = isWeekly
+                  ? `week-${day.weekNo}-${idx}`
+                  : `day-${day.date}-${idx}`;
 
                 return (
                   <div
-                    key={day.date}
+                    key={itemKey}
                     className="flex-1 flex flex-col items-center gap-1.5"
                   >
                     <div className="relative w-full flex flex-col items-center">
@@ -416,7 +433,9 @@ const DashboardStatCard = ({
                             : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"
                         }`}
                       >
-                        {val >= 1000
+                        {isTrendChart
+                          ? `${val.toFixed(1)}%`
+                          : val >= 1000
                           ? `${(val / 1000).toFixed(1)}k`
                           : val.toLocaleString()}
                       </span>
@@ -432,7 +451,7 @@ const DashboardStatCard = ({
                       ></div>
                     </div>
                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">
-                      {day.date.slice(5)}
+                      {isWeekly ? `W${day.weekNo}` : day.date?.slice(5) || ""}
                     </span>
                   </div>
                 );

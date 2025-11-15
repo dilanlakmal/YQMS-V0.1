@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import {
@@ -16,6 +16,8 @@ import HeaderButton from "./CommonUI/HeaderButton";
 //-- Dashboard Views --
 import DailyView from "./dashboard/DailyView";
 import DailyTrendView from "./dashboard/DailyTrendView";
+import WeeklyView from "./dashboard/WeeklyView";
+import MonthlyView from "./dashboard/MonthlyView";
 
 /**
  * The main container for the QC1 Dashboard.
@@ -29,6 +31,37 @@ const QC1Dashboard = () => {
   const [startDate, endDate] = dateRange;
   const [activeDashboardView, setActiveDashboardView] = useState("Daily View");
 
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  // Add useEffect to enforce week boundaries
+  useEffect(() => {
+    if (activeDashboardView === "Weekly View" && startDate && endDate) {
+      const getStartOfWeek = (date) => {
+        const d = new Date(date);
+        const day = d.getDay();
+        const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+        return new Date(d.setDate(diff));
+      };
+
+      const getEndOfWeek = (date) => {
+        const start = getStartOfWeek(date);
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        return end;
+      };
+
+      const adjustedStart = getStartOfWeek(startDate);
+      const adjustedEnd = getEndOfWeek(endDate);
+
+      if (
+        adjustedStart.getTime() !== startDate.getTime() ||
+        adjustedEnd.getTime() !== endDate.getTime()
+      ) {
+        setDateRange([adjustedStart, adjustedEnd]);
+      }
+    }
+  }, [activeDashboardView, startDate, endDate]);
+
   // A helper function to render the currently active view component
   const renderActiveView = () => {
     switch (activeDashboardView) {
@@ -37,7 +70,14 @@ const QC1Dashboard = () => {
       case "Daily Trend":
         return <DailyTrendView startDate={startDate} endDate={endDate} />;
       case "Weekly View":
+        return <WeeklyView startDate={startDate} endDate={endDate} />;
       case "Monthly View":
+        return (
+          <MonthlyView
+            selectedYear={selectedYear}
+            onYearChange={setSelectedYear}
+          />
+        );
       case "Weekly Trend":
       case "Monthly Trend":
       default:
@@ -108,7 +148,21 @@ const QC1Dashboard = () => {
                   onClick={() => setActiveDashboardView("Monthly Trend")}
                 />
               </div>
-              <div className="flex items-center gap-3 bg-white/20 backdrop-blur-md rounded-xl px-4 py-3">
+              {activeDashboardView !== "Monthly View" && (
+                <div className="flex items-center gap-3 bg-white/20 backdrop-blur-md rounded-xl px-4 py-3">
+                  <Calendar className="text-white" size={20} />
+                  <DatePicker
+                    selectsRange={true}
+                    startDate={startDate}
+                    endDate={endDate}
+                    onChange={(update) => setDateRange(update)}
+                    className="bg-transparent text-white font-medium outline-none w-64 placeholder-white/70"
+                    popperClassName="react-datepicker-popper-z-50"
+                    portalId="root-portal"
+                  />
+                </div>
+              )}
+              {/* <div className="flex items-center gap-3 bg-white/20 backdrop-blur-md rounded-xl px-4 py-3">
                 <Calendar className="text-white" size={20} />
                 <DatePicker
                   selectsRange={true}
@@ -119,7 +173,7 @@ const QC1Dashboard = () => {
                   popperClassName="react-datepicker-popper-z-50"
                   portalId="root-portal"
                 />
-              </div>
+              </div> */}
             </div>
           </div>
         </header>
