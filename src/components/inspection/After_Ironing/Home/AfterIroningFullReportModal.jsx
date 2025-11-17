@@ -84,7 +84,7 @@ const MeasurementComparisonTable = ({ beforeWashData, afterWashData, afterIronin
     
     return { 
       pointsMap, 
-      allSizes: Array.from(allSizes).sort(), 
+      allSizes: Array.from(allSizes), 
       allPieces: Array.from(allPieces).sort((a, b) => a - b) 
     };
   };

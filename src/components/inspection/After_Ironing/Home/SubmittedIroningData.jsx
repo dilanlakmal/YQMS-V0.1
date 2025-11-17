@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Buffer } from 'buffer';
 import { API_BASE_URL } from '../../../../../config'; 
 import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
-import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
-import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
+import SubmittedWashingDataFilter from './SubmittedIroningDataFilter';
+import QCWashingViewDetailsModal from './QCIroningViewDetailsModal'; 
 import AfterIroningFullReportModal from './AfterIroningFullReportModal';
 import { PDFDownloadLink} from '@react-pdf/renderer';
 import Swal from 'sweetalert2';
@@ -367,71 +367,6 @@ const processImagesInRecord = async (record, API_BASE_URL) => {
   }
 };
 
-const processImageToBase64 = async (imagePath) => {
-  try {
-    
-    const cleanPath = imagePath.replace('./public/', '');
-    const response = await fetch(`${API_BASE_URL}/${cleanPath}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Validate JPEG header (SOI marker: 0xFF 0xD8)
-    if (uint8Array.length < 2) {
-      throw new Error('Image data too short');
-    }
-    
-    if (uint8Array[0] !== 0xFF || uint8Array[1] !== 0xD8) {
-      // Sometimes the header gets corrupted, try to find the actual start
-      let soi = -1;
-      for (let i = 0; i < Math.min(100, uint8Array.length - 1); i++) {
-        if (uint8Array[i] === 0xFF && uint8Array[i + 1] === 0xD8) {
-          soi = i;
-          break;
-        }
-      }
-      
-      if (soi > 0) {
-        // Create new array starting from the actual SOI
-        const correctedArray = uint8Array.slice(soi);
-        const base64 = btoa(String.fromCharCode.apply(null, correctedArray));
-        return `data:image;base64,${base64}`;
-      } else {
-        throw new Error('No valid JPEG SOI marker found');
-      }
-    }
-    
-    // Convert to base64 using chunks to avoid call stack issues
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, chunk);
-    }
-    
-    const base64 = btoa(binary);
-    const dataUrl = `data:image/jpeg;base64,${base64}`;
-    
-    
-    // Final validation
-    try {
-      atob(base64);
-    } catch (e) {
-      console.error('❌ Base64 validation failed:', e);
-      return null;
-    }
-    
-    return dataUrl;
-  } catch (error) {
-    console.error('❌ Error processing image:', imagePath, error);
-    return null;
-  }
-};
-
 // Add delete function
 const handleDelete = async (record) => {
   try {
@@ -694,7 +629,7 @@ const handleDownloadPDF = async (record) => {
     
     // 4. Generate PDF
     const { pdf } = await import("@react-pdf/renderer");
-    const { QcWashingFullReportPDF } = await import("./qcWashingFullReportPDF");
+    const { QcWashingFullReportPDF } = await import("./qcIroningFullReportPDF");
     
     const blob = await pdf(
       React.createElement(QcWashingFullReportPDF, {
@@ -1284,7 +1219,7 @@ const handleDownloadPDF = async (record) => {
                                 <Download size={16} className="mr-3" />
                                 {isqcWashingPDF ? 'Generating PDF...' : 'Download PDF'}
                               </button>
-                              <hr className="my-1 border-gray-200 dark:border-gray-600" />
+                              {/* <hr className="my-1 border-gray-200 dark:border-gray-600" />
                               <button
                                 onClick={() => {
                                   handleDelete(record);
@@ -1294,7 +1229,7 @@ const handleDownloadPDF = async (record) => {
                               >
                                 <Trash2 size={16} className="mr-3" />
                                 Delete
-                              </button>
+                              </button> */}
                             </div>
                           </div>
                         )}

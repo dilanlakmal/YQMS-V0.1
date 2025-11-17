@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 import { cleanup } from "../../../../utils/measurementHelperFunction";
-import QCWashingValidation from "./QCWashingValidation";
+import QCWashingValidation from "./QCIroningValidation";
 
 const OrderDetailsSection = ({
   formData,

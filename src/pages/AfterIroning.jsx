@@ -8,7 +8,7 @@ import MeasurementDetailsSection from "../components/inspection/After_Ironing/Ho
 import OverAllSummaryCard from "../components/inspection/After_Ironing/Home/OverAllSummaryCard";
 import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
-import SubmittedDataPage from "../components/inspection/After_Ironing/Home/SubmittedWashingData";
+import SubmittedDataPage from "../components/inspection/After_Ironing/Home/SubmittedIroningData";
 import { useTranslation } from "react-i18next";
 // import SubConEdit from "../components/inspection/After_Ironing/Home/SubConEdit";
 

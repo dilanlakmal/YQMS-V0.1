@@ -36,7 +36,7 @@ const WashingReportDetails = () => {
     if (id) {
       fetchReportData();
     }
-  }, [id]);
+  }, [id]); 
 
   if (isLoading) {
     return <div className="text-center py-10">Loading report details...</div>;

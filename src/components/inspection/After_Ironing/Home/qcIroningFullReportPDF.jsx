@@ -8,7 +8,7 @@ import {
   View,
   Image,
 } from "@react-pdf/renderer";
-import { getToleranceAsFraction, decimalToFraction } from "../Home/fractionConverter";
+import { getToleranceAsFraction, decimalToFraction } from "./fractionConverter";
 import { API_BASE_URL } from "../../../../../config";
 
 // --- FONT REGISTRATION ---
