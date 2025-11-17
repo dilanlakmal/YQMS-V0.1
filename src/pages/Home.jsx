@@ -495,6 +495,22 @@ function Home() {
              version: '0.1',
           }
         ]
+      },
+      {
+        id: "ai-section",
+        title: "AI-Servicers",
+        icon: <ClipboardList className="w-5 h-5 mr-2" />,
+        bgColor: "bg-rose-50 dark:bg-rose-900/20",
+        items: [
+          {
+            path: "/translator",
+            roles: ["AI"],
+            image: "assets/Home/translator.png",
+            title: "AI Translator",
+            description: "Upload and translate",
+             version: '0',
+          }
+        ]
       }
     ],
     [t]
@@ -704,7 +720,7 @@ function Home() {
                         <img
                           src={item.image}
                           alt={item.title}
-                          className="w-14 h-14 object-contain mb-3"
+                          className="w-16 h-16 object-contain mb-3"
                         />
                         <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
                           {item.title}

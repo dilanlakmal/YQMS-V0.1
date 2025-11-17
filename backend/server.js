@@ -189,6 +189,7 @@ import qc2Rework from "./routes/QC2System/QC2Inspection/QC2ReworkRoutes.js";
   AI Import
 ------------------------------ */
 import AIChatBot from "./routes/AI/AIChatBotRoutes.js";
+import translator from "./routes/AI/Translator/translatorRoutes.js";
 
 /* ------------------------------
   PivotY - QA Sections
@@ -433,6 +434,7 @@ app.use(QASections_DefectCategory);
 AI Routes
 ------------------------------ */
 app.use(AIChatBot);
+app.use(translator);
 
 /* -----------------------------
 After Ironing Routes
