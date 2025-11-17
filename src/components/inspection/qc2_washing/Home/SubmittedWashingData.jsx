@@ -14,6 +14,7 @@ window.Buffer = window.Buffer || Buffer;
 
 const SubmittedWashingDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
+  const [processedData, setProcessedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -158,7 +159,8 @@ const fetchSubmittedData = async (showLoading = true) => {
           displayWashQty: record.washQty,
           isActualWashQty: false,
         }));
-        applyFilters(currentFilters || {}, false, dataToProcess);
+        setProcessedData(dataToProcess);
+        applyFilters(currentFilters || {}, currentFilters ? false : true, dataToProcess);
       } else {
         // Show estimated data immediately, then process actual data in background
         const estimatedData = submittedData.map(record => ({
@@ -166,7 +168,8 @@ const fetchSubmittedData = async (showLoading = true) => {
           displayWashQty: record.washQty,
           isActualWashQty: false,
         }));
-        applyFilters(currentFilters || {}, false, estimatedData);
+        setProcessedData(estimatedData);
+        applyFilters(currentFilters || {}, currentFilters ? false : true, estimatedData);
         
         setIsProcessing(true);
         
@@ -181,39 +184,6 @@ const fetchSubmittedData = async (showLoading = true) => {
               batch.map(async (record) => {
                 const washQtyData = await fetchRealWashQty(record);
                 let finalRecord = { ...record, ...washQtyData };
-
-                // If we have an actual wash quantity, fetch the corresponding AQL sample size for display.
-                if (
-                  finalRecord.isActualWashQty &&
-                  finalRecord.displayWashQty > 0 &&
-                  aqlEndpointAvailable &&
-                  record.reportType?.toLowerCase() === 'inline' // Only update for 'inline' reports
-                ) {
-                  try {
-                    const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ lotSize: finalRecord.displayWashQty, orderNo: record.orderNo })
-                    });
-
-                    if (aqlResponse.ok) {
-                      const aqlResult = await aqlResponse.json();
-                      if (aqlResult.success && aqlResult.aqlData) {
-                        // Temporarily override checkedQty for display purposes only.
-                        finalRecord.checkedQty = aqlResult.aqlData.sampleSize;
-                      }
-                    } else if (aqlResponse.status === 404) {
-                      // Disable AQL endpoint if it returns 404
-                      setAqlEndpointAvailable(false);
-                      console.warn('AQL endpoint not available, disabling future calls');
-                    }
-                  } catch (e) { 
-                    console.error("AQL fetch for display failed:", e);
-                    // Disable AQL endpoint on network errors to prevent loops
-                    setAqlEndpointAvailable(false);
-                  }
-                }
-
                 return finalRecord;
               })
             );
@@ -221,10 +191,14 @@ const fetchSubmittedData = async (showLoading = true) => {
             
             // Update UI progressively
             if (actualData.length % 20 === 0) {
-              applyFilters(currentFilters || {}, false, [...actualData, ...submittedData.slice(actualData.length).map(r => ({ ...r, displayWashQty: r.washQty, isActualWashQty: false }))]);
+              const progressData = [...actualData, ...submittedData.slice(actualData.length).map(r => ({ ...r, displayWashQty: r.washQty, isActualWashQty: false }))];
+              setProcessedData(progressData);
+              applyFilters(currentFilters || {}, false, progressData);
             }
           }
           
+          // Store final processed data and apply current filters
+          setProcessedData(actualData);
           applyFilters(currentFilters || {}, false, actualData);
           setIsProcessing(false);
         }, 100);
@@ -232,7 +206,7 @@ const fetchSubmittedData = async (showLoading = true) => {
     };
 
     processDataForView();
-  }, [viewMode, submittedData, isLoading]); // Removed currentFilters from dependencies to prevent infinite loop
+  }, [viewMode, submittedData, isLoading]);
 
   const fetchRealWashQty = async (record) => {
     try {
@@ -867,6 +841,24 @@ const handleDownloadPDF = async (record) => {
   const applyFilters = (filters, resetPage = true, dataToFilter = submittedData) => {
     let filtered = [...dataToFilter];
     
+    // Check if filters are empty (cleared)
+    const hasFilters = filters && Object.keys(filters).some(key => {
+      const value = filters[key];
+      if (key === 'dateRange') {
+        return value && (value.startDate || value.endDate);
+      }
+      return value && value !== '';
+    });
+
+    // If no filters, show last 20 records (most recent)
+    if (!hasFilters) {
+      // Sort by date descending to get most recent records first
+      filtered = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
+      setFilteredData(filtered);
+      setCurrentPage(1);
+      return;
+    }
+    
     // Date range filter
     if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
       filtered = filtered.filter(item => {
@@ -914,11 +906,6 @@ const handleDownloadPDF = async (record) => {
       });
     }
 
-    // Buyer filter
-    // if (filters.buyer) {
-    //   filtered = filtered.filter(item => item.buyer === filters.buyer);
-    // }
-
     // Factory name filter
     if (filters.factoryName) {
       filtered = filtered.filter(item => item.factoryName === filters.factoryName);
@@ -948,20 +935,72 @@ const handleDownloadPDF = async (record) => {
   // Handle filter changes
   const handleFilterChange = (filters) => {
     setCurrentFilters(filters);
-    // Apply filters immediately to current data
-    applyFilters(filters, true, filteredData.length > 0 ? filteredData : submittedData);
+    // Apply filters to the processed data (which has actual wash qty)
+    applyFilters(filters, true, processedData.length > 0 ? processedData : submittedData);
   };
 
   // Reset filters
   const handleFilterReset = () => {
     setCurrentFilters({});
+    // Apply empty filters to show last 20 records
+    applyFilters({}, true, processedData.length > 0 ? processedData : submittedData);
   };
 
+  // Process AQL for current page records only
   useEffect(() => {
+    const processCurrentPageAQL = async () => {
+      if (!aqlEndpointAvailable || viewMode !== 'actual') return;
+      
+      const startIndex = (currentPage - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const currentPageRecords = filteredData.slice(startIndex, endIndex);
+      
+      const updatedRecords = await Promise.all(
+        currentPageRecords.map(async (record) => {
+          // Only process AQL for inline reports with actual wash qty
+          if (
+            record.isActualWashQty &&
+            record.displayWashQty > 0 &&
+            record.reportType?.toLowerCase() === 'inline'
+          ) {
+            try {
+              const aqlResponse = await fetch(`${API_BASE_URL}/api/qc-washing/aql-chart/find`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lotSize: record.displayWashQty, orderNo: record.orderNo })
+              });
+
+              if (aqlResponse.ok) {
+                const aqlResult = await aqlResponse.json();
+                if (aqlResult.success && aqlResult.aqlData) {
+                  return { ...record, checkedQty: aqlResult.aqlData.sampleSize };
+                }
+              } else if (aqlResponse.status === 404) {
+                setAqlEndpointAvailable(false);
+                console.warn('AQL endpoint not available, disabling future calls');
+              }
+            } catch (e) {
+              console.error("AQL fetch failed:", e);
+              setAqlEndpointAvailable(false);
+            }
+          }
+          return record;
+        })
+      );
+      
+      setPaginatedData(updatedRecords);
+    };
+    
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    setPaginatedData(filteredData.slice(startIndex, endIndex));
-  }, [filteredData, currentPage, itemsPerPage]);
+    const currentPageRecords = filteredData.slice(startIndex, endIndex);
+    
+    // Set initial paginated data
+    setPaginatedData(currentPageRecords);
+    
+    // Process AQL for current page only
+    processCurrentPageAQL();
+  }, [filteredData, currentPage, itemsPerPage, aqlEndpointAvailable, viewMode]);
 
   useEffect(() => {
     if (viewDetailsModal.isOpen && viewDetailsModal.itemData?._id) {
