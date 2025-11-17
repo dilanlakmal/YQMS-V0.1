@@ -150,7 +150,7 @@ const fetchSubmittedData = async (showLoading = true) => {
 
   useEffect(() => {
     const processDataForView = async () => {
-      if (isLoading) return;
+      if (isLoading || submittedData.length === 0) return;
 
       if (viewMode === 'estimated') {
         const dataToProcess = submittedData.map(record => ({
@@ -202,8 +202,16 @@ const fetchSubmittedData = async (showLoading = true) => {
                         // Temporarily override checkedQty for display purposes only.
                         finalRecord.checkedQty = aqlResult.aqlData.sampleSize;
                       }
+                    } else if (aqlResponse.status === 404) {
+                      // Disable AQL endpoint if it returns 404
+                      setAqlEndpointAvailable(false);
+                      console.warn('AQL endpoint not available, disabling future calls');
                     }
-                  } catch (e) { console.error("AQL fetch for display failed:", e); }
+                  } catch (e) { 
+                    console.error("AQL fetch for display failed:", e);
+                    // Disable AQL endpoint on network errors to prevent loops
+                    setAqlEndpointAvailable(false);
+                  }
                 }
 
                 return finalRecord;
@@ -224,7 +232,7 @@ const fetchSubmittedData = async (showLoading = true) => {
     };
 
     processDataForView();
-  }, [viewMode, submittedData, currentFilters, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [viewMode, submittedData, isLoading]); // Removed currentFilters from dependencies to prevent infinite loop
 
   const fetchRealWashQty = async (record) => {
     try {
@@ -940,6 +948,8 @@ const handleDownloadPDF = async (record) => {
   // Handle filter changes
   const handleFilterChange = (filters) => {
     setCurrentFilters(filters);
+    // Apply filters immediately to current data
+    applyFilters(filters, true, filteredData.length > 0 ? filteredData : submittedData);
   };
 
   // Reset filters
