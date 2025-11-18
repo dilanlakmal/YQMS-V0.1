@@ -33,7 +33,7 @@ import {
   Bot
 } from "lucide-react";
 
-export default function Navbar({ onLogout }) {
+export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const { user, clearUser } = useAuth();
@@ -50,7 +50,6 @@ export default function Navbar({ onLogout }) {
   const profileMenuRef = useRef(null);
   const navRef = useRef(null);
 
-  const [isChatOpen, setIsChatOpen] = useState(false);
 
   const navStructure = useMemo(
     () => [
@@ -318,7 +317,12 @@ export default function Navbar({ onLogout }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  return (
+  const handleBotClick = () => {
+    setIsChatOpen((prev) => !prev);
+    navigate("/chatbot");
+  };
+
+  return  (
     <>
       <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-md fixed top-0 left-0 right-0 z-50 transition-colors">
         <div className="max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6">
@@ -382,7 +386,7 @@ export default function Navbar({ onLogout }) {
               <LanguageSwitcher />
               {/* --- ADD THE AI BOT BUTTON HERE --- */}
               <button
-                onClick={() => setIsChatOpen((prev) => !prev)}
+                onClick={handleBotClick}
                 className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors relative"
                 aria-label="Open AI Chat"
               >
@@ -519,7 +523,7 @@ export default function Navbar({ onLogout }) {
         </div>
       </div>
       {/* --- RENDER THE CHATBOX CONDITIONALLY --- */}
-      {isChatOpen && <YQMSAIChatBox onClose={() => setIsChatOpen(false)} />}
+      {/* {isChatOpen && <YQMSAIChatBox onClose={() => setIsChatOpen(false)} />} */}
     </>
   );
 }
