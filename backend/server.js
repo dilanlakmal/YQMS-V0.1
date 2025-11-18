@@ -171,6 +171,7 @@ import QASections_ProductType from "./routes/PivotY/QASections/QASections_Produc
 import QASections_Home from "./routes/PivotY/QASections/QASections_Home_Route.js";
 import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Route.js";
 import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
+import QASections_Buyer from "./routes/PivotY/QASections/QASections_Buyer_Route.js";
 import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
 import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
 import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
@@ -411,6 +412,7 @@ app.use(QASections_ProductType);
 app.use(QASections_Home);
 app.use(QASections_Photos);
 app.use(QASections_Packing);
+app.use(QASections_Buyer);
 app.use(QASections_DefectList);
 app.use(QASections_DefectCategory);
 app.use(QASections_ProductLocation);

@@ -10,7 +10,9 @@ import {
   Image as ImageIcon,
   AlertCircle,
   Loader2,
-  ArrowLeft
+  ArrowLeft,
+  Edit,
+  Check
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -33,6 +35,13 @@ const YPivotQASectionsProductLocationManagement = () => {
   const [viewMode, setViewMode] = useState("create"); // 'create' or 'list'
   const [selectedConfig, setSelectedConfig] = useState(null);
   const [hoveredLocation, setHoveredLocation] = useState(null);
+
+  const [editingConfigId, setEditingConfigId] = useState(null);
+
+  // 🆕 State for advanced editing
+  const [editingLocationId, setEditingLocationId] = useState(null); // For in-line name editing
+  const [editingLocationName, setEditingLocationName] = useState("");
+  const [draggingLocation, setDraggingLocation] = useState(null); // For drag-and-drop
 
   const [loadingProductTypes, setLoadingProductTypes] = useState(true);
 
@@ -165,26 +174,26 @@ const YPivotQASectionsProductLocationManagement = () => {
     });
   };
 
-  // Remove location
-  const removeLocation = (locationNo, view) => {
+  // 🔄 MODIFIED: Remove location now identifies by _id or a temporary key
+  const removeLocation = (location, view) => {
     Swal.fire({
       title: "Remove Location?",
-      text: "Are you sure you want to remove this location?",
+      text: `Are you sure you want to remove "${location.LocationName}"?`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#ef4444",
-      cancelButtonColor: "#6b7280",
       confirmButtonText: "Yes, remove it"
     }).then((result) => {
       if (result.isConfirmed) {
+        const idToRemove = location._id || location.tempId;
         if (view === "front") {
           const updated = frontLocations
-            .filter((loc) => loc.LocationNo !== locationNo)
+            .filter((loc) => (loc._id || loc.tempId) !== idToRemove)
             .map((loc, index) => ({ ...loc, LocationNo: index + 1 }));
           setFrontLocations(updated);
         } else {
           const updated = backLocations
-            .filter((loc) => loc.LocationNo !== locationNo)
+            .filter((loc) => (loc._id || loc.tempId) !== idToRemove)
             .map((loc, index) => ({ ...loc, LocationNo: index + 1 }));
           setBackLocations(updated);
         }
@@ -192,9 +201,70 @@ const YPivotQASectionsProductLocationManagement = () => {
     });
   };
 
+  // 🆕 Handlers for in-line name editing
+  const handleEditLocationName = (location) => {
+    setEditingLocationId(location._id || location.tempId);
+    setEditingLocationName(location.LocationName);
+  };
+
+  const handleSaveLocationName = (location, view) => {
+    const idToUpdate = location._id || location.tempId;
+    const updateFn = (locations) =>
+      locations.map((loc) =>
+        (loc._id || loc.tempId) === idToUpdate
+          ? { ...loc, LocationName: editingLocationName }
+          : loc
+      );
+
+    if (view === "front") {
+      setFrontLocations(updateFn);
+    } else {
+      setBackLocations(updateFn);
+    }
+    setEditingLocationId(null);
+    setEditingLocationName("");
+  };
+
+  // 🆕 Drag and Drop Handlers
+  const handleDragStart = (e, location, view) => {
+    e.preventDefault();
+    setDraggingLocation({ ...location, view });
+  };
+
+  const handleDragMove = (e, view) => {
+    if (!draggingLocation || draggingLocation.view !== view) return;
+
+    const imageRef = view === "front" ? frontImageRef : backImageRef;
+    if (!imageRef.current) return;
+
+    const rect = imageRef.current.getBoundingClientRect();
+    let x = ((e.clientX - rect.left) / rect.width) * 100;
+    let y = ((e.clientY - rect.top) / rect.height) * 100;
+
+    // Clamp values between 0 and 100 to keep marker within bounds
+    x = Math.max(0, Math.min(100, x));
+    y = Math.max(0, Math.min(100, y));
+
+    const idToUpdate = draggingLocation._id || draggingLocation.tempId;
+    const updateFn = (locations) =>
+      locations.map((loc) =>
+        (loc._id || loc.tempId) === idToUpdate ? { ...loc, x, y } : loc
+      );
+
+    if (view === "front") {
+      setFrontLocations(updateFn);
+    } else {
+      setBackLocations(updateFn);
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingLocation(null);
+  };
+
   // Save configuration
   const handleSave = async () => {
-    // Validation
+    // Validation (no changes here, remains the same)
     if (!selectedProductType) {
       Swal.fire({
         icon: "error",
@@ -204,7 +274,8 @@ const YPivotQASectionsProductLocationManagement = () => {
       return;
     }
 
-    if (!frontImage || !backImage) {
+    // A new image is only required when creating. When editing, user might not want to change it.
+    if (!editingConfigId && (!frontImage || !backImage)) {
       Swal.fire({
         icon: "error",
         title: "Validation Error",
@@ -224,21 +295,23 @@ const YPivotQASectionsProductLocationManagement = () => {
         confirmButtonColor: "#6366f1",
         cancelButtonColor: "#6b7280"
       });
-
       if (!result.isConfirmed) return;
     }
 
-    submitData();
+    // Decide which submission function to call
+    if (editingConfigId) {
+      submitUpdateData();
+    } else {
+      submitCreateData();
+    }
   };
 
-  const submitData = async () => {
+  const submitCreateData = async () => {
     setLoading(true);
-
     try {
       const productTypeObj = productTypes.find(
         (pt) => pt._id === selectedProductType
       );
-
       const formData = new FormData();
       formData.append("productTypeId", selectedProductType);
       formData.append(
@@ -254,9 +327,7 @@ const YPivotQASectionsProductLocationManagement = () => {
         `${API_BASE_URL}/api/qa-sections-product-location`,
         formData,
         {
-          headers: {
-            "Content-Type": "multipart/form-data"
-          }
+          headers: { "Content-Type": "multipart/form-data" }
         }
       );
 
@@ -264,16 +335,13 @@ const YPivotQASectionsProductLocationManagement = () => {
         await Swal.fire({
           icon: "success",
           title: "Success!",
-          text: "Product location configuration saved successfully",
-          confirmButtonColor: "#6366f1"
+          text: "Configuration saved successfully"
         });
-
         resetForm();
         fetchSavedConfigurations();
         setViewMode("list");
       }
     } catch (error) {
-      console.error("Error saving configuration:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
@@ -284,6 +352,49 @@ const YPivotQASectionsProductLocationManagement = () => {
     }
   };
 
+  // 🆕 NEW: Function to handle the PUT request for updates
+  const submitUpdateData = async () => {
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      // Only append new images if the user has selected them
+      if (frontImage) formData.append("frontView", frontImage);
+      if (backImage) formData.append("backView", backImage);
+
+      // Always send the latest location data
+      formData.append("frontLocations", JSON.stringify(frontLocations));
+      formData.append("backLocations", JSON.stringify(backLocations));
+
+      const response = await axios.put(
+        `${API_BASE_URL}/api/qa-sections-product-location/${editingConfigId}`,
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" }
+        }
+      );
+
+      if (response.data.success) {
+        await Swal.fire({
+          icon: "success",
+          title: "Updated!",
+          text: "Configuration updated successfully"
+        });
+        resetForm();
+        fetchSavedConfigurations();
+        setViewMode("list");
+      }
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: error.response?.data?.message || "Failed to update configuration"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reset form
   const resetForm = () => {
     setSelectedProductType("");
     setFrontImage(null);
@@ -294,6 +405,8 @@ const YPivotQASectionsProductLocationManagement = () => {
     setBackLocations([]);
     setIsMarkingFront(false);
     setIsMarkingBack(false);
+
+    setEditingConfigId(null);
   };
 
   // View saved configuration
@@ -341,37 +454,86 @@ const YPivotQASectionsProductLocationManagement = () => {
     }
   };
 
+  // Function to prepare the form for editing an existing configuration
+  const handleEditConfiguration = (config) => {
+    // 1. Set the ID of the item being edited
+    setEditingConfigId(config._id);
+
+    // 2. Populate the form state with existing data
+    setSelectedProductType(config.productTypeId);
+    setFrontLocations(config.frontView.locations);
+    setBackLocations(config.backView.locations);
+
+    // 3. Set the image previews from the server URLs
+    setFrontImagePreview(
+      `${API_BASE_URL}/api/qa-sections-product-location/image/${config.frontView.imagePath
+        .split("/")
+        .pop()}`
+    );
+    setBackImagePreview(
+      `${API_BASE_URL}/api/qa-sections-product-location/image/${config.backView.imagePath
+        .split("/")
+        .pop()}`
+    );
+
+    // 4. Reset file inputs, as we can't pre-populate them. They are now optional.
+    setFrontImage(null);
+    setBackImage(null);
+
+    // 5. Switch to the form view
+    setViewMode("create");
+  };
+
   // Render location markers
-  const renderLocationMarkers = (locations, color = "red") => {
-    return locations.map((location) => (
-      <div
-        key={location.LocationNo || location._id}
-        className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
-        style={{
-          left: `${location.x}%`,
-          top: `${location.y}%`
-        }}
-        onMouseEnter={() => setHoveredLocation(location)}
-        onMouseLeave={() => setHoveredLocation(null)}
-      >
-        <div className="relative">
-          <div
-            className={`w-8 h-8 bg-${color}-500 text-white rounded-full flex items-center justify-center font-bold text-sm border-2 border-white shadow-lg hover:scale-110 transition-transform cursor-pointer`}
-            style={{ backgroundColor: color === "red" ? "#ef4444" : "#3b82f6" }}
-          >
-            {location.LocationNo}
-          </div>
-          {hoveredLocation?.LocationNo === location.LocationNo && (
-            <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded whitespace-nowrap z-10 shadow-lg">
-              <div className="font-semibold">
-                Location {location.LocationNo}
-              </div>
-              <div>{location.LocationName}</div>
+  const renderLocationMarkers = (locations, color = "red", view) => {
+    return locations.map((location) => {
+      // FIX START: Add a check to see if this is the location being edited in the list below
+      const isEditingThisLocation =
+        editingLocationId === (location._id || location.tempId);
+
+      return (
+        <div
+          key={location.LocationNo || location._id}
+          className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
+          style={{
+            left: `${location.x}%`,
+            top: `${location.y}%`
+          }}
+          onMouseEnter={() => setHoveredLocation(location)}
+          onMouseLeave={() => setHoveredLocation(null)}
+          onMouseDown={(e) => handleDragStart(e, location, view)}
+        >
+          <div className="relative">
+            <div
+              // FIX START: Add conditional classes for pulsing/ringing the active marker
+              className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm border-2 border-white shadow-lg transition-transform ${
+                draggingLocation
+                  ? "cursor-grabbing"
+                  : "cursor-grab hover:scale-110"
+              } ${
+                isEditingThisLocation
+                  ? "ring-4 ring-offset-2 ring-yellow-400 animate-pulse"
+                  : ""
+              }`}
+              // FIX END
+              style={{
+                backgroundColor: color === "red" ? "#ef4444" : "#3b82f6"
+              }}
+            >
+              {location.LocationNo}
             </div>
-          )}
+            {hoveredLocation?.LocationNo === location.LocationNo && (
+              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded whitespace-nowrap z-10 shadow-lg">
+                <div className="font-semibold">
+                  Location {location.LocationNo}
+                </div>
+                <div>{location.LocationName}</div>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    ));
+      );
+    });
   };
 
   return (
@@ -385,7 +547,9 @@ const YPivotQASectionsProductLocationManagement = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-800 dark:text-white">
-                Product Location Management
+                {editingConfigId
+                  ? "Edit Configuration"
+                  : "Product Location Management"}
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 Upload product images and mark inspection locations
@@ -428,19 +592,53 @@ const YPivotQASectionsProductLocationManagement = () => {
             <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
               Select Product Type <span className="text-red-500">*</span>
             </label>
+
             <select
               value={selectedProductType}
               onChange={(e) => setSelectedProductType(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-colors"
+              disabled={!!editingConfigId}
+              className={`w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:text-white transition-colors ${
+                editingConfigId
+                  ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                  : ""
+              }`}
             >
               <option value="">-- Select a Product Type --</option>
-              {productTypes.map((type) => (
-                <option key={type._id} value={type._id}>
-                  {type.EnglishProductName}
-                  {type.KhmerProductName && ` (${type.KhmerProductName})`}
-                </option>
-              ))}
+
+              {(() => {
+                // FIX START: Correctly map the ID from the populated object
+                const configuredTypeIds = savedConfigurations.map(
+                  (c) => c.productTypeId._id
+                );
+                // FIX END
+
+                return productTypes.map((type) => {
+                  const isConfigured = configuredTypeIds.includes(type._id);
+                  const isCurrentlyEditing =
+                    editingConfigId && type._id === selectedProductType;
+                  const isDisabled = isConfigured && !isCurrentlyEditing;
+
+                  return (
+                    <option
+                      key={type._id}
+                      value={type._id}
+                      disabled={isDisabled}
+                    >
+                      {type.EnglishProductName}
+                      {type.KhmerProductName && ` (${type.KhmerProductName})`}
+                      {isDisabled && " (Already Configured)"}
+                    </option>
+                  );
+                });
+              })()}
             </select>
+
+            {/* Add a helper note when in edit mode */}
+            {editingConfigId && (
+              <p className="text-xs text-gray-500 mt-2">
+                Product Type cannot be changed when editing a configuration.
+              </p>
+            )}
           </div>
 
           {/* Image Upload Section */}
@@ -481,19 +679,24 @@ const YPivotQASectionsProductLocationManagement = () => {
                     </label>
                   ) : (
                     <div className="space-y-4">
-                      <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
+                      <div
+                        className="relative border-2 h-[600px] border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900"
+                        onMouseMove={(e) => handleDragMove(e, "front")}
+                        onMouseUp={handleDragEnd}
+                        onMouseLeave={handleDragEnd}
+                      >
                         <img
                           ref={frontImageRef}
                           src={frontImagePreview}
                           alt="Front View"
-                          className={`w-full h-auto ${
+                          className={`w-full h-full object-contain ${
                             isMarkingFront
                               ? "cursor-crosshair"
                               : "cursor-default"
                           }`}
                           onClick={(e) => handleImageClick(e, "front")}
                         />
-                        {renderLocationMarkers(frontLocations, "red")}
+                        {renderLocationMarkers(frontLocations, "red", "front")}
                       </div>
 
                       <div className="flex gap-2">
@@ -530,28 +733,78 @@ const YPivotQASectionsProductLocationManagement = () => {
                             Marked Locations:
                           </h4>
                           <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {frontLocations.map((loc) => (
-                              <div
-                                key={loc.LocationNo}
-                                className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                  <span className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                    {loc.LocationNo}
-                                  </span>
-                                  {loc.LocationName}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    removeLocation(loc.LocationNo, "front")
-                                  }
-                                  className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                  title="Remove location"
+                            {frontLocations.map((loc) => {
+                              const isEditing =
+                                editingLocationId === (loc._id || loc.tempId);
+                              return (
+                                <div
+                                  key={loc._id || loc.tempId}
+                                  className="flex items-center justify-between ..."
                                 >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-2 flex-grow">
+                                    <span className="w-6 h-6 bg-red-500 ...">
+                                      {loc.LocationNo}
+                                    </span>
+                                    {isEditing ? (
+                                      <input
+                                        type="text"
+                                        value={editingLocationName}
+                                        onChange={(e) =>
+                                          setEditingLocationName(e.target.value)
+                                        }
+                                        className="text-sm p-1 border rounded w-full"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="text-sm ...">
+                                        {loc.LocationName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {isEditing ? (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleSaveLocationName(loc, "front")
+                                          }
+                                          title="Save Name"
+                                        >
+                                          <Check className="w-4 h-4 text-green-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            setEditingLocationId(null)
+                                          }
+                                          title="Cancel"
+                                        >
+                                          <X className="w-4 h-4 text-gray-500" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleEditLocationName(loc)
+                                          }
+                                          title="Edit name"
+                                        >
+                                          <Edit className="w-4 h-4 text-blue-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            removeLocation(loc, "front")
+                                          }
+                                          title="Remove location"
+                                        >
+                                          <X className="w-4 h-4 text-red-500" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -593,19 +846,24 @@ const YPivotQASectionsProductLocationManagement = () => {
                     </label>
                   ) : (
                     <div className="space-y-4">
-                      <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
+                      <div
+                        className="relative border-2 h-[600px] border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900"
+                        onMouseMove={(e) => handleDragMove(e, "back")}
+                        onMouseUp={handleDragEnd}
+                        onMouseLeave={handleDragEnd}
+                      >
                         <img
                           ref={backImageRef}
                           src={backImagePreview}
                           alt="Back View"
-                          className={`w-full h-auto ${
+                          className={`w-full h-full object-contain ${
                             isMarkingBack
                               ? "cursor-crosshair"
                               : "cursor-default"
                           }`}
                           onClick={(e) => handleImageClick(e, "back")}
                         />
-                        {renderLocationMarkers(backLocations, "blue")}
+                        {renderLocationMarkers(backLocations, "blue", "back")}
                       </div>
 
                       <div className="flex gap-2">
@@ -642,28 +900,78 @@ const YPivotQASectionsProductLocationManagement = () => {
                             Marked Locations:
                           </h4>
                           <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {backLocations.map((loc) => (
-                              <div
-                                key={loc.LocationNo}
-                                className="flex items-center justify-between bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-600"
-                              >
-                                <span className="text-sm text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                  <span className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-bold">
-                                    {loc.LocationNo}
-                                  </span>
-                                  {loc.LocationName}
-                                </span>
-                                <button
-                                  onClick={() =>
-                                    removeLocation(loc.LocationNo, "back")
-                                  }
-                                  className="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
-                                  title="Remove location"
+                            {backLocations.map((loc) => {
+                              const isEditing =
+                                editingLocationId === (loc._id || loc.tempId);
+                              return (
+                                <div
+                                  key={loc._id || loc.tempId}
+                                  className="flex items-center justify-between ..."
                                 >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
+                                  <div className="flex items-center gap-2 flex-grow">
+                                    <span className="w-6 h-6 bg-blue-500 ...">
+                                      {loc.LocationNo}
+                                    </span>
+                                    {isEditing ? (
+                                      <input
+                                        type="text"
+                                        value={editingLocationName}
+                                        onChange={(e) =>
+                                          setEditingLocationName(e.target.value)
+                                        }
+                                        className="text-sm p-1 border rounded w-full"
+                                        autoFocus
+                                      />
+                                    ) : (
+                                      <span className="text-sm ...">
+                                        {loc.LocationName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {isEditing ? (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleSaveLocationName(loc, "back")
+                                          }
+                                          title="Save Name"
+                                        >
+                                          <Check className="w-4 h-4 text-green-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            setEditingLocationId(null)
+                                          }
+                                          title="Cancel"
+                                        >
+                                          <X className="w-4 h-4 text-gray-500" />
+                                        </button>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <button
+                                          onClick={() =>
+                                            handleEditLocationName(loc)
+                                          }
+                                          title="Edit name"
+                                        >
+                                          <Edit className="w-4 h-4 text-blue-500" />
+                                        </button>
+                                        <button
+                                          onClick={() =>
+                                            removeLocation(loc, "back")
+                                          }
+                                          title="Remove location"
+                                        >
+                                          <X className="w-4 h-4 text-red-500" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                           </div>
                         </div>
                       )}
@@ -746,7 +1054,9 @@ const YPivotQASectionsProductLocationManagement = () => {
                         ) : (
                           <>
                             <Save className="w-4 h-4" />
-                            Save Configuration
+                            {editingConfigId
+                              ? "Update Configuration"
+                              : "Save Configuration"}
                           </>
                         )}
                       </button>
@@ -821,6 +1131,14 @@ const YPivotQASectionsProductLocationManagement = () => {
                       <Eye className="w-4 h-4 inline mr-1" />
                       View
                     </button>
+                    {/* EDIT BUTTON */}
+                    <button
+                      onClick={() => handleEditConfiguration(config)}
+                      className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm transition-colors"
+                      title="Edit configuration"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => deleteConfiguration(config._id)}
                       className="px-3 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm transition-colors"
@@ -869,13 +1187,13 @@ const YPivotQASectionsProductLocationManagement = () => {
                   Front View ({selectedConfig.frontView.locations.length}{" "}
                   locations)
                 </h4>
-                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4">
+                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4 h-[600px]">
                   <img
                     src={`${API_BASE_URL}/api/qa-sections-product-location/image/${selectedConfig.frontView.imagePath
                       .split("/")
                       .pop()}`}
                     alt="Front View"
-                    className="w-full h-auto"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       console.error("Error loading front image");
                       e.target.src =
@@ -917,13 +1235,13 @@ const YPivotQASectionsProductLocationManagement = () => {
                   Back View ({selectedConfig.backView.locations.length}{" "}
                   locations)
                 </h4>
-                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4">
+                <div className="relative border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 mb-4 h-[600px]">
                   <img
-                    src={`/api/qa-sections-product-location/image/${selectedConfig.backView.imagePath
+                    src={`${API_BASE_URL}/api/qa-sections-product-location/image/${selectedConfig.backView.imagePath
                       .split("/")
                       .pop()}`}
                     alt="Back View"
-                    className="w-full h-auto"
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       console.error("Error loading back image");
                       e.target.src =

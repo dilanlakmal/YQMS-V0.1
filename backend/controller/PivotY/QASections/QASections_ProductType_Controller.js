@@ -1,360 +1,246 @@
 import { QASectionsProductType } from "../../MongoDB/dbConnectionController.js";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 
-/* ============================================================
-   🆕 QA SECTIONS PRODUCT TYPE - CRUD Endpoints Controllers
-   ============================================================ */
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-/**
- * POST /api/qa-sections-product-type
- * Controller: Creates a new product type
- */
+// --- MULTER CONFIGURATION FOR FILE UPLOADS ---
+
+// Define the storage directory
+const uploadDir = path.join(__dirname, "../../../storage/PivotY/ProductType");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Configure multer's disk storage
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (req, file, cb) => {
+    const productName = req.body.EnglishProductName.replace(/\s+/g, "_");
+    const uniqueSuffix = Date.now();
+    const extension = path.extname(file.originalname);
+    cb(null, `${productName}-${uniqueSuffix}${extension}`);
+  }
+});
+
+// Create the multer upload instance
+export const upload = multer({
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB file size limit
+  fileFilter: (req, file, cb) => {
+    const filetypes = /jpeg|jpg|png|gif|webp/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(
+      path.extname(file.originalname).toLowerCase()
+    );
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(
+      new Error(
+        "Error: File upload only supports the following filetypes - " +
+          filetypes
+      )
+    );
+  }
+});
+
+// --- CRUD CONTROLLERS ---
+
 export const CreateProductType = async (req, res) => {
   try {
-    const {
-      EnglishProductName,
-      KhmerProductName,
-      ChineseProductName,
-      ProductLocation
-    } = req.body;
+    const { EnglishProductName, KhmerProductName, ChineseProductName } =
+      req.body;
 
-    // Validate required fields based on the new schema
-    if (!EnglishProductName || !KhmerProductName || !ChineseProductName) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "EnglishProductName, KhmerProductName, and ChineseProductName are required"
-      });
+    if (!EnglishProductName) {
+      return res
+        .status(400)
+        .json({ success: false, message: "English Product Name is required." });
     }
 
-    // Get the highest 'no' and increment it for the new entry
-    const maxProductType = await QASectionsProductType.findOne()
-      .sort({ no: -1 })
-      .select("no");
-
-    const newNo = maxProductType ? maxProductType.no + 1 : 1;
+    // Auto-generate 'no'
+    const maxNoDoc = await QASectionsProductType.findOne().sort({ no: -1 });
+    const newNo = maxNoDoc ? maxNoDoc.no + 1 : 1;
 
     const newProductType = new QASectionsProductType({
       no: newNo,
       EnglishProductName,
-      KhmerProductName,
-      ChineseProductName,
-      ProductLocation: ProductLocation || []
+      KhmerProductName: KhmerProductName || "",
+      ChineseProductName: ChineseProductName || "",
+      imageURL: req.file
+        ? `/storage/PivotY/ProductType/${req.file.filename}`
+        : ""
     });
 
     await newProductType.save();
-
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
-      message: "Product type created successfully",
+      message: "Product Type created successfully.",
       data: newProductType
     });
   } catch (error) {
-    console.error("Error creating product type:", error);
-
-    // Handle duplicate key error for the 'no' field
+    // Clean up uploaded file if DB save fails
+    if (req.file) fs.unlinkSync(req.file.path);
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Duplicate entry for 'no' or other unique field."
+        message: "English Product Name must be unique."
       });
     }
-
-    return res.status(500).json({
-      success: false,
-      message: "Failed to create product type",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error.", error: error.message });
   }
 };
 
-/**
- * GET /api/qa-sections-product-type
- * Controller: Retrieves all product types sorted by no
- */
 export const GetProductTypes = async (req, res) => {
   try {
     const productTypes = await QASectionsProductType.find().sort({ no: 1 });
-
-    return res.status(200).json({
-      success: true,
-      count: productTypes.length,
-      data: productTypes
-    });
+    res.status(200).json({ success: true, data: productTypes });
   } catch (error) {
-    console.error("Error fetching product types:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch product types",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error.", error: error.message });
   }
 };
 
-/**
- * GET /api/qa-sections-product-type/:id
- * Controller: Retrieves a specific product type by ID
- */
-export const GetSpecificProductType = async (req, res) => {
-  try {
-    const productType = await QASectionsProductType.findById(req.params.id);
-
-    if (!productType) {
-      return res.status(404).json({
-        success: false,
-        message: "Product type not found"
-      });
-    }
-
-    return res.status(200).json({
-      success: true,
-      data: productType
-    });
-  } catch (error) {
-    console.error("Error fetching specific product type:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to fetch product type",
-      error: error.message
-    });
-  }
-};
-
-/**
- * PUT /api/qa-sections-product-type/:id
- * Controller: Updates a specific product type
- */
 export const UpdateProductType = async (req, res) => {
   try {
+    const { id } = req.params;
+    // Read the new 'removeImage' field from the form data
     const {
       EnglishProductName,
       KhmerProductName,
       ChineseProductName,
-      ProductLocation
+      removeImage
     } = req.body;
 
-    // Validate required fields
-    if (!EnglishProductName || !KhmerProductName || !ChineseProductName) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "EnglishProductName, KhmerProductName, and ChineseProductName are required"
-      });
+    if (!EnglishProductName) {
+      return res
+        .status(400)
+        .json({ success: false, message: "English Product Name is required." });
     }
 
-    // Only include ProductLocation in the update if it's provided
-    if (ProductLocation !== undefined) {
-      updateData.ProductLocation = ProductLocation;
+    const productType = await QASectionsProductType.findById(id);
+    if (!productType) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product Type not found." });
     }
 
-    const updatedProductType = await QASectionsProductType.findByIdAndUpdate(
-      req.params.id,
-      {
-        EnglishProductName,
-        KhmerProductName,
-        ChineseProductName
-      },
-      { new: true, runValidators: true }
-    );
+    let imageURL = productType.imageURL;
 
-    if (!updatedProductType) {
-      return res.status(404).json({
-        success: false,
-        message: "Product type not found"
-      });
+    // --- NEW LOGIC for handling image updates ---
+
+    // Case 1: A new file is uploaded (replaces old or adds new)
+    if (req.file) {
+      if (productType.imageURL) {
+        const oldImagePath = path.join(
+          __dirname,
+          "../../../",
+          productType.imageURL.substring(1)
+        );
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      imageURL = `/storage/PivotY/ProductType/${req.file.filename}`;
+    }
+    // Case 2: No new file, but removal is requested
+    else if (removeImage === "true") {
+      if (productType.imageURL) {
+        const oldImagePath = path.join(
+          __dirname,
+          "../../../",
+          productType.imageURL.substring(1)
+        );
+        if (fs.existsSync(oldImagePath)) {
+          fs.unlinkSync(oldImagePath);
+        }
+      }
+      imageURL = ""; // Set the URL to empty
     }
 
-    return res.status(200).json({
+    // Case 3 (else): No new file and no removal request, imageURL remains unchanged.
+
+    productType.EnglishProductName = EnglishProductName;
+    productType.KhmerProductName = KhmerProductName || "";
+    productType.ChineseProductName = ChineseProductName || "";
+    productType.imageURL = imageURL;
+
+    const updatedProductType = await productType.save();
+    res.status(200).json({
       success: true,
-      message: "Product type updated successfully",
+      message: "Product Type updated successfully.",
       data: updatedProductType
     });
   } catch (error) {
-    console.error("Error updating product type:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to update product type",
-      error: error.message
-    });
+    if (req.file) fs.unlinkSync(req.file.path);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        success: false,
+        message: "English Product Name must be unique."
+      });
+    }
+    res
+      .status(500)
+      .json({ success: false, message: "Server error.", error: error.message });
   }
 };
 
-/**
- * DELETE /api/qa-sections-product-type/:id
- * Controller: Deletes a specific product type
- */
 export const DeleteProductType = async (req, res) => {
   try {
-    const deletedProductType = await QASectionsProductType.findByIdAndDelete(
-      req.params.id
-    );
-
-    if (!deletedProductType) {
-      return res.status(404).json({
-        success: false,
-        message: "Product type not found"
-      });
-    }
-    return res.status(200).json({
-      success: true,
-      message: "Product type deleted successfully",
-      data: deletedProductType
-    });
-  } catch (error) {
-    console.error("Error deleting product type:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to delete product type",
-      error: error.message
-    });
-  }
-};
-
-/* ============================================================
-   🆕 Controllers for Managing Product Locations
-   ============================================================ */
-
-/**
- * POST /api/qa-sections-product-type/:id/locations
- * Controller: Adds a new location to a product type.
- */
-export const AddProductLocation = async (req, res) => {
-  try {
     const { id } = req.params;
-    const { Name } = req.body;
+    const productType = await QASectionsProductType.findByIdAndDelete(id);
 
-    if (!Name) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Location 'Name' is required." });
-    }
-
-    const productType = await QASectionsProductType.findById(id);
     if (!productType) {
       return res
         .status(404)
-        .json({ success: false, message: "Product type not found." });
+        .json({ success: false, message: "Product Type not found." });
     }
 
-    // Determine the next 'No'
-    const maxNo = productType.ProductLocation.reduce(
-      (max, loc) => (loc.No > max ? loc.No : max),
-      0
-    );
-    const newLocation = {
-      No: maxNo + 1,
-      Name: Name
-    };
+    // Delete the associated image file
+    if (productType.imageURL) {
+      const imagePath = path.join(
+        __dirname,
+        "../../../",
+        productType.imageURL.substring(1)
+      );
+      if (fs.existsSync(imagePath)) {
+        fs.unlinkSync(imagePath);
+      }
+    }
 
-    productType.ProductLocation.push(newLocation);
-    await productType.save();
-
-    res.status(201).json({
-      success: true,
-      message: "Location added successfully.",
-      data: productType
-    });
+    res
+      .status(200)
+      .json({ success: true, message: "Product Type deleted successfully." });
   } catch (error) {
-    console.error("Error adding product location:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to add location.",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error.", error: error.message });
   }
 };
 
-/**
- * PUT /api/qa-sections-product-type/:id/locations/:locationId
- * Controller: Updates a specific location within a product type.
- */
-export const UpdateProductLocation = async (req, res) => {
+// Controller to serve static images
+export const GetProductImage = (req, res) => {
   try {
-    const { id, locationId } = req.params;
-    const { Name, No } = req.body; // Allow updating Name and/or No
+    const { filename } = req.params;
+    const imagePath = path.join(uploadDir, filename);
 
-    if (!Name && No === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Either 'Name' or 'No' must be provided for update."
-      });
+    if (fs.existsSync(imagePath)) {
+      res.sendFile(imagePath);
+    } else {
+      res.status(404).json({ success: false, message: "Image not found." });
     }
-
-    const productType = await QASectionsProductType.findById(id);
-    if (!productType) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product type not found." });
-    }
-
-    const location = productType.ProductLocation.id(locationId);
-    if (!location) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Location not found." });
-    }
-
-    // Update fields if they are provided
-    if (Name) location.Name = Name;
-    if (No !== undefined) location.No = No;
-
-    await productType.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Location updated successfully.",
-      data: productType
-    });
   } catch (error) {
-    console.error("Error updating product location:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update location.",
-      error: error.message
-    });
-  }
-};
-
-/**
- * DELETE /api/qa-sections-product-type/:id/locations/:locationId
- * Controller: Deletes a specific location from a product type.
- */
-export const DeleteProductLocation = async (req, res) => {
-  try {
-    const { id, locationId } = req.params;
-
-    // Use findByIdAndUpdate with the $pull operator for an atomic and reliable update.
-    const updatedProductType = await QASectionsProductType.findByIdAndUpdate(
-      id, // The ID of the parent document to find
-      {
-        // The update operation:
-        $pull: {
-          // Specify the array field:
-          ProductLocation: {
-            // Specify the condition to match the element to remove:
-            _id: locationId
-          }
-        }
-      },
-      { new: true } // This option returns the document *after* the update has been applied
-    );
-
-    if (!updatedProductType) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Product type not found." });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: "Location deleted successfully.",
-      data: updatedProductType // Send back the updated parent document
-    });
-  } catch (error) {
-    console.error("Error deleting product location:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to delete location.",
-      error: error.message
-    });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error.", error: error.message });
   }
 };

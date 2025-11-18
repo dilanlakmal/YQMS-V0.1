@@ -92,6 +92,7 @@ import createQASectionsProductType from "../../models/QA/QASectionsProductType.j
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
 import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
+import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
@@ -223,6 +224,7 @@ export const QASectionsProductType =
 export const QASectionsHome = createQASectionsHomeModel(ymProdConnection);
 export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
+export const QASectionsBuyer = createQASectionsBuyerModel(ymProdConnection);
 export const QASectionsDefectCategory =
   createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList =

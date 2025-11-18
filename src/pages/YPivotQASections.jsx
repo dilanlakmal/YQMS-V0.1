@@ -1,4 +1,18 @@
-import { Camera, FileText, Package, TrendingUp } from "lucide-react";
+import {
+  Camera,
+  FileText,
+  Package,
+  TrendingUp,
+  User,
+  Shield,
+  Sparkles,
+  Circle,
+  Layers,
+  Users,
+  MapPin,
+  CheckSquare,
+  Image as ImageIcon
+} from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQASectionsHeader from "../components/inspection/PivotY/QASections/YPivotQASectionsHeader";
@@ -25,32 +39,82 @@ const PlaceholderComponent = ({ title, icon: Icon }) => {
 const YPivotQASections = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("header");
+  const [activeSubTab, setActiveSubTab] = useState("buyer");
 
   const tabs = useMemo(
     () => [
       {
         id: "header",
         label: "Header",
-        icon: <FileText size={18} />,
-        component: <YPivotQASectionsHeader />
+        icon: <FileText size={20} />,
+        component: <YPivotQASectionsHeader />,
+        gradient: "from-blue-500 to-cyan-500",
+        description: "Manage header information"
       },
       {
         id: "photos",
         label: "Photos",
-        icon: <Camera size={18} />,
-        component: <YPivotQASectionsPhotos />
+        icon: <Camera size={20} />,
+        component: <YPivotQASectionsPhotos />,
+        gradient: "from-purple-500 to-pink-500",
+        description: "Photo management"
       },
       {
         id: "packing",
         label: "Packing",
-        icon: <Package size={18} />,
-        component: <YPivotQASectionsPacking />
+        icon: <Package size={20} />,
+        component: <YPivotQASectionsPacking />,
+        gradient: "from-orange-500 to-red-500",
+        description: "Packing details"
       },
       {
         id: "production",
         label: "Production",
-        icon: <TrendingUp size={18} />,
-        component: <YPivotQASectionsProduct />
+        icon: <TrendingUp size={20} />,
+        component: (
+          <YPivotQASectionsProduct
+            activeSubTab={activeSubTab}
+            setActiveSubTab={setActiveSubTab}
+          />
+        ),
+        gradient: "from-green-500 to-emerald-500",
+        description: "Production management"
+      }
+    ],
+    [activeSubTab]
+  );
+
+  const subTabs = useMemo(
+    () => [
+      {
+        id: "buyer",
+        label: "Buyer",
+        icon: <Users size={20} />
+      },
+      {
+        id: "category",
+        label: "Category",
+        icon: <Layers size={20} />
+      },
+      {
+        id: "product-type",
+        label: "Product Type",
+        icon: <ImageIcon size={20} />
+      },
+      {
+        id: "product-location",
+        label: "Location",
+        icon: <MapPin size={20} />
+      },
+      {
+        id: "defect",
+        label: "Defect",
+        icon: <FileText size={20} />
+      },
+      {
+        id: "buyer-status",
+        label: "Buyer Status",
+        icon: <CheckSquare size={20} />
       }
     ],
     []
@@ -60,57 +124,199 @@ const YPivotQASections = () => {
     return tabs.find((tab) => tab.id === activeTab)?.component || null;
   }, [activeTab, tabs]);
 
+  const activeTabData = useMemo(() => {
+    return tabs.find((tab) => tab.id === activeTab);
+  }, [activeTab, tabs]);
+
+  const activeSubTabData = useMemo(() => {
+    return subTabs.find((tab) => tab.id === activeSubTab);
+  }, [activeSubTab, subTabs]);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
-      {/* Header Section */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
-                Y Pivot - QA Sections
-              </h1>
-              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                Quality Assurance QA Inspection System{" "}
-                {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
-              </p>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      {/* Tabs Container */}
-      <div className="max-w-8xl mx-auto px-2 sm:px-3 lg:px-4 pt-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-          <div className="overflow-x-auto scrollbar-hide">
-            <nav className="flex min-w-max" aria-label="Tabs">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`group inline-flex items-center gap-2 px-4 sm:px-6 py-3 sm:py-4 text-sm sm:text-base font-semibold whitespace-nowrap transition-all duration-200 border-b-4 ${
-                    activeTab === tab.id
-                      ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400"
-                      : "border-transparent hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                  }`}
-                >
-                  {React.cloneElement(tab.icon, {
-                    className: "w-4 h-4 sm:w-5 sm:h-5"
+      {/* Compact Header Section with Integrated Tabs */}
+      <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-2xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+
+        <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            {/* Left Side - Title, Navigation, and Active Status */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-6 flex-1">
+              {/* Title Section */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                  <Shield size={24} className="text-white" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <h1 className="text-lg sm:text-xl lg:text-2xl font-black text-white tracking-tight">
+                      Fin Check System | Settings
+                    </h1>
+                    <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
+                      <Sparkles size={12} className="text-yellow-300" />
+                      <span className="text-xs font-bold text-white">PRO</span>
+                    </div>
+                  </div>
+                  <p className="text-xs sm:text-sm text-indigo-100 font-medium">
+                    Configure System Settings
+                  </p>
+                </div>
+              </div>
+
+              {/* Icon Navigation Buttons with Labels */}
+              <div className="flex items-center gap-3">
+                {/* Main Tabs */}
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                  {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() => setActiveTab(tab.id)}
+                        className={`group relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-300 ${
+                          isActive
+                            ? "bg-white shadow-lg scale-105"
+                            : "bg-transparent hover:bg-white/20 hover:scale-102"
+                        }`}
+                      >
+                        {/* Icon */}
+                        <div
+                          className={`transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {React.cloneElement(tab.icon, {
+                            className: "w-5 h-5"
+                          })}
+                        </div>
+
+                        {/* Label */}
+                        <span
+                          className={`text-xs font-bold transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {tab.label}
+                        </span>
+
+                        {/* Active Indicator Dot */}
+                        {isActive && (
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                        )}
+                      </button>
+                    );
                   })}
-                  <span>{tab.label}</span>
-                </button>
-              ))}
-            </nav>
+                </div>
+
+                {/* Sub Tabs - Only show when Production tab is active */}
+                {activeTab === "production" && (
+                  <>
+                    {/* Vertical Divider */}
+                    <div className="h-20 w-px bg-white/30"></div>
+
+                    {/* Sub Tabs */}
+                    <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                      {subTabs.map((subTab) => {
+                        const isActive = activeSubTab === subTab.id;
+                        return (
+                          <button
+                            key={subTab.id}
+                            onClick={() => setActiveSubTab(subTab.id)}
+                            className={`group relative flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all duration-300 ${
+                              isActive
+                                ? "bg-white shadow-lg scale-105"
+                                : "bg-transparent hover:bg-white/20 hover:scale-102"
+                            }`}
+                          >
+                            {/* Icon */}
+                            <div
+                              className={`transition-colors duration-300 ${
+                                isActive ? "text-indigo-600" : "text-white"
+                              }`}
+                            >
+                              {React.cloneElement(subTab.icon, {
+                                className: "w-4 h-4"
+                              })}
+                            </div>
+
+                            {/* Label */}
+                            <span
+                              className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                                isActive ? "text-indigo-600" : "text-white"
+                              }`}
+                            >
+                              {subTab.label}
+                            </span>
+
+                            {/* Active Indicator Dot */}
+                            {isActive && (
+                              <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+
+                {/* Active Status Indicator */}
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+                  <div className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
+                      {activeTab === "production" && activeSubTabData
+                        ? activeSubTabData.label
+                        : activeTabData?.label}
+                    </p>
+                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      Active Section
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Side - User Info (Compact) */}
+            {user && (
+              <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
+                <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
+                  <User size={20} className="text-white" />
+                </div>
+                <div>
+                  <p className="text-white font-bold text-sm leading-tight">
+                    {user.job_title || "Operator"}
+                  </p>
+                  <p className="text-indigo-200 text-xs font-medium leading-tight">
+                    ID: {user.emp_id}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
       {/* Content Container */}
-      <div className="max-w-8xl mx-auto px-2 sm:px-3 lg:px-4 pb-4">
-        <div className="mt-6">{activeComponent}</div>
+      <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
+        <div className="animate-fadeIn">
+          {/* Active Component */}
+          <div className="transform transition-all duration-500 ease-out">
+            {activeComponent}
+          </div>
+        </div>
       </div>
 
-      {/* Hide scrollbar */}
+      {/* Styles */}
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -118,6 +324,42 @@ const YPivotQASections = () => {
         .scrollbar-hide {
           -ms-overflow-style: none;
           scrollbar-width: none;
+        }
+
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out;
+        }
+
+        .bg-grid-white {
+          background-image: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            );
+        }
+
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+
+        .hover\\:scale-102:hover {
+          transform: scale(1.02);
         }
       `}</style>
     </div>
