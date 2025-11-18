@@ -3,7 +3,8 @@ import {
   Navigate,
   Route,
   BrowserRouter as Router,
-  Routes
+  Routes,
+  useLocation
 } from "react-router-dom";
 
 import "./App.css";
@@ -53,6 +54,7 @@ import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement
 import QCWashingPage from "./pages/QCWashing.jsx";
 import PackingList from "./pages/PackingList.jsx";
 import Measurement from "./pages/Measurement.jsx";
+import YQMSAIChatBox from "./pages/YQMSAIChatBox.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -125,6 +127,18 @@ function AppContent() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [inspectionStartTime, setInspectionStartTime] = useState(null);
 
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const location = useLocation();
+
+  useEffect(() => {
+  if (location.pathname !== "/chatbot") {
+    setIsChatOpen(false);
+  }
+  else if (location.pathname === "/chatbot") {
+    setIsChatOpen(true);
+  }
+}, [location.pathname]);
+  
   useEffect(() => {
     let interval;
     if (isPlaying) {
@@ -287,7 +301,14 @@ function AppContent() {
     }
   };
 
-  return (
+  return isChatOpen ? (
+    <Routes>
+      <Route
+        path="/chatbot"
+        element={<YQMSAIChatBox isOpen={isChatOpen} setIsOpen={setIsChatOpen} />}
+      />
+    </Routes>
+  ) : (
     <div className="min-h-screen bg-gray-50">
       {isAuthenticated && <Navbar onLogout={handleLogout} />}
       <div className={isAuthenticated ? "pt-16" : ""}>
