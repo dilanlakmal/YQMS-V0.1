@@ -310,7 +310,7 @@ function AppContent() {
     </Routes>
   ) : (
     <div className="min-h-screen bg-gray-50">
-      {isAuthenticated && <Navbar onLogout={handleLogout} />}
+      {isAuthenticated && <Navbar onLogout={handleLogout} isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} />}
       <div className={isAuthenticated ? "pt-16" : ""}>
         <Routes>
           {/* Public Routes */}
