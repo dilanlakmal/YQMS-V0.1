@@ -1,12 +1,18 @@
 import react from "@vitejs/plugin-react";
 import fs from "fs";
 import { defineConfig } from "vite";
+import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
   assetsInclude: ["**/*.ttf"],
   optimizeDeps: {
     include: ["jspdf", "jspdf-autotable"]
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
   },
   server: {
     host: "0.0.0.0",
