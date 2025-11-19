@@ -1,4 +1,7 @@
-import { QASectionsDefectList } from "../../MongoDB/dbConnectionController.js";
+import {
+  QASectionsDefectList,
+  QASectionsDefectCategory
+} from "../../MongoDB/dbConnectionController.js";
 
 /* ============================================================
    🆕 QA SECTIONS DEFECT LIST - CRUD Endpoints Controllers
@@ -270,12 +273,10 @@ export const BulkUpdateStatusByBuyer = async (req, res) => {
     const updates = req.body; // Expects an array of { defectId, statusByBuyer }
 
     if (!Array.isArray(updates) || updates.length === 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Request body must be a non-empty array of updates."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Request body must be a non-empty array of updates."
+      });
     }
 
     const operations = updates.map(({ defectId, statusByBuyer }) => ({
@@ -294,12 +295,10 @@ export const BulkUpdateStatusByBuyer = async (req, res) => {
     });
   } catch (error) {
     console.error("Error during bulk update of statusByBuyer:", error);
-    res
-      .status(500)
-      .json({
-        success: false,
-        message: "Bulk update failed.",
-        error: error.message
-      });
+    res.status(500).json({
+      success: false,
+      message: "Bulk update failed.",
+      error: error.message
+    });
   }
 };

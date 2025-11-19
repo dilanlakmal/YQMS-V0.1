@@ -62,8 +62,11 @@ import createQAStandardDefectsModel from "../../models/QAStandardDefectsModel.js
 import createAuditCheckPointModel from "../../models/AuditCheckPoint.js";
 
 import createBuyerSpecTemplateModel from "../../models/BuyerSpecTemplate.js";
+import createBuyerSpecTemplateM2Model from "../../models/BuyerSpecTemplateM2.js";
 import createANFMeasurementReportModel from "../../models/ANFMeasurementReport.js";
 import createSizeCompletionStatusModel from "../../models/SizeCompletionStatus.model.js";
+import createANFMeasurementReportPackingModel from "../../models/ANFMeasurementReportPacking.js";
+import createSizeCompletionStatusPackingModel from "../../models/SizeCompletionStatusPacking.js";
 
 import createQCWashingDefectsModel from "../../models/QCWashingDefectsModel.js";
 import createQCWashingCheckpointsModel from "../../models/QCWashingCheckpointsModel.js";
@@ -177,21 +180,32 @@ export const ElasticReport = createElasticReportModel(ymProdConnection);
 export const EMBDefect = createEMBDefectModel(ymProdConnection);
 export const PrintingDefect = createPrintingDefectModel(ymProdConnection);
 export const EMBReport = createEMBReportModel(ymProdConnection);
+
 export const QADefectsModel = createQADefectsModel(ymProdConnection);
 export const QCAccuracyReportModel =
   createQCAccuracyReportModel(ymProdConnection);
 export const QAStandardDefectsModel =
   createQAStandardDefectsModel(ymProdConnection);
+
 export const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
 export const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
 export const SCCElasticOperator =
   createSCCElasticOperatorModel(ymProdConnection);
+
 export const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
+
 export const BuyerSpecTemplate = createBuyerSpecTemplateModel(ymProdConnection);
+export const BuyerSpecTemplateM2 =
+  createBuyerSpecTemplateM2Model(ymProdConnection);
 export const ANFMeasurementReport =
   createANFMeasurementReportModel(ymProdConnection);
 export const SizeCompletionStatus =
   createSizeCompletionStatusModel(ymProdConnection);
+export const ANFMeasurementReportPacking =
+  createANFMeasurementReportPackingModel(ymProdConnection);
+export const SizeCompletionStatusPacking =
+  createSizeCompletionStatusPackingModel(ymProdConnection);
+
 export const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
 export const QCWashingCheckList =
   createQCWashingCheckpointsModel(ymProdConnection);
@@ -209,12 +223,15 @@ export const QCWashingMachineStandard =
 export const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
+
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
 export const SubConDefect = createSubConDefectsModel(ymProdConnection);
 export const SubconSewingFactory =
   createSubconSewingFactoryModel(ymProdConnection);
 export const SubconSewingQc1Report =
   createSubconSewingQc1ReportModel(ymProdConnection);
+
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);

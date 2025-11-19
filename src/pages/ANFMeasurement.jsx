@@ -48,6 +48,7 @@ const ANFMeasurement = () => {
 
   // --- LIFTED STATE FROM THE FORM COMPONENT ---
   const [inspectionState, setInspectionState] = useState({
+    stage: { value: "M1", label: "M1 - 5 Points" },
     inspectionDate: new Date(),
     selectedMo: null,
     selectedSize: null,

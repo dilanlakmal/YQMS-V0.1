@@ -60,6 +60,7 @@ Common File Imports
 import aql from "./routes/Common/AQLRoutes.js";
 /*-------------Buyer Spec Imports --------------*/
 import buyerSpec from "./routes/Common/DTOrdersBuyerSpecRoutes.js";
+import buyerSpecPacking from "./routes/Common/DTOrdersBuyerSpecPackingRoutes.js";
 /*-------------DT-Orders Imports --------------*/
 import dtOrders from "./routes/Common/DTOrdersRoutes.js";
 
@@ -162,6 +163,7 @@ import qc_real_wash_qty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 import ANF from "./routes/ANF/ANFReportRoutes.js";
 import ANFInspection from "./routes/ANF/ANFInspectionRoutes.js";
 import ANFResult from "./routes/ANF/ANFResultRoutes.js";
+import ANFInspectionPacking from "./routes/ANF/ANFInspectionPackingRoutes.js";
 
 /* ------------------------------
   PivotY - QA Sections
@@ -262,6 +264,7 @@ Commin file  Routes
 app.use(aql);
 /* -----------Buyer Specs -----------------*/
 app.use(buyerSpec);
+app.use(buyerSpecPacking);
 /* ----------- DT_Orders -----------------*/
 app.use(dtOrders);
 
@@ -403,6 +406,7 @@ app.use(qc_real_wash_qty);
 app.use(ANF);
 app.use(ANFInspection);
 app.use(ANFResult);
+app.use(ANFInspectionPacking);
 
 /* ------------------------------
   PivotY - QA Sections routes
@@ -493,16 +497,16 @@ app.use((req, res, next) => {
    Graceful Shutdown
 ------------------------------ */
 
-// process.on("SIGINT", async () => {
-//   try {
-//     await closeSQLPools();
-//     console.log("SQL connection pools closed.");
-//   } catch (err) {
-//     console.error("Error closing SQL connection pools:", err);
-//   } finally {
-//     process.exit(0);
-//   }
-// });
+process.on("SIGINT", async () => {
+  try {
+    await closeSQLPools();
+    console.log("SQL connection pools closed.");
+  } catch (err) {
+    console.error("Error closing SQL connection pools:", err);
+  } finally {
+    process.exit(0);
+  }
+});
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
