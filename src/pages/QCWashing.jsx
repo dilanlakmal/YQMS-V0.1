@@ -1905,6 +1905,34 @@ if (
     }
   };
 
+  const autoSaveOverallSummary = async (summary, recordId) => {
+    if (!recordId || !summary) return;
+    try {
+      await fetch(
+        `${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ summary })
+        }
+      );
+    } catch (error) {
+      console.error("Failed to auto-save overall summary:", error);
+    }
+  };
+
+  // Function to calculate and update summary data (NEW/MODIFIED)
+  const updateSummaryData = (currentFormData) => {
+    const summary = calculateSummaryData(currentFormData);
+    setFormData((prevData) => ({
+      ...prevData,
+      ...summary
+    }));
+    if (recordId) {
+      autoSaveSummary(summary, recordId);
+    }
+  };
+
   const clearFormData = () => {
     // Reset form data to initial state
     setFormData({

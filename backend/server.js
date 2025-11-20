@@ -10,6 +10,7 @@ Common File Imports
 import aql from "./routes/Common/AQLRoutes.js";
 /*-------------Buyer Spec Imports --------------*/
 import buyerSpec from "./routes/Common/DTOrdersBuyerSpecRoutes.js";
+import buyerSpecPacking from "./routes/Common/DTOrdersBuyerSpecPackingRoutes.js";
 /*-------------DT-Orders Imports --------------*/
 import dtOrders from "./routes/Common/DTOrdersRoutes.js";
 /* -----------------------------
@@ -28,9 +29,14 @@ Digital Measurement Imports
 ------------------------------ */
 import digitalMeasurement from "./routes/DigitalMeasurement/DigitalMeasurmentRoutes.js";
 /* -----------------------------
+Measurement Imports
+------------------------------ */
+import measurement from "./routes/Measurement/measurementRoutes.js";
+
+/* -----------------------------
 Download Data Imports
 ------------------------------ */
-import downloadData from "./routes/DownloadData/downloaddataRoutes.js";
+import downloadData from "./routes/DownloadData/downloadDataRoutes.js";
 
 /* -----------------------------
 QC1 Inspection Imports
@@ -162,7 +168,7 @@ import ieWorkerAssignement from "./routes/QC2System/IEAdmin/IEWorkerAssignmentRo
 import qc2SubConFactory from "./routes/QC2System/SystemAdmin/QC2SubConFactoryRoutes.js"; 
 import qc2Defects from "./routes/QC2System/SystemAdmin/QC2DefectsRoutes.js";
 /* ------------Bundle Registarion-----------------*/
-import bundleRegistrationInspection from "./routes/QC2System/BundleRegistration/bundelRestrationInspectionRoutes.js";
+import bundleRegistrationInspection from "./routes/QC2System/BundleRegistration/BundelRestrationInspectionRoutes.js";
 import bundleRegistrationData from "./routes/QC2System/BundleRegistration/BundleRegistationDataRoutes.js";
 import bundleRegistationReprint from "./routes/QC2System/BundleRegistration/BundleRegistrationReprintRoutes.js";
 /* ------------Ironing-----------------*/
@@ -195,11 +201,14 @@ import translator from "./routes/AI/Translator/translatorRoutes.js";
   PivotY - QA Sections
 ------------------------------ */
 
+import QASections_ProductType from "./routes/PivotY/QASections/QASections_ProductType_Route.js";
 import QASections_Home from "./routes/PivotY/QASections/QASections_Home_Route.js";
 import QASections_Photos from "./routes/PivotY/QASections/QASections_Photos_Route.js";
 import QASections_Packing from "./routes/PivotY/QASections/QASections_Packing_Route.js";
+import QASections_Buyer from "./routes/PivotY/QASections/QASections_Buyer_Route.js";
 import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
 import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
+import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
 
 /* -----------------------------
   After Ironing Import
@@ -230,6 +239,7 @@ Commin file  Routes
 app.use(aql);
 /* -----------Buyer Specs -----------------*/
 app.use(buyerSpec);
+app.use(buyerSpecPacking);
 /* ----------- DT_Orders -----------------*/
 app.use(dtOrders);
 /* -----------------------------
@@ -251,6 +261,11 @@ Digital Measurement Routes
 app.use(digitalMeasurement);
 
 /* -----------------------------
+Measurement Routes
+------------------------------ */
+app.use(measurement);
+
+/* -----------------------------
 Download Data Routes
 ------------------------------ */
 app.use(downloadData);
@@ -259,6 +274,8 @@ app.use(downloadData);
 QC1 Inspection Routes
 ------------------------------ */
 app.use(qc1Inspection);
+app.use(QC1SunriseReportRoutes);
+app.use(QC1SummaryDashboardRoutes);
 
 /* -----------------------------
 QC1 Sunrise Routes
@@ -424,11 +441,15 @@ app.use(qc2Rework);
 /* ------------------------------
   PivotY - QA Sections routes
 ------------------------------ */
+
+app.use(QASections_ProductType);
 app.use(QASections_Home);
 app.use(QASections_Photos);
 app.use(QASections_Packing);
+app.use(QASections_Buyer);
 app.use(QASections_DefectList);
 app.use(QASections_DefectCategory);
+app.use(QASections_ProductLocation);
 
 /* -----------------------------
 AI Routes
@@ -455,6 +476,11 @@ app.use(afterIroning);
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 }); 
+
+/* -----------------------------
+  QC Output Routes
+------------------------------ */
+app.use(QCOutputRoute);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {

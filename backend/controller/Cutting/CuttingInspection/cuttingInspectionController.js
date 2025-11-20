@@ -1,10 +1,7 @@
-import {
-  CuttingInspection,                
-} from "../../MongoDB/dbConnectionController.js"; 
-
+import { CuttingInspection } from "../../MongoDB/dbConnectionController.js";
 
 export const saveCuttingInspection = async (req, res) => {
-try {
+  try {
     const {
       inspectionDate,
       cutting_emp_id,
@@ -108,7 +105,7 @@ try {
 };
 
 export const getCuttingInspectionProgress = async (req, res) => {
-    try {
+  try {
     const { moNo, tableNo, garmentType } = req.query;
 
     // Validate required query parameters
@@ -191,7 +188,7 @@ export const getCuttingInspectionProgress = async (req, res) => {
 };
 
 export const getCuttingInspectionMono = async (req, res) => {
-    try {
+  try {
     const { search, startDate, endDate } = req.query;
 
     const pipeline = [];
@@ -247,7 +244,7 @@ export const getCuttingInspectionMono = async (req, res) => {
 };
 
 export const getCuttingInspectionTable = async (req, res) => {
-    try {
+  try {
     const { moNo, search, startDate, endDate } = req.query;
     if (!moNo) {
       return res.status(400).json({ message: "MO Number is required" });
@@ -311,7 +308,7 @@ export const getCuttingInspectionTable = async (req, res) => {
 };
 
 export const getCuttinginspectionDetail = async (req, res) => {
-    try {
+  try {
     const { moNo, tableNo } = req.query;
     if (!moNo || !tableNo) {
       return res
@@ -334,75 +331,124 @@ export const getCuttinginspectionDetail = async (req, res) => {
 };
 
 export const updateCuttingInspection = async (req, res) => {
-    try {
-        const { moNo, tableNo, updatedFields, updatedInspectionDataItem } =
-          req.body;
-    
-        if (!moNo || !tableNo) {
-          return res.status(400).json({
-            message: "MO Number and Table Number are required for update."
-          });
-        }
-        if (
-          !updatedInspectionDataItem ||
-          !updatedInspectionDataItem.inspectedSize
-        ) {
-          return res.status(400).json({
-            message:
-              "Valid 'updatedInspectionDataItem' with 'inspectedSize' is required."
-          });
-        }
-    
-        const inspectionDoc = await CuttingInspection.findOne({ moNo, tableNo });
-    
-        if (!inspectionDoc) {
-          return res
-            .status(404)
-            .json({ message: "Inspection document not found to update." });
-        }
+  try {
+    const { moNo, tableNo, updatedFields, updatedInspectionDataItem } =
+      req.body;
 
-        if (updatedFields) {
-          if (updatedFields.totalBundleQty !== undefined)
-            inspectionDoc.totalBundleQty = updatedFields.totalBundleQty;
-          if (updatedFields.bundleQtyCheck !== undefined)
-            inspectionDoc.bundleQtyCheck = updatedFields.bundleQtyCheck;
-          if (updatedFields.totalInspectionQty !== undefined)
-            inspectionDoc.totalInspectionQty = updatedFields.totalInspectionQty;
-          if (updatedFields.cuttingtype !== undefined)
-            inspectionDoc.cuttingtype = updatedFields.cuttingtype;
-        }
-    
-        const itemIndex = inspectionDoc.inspectionData.findIndex(
-          (item) => item.inspectedSize === updatedInspectionDataItem.inspectedSize
-        );
-    
-        if (itemIndex > -1) {
-          inspectionDoc.inspectionData[itemIndex] = {
-            ...inspectionDoc.inspectionData[itemIndex], 
-            ...updatedInspectionDataItem, 
-            updated_at: new Date() 
-          };
-        } else {
-          return res.status(400).json({
-            message: `Inspection data for size ${updatedInspectionDataItem.inspectedSize} not found in the document. Cannot update.`
-          });
-        }
-    
-        inspectionDoc.updated_at = new Date(); 
-        inspectionDoc.markModified("inspectionData"); 
-    
-        await inspectionDoc.save();
-    
-        res.status(200).json({
-          message: "Cutting inspection data updated successfully.",
-          data: inspectionDoc
-        });
-      } catch (error) {
-        console.error("Error updating cutting inspection data:", error);
-        res.status(500).json({
-          message: "Failed to update cutting inspection data",
-          error: error.message
-        });
-      }
+    if (!moNo || !tableNo) {
+      return res.status(400).json({
+        message: "MO Number and Table Number are required for update."
+      });
+    }
+    if (
+      !updatedInspectionDataItem ||
+      !updatedInspectionDataItem.inspectedSize
+    ) {
+      return res.status(400).json({
+        message:
+          "Valid 'updatedInspectionDataItem' with 'inspectedSize' is required."
+      });
+    }
+
+    const inspectionDoc = await CuttingInspection.findOne({ moNo, tableNo });
+
+    if (!inspectionDoc) {
+      return res
+        .status(404)
+        .json({ message: "Inspection document not found to update." });
+    }
+
+    if (updatedFields) {
+      if (updatedFields.totalBundleQty !== undefined)
+        inspectionDoc.totalBundleQty = updatedFields.totalBundleQty;
+      if (updatedFields.bundleQtyCheck !== undefined)
+        inspectionDoc.bundleQtyCheck = updatedFields.bundleQtyCheck;
+      if (updatedFields.totalInspectionQty !== undefined)
+        inspectionDoc.totalInspectionQty = updatedFields.totalInspectionQty;
+      if (updatedFields.cuttingtype !== undefined)
+        inspectionDoc.cuttingtype = updatedFields.cuttingtype;
+    }
+
+    const itemIndex = inspectionDoc.inspectionData.findIndex(
+      (item) => item.inspectedSize === updatedInspectionDataItem.inspectedSize
+    );
+
+    if (itemIndex > -1) {
+      inspectionDoc.inspectionData[itemIndex] = {
+        ...inspectionDoc.inspectionData[itemIndex],
+        ...updatedInspectionDataItem,
+        updated_at: new Date()
+      };
+    } else {
+      return res.status(400).json({
+        message: `Inspection data for size ${updatedInspectionDataItem.inspectedSize} not found in the document. Cannot update.`
+      });
+    }
+
+    inspectionDoc.updated_at = new Date();
+    inspectionDoc.markModified("inspectionData");
+
+    await inspectionDoc.save();
+
+    res.status(200).json({
+      message: "Cutting inspection data updated successfully.",
+      data: inspectionDoc
+    });
+  } catch (error) {
+    console.error("Error updating cutting inspection data:", error);
+    res.status(500).json({
+      message: "Failed to update cutting inspection data",
+      error: error.message
+    });
+  }
 };
 
+// ============================================================
+// GETs unique MO numbers and their associated garmentType
+// ============================================================
+export const getCuttingProductTypes = async (req, res) => {
+  try {
+    const productTypes = await CuttingInspection.aggregate([
+      // Stage 1: Filter out documents where garmentType is missing or empty
+      {
+        $match: {
+          garmentType: { $exists: true, $ne: "" }
+        }
+      },
+      // Stage 2: Group by moNo and take the first garmentType found for that moNo
+      {
+        $group: {
+          _id: "$moNo",
+          garmentType: { $first: "$garmentType" }
+        }
+      },
+      // Stage 3: Reshape the output documents
+      {
+        $project: {
+          _id: 0,
+          moNo: "$_id",
+          garmentType: "$garmentType"
+        }
+      },
+      // Stage 4: Sort by moNo
+      {
+        $sort: {
+          moNo: 1
+        }
+      }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      count: productTypes.length,
+      data: productTypes
+    });
+  } catch (error) {
+    console.error("Error fetching cutting product types:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch cutting product types",
+      error: error.message
+    });
+  }
+};

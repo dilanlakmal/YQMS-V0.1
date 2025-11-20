@@ -2,6 +2,10 @@ import React, { useState } from "react";
 import SubConQCDashboardDailyView from "./SubConQCDashboardDailyView";
 import SubConQCDashboardNavigationPanel from "./SubConQCDashboardNavigationPanel";
 import SubConQCDashboardDailyTrend from "./SubConQCDashboardDailyTrend";
+import SubConQCDashboardWeeklyView from "./SubConQCDashboardWeeklyView";
+import SubConQCDashboardMonthlyView from "./SubConQCDashboardMonthlyView";
+import SubConQCDashboardWeeklyTrend from "./SubConQCDashboardWeeklyTrend";
+import SubConQCDashboardMonthlyTrend from "./SubConQCDashboardMonthlyTrend";
 
 // Placeholder for other views you will build later
 const PlaceholderComponent = ({ title }) => (
@@ -20,15 +24,15 @@ const SubConQCDashboard = () => {
       case "dailyView":
         return <SubConQCDashboardDailyView />;
       case "weeklyView":
-        return <PlaceholderComponent title="Weekly View" />;
+        return <SubConQCDashboardWeeklyView />;
       case "monthlyView":
-        return <PlaceholderComponent title="Monthly View" />;
+        return <SubConQCDashboardMonthlyView />;
       case "dailyTrend":
         return <SubConQCDashboardDailyTrend />;
       case "weeklyTrend":
-        return <PlaceholderComponent title="Weekly Trend" />;
+        return <SubConQCDashboardWeeklyTrend />;
       case "monthlyTrend":
-        return <PlaceholderComponent title="Monthly Trend" />;
+        return <SubConQCDashboardMonthlyTrend />;
       default:
         return <SubConQCDashboardDailyView />;
     }

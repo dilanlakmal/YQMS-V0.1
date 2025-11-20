@@ -89,3 +89,210 @@ export const getYorksysOrder = async (req, res) => {
     });
   }
 };
+
+// ============================================================
+// Retrieves unique values for filter dropdowns
+// ============================================================
+export const getYorksysOrderFilterOptions = async (req, res) => {
+  try {
+    // Fetch distinct values in parallel for better performance
+    const [factories, buyers, seasons] = await Promise.all([
+      YorksysOrders.distinct("factory"),
+      YorksysOrders.distinct("buyer"),
+      YorksysOrders.distinct("season")
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        // Filter out any null/empty values and sort them
+        factories: factories.filter(Boolean).sort(),
+        buyers: buyers.filter(Boolean).sort(),
+        seasons: seasons.filter(Boolean).sort()
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching filter options.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Retrieves all Yorksys orders with pagination
+// ============================================================
+export const getYorksysOrdersPagination = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    // --- Build Filter Object ---
+    const filter = {};
+    if (req.query.factory) filter.factory = req.query.factory;
+    if (req.query.buyer) filter.buyer = req.query.buyer;
+    if (req.query.season) filter.season = req.query.season;
+    // Use case-insensitive regex for text searches
+    if (req.query.moNo)
+      filter.moNo = { $regex: new RegExp(req.query.moNo, "i") };
+    if (req.query.style)
+      filter.style = { $regex: new RegExp(req.query.style, "i") };
+
+    // Fetch filtered data and total count in parallel
+    const [orders, totalRecords] = await Promise.all([
+      YorksysOrders.find(filter) // Apply the filter
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      YorksysOrders.countDocuments(filter) // Count only filtered documents
+    ]);
+
+    const totalPages = Math.ceil(totalRecords / limit);
+
+    return res.status(200).json({
+      success: true,
+      data: orders,
+      pagination: {
+        currentPage: page,
+        totalPages: totalPages,
+        totalRecords: totalRecords,
+        limit: limit
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching all Yorksys orders:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching orders.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Updates the productType for a specific Yorksys order
+// ============================================================
+export const updateYorksysOrderProductType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { productType } = req.body;
+
+    // Validate input
+    if (!productType) {
+      return res.status(400).json({
+        success: false,
+        message: "Product type is required."
+      });
+    }
+
+    const updatedOrder = await YorksysOrders.findByIdAndUpdate(
+      id,
+      { productType: productType },
+      { new: true, runValidators: true } // Return the updated document
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: `Order with ID ${id} not found.`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Product type for MO ${updatedOrder.moNo} updated successfully!`,
+      data: updatedOrder
+    });
+  } catch (error) {
+    console.error("Error updating product type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while updating product type.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+//  PREVIEWS the number of matching records for bulk update
+// ============================================================
+export const previewBulkUpdateProductType = async (req, res) => {
+  try {
+    const { moNos } = req.body;
+
+    if (!moNos || !Array.isArray(moNos)) {
+      return res.status(400).json({
+        success: false,
+        message: "An array of 'moNos' is required."
+      });
+    }
+
+    const matchCount = await YorksysOrders.countDocuments({
+      moNo: { $in: moNos }
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        matchCount: matchCount
+      }
+    });
+  } catch (error) {
+    console.error("Error previewing bulk update:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during bulk update preview.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+//  PERFORMS a bulk update of productType from cutting data
+// ============================================================
+export const bulkUpdateProductTypeFromCutting = async (req, res) => {
+  try {
+    const cuttingData = req.body; // Expects an array of { moNo, garmentType }
+
+    if (
+      !cuttingData ||
+      !Array.isArray(cuttingData) ||
+      cuttingData.length === 0
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "A non-empty array of cutting data is required."
+      });
+    }
+
+    // Create an array of bulk write operations
+    const operations = cuttingData.map((item) => ({
+      updateOne: {
+        filter: { moNo: item.moNo },
+        update: { $set: { productType: item.garmentType } }
+      }
+    }));
+
+    // Execute the bulk write operation
+    const result = await YorksysOrders.bulkWrite(operations);
+
+    res.status(200).json({
+      success: true,
+      message: `Bulk update completed successfully. ${result.modifiedCount} records updated.`,
+      data: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount
+      }
+    });
+  } catch (error) {
+    console.error("Error performing bulk update:", error);
+    res.status(500).json({
+      success: false,
+      message: "Internal server error during bulk update.",
+      error: error.message
+    });
+  }
+};

@@ -1,30 +1,13 @@
-import fsPromises from 'fs/promises';
-import {sanitize } from "../../../helpers/helperFunctions.js";
+import fsPromises from "fs/promises";
+import { sanitize } from "../../../helpers/helperFunctions.js";
 import multer from "multer";
 import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url";
-import { API_BASE_URL } from '../../../Config/appConfig.js';
-
+import { API_BASE_URL } from "../../../Config/appConfig.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __backendDir = path.dirname(__filename);
-
-// Endpoint to upload images for QC Inline Roving
-// export const saveQCImage = async (req, res) => {
-//     try {
-//     if (!req.file) {
-//       return res.status(400).json({ message: "No image uploaded" });
-//     }
-//     const imagePath = `/storage/qcinline/${req.file.filename}`;
-//     res.status(200).json({ imagePath });
-//   } catch (error) {
-//     console.error("Error uploading image:", error);
-//     res
-//       .status(500)
-//       .json({ message: "Failed to upload image", error: error.message });
-//   }
-// };
 
 //Roving image upload
 export const saveRovingImage = async (req, res) => {

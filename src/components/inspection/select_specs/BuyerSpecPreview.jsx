@@ -8,7 +8,8 @@ const BuyerSpecPreview = ({
   onClose,
   selectedSpecs,
   orderData,
-  selectedBuyer
+  selectedBuyer,
+  selectedStage // Received from parent
 }) => {
   const [specOrder, setSpecOrder] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -98,10 +99,17 @@ const BuyerSpecPreview = ({
         specData: specData
       };
 
-      await axios.post(`${API_BASE_URL}/api/buyer-spec-templates`, payload, {
+      // DETERMINE ENDPOINT BASED ON STAGE
+      const apiEndpoint =
+        selectedStage.value === "M2"
+          ? `${API_BASE_URL}/api/buyer-spec-templates-m2`
+          : `${API_BASE_URL}/api/buyer-spec-templates`;
+
+      await axios.post(apiEndpoint, payload, {
         withCredentials: true
       });
-      alert("Spec template saved successfully!");
+
+      alert(`Spec template (${selectedStage.label}) saved successfully!`);
       onClose();
     } catch (error) {
       console.error("Error saving spec template:", error);
@@ -122,7 +130,7 @@ const BuyerSpecPreview = ({
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-screen-2xl my-8 flex flex-col h-[90vh]">
         <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center flex-shrink-0">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Preview & Order Specs
+            Preview & Order Specs - {selectedStage?.label}
           </h2>
           <button
             onClick={onClose}

@@ -192,7 +192,7 @@ function Home() {
           },
            {
             path: "/measurement",
-            roles: ["QC Washing"],
+            roles: ["QC Washing", "QA"],
             image: "assets/Home/measurement.png",
             title: t("home.Measurement"),
             description: "All Style measurements",
@@ -351,7 +351,7 @@ function Home() {
              version: '0.1',
           },
           {
-            path: "/qc-accuracy-ver2",
+            path: "/qc-output",
             roles: ["QA"],
             image: "assets/Home/qcOutput.png",
             title: "QC Output",
