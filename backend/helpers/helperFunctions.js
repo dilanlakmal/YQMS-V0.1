@@ -93,12 +93,6 @@ export const sanitize = (input) => {
   return sane;
 };
 
-export const cleanup = (input) => {
-  if (typeof input !== "string") input = String(input);
-  return input;
-};
-
-
 // export const getOrdinal = (n) => {
 //   if (n <= 0) return String(n);
 //   const s = ["th", "st", "nd", "rd"];
