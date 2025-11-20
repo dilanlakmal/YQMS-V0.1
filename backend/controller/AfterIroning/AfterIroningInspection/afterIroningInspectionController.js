@@ -2480,19 +2480,11 @@ export const checkAfterIroningRecord = async (req, res) => {
     // Build query to find matching QC Washing record
     const query = {
       orderNo: orderNo,
+      reportType:"SOP",
       status: { $in: ['submitted', 'approved'] } // Only check completed records
     };
 
-    // Add optional filters if provided
-    if (color) {
-      query.color = color;
-    }
-    if (factoryName) {
-      query.factoryName = factoryName;
-    }
-    if (reportType) {
-      query.reportType = reportType;
-    }
+    
 
     // Find the most recent matching record
     const qcWashingRecord = await QCWashing.findOne(query)

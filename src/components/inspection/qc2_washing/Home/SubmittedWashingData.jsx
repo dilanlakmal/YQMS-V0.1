@@ -1,11 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Buffer } from 'buffer';
 import { API_BASE_URL } from '../../../../../config'; 
-import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
+import { MoreVertical, Eye, FileText, Download } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedWashingDataFilter';
 import QCWashingViewDetailsModal from './QCWashingViewDetailsModal'; 
 import QCWashingFullReportModal from './QCWashingFullReportModal';
-import { PDFDownloadLink} from '@react-pdf/renderer';
 import Swal from 'sweetalert2';
 
 // Polyfill Buffer for client-side PDF generation
@@ -372,195 +371,6 @@ const fetchSubmittedData = async (showLoading = true) => {
   });
 };
 
-// Skip image conversion due to CORS issues - use placeholders
-const convertImageToBase64 = async (imagePath, API_BASE_URL) => {
-  if (!imagePath) return null;
-  
-  // If it's already base64, return it
-  if (imagePath.startsWith('data:image/')) {
-    return imagePath;
-  }
-  return null;
-};
-
-
-// Process images for PDF rendering
-const processImagesInRecord = async (record, API_BASE_URL) => {
-  try {
-    const processedRecord = JSON.parse(JSON.stringify(record)); // Deep clone
-    
-    
-    // Process defect images
-    if (processedRecord.defectDetails?.defectsByPc) {
-      
-      for (let pcIndex = 0; pcIndex < processedRecord.defectDetails.defectsByPc.length; pcIndex++) {
-        const pcDefect = processedRecord.defectDetails.defectsByPc[pcIndex];
-        
-        if (pcDefect.pcDefects) {
-          
-          for (let defectIndex = 0; defectIndex < pcDefect.pcDefects.length; defectIndex++) {
-            const defect = pcDefect.pcDefects[defectIndex];
-            
-            if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              
-              const processedImages = [];
-              for (const imagePath of defect.defectImages) {
-                // Skip if already base64
-                if (imagePath && imagePath.startsWith('data:image/')) {
-                  processedImages.push(imagePath);
-                  continue;
-                }
-                
-                // For CORS-blocked images, add placeholder info
-                processedImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'defect' });
-              }
-              
-              // IMPORTANT: Assign the processed images back to the correct location
-              processedRecord.defectDetails.defectsByPc[pcIndex].pcDefects[defectIndex].defectImages = processedImages;
-            }
-          }
-        }
-      }
-    }
-
-    // Process additional images
-    if (processedRecord.defectDetails?.additionalImages && Array.isArray(processedRecord.defectDetails.additionalImages)) {
-      const processedAdditionalImages = [];
-      for (const imagePath of processedRecord.defectDetails.additionalImages) {
-        // Skip if already base64
-        if (imagePath && imagePath.startsWith('data:image/')) {
-          processedAdditionalImages.push(imagePath);
-          continue;
-        }
-        
-        processedAdditionalImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'additional' });
-      }
-      
-      // IMPORTANT: Assign the processed images back
-      processedRecord.defectDetails.additionalImages = processedAdditionalImages;
-    }
-
-    // Process inspection images
-    if (processedRecord.inspectionDetails?.checkedPoints) {
-      for (let pointIndex = 0; pointIndex < processedRecord.inspectionDetails.checkedPoints.length; pointIndex++) {
-        const point = processedRecord.inspectionDetails.checkedPoints[pointIndex];
-        
-        // Process point image
-        if (point.image) {
-          try {
-            if (!point.image.startsWith('data:image/')) {
-              const processedImage = await convertImageToBase64(point.image, API_BASE_URL);
-              processedRecord.inspectionDetails.checkedPoints[pointIndex].image = processedImage || null;
-            }
-          } catch (error) {
-            processedRecord.inspectionDetails.checkedPoints[pointIndex].image = null;
-          }
-        }
-
-        // Process comparison images in inspection points
-        if (point.comparison && Array.isArray(point.comparison)) {
-          const processedComparisonImages = [];
-          for (const imagePath of point.comparison) {
-            if (imagePath.startsWith('data:image/')) {
-              processedComparisonImages.push(imagePath);
-            } else {
-              processedComparisonImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'comparison' });
-            }
-          }
-          processedRecord.inspectionDetails.checkedPoints[pointIndex].comparison = processedComparisonImages;
-        }
-      }
-    }
-
-    // Process machine process images
-    if (processedRecord.inspectionDetails?.machineProcesses) {
-      for (let machineIndex = 0; machineIndex < processedRecord.inspectionDetails.machineProcesses.length; machineIndex++) {
-        const machine = processedRecord.inspectionDetails.machineProcesses[machineIndex];
-        if (machine.image) {
-          try {
-            if (!machine.image.startsWith('data:image/')) {
-              const processedImage = await convertImageToBase64(machine.image, API_BASE_URL);
-              processedRecord.inspectionDetails.machineProcesses[machineIndex].image = processedImage || null;
-            }
-          } catch (error) {
-            processedRecord.inspectionDetails.machineProcesses[machineIndex].image = null;
-          }
-        }
-      }
-    }
-    
-    return processedRecord;
-  } catch (error) {
-    console.error('❌ Error processing images in record:', error);
-    return record; // Return original record if processing fails
-  }
-};
-
-const processImageToBase64 = async (imagePath) => {
-  try {
-    
-    const cleanPath = imagePath.replace('./public/', '');
-    const response = await fetch(`${API_BASE_URL}/${cleanPath}`);
-    
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    
-    const arrayBuffer = await response.arrayBuffer();
-    const uint8Array = new Uint8Array(arrayBuffer);
-    
-    // Validate JPEG header (SOI marker: 0xFF 0xD8)
-    if (uint8Array.length < 2) {
-      throw new Error('Image data too short');
-    }
-    
-    if (uint8Array[0] !== 0xFF || uint8Array[1] !== 0xD8) {
-      // Sometimes the header gets corrupted, try to find the actual start
-      let soi = -1;
-      for (let i = 0; i < Math.min(100, uint8Array.length - 1); i++) {
-        if (uint8Array[i] === 0xFF && uint8Array[i + 1] === 0xD8) {
-          soi = i;
-          break;
-        }
-      }
-      
-      if (soi > 0) {
-        // Create new array starting from the actual SOI
-        const correctedArray = uint8Array.slice(soi);
-        const base64 = btoa(String.fromCharCode.apply(null, correctedArray));
-        return `data:image;base64,${base64}`;
-      } else {
-        throw new Error('No valid JPEG SOI marker found');
-      }
-    }
-    
-    // Convert to base64 using chunks to avoid call stack issues
-    let binary = '';
-    const chunkSize = 8192;
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-      const chunk = uint8Array.subarray(i, i + chunkSize);
-      binary += String.fromCharCode.apply(null, chunk);
-    }
-    
-    const base64 = btoa(binary);
-    const dataUrl = `data:image/jpeg;base64,${base64}`;
-    
-    
-    // Final validation
-    try {
-      atob(base64);
-    } catch (e) {
-      console.error('❌ Base64 validation failed:', e);
-      return null;
-    }
-    
-    return dataUrl;
-  } catch (error) {
-    console.error('❌ Error processing image:', imagePath, error);
-    return null;
-  }
-};
-
 const handleDownloadPDF = async (record) => {
   try {
     setIsQcWashingPDF(true);
@@ -669,7 +479,7 @@ const handleDownloadPDF = async (record) => {
     
     // Handle additional images
     if (record.defectDetails?.additionalImages && Array.isArray(record.defectDetails.additionalImages)) {
-      record.defectDetails.additionalImages.forEach((img, index) => {
+      record.defectDetails.additionalImages.forEach((img) => {
         if (typeof img === 'string') {
           imageUrls.add(img);
         } else if (typeof img === 'object' && img !== null) {

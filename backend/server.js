@@ -454,7 +454,7 @@ app.use(afterIroning);
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
-});
+}); 
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {

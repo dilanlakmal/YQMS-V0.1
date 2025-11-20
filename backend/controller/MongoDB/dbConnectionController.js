@@ -87,17 +87,18 @@ export const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
   //"mongodb://localhost:27017/ym_prod"
 );
-export const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
-);
-
 //Connection status
 ymProdConnection.on("connected", () =>
   console.log("✅ Connected to ym_prod database in 192.167.1.10:29000...")
 );
 ymProdConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
+
+export const ymEcoConnection = mongoose.createConnection(
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
+  //"mongodb://localhost:27017/ym_prod"
+);
+//Connection status
 ymEcoConnection.on("connected", () =>
   console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
 );
