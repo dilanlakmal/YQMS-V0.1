@@ -29,6 +29,8 @@ import CuttingOrderModify from "../components/inspection/cutting/CuttingOrderMod
 import MeasurementTable from "../components/inspection/cutting/MeasurementTable";
 import CuttingReportQCView from "../components/inspection/cutting/report/CuttingReportQCView";
 
+import { useSearchParams } from "react-router-dom";
+
 const CuttingPage = () => {
   const { t, i18n } = useTranslation();
   const { user, loading: authLoading } = useAuth();
@@ -120,7 +122,20 @@ const CuttingPage = () => {
   const [measurementPoints, setMeasurementPoints] = useState([]);
   const [fabricDefects, setFabricDefects] = useState([]);
   const [aqlDetails, setAQLDetails] = useState(null);
+
+  const [searchParams] = useSearchParams();
+
   const cuttingIssuesRef = useRef(null); // Ref for CuttingIssues component
+
+  useEffect(() => {
+    const notifMoNo = searchParams.get("moNo");
+    const notifTableNo = searchParams.get("tableNo");
+
+    // If these params exist, force the tab to 'report'
+    if (notifMoNo && notifTableNo) {
+      setActiveTab("report");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();

@@ -100,6 +100,8 @@ import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectLis
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 
+import normalNotificationSchema from "../../models/NormalNotification.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
@@ -248,6 +250,8 @@ export const QASectionsDefectList =
   createQASectionsDefectListModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
+
+export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

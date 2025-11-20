@@ -5,11 +5,16 @@
 import { app, server, PORT } from "./Config/appConfig.js";
 
 /* -----------------------------
-User Imports
+  User Imports
 ------------------------------ */
 import auth from "./routes/User/authRoutes.js";
 import roleManagement from "./routes/User/roleManagementRoutes.js";
 import user from "./routes/User/userRoutes.js";
+
+/* -----------------------------
+  Notifications
+------------------------------ */
+import normalNotification from "./routes/Notification/normalNotificationRoutes.js";
 
 /* ------------------------------
    SQL Query Import
@@ -253,6 +258,11 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 app.use(auth);
 app.use(roleManagement);
 app.use(user);
+
+/* -----------------------------
+  Notifications Routes
+------------------------------ */
+app.use(normalNotification);
 
 /* ------------------------------
   SQL Query routes start

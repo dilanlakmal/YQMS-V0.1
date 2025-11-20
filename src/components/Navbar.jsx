@@ -14,6 +14,9 @@ import { API_BASE_URL } from "../../config";
 import LanguageSwitcher from "../components/layout/LangSwitch";
 import YQMSAIChatBox from "../pages/YQMSAIChatBox";
 
+import NormalNotifications from "./NormalNotifications";
+import SpecialNotifications from "./SpecialNotifications";
+
 import {
   Layers,
   Settings,
@@ -380,6 +383,14 @@ export default function Navbar({ onLogout }) {
             {/* Right Side: Actions */}
             <div className="flex items-center space-x-2 sm:space-x-3">
               <LanguageSwitcher />
+              {/* --- INSERT START: NOTIFICATIONS --- */}
+              {/* Only show notifications if user is logged in */}
+              {user && (
+                <>
+                  <SpecialNotifications />
+                  <NormalNotifications />
+                </>
+              )}
               {/* --- ADD THE AI BOT BUTTON HERE --- */}
               <button
                 onClick={() => setIsChatOpen((prev) => !prev)}
