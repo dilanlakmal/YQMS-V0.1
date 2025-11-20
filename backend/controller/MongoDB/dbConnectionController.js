@@ -78,13 +78,14 @@ import createDTOrdersSchema from "../../models/DT_Orders/dt_orders.js";
 import CuttingInlineOrdersModel from "../../models/Cutting/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 import createYorksysOrdersModel from "../../models/YorkSys/YorksysOrders.js";
+import createQASectionsProductType from "../../models/QA/QASectionsProductType.js";
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
 import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
-
+import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 
 //MongoDB Connections
@@ -200,12 +201,14 @@ export const SubconSewingQc1Report = createSubconSewingQc1ReportModel(ymProdConn
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
+export const QASectionsProductType = createQASectionsProductType(ymProdConnection);
 export const QASectionsHome = createQASectionsHomeModel(ymProdConnection);
 export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
 export const QASectionsDefectCategory = createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList = createQASectionsDefectListModel(ymProdConnection);
 export const AfterIroning = createAfterIroningModel(ymProdConnection);
+export const QASectionsBuyer = createQASectionsBuyerModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
 

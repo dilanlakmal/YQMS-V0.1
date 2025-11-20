@@ -1,5 +1,7 @@
 import {
   saveqcwashingFirstOutput,
+  checkAfterIroningSubmittedStyle,
+  checkQCWashingRecord,
   getAfterIroningMeasurementData,
   findAfterIroningExistingRecord, 
   checkAfterIroningSubmittedRecord, 
@@ -56,6 +58,8 @@ const  cleanupColor = (req, res, next) => {
 ------------------------------ */
 
 router.post('/api/after-ironing/first-output-details', saveqcwashingFirstOutput)
+router.post('/api/after-ironing/check-submitted-style', checkAfterIroningSubmittedStyle);
+router.post('/api/after-ironing/check-qc-washing-record', checkQCWashingRecord);
 router.get('/api/after-ironing/check-measurement-details/:orderNo', getAfterIroningMeasurementData);
 router.post('/api/after-ironing/find-existing', findAfterIroningExistingRecord);
 // Check for any submitted record with the same order no and color

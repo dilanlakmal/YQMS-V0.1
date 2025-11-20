@@ -171,21 +171,17 @@ const initializeDefaultCheckpointData = async (setCheckpointInspectionData) => {
 function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
   const currentMeasurementDetails = currentFormData.measurementDetails;
-
+  
   let measurementArray = [];
-  if (
-    currentMeasurementDetails &&
-    typeof currentMeasurementDetails === "object"
-  ) {
+  if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
     measurementArray = currentMeasurementDetails.measurement || [];
   } else if (Array.isArray(currentMeasurementDetails)) {
     measurementArray = currentMeasurementDetails;
   }
 
-  // 1. Calculate totalCheckedPcs from measurement data qty (FIXED)
+  // 1. Calculate totalCheckedPcs from measurement data qty
   let totalCheckedPcs = 0;
   measurementArray.forEach((data) => {
-    // Use qty field which represents the number of pieces checked for each size
     if (typeof data.qty === "number" && data.qty > 0) {
       totalCheckedPcs += data.qty;
     }
@@ -201,7 +197,7 @@ function calculateSummaryData(currentFormData) {
   let measurementPoints = 0;
   let measurementPass = 0;
 
-  // Check if measurementSizeSummary exists (same as backend logic)
+  // Check if measurementSizeSummary exists
   if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
     currentMeasurementDetails.measurementSizeSummary.forEach(sizeData => {
       measurementPoints += (sizeData.checkedPoints || 0);
@@ -229,7 +225,7 @@ function calculateSummaryData(currentFormData) {
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
     ? currentDefectDetails.defectsByPc.length
     : 0;
-
+    
   const defectCount = currentDefectDetails?.defectsByPc
     ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
         return (
@@ -245,48 +241,45 @@ function calculateSummaryData(currentFormData) {
       }, 0)
     : 0;
 
-  // 4. Defect rate and ratio (use totalCheckedPcs, not measurementPoints)
-  const defectRate =
-    totalCheckedPcs > 0
-      ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
-      : 0;
+  // 4. Defect rate and ratio
+  const defectRate = totalCheckedPcs > 0
+    ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
+    : 0;
+    
+  const defectRatio = totalCheckedPcs > 0
+    ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
+    : 0;
 
-  const defectRatio =
-    totalCheckedPcs > 0
-      ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
-      : 0;
+  // 5. CRITICAL FIX: Overall result calculation - SIMPLIFIED
+  const savedDefectResult = currentDefectDetails?.result || "Pass";
+  const measurementPassRate = measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
+  
+  console.log('Frontend calculation:', {
+    measurementPassRate,
+    savedDefectResult,
+    reportType: currentFormData.reportType
+  });
 
-  // 5. SIMPLIFIED LOGIC - only consider defectDetails.result and pass rate >= 95%
-  let overallResult = "Pending";
-  const savedDefectResult = currentDefectDetails?.result || "Pending";
+  // CRITICAL FIX: Simplified overall result logic for ALL report types
+  const overallResult = (measurementPassRate >= 95.0 && savedDefectResult === "Pass") ? "Pass" : "Fail";
 
-  // Calculate measurement pass rate - default to 100% when no measurement points
-  const measurementPassRate =
-    measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-
-  // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
-  if (savedDefectResult === "Pass" && measurementPassRate >= 95.0) {
-    overallResult = "Pass";
-  } else if (savedDefectResult === "Fail" || (measurementPoints > 0 && measurementPassRate < 95.0)) {
-    overallResult = "Fail";
-  } else {
-    overallResult = "Pending";
-  }
+  console.log('Frontend final result:', overallResult);
 
   return {
-    checkedQty: checkedQty, // Ensure checkedQty is a number
-    totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
+    checkedQty: checkedQty,
+    totalCheckedPcs: totalCheckedPcs || 0,
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
     defectRate,
     defectRatio,
     overallFinalResult: overallResult || "Pending",
     overallResult,
-    // Additional fields for measurement statistics
     measurementPoints: measurementPoints || 0,
     measurementPass: measurementPass || 0
   };
 }
+
+
 
 const AfterIroning = () => {
   const { user } = useAuth();
@@ -796,65 +789,85 @@ const AfterIroning = () => {
   };
 
   const fetchOrderDetailsByStyle = async (orderNo) => {
-    if (!orderNo) {
-      setColorOptions([]);
+  if (!orderNo) {
+    setColorOptions([]);
+    setFormData((prev) => ({
+      ...prev,
+      color: "",
+      orderQty: "",
+      buyer: ""
+    }));
+    setStyleSuggestions([]);
+    return;
+  }
+
+  try {
+    setIsDataLoading(true);
+    let response = await fetch(
+      `${API_BASE_URL}/api/after-ironing/order-details-by-style/${orderNo}`
+    );
+
+    let orderData = await response.json();
+
+    if (!orderData.success) {
+      response = await fetch(
+        `${API_BASE_URL}/api/after-ironing/order-details-by-order/${orderNo}`
+      );
+      orderData = await response.json();
+    }
+
+    if (orderData.success) {
+      setColorOptions(orderData.colors || []);
+      
+      // NEW: Check for QC Washing SOP record to get default color
+      let defaultColor = "";
+      try {
+        const washingResponse = await fetch(`${API_BASE_URL}/api/after-ironing/check-qc-washing-record`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            orderNo: orderNo,
+            reportType: "SOP"
+          })
+        });
+        
+        const washingData = await washingResponse.json();
+        if (washingData.success && washingData.exists && washingData.record) {
+          defaultColor = washingData.record.color;
+          console.log(`Found QC Washing SOP record with color: ${defaultColor}`);
+        }
+      } catch (washingError) {
+        console.log('No QC Washing SOP record found, using first available color');
+      }
+
+      // Set form data with default color from washing record or first available color
       setFormData((prev) => ({
         ...prev,
-        color: "",
-        orderQty: "",
-        buyer: ""
+        orderQty: orderData.orderQty || "",
+        buyer: orderData.buyer || "",
+        color: defaultColor || 
+               (orderData.colors && orderData.colors.length > 0 ? orderData.colors[0] : "")
       }));
-      setStyleSuggestions([]);
-      return;
-    }
 
-    try {
-      setIsDataLoading(true);
-      let response = await fetch(
-        `${API_BASE_URL}/api/after-ironing/order-details-by-style/${orderNo}`
+    } else {
+      throw new Error(
+        orderData.message || "Style/Order not found in master records."
       );
-      let orderData = await response.json();
-
-      if (!orderData.success) {
-        response = await fetch(
-          `${API_BASE_URL}/api/after-ironing/order-details-by-order/${orderNo}`
-        );
-        orderData = await response.json();
-      }
-
-      if (orderData.success) {
-        setColorOptions(orderData.colors || []);
-        setFormData((prev) => ({
-          ...prev,
-          orderQty: orderData.orderQty || "",
-          buyer: orderData.buyer || "",
-          color:
-            prev.color ||
-            (orderData.colors && orderData.colors.length > 0
-              ? orderData.colors[0]
-              : "")
-        }));
-        
-        // Optional: Check for matching QC washing record (endpoint not implemented)
-        // This feature would load measurement defaults from washing reports
-      } else {
-        throw new Error(
-          orderData.message || "Style/Order not found in master records."
-        );
-      }
-    } catch (error) {
-      console.error("Error fetching order details:", error);
-      Swal.fire(
-        "Error",
-        `Could not fetch details for: ${orderNo}. Please check the Style No or Order No.`,
-        "error"
-      );
-      setColorOptions([]);
-      setFormData((prev) => ({ ...prev, color: "", orderQty: "", buyer: "" }));
-    } finally {
-      setIsDataLoading(false);
     }
-  };
+  } catch (error) {
+    console.error("Error fetching order details:", error);
+    Swal.fire(
+      "Error",
+      `Could not fetch details for: ${orderNo}. Please check the Style No or Order No.`,
+      "error"
+    );
+    setColorOptions([]);
+    setFormData((prev) => ({ ...prev, color: "", orderQty: "", buyer: "" }));
+  } finally {
+    setIsDataLoading(false);
+  }
+};
+
 
   const loadSavedDataById = async (id) => {
   if (!id) return;
@@ -1392,7 +1405,56 @@ const AfterIroning = () => {
     };
   };
 
-  const handleSizeSubmit = async (transformedSizeData) => {
+  const handleSizeSubmit = async (transformedSizeData,  newRecordId) => {
+
+      if (newRecordId && !recordId) {
+        setRecordId(newRecordId);
+      }
+
+      // Save complete order data to the newly created record
+    try {
+      const completeOrderData = {
+        ...formData,
+        colorOrderQty,
+        _id: newRecordId, // Update existing record
+        // Ensure all required fields are included
+        date: formData.date || new Date().toISOString().split("T")[0],
+        reportType: formData.reportType || 'SOP',
+        factoryName: formData.factoryName || 'YM',
+        buyer: formData.buyer || '',
+        orderQty: formData.orderQty || 0,
+        checkedQty: formData.checkedQty || 30,
+        ironingQty: formData.ironingQty || 30,
+        washQty: formData.washQty || 30,
+        aql: formData.aql || []
+      };
+
+      console.log('Updating record with complete order data:', completeOrderData);
+
+      const response = await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          formData: completeOrderData,
+          userId: user?.emp_id || 'system',
+          savedAt: new Date().toISOString()
+        })
+      });
+
+      const result = await response.json();
+      if (!result.success) {
+        console.error('Failed to update record with order data:', result.message);
+      } else {
+        console.log('Successfully updated record with order data');
+      }
+    } catch (error) {
+      console.error('Failed to update record with order data:', error);
+    }
+      
+      // If transformedSizeData is null, it means we're just updating the recordId
+      if (!transformedSizeData) {
+        return;
+      }
     const before_after_wash =
       formData.before_after_wash === "Before Ironing"
         ? "beforeIroning"
@@ -1403,17 +1465,71 @@ const AfterIroning = () => {
       const existingIndex = currentArray.findIndex(
         (item) => item.size === transformedSizeData.size && item.kvalue === transformedSizeData.kvalue
       );
+
+      let updatedArray;
+
       if (existingIndex >= 0) {
-        const updated = [...currentArray];
-        updated[existingIndex] = transformedSizeData;
-        return { ...prev, [before_after_wash]: updated };
-      } else {
-        return {
-          ...prev,
-          [before_after_wash]: [...currentArray, transformedSizeData]
-        };
+      updatedArray = [...currentArray];
+      updatedArray[existingIndex] = transformedSizeData;
+    } else {
+      updatedArray = [...currentArray, transformedSizeData];
+    }
+
+    const measurementSizeSummary = updatedArray.map(measurement => {
+      if (measurement.summaryData) {
+        return measurement.summaryData;
       }
+      
+      // Fallback calculation if summaryData is missing
+      let checkedPcs = measurement.pcs?.length || 0;
+      let checkedPoints = 0;
+      let totalPass = 0;
+      let totalFail = 0;
+      let plusToleranceFailCount = 0;
+      let minusToleranceFailCount = 0;
+
+      measurement.pcs?.forEach((pc) => {
+        (pc.measurementPoints || []).forEach((point) => {
+          checkedPoints++;
+          if (point.result === "pass") totalPass++;
+          if (point.result === "fail") {
+            totalFail++;
+            const value = typeof point.measured_value_decimal === "number"
+              ? point.measured_value_decimal
+              : parseFloat(point.measured_value_decimal);
+            
+            if (!isNaN(value)) {
+              if (value > point.tolerancePlus) plusToleranceFailCount++;
+              if (value < point.toleranceMinus) minusToleranceFailCount++;
+            }
+          }
+        });
+   });
+
+      return {
+        size: measurement.size,
+        kvalue: measurement.kvalue,
+        checkedPcs,
+        checkedPoints,
+        totalPass,
+        totalFail,
+        plusToleranceFailCount,
+        minusToleranceFailCount,
+        before_after_wash: measurement.before_after_wash
+      };
     });
+
+    // Update formData with complete measurement details including summary
+    setFormData(prevFormData => ({
+      ...prevFormData,
+      measurementDetails: {
+        measurement: updatedArray,
+        measurementSizeSummary: measurementSizeSummary
+      }
+    }));
+
+    return { ...prev, [before_after_wash]: updatedArray };
+  });
 
     setSavedSizes((prev) => {
       if (!prev.includes(transformedSizeData.size)) {
@@ -1458,50 +1574,6 @@ const AfterIroning = () => {
       }
     }
   };
-
-  const handleImageChange = async (e) => {
-    const files = Array.from(e.target.files);
-    if (uploadedImages.length + files.length > 5) {
-      Swal.fire(
-        "Limit Exceeded",
-        "You can only upload a maximum of 5 images.",
-        "warning"
-      );
-      return;
-    }
-
-    const options = {
-      maxSizeMB: 0.5,
-      maxWidthOrHeight: 1024,
-      useWebWorker: true
-    };
-
-    Swal.fire({
-      title: "Compressing images...",
-      text: "Please wait.",
-      allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      }
-    });
-
-    for (const file of files) {
-      try {
-        const compressedFile = await imageCompression(file, options);
-        const preview = URL.createObjectURL(compressedFile);
-        setUploadedImages((prev) => [
-          ...prev,
-          { file: compressedFile, preview, name: compressedFile.name }
-        ]);
-      } catch (error) {
-        console.error("Image compression failed:", error);
-        Swal.fire("Error", "Failed to compress image.", "error");
-      }
-    }
-    Swal.close();
-  };
-
-
 
   const clearFormData = () => {
     setFormData({
@@ -1601,18 +1673,65 @@ const AfterIroning = () => {
         )
       };
 
-      const measurementDetails = {
-        measurement: [
-          ...measurementData.beforeIroning.map((item) => ({
-            ...item,
-            before_after_wash: "beforeIroning"
-          })),
-          ...measurementData.afterIroning.map((item) => ({
-            ...item,
-            before_after_wash: "afterIroning"
-          }))
-        ]
-      };
+     const measurementDetails = formData.measurementDetails || {
+  measurement: [
+    ...measurementData.beforeIroning.map((item) => ({
+      ...item,
+      before_after_wash: "beforeIroning"
+    })),
+    ...measurementData.afterIroning.map((item) => ({
+      ...item,
+      before_after_wash: "afterIroning"
+    }))
+  ],
+  measurementSizeSummary: [] // This will be populated from the saved data
+};
+
+// If measurementSizeSummary is empty, calculate it from measurement data
+if (!measurementDetails.measurementSizeSummary || measurementDetails.measurementSizeSummary.length === 0) {
+  const measurementSizeSummary = [];
+  measurementDetails.measurement.forEach(measurement => {
+    if (measurement.pcs && Array.isArray(measurement.pcs)) {
+      let checkedPcs = measurement.pcs.length;
+      let checkedPoints = 0;
+      let totalPass = 0;
+      let totalFail = 0;
+      let plusToleranceFailCount = 0;
+      let minusToleranceFailCount = 0;
+
+      measurement.pcs.forEach((pc) => {
+        (pc.measurementPoints || []).forEach((point) => {
+          checkedPoints++;
+          if (point.result === "pass") totalPass++;
+          if (point.result === "fail") {
+            totalFail++;
+            const value = typeof point.measured_value_decimal === "number"
+              ? point.measured_value_decimal
+              : parseFloat(point.measured_value_decimal);
+            
+            if (!isNaN(value)) {
+              if (value > point.tolerancePlus) plusToleranceFailCount++;
+              if (value < point.toleranceMinus) minusToleranceFailCount++;
+            }
+          }
+        });
+      });
+
+      measurementSizeSummary.push({
+        size: measurement.size,
+        kvalue: measurement.kvalue,
+        checkedPcs,
+        checkedPoints,
+        totalPass,
+        totalFail,
+        plusToleranceFailCount,
+        minusToleranceFailCount
+      });
+    }
+  });
+
+  measurementDetails.measurementSizeSummary = measurementSizeSummary;
+}
 
       const summary = calculateSummaryData({
         ...formData,
@@ -1639,9 +1758,7 @@ const AfterIroning = () => {
     recordId
   ]);
 
-  const loadColorSpecificData = async (orderNo, color) => {
-    // Logic to load color specific data
-  };
+
 
   const loadSavedSizes = async (orderNo, color) => {
     try {
@@ -1867,6 +1984,8 @@ useEffect(() => {
                 showMeasurementTable={showMeasurementTable}
                 onMeasurementEdit={handleMeasurementEdit}
                 recordId={recordId}
+                formData={formData}
+                user={user}
               />
             )}
 
@@ -1923,6 +2042,7 @@ useEffect(() => {
                   try {
                     // Ensure we have a record ID by saving order data first
                     let currentRecordId = recordId;
+                    
                     if (!currentRecordId) {
                       const orderResponse = await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
                         method: "POST",
@@ -1940,20 +2060,89 @@ useEffect(() => {
                       }
                     }
 
-                    // Save all data to the record
                     if (currentRecordId) {
-                      // Update order data if record already exists
-                      if (recordId) {
-                        await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({
-                            formData: { ...formData, colorOrderQty },
-                            userId: user?.emp_id,
-                            savedAt: new Date().toISOString()
-                          })
+                      // CRITICAL FIX: Build measurement details from current frontend state
+                      const currentMeasurementDetails = {
+                        measurement: [
+                          ...measurementData.afterIroning.map((item) => ({
+                            ...item,
+                            before_after_wash: "afterIroning"
+                          }))
+                        ],
+                        measurementSizeSummary: []
+                      };
+
+                      // Calculate measurementSizeSummary from current measurement data
+                      if (currentMeasurementDetails.measurement.length > 0) {
+                        const measurementSizeSummary = [];
+                        currentMeasurementDetails.measurement.forEach(measurement => {
+                          if (measurement.pcs && Array.isArray(measurement.pcs)) {
+                            let checkedPcs = measurement.pcs.length;
+                            let checkedPoints = 0;
+                            let totalPass = 0;
+                            let totalFail = 0;
+                            let plusToleranceFailCount = 0;
+                            let minusToleranceFailCount = 0;
+
+                            measurement.pcs.forEach((pc) => {
+                              (pc.measurementPoints || []).forEach((point) => {
+                                checkedPoints++;
+                                if (point.result === "pass") totalPass++;
+                                if (point.result === "fail") {
+                                  totalFail++;
+                                  const value = typeof point.measured_value_decimal === "number"
+                                    ? point.measured_value_decimal
+                                    : parseFloat(point.measured_value_decimal);
+                                  
+                                  if (!isNaN(value)) {
+                                    if (value > point.tolerancePlus) plusToleranceFailCount++;
+                                    if (value < point.toleranceMinus) minusToleranceFailCount++;
+                                  }
+                                }
+                              });
+                            });
+
+                            measurementSizeSummary.push({
+                              size: measurement.size,
+                              kvalue: measurement.kvalue,
+                              checkedPcs,
+                              checkedPoints,
+                              totalPass,
+                              totalFail,
+                              plusToleranceFailCount,
+                              minusToleranceFailCount,
+                              before_after_wash: measurement.before_after_wash
+                            });
+                          }
                         });
+                        currentMeasurementDetails.measurementSizeSummary = measurementSizeSummary;
                       }
+
+                      console.log('Submitting with current measurement details:', currentMeasurementDetails);
+
+                      // Update the record with complete measurement details INCLUDING summary
+                      const updateResponse = await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          formData: { 
+                            ...formData, 
+                            colorOrderQty,
+                            measurementDetails: currentMeasurementDetails, // Use current frontend state
+                            _id: currentRecordId // Update existing record
+                          },
+                          userId: user?.emp_id,
+                          savedAt: new Date().toISOString()
+                        })
+                      });
+
+                      const updateResult = await updateResponse.json();
+                      if (!updateResult.success) {
+                        console.error('Failed to update record with measurement summary:', updateResult.message);
+                        throw new Error('Failed to update measurement summary');
+                      }
+
+                      console.log('Successfully updated record with measurement summary');
 
                       // Save inspection data if exists
                       if (inspectionData.length > 0 || checkpointInspectionData.length > 0) {
@@ -2089,16 +2278,27 @@ useEffect(() => {
                     const response = await fetch(`${API_BASE_URL}/api/after-ironing/submit`, {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ orderNo: formData.orderNo }),
+                      body: JSON.stringify({ 
+                        orderNo: formData.orderNo,
+                        recordId: currentRecordId
+                      }),
                     });
                     
                     const submitResult = await response.json();
                     if (submitResult.success) {
-                      Swal.fire("Submitted!", "Your After Ironing report has been submitted successfully.", "success");
+                      Swal.fire({
+                        icon: 'success',
+                        title: 'Success',
+                        text: 'Your After Ironing report has been submitted successfully!',
+                        showConfirmButton: true,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#3085d6'
+                      });
                       clearFormData();
                     } else {
                       throw new Error(submitResult.message || "Submission failed");
                     }
+
                   } catch (error) {
                     console.error("Submit error:", error);
                     Swal.fire({
@@ -2112,6 +2312,7 @@ useEffect(() => {
               >
                 Submit All Data
               </button>
+
               </div>
             )}
           

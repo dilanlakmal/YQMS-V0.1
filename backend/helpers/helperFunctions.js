@@ -99,6 +99,10 @@ export const sanitize = (input) => {
 //   const v = n % 100;
 //   return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
 // }
+export const cleanup = (input) => {
+  if (typeof input !== "string") input = String(input);
+  return input;
+};
 
 export const formatDate = (date) => {
   const d = new Date(date);

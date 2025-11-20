@@ -26,6 +26,123 @@ const OrderDetailsSection = ({
 }) => {
   const [isChecking, setIsChecking] = useState(false);
 
+  // NEW: Function to check for submitted records with different colors
+  const checkSubmittedStyleColor = async (orderNo, color) => {
+    if (!orderNo || !color) return { success: true };
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/after-ironing/check-submitted-style`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderNo, color })
+      });
+      
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.error('Error checking submitted style-color:', error);
+      return { success: false, message: 'Error checking existing records' };
+    }
+  };
+
+  // NEW: Function to clear order details section
+  const clearOrderDetails = () => {
+    handleInputChange("orderNo", "");
+    handleInputChange("color", "");
+    handleInputChange("orderQty", "");
+    handleInputChange("buyer", "");
+    setRecordId(null);
+    setSavedSizes([]);
+    onWashingValidationChange?.(false, false);
+  };
+
+  // MODIFIED: Enhanced color change validation
+  const handleColorChange = async (selectedColor) => {
+    if (!selectedColor || !formData.orderNo) {
+      handleInputChange('color', selectedColor);
+      return;
+    }
+
+    // Check for existing submitted records with different colors
+    const checkResult = await checkSubmittedStyleColor(formData.orderNo, selectedColor);
+    
+    if (!checkResult.success && checkResult.existingColor) {
+      // Show error and confirmation dialog
+      const result = await Swal.fire({
+        icon: 'warning',
+        title: 'Style Already Submitted',
+        html: `
+          <div class="text-left">
+            <p><strong>Style:</strong> ${formData.orderNo}</p>
+            <p><strong>Existing Color:</strong> ${checkResult.existingColor}</p>
+            <p><strong>Selected Color:</strong> ${selectedColor}</p>
+            <br>
+            <p class="text-red-600 font-medium">⚠️ Only one color per style can be submitted.</p>
+            <br>
+            <p>Do you want to edit the existing record with color "${checkResult.existingColor}"?</p>
+          </div>
+        `,
+        showCancelButton: true,
+        confirmButtonText: 'Yes, Edit Existing Record',
+        cancelButtonText: 'Cancel',
+        reverseButtons: true,
+        customClass: {
+          popup: 'swal2-popup-large'
+        }
+      });
+
+      if (result.isConfirmed) {
+        // User wants to edit the existing record
+        const editConfirmation = await Swal.fire({
+          icon: 'question',
+          title: 'Load Existing Record',
+          text: `This will load the existing submitted record for style "${formData.orderNo}" with color "${checkResult.existingColor}". Continue?`,
+          showCancelButton: true,
+          confirmButtonText: 'Yes, Load Record',
+          cancelButtonText: 'Cancel'
+        });
+
+        if (editConfirmation.isConfirmed) {
+          // Load the existing record
+          if (checkResult.existingRecordId) {
+            onLoadSavedDataById(checkResult.existingRecordId);
+          } else {
+            // Fallback: try to find and load the record
+            try {
+              const response = await fetch(`${API_BASE_URL}/api/after-ironing/check-submitted`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  orderNo: formData.orderNo,
+                  color: checkResult.existingColor
+                })
+              });
+              
+              const data = await response.json();
+              if (data.exists && data.record) {
+                onLoadSavedDataById(data.record._id);
+              }
+            } catch (error) {
+              console.error('Error loading existing record:', error);
+              Swal.fire('Error', 'Failed to load the existing record.', 'error');
+            }
+          }
+        } else {
+          // User cancelled loading - clear the form
+          clearOrderDetails();
+        }
+      } else {
+        // User cancelled - clear the form
+        clearOrderDetails();
+      }
+      return;
+    }
+
+    // No conflict found, proceed with normal color change
+    handleInputChange('color', selectedColor);
+  };
+  
+
   // Effect to check for an existing record when key details change
   useEffect(() => {
     // Don't run the check if essential details are missing
@@ -50,8 +167,8 @@ const OrderDetailsSection = ({
             inspectorId: user.emp_id,
           }),
         });
-        const data = await response.json();
 
+        const data = await response.json();
         if (data.exists && data.record) {
           const result = await Swal.fire({
             title: 'Existing Record Found',
@@ -96,8 +213,8 @@ const OrderDetailsSection = ({
             color: formData.color,
           }),
         });
-        const data = await response.json();
 
+        const data = await response.json();
         if (data.exists && data.record) {
           const result = await Swal.fire({
             title: 'Submitted Report Found',
@@ -117,6 +234,7 @@ const OrderDetailsSection = ({
       }
       setIsChecking(false);
     };
+
     checkSubmittedRecord();
   }, [formData.orderNo, formData.color]);
 
@@ -194,7 +312,6 @@ const OrderDetailsSection = ({
       if (formData.orderNo && formData.reportType === 'SOP') {
         handleReportTypeChange('SOP');
       }
-
     }, 150);
   };
 
@@ -214,7 +331,6 @@ const OrderDetailsSection = ({
         handleReportTypeChange('SOP');
       }, 100);
     }
-
   };
 
   const [washingValidationPassed, setWashingValidationPassed] = useState(true);
@@ -224,11 +340,9 @@ const OrderDetailsSection = ({
     const isWashingNotCompleted = record?.error === 'WASHING_NOT_COMPLETED';
     setWashingValidationPassed(isValid);
     onWashingValidationChange?.(isValid, isExistingData);
-
     if (!isValid && isWashingNotCompleted && !isExistingData) {
       // Clear order and color if washing is not completed (but not for existing data)
-      handleInputChange("orderNo", "");
-      handleInputChange("color", "");
+      clearOrderDetails();
     }
   };
 
@@ -237,13 +351,10 @@ const OrderDetailsSection = ({
       const response = await fetch(
        `${API_BASE_URL}/api/after-ironing/saved-sizes/${orderNo}/${encodeURIComponent(color)}`
       );
-
       if (!response.ok) {
         return;
       }
-
       const data = await response.json();
-
       if (data.success) {
         setSavedSizes(data.savedSizes || []);
       }
@@ -275,6 +386,7 @@ const OrderDetailsSection = ({
           {isVisible ? 'Hide' : 'Show'}
         </button>
       </div>
+
          {isVisible && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 dark:text-white">
           <div className="flex items-center space-x-4">
@@ -304,6 +416,7 @@ const OrderDetailsSection = ({
               )}
             </div>
           </div>
+
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Date:</label>
             <input 
@@ -313,6 +426,7 @@ const OrderDetailsSection = ({
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             />
           </div>
+
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Order QTY:</label>
             <input 
@@ -325,11 +439,12 @@ const OrderDetailsSection = ({
             />
           </div>
           
+         {/* MODIFIED: Color selection with validation */}
          <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">Color:</label>
             <select
               value={formData.color}
-              onChange={(e) => handleInputChange('color', e.target.value)}
+              onChange={(e) => handleColorChange(e.target.value)}
               className="flex-1 px-3 py-2 border rounded-md focus:ring-2 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             >
               <option value="">-- Select Color --</option>
@@ -370,6 +485,7 @@ const OrderDetailsSection = ({
               style={{opacity: 1, color: 'inherit'}}
             />
           </div>
+
          <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">Buyer:</label>
             <input 
@@ -392,6 +508,7 @@ const OrderDetailsSection = ({
               style={{opacity: 1, color: 'inherit'}}
             />
           </div>  
+
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium">Before/After Iron:</label>
             <input
@@ -402,6 +519,7 @@ const OrderDetailsSection = ({
               style={{opacity: 1, color: 'inherit'}}
             />
           </div>         
+
           <div className="flex items-center space-x-4">
             <label className="w-20 text-sm font-medium dark:text-gray-300">Iron Qty:</label>
             <input 

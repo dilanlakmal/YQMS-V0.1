@@ -42,6 +42,8 @@ import downloadData from "./routes/DownloadData/downloadDataRoutes.js";
 QC1 Inspection Imports
 ------------------------------ */
 import qc1Inspection from "./routes/QC1Inspection/qc1InspectionRoutes.js";
+import QC1SunriseReportRoutes from "./routes/QC1Inspection/QCReportServer.js";
+import QC1SummaryDashboardRoutes from "./routes/QC1Inspection/QC1SummaryDashboard.js";
 /* -----------------------------
 QC1 Sunrise Imports
 ------------------------------ */
@@ -87,10 +89,6 @@ import PackingList from "./routes/PackingList/packingListRoutes.js";
 Yorksys Orders Imports
 ------------------------------ */
 import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
-/* -----------------------------
-Measurement Imports
------------------------------- */
-import measurement from "./routes/Measurement/measurementRoutes.js";
 /* -----------------------------
 SCC Imports
 ------------------------------ */
@@ -214,6 +212,11 @@ import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_Pr
   After Ironing Import
 ------------------------------ */
 import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
+
+/* -----------------------------
+  QC Output Imports
+------------------------------ */
+import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */

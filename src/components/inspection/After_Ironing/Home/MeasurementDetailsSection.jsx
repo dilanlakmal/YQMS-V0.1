@@ -20,7 +20,8 @@ const MeasurementDetailsSection = ({
   onMeasurementEdit,
   before_after_wash,
   recordId,
-  formData = {}
+  formData = {},
+  user
 }) => {
   const sanitizeColor = (colorInput) => {
     return cleanup(colorInput);
@@ -364,7 +365,6 @@ const setKValueForSize = async (size, kValue) => {
     before_after_wash,
     isEdit = false
   ) => {
-    // ... your existing transformMeasurementData implementation
     const pcs = [];
     for (let pcIndex = 0; pcIndex < qty; pcIndex++) {
       const measurementPoints = [];
@@ -495,7 +495,8 @@ const setKValueForSize = async (size, kValue) => {
         totalPass: totalPass,
         totalFail: totalFail,
         plusToleranceFailCount: plusToleranceFailCount,
-        minusToleranceFailCount: minusToleranceFailCount
+        minusToleranceFailCount: minusToleranceFailCount,
+        before_after_wash: washType,
       }
     };
   };
@@ -961,17 +962,30 @@ const setKValueForSize = async (size, kValue) => {
         orderNo,
         color,
         before_after_wash,
-        status: 'processing'
+        status: 'processing',
+        date: formData?.date || new Date().toISOString().split("T")[0],
+        reportType: formData?.reportType || 'SOP',
+        factoryName: formData?.factoryName || 'YM',
+        buyer: formData?.buyer || '',
+        orderQty: formData?.orderQty || 0,
+        checkedQty: formData?.checkedQty || 30,
+        ironingQty: formData?.ironingQty || 30,
+        washQty: formData?.washQty || 30,
+        aql: formData?.aql || [],
+        colorOrderQty: formData?.colorOrderQty || 0
       };
       const response = await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ formData: newRecord, userId: 'system', savedAt: new Date() })
+        body: JSON.stringify({ formData: newRecord, userId: user?.emp_id || 'system', savedAt: new Date() })
       });
       const result = await response.json();
       if (result.success) {
         currentRecordId = result.id;
       }
+      if (onSizeSubmit) {
+          onSizeSubmit(null, currentRecordId); // Pass recordId as second parameter
+        }
     } catch (error) {
       console.error('Failed to create record:', error);
     }
@@ -1098,8 +1112,9 @@ const setKValueForSize = async (size, kValue) => {
         icon: 'success',
         title: 'Success',
         text: `Measurements for size ${size} saved successfully!`,
-        timer: 2000,
-        showConfirmButton: false
+        showConfirmButton: true,
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#3085d6'
       });
     } else {
       throw new Error(result.message || 'Failed to save measurements');
@@ -1816,6 +1831,7 @@ MeasurementDetailsSection.propTypes = {
   before_after_wash: PropTypes.string,
   recordId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   formData: PropTypes.object,
+  user: PropTypes.object,
 };
 
 export default MeasurementDetailsSection;

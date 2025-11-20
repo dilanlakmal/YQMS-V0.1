@@ -19,18 +19,6 @@ function getServerBaseUrl(req) {
   return `${protocol}://${host}`;
 }
 
-function normalizeInspectionImagePath(img) {
-  if (!img) return "";
-  if (img.preview && typeof img.preview === "string") {
-    if (img.preview.startsWith("http")) return img.preview;
-    if (img.preview.startsWith("./public/storage/")) {
-      const relativePath = img.preview.replace("./public/storage/", "");
-      return `${process.env.BASE_URL || "http://localhost:5001"}/storage/${relativePath}`;
-    }
-    // ... other path normalizations
-  }
-  return "";
-}
 
 function groupCheckpointData(checkpointInspectionData) {
   const mainCheckpoints = new Map();
@@ -126,6 +114,114 @@ export const saveqcwashingFirstOutput = async (req, res) => {
       });
     }
 };
+
+export const checkAfterIroningSubmittedStyle = async (req, res) => {
+  try {
+    const { orderNo, color } = req.body;
+
+    if (!orderNo || !color) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number and color are required"
+      });
+    }
+
+    // Check for existing submitted records with same style but different color
+    const existingSubmittedRecord = await AfterIroning.findOne({
+      orderNo: orderNo,
+      color: { $ne: color },
+      status: "submitted"
+    });
+
+    if (existingSubmittedRecord) {
+      return res.json({
+        success: false,
+        exists: true,
+        message: `Style ${orderNo} already has a submitted record with color "${existingSubmittedRecord.color}"`,
+        existingColor: existingSubmittedRecord.color,
+        existingRecordId: existingSubmittedRecord._id,
+        submittedAt: existingSubmittedRecord.submittedAt
+      });
+    }
+
+    res.json({
+      success: true,
+      exists: false,
+      message: "No conflicting submitted records found"
+    });
+
+  } catch (error) {
+    console.error("Error checking submitted style-color:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while checking submitted records"
+    });
+  }
+};
+
+export const checkQCWashingRecord = async (req, res) => {
+  try {
+    const { orderNo, reportType } = req.body;
+
+    if (!orderNo) {
+      return res.status(400).json({
+        success: false,
+        message: "Order No is required"
+      });
+    }
+
+    // Build query to find matching QC Washing record
+    const query = {
+      orderNo: orderNo,
+      status: { $in: ['submitted', 'approved'] } // Only check completed records
+    };
+
+    // Add report type filter if provided
+    if (reportType) {
+      query.reportType = reportType;
+    }
+
+    // Find the most recent matching record
+    const qcWashingRecord = await QCWashing.findOne(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (qcWashingRecord) {
+      res.json({
+        success: true,
+        exists: true,
+        message: "QC Washing record found",
+        record: {
+          id: qcWashingRecord._id,
+          orderNo: qcWashingRecord.orderNo,
+          color: qcWashingRecord.color,
+          factoryName: qcWashingRecord.factoryName,
+          reportType: qcWashingRecord.reportType,
+          status: qcWashingRecord.status,
+          overallFinalResult: qcWashingRecord.overallFinalResult,
+          submittedAt: qcWashingRecord.submittedAt,
+          createdAt: qcWashingRecord.createdAt
+        }
+      });
+    } else {
+      res.json({
+        success: false,
+        exists: false,
+        message: "No QC Washing record found"
+      });
+    }
+
+  } catch (error) {
+    console.error("Error checking QC Washing record:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while checking QC Washing record",
+      error: error.message
+    });
+  }
+};
+
+
 
 export const getAfterIroningMeasurementData = async (req, res) => {
   try {
@@ -287,106 +383,151 @@ export const checkAfterIroningSubmittedRecord = async (req, res) => {
 };
 
 
-//New After Ironing Endpoints
 export const saveAfterIroningOrderData = async (req, res) => {
   try {
-      const { formData, userId, savedAt } = req.body;
-  
-      if (!formData || !formData.orderNo) {
-        return res
-          .status(400)
-          .json({ success: false, message: "Order No is required." });
-      }
-  
-      const dateValue = formData.date
-        ? new Date(
-            formData.date.length === 10
-              ? formData.date + "T00:00:00.000Z"
-              : formData.date
-          )
-        : undefined;
-  
-      // Clean up defectDetails to prevent casting errors on save
-      if (formData.defectDetails && Array.isArray(formData.defectDetails.defectsByPc)) {
-        formData.defectDetails.defectsByPc.forEach(pc => {
-          if (Array.isArray(pc.pcDefects)) {
-            pc.pcDefects.forEach(defect => {
-              if (defect.defectImages && defect.defectImages.some(img => typeof img === 'object')) {
-                defect.defectImages = defect.defectImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
-              }
-            });
-          }
-        });
-      }
+    const { formData, userId, savedAt } = req.body;
 
-      // Clean up inspectionDetails to prevent casting errors on save
-      if (formData.inspectionDetails && Array.isArray(formData.inspectionDetails.checkpointInspectionData)) {
-        formData.inspectionDetails.checkpointInspectionData.forEach(checkpoint => {
-          // Clean up main checkpoint images
-          if (checkpoint.comparisonImages && checkpoint.comparisonImages.some(img => typeof img === 'object')) {
-            checkpoint.comparisonImages = checkpoint.comparisonImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
-          }
-          // Clean up sub-point images
-          if (Array.isArray(checkpoint.subPoints)) {
-            checkpoint.subPoints.forEach(subPoint => {
-              if (subPoint.comparisonImages && subPoint.comparisonImages.some(img => typeof img === 'object')) {
-                subPoint.comparisonImages = subPoint.comparisonImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
-              }
-            });
-          }
-        });
-      }
+    if (!formData || !formData.orderNo) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Order No is required." });
+    }
 
-      // Build the query for uniqueness - same as find-existing
-      const query = {
-        orderNo: formData.orderNo,
-        date: dateValue,
-        color: formData.color,
-        factoryName: formData.factoryName,
-        reportType: formData.reportType,
-        before_after_wash: formData.before_after_wash,
-        ironingType: formData.ironingType,
-        "inspector.empId": userId
-      };
-  
-      Object.keys(query).forEach(
-        (key) =>
-          (query[key] === undefined || query[key] === "") && delete query[key]
-      );
-  
-      // Find existing record for THIS specific inspector
-      let record = await AfterIroning.findOne(query);
-  
-      if (!record) {
-        record = new AfterIroning({
-          ...formData,
-          inspector: {
-            empId: userId
-          },
-          colorOrderQty: formData.colorOrderQty,
-          userId,
-          savedAt,
-          status: "processing"
-        });
-      } else {
-        Object.assign(record, formData);
-        record.inspector.empId = userId;
-        record.userId = userId;
-        record.savedAt = savedAt;
-        record.status = "processing";
-      }
-  
-      await record.save();
-  
-      res.json({ success: true, id: record._id });
-    } catch (err) {
-      console.error("OrderData-save error:", err);
-      res.status(500).json({
-        success: false,
-        message: "Server error while saving order data."
+    const dateValue = formData.date
+      ? new Date(
+          formData.date.length === 10
+            ? formData.date + "T00:00:00.000Z"
+            : formData.date
+        )
+      : undefined;
+
+    // Clean up defectDetails to prevent casting errors on save
+    if (formData.defectDetails && Array.isArray(formData.defectDetails.defectsByPc)) {
+      formData.defectDetails.defectsByPc.forEach(pc => {
+        if (Array.isArray(pc.pcDefects)) {
+          pc.pcDefects.forEach(defect => {
+            if (defect.defectImages && defect.defectImages.some(img => typeof img === 'object')) {
+              defect.defectImages = defect.defectImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
+            }
+          });
+        }
       });
     }
+
+    // Clean up inspectionDetails to prevent casting errors on save
+    if (formData.inspectionDetails && Array.isArray(formData.inspectionDetails.checkpointInspectionData)) {
+      formData.inspectionDetails.checkpointInspectionData.forEach(checkpoint => {
+        // Clean up main checkpoint images
+        if (checkpoint.comparisonImages && checkpoint.comparisonImages.some(img => typeof img === 'object')) {
+          checkpoint.comparisonImages = checkpoint.comparisonImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
+        }
+        // Clean up sub-point images
+        if (Array.isArray(checkpoint.subPoints)) {
+          checkpoint.subPoints.forEach(subPoint => {
+            if (subPoint.comparisonImages && subPoint.comparisonImages.some(img => typeof img === 'object')) {
+              subPoint.comparisonImages = subPoint.comparisonImages.filter(img => typeof img === 'string' && (img.startsWith('http') || img.startsWith('/storage')));
+            }
+          });
+        }
+      });
+    }
+
+    let record;
+
+    // CRITICAL FIX: If _id is provided, update that specific record
+    if (formData._id) {
+      console.log('Updating existing record with ID:', formData._id);
+      record = await AfterIroning.findById(formData._id);
+      
+      if (record) {
+        // Update existing record with new data, preserving measurementDetails
+        const updateData = {
+          ...formData,
+          measurementDetails: formData.measurementDetails,
+          inspector: { empId: userId },
+          userId: userId,
+          savedAt: savedAt,
+          status: record.status === "submitted" ? "submitted" : "processing"
+        };
+        
+        // Remove _id from update data to avoid conflicts
+        delete updateData._id;
+        
+        Object.assign(record, updateData);
+        await record.save();
+        
+        console.log('Successfully updated existing record');
+        return res.json({ success: true, id: record._id });
+      } else {
+        console.log('Record with provided _id not found, creating new record');
+      }
+    }
+
+    // If no _id provided or record not found, try to find existing record
+    if (!record) {
+      // Build the query for uniqueness - but make it more flexible
+      const query = {
+        orderNo: formData.orderNo,
+        color: formData.color,
+        before_after_wash: formData.before_after_wash,
+        "inspector.empId": userId,
+        // status: { $ne: "submitted" } // Don't match submitted records
+      };
+
+      // Only add date to query if it's provided and valid
+      if (dateValue) {
+        query.date = dateValue;
+      }
+
+      // Only add these fields to query if they're provided
+      if (formData.factoryName) query.factoryName = formData.factoryName;
+      if (formData.reportType) query.reportType = formData.reportType;
+      if (formData.ironingType) query.ironingType = formData.ironingType;
+
+      console.log('Searching for existing record with query:', query);
+      record = await AfterIroning.findOne(query);
+    }
+
+    if (!record) {
+      // Create new record
+      console.log('Creating new record');
+      record = new AfterIroning({
+        ...formData,
+        date: dateValue,
+        inspector: { empId: userId },
+        colorOrderQty: formData.colorOrderQty,
+        userId,
+        savedAt,
+       status: "processing"
+      });
+    } else {
+      // Update existing record
+      console.log('Updating found record:', record._id);
+      Object.assign(record, {
+        ...formData,
+        date: dateValue,
+        inspector: { empId: userId },
+        userId: userId,
+        savedAt: savedAt,
+        status: record.status === "submitted" ? "submitted" : "processing",
+        // Preserve existing measurementDetails if not provided
+        measurementDetails: formData.measurementDetails || record.measurementDetails
+      });
+    }
+
+    await record.save();
+    console.log('Record saved successfully:', record._id);
+
+    res.json({ success: true, id: record._id });
+  } catch (err) {
+    console.error("OrderData-save error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Server error while saving order data."
+    });
+  }
 };
+
 
 export const saveAfterIroningInspectionData = async (req, res) => {
   try {
@@ -1397,198 +1538,170 @@ export const getmeasurmentSpec = async (req, res) => {
 };
 
 export const saveAfterIroningSummary = async (req, res) => {
-    try {
-        const { recordId } = req.params;
-        const summary = req.body.summary || {};
-    
-        const qcRecord = await AfterIroning.findById(recordId);
-        if (!qcRecord) {
-          return res.status(404).json({ success: false, message: "Record not found." });
-        }
-    
-        // Store the previous result for comparison
-        const previousResult = qcRecord.overallFinalResult;
-    
-        // 1. Calculate measurement statistics from current data
-        let totalMeasurementPoints = 0;
-        let totalMeasurementPass = 0;
-        let totalMeasurementFail = 0;
-    
-        // Use measurementSizeSummary if available (most accurate)
-        if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
-          qcRecord.measurementDetails.measurementSizeSummary.forEach(sizeData => {
-            totalMeasurementPoints += (sizeData.checkedPoints || 0);
-            totalMeasurementPass += (sizeData.totalPass || 0);
-            totalMeasurementFail += (sizeData.totalFail || 0);
-          });
-        } else if (qcRecord.measurementDetails?.measurement?.length > 0) {
-          // Fallback: Calculate from measurement array
-          qcRecord.measurementDetails.measurement.forEach((data) => {
-            if (data.pcs && Array.isArray(data.pcs)) {
-              data.pcs.forEach((pc) => {
-                if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
-                  pc.measurementPoints.forEach((point) => {
-                    if (point.result === "pass" || point.result === "fail") {
-                      totalMeasurementPoints++;
-                      if (point.result === "pass") {
-                        totalMeasurementPass++;
-                      } else {
-                        totalMeasurementFail++;
-                      }
-                    }
-                  });
+  try {
+    const { recordId } = req.params;
+    const summary = req.body.summary || {};
+
+    const qcRecord = await AfterIroning.findById(recordId);
+    if (!qcRecord) {
+      return res.status(404).json({ success: false, message: "Record not found." });
+    }
+
+    // Store the previous result for comparison
+    const previousResult = qcRecord.overallFinalResult;
+
+    // 1. Calculate measurement statistics from current data
+    let totalMeasurementPoints = 0;
+    let totalMeasurementPass = 0;
+    let totalMeasurementFail = 0;
+
+    // Use measurementSizeSummary if available (most accurate)
+    if (qcRecord.measurementDetails?.measurementSizeSummary?.length > 0) {
+      qcRecord.measurementDetails.measurementSizeSummary.forEach(sizeData => {
+        totalMeasurementPoints += (sizeData.checkedPoints || 0);
+        totalMeasurementPass += (sizeData.totalPass || 0);
+        totalMeasurementFail += (sizeData.totalFail || 0);
+      });
+    } else if (qcRecord.measurementDetails?.measurement?.length > 0) {
+      // Fallback: Calculate from measurement array
+      qcRecord.measurementDetails.measurement.forEach((data) => {
+        if (data.pcs && Array.isArray(data.pcs)) {
+          data.pcs.forEach((pc) => {
+            if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
+              pc.measurementPoints.forEach((point) => {
+                if (point.result === "pass" || point.result === "fail") {
+                  totalMeasurementPoints++;
+                  if (point.result === "pass") {
+                    totalMeasurementPass++;
+                  } else {
+                    totalMeasurementFail++;
+                  }
                 }
               });
             }
           });
         }
-    
-        // 2. Calculate defect statistics from current data
-        let totalCheckedPcs = 0;
-        let rejectedDefectPcs = 0;
-        let totalDefectCount = 0;
-    
-        // Calculate totalCheckedPcs from measurement data
-        if (qcRecord.measurementDetails?.measurement) {
-          qcRecord.measurementDetails.measurement.forEach((measurement) => {
-            if (typeof measurement.qty === "number" && measurement.qty > 0) {
-              totalCheckedPcs += measurement.qty;
-            }
-          });
+      });
+    }
+
+    // 2. Calculate defect statistics from current data
+    let totalCheckedPcs = 0;
+    let rejectedDefectPcs = 0;
+    let totalDefectCount = 0;
+
+    // Calculate totalCheckedPcs from measurement data
+    if (qcRecord.measurementDetails?.measurement) {
+      qcRecord.measurementDetails.measurement.forEach((measurement) => {
+        if (typeof measurement.qty === "number" && measurement.qty > 0) {
+          totalCheckedPcs += measurement.qty;
         }
-        
-        // Fallback to checkedQty if no measurement data
-        if (totalCheckedPcs === 0) {
-          totalCheckedPcs = parseInt(qcRecord.checkedQty, 10) || 0;
+      });
+    }
+    
+    // Fallback to checkedQty if no measurement data
+    if (totalCheckedPcs === 0) {
+      totalCheckedPcs = parseInt(qcRecord.checkedQty, 10) || 0;
+    }
+
+    // Calculate defects
+    const defectDetails = qcRecord.defectDetails || {};
+    if (Array.isArray(defectDetails.defectsByPc)) {
+      rejectedDefectPcs = defectDetails.defectsByPc.length;
+      totalDefectCount = defectDetails.defectsByPc.reduce((sum, pc) =>
+        sum + (Array.isArray(pc.pcDefects)
+          ? pc.pcDefects.reduce((defSum, defect) =>
+              defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+          : 0), 0);
+    }
+
+    // 3. Calculate pass rate
+    const passRate = totalMeasurementPoints > 0 
+      ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
+      : 100;
+
+    // 4. CRITICAL FIX: Determine overall result based on BOTH measurement pass rate AND defect result
+    const measurementResult = passRate >= 95 ? "Pass" : "Fail";
+    
+    // Get defect result from defectDetails
+    const defectResult = qcRecord.defectDetails?.result || "Pass";
+    
+    console.log('Overall result calculation:', {
+      passRate,
+      measurementResult,
+      defectResult,
+      reportType: qcRecord.reportType
+    });
+
+    // CRITICAL FIX: Overall result logic - SIMPLIFIED AND CORRECTED
+    let newOverallFinalResult;
+    
+    // For ALL report types: Pass rate >= 95% AND defect result = "Pass"
+    newOverallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+
+    console.log('Final calculation result:', {
+      condition1: `Pass Rate ${passRate}% >= 95%: ${passRate >= 95}`,
+      condition2: `Defect Result "${defectResult}" === "Pass": ${defectResult === "Pass"}`,
+      finalResult: newOverallFinalResult
+    });
+
+    // 5. Update ALL calculated fields with fresh values
+    qcRecord.totalCheckedPcs = totalCheckedPcs;
+    qcRecord.rejectedDefectPcs = rejectedDefectPcs;
+    qcRecord.totalDefectCount = totalDefectCount;
+    qcRecord.defectRate = totalCheckedPcs > 0
+      ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1))
+      : 0;
+    qcRecord.defectRatio = totalCheckedPcs > 0
+      ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
+      : 0;
+    qcRecord.totalCheckedPoint = totalMeasurementPoints;
+    qcRecord.totalPass = totalMeasurementPass;
+    qcRecord.totalFail = totalMeasurementFail;
+    qcRecord.passRate = passRate;
+    
+    // CRITICAL FIX: Set the new overall result
+    qcRecord.overallFinalResult = newOverallFinalResult;
+    
+    // Mark the field as modified to ensure it gets saved
+    qcRecord.markModified('overallFinalResult');
+    
+    // Save the record
+    await qcRecord.save();
+
+    console.log('Saved overall result:', qcRecord.overallFinalResult);
+
+    // DETAILED RESPONSE FOR DEBUGGING
+    res.json({ 
+      success: true,
+      message: "Overall result recalculated and saved successfully",
+      previousResult: previousResult,
+      newResult: newOverallFinalResult,
+      debugInfo: {
+        measurementCalculation: {
+          totalPoints: totalMeasurementPoints,
+          totalPass: totalMeasurementPass,
+          totalFail: totalMeasurementFail,
+          passRate: passRate,
+          measurementResult: measurementResult,
+          passRateThreshold: 95
+        },
+        defectCalculation: {
+          defectResult: defectResult,
+          totalDefectCount: totalDefectCount
+        },
+        overallCalculation: {
+          reportType: qcRecord.reportType,
+          logic: `(Pass Rate ${passRate}% >= 95% AND Defect Result "${defectResult}" === "Pass") = ${newOverallFinalResult}`,
+          finalResult: newOverallFinalResult
         }
-    
-        // Calculate defects
-        const defectDetails = qcRecord.defectDetails || {};
-        if (Array.isArray(defectDetails.defectsByPc)) {
-          rejectedDefectPcs = defectDetails.defectsByPc.length;
-          totalDefectCount = defectDetails.defectsByPc.reduce((sum, pc) =>
-            sum + (Array.isArray(pc.pcDefects)
-              ? pc.pcDefects.reduce((defSum, defect) =>
-                  defSum + (parseInt(defect.defectQty, 10) || 0), 0)
-              : 0), 0);
-        }
-    
-        // 3. Calculate pass rate
-        const passRate = totalMeasurementPoints > 0 
-          ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
-          : 100;
-    
-        // 4. Determine measurement result based on 95% threshold
-        let measurementResult = "Pass";
-        if (totalMeasurementPoints > 0) {
-          // Use 95% pass rate threshold for measurement result
-          measurementResult = passRate >= 95 ? "Pass" : "Fail";
-        }
-    
-        // 5. Determine defect result based on current data and AQL
-        let defectResult;
-        const aql = qcRecord.aql?.[0];
-        
-        if (aql && typeof aql.acceptedDefect === "number") {
-          // Use AQL logic
-          defectResult = totalDefectCount <= aql.acceptedDefect ? "Pass" : "Fail";
-        } else {
-          // Fallback: use saved defect result or assume Pass if no defects
-          defectResult =
-            qcRecord.defectDetails?.result ||
-            (totalDefectCount === 0 ? "Pass" : "Fail");
-        }
-    
-        // 6. Calculate FRESH overall result
-        let newOverallFinalResult;
-        const isSOP = qcRecord.reportType === "SOP";
-    
-        // For SOP, both measurement and defects must pass.
-        const isMeasurementPass = passRate >= 95;
-        const isDefectPass = totalDefectCount === 0;
-    
-        if (isSOP) {
-          newOverallFinalResult =
-            isMeasurementPass && isDefectPass ? "Pass" : "Fail";
-        } else {
-          // For other report types, use the individual results
-          newOverallFinalResult =
-            measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
-        }
-    
-        // 7. Update ALL calculated fields with fresh values
-        qcRecord.totalCheckedPcs = totalCheckedPcs;
-        qcRecord.rejectedDefectPcs = rejectedDefectPcs;
-        qcRecord.totalDefectCount = totalDefectCount;
-        qcRecord.defectRate = totalCheckedPcs > 0
-          ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1))
-          : 0;
-        qcRecord.defectRatio = totalCheckedPcs > 0
-          ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
-          : 0;
-        qcRecord.totalCheckedPoint = totalMeasurementPoints;
-        qcRecord.totalPass = totalMeasurementPass;
-        qcRecord.totalFail = totalMeasurementFail;
-        qcRecord.passRate = passRate;
-        
-        // CRITICAL FIX: Set the new overall result
-        qcRecord.overallFinalResult = newOverallFinalResult;
-        
-        // Mark the field as modified to ensure it gets saved
-        qcRecord.markModified('overallFinalResult');
-        
-        // Save the record
-        await qcRecord.save();
-    
-        // DETAILED RESPONSE FOR DEBUGGING
-        res.json({ 
-          success: true,
-          message: "Overall result recalculated and saved successfully",
-          previousResult: previousResult,
-          newResult: newOverallFinalResult,
-          debugInfo: {
-            measurementCalculation: {
-              totalPoints: totalMeasurementPoints,
-              totalPass: totalMeasurementPass,
-              totalFail: totalMeasurementFail,
-              passRate: passRate,
-              measurementResult: measurementResult,
-              logic: qcRecord.reportType === "SOP"
-                ? `SOP Logic: (Measurement Pass Rate ${passRate}% >= 95%) AND (Defect Count ${totalDefectCount} === 0)`
-                : `Standard Logic: (Measurement Result '${measurementResult}' === 'Pass') AND (Defect Result '${defectResult}' === 'Pass')`
-            },
-            defectCalculation: {
-              totalDefectCount: totalDefectCount,
-              aqlAcceptedDefect: aql?.acceptedDefect || "N/A",
-              defectResult: defectResult,
-              logic: `${totalDefectCount} defects <= ${aql?.acceptedDefect || 0} = ${defectResult}`
-            },
-            overallCalculation: {
-              measurementResult: measurementResult,
-              defectResult: defectResult,
-              overallResult: newOverallFinalResult,
-              logic: `(${measurementResult} AND ${defectResult}) = ${newOverallFinalResult}`
-            }
-          },
-          calculatedValues: {
-            totalCheckedPcs,
-            rejectedDefectPcs,
-            totalDefectCount,
-            totalMeasurementPoints,
-            totalMeasurementPass,
-            totalMeasurementFail,
-            passRate,
-            measurementResult,
-            defectResult,
-            overallFinalResult: newOverallFinalResult
-          }
-        });
-    
-      } catch (error) {
-        console.error("Save summary error:", error);
-        res.status(500).json({ success: false, message: "Failed to save summary." });
       }
-  };
+    });
+
+  } catch (error) {
+    console.error("Save summary error:", error);
+    res.status(500).json({ success: false, message: "Failed to save summary." });
+  }
+};
 
 export const updateAfterIroningMeasurementData = async (req, res) => {
   try {
@@ -2062,97 +2175,169 @@ function calculateMeasurementSizeSummary(measurementDetail) {
 // Save or update measurement details for a record
 export const saveAfterIroningMeasurementData = async (req, res) => {
   try {
-      const { recordId, measurementDetail } = req.body;
-      
-      if (!recordId || !measurementDetail) {
-        return res.status(400).json({
-          success: false,
-          message: "Missing recordId or measurementDetail"
-        });
-      }
-      
-      if (!measurementDetail.before_after_wash || !measurementDetail.kvalue) {
-        return res.status(400).json({
-          success: false,
-          message: "before_after_wash and kvalue are required in measurementDetail"
-        });
-      }
-  
-      const record = await AfterIroning.findById(recordId);
-      if (!record) {
-        return res.status(404).json({ 
-          success: false, 
-          message: "Record not found" 
-        });
-      }
-  
-      if (!record.measurementDetails) {
-        record.measurementDetails = {
-          measurement: [],
-          measurementSizeSummary: []
-        };
-      }
-  
-      const washType = measurementDetail.before_after_wash;
-      const isEdit = measurementDetail.isEdit === true;
-   
-      const measurementIndex = record.measurementDetails.measurement.findIndex(
-        (m) => 
-          m.size === measurementDetail.size &&
-          m.kvalue === measurementDetail.kvalue &&
-          m.before_after_wash === washType
-      );
-      
-      let summaryIndex = -1;
-  
-      summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
-        (s) => 
-          s.size === measurementDetail.size &&
-          s.kvalue === measurementDetail.kvalue &&
-          s.before_after_wash === washType
-      );
-      
-      if (summaryIndex === -1) {
-        summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
-          (s) => 
-            s.size === measurementDetail.size &&
-            s.kvalue === measurementDetail.kvalue
-        );
-        
-      }
-      
-      // Calculate new summary
-      const summary = calculateMeasurementSizeSummary(measurementDetail);
-      
-      if (measurementIndex !== -1) {
-        record.measurementDetails.measurement[measurementIndex] = measurementDetail;
-      } else {
-        record.measurementDetails.measurement.push(measurementDetail);
-      }
-      
-      if (summaryIndex !== -1) {
-        record.measurementDetails.measurementSizeSummary[summaryIndex] = summary;
-      } else {
-        record.measurementDetails.measurementSizeSummary.push(summary);
-      }
-  
-      record.savedAt = new Date();
-      await record.save();
-  
-      res.json({
-        success: true,
-        message: isEdit ? "Measurement detail updated" : "Measurement detail saved",
-        measurementDetails: record.measurementDetails
-      });
-  
-    } catch (err) {
-      console.error("Measurement save error:", err);
-      res.status(500).json({ 
-        success: false, 
-        message: "Failed to save measurement detail" 
+    const { recordId, measurementDetail } = req.body;
+    
+    if (!recordId || !measurementDetail) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing recordId or measurementDetail"
       });
     }
+    
+    if (!measurementDetail.before_after_wash || !measurementDetail.kvalue) {
+      return res.status(400).json({
+        success: false,
+        message: "before_after_wash and kvalue are required in measurementDetail"
+      });
+    }
+
+    const record = await AfterIroning.findById(recordId);
+    if (!record) {
+      return res.status(404).json({ 
+        success: false, 
+        message: "Record not found" 
+      });
+    }
+
+    console.log(`Updating measurement for record ${recordId} (status: ${record.status})`);
+
+    if (!record.measurementDetails) {
+      record.measurementDetails = {
+        measurement: [],
+        measurementSizeSummary: []
+      };
+    }
+
+    const washType = measurementDetail.before_after_wash;
+
+    // Find existing measurement index
+    const measurementIndex = record.measurementDetails.measurement.findIndex(
+      (m) => 
+        m.size === measurementDetail.size &&
+        m.kvalue === measurementDetail.kvalue &&
+        m.before_after_wash === washType
+    );
+
+    // Update or add measurement
+    if (measurementIndex !== -1) {
+      record.measurementDetails.measurement[measurementIndex] = measurementDetail;
+      console.log(`Updated existing measurement at index ${measurementIndex}`);
+    } else {
+      record.measurementDetails.measurement.push(measurementDetail);
+      console.log(`Added new measurement for size ${measurementDetail.size}, kvalue ${measurementDetail.kvalue}`);
+    }
+    
+    // Find existing summary index
+    let summaryIndex = record.measurementDetails.measurementSizeSummary.findIndex(
+      (s) => 
+        s.size === measurementDetail.size &&
+        s.kvalue === measurementDetail.kvalue &&
+        s.before_after_wash === washType
+    );
+
+    const summaryData = measurementDetail.summaryData || calculateMeasurementSizeSummary(measurementDetail);
+    
+    // Update or add summary
+    if (summaryIndex !== -1) {
+      record.measurementDetails.measurementSizeSummary[summaryIndex] = summaryData;
+      console.log(`Updated existing summary at index ${summaryIndex}`);
+    } else {
+      record.measurementDetails.measurementSizeSummary.push(summaryData);
+      console.log(`Added new summary for size ${measurementDetail.size}, kvalue ${measurementDetail.kvalue}`);
+    }
+
+    // CRITICAL FIX: Recalculate overall summary for all records (not just submitted)
+    console.log('Recalculating overall summary...');
+    
+    // Recalculate top-level summary from measurementSizeSummary
+    let totalCheckedPoint = 0;
+    let totalPass = 0;
+    let totalFail = 0;
+    let totalCheckedPcs = 0;
+
+    record.measurementDetails.measurementSizeSummary.forEach(sizeData => {
+      totalCheckedPoint += (sizeData.checkedPoints || 0);
+      totalPass += (sizeData.totalPass || 0);
+      totalFail += (sizeData.totalFail || 0);
+      totalCheckedPcs += (sizeData.checkedPcs || 0);
+    });
+
+    // Calculate pass rate
+    const passRate = totalCheckedPoint > 0 
+      ? Math.round((totalPass / totalCheckedPoint) * 100) 
+      : 100;
+
+    // Update top-level fields
+    record.totalCheckedPoint = totalCheckedPoint;
+    record.totalPass = totalPass;
+    record.totalFail = totalFail;
+    record.passRate = passRate;
+    
+    // Update totalCheckedPcs only if we have measurement data
+    if (totalCheckedPcs > 0) {
+      record.totalCheckedPcs = totalCheckedPcs;
+    }
+
+    // CRITICAL FIX: Recalculate overall result correctly
+    const measurementResult = passRate >= 95 ? "Pass" : "Fail";
+    const defectResult = record.defectDetails?.result || "Pass";
+    
+    console.log('Overall result recalculation:', {
+      passRate,
+      measurementResult,
+      defectResult,
+      reportType: record.reportType
+    });
+
+    // let newOverallResult;
+    
+    const newOverallResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+    
+    record.overallFinalResult = newOverallResult;
+    record.markModified('overallFinalResult');
+    
+    console.log('Updated overall summary:', {
+      totalCheckedPoint,
+      totalPass,
+      totalFail,
+      passRate,
+      overallFinalResult: newOverallResult
+    });
+    
+    record.savedAt = new Date();
+    await record.save();
+
+    console.log('Saved measurement details with summary:', {
+      measurement: record.measurementDetails.measurement.length,
+      summary: record.measurementDetails.measurementSizeSummary.length,
+      recordStatus: record.status,
+      finalOverallResult: record.overallFinalResult
+    });
+
+    res.json({
+      success: true,
+      message: "Measurement detail saved with summary",
+      measurementDetails: record.measurementDetails,
+      overallSummary: {
+        totalCheckedPoint: record.totalCheckedPoint,
+        totalPass: record.totalPass,
+        totalFail: record.totalFail,
+        passRate: record.passRate,
+        overallFinalResult: record.overallFinalResult
+      }
+    });
+
+  } catch (err) {
+    console.error("Measurement save error:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to save measurement detail",
+      error: err.message
+    });
+  }
 };
+
+
 
 // Load color-specific data
 export const loadAfterIroningColorData = async (req, res) => {
@@ -2240,45 +2425,117 @@ export const getAfterIroningSubmittedData = async (req, res) => {
 };
 
 export const saveAfterIroning = async (req, res) => {
-try {
-    const { orderNo } = req.body;
+  try {
+    const { orderNo, recordId } = req.body;
+    
     if (!orderNo) {
-      return res
-        .status(400)
-        .json({ success: false, message: "orderNo is required" });
-    }
-    const latestAutoSave = await AfterIroning.findOne({
-      orderNo,
-    }).sort({ updatedAt: -1 });
-
-    if (!latestAutoSave) {
-      return res.status(404).json({
-        success: false,
-        message: "No auto-save record found to submit."
+      return res.status(400).json({ 
+        success: false, 
+        message: "orderNo is required" 
       });
     }
 
-    latestAutoSave.isAutoSave = false;
-    latestAutoSave.status = "submitted";
-    latestAutoSave.submittedAt = new Date();
-    latestAutoSave.savedAt = new Date();
-    await latestAutoSave.save();
+    // Find the record to submit
+    let recordToSubmit;
+    
+    if (recordId) {
+      recordToSubmit = await AfterIroning.findById(recordId);
+    } else {
+      recordToSubmit = await AfterIroning.findOne({
+        orderNo,
+        status: { $ne: "submitted" }
+      }).sort({ updatedAt: -1 });
+    }
+
+    if (!recordToSubmit) {
+      return res.status(404).json({
+        success: false,
+        message: "No record found to submit."
+      });
+    }
+
+    // CRITICAL FIX: Recalculate top-level summary from measurementSizeSummary before submitting
+    if (recordToSubmit.measurementDetails?.measurementSizeSummary?.length > 0) {
+      let totalCheckedPoint = 0;
+      let totalPass = 0;
+      let totalFail = 0;
+      let totalCheckedPcs = 0;
+
+      recordToSubmit.measurementDetails.measurementSizeSummary.forEach(sizeData => {
+        totalCheckedPoint += (sizeData.checkedPoints || 0);
+        totalPass += (sizeData.totalPass || 0);
+        totalFail += (sizeData.totalFail || 0);
+        totalCheckedPcs += (sizeData.checkedPcs || 0);
+      });
+
+      // Calculate pass rate
+      const passRate = totalCheckedPoint > 0 
+        ? Math.round((totalPass / totalCheckedPoint) * 100) 
+        : 100;
+
+      // Update top-level fields
+      recordToSubmit.totalCheckedPoint = totalCheckedPoint;
+      recordToSubmit.totalPass = totalPass;
+      recordToSubmit.totalFail = totalFail;
+      recordToSubmit.passRate = passRate;
+      
+      // Update totalCheckedPcs only if we have measurement data
+      if (totalCheckedPcs > 0) {
+        recordToSubmit.totalCheckedPcs = totalCheckedPcs;
+      }
+
+      // Recalculate overall result
+      const measurementResult = passRate >= 95 ? "Pass" : "Fail";
+      const defectResult = recordToSubmit.defectDetails?.result || "Pass";
+      
+      // For SOP, both measurement and defects must pass
+      const isSOP = recordToSubmit.reportType === "SOP";
+      let newOverallResult;
+      
+      if (isSOP) {
+        const isMeasurementPass = passRate >= 95;
+        const isDefectPass = (recordToSubmit.totalDefectCount || 0) === 0;
+        newOverallResult = isMeasurementPass && isDefectPass ? "Pass" : "Fail";
+      } else {
+        newOverallResult = measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
+      }
+      
+      recordToSubmit.overallFinalResult = newOverallResult;
+
+      console.log('Updated top-level summary before submit:', {
+        totalCheckedPoint,
+        totalPass,
+        totalFail,
+        passRate,
+        overallFinalResult: newOverallResult
+      });
+    }
+
+    // Update status and submission timestamp
+    recordToSubmit.isAutoSave = false;
+    recordToSubmit.status = "submitted";
+    recordToSubmit.submittedAt = new Date();
+    recordToSubmit.savedAt = new Date();
+
+    await recordToSubmit.save();
 
     res.json({
       success: true,
-      submissionId: latestAutoSave._id,
-      message: "QC Washing data submitted successfully"
+      submissionId: recordToSubmit._id,
+      message: "After Ironing data submitted successfully"
     });
+
   } catch (error) {
     console.error("Submit error:", error);
     res.status(500).json({
       success: false,
       message: "Failed to submit data",
-      error: error.message,
-      stack: error.stack
+      error: error.message
     });
   }
 };
+
+
 
 // function normalizeInspectionImagePath(img) {
 //   if (!img) return "";
