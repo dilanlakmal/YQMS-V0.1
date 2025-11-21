@@ -44,10 +44,10 @@ const DashboardPage = ({ basePath = "/ai-agent" }) => {
         </div>
 
         <div className="options">
-          <div className="option">
+          {/* <div className="option">
             <img src="/chat.png" alt="" />
             <span>New Chat</span>
-          </div>
+          </div> */}
           <div className="option">
             <img src="/image.png" alt="" />
             <span>Analyze Image for YQMS</span>

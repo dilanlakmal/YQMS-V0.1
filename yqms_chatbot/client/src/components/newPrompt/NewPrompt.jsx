@@ -31,7 +31,9 @@ const NewPrompt = ({ data }) => {
   }, []);
 
   useEffect(() => {
-    endRef.current.scrollIntoView({ behavior: "smooth" });
+    if (endRef.current) {
+      endRef.current.scrollIntoView({ behavior: "smooth" });
+    }
   }, [question, answer, img.dbData]);
 
   const mutation = useMutation({
@@ -44,7 +46,10 @@ const NewPrompt = ({ data }) => {
       queryClient.invalidateQueries({ queryKey: ["chat", data._id] }).then(() => {
         formRef.current?.reset();
         setQuestion("");
-        setAnswer("");
+        // Clear answer only after a delay to ensure DB data is loaded
+        setTimeout(() => {
+          setAnswer("");
+        }, 500);
         setMutationError("");
         setImg({
           isLoading: false,
@@ -61,8 +66,7 @@ const NewPrompt = ({ data }) => {
 
   const add = async (text, currentImg, isInitial = false) => {
     if (!isInitial) setQuestion(text);
-    setAnswer("");
-
+    
     try {
       if (!chatRef.current) {
         chatRef.current = ai.chats.create({
@@ -70,25 +74,28 @@ const NewPrompt = ({ data }) => {
           history: []
         });
       }
-
+  
       const contents = [text];
       if (currentImg?.aiData && Object.keys(currentImg.aiData).length > 0) {
         contents.push(currentImg.aiData);
       }
-
+  
       let fullAnswer = "";
+      setAnswer(""); // Clear previous answer when starting new stream
       const stream = await chatRef.current.sendMessageStream({
         message: contents
       });
-
+  
       for await (const chunk of stream) {
         fullAnswer += chunk.text;
         setAnswer(fullAnswer);
       }
-
-      if (!isInitial) {
+  
+      // Always save to database, even for initial response
+      if (fullAnswer) {
         await mutation.mutateAsync({
-          question: text,
+          // don’t push the question again for the initial response
+          question: isInitial ? null : text,
           answer: fullAnswer,
           img: currentImg?.dbData?.filePath
         });
@@ -117,6 +124,15 @@ const NewPrompt = ({ data }) => {
     }
   }, [data]);
 
+  // Check if a message is already in the database history
+  const isMessageInHistory = (text) => {
+    if (!data?.history) return false;
+    return data.history.some(msg => 
+      msg.role === "model" && 
+      msg.parts?.[0]?.text === text
+    );
+  };
+
   return (
     <>
       {img.isLoading && <div>Uploading...</div>}
@@ -125,12 +141,13 @@ const NewPrompt = ({ data }) => {
           urlEndpoint={import.meta.env.VITE_IMAGE_KIT_ENDPOINT}
           path={img.dbData?.filePath}
           width="250"
-          transformation={{ width: 380 }}
+          transformation={[{ width: 380 }]}  
         />
       )}
 
       {question && <div className="message user">{question}</div>}
-      {answer && (
+      {/* Only show streaming answer if it's not already in database history */}
+      {answer && !isMessageInHistory(answer) && (
         <div className="message">
           {answer === "Thinking..." ? (
             <div className="typing-indicator"></div>
