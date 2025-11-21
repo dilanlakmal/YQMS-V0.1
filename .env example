@@ -5,37 +5,37 @@ VITE_API_BASE_URL=http://localhost:5001
 # Azure Translator (Fake Example Values)
 ###############################################
 
-AZURE_TRANSLATOR_KEY="FAKE_KEY_1234567890ABCDEFGH1234567890ABCDEFGH"
-AZURE_TRANSLATOR_ENDPOINT="https://fake-translator-endpoint.cognitiveservices.azurefake.com"
-AZURE_TRANSLATOR_REGION="eastasia"
+AZURE_TRANSLATOR_KEY="your-azure-translator-key"
+AZURE_TRANSLATOR_ENDPOINT="your-azure-translator-endpoint"
+AZURE_TRANSLATOR_REGION="your-azure-translator-region"
 
-AZURE_TRANSLATOR_KEY_FILE="FAKE_KEY_FILE_0987654321ZYXWVUT0987654321ZYXWVUT"
-AZURE_TRANSLATOR_ENDPOINT_FILE="https://fake-docs-translator.cognitiveservices.azurefake.com"
+AZURE_TRANSLATOR_KEY_FILE="your-azure-translator-key-file"
+AZURE_TRANSLATOR_ENDPOINT_FILE="your-azure-translator-endpoint-file"
 
 
 ###############################################
 # Azure Blob Storage (Fake Example Values)
 ###############################################
 
-AZURE_STORAGE_ACCOUNT_NAME="fakestorageaccount"
-AZURE_STORAGE_ACCOUNT_KEY="FAKE_STORAGE_KEY_abc123xyz789+/FAKEKEYONLY=="
+AZURE_STORAGE_ACCOUNT_NAME="your-azure-storage-account-name"
+AZURE_STORAGE_ACCOUNT_KEY="your-azure-storage-account-key"
 
-AZURE_STORAGE_SOURCE_CONTAINER="input-container"
-SOURCE_BLOB_SAS_URL="https://fakestorageaccount.blob.core.windows.net/input-container?sp=rl&st=2025-01-01T00:00:00Z&se=2025-12-31T23:59:59Z&spr=https&sv=2025-01-01&sr=c&sig=FAKE_SIGNATURE_1234567890abcdef"
+AZURE_STORAGE_SOURCE_CONTAINER="your-azure-storage-source-container"
+SOURCE_BLOB_SAS_URL="your-azure-storage-source-blob-sas-url"
 
-AZURE_STORAGE_TARGET_CONTAINER="output-container"
-TARGET_BLOB_SAS_URL="https://fakestorageaccount.blob.core.windows.net/output-container?sp=rwl&st=2025-01-01T00:00:00Z&se=2025-12-31T23:59:59Z&spr=https&sv=2025-01-01&sr=c&sig=FAKE_SIGNATURE_abcdef1234567890"
+AZURE_STORAGE_TARGET_CONTAINER="your-azure-storage-target-container"
+TARGET_BLOB_SAS_URL="your-azure-storage-target-blob-sas-url"
 
 # VITE_GEMINI_PUBLIC_KEY=AIzaSyBPCEj5aNwE5xPBhvldQG7yVSVZ8zg3cBw
 # VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/gytoetw8d
 # VITE_IMAGE_KIT_PUBLIC_KEY=public_oFP6dIClvu3/ZlB7HEFqHNI7SHA=
 # VITE_IMAGE_KIT_PRIVATE_KEY=private_qfqi7EmiRRRX7VdQqS/9NYiO9nc=
 
-VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/gytoetw8d
-VITE_IMAGE_KIT_PUBLIC_KEY=public_oFP6dIClvu3/ZlB7HEFqHNI7SHA=
-VITE_GEMINI_PUBLIC_KEY=AIzaSyBPCEj5aNwE5xPBhvldQG7yVSVZ8zg3cBw
+VITE_IMAGE_KIT_ENDPOINT=your-imagekit-endpoint
+VITE_IMAGE_KIT_PUBLIC_KEY=your-imagekit-public-key
+VITE_GEMINI_PUBLIC_KEY=your-gemini-public-key
 # VITE_API_BASE_URL=http://localhost:5001
 
 # IMAGEKIT_PUBLIC_KEY=public_oFP6dIClvu3/ZlB7HEFqHNI7SHA=
-IMAGEKIT_PRIVATE_KEY=private_qfqi7EmiRRRX7VdQqS/9NYiO9nc=
+IMAGEKIT_PRIVATE_KEY=your-imagekit-private-key
 # IMAGEKIT_ENDPOINT=https://ik.imagekit.io/gytoetw8d
