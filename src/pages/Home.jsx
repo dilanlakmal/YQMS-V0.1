@@ -758,6 +758,13 @@ function Home() {
         bgColor: "bg-green-50 dark:bg-green-900/20",
         items: [
           {
+            path: "/ai-agent",
+            roles: ["Admin", "Translator", "System Administration"],
+            image: "assets/Home/ai_chatbot.png",
+            title: "AI Chatbot",
+            description: "YAI assistant for YQMS"
+          },
+          {
             path: "/system-translator",
             roles: ["Admin", "Translator"], // Adjust roles as needed
             image: "assets/Home/translator.png", // You'll need to add this image

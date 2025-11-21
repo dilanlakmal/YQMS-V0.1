@@ -1,0 +1,59 @@
+.rootLayout {
+    padding: 0;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #191918;
+    
+    header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 16px 24px;
+        background-color: #1a1a1a;
+        border-bottom: 1px solid #2d2d2d;
+        flex-shrink: 0;
+        z-index: 100;
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            font-weight: 600;
+            gap: 10px;
+            text-decoration: none;
+            color: #fff;
+            transition: opacity 0.2s ease;
+            
+            &:hover {
+                opacity: 0.8;
+            }
+            
+            img {
+                width: 32px;
+                height: 32px;
+                border-radius: 6px;
+            }
+            
+            span {
+                font-size: 18px;
+                background: linear-gradient(135deg, #217bfe 0%, #e55571 100%);
+                background-clip: text;
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                letter-spacing: -0.5px;
+            }
+        }
+        
+        .user {
+            display: flex;
+            align-items: center;
+        }
+    }
+    
+    main {
+        flex: 1;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+}

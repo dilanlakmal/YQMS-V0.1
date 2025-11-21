@@ -17,6 +17,7 @@ import sharp from "sharp";
 import path from "path";
 import { Server } from "socket.io"; // Import Socket.io
 import { fileURLToPath } from "url";
+import dotenv from "dotenv";
 import createIroningModel from "./models/Ironing.js";
 //import createRoleModel from "./models/Role.js";
 import createRoleManagmentModel from "./models/RoleManagment.js";
@@ -101,6 +102,9 @@ import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "./models/QCWashingQtyOld.js";
 import createQCWorkersModel from "./models/QCWorkers.js";
 import createDTOrdersSchema from "./models/dt_orders.js";
+import createAiChatRoutes from "../yqms_chatbot/backend/routes/aiChatRoutes.js";
+
+dotenv.config();
 
 // import sql from "mssql"; // Import mssql for SQL Server connection
 // import cron from "node-cron"; // Import node-cron for scheduling
@@ -322,7 +326,6 @@ const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
 export const DtOrder = createDTOrdersSchema(ymProdConnection);
-
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -343,6 +346,7 @@ app.use(translateFilesRoute);
   Functional routs
 ------------------------------ */
 app.use(qcRealWashQty);
+
 
 // /* ------------------------------
 //    YM DataSore SQL
@@ -15090,6 +15094,14 @@ const generateRandomString = (length) => {
   }
   return result;
 };
+
+
+
+const aiChatRoutes = createAiChatRoutes({
+  connection: ymProdConnection,
+  authenticateUser
+});
+app.use("/api", aiChatRoutes);
 
 // ------------------------
 // Multer Storage Setup

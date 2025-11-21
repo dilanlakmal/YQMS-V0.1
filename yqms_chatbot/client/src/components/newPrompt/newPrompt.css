@@ -1,0 +1,76 @@
+.endChat {
+    padding-bottom: 80px;
+}
+
+.newPrompt {
+    position: fixed;
+    bottom: 20px;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: center;
+    z-index: 100;
+    padding: 0 20px;
+}
+
+.newForm {
+    width: 50%;
+    max-width: 800px;
+    background-color: #2c2937;
+    border: 1px solid #3d3a47;
+    border-radius: 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 4px 4px 16px;
+    transition: all 0.3s ease;
+
+    &:focus-within {
+        border-color: #4d4a57;
+        box-shadow: 0 0 0 4px rgba(33, 123, 254, 0.1);
+    }
+
+    input[type="text"] {
+        flex: 1;
+        padding: 16px 0;
+        border: none;
+        outline: none;
+        background-color: transparent;
+        color: #ececec;
+        font-size: 15px;
+
+        &::placeholder {
+            color: #8e8e93;
+        }
+    }
+
+    button,
+    label {
+        border-radius: 50%;
+        background: linear-gradient(135deg, #217bfe 0%, #e55571 100%);
+        border: none;
+        padding: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        width: 44px;
+        height: 44px;
+        flex-shrink: 0;
+        transition: all 0.3s ease;
+
+        &:hover {
+            transform: scale(1.05);
+            box-shadow: 0 4px 12px rgba(33, 123, 254, 0.4);
+        }
+
+        &:active {
+            transform: scale(0.95);
+        }
+
+        img {
+            width: 18px;
+            height: 18px;
+        }
+    }
+}

@@ -51,6 +51,7 @@ import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurem
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import QCWashingPage from "./pages/QCWashing.jsx";
 import SystemTranslator from "./pages/SystemTranslator.jsx";
+import AIAgent from "./pages/AIAgent.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -301,6 +302,7 @@ function AppContent() {
             <>
               <Route path="/home" element={<Home />} />
               <Route path="/system-translator" element={<SystemTranslator />} />
+              <Route path="/ai-agent/*" element={<AIAgent />} />
               <Route
                 path="/details"
                 element={

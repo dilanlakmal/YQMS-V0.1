@@ -27,6 +27,3 @@ AZURE_STORAGE_TARGET_CONTAINER="output-container"
 TARGET_BLOB_SAS_URL="https://fakestorageaccount.blob.core.windows.net/output-container?sp=rwl&st=2025-01-01T00:00:00Z&se=2025-12-31T23:59:59Z&spr=https&sv=2025-01-01&sr=c&sig=FAKE_SIGNATURE_abcdef1234567890"
 
 
-
-
-
