@@ -131,6 +131,7 @@ import {
 import qcRealWashQty from "./route/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
 import translateTextRoute from "./route/translate-text/translateTextRoute.js";
 import translateFilesRoute from "./route/translate-files/translateFilesRoute.js";
+import glossaryRoute from "./route/glossaries/glossaryRoute.js";
 
 /* ------------------------------
    Connection String
@@ -341,6 +342,8 @@ app.use(sqlQuery);
 app.use(translateTextRoute);
 // Translate files routes start
 app.use(translateFilesRoute);
+// Glossary routes start
+app.use(glossaryRoute);
 
 /* ------------------------------
   Functional routs

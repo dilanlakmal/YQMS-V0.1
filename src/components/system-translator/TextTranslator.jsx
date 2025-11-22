@@ -68,6 +68,13 @@ export default function TextTranslator() {
 
   return (
     <div className="space-y-6">
+      {/* Info note about glossaries */}
+      <div className="translator-rounded translator-border p-3 text-sm" style={{ backgroundColor: "oklch(0.9 0.05 250 / 0.15)" }}>
+        <p className="translator-text-foreground">
+          <strong>Note:</strong> Glossaries are only available for file translation. Switch to "File Translation" mode to use glossaries for improved accuracy.
+        </p>
+      </div>
+      
       <div className="grid gap-6 md:grid-cols-2">
         {/* Source Text */}
         <div className="space-y-4">

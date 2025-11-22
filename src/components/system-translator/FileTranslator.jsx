@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import LanguageSelector from "./LanguageSelector";
+import GlossarySelector from "./glossaries/GlossarySelector";
 import { API_BASE_URL } from "../../../config";
 
 const VALID_FILE_TYPES = [
@@ -34,6 +35,7 @@ export default function FileTranslator() {
   const [characterCount, setCharacterCount] = useState(null);
   const [estimatedCost, setEstimatedCost] = useState(null);
   const [countingCharacters, setCountingCharacters] = useState(false);
+  const [selectedGlossary, setSelectedGlossary] = useState(null);
 
   // Load files from blob storage
   const loadBlobFiles = async () => {
@@ -260,6 +262,11 @@ export default function FileTranslator() {
         formData.append("sourceLanguage", sourceLanguage)
       }
       // If sourceLanguage is "auto" or null, don't send it - Azure will auto-detect
+      
+      // Add glossary if selected
+      if (selectedGlossary) {
+        formData.append("glossaryBlobName", selectedGlossary)
+      }
 
       setProgress("Submitting translation job to Azure...")
 
@@ -303,6 +310,7 @@ export default function FileTranslator() {
     setError("")
     setSuccess("")
     setProgress("")
+    setSelectedGlossary(null)
   }
 
   const totalFileSize = [...uploadedFiles, ...selectedBlobFiles].reduce((sum, file) => {
@@ -387,7 +395,10 @@ export default function FileTranslator() {
               <label className="text-sm font-semibold translator-text-foreground">Source Language</label>
               <LanguageSelector 
                 value={sourceLanguage} 
-                onChange={setSourceLanguage}
+                onChange={(lang) => {
+                  setSourceLanguage(lang);
+                  setSelectedGlossary(null); // Reset glossary when source language changes
+                }}
                 includeAuto={true}  // Add this prop to enable auto-detect option
                 label=""  // Optional: hide label since it's already shown above
               />
@@ -396,10 +407,23 @@ export default function FileTranslator() {
               <label className="text-sm font-semibold translator-text-foreground">Target Language</label>
               <LanguageSelector 
                 value={targetLanguage} 
-                onChange={setTargetLanguage} 
+                onChange={(lang) => {
+                  setTargetLanguage(lang);
+                  setSelectedGlossary(null); // Reset glossary when target language changes
+                }}
                 label="To:" 
               />
             </div>
+          </div>
+
+          {/* Glossary Selection */}
+          <div className="space-y-2">
+            <GlossarySelector
+              sourceLanguage={sourceLanguage}
+              targetLanguage={targetLanguage}
+              value={selectedGlossary}
+              onChange={setSelectedGlossary}
+            />
           </div>
 
           {/* Available Files from Blob Storage */}

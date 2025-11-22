@@ -17,6 +17,7 @@ import { promisify } from 'util';
 const unlink = promisify(fs.unlink);
 import { countDocumentCharacters, calculateTranslationCost } from "../../utils/documentHelper.js";
 import { logTranslationCost } from "../../utils/translationCostLogger.js";
+import { getGlossaryUrl } from "../glossaries/glossaryController.js";
 
 // Create temp directory if it doesn't exist
 const tempUploadDir = path.join(process.cwd(), 'temp', 'uploads');
@@ -114,11 +115,14 @@ const sanitizeBlobName = (filename) => {
 };
 
 const translateFiles = async (req, res) => {
+  let sourceLanguage; // Declare at function scope
+  let targetLanguage; // Declare at function scope
+  
   try {
     const uploadedFiles = req.files && req.files["files"] ? req.files["files"] : [];
-    const targetLanguage = req.body.targetLanguage;
-    // Remove sourceLanguage requirement - let Azure auto-detect
-    const sourceLanguage = req.body.sourceLanguage || null; // null = auto-detect
+    targetLanguage = req.body.targetLanguage;
+    sourceLanguage = req.body.sourceLanguage || null;
+    const glossaryBlobName = req.body.glossaryBlobName || null;
 
     let selectedBlobFiles = [];
     if (req.body.blobFileNames) {
@@ -302,16 +306,33 @@ const translateFiles = async (req, res) => {
         sourceObject.language = sourceLanguage;
       }
 
+      // Build target object
+      const targetObject = {
+        targetUrl,
+        storageSource: "AzureBlob",
+        language: targetLanguage
+      };
+
+      // Add glossary if provided
+      if (glossaryBlobName) {
+        try {
+          const glossaryInfo = await getGlossaryUrl(glossaryBlobName, 24);
+          // Azure only supports TSV format, so always use "tsv"
+          targetObject.glossaries = [{
+            glossaryUrl: glossaryInfo.glossaryUrl,
+            format: "tsv"  // Always use "tsv" regardless of original file format
+          }];
+          console.log(`Using glossary: ${glossaryBlobName} (converted to TSV)`);
+        } catch (glossaryError) {
+          console.warn(`Failed to get glossary URL for ${glossaryBlobName}:`, glossaryError.message);
+          // Continue without glossary if it fails
+        }
+      }
+
       inputs.push({
         storageType: "File",
         source: sourceObject,
-        targets: [
-          {
-            targetUrl,
-            storageSource: "AzureBlob",
-            language: targetLanguage
-          }
-        ]
+        targets: [targetObject]
       });
 
       processedFiles.push({
