@@ -13,6 +13,8 @@ dist-ssr
 *.local
 
 # Environment variables
+/backend/.env
+backend/.env.*.local
 .env
 .env.local
 .env.*.local
@@ -40,6 +42,10 @@ dist-ssr
 # Ignore all content within the public storage directory.
 # handles all image upload folders in frontend
 public/storage/
+
+# Ignore temporary upload and glossary files
+temp/glossaries/
+temp/uploads/
 
 
 
