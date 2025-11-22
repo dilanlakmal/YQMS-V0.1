@@ -1,4 +1,5 @@
 import { CuttingInspection } from "../../MongoDB/dbConnectionController.js";
+import { createNotification } from "../../Notification/normalNotificationController.js";
 
 export const saveCuttingInspection = async (req, res) => {
   try {
@@ -55,6 +56,8 @@ export const saveCuttingInspection = async (req, res) => {
       }
     }
 
+    let docToProcess = null;
+
     const existingDoc = await CuttingInspection.findOne({
       inspectionDate,
       moNo,
@@ -65,7 +68,7 @@ export const saveCuttingInspection = async (req, res) => {
     if (existingDoc) {
       existingDoc.inspectionData.push(...inspectionData);
       existingDoc.updated_at = new Date();
-      await existingDoc.save();
+      docToProcess = await existingDoc.save();
       res.status(200).json({ message: "Data appended successfully" });
     } else {
       const newDoc = new CuttingInspection({
@@ -93,8 +96,62 @@ export const saveCuttingInspection = async (req, res) => {
         garmentType,
         inspectionData
       });
-      await newDoc.save();
+      docToProcess = await newDoc.save();
       res.status(200).json({ message: "Data saved successfully" });
+    }
+
+    // ============================
+    // NOTIFICATION LOGIC
+    // ============================
+
+    if (docToProcess) {
+      // 1. Calculate total bundles checked across all sizes in the document
+      const currentBundlesChecked = docToProcess.inspectionData.reduce(
+        (sum, item) => {
+          return sum + (item.bundleQtyCheckSize || 0);
+        },
+        0
+      );
+
+      // 2. Collect all sizes for the message
+      const sizesList = docToProcess.inspectionData
+        .map((item) => item.inspectedSize)
+        .filter((val, index, self) => self.indexOf(val) === index) // Unique sizes
+        .join(", ");
+
+      // 3. Check if Inspection is Finished
+      // We check >= just in case of data anomalies, but == is the target
+      if (currentBundlesChecked >= docToProcess.bundleQtyCheck) {
+        const notificationMetadata = {
+          moNo: docToProcess.moNo,
+          tableNo: docToProcess.tableNo,
+          color: docToProcess.color,
+          inspectionDate: docToProcess.inspectionDate,
+          inspectionType: docToProcess.cuttingtype,
+          reporterId: docToProcess.cutting_emp_id,
+          reporterName: docToProcess.cutting_emp_engName,
+          // --- NEW DATA ---
+          totalInspectionQty: docToProcess.totalInspectionQty,
+          totalBundles: docToProcess.bundleQtyCheck,
+          checkedBundles: currentBundlesChecked,
+          sizes: sizesList
+        };
+
+        // Fire Notification
+        createNotification({
+          type: "CUTTING_INSPECTION_SUBMISSION",
+          title: "Cutting Inspection Report Completed", // Changed title to reflect completion
+          message: `MO: ${docToProcess.moNo} | Table: ${docToProcess.tableNo} is complete.`,
+          metadata: notificationMetadata,
+          sender: {
+            emp_id: docToProcess.cutting_emp_id,
+            name: docToProcess.cutting_emp_engName
+          },
+          // Added 'Super Admin' to the list
+          targetRoles: ["Admin", "Super Admin", "Cutting"],
+          link: `/cutting?moNo=${docToProcess.moNo}&tableNo=${docToProcess.tableNo}`
+        });
+      }
     }
   } catch (error) {
     console.error("Error saving cutting inspection data:", error);

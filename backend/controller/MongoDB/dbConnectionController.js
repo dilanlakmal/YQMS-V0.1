@@ -87,6 +87,10 @@ import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefec
 import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
 import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
+import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
+import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
+
+import normalNotificationSchema from "../../models/NormalNotification.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
@@ -211,6 +215,12 @@ export const AfterIroning = createAfterIroningModel(ymProdConnection);
 export const QASectionsBuyer = createQASectionsBuyerModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
+export const QASectionsAqlSampleLetters =
+  createQASectionsAqlSampleLettersModel(ymProdConnection);
+export const QASectionsAqlValues =
+  createQASectionsAqlValuesModel(ymProdConnection);
+
+export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

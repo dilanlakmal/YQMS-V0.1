@@ -125,6 +125,18 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
   const [data, setData] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [stage, setStage] = useState({ value: "M1", label: "M1 - 5 Points" });
+
+  const stageOptions = [
+    { value: "M1", label: "M1 - 5 Points" },
+    { value: "M2", label: "M2 - 2 Points" }
+  ];
+
+  const getApiPrefix = () => {
+    return stage.value === "M2"
+      ? `${API_BASE_URL}/api/anf-measurement-packing`
+      : `${API_BASE_URL}/api/anf-measurement`;
+  };
 
   const [filters, setFilters] = useState({
     startDate: subDays(new Date(), 30),
@@ -151,12 +163,15 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
   const [selectedItem, setSelectedItem] = useState(null);
 
   // --- filter options fetch and data fetch useEffects ---
+  /* ------------------------------------------------------------------
+     Update Filter Fetch to use Dynamic Prefix & Dependency
+     ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/anf-measurement/results/filters`
-        );
+        const prefix = getApiPrefix(); // Use helper
+        const res = await axios.get(`${prefix}/results/filters`);
+
         setFilterOptions({
           buyers: [
             { value: "All", label: "All Buyers" },
@@ -180,22 +195,23 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
       }
     };
     fetchOptions();
-  }, []);
+  }, [stage]); // Add stage dependency
 
+  /* ------------------------------------------------------------------
+     Update Data Fetch to use Dynamic Prefix & Dependency
+     ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       setError(null);
       try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/anf-measurement/results/summary`,
-          {
-            params: {
-              startDate: filters.startDate.toISOString().split("T")[0],
-              endDate: filters.endDate.toISOString().split("T")[0]
-            }
+        const prefix = getApiPrefix(); // Use helper
+        const res = await axios.get(`${prefix}/results/summary`, {
+          params: {
+            startDate: filters.startDate.toISOString().split("T")[0],
+            endDate: filters.endDate.toISOString().split("T")[0]
           }
-        );
+        });
         setData(res.data);
       } catch (err) {
         setError("Failed to fetch summary data. Please try again.");
@@ -207,9 +223,9 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
     if (filters.startDate && filters.endDate) {
       fetchData();
     }
-  }, [filters.startDate, filters.endDate]);
+  }, [filters.startDate, filters.endDate, stage]); // Add stage dependency
 
-  // --- MODIFIED: Apply the dataProcessor function here ---
+  // --- dataProcessor function---
   const processedData = useMemo(() => {
     // The prop function is called here.
     // If not provided, it defaults to (data) => data, returning the original data.
@@ -288,7 +304,7 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
 
         {/* --- FILTERS SECTION --- */}
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md mb-3">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">
                 Start Date
@@ -309,6 +325,18 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
                   setFilters((f) => ({ ...f, endDate: date }))
                 }
                 className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Measurement Stage
+              </label>
+              <Select
+                options={stageOptions}
+                value={stage}
+                onChange={setStage}
+                styles={selectStyles}
+                isSearchable={false}
               />
             </div>
             <div>
@@ -625,6 +653,7 @@ const ANFMeasurementResults = ({ dataProcessor = (data) => data }) => {
           onClose={handleCloseModal}
           itemData={selectedItem}
           dateRange={{ startDate: filters.startDate, endDate: filters.endDate }}
+          stage={stage}
         />
       )}
     </div>

@@ -12,7 +12,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import { API_BASE_URL } from "../../../../config";
 import ANFStyleViewFullReportPDF from "./ANFStyleViewFullReportPDF";
 
@@ -168,10 +168,16 @@ const InfoBlock = ({ label, value, isHighlighted = false }) => (
 // --- MAIN PAGE COMPONENT ---
 const ANFBuyerStyleViewFullReport = () => {
   const { moNo } = useParams();
+  const [searchParams] = useSearchParams();
+  const stageValue = searchParams.get("stage") || "M1";
+
   const [originalReportData, setOriginalReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  /* ------------------------------------------------------------------
+     Update Fetch Logic with Dynamic Prefix
+  ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchReport = async () => {
       if (!moNo) {
@@ -179,9 +185,16 @@ const ANFBuyerStyleViewFullReport = () => {
         setIsLoading(false);
         return;
       }
+
+      const apiPrefix =
+        stageValue === "M2"
+          ? `${API_BASE_URL}/api/anf-measurement-packing`
+          : `${API_BASE_URL}/api/anf-measurement`;
+
       try {
+        // Use dynamic prefix
         const res = await axios.get(
-          `${API_BASE_URL}/api/anf-measurement/style-view-full-report/${moNo}`
+          `${apiPrefix}/style-view-full-report/${moNo}`
         );
         setOriginalReportData(res.data);
       } catch (err) {
@@ -191,9 +204,9 @@ const ANFBuyerStyleViewFullReport = () => {
       }
     };
     fetchReport();
-  }, [moNo]);
+  }, [moNo, stageValue]);
 
-  // --- MODIFICATION: This large memo processes the original data into the buyer's view ---
+  // --- This large memo processes the original data into the buyer's view ---
   const buyerReportData = useMemo(() => {
     if (!originalReportData) return null;
 

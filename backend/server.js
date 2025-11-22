@@ -1,4 +1,9 @@
 import { app, server, PORT} from "./Config/appConfig.js";
+
+/* -----------------------------
+  Notifications
+------------------------------ */
+import normalNotification from "./routes/Notification/normalNotificationRoutes.js";
 /* -----------------------------
 Real Wash Qty Imports
 ------------------------------ */
@@ -71,6 +76,11 @@ ANF Imports
 import ANF from "./routes/ANF/ANFReportRoutes.js";
 import ANFInspection from "./routes/ANF/ANFInspectionRoutes.js";
 import ANFResult from "./routes/ANF/ANFResultRoutes.js";
+import ANFInspectionPacking from "./routes/ANF/ANFInspectionPackingRoutes.js";
+import ANFReportPacking from "./routes/ANF/ANFReportPackingRoutes.js";
+import ANFResultPacking from "./routes/ANF/ANFResultPackingRoutes.js";
+
+
 /* -----------------------------
 QC2 Upload Data Imports
 ------------------------------ */
@@ -207,6 +217,8 @@ import QASections_Buyer from "./routes/PivotY/QASections/QASections_Buyer_Route.
 import QASections_DefectList from "./routes/PivotY/QASections/QASections_DefectList_Route.js";
 import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_DefectCategory_Route.js";
 import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
+import QASections_AQL_Sample_Letters from "./routes/PivotY/QASections/QASections_AQL_Sample_Letter_Route.js";
+import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Values_Route.js";
 
 /* -----------------------------
   After Ironing Import
@@ -229,7 +241,10 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 /* ------------------------------
   Functional routs
 ------------------------------ */
-
+/* -----------------------------
+  Notifications Routes
+------------------------------ */
+app.use(normalNotification);
 /* -----------------------------
 Real Wash QTY Routes
 ------------------------------ */
@@ -312,6 +327,9 @@ ANF Routes
 app.use(ANF);
 app.use(ANFInspection); 
 app.use(ANFResult);
+app.use(ANFInspectionPacking);
+app.use(ANFReportPacking);
+app.use(ANFResultPacking);
 
 /* -----------------------------
 QC2 Upload Data Routes
@@ -453,6 +471,8 @@ app.use(QASections_Buyer);
 app.use(QASections_DefectList);
 app.use(QASections_DefectCategory);
 app.use(QASections_ProductLocation);
+app.use(QASections_AQL_Sample_Letters);
+app.use(QASections_AQL_Values);
 
 /* -----------------------------
 AI Routes
