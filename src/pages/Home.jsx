@@ -251,16 +251,16 @@ function Home() {
       },
       {
         id: "y-pivot",
-        title: "Pivot Y",
+        title: "Fin Check System",
         icon: <Layers className="w-5 h-5 mr-2" />,
         bgColor: "bg-blue-50 dark:bg-blue-900/20",
         items: [
           {
             path: "/qa-sections",
             pageId: "qa-sections",
-            image: "assets/Home/qasections.png",
+            image: "assets/Home/FinCheck.png",
             title: t("home.qa_sections"),
-            description: "QA Inspection Sections"
+            description: "Fin Check Configuration"
           },
           {
             path: "/qa-templates",

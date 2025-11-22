@@ -44,9 +44,9 @@
     "qc2_washing_data": "QC2 Wahing Data Upload",
     "qc1_subcon_inspection": "Sub Con QC1",
     "Measurement": "Measurement",
-    "qa_sections": "QA Sections",
-    "qa_templates": "QA Templates",
-    "y_pivot_inspection": "QA Inspection"
+    "qa_sections": "Fin Check | Settings",
+    "qa_templates": "Fin Check | Templates",
+    "y_pivot_inspection": "Fin Check | Inspection"
   },
 
   "nav": {
