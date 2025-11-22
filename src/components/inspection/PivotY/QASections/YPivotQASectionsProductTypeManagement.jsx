@@ -16,6 +16,419 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 
+// ====== MOVE COMPONENTS OUTSIDE ======
+
+// Product Card Component (MOVED OUTSIDE)
+const ProductCard = ({
+  product,
+  isEditing,
+  formData,
+  setFormData,
+  imagePreview,
+  selectedImage,
+  fileInputRef,
+  handleImageChange,
+  removeImage,
+  handleSave,
+  handleCancel,
+  handleEdit,
+  handleDelete
+}) => {
+  if (isEditing) {
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-indigo-500 dark:border-indigo-400 overflow-hidden transform transition-all duration-300">
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 text-white">
+              <Edit size={18} />
+              <span className="font-semibold text-sm">Editing Product</span>
+            </div>
+            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold">
+              No: {product.no}
+            </span>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* English Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+              <Globe size={14} className="text-indigo-500" />
+              English Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              placeholder="English name..."
+              value={formData.EnglishProductName}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  EnglishProductName: e.target.value
+                })
+              }
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
+            />
+          </div>
+
+          {/* Khmer Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+              <Languages size={14} className="text-purple-500" />
+              Khmer Name
+            </label>
+            <input
+              type="text"
+              placeholder="ឈ្មោះជាភាសាខ្មែរ..."
+              value={formData.KhmerProductName}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  KhmerProductName: e.target.value
+                })
+              }
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-all outline-none"
+            />
+          </div>
+
+          {/* Chinese Name */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+              <Languages size={14} className="text-blue-500" />
+              Chinese Name
+            </label>
+            <input
+              type="text"
+              placeholder="中文名称..."
+              value={formData.ChineseProductName}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  ChineseProductName: e.target.value
+                })
+              }
+              className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all outline-none"
+            />
+          </div>
+
+          {/* Image Upload */}
+          <div className="space-y-2">
+            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+              <ImageIcon size={14} className="text-green-500" />
+              Product Image
+            </label>
+            <div className="flex flex-col items-center gap-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+              {imagePreview ? (
+                <div className="relative">
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-32 h-32 object-cover rounded-lg shadow-md"
+                  />
+                  <button
+                    onClick={removeImage}
+                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                  <ImageIcon
+                    size={40}
+                    className="text-gray-400 dark:text-gray-500"
+                  />
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                onChange={handleImageChange}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current.click()}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all text-sm font-medium"
+              >
+                <Upload size={16} />
+                {imagePreview ? "Change Image" : "Upload Image"}
+              </button>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex gap-2 pt-2">
+            <button
+              onClick={() => handleSave(product._id)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 dark:bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 dark:hover:bg-green-700 shadow-md transition-all"
+            >
+              <Save size={16} />
+              Save Changes
+            </button>
+            <button
+              onClick={handleCancel}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-500 dark:bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 shadow-md transition-all"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // View Mode
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform hover:scale-105 transition-all duration-300">
+      {/* Header with Number */}
+      <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
+              <ImageIcon size={16} className="text-white" />
+            </div>
+            <span className="text-white font-semibold text-sm">
+              Product Type
+            </span>
+          </div>
+          <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold">
+            No: {product.no}
+          </span>
+        </div>
+      </div>
+
+      {/* Image Section */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-750">
+        {product.imageURL ? (
+          <img
+            src={`${API_BASE_URL}/api/qa-sections-product-type/image/${product.imageURL
+              .split("/")
+              .pop()}`}
+            alt={product.EnglishProductName}
+            className="w-full h-48 object-cover rounded-lg shadow-md"
+          />
+        ) : (
+          <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+            <ImageIcon size={48} className="text-gray-400 dark:text-gray-500" />
+          </div>
+        )}
+      </div>
+
+      {/* Content Section */}
+      <div className="p-5 space-y-3">
+        {/* English Name */}
+        <div>
+          <div className="flex items-center gap-1.5 mb-1">
+            <Globe size={12} className="text-indigo-500" />
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+              English
+            </span>
+          </div>
+          <p className="text-base font-bold text-gray-900 dark:text-gray-100">
+            {product.EnglishProductName}
+          </p>
+        </div>
+
+        {/* Khmer Name */}
+        {product.KhmerProductName && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Languages size={12} className="text-purple-500" />
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                Khmer
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {product.KhmerProductName}
+            </p>
+          </div>
+        )}
+
+        {/* Chinese Name */}
+        {product.ChineseProductName && (
+          <div>
+            <div className="flex items-center gap-1.5 mb-1">
+              <Languages size={12} className="text-blue-500" />
+              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
+                Chinese
+              </span>
+            </div>
+            <p className="text-sm text-gray-700 dark:text-gray-300">
+              {product.ChineseProductName}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="px-5 pb-5 flex gap-2">
+        <button
+          onClick={() => handleEdit(product)}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 dark:bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 shadow-md transition-all"
+        >
+          <Edit size={16} />
+          Edit
+        </button>
+        <button
+          onClick={() => handleDelete(product._id, product.EnglishProductName)}
+          className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 dark:bg-red-600 text-white font-semibold rounded-lg hover:bg-red-600 dark:hover:bg-red-700 shadow-md transition-all"
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// Add New Card Component (MOVED OUTSIDE)
+const AddNewCard = ({
+  formData,
+  setFormData,
+  imagePreview,
+  fileInputRef,
+  handleImageChange,
+  removeImage,
+  handleSave,
+  handleCancel
+}) => {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-green-500 dark:border-green-400 overflow-hidden">
+      <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3">
+        <div className="flex items-center gap-2 text-white">
+          <Plus size={18} />
+          <span className="font-semibold text-sm">Add New Product</span>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-4">
+        {/* English Name */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+            <Globe size={14} className="text-indigo-500" />
+            English Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            type="text"
+            placeholder="English name..."
+            value={formData.EnglishProductName}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                EnglishProductName: e.target.value
+              })
+            }
+            className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
+          />
+        </div>
+
+        {/* Khmer Name */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+            <Languages size={14} className="text-purple-500" />
+            Khmer Name
+          </label>
+          <input
+            type="text"
+            placeholder="ឈ្មោះជាភាសាខ្មែរ..."
+            value={formData.KhmerProductName}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                KhmerProductName: e.target.value
+              })
+            }
+            className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-all outline-none"
+          />
+        </div>
+
+        {/* Chinese Name */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+            <Languages size={14} className="text-blue-500" />
+            Chinese Name
+          </label>
+          <input
+            type="text"
+            placeholder="中文名称..."
+            value={formData.ChineseProductName}
+            onChange={(e) =>
+              setFormData({
+                ...formData,
+                ChineseProductName: e.target.value
+              })
+            }
+            className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all outline-none"
+          />
+        </div>
+
+        {/* Image Upload */}
+        <div className="space-y-2">
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+            <ImageIcon size={14} className="text-green-500" />
+            Product Image
+          </label>
+          <div className="flex flex-col items-center gap-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
+            {imagePreview ? (
+              <div className="relative">
+                <img
+                  src={imagePreview}
+                  alt="Preview"
+                  className="w-32 h-32 object-cover rounded-lg shadow-md"
+                />
+                <button
+                  onClick={removeImage}
+                  className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
+                <ImageIcon
+                  size={40}
+                  className="text-gray-400 dark:text-gray-500"
+                />
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              ref={fileInputRef}
+              onChange={handleImageChange}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current.click()}
+              className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all text-sm font-medium"
+            >
+              <Upload size={16} />
+              {imagePreview ? "Change Image" : "Upload Image"}
+            </button>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex gap-2 pt-2">
+          <button
+            onClick={() => handleSave(null)}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 dark:bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 dark:hover:bg-green-700 shadow-md transition-all"
+          >
+            <Save size={16} />
+            Save Product
+          </button>
+          <button
+            onClick={handleCancel}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-500 dark:bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 shadow-md transition-all"
+          >
+            <X size={16} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ====== MAIN COMPONENT ======
 const YPivotQASectionsProductTypeManagement = () => {
   const [productTypes, setProductTypes] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -192,398 +605,6 @@ const YPivotQASectionsProductTypeManagement = () => {
     }
   };
 
-  // Product Card Component
-  const ProductCard = ({ product, isEditing }) => {
-    if (isEditing) {
-      return (
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-indigo-500 dark:border-indigo-400 overflow-hidden transform transition-all duration-300">
-          <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-white">
-                <Edit size={18} />
-                <span className="font-semibold text-sm">Editing Product</span>
-              </div>
-              <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold">
-                No: {product.no}
-              </span>
-            </div>
-          </div>
-
-          <div className="p-5 space-y-4">
-            {/* English Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                <Globe size={14} className="text-indigo-500" />
-                English Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                placeholder="English name..."
-                value={formData.EnglishProductName}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    EnglishProductName: e.target.value
-                  })
-                }
-                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
-              />
-            </div>
-
-            {/* Khmer Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                <Languages size={14} className="text-purple-500" />
-                Khmer Name
-              </label>
-              <input
-                type="text"
-                placeholder="ឈ្មោះជាភាសាខ្មែរ..."
-                value={formData.KhmerProductName}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    KhmerProductName: e.target.value
-                  })
-                }
-                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-all outline-none"
-              />
-            </div>
-
-            {/* Chinese Name */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                <Languages size={14} className="text-blue-500" />
-                Chinese Name
-              </label>
-              <input
-                type="text"
-                placeholder="中文名称..."
-                value={formData.ChineseProductName}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    ChineseProductName: e.target.value
-                  })
-                }
-                className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all outline-none"
-              />
-            </div>
-
-            {/* Image Upload */}
-            <div className="space-y-2">
-              <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-                <ImageIcon size={14} className="text-green-500" />
-                Product Image
-              </label>
-              <div className="flex flex-col items-center gap-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                {imagePreview ? (
-                  <div className="relative">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-32 h-32 object-cover rounded-lg shadow-md"
-                    />
-                    <button
-                      onClick={removeImage}
-                      className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                    <ImageIcon
-                      size={40}
-                      className="text-gray-400 dark:text-gray-500"
-                    />
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  onChange={handleImageChange}
-                  className="hidden"
-                />
-                <button
-                  onClick={() => fileInputRef.current.click()}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all text-sm font-medium"
-                >
-                  <Upload size={16} />
-                  {imagePreview ? "Change Image" : "Upload Image"}
-                </button>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 pt-2">
-              <button
-                onClick={() => handleSave(product._id)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 dark:bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 dark:hover:bg-green-700 shadow-md transition-all"
-              >
-                <Save size={16} />
-                Save Changes
-              </button>
-              <button
-                onClick={handleCancel}
-                className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-500 dark:bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 shadow-md transition-all"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    // View Mode
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg hover:shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transform hover:scale-105 transition-all duration-300">
-        {/* Header with Number */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center">
-                <ImageIcon size={16} className="text-white" />
-              </div>
-              <span className="text-white font-semibold text-sm">
-                Product Type
-              </span>
-            </div>
-            <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs font-bold">
-              No: {product.no}
-            </span>
-          </div>
-        </div>
-
-        {/* Image Section */}
-        <div className="p-4 bg-gray-50 dark:bg-gray-750">
-          {product.imageURL ? (
-            <img
-              src={`${API_BASE_URL}/api/qa-sections-product-type/image/${product.imageURL
-                .split("/")
-                .pop()}`}
-              alt={product.EnglishProductName}
-              className="w-full h-48 object-cover rounded-lg shadow-md"
-            />
-          ) : (
-            <div className="w-full h-48 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-              <ImageIcon
-                size={48}
-                className="text-gray-400 dark:text-gray-500"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Content Section */}
-        <div className="p-5 space-y-3">
-          {/* English Name */}
-          <div>
-            <div className="flex items-center gap-1.5 mb-1">
-              <Globe size={12} className="text-indigo-500" />
-              <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                English
-              </span>
-            </div>
-            <p className="text-base font-bold text-gray-900 dark:text-gray-100">
-              {product.EnglishProductName}
-            </p>
-          </div>
-
-          {/* Khmer Name */}
-          {product.KhmerProductName && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <Languages size={12} className="text-purple-500" />
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  Khmer
-                </span>
-              </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                {product.KhmerProductName}
-              </p>
-            </div>
-          )}
-
-          {/* Chinese Name */}
-          {product.ChineseProductName && (
-            <div>
-              <div className="flex items-center gap-1.5 mb-1">
-                <Languages size={12} className="text-blue-500" />
-                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">
-                  Chinese
-                </span>
-              </div>
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                {product.ChineseProductName}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="px-5 pb-5 flex gap-2">
-          <button
-            onClick={() => handleEdit(product)}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-500 dark:bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-600 dark:hover:bg-blue-700 shadow-md transition-all"
-          >
-            <Edit size={16} />
-            Edit
-          </button>
-          <button
-            onClick={() =>
-              handleDelete(product._id, product.EnglishProductName)
-            }
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 dark:bg-red-600 text-white font-semibold rounded-lg hover:bg-red-600 dark:hover:bg-red-700 shadow-md transition-all"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // Add New Card
-  const AddNewCard = () => {
-    return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-2 border-green-500 dark:border-green-400 overflow-hidden">
-        <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-4 py-3">
-          <div className="flex items-center gap-2 text-white">
-            <Plus size={18} />
-            <span className="font-semibold text-sm">Add New Product</span>
-          </div>
-        </div>
-
-        <div className="p-5 space-y-4">
-          {/* English Name */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <Globe size={14} className="text-indigo-500" />
-              English Name <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="English name..."
-              value={formData.EnglishProductName}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  EnglishProductName: e.target.value
-                })
-              }
-              className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 dark:focus:ring-indigo-800 transition-all outline-none"
-            />
-          </div>
-
-          {/* Khmer Name */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <Languages size={14} className="text-purple-500" />
-              Khmer Name
-            </label>
-            <input
-              type="text"
-              placeholder="ឈ្មោះជាភាសាខ្មែរ..."
-              value={formData.KhmerProductName}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  KhmerProductName: e.target.value
-                })
-              }
-              className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-all outline-none"
-            />
-          </div>
-
-          {/* Chinese Name */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <Languages size={14} className="text-blue-500" />
-              Chinese Name
-            </label>
-            <input
-              type="text"
-              placeholder="中文名称..."
-              value={formData.ChineseProductName}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  ChineseProductName: e.target.value
-                })
-              }
-              className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 transition-all outline-none"
-            />
-          </div>
-
-          {/* Image Upload */}
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-              <ImageIcon size={14} className="text-green-500" />
-              Product Image
-            </label>
-            <div className="flex flex-col items-center gap-3 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-              {imagePreview ? (
-                <div className="relative">
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-32 h-32 object-cover rounded-lg shadow-md"
-                  />
-                  <button
-                    onClick={removeImage}
-                    className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full hover:bg-red-600 shadow-lg transition-all"
-                  >
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <div className="w-32 h-32 bg-gray-200 dark:bg-gray-700 rounded-lg flex items-center justify-center">
-                  <ImageIcon
-                    size={40}
-                    className="text-gray-400 dark:text-gray-500"
-                  />
-                </div>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                ref={fileInputRef}
-                onChange={handleImageChange}
-                className="hidden"
-              />
-              <button
-                onClick={() => fileInputRef.current.click()}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 transition-all text-sm font-medium"
-              >
-                <Upload size={16} />
-                {imagePreview ? "Change Image" : "Upload Image"}
-              </button>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-2 pt-2">
-            <button
-              onClick={() => handleSave(null)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 dark:bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 dark:hover:bg-green-700 shadow-md transition-all"
-            >
-              <Save size={16} />
-              Save Product
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-500 dark:bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-600 dark:hover:bg-gray-700 shadow-md transition-all"
-            >
-              <X size={16} />
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-4">
       {/* Header with Search and Add Button */}
@@ -660,7 +681,18 @@ const YPivotQASectionsProductTypeManagement = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {/* Add New Card - Show First */}
-          {isAddingNew && <AddNewCard />}
+          {isAddingNew && (
+            <AddNewCard
+              formData={formData}
+              setFormData={setFormData}
+              imagePreview={imagePreview}
+              fileInputRef={fileInputRef}
+              handleImageChange={handleImageChange}
+              removeImage={removeImage}
+              handleSave={handleSave}
+              handleCancel={handleCancel}
+            />
+          )}
 
           {/* Product Cards */}
           {filteredProductTypes.length === 0 && !isAddingNew ? (
@@ -690,6 +722,17 @@ const YPivotQASectionsProductTypeManagement = () => {
                 key={product._id}
                 product={product}
                 isEditing={editingId === product._id}
+                formData={formData}
+                setFormData={setFormData}
+                imagePreview={imagePreview}
+                selectedImage={selectedImage}
+                fileInputRef={fileInputRef}
+                handleImageChange={handleImageChange}
+                removeImage={removeImage}
+                handleSave={handleSave}
+                handleCancel={handleCancel}
+                handleEdit={handleEdit}
+                handleDelete={handleDelete}
               />
             ))
           )}
