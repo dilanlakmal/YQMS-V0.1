@@ -1535,6 +1535,7 @@ export const getmeasurmentSpec = async (req, res) => {
 export const saveAfterIroningSummary = async (req, res) => {
   try {
     const { recordId } = req.params;
+    // The summary object from the frontend may contain the calculated overallFinalResult
     const summary = req.body.summary || {};
 
     const qcRecord = await AfterIroning.findById(recordId);
@@ -1623,15 +1624,23 @@ export const saveAfterIroningSummary = async (req, res) => {
       reportType: qcRecord.reportType
     });
 
-    // CRITICAL FIX: Consistent overall result logic
-    const newOverallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+    let newOverallFinalResult;
+
+    // Prioritize the result sent from the frontend if it's valid ('Pass' or 'Fail')
+    if (summary.overallFinalResult && ['Pass', 'Fail'].includes(summary.overallFinalResult)) {
+      newOverallFinalResult = summary.overallFinalResult;
+      console.log('Using overall result from frontend:', newOverallFinalResult);
+    } else {
+      // Fallback to backend recalculation if frontend result is not provided or invalid
+      newOverallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+      console.log('Recalculating overall result on backend:', newOverallFinalResult);
+    }
     
     console.log('Backend final calculation result:', {
       condition1: `Pass Rate ${passRate}% >= 95%: ${passRate >= 95}`,
       condition2: `Defect Result "${defectResult}" === "Pass": ${defectResult === "Pass"}`,
       finalResult: newOverallFinalResult
     });
-
     // 5. Update ALL calculated fields with fresh values
     qcRecord.totalCheckedPcs = totalCheckedPcs;
     qcRecord.rejectedDefectPcs = rejectedDefectPcs;
@@ -2429,22 +2438,26 @@ export const saveAfterIroning = async (req, res) => {
       });
     }
 
-    // CRITICAL FIX: Recalculate top-level summary from measurementSizeSummary before submitting
-    if (recordToSubmit.measurementDetails?.measurementSizeSummary?.length > 0) {
-  
-      const summary = calculateOverallSummary(
-        recordToSubmit.defectDetails,
-        recordToSubmit.inspectionDetails,
-        recordToSubmit.measurementDetails
-      );
+    // CRITICAL FIX: Always recalculate the final result on submission to ensure data integrity.
+    // This uses the same logic as saveAfterIroningSummary.
+    
+    // 1. Calculate pass rate from the most recent data.
+    const passRate = recordToSubmit.passRate ?? 100; // Use the already calculated passRate on the record.
 
-      // summary.overallResult should contain final Pass/Fail
-      recordToSubmit.overallFinalResult =
-        summary?.overallResult || summary || "Pending";
+    // 2. Get the defect result.
+    const defectResult = recordToSubmit.defectDetails?.result || "Pass";
 
-      console.log("Recalculated overallFinalResult:", recordToSubmit.overallFinalResult);
-      
-    }
+    // 3. Determine the final overall result.
+    const newOverallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+
+    console.log('Final submission calculation:', {
+      passRate,
+      defectResult,
+      finalResult: newOverallFinalResult
+    });
+
+    recordToSubmit.overallFinalResult = newOverallFinalResult;
+
     // Update status and submission timestamp
     recordToSubmit.isAutoSave = false;
     recordToSubmit.status = "submitted";
