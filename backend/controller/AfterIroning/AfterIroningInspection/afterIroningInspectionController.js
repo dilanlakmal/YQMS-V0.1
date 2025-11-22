@@ -5,7 +5,7 @@ ymProdConnection,
 AQLChart,
 QCWashingFirstOutput,              
 } from "../../MongoDB/dbConnectionController.js";
-import { getBuyerFromMoNumber, getAqlLevelForBuyer} from "../../../helpers/helperFunctions.js";
+import { getBuyerFromMoNumber, getAqlLevelForBuyer, calculateOverallSummary} from "../../../helpers/helperFunctions.js";
 import fs from "fs";
 import { 
   __backendDir, 
@@ -221,8 +221,6 @@ export const checkQCWashingRecord = async (req, res) => {
   }
 };
 
-
-
 export const getAfterIroningMeasurementData = async (req, res) => {
   try {
         const { orderNo } = req.params;
@@ -382,7 +380,6 @@ export const checkAfterIroningSubmittedRecord = async (req, res) => {
   }
 };
 
-
 export const saveAfterIroningOrderData = async (req, res) => {
   try {
     const { formData, userId, savedAt } = req.body;
@@ -527,7 +524,6 @@ export const saveAfterIroningOrderData = async (req, res) => {
     });
   }
 };
-
 
 export const saveAfterIroningInspectionData = async (req, res) => {
   try {
@@ -862,7 +858,6 @@ export const updateAfterIroningInspectionData = async (req, res) => {
       res.status(500).json({ success: false, message: "Server error" });
     }
 };
-
 
 // Save defect details with images
 export const saveAfterIroningDefectData = async (req, res) => {
@@ -1619,26 +1614,19 @@ export const saveAfterIroningSummary = async (req, res) => {
       ? Math.round((totalMeasurementPass / totalMeasurementPoints) * 100) 
       : 100;
 
-    // 4. CRITICAL FIX: Determine overall result based on BOTH measurement pass rate AND defect result
-    const measurementResult = passRate >= 95 ? "Pass" : "Fail";
-    
-    // Get defect result from defectDetails
+    // 4. CRITICAL FIX: Determine overall result
     const defectResult = qcRecord.defectDetails?.result || "Pass";
     
-    console.log('Overall result calculation:', {
+    console.log('Backend overall result calculation:', {
       passRate,
-      measurementResult,
       defectResult,
       reportType: qcRecord.reportType
     });
 
-    // CRITICAL FIX: Overall result logic - SIMPLIFIED AND CORRECTED
-    let newOverallFinalResult;
+    // CRITICAL FIX: Consistent overall result logic
+    const newOverallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
     
-    // For ALL report types: Pass rate >= 95% AND defect result = "Pass"
-    newOverallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
-
-    console.log('Final calculation result:', {
+    console.log('Backend final calculation result:', {
       condition1: `Pass Rate ${passRate}% >= 95%: ${passRate >= 95}`,
       condition2: `Defect Result "${defectResult}" === "Pass": ${defectResult === "Pass"}`,
       finalResult: newOverallFinalResult
@@ -1659,41 +1647,29 @@ export const saveAfterIroningSummary = async (req, res) => {
     qcRecord.totalFail = totalMeasurementFail;
     qcRecord.passRate = passRate;
     
-    // CRITICAL FIX: Set the new overall result
+    // CRITICAL FIX: Set the new overall result and force save
     qcRecord.overallFinalResult = newOverallFinalResult;
-    
-    // Mark the field as modified to ensure it gets saved
     qcRecord.markModified('overallFinalResult');
+    qcRecord.updatedAt = new Date();
     
     // Save the record
     await qcRecord.save();
-
+    
     console.log('Saved overall result:', qcRecord.overallFinalResult);
 
-    // DETAILED RESPONSE FOR DEBUGGING
     res.json({ 
       success: true,
       message: "Overall result recalculated and saved successfully",
       previousResult: previousResult,
       newResult: newOverallFinalResult,
-      debugInfo: {
-        measurementCalculation: {
-          totalPoints: totalMeasurementPoints,
-          totalPass: totalMeasurementPass,
-          totalFail: totalMeasurementFail,
-          passRate: passRate,
-          measurementResult: measurementResult,
-          passRateThreshold: 95
-        },
-        defectCalculation: {
-          defectResult: defectResult,
-          totalDefectCount: totalDefectCount
-        },
-        overallCalculation: {
-          reportType: qcRecord.reportType,
-          logic: `(Pass Rate ${passRate}% >= 95% AND Defect Result "${defectResult}" === "Pass") = ${newOverallFinalResult}`,
-          finalResult: newOverallFinalResult
-        }
+      summary: {
+        totalCheckedPcs,
+        rejectedDefectPcs,
+        totalDefectCount,
+        defectRate: qcRecord.defectRate,
+        defectRatio: qcRecord.defectRatio,
+        passRate,
+        overallFinalResult: newOverallFinalResult
       }
     });
 
@@ -1702,6 +1678,7 @@ export const saveAfterIroningSummary = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to save summary." });
   }
 };
+
 
 export const updateAfterIroningMeasurementData = async (req, res) => {
   try {
@@ -2337,8 +2314,6 @@ export const saveAfterIroningMeasurementData = async (req, res) => {
   }
 };
 
-
-
 // Load color-specific data
 export const loadAfterIroningColorData = async (req, res) => {
   try {
@@ -2426,7 +2401,7 @@ export const getAfterIroningSubmittedData = async (req, res) => {
 
 export const saveAfterIroning = async (req, res) => {
   try {
-    const { orderNo, recordId } = req.body;
+    const { orderNo, recordId, overallFinalResult } = req.body;
     
     if (!orderNo) {
       return res.status(400).json({ 
@@ -2456,61 +2431,20 @@ export const saveAfterIroning = async (req, res) => {
 
     // CRITICAL FIX: Recalculate top-level summary from measurementSizeSummary before submitting
     if (recordToSubmit.measurementDetails?.measurementSizeSummary?.length > 0) {
-      let totalCheckedPoint = 0;
-      let totalPass = 0;
-      let totalFail = 0;
-      let totalCheckedPcs = 0;
+  
+      const summary = calculateOverallSummary(
+        recordToSubmit.defectDetails,
+        recordToSubmit.inspectionDetails,
+        recordToSubmit.measurementDetails
+      );
 
-      recordToSubmit.measurementDetails.measurementSizeSummary.forEach(sizeData => {
-        totalCheckedPoint += (sizeData.checkedPoints || 0);
-        totalPass += (sizeData.totalPass || 0);
-        totalFail += (sizeData.totalFail || 0);
-        totalCheckedPcs += (sizeData.checkedPcs || 0);
-      });
+      // summary.overallResult should contain final Pass/Fail
+      recordToSubmit.overallFinalResult =
+        summary?.overallResult || summary || "Pending";
 
-      // Calculate pass rate
-      const passRate = totalCheckedPoint > 0 
-        ? Math.round((totalPass / totalCheckedPoint) * 100) 
-        : 100;
-
-      // Update top-level fields
-      recordToSubmit.totalCheckedPoint = totalCheckedPoint;
-      recordToSubmit.totalPass = totalPass;
-      recordToSubmit.totalFail = totalFail;
-      recordToSubmit.passRate = passRate;
+      console.log("Recalculated overallFinalResult:", recordToSubmit.overallFinalResult);
       
-      // Update totalCheckedPcs only if we have measurement data
-      if (totalCheckedPcs > 0) {
-        recordToSubmit.totalCheckedPcs = totalCheckedPcs;
-      }
-
-      // Recalculate overall result
-      const measurementResult = passRate >= 95 ? "Pass" : "Fail";
-      const defectResult = recordToSubmit.defectDetails?.result || "Pass";
-      
-      // For SOP, both measurement and defects must pass
-      const isSOP = recordToSubmit.reportType === "SOP";
-      let newOverallResult;
-      
-      if (isSOP) {
-        const isMeasurementPass = passRate >= 95;
-        const isDefectPass = (recordToSubmit.totalDefectCount || 0) === 0;
-        newOverallResult = isMeasurementPass && isDefectPass ? "Pass" : "Fail";
-      } else {
-        newOverallResult = measurementResult === "Pass" && defectResult === "Pass" ? "Pass" : "Fail";
-      }
-      
-      recordToSubmit.overallFinalResult = newOverallResult;
-
-      console.log('Updated top-level summary before submit:', {
-        totalCheckedPoint,
-        totalPass,
-        totalFail,
-        passRate,
-        overallFinalResult: newOverallResult
-      });
     }
-
     // Update status and submission timestamp
     recordToSubmit.isAutoSave = false;
     recordToSubmit.status = "submitted";
@@ -2534,8 +2468,6 @@ export const saveAfterIroning = async (req, res) => {
     });
   }
 };
-
-
 
 // function normalizeInspectionImagePath(img) {
 //   if (!img) return "";

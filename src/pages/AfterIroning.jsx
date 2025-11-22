@@ -10,6 +10,7 @@ import Swal from "sweetalert2";
 import imageCompression from "browser-image-compression";
 import SubmittedDataPage from "../components/inspection/After_Ironing/Home/SubmittedIroningData";
 import { useTranslation } from "react-i18next";
+import { calculateOverallSummary } from "../utils/afterIroningHelperFunction.js";
 // import SubConEdit from "../components/inspection/After_Ironing/Home/SubConEdit";
 
 const normalizeImageSrc = (src) => {
@@ -167,119 +168,6 @@ const initializeDefaultCheckpointData = async (setCheckpointInspectionData) => {
     console.error("Error initializing checkpoint data:", error);
   }
 };
-
-function calculateSummaryData(currentFormData) {
-  const currentDefectDetails = currentFormData.defectDetails;
-  const currentMeasurementDetails = currentFormData.measurementDetails;
-  
-  let measurementArray = [];
-  if (currentMeasurementDetails && typeof currentMeasurementDetails === "object") {
-    measurementArray = currentMeasurementDetails.measurement || [];
-  } else if (Array.isArray(currentMeasurementDetails)) {
-    measurementArray = currentMeasurementDetails;
-  }
-
-  // 1. Calculate totalCheckedPcs from measurement data qty
-  let totalCheckedPcs = 0;
-  measurementArray.forEach((data) => {
-    if (typeof data.qty === "number" && data.qty > 0) {
-      totalCheckedPcs += data.qty;
-    }
-  });
-
-  // If no measurement data, fallback to checkedQty from form
-  const checkedQty = parseInt(currentFormData.checkedQty, 10) || 0;
-  if (totalCheckedPcs === 0) {
-    totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
-  }
-
-  // 2. Calculate measurement points and passes using measurementSizeSummary if available
-  let measurementPoints = 0;
-  let measurementPass = 0;
-
-  // Check if measurementSizeSummary exists
-  if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
-    currentMeasurementDetails.measurementSizeSummary.forEach(sizeData => {
-      measurementPoints += (sizeData.checkedPoints || 0);
-      measurementPass += (sizeData.totalPass || 0);
-    });
-  } else {
-    // Fallback: Calculate from measurement array
-    measurementArray.forEach((data) => {
-      if (Array.isArray(data.pcs)) {
-        data.pcs.forEach((pc) => {
-          if (Array.isArray(pc.measurementPoints)) {
-            pc.measurementPoints.forEach((point) => {
-              if (point.result === "pass" || point.result === "fail") {
-                measurementPoints++;
-                if (point.result === "pass") measurementPass++;
-              }
-            });
-          }
-        });
-      }
-    });
-  }
-
-  // 3. Defect calculations
-  const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
-    ? currentDefectDetails.defectsByPc.length
-    : 0;
-    
-  const defectCount = currentDefectDetails?.defectsByPc
-    ? currentDefectDetails.defectsByPc.reduce((sum, pc) => {
-        return (
-          sum +
-          (Array.isArray(pc.pcDefects)
-            ? pc.pcDefects.reduce(
-                (defSum, defect) =>
-                  defSum + (parseInt(defect.defectQty, 10) || 0),
-                0
-              )
-            : 0)
-        );
-      }, 0)
-    : 0;
-
-  // 4. Defect rate and ratio
-  const defectRate = totalCheckedPcs > 0
-    ? Number(((defectCount / totalCheckedPcs) * 100).toFixed(1))
-    : 0;
-    
-  const defectRatio = totalCheckedPcs > 0
-    ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
-    : 0;
-
-  // 5. CRITICAL FIX: Overall result calculation - SIMPLIFIED
-  const savedDefectResult = currentDefectDetails?.result || "Pass";
-  const measurementPassRate = measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-  
-  console.log('Frontend calculation:', {
-    measurementPassRate,
-    savedDefectResult,
-    reportType: currentFormData.reportType
-  });
-
-  // CRITICAL FIX: Simplified overall result logic for ALL report types
-  const overallResult = (measurementPassRate >= 95.0 && savedDefectResult === "Pass") ? "Pass" : "Fail";
-
-  console.log('Frontend final result:', overallResult);
-
-  return {
-    checkedQty: checkedQty,
-    totalCheckedPcs: totalCheckedPcs || 0,
-    rejectedDefectPcs: rejectedDefectPcs || 0,
-    totalDefectCount: defectCount || 0,
-    defectRate,
-    defectRatio,
-    overallFinalResult: overallResult || "Pending",
-    overallResult,
-    measurementPoints: measurementPoints || 0,
-    measurementPass: measurementPass || 0
-  };
-}
-
-
 
 const AfterIroning = () => {
   const { user } = useAuth();
@@ -1659,104 +1547,109 @@ const AfterIroning = () => {
   };
 
   useEffect(() => {
-    const timeoutId = setTimeout(() => {
-      const defectDetails = {
-        ...formData.defectDetails,
-        checkedQty: formData.checkedQty,
-        ironingQty: formData.ironingQty,
-        result: formData.result,
-        defectsByPc: Object.entries(defectsByPc).map(
-          ([pcNumber, pcDefects]) => ({
-            pcNumber,
-            pcDefects
-          })
-        )
-      };
+  const timeoutId = setTimeout(() => {
+    const defectDetails = {
+      ...formData.defectDetails,
+      checkedQty: formData.checkedQty,
+      ironingQty: formData.ironingQty,
+      result: formData.result,
+      defectsByPc: Object.entries(defectsByPc).map(
+        ([pcNumber, pcDefects]) => ({
+          pcNumber,
+          pcDefects
+        })
+      )
+    };
 
-     const measurementDetails = formData.measurementDetails || {
-  measurement: [
-    ...measurementData.beforeIroning.map((item) => ({
-      ...item,
-      before_after_wash: "beforeIroning"
-    })),
-    ...measurementData.afterIroning.map((item) => ({
-      ...item,
-      before_after_wash: "afterIroning"
-    }))
-  ],
-  measurementSizeSummary: [] // This will be populated from the saved data
-};
+    const measurementDetails = formData.measurementDetails || {
+      measurement: [
+        ...measurementData.beforeIroning.map((item) => ({
+          ...item,
+          before_after_wash: "beforeIroning"
+        })),
+        ...measurementData.afterIroning.map((item) => ({
+          ...item,
+          before_after_wash: "afterIroning"
+        }))
+      ],
+      measurementSizeSummary: []
+    };
 
-// If measurementSizeSummary is empty, calculate it from measurement data
-if (!measurementDetails.measurementSizeSummary || measurementDetails.measurementSizeSummary.length === 0) {
-  const measurementSizeSummary = [];
-  measurementDetails.measurement.forEach(measurement => {
-    if (measurement.pcs && Array.isArray(measurement.pcs)) {
-      let checkedPcs = measurement.pcs.length;
-      let checkedPoints = 0;
-      let totalPass = 0;
-      let totalFail = 0;
-      let plusToleranceFailCount = 0;
-      let minusToleranceFailCount = 0;
+    // If measurementSizeSummary is empty, calculate it from measurement data
+    if (!measurementDetails.measurementSizeSummary || measurementDetails.measurementSizeSummary.length === 0) {
+      const measurementSizeSummary = [];
+      measurementDetails.measurement.forEach(measurement => {
+        if (measurement.pcs && Array.isArray(measurement.pcs)) {
+          let checkedPcs = measurement.pcs.length;
+          let checkedPoints = 0;
+          let totalPass = 0;
+          let totalFail = 0;
+          let plusToleranceFailCount = 0;
+          let minusToleranceFailCount = 0;
 
-      measurement.pcs.forEach((pc) => {
-        (pc.measurementPoints || []).forEach((point) => {
-          checkedPoints++;
-          if (point.result === "pass") totalPass++;
-          if (point.result === "fail") {
-            totalFail++;
-            const value = typeof point.measured_value_decimal === "number"
-              ? point.measured_value_decimal
-              : parseFloat(point.measured_value_decimal);
-            
-            if (!isNaN(value)) {
-              if (value > point.tolerancePlus) plusToleranceFailCount++;
-              if (value < point.toleranceMinus) minusToleranceFailCount++;
-            }
-          }
-        });
+          measurement.pcs.forEach((pc) => {
+            (pc.measurementPoints || []).forEach((point) => {
+              checkedPoints++;
+              if (point.result === "pass") totalPass++;
+              if (point.result === "fail") {
+                totalFail++;
+                const value = typeof point.measured_value_decimal === "number"
+                  ? point.measured_value_decimal
+                  : parseFloat(point.measured_value_decimal);
+                
+                if (!isNaN(value)) {
+                  if (value > point.tolerancePlus) plusToleranceFailCount++;
+                  if (value < point.toleranceMinus) minusToleranceFailCount++;
+                }
+              }
+            });
+          });
+
+          measurementSizeSummary.push({
+            size: measurement.size,
+            kvalue: measurement.kvalue,
+            checkedPcs,
+            checkedPoints,
+            totalPass,
+            totalFail,
+            plusToleranceFailCount,
+            minusToleranceFailCount
+          });
+        }
       });
-
-      measurementSizeSummary.push({
-        size: measurement.size,
-        kvalue: measurement.kvalue,
-        checkedPcs,
-        checkedPoints,
-        totalPass,
-        totalFail,
-        plusToleranceFailCount,
-        minusToleranceFailCount
-      });
+      measurementDetails.measurementSizeSummary = measurementSizeSummary;
     }
-  });
 
-  measurementDetails.measurementSizeSummary = measurementSizeSummary;
-}
+    // USE SINGLE CALCULATION FUNCTION
+    const summary = calculateOverallSummary({
+      defectDetails,
+      measurementDetails,
+      checkedQty: formData.checkedQty,
+      ironingQty: formData.ironingQty,
+      washQty: formData.washQty
+    });
 
-      const summary = calculateSummaryData({
-        ...formData,
-        defectDetails,
-        measurementDetails
-      });
+    console.log('Single calculation result:', summary);
 
-      setFormData((prev) => ({
-        ...prev,
-        defectDetails,
-        measurementDetails,
-        ...summary
-      }));
-    }, 100);
+    setFormData((prev) => ({
+      ...prev,
+      defectDetails,
+      measurementDetails,
+      ...summary
+    }));
 
-    return () => clearTimeout(timeoutId);
-  }, [
-    defectsByPc,
-    measurementData.beforeIroning,
-    measurementData.afterIroning,
-    formData.checkedQty,
-    formData.ironingQty,
-    formData.result,
-    recordId
-  ]);
+  }, 100);
+
+  return () => clearTimeout(timeoutId);
+}, [
+  defectsByPc,
+  measurementData.beforeIroning,
+  measurementData.afterIroning,
+  formData.checkedQty,
+  formData.ironingQty,
+  formData.result,
+  recordId
+]);
 
 
 
@@ -1890,20 +1783,6 @@ useEffect(() => {
                   checkpointInspectionData: checkpointInspectionData
                 }
               }}
-              recordId={recordId}
-              onSummaryUpdate={(updatedSummary) => {
-                setFormData(prev => ({ 
-                  ...prev, 
-                  ...updatedSummary,
-                  overallFinalResult: updatedSummary.overallFinalResult,
-                  totalCheckedPcs: updatedSummary.totalCheckedPcs,
-                  rejectedDefectPcs: updatedSummary.rejectedDefectPcs,
-                  totalDefectCount: updatedSummary.totalDefectCount,
-                  defectRate: updatedSummary.defectRate,
-                  defectRatio: updatedSummary.defectRatio
-                }));
-              }}
-              measurementData={formData.measurementDetails}
               defectDetails={formData.defectDetails}
               before_after_wash={formData.before_after_wash}
               showMeasurementTable={showMeasurementTable}
@@ -2039,6 +1918,21 @@ useEffect(() => {
 
                   if (!result.isConfirmed) return;
 
+                  // Re-calculate summary right before submission to ensure it's up-to-date
+                  const finalSummary = calculateOverallSummary({
+                    defectDetails: {
+                      ...formData.defectDetails,
+                      result: formData.result,
+                      defectsByPc: Object.entries(defectsByPc).map(([pcNumber, pcDefects]) => ({ pcNumber, pcDefects })),
+                    },
+                    measurementDetails: {
+                      measurement: [...measurementData.beforeIroning, ...measurementData.afterIroning],
+                    },
+                    checkedQty: formData.checkedQty,
+                    ironingQty: formData.ironingQty,
+                    washQty: formData.washQty,
+                  });
+
                   try {
                     // Ensure we have a record ID by saving order data first
                     let currentRecordId = recordId;
@@ -2048,7 +1942,7 @@ useEffect(() => {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
-                          formData: { ...formData, colorOrderQty },
+                          formData: { ...formData, ...finalSummary, colorOrderQty },
                           userId: user?.emp_id,
                           savedAt: new Date().toISOString()
                         })
@@ -2127,6 +2021,7 @@ useEffect(() => {
                         body: JSON.stringify({
                           formData: { 
                             ...formData, 
+                            ...finalSummary, // Include the final calculated summary
                             colorOrderQty,
                             measurementDetails: currentMeasurementDetails, // Use current frontend state
                             _id: currentRecordId // Update existing record
@@ -2280,7 +2175,8 @@ useEffect(() => {
                       headers: { "Content-Type": "application/json" },
                       body: JSON.stringify({ 
                         orderNo: formData.orderNo,
-                        recordId: currentRecordId
+                        recordId: currentRecordId,
+                        overallFinalResult: finalSummary.overallFinalResult // Pass the final result
                       }),
                     });
                     

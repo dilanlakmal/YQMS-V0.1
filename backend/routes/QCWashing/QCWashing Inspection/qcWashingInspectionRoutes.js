@@ -30,7 +30,6 @@ import express from 'express';
 import { 
   uploadInspectionImage,
   uploadDefectImage,
-  cleanup,
  } from "../../../helpers/helperFunctions.js";
 
 const router = express.Router();
