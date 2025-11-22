@@ -5,7 +5,8 @@ import {
   MapPin,
   CheckSquare,
   Image as ImageIcon,
-  BookOpen
+  BookOpen,
+  Sliders
 } from "lucide-react";
 import React, { useMemo } from "react";
 import YPivotQASectionsProductCategory from "./YPivotQASectionsProductCategory";
@@ -15,6 +16,7 @@ import YPivotQASectionsBuyerStatusManagement from "./YPivotQASectionsBuyerStatus
 import YPivotQASectionsProductDefectManagement from "./YPivotQASectionsProductDefectManagement";
 import YPivotQASectionsProductLocationManagement from "./YPivotQASectionsProductLocationManagement";
 import YPivotQASectionsAQLTerminology from "./YPivotQASectionsAQLTerminology";
+import YPivotQASectionsAQLBuyerConfig from "./YPivotQASectionsAQLBuyerConfig";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -77,6 +79,12 @@ const YPivotQASectionsProduct = ({ activeSubTab, setActiveSubTab }) => {
         label: "AQL Terminology",
         icon: <BookOpen size={16} />,
         component: <YPivotQASectionsAQLTerminology />
+      },
+      {
+        id: "aql-config",
+        label: "AQL Config",
+        icon: <Sliders size={16} />,
+        component: <YPivotQASectionsAQLBuyerConfig />
       }
     ],
     []

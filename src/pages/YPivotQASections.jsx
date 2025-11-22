@@ -12,7 +12,8 @@ import {
   MapPin,
   CheckSquare,
   Image as ImageIcon,
-  BookOpen
+  BookOpen,
+  Sliders
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -121,6 +122,11 @@ const YPivotQASections = () => {
         id: "aql-term",
         label: "AQL Term",
         icon: <BookOpen size={20} />
+      },
+      {
+        id: "aql-config",
+        label: "AQL Config",
+        icon: <Sliders size={20} />
       }
     ],
     []

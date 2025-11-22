@@ -186,6 +186,7 @@ import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_Def
 import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
 import QASections_AQL_Sample_Letters from "./routes/PivotY/QASections/QASections_AQL_Sample_Letter_Route.js";
 import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Values_Route.js";
+import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Config_Routes.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -438,6 +439,7 @@ app.use(QASections_DefectCategory);
 app.use(QASections_ProductLocation);
 app.use(QASections_AQL_Sample_Letters);
 app.use(QASections_AQL_Values);
+app.use(QASections_AQL_Config);
 
 /* -----------------------------
   QA Random Inspection Routes
