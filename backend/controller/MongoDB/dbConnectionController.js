@@ -99,6 +99,8 @@ import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
+import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
+import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
@@ -250,6 +252,10 @@ export const QASectionsDefectList =
   createQASectionsDefectListModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
+export const QASectionsAqlSampleLetters =
+  createQASectionsAqlSampleLettersModel(ymProdConnection);
+export const QASectionsAqlValues =
+  createQASectionsAqlValuesModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
