@@ -276,7 +276,7 @@ const AfterIroningFullReportModal = ({ isOpen, onClose, recordData, checkpointDe
   };
 
   // Fetch comparison data for measurement comparison
-  const fetchComparisonData = async (orderNo, color, date, reportType, factoryName) => {
+  const fetchComparisonData = async (orderNo, date, reportType, factoryName) => {
     setIsLoadingComparison(true);
     
     try {
@@ -284,7 +284,6 @@ const AfterIroningFullReportModal = ({ isOpen, onClose, recordData, checkpointDe
       const response = await axios.get(`${API_BASE_URL}/api/after-ironing/qc-washing-measurement`, {
         params: {
           orderNo,
-          color,
           date,
           reportType,
           factoryName
@@ -311,7 +310,6 @@ const AfterIroningFullReportModal = ({ isOpen, onClose, recordData, checkpointDe
       
       const transformedData = {
         ...recordData,
-        colorName: recordData.color,
         formData: {
           result: recordData.overallFinalResult,
           remarks: recordData.defectDetails?.comment || "",
@@ -336,7 +334,6 @@ const AfterIroningFullReportModal = ({ isOpen, onClose, recordData, checkpointDe
       if (recordData.measurementDetails?.measurement?.length > 0) {
         fetchComparisonData(
           recordData.orderNo,
-          recordData.color,
           recordData.date,
           recordData.reportType,
           recordData.factoryName

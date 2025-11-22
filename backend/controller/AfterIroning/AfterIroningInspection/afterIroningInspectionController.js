@@ -437,10 +437,17 @@ export const saveAfterIroningOrderData = async (req, res) => {
       record = await AfterIroning.findById(formData._id);
       
       if (record) {
+        // CRITICAL FIX: Ensure measurementDetails is an object, not an array.
+        // The frontend sometimes sends an empty array `[]` which causes a cast error.
+        const measurementDetailsUpdate = (formData.measurementDetails && !Array.isArray(formData.measurementDetails))
+          ? formData.measurementDetails
+          : record.measurementDetails; // Preserve existing if new is invalid/empty array
+
         // Update existing record with new data, preserving measurementDetails
         const updateData = {
           ...formData,
-          measurementDetails: formData.measurementDetails,
+          // Use the sanitized measurementDetails
+          measurementDetails: measurementDetailsUpdate,
           inspector: { empId: userId },
           userId: userId,
           savedAt: savedAt,
@@ -507,8 +514,10 @@ export const saveAfterIroningOrderData = async (req, res) => {
         userId: userId,
         savedAt: savedAt,
         status: record.status === "submitted" ? "submitted" : "processing",
-        // Preserve existing measurementDetails if not provided
-        measurementDetails: formData.measurementDetails || record.measurementDetails
+        // CRITICAL FIX: Preserve existing measurementDetails if not provided or if it's an invalid empty array
+        measurementDetails: (formData.measurementDetails && !Array.isArray(formData.measurementDetails))
+          ? formData.measurementDetails
+          : record.measurementDetails
       });
     }
 
@@ -2756,9 +2765,9 @@ export const getAllSubmittedAfterIroningData = async (req, res) => {
 // Get QC Washing measurement data for comparison
 export const getQCWashingMeasurementData = async (req, res) => {
   try {
-    const { orderNo, color, date, reportType, factoryName } = req.query;
+    const { orderNo, date, reportType, factoryName } = req.query;
 
-    if (!orderNo || !color) {
+    if (!orderNo) {
       return res.status(400).json({
         success: false,
         message: "Order number and color are required"
@@ -2768,7 +2777,6 @@ export const getQCWashingMeasurementData = async (req, res) => {
     // Build query to find matching QC Washing record
     const query = {
       orderNo: orderNo,
-      color: color,
       status: { $in: ['submitted', 'approved'] }
     };
 
@@ -2819,7 +2827,6 @@ export const getQCWashingMeasurementData = async (req, res) => {
       recordInfo: {
         id: qcWashingRecord._id,
         orderNo: qcWashingRecord.orderNo,
-        color: qcWashingRecord.color,
         date: qcWashingRecord.date,
         reportType: qcWashingRecord.reportType,
         factoryName: qcWashingRecord.factoryName
