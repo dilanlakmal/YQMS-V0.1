@@ -65,7 +65,7 @@ const ChatPage = () => {
             <>
               {data?.history?.length > 0 ? (
                 data.history.map((message, i) => (
-                  <div key={i} style={{ width: '100%' }}>
+                  <div key={i} style={{ width: '100%', display: 'flex', flexDirection: 'column' }}>
                     {message.img && (
                       <div style={{ marginBottom: '16px', borderRadius: '12px', overflow: 'hidden' }}>
                         <IKImage
