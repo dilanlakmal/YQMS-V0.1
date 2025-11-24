@@ -42,6 +42,29 @@ export const io = new SocketIO(server, {
   },
 });
 
+export const TRANSLATION_CONFIG = {
+  // Chunk settings
+  MAX_CHUNK_SIZE: 400,           // Characters per chunk (MyMemory limit is 500)
+  MAX_TOTAL_LENGTH: 10000,       // Maximum total text length
+  
+  // Timing settings
+  CHUNK_DELAY: 1000,             // Delay between chunks (ms)
+  TIMEOUT: 30000,                // Request timeout (ms)
+  
+  // Retry settings
+  MAX_RETRIES: 3,                // Retry attempts per chunk
+  
+  // API priorities (order matters)
+  API_PRIORITY: ['mymemory', 'google', 'libretranslate'],
+  
+  // Language mappings for different APIs
+  LANGUAGE_MAPPINGS: {
+    'zh-traditional': 'zh',
+    'zh-simplified': 'zh'
+  }
+};
+
+
 // Define allowed origins once
 const allowedOrigins = [
   "https://192.167.12.85:3001",
