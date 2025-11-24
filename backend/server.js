@@ -188,6 +188,12 @@ import QASections_AQL_Sample_Letters from "./routes/PivotY/QASections/QASections
 import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Values_Route.js";
 import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Config_Routes.js";
 
+/* ------------------------------
+  PivotY - QA Measurement Specs
+------------------------------ */
+
+import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_Measurement_Specs_Route.js";
+
 /* -----------------------------
 QA Random Inspection Imports
 ------------------------------ */
@@ -440,6 +446,11 @@ app.use(QASections_ProductLocation);
 app.use(QASections_AQL_Sample_Letters);
 app.use(QASections_AQL_Values);
 app.use(QASections_AQL_Config);
+
+/* ------------------------------
+  PivotY - QA Measurements routes
+------------------------------ */
+app.use(QASections_Measurement_Specs);
 
 /* -----------------------------
   QA Random Inspection Routes

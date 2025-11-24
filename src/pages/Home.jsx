@@ -258,9 +258,18 @@ function Home() {
           {
             path: "/qa-sections",
             pageId: "qa-sections",
+            roles: ["Admin", "QA"],
             image: "assets/Home/FinCheck.png",
             title: t("home.qa_sections"),
             description: "Fin Check Configuration"
+          },
+          {
+            path: "/qa-measurements",
+            pageId: "qa-measurements",
+            roles: ["Admin", "QA", "QA Clerk", "Washing Clerk"],
+            image: "assets/Home/FinCheck_Measurements.png",
+            title: t("home.qa_measurements"),
+            description: "Fin Check Measurements"
           },
           {
             path: "/qa-templates",
@@ -593,17 +602,6 @@ function Home() {
                 </button>
               ))}
             </nav>
-            {/* <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === "light" ? (
-                <Moon className="w-5 h-5" />
-              ) : (
-                <Sun className="w-5 h-5" />
-              )}
-            </button> */}
           </div>
         </div>
       </header>

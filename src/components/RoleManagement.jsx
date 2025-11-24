@@ -278,7 +278,8 @@ export default function RoleManagement() {
     "ANF QA",
     "QC Washing",
     "QC1 Sub Con",
-    "Measurement"
+    "Measurement",
+    "Fin Check Measurements"
   ];
 
   // Prepare sorted table data for rendering

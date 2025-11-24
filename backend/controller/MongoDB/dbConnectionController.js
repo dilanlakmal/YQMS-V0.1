@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 
 //Schemas
+import createDTOrdersSchema from "../../models/dt_orders.js";
+
 import creatQCRealWashQty from "../../models/QCRealWashingQty.js";
 import createIroningModel from "../../models/Ironing.js";
 import createRoleManagmentModel from "../../models/RoleManagment.js";
@@ -85,7 +87,6 @@ import createQCWashingMachineStandard from "../../models/qcWashingStanderd.js";
 import createQC2OlderDefectModel from "../../models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "../../models/QCWashingQtyOld.js";
 import createQCWorkersModel from "../../models/QCWorkers.js";
-import createDTOrdersSchema from "../../models/dt_orders.js";
 import CuttingInlineOrdersModel from "../../models/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 
@@ -102,6 +103,8 @@ import createQASectionsProductLocationModel from "../../models/QA/QASectionsProd
 import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
 import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
 import createQASectionsAqlBuyerConfigModel from "../../models/QA/QASectionsAqlBuyerConfig.js";
+
+import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMeasurementSpecs.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
@@ -132,6 +135,8 @@ ymEcoConnection.on("error", (err) =>
 );
 
 //Collections
+export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
 export const QCRealWashQty = creatQCRealWashQty(ymProdConnection);
 export const UserMain = createUserModel(ymEcoConnection);
 export const UserProd = createUserModel(ymProdConnection);
@@ -229,8 +234,6 @@ export const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
 
-export const DtOrder = createDTOrdersSchema(ymProdConnection);
-
 export const SubConDefect = createSubConDefectsModel(ymProdConnection);
 export const SubconSewingFactory =
   createSubconSewingFactoryModel(ymProdConnection);
@@ -259,6 +262,9 @@ export const QASectionsAqlValues =
   createQASectionsAqlValuesModel(ymProdConnection);
 export const QASectionsAqlBuyerConfig =
   createQASectionsAqlBuyerConfigModel(ymProdConnection);
+
+export const QASectionsMeasurementSpecs =
+  createQASectionsMeasurementSpecsModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 

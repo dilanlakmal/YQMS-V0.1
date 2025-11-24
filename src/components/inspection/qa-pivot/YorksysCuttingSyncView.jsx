@@ -5,7 +5,9 @@ import {
   Loader,
   CheckCircle,
   AlertTriangle,
-  HelpCircle
+  HelpCircle,
+  GitMerge,
+  Ban
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../config";
 
@@ -99,37 +101,48 @@ const YorksysCuttingSyncView = () => {
   };
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md max-w-4xl mx-auto">
-      <h2 className="text-xl font-bold text-gray-800 mb-2">
-        Sync Product Type from Cutting
-      </h2>
-      <p className="text-sm text-gray-500 mb-6">
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-300 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+          <GitMerge className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+          Sync Product Type from Cutting
+        </h2>
+      </div>
+
+      <p className="text-sm text-gray-500 dark:text-gray-400 mb-6 ml-11">
         This tool updates the 'Product Type' in Yorksys Orders using the
         'Garment Type' recorded during Cutting Inspection.
       </p>
 
       {/* --- Data Summary Box --- */}
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-6 mb-6">
-        <div className="flex justify-between items-center">
+      <div className="bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h3 className="text-md font-semibold text-slate-700 mb-2">
+            <h3 className="text-md font-semibold text-gray-700 dark:text-gray-200 mb-2">
               Cutting Inspection Data Summary
             </h3>
             {loading ? (
-              <div className="flex items-center gap-2 text-slate-500">
+              <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
                 <Loader className="w-4 h-4 animate-spin" />
                 <span>Loading data...</span>
               </div>
             ) : error ? (
-              <p className="text-red-600 text-sm font-medium">{error}</p>
+              <p className="text-red-600 dark:text-red-400 text-sm font-medium">
+                {error}
+              </p>
             ) : (
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 text-slate-800">
-                  <Layers className="w-5 h-5 text-indigo-600" />
+                <div className="flex items-center gap-2 text-gray-800 dark:text-gray-100">
+                  <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   <span className="text-2xl font-bold">
                     {cuttingData.length}
                   </span>
-                  <span className="text-sm">MOs with Product Types Found</span>
+                  <span className="text-sm text-gray-500 dark:text-gray-400">
+                    MOs with Product Types Found
+                  </span>
                 </div>
               </div>
             )}
@@ -137,7 +150,7 @@ const YorksysCuttingSyncView = () => {
           <button
             onClick={fetchCuttingData}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 text-sm font-medium rounded-md hover:bg-slate-300 disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 text-gray-700 dark:text-gray-200 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-500 disabled:opacity-50 shadow-sm transition-colors"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             Refresh
@@ -146,13 +159,12 @@ const YorksysCuttingSyncView = () => {
       </div>
 
       {/* --- Update Action Section --- */}
-      <div className="text-center">
+      <div className="flex flex-col items-center justify-center space-y-4">
+        {/* Disabled Button */}
         <button
           onClick={handlePreviewUpdate}
-          disabled={
-            loading || cuttingData.length === 0 || isPreviewing || isUpdating
-          }
-          className="w-full sm:w-auto flex items-center justify-center px-8 py-3 bg-indigo-600 text-white font-semibold rounded-md shadow-sm hover:bg-indigo-700 disabled:bg-indigo-300 disabled:cursor-not-allowed transition-colors"
+          disabled={true} // Hardcoded disabled as requested
+          className="w-full sm:w-auto flex items-center justify-center px-8 py-3 bg-gray-300 dark:bg-gray-700 text-gray-500 dark:text-gray-400 font-bold rounded-lg cursor-not-allowed shadow-none transition-colors border border-gray-300 dark:border-gray-600"
         >
           {isPreviewing ? (
             <>
@@ -163,31 +175,39 @@ const YorksysCuttingSyncView = () => {
             "Update Yorksys Product Type from Cutting"
           )}
         </button>
+
+        {/* Message Below Button */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 rounded-lg text-amber-700 dark:text-amber-400 animate-fadeIn">
+          <Ban className="w-4 h-4 flex-shrink-0" />
+          <span className="text-sm font-semibold">
+            This functionality disabled since Product Type changed
+          </span>
+        </div>
       </div>
 
-      {/* --- Confirmation Dialog --- */}
+      {/* --- Confirmation Dialog (Hidden in disabled state but kept for logic) --- */}
       {matchCount !== null && !isUpdating && (
-        <div className="mt-6 p-4 border-l-4 border-amber-400 bg-amber-50 rounded-md">
+        <div className="mt-6 p-4 border-l-4 border-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-md">
           <div className="flex items-start gap-3">
-            <HelpCircle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <HelpCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5" />
             <div>
-              <h4 className="font-bold text-amber-800">
+              <h4 className="font-bold text-amber-800 dark:text-amber-300">
                 Confirmation Required
               </h4>
-              <p className="text-sm text-amber-700 mt-1">
+              <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
                 Found <strong>{matchCount} matching records</strong> in Yorksys
                 Orders that will be updated. This action cannot be undone.
               </p>
               <div className="mt-4 flex gap-3">
                 <button
                   onClick={handleConfirmUpdate}
-                  className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors"
                 >
                   Yes, Proceed with Update
                 </button>
                 <button
                   onClick={() => setMatchCount(null)}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-200 rounded-md hover:bg-slate-300"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 rounded-md transition-colors"
                 >
                   Cancel
                 </button>
@@ -199,9 +219,9 @@ const YorksysCuttingSyncView = () => {
 
       {/* --- Loading indicator for final update --- */}
       {isUpdating && (
-        <div className="mt-6 p-4 border-l-4 border-blue-400 bg-blue-50 rounded-md flex items-center gap-3">
-          <Loader className="w-5 h-5 text-blue-600 animate-spin" />
-          <p className="text-sm font-medium text-blue-700">
+        <div className="mt-6 p-4 border-l-4 border-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-md flex items-center gap-3">
+          <Loader className="w-5 h-5 text-blue-600 dark:text-blue-400 animate-spin" />
+          <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
             Updating records... Please wait.
           </p>
         </div>
@@ -212,8 +232,8 @@ const YorksysCuttingSyncView = () => {
         <div
           className={`mt-6 p-4 flex items-center gap-3 rounded-md border ${
             updateResult.success
-              ? "bg-green-50 text-green-800 border-green-200"
-              : "bg-red-50 text-red-800 border-red-200"
+              ? "bg-green-50 dark:bg-green-900/20 text-green-800 dark:text-green-300 border-green-200 dark:border-green-800"
+              : "bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-300 border-red-200 dark:border-red-800"
           }`}
         >
           {updateResult.success ? (

@@ -8,7 +8,8 @@ import {
   FilterX,
   Loader,
   Eye,
-  Search
+  Search,
+  List
 } from "lucide-react";
 import React, { useCallback, useRef, useEffect, useState } from "react";
 import { API_BASE_URL } from "../../../../config";
@@ -26,7 +27,7 @@ export const useDebounce = (value, delay) => {
   return debouncedValue;
 };
 
-// --- Reusable Searchable Select Component
+// --- Reusable Searchable Select Component (Dark Mode Enhanced) ---
 export const SearchableSelect = ({
   options,
   value,
@@ -61,26 +62,32 @@ export const SearchableSelect = ({
   return (
     <div className="relative" ref={ref}>
       <div
-        className="w-full p-2 pl-3 pr-8 flex items-center justify-between border border-gray-300 rounded-md text-sm shadow-sm bg-white cursor-pointer"
+        className="w-full p-2.5 pl-3 pr-8 flex items-center justify-between border border-gray-300 dark:border-gray-600 rounded-lg text-sm shadow-sm bg-white dark:bg-gray-700 cursor-pointer hover:border-indigo-500 dark:hover:border-indigo-400 transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className={value ? "text-gray-800" : "text-gray-500"}>
+        <span
+          className={`${
+            value
+              ? "text-gray-900 dark:text-gray-100"
+              : "text-gray-500 dark:text-gray-400"
+          } truncate`}
+        >
           {value || placeholder}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-gray-400 transition-transform ${
+          className={`w-4 h-4 text-gray-400 dark:text-gray-400 transition-transform ${
             isOpen ? "rotate-180" : ""
           }`}
         />
       </div>
 
       {isOpen && (
-        <div className="absolute z-20 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-          <div className="p-2">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+          <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 z-10">
             <input
               type="text"
               placeholder="Search..."
-              className="w-full p-2 border border-gray-300 rounded-md text-sm"
+              className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md text-sm bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               autoFocus
@@ -91,14 +98,14 @@ export const SearchableSelect = ({
               filteredOptions.map((option) => (
                 <li
                   key={option}
-                  className="px-4 py-2 text-sm text-gray-700 hover:bg-indigo-50 cursor-pointer"
+                  className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/50 cursor-pointer transition-colors"
                   onClick={() => handleSelect(option)}
                 >
                   {option}
                 </li>
               ))
             ) : (
-              <li className="px-4 py-2 text-sm text-gray-500">
+              <li className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center">
                 No results found
               </li>
             )}
@@ -122,7 +129,6 @@ const calculateTotalQty = (countryArray) => {
   return countryArray.reduce((sum, country) => sum + country.TotalQty, 0);
 };
 
-// 🔄 MODIFIED: Returns an object for a two-line display with the correct date format
 const formatTimestamp = (isoString) => {
   if (!isoString) return { date: "N/A", time: "" };
   try {
@@ -130,7 +136,6 @@ const formatTimestamp = (isoString) => {
     date.setHours(date.getHours() + 7); // Add +7 hours
 
     const datePart = date.toLocaleDateString("en-US", {
-      // MM/DD/YYYY format
       year: "numeric",
       month: "2-digit",
       day: "2-digit"
@@ -200,7 +205,6 @@ const YorksysOrdersView = () => {
       page: currentPage,
       limit: PAGE_LIMIT
     });
-    // Add active filters to the request parameters
     if (filters.factory) params.append("factory", filters.factory);
     if (filters.buyer) params.append("buyer", filters.buyer);
     if (filters.season) params.append("season", filters.season);
@@ -230,12 +234,10 @@ const YorksysOrdersView = () => {
     debouncedStyle
   ]);
 
-  // Initial load for filter dropdowns
   useEffect(() => {
     fetchFilterOptions();
   }, []);
 
-  // Re-fetch orders when page or filters change
   useEffect(() => {
     fetchOrders();
   }, [fetchOrders]);
@@ -244,7 +246,7 @@ const YorksysOrdersView = () => {
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
     setFilters((prev) => ({ ...prev, [name]: value }));
-    setCurrentPage(1); // CRITICAL: Reset to first page on any filter change
+    setCurrentPage(1);
   };
 
   const clearFilters = () => {
@@ -267,7 +269,6 @@ const YorksysOrdersView = () => {
     }
   };
 
-  // --- UI Rendering Logic ---
   const generatePageNumbers = () => {
     const { totalPages } = pagination;
     const pages = [];
@@ -293,20 +294,27 @@ const YorksysOrdersView = () => {
   );
 
   return (
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">Yorksys Orders</h2>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg transition-colors duration-300">
+      <div className="flex items-center gap-2 mb-6">
+        <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
+          <List className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
+          Yorksys Orders
+        </h2>
+      </div>
 
       {/* --- Filter Pane --- */}
-      <div className="mb-6 p-4 border rounded-lg bg-gray-50">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter className="w-5 h-5 text-gray-600" />
-          <h3 className="text-md font-semibold text-gray-700">
+      <div className="mb-6 p-5 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700/30">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+          <h3 className="text-sm font-bold uppercase tracking-wider text-gray-700 dark:text-gray-200">
             Filter Options
           </h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">
               Factory
             </label>
             <SearchableSelect
@@ -318,7 +326,7 @@ const YorksysOrdersView = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">
               Buyer
             </label>
             <SearchableSelect
@@ -330,7 +338,7 @@ const YorksysOrdersView = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">
               Season
             </label>
             <SearchableSelect
@@ -342,7 +350,7 @@ const YorksysOrdersView = () => {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">
               MO No
             </label>
             <div className="relative">
@@ -352,13 +360,13 @@ const YorksysOrdersView = () => {
                 placeholder="Search MO..."
                 value={filters.moNo}
                 onChange={handleFilterChange}
-                className="w-full p-2 pl-8 border border-gray-300 rounded-md text-sm shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full p-2.5 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none transition-all"
               />
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1.5 uppercase">
               Cust. Style
             </label>
             <div className="relative">
@@ -368,15 +376,15 @@ const YorksysOrdersView = () => {
                 placeholder="Search Style..."
                 value={filters.style}
                 onChange={handleFilterChange}
-                className="w-full p-2 pl-8 border border-gray-300 rounded-md text-sm shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full p-2.5 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none transition-all"
               />
-              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
             </div>
           </div>
           <div className="self-end">
             <button
               onClick={clearFilters}
-              className="w-full flex items-center justify-center gap-2 p-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-medium transition-colors"
+              className="w-full flex items-center justify-center gap-2 p-2.5 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500 text-sm font-bold transition-all"
             >
               <FilterX className="w-4 h-4" /> Clear
             </button>
@@ -385,21 +393,22 @@ const YorksysOrdersView = () => {
       </div>
 
       {error && (
-        <div className="mb-4 flex items-center p-3 bg-red-50 text-red-700 border border-red-200 rounded-md">
-          <AlertTriangle className="w-5 h-5 mr-2" /> <span>Error: {error}</span>
+        <div className="mb-6 flex items-center p-4 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800 rounded-lg animate-fadeIn">
+          <AlertTriangle className="w-5 h-5 mr-3 flex-shrink-0" />
+          <span className="font-medium">Error: {error}</span>
         </div>
       )}
 
       {/* --- Table Section --- */}
-      <div className="overflow-x-auto border border-gray-200 rounded-lg">
-        <div className="relative">
+      <div className="overflow-x-auto border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm">
+        <div className="relative min-h-[300px]">
           {loading && (
-            <div className="absolute inset-0 bg-white bg-opacity-75 flex justify-center items-center z-10 rounded-lg">
-              <Loader className="w-8 h-8 animate-spin text-indigo-600" />
+            <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 flex justify-center items-center z-10 backdrop-blur-sm transition-all">
+              <Loader className="w-8 h-8 animate-spin text-indigo-600 dark:text-indigo-400" />
             </div>
           )}
-          <table className="min-w-full divide-y divide-gray-200 text-sm">
-            <thead className="bg-gray-100">
+          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead className="bg-gray-100 dark:bg-gray-700/80">
               <tr>
                 {[
                   "Factory",
@@ -414,73 +423,83 @@ const YorksysOrdersView = () => {
                   "Total Order Qty",
                   "Created At",
                   "Updated At",
-                  "SKU Details"
+                  "Actions"
                 ].map((header) => (
                   <th
                     key={header}
-                    className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider"
+                    className="px-6 py-4 text-left text-xs font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider"
                   >
                     {header}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {orders.map((order) => {
                 const createdAt = formatTimestamp(order.createdAt);
                 const updatedAt = formatTimestamp(order.updatedAt);
                 return (
                   <tr
                     key={order._id}
-                    className="hover:bg-gray-50 transition-colors align-middle"
+                    className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors align-middle"
                   >
-                    <td className="text-sm px-6 py-4 font-semibold whitespace-nowrap">
+                    <td className="text-sm px-6 py-4 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">
                       {order.factory}
                     </td>
-                    <td className="text-sm px-6 py-4 font-semibold whitespace-nowrap font-medium text-indigo-700">
+                    <td className="text-sm px-6 py-4 font-bold whitespace-nowrap text-indigo-700 dark:text-indigo-400">
                       {order.moNo}
                     </td>
-                    <td className="text-xs px-6 py-4 whitespace-nowrap">
+                    <td className="text-sm px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
                       {order.style}
                     </td>
-                    <td className="text-sm px-6 py-4 font-semibold whitespace-nowrap">
+                    <td className="text-sm px-6 py-4 font-medium text-gray-700 dark:text-gray-200 whitespace-nowrap">
                       {order.buyer}
                     </td>
-                    <td className="text-sm px-6 py-4 whitespace-nowrap text-center">
+                    <td className="text-sm px-6 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-400">
                       {order.currency}
                     </td>
-                    <td className="text-xs px-6 py-4 ">{order.destination}</td>
-                    <td className="text-sm px-6 py-4 whitespace-nowrap">
+                    <td className="text-xs px-6 py-4 text-gray-600 dark:text-gray-300">
+                      {order.destination}
+                    </td>
+                    <td className="text-sm px-6 py-4 whitespace-nowrap text-gray-600 dark:text-gray-300">
                       {order.shipMode}
                     </td>
-                    <td className="text-xs px-6 py-4 whitespace-nowrap text-center">
+                    <td className="text-xs px-6 py-4 whitespace-nowrap text-center text-gray-600 dark:text-gray-300">
                       {order.season}
                     </td>
-                    <td
-                      className="text-xs px-6 py-4 bg-blue-50 font-semibold max-w-xs truncate"
-                      title={formatFabricContent(order.FabricContent)}
-                    >
-                      {formatFabricContent(order.FabricContent)}
+                    <td className="px-6 py-4">
+                      <div
+                        className="text-xs bg-blue-50 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 px-2 py-1 rounded font-medium max-w-[400px] truncate"
+                        title={formatFabricContent(order.FabricContent)}
+                      >
+                        {formatFabricContent(order.FabricContent)}
+                      </div>
                     </td>
-                    <td className="text-xs px-6 py-4 whitespace-nowrap text-right font-semibold bg-amber-100 text-gray-800">
-                      {calculateTotalQty(
-                        order.OrderQtyByCountry
-                      ).toLocaleString()}
+                    <td className="px-6 py-4 whitespace-nowrap text-right">
+                      <span className="text-xs font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 px-2 py-1 rounded">
+                        {calculateTotalQty(
+                          order.OrderQtyByCountry
+                        ).toLocaleString()}
+                      </span>
                     </td>
-                    <td className="text-xs px-6 py-4 whitespace-nowrap text-gray-600">
+                    <td className="text-xs px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                       <div className="flex flex-col">
-                        <span>{createdAt.date}</span>
-                        <span className="flex items-center gap-1 text-xs text-gray-500">
-                          <Clock size={12} />
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          {createdAt.date}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] opacity-80">
+                          <Clock size={10} />
                           {createdAt.time}
                         </span>
                       </div>
                     </td>
-                    <td className="text-xs px-6 py-4 whitespace-nowrap text-gray-600">
+                    <td className="text-xs px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
                       <div className="flex flex-col">
-                        <span>{updatedAt.date}</span>
-                        <span className="flex items-center gap-1 text-xs text-gray-500">
-                          <Clock size={12} />
+                        <span className="font-medium text-gray-700 dark:text-gray-300">
+                          {updatedAt.date}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] opacity-80">
+                          <Clock size={10} />
                           {updatedAt.time}
                         </span>
                       </div>
@@ -488,9 +507,9 @@ const YorksysOrdersView = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       <button
                         onClick={() => handleViewDetails(order)}
-                        className="inline-flex items-center gap-2 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-full py-1.5 px-4 transition-colors"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 rounded-lg py-2 px-3 transition-colors shadow-sm"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5" />
                         View
                       </button>
                     </td>
@@ -499,8 +518,16 @@ const YorksysOrdersView = () => {
               })}
               {!loading && orders.length === 0 && (
                 <tr>
-                  <td colSpan="13" className="text-center py-10 text-gray-500">
-                    No orders found matching your criteria.
+                  <td
+                    colSpan="13"
+                    className="text-center py-12 text-gray-500 dark:text-gray-400"
+                  >
+                    <p className="text-base font-medium">
+                      No orders found matching your criteria.
+                    </p>
+                    <p className="text-xs mt-1">
+                      Try adjusting the filters or search terms.
+                    </p>
                   </td>
                 </tr>
               )}
@@ -511,34 +538,46 @@ const YorksysOrdersView = () => {
 
       {/* --- Pagination Controls --- */}
       {pagination.totalRecords > 0 && (
-        <div className="flex items-center justify-between mt-4 px-2">
-          <p className="text-sm text-gray-700">
-            Showing <span className="font-medium">{startRecord}</span> to{" "}
-            <span className="font-medium">{endRecord}</span> of{" "}
-            <span className="font-medium">{pagination.totalRecords}</span>{" "}
+        <div className="flex flex-col sm:flex-row items-center justify-between mt-6 px-2 gap-4">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Showing{" "}
+            <span className="font-bold text-gray-900 dark:text-gray-100">
+              {startRecord}
+            </span>{" "}
+            to{" "}
+            <span className="font-bold text-gray-900 dark:text-gray-100">
+              {endRecord}
+            </span>{" "}
+            of{" "}
+            <span className="font-bold text-gray-900 dark:text-gray-100">
+              {pagination.totalRecords}
+            </span>{" "}
             results
           </p>
-          <nav className="flex items-center gap-1">
+          <nav className="flex items-center gap-1.5">
             <button
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
             {generatePageNumbers().map((page, index) =>
               page === "..." ? (
-                <span key={index} className="px-4 py-2 text-gray-500">
+                <span
+                  key={index}
+                  className="px-3 py-2 text-gray-500 dark:text-gray-400"
+                >
                   ...
                 </span>
               ) : (
                 <button
                   key={index}
                   onClick={() => handlePageChange(page)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
+                  className={`px-3.5 py-2 rounded-lg text-sm font-bold transition-all ${
                     page === currentPage
-                      ? "bg-indigo-600 text-white shadow-sm"
-                      : "hover:bg-gray-100"
+                      ? "bg-indigo-600 text-white shadow-md hover:bg-indigo-700"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                   }`}
                 >
                   {page}
@@ -548,7 +587,7 @@ const YorksysOrdersView = () => {
             <button
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === pagination.totalPages}
-              className="p-2 rounded-md disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100"
+              className="p-2 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight className="w-5 h-5" />
             </button>

@@ -83,6 +83,7 @@ import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
 
 import YPivotQASections from "./pages/YPivotQASections.jsx";
+import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
@@ -472,6 +473,10 @@ function AppContent() {
               <Route path="/packing-list" element={<PackingList />} />
               <Route path="/measurement" element={<Measurement />} />
               <Route path="/qa-sections" element={<YPivotQASections />} />
+              <Route
+                path="/qa-measurements"
+                element={<YPivotQAMeasurements />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
