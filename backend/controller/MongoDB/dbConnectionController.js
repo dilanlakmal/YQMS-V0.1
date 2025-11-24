@@ -96,14 +96,18 @@ import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectLis
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 
+import createConversationModel from "../../models/chatbot/conversation.model.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+  // "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
+  process.env.MONGO_URI_PRODUCTION
   //"mongodb://localhost:27017/ym_prod"
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
+  // "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
+  process.env.MONGO_URI_ECO
   //"mongodb://localhost:27017/ym_prod"
 );
 
@@ -229,6 +233,9 @@ export const QASectionsDefectList =
   createQASectionsDefectListModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
+
+
+export const Conversation = createConversationModel(ymEcoConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

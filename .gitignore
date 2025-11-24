@@ -38,6 +38,7 @@ dist-ssr
 # handles all image upload folders in frontend
 public/storage/
 
+backend/.env
 
 
 # ==================================

@@ -17,7 +17,7 @@ export default function BotHeader({ onClose }) {
             AI
           </span>
         </div>
-        <h1 className="text-lg font-semibold">ChatGPT</h1>
+        <h1 className="text-lg font-semibold">YQMS AI</h1>
       </div>
       <div className="ml-auto flex gap-2">
         {/* <Button variant="ghost" size="icon">

@@ -242,6 +242,12 @@ import PackingList from "./routes/PackingList/packingListRoutes.js";
 ------------------------------ */
 import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 
+
+/* -----------------------------
+  Chatbot Output Imports
+------------------------------ */
+import conversationRoutes from "./routes/AI/conversation.route.js";
+import chatRoutes from "./routes/AI/chat.route.js";
 /* -----------------------------
   User Routes
 ------------------------------ */
@@ -481,6 +487,11 @@ app.use(PackingList);
 ------------------------------ */
 app.use(QCOutputRoute);
 
+/* -----------------------------
+  Chatbot Output Routes
+------------------------------ */
+app.use("/api/ai/conversation", conversationRoutes);
+app.use("/api/ai/chat", chatRoutes);
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
