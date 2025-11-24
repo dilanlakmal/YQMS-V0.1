@@ -8,7 +8,8 @@ import {
   listGlossaries,
   getGlossariesByLanguagePair,
   deleteGlossary,
-  getGlossaryUrlEndpoint
+  getGlossaryUrlEndpoint,
+  addEntriesToGlossary
 } from "../../controller/glossaries/glossaryController.js";
 
 const router = express.Router();
@@ -55,6 +56,9 @@ router.get("/api/glossaries/:blobName/url", getGlossaryUrlEndpoint);
 
 // DELETE /api/glossaries/delete - Delete glossary
 router.delete("/api/glossaries/delete", deleteGlossary);
+
+// POST /api/glossaries/add-entries - Add entries to existing glossary
+router.post("/api/glossaries/add-entries", addEntriesToGlossary);
 
 export default router;
 

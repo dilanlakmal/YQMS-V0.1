@@ -202,3 +202,75 @@ export const extractCleanFileName = (blobName) => {
   const match = blobName.match(uuidPattern);
   return match ? match[1] : blobName;
 };
+
+/**
+ * Read blob content as buffer
+ * @param {string} containerName - Container name
+ * @param {string} blobName - Blob name
+ * @param {string} storageAccountName - Storage account name
+ * @param {string} storageAccountKey - Storage account key
+ * @returns {Promise<Buffer>} - Blob content as buffer
+ */
+export const readBlobContent = async (containerName, blobName, storageAccountName, storageAccountKey) => {
+  try {
+    const sharedKeyCredential = new StorageSharedKeyCredential(storageAccountName, storageAccountKey);
+    const blobServiceClient = new BlobServiceClient(
+      `https://${storageAccountName}.blob.core.windows.net`,
+      sharedKeyCredential
+    );
+
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    
+    // Download blob content
+    const downloadResponse = await blockBlobClient.download(0);
+    const chunks = [];
+    
+    for await (const chunk of downloadResponse.readableStreamBody) {
+      chunks.push(chunk);
+    }
+    
+    // Combine chunks into single buffer
+    const buffer = Buffer.concat(chunks);
+    return buffer;
+  } catch (error) {
+    console.error(`Error reading blob ${blobName}:`, error);
+    throw new Error(`Failed to read blob: ${error.message}`);
+  }
+};
+
+/**
+ * Update existing blob content (overwrite)
+ * @param {string} containerName - Container name
+ * @param {string} blobName - Blob name
+ * @param {Buffer} newBuffer - New content buffer
+ * @param {string} storageAccountName - Storage account name
+ * @param {string} storageAccountKey - Storage account key
+ * @returns {Promise<string>} - Blob URL
+ */
+export const updateBlobContent = async (containerName, blobName, newBuffer, storageAccountName, storageAccountKey) => {
+  try {
+    const sharedKeyCredential = new StorageSharedKeyCredential(storageAccountName, storageAccountKey);
+    const blobServiceClient = new BlobServiceClient(
+      `https://${storageAccountName}.blob.core.windows.net`,
+      sharedKeyCredential
+    );
+
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    
+    // Create container if it doesn't exist
+    await containerClient.createIfNotExists();
+    
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    
+    // Upload (overwrite) the new content
+    await blockBlobClient.upload(newBuffer, newBuffer.length, {
+      blobHTTPHeaders: { blobContentType: 'application/octet-stream' }
+    });
+
+    return blockBlobClient.url;
+  } catch (error) {
+    console.error(`Error updating blob ${blobName}:`, error);
+    throw new Error(`Failed to update blob: ${error.message}`);
+  }
+};

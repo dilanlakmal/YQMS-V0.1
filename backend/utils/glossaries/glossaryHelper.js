@@ -275,3 +275,139 @@ export const generateGlossaryBlobName = (sourceLang, targetLang, format) => {
   return `${sourceLang}-${targetLang}-${timestamp}-${uuid}.tsv`;
 };
 
+/**
+ * Generate plural form of a word
+ * Simple pluralization rules:
+ * - Add "s" for most words
+ * - Add "es" for words ending in s, x, z, ch, sh
+ * - Change "y" to "ies" for words ending in consonant+y
+ * @param {string} word - Word to pluralize
+ * @returns {string} - Plural form
+ */
+const pluralizeWord = (word) => {
+  if (!word || word.length === 0) return word;
+  
+  const lower = word.toLowerCase();
+  const lastChar = lower[lower.length - 1];
+  const lastTwoChars = lower.slice(-2);
+  
+  // Words ending in s, x, z, ch, sh -> add "es"
+  if (lastChar === 's' || lastChar === 'x' || lastChar === 'z' || 
+      lastTwoChars === 'ch' || lastTwoChars === 'sh') {
+    return word + 'es';
+  }
+  
+  // Words ending in consonant + y -> change y to ies
+  if (lastChar === 'y' && lower.length > 1) {
+    const vowels = ['a', 'e', 'i', 'o', 'u'];
+    const secondLastChar = lower[lower.length - 2];
+    if (!vowels.includes(secondLastChar)) {
+      return word.slice(0, -1) + 'ies';
+    }
+  }
+  
+  // Default: add "s"
+  return word + 's';
+};
+
+/**
+ * Generate plural form for a phrase (only pluralize first word for multi-word phrases)
+ * @param {string} phrase - Phrase to pluralize
+ * @returns {string} - Plural form
+ */
+const pluralizePhrase = (phrase) => {
+  if (!phrase || !phrase.includes(' ')) {
+    return pluralizeWord(phrase);
+  }
+  
+  const words = phrase.split(' ');
+  const firstWord = words[0];
+  const rest = words.slice(1).join(' ');
+  
+  // Pluralize first word only
+  const pluralFirstWord = pluralizeWord(firstWord);
+  
+  return rest ? `${pluralFirstWord} ${rest}` : pluralFirstWord;
+};
+
+/**
+ * Expand entries with case variations and plural forms
+ * Single words: 3 case variations + 3 plural variations = 6 total
+ * Multi-word phrases: 4 case variations (idioms typically don't pluralize, but we'll add plural for first word)
+ * @param {Array<{source: string, target: string}>} entries - Original entries
+ * @returns {Array<{source: string, target: string}>} - Expanded entries with case variations and plural forms
+ */
+export const expandEntriesWithCaseVariations = (entries) => {
+  const expanded = [];
+  const seen = new Set(); // Track exact duplicates (case-sensitive)
+
+  for (const entry of entries) {
+    const { source, target } = entry;
+    
+    if (!source || !target) {
+      continue; // Skip invalid entries
+    }
+
+    const isMultiWord = source.includes(' ');
+
+    if (isMultiWord) {
+      // Multi-word phrase: Generate 4 case variations
+      const lower = source.toLowerCase();
+      const firstWordCap = source.split(' ').map((word, idx) => 
+        idx === 0 ? word.charAt(0).toUpperCase() + word.slice(1).toLowerCase() : word.toLowerCase()
+      ).join(' ');
+      const titleCase = source.split(' ').map(word => 
+        word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+      ).join(' ');
+      const upper = source.toUpperCase();
+
+      // Add case variations
+      const caseVariations = [lower, firstWordCap, titleCase, upper];
+      for (const variation of caseVariations) {
+        const key = `${variation}\t${target}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          expanded.push({ source: variation, target });
+        }
+      }
+
+      // Add plural forms for each case variation
+      for (const variation of caseVariations) {
+        const plural = pluralizePhrase(variation);
+        const pluralKey = `${plural}\t${target}`;
+        if (!seen.has(pluralKey)) {
+          seen.add(pluralKey);
+          expanded.push({ source: plural, target });
+        }
+      }
+    } else {
+      // Single word: Generate 3 case variations
+      const lower = source.toLowerCase();
+      const upper = source.toUpperCase();
+      const titleCase = source.charAt(0).toUpperCase() + source.slice(1).toLowerCase();
+
+      // Add case variations
+      const caseVariations = [lower, upper, titleCase];
+      for (const variation of caseVariations) {
+        const key = `${variation}\t${target}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          expanded.push({ source: variation, target });
+        }
+      }
+
+      // Add plural forms for each case variation
+      for (const variation of caseVariations) {
+        const plural = pluralizeWord(variation);
+        const pluralKey = `${plural}\t${target}`;
+        if (!seen.has(pluralKey)) {
+          seen.add(pluralKey);
+          expanded.push({ source: plural, target });
+        }
+      }
+    }
+  }
+
+  return expanded;
+};
+

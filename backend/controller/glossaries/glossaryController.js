@@ -9,13 +9,17 @@ import {
   getBlobSASUrl,
   listBlobsInContainer,
   downloadBlobByName,
-  deleteBlob
+  deleteBlob,
+  readBlobContent,
+  updateBlobContent
 } from "../../utils/azureBlobHelper.js";
 import { BlobSASPermissions } from "@azure/storage-blob";
 import {
   validateGlossaryFile,
   generateGlossaryBlobName,
-  detectGlossaryFormat
+  detectGlossaryFormat,
+  expandEntriesWithCaseVariations,
+  parseGlossaryFile
 } from "../../utils/glossaries/glossaryHelper.js";
 import fs from 'fs';
 import { promisify } from 'util';
@@ -48,6 +52,59 @@ const parseGlossaryBlobName = (blobName) => {
     format: ext,
     originalName: blobName
   };
+};
+
+/**
+ * Find existing glossary by language pair
+ * Returns the most recent glossary if multiple exist
+ * @param {string} sourceLanguage - Source language code
+ * @param {string} targetLanguage - Target language code
+ * @param {string} storageAccountName - Storage account name
+ * @param {string} storageAccountKey - Storage account key
+ * @returns {Promise<{blobName: string, lastModified: Date} | null>} - Found glossary or null
+ */
+const findGlossaryByLanguagePair = async (sourceLanguage, targetLanguage, storageAccountName, storageAccountKey) => {
+  try {
+    // List all blobs in glossary container
+    const blobs = await listBlobsInContainer(
+      GLOSSARY_CONTAINER,
+      storageAccountName,
+      storageAccountKey
+    );
+
+    // Parse metadata and filter by language pair
+    const matchingGlossaries = blobs
+      .map(blob => {
+        const metadata = parseGlossaryBlobName(blob.name);
+        if (!metadata) return null;
+
+        return {
+          blobName: blob.name,
+          sourceLanguage: metadata.sourceLang,
+          targetLanguage: metadata.targetLang,
+          lastModified: blob.lastModified
+        };
+      })
+      .filter(glossary => 
+        glossary &&
+        glossary.sourceLanguage.toLowerCase() === sourceLanguage.toLowerCase() &&
+        glossary.targetLanguage.toLowerCase() === targetLanguage.toLowerCase()
+      )
+      .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)); // Most recent first
+
+    if (matchingGlossaries.length === 0) {
+      return null;
+    }
+
+    // Return the most recent one
+    return {
+      blobName: matchingGlossaries[0].blobName,
+      lastModified: matchingGlossaries[0].lastModified
+    };
+  } catch (error) {
+    console.error("Error finding glossary by language pair:", error);
+    throw error;
+  }
 };
 
 /**
@@ -104,18 +161,33 @@ export const uploadGlossary = async (req, res) => {
       });
     }
 
+    // Expand entries with case variations
+    const originalCount = validation.entries.length;
+    const expandedEntries = expandEntriesWithCaseVariations(validation.entries);
+    const expandedCount = expandedEntries.length;
+    
+    if (expandedCount > originalCount) {
+      console.log(`Expanded ${originalCount} entries to ${expandedCount} entries with case variations`);
+    }
+
     // Convert to TSV if not already TSV
     let finalBuffer = fileBuffer;
     let finalFormat = validation.format;
 
     if (validation.format !== 'tsv') {
-      // Convert entries to TSV format
-      const tsvContent = validation.entries
+      // Convert expanded entries to TSV format
+      const tsvContent = expandedEntries
         .map(e => `${e.source}\t${e.target}`)
         .join('\n');
       finalBuffer = Buffer.from(tsvContent, 'utf-8');
       finalFormat = 'tsv';
       console.log(`Converted ${validation.format} glossary to TSV format`);
+    } else {
+      // Even if already TSV, use expanded entries
+      const tsvContent = expandedEntries
+        .map(e => `${e.source}\t${e.target}`)
+        .join('\n');
+      finalBuffer = Buffer.from(tsvContent, 'utf-8');
     }
 
     // Generate blob name with .tsv extension
@@ -148,7 +220,8 @@ export const uploadGlossary = async (req, res) => {
         sourceLanguage: sourceLanguage.toLowerCase(),
         targetLanguage: targetLanguage.toLowerCase(),
         format: finalFormat,
-        entryCount: validation.entries.length,
+        entryCount: expandedCount,
+        originalEntryCount: originalCount,
         fileName: file.originalname,
         warnings: validation.warnings
       }
@@ -404,6 +477,156 @@ export const getGlossaryUrlEndpoint = async (req, res) => {
     console.error("Get glossary URL endpoint error:", error);
     return res.status(500).json({
       error: "Failed to get glossary URL",
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Add entries to existing glossary
+ * POST /api/glossaries/add-entries
+ */
+export const addEntriesToGlossary = async (req, res) => {
+  try {
+    const { sourceLanguage, targetLanguage, entries, blobName } = req.body;
+
+    // Validate input
+    if (!sourceLanguage || !targetLanguage) {
+      return res.status(400).json({
+        error: "Source language and target language are required"
+      });
+    }
+
+    if (!entries || !Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({
+        error: "Entries array is required and must not be empty"
+      });
+    }
+
+    // Validate entries structure
+    for (const entry of entries) {
+      if (!entry.source || !entry.target) {
+        return res.status(400).json({
+          error: "Each entry must have both 'source' and 'target' fields"
+        });
+      }
+    }
+
+    // Get storage configuration
+    const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
+    const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+
+    if (!storageAccountKey) {
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
+      });
+    }
+
+    // Find existing glossary
+    let existingGlossary = null;
+    let targetBlobName = blobName;
+
+    if (blobName) {
+      // Use provided blob name
+      existingGlossary = { blobName: blobName };
+    } else {
+      // Find by language pair
+      existingGlossary = await findGlossaryByLanguagePair(
+        sourceLanguage.toLowerCase(),
+        targetLanguage.toLowerCase(),
+        storageAccountName,
+        storageAccountKey
+      );
+      if (existingGlossary) {
+        targetBlobName = existingGlossary.blobName;
+      }
+    }
+
+    // Get existing entries if glossary exists
+    let existingEntries = [];
+    if (existingGlossary) {
+      try {
+        // Download existing glossary
+        const existingBuffer = await readBlobContent(
+          GLOSSARY_CONTAINER,
+          targetBlobName,
+          storageAccountName,
+          storageAccountKey
+        );
+
+        // Parse existing TSV entries
+        existingEntries = await parseGlossaryFile(existingBuffer, 'tsv');
+        console.log(`Found existing glossary with ${existingEntries.length} entries`);
+      } catch (error) {
+        console.error("Error reading existing glossary:", error);
+        // If we can't read it, treat as new glossary
+        existingGlossary = null;
+        existingEntries = [];
+      }
+    }
+
+    // Expand new entries with case variations (includes plural forms)
+    const expandedNewEntries = expandEntriesWithCaseVariations(entries);
+    console.log(`Expanded ${entries.length} new entries to ${expandedNewEntries.length} entries with case variations and plural forms`);
+
+    // Merge entries - ignore duplicates, just append all new entries
+    const mergedEntries = [...existingEntries, ...expandedNewEntries];
+    const addedVariations = expandedNewEntries;
+
+    // Convert merged entries to TSV
+    const tsvContent = mergedEntries
+      .map(e => `${e.source}\t${e.target}`)
+      .join('\n');
+    const tsvBuffer = Buffer.from(tsvContent, 'utf-8');
+
+    // Upload updated TSV
+    if (existingGlossary) {
+      // Update existing glossary
+      await updateBlobContent(
+        GLOSSARY_CONTAINER,
+        targetBlobName,
+        tsvBuffer,
+        storageAccountName,
+        storageAccountKey
+      );
+      console.log(`Updated glossary ${targetBlobName} with ${mergedEntries.length} total entries`);
+    } else {
+      // Create new glossary
+      targetBlobName = generateGlossaryBlobName(
+        sourceLanguage.toLowerCase(),
+        targetLanguage.toLowerCase(),
+        'tsv'
+      );
+      await uploadFileToBlob(
+        tsvBuffer,
+        targetBlobName,
+        GLOSSARY_CONTAINER,
+        storageAccountName,
+        storageAccountKey
+      );
+      console.log(`Created new glossary ${targetBlobName} with ${mergedEntries.length} entries`);
+    }
+
+    // Return response
+    return res.status(200).json({
+      success: true,
+      message: existingGlossary 
+        ? `Added ${addedVariations.length} entries to existing glossary`
+        : `Created new glossary with ${addedVariations.length} entries`,
+      glossary: {
+        blobName: targetBlobName,
+        sourceLanguage: sourceLanguage.toLowerCase(),
+        targetLanguage: targetLanguage.toLowerCase(),
+        totalEntries: mergedEntries.length,
+        addedEntries: addedVariations.length
+      },
+      addedVariations: addedVariations.slice(0, 50) // Limit to first 50 for response size
+    });
+
+  } catch (error) {
+    console.error("Add entries to glossary error:", error);
+    return res.status(500).json({
+      error: "Failed to add entries to glossary",
       details: error.message
     });
   }
