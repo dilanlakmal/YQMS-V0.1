@@ -13,6 +13,7 @@ import {
 import { read, utils } from "xlsx";
 import { cleanWashingSpecData } from "../components/inspection/qc2_washing/WashingSpecDataCleaning";
 import WashingSpecsDataPreview from "../components/inspection/qc2_washing/WashingSpecsDataPreview";
+import UploadedSpecsView from "../components/inspection/qc2_washing/UploadedSpecsView";
 import { API_BASE_URL } from "../../config";
 
 const UploadWashingSpecs = () => {
@@ -179,6 +180,7 @@ const UploadWashingSpecs = () => {
       // Optional: Clear data after successful save
       setWashingSpecsData([]);
       setSelectedFile(null);
+      window.location.reload(); // Simple reload to update table
     } catch (err) {
       console.error("Save Error:", err);
       setSaveStatus({ message: err.message, type: "error" });
@@ -319,6 +321,12 @@ const UploadWashingSpecs = () => {
             allSpecData={washingSpecsData} // Pass the entire array
           />
         )}
+      </div>
+      {/* --- NEW: Uploaded Specs Table --- */}
+      <div className="max-w-7xl mx-auto">
+        {" "}
+        {/* Constrain width if needed */}
+        <UploadedSpecsView />
       </div>
     </div>
   );

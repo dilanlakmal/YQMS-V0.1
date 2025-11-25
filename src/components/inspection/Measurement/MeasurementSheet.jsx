@@ -64,7 +64,7 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
       decimal === "" ||
       isNaN(parseFloat(decimal))
     ) {
-      return "N/A";
+      return "";
     }
 
     const num = parseFloat(decimal);
