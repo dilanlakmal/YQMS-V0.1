@@ -584,3 +584,122 @@ export const fixWashingSpecsIssues = async (req, res) => {
     res.status(500).json({ error: "Failed to fix data." });
   }
 };
+
+/**
+ * NEW: Fix TOL Issues (Recalculate decimals for TolMinus/TolPlus)
+ */
+export const fixTolIssues = async (req, res) => {
+  try {
+    const collection = ymProdConnection.db.collection("dt_orders");
+
+    // Find documents that have BeforeWashSpecs OR AfterWashSpecs
+    const cursor = collection.find({
+      $or: [
+        { BeforeWashSpecs: { $exists: true, $not: { $size: 0 } } },
+        { AfterWashSpecs: { $exists: true, $not: { $size: 0 } } }
+      ]
+    });
+
+    let totalBwTolFixed = 0;
+    let totalAwTolFixed = 0;
+    let totalDecimalsInserted = 0;
+    let modifiedDocCount = 0;
+
+    while (await cursor.hasNext()) {
+      const doc = await cursor.next();
+      let isModified = false;
+
+      // Helper to fix a single Tolerance Object
+      const fixToleranceObject = (tolObj) => {
+        let fixed = false;
+        // Check if fraction exists but decimal is null/undefined
+        const fractionVal = tolObj.fraction
+          ? String(tolObj.fraction).trim()
+          : "";
+        const isDecimalNull =
+          tolObj.decimal === null || tolObj.decimal === undefined;
+
+        if (fractionVal !== "" && isDecimalNull) {
+          // Normalize Fraction String (Remove double spaces, fix slash)
+          // e.g. "-  1/2" -> "-1/2", "1  1/2" -> "1 1/2"
+          let cleanedFraction = fractionVal
+            .replace(/⁄/g, "/")
+            .replace(/\s+/g, " ");
+
+          // Specific fix for negative sign spacing: "- 1/2" -> "-1/2"
+          cleanedFraction = cleanedFraction.replace(/-\s+/, "-");
+
+          // Calculate Decimal
+          const newDecimal = fractionToDecimalBackend(cleanedFraction);
+
+          if (newDecimal !== null) {
+            tolObj.decimal = newDecimal;
+            tolObj.fraction = cleanedFraction; // Save clean string
+            fixed = true;
+          }
+        }
+        return fixed;
+      };
+
+      // --- Fix Before Wash Specs ---
+      if (doc.BeforeWashSpecs && Array.isArray(doc.BeforeWashSpecs)) {
+        doc.BeforeWashSpecs.forEach((row) => {
+          if (row.TolMinus && fixToleranceObject(row.TolMinus)) {
+            totalBwTolFixed++;
+            totalDecimalsInserted++;
+            isModified = true;
+          }
+          if (row.TolPlus && fixToleranceObject(row.TolPlus)) {
+            totalBwTolFixed++;
+            totalDecimalsInserted++;
+            isModified = true;
+          }
+        });
+      }
+
+      // --- Fix After Wash Specs ---
+      if (doc.AfterWashSpecs && Array.isArray(doc.AfterWashSpecs)) {
+        doc.AfterWashSpecs.forEach((row) => {
+          if (row.TolMinus && fixToleranceObject(row.TolMinus)) {
+            totalAwTolFixed++;
+            totalDecimalsInserted++;
+            isModified = true;
+          }
+          if (row.TolPlus && fixToleranceObject(row.TolPlus)) {
+            totalAwTolFixed++;
+            totalDecimalsInserted++;
+            isModified = true;
+          }
+        });
+      }
+
+      // Only update DB if changes were made
+      if (isModified) {
+        await collection.updateOne(
+          { _id: doc._id },
+          {
+            $set: {
+              BeforeWashSpecs: doc.BeforeWashSpecs,
+              AfterWashSpecs: doc.AfterWashSpecs
+            }
+          }
+        );
+        modifiedDocCount++;
+      }
+    }
+
+    res.json({
+      success: true,
+      message: "TOL Fix process completed.",
+      stats: {
+        totalBwTolFixed,
+        totalAwTolFixed,
+        totalDecimalsInserted,
+        documentsUpdated: modifiedDocCount
+      }
+    });
+  } catch (error) {
+    console.error("Error fixing TOL specs:", error);
+    res.status(500).json({ error: "Failed to fix TOL data." });
+  }
+};

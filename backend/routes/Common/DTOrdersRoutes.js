@@ -5,7 +5,8 @@ import {
   getOrderSizes,
   saveWashingSpecs,
   getUploadedSpecsOrders,
-  fixWashingSpecsIssues
+  fixWashingSpecsIssues,
+  fixTolIssues
 } from "../../controller/Common/DTOrdersController.js";
 
 const router = express.Router();
@@ -16,6 +17,8 @@ router.get("/api/order-sizes/:mono/:color", getOrderSizes);
 router.post("/api/washing-specs/save", saveWashingSpecs);
 
 router.get("/api/washing-specs/uploaded-list", getUploadedSpecsOrders);
+
 router.post("/api/washing-specs/fix-issues", fixWashingSpecsIssues);
+router.post("/api/washing-specs/fix-tol", fixTolIssues);
 
 export default router;
