@@ -19,6 +19,8 @@ import {
 } from "./lib/api/conversation";
 import { ChatMessageTyping } from "./ChatMessage";
 import { MdKeyboardArrowRight, MdKeyboardArrowDown } from "react-icons/md";
+import { MdGTranslate } from "react-icons/md";
+import { IoSearch } from "react-icons/io5";
 
 // Reusable user profile component
 function UserProfile({ userData, center }) {
@@ -165,7 +167,7 @@ function ExpandedSidebar({
   return (
     <div className="flex h-full flex-col bg-background">
       {/* New Chat Button */}
-      <div className="flex items-center justify-between border-border bg-background px-4 py-3 translate-y-1">
+      <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3 translate-y-1">
         <Button
           key="new_chat"
           variant="default"
@@ -177,7 +179,19 @@ function ExpandedSidebar({
           New chat
         </Button>
       </div>
-      <div className="h-60" /> {/* spacer */}
+      <div className="flex items-center h-20 ml-5 gap-3">
+        <Button variant="ghost" size="lg" className="p-1">
+          <IoSearch className="h-8 w-8 align-middle" />
+          <span className="font-medium">Search chats</span>
+        </Button>
+      </div>
+      <div className="flex items-center h-0 ml-5 gap-3">
+        <Button variant="ghost" size="lg" className="p-1">
+          <MdGTranslate className="h-8 w-8 align-middle" />
+          <span className="font-medium">Azure translator</span>
+        </Button>
+      </div>
+      <div className="h-20" /> {/* spacer */}
       <button
         className="px-3 py-2 flex items-center gap-1 mt-4"
         onClick={() => setShowAllChats(!showAllChats)}
@@ -189,7 +203,6 @@ function ExpandedSidebar({
           <MdKeyboardArrowRight className="w-4 h-4" />
         )}
       </button>
-      {/* Conversation List */}
       <ScrollArea className="flex-1 px-2 py-3 overflow-y-auto ">
         {showAllChats && (
           <div className="space-y-1">
@@ -205,10 +218,10 @@ function ExpandedSidebar({
                     activeConversationId === conv._id ? "secondary" : "ghost"
                   }
                   className={cn(
-                    "w-full gap-3 py-2.5 h-auto justify-start px-3 transition-all",
-                    activeConversationId === conv._id &&
-                      "bg-secondary/80 font-medium",
-                    "hover:bg-secondary/60",
+                    "w-full gap-3 py-2.5 h-auto justify-start px-3 transition-all flex items-center relative",
+                    activeConversationId === conv._id
+                      ? "bg-gray-400 text-white font-semibold border-l-4 border-gray-700"
+                      : "bg-transparent text-gray-700 hover:bg-blue-100",
                   )}
                   onClick={() => onSelectConversation(conv._id)}
                 >
@@ -299,7 +312,17 @@ function CollapsedSidebar({
           <Plus className="h-4 w-4" />
         </Button>
       </div>
-
+      <div className="flex items-center h-20 ml-5 gap-3">
+        <Button variant="ghost" size="lg" className="p-1">
+          <IoSearch className="h-8 w-8 align-middle" />
+        </Button>
+      </div>
+      <div className="flex items-center h-0 ml-5 gap-3">
+        <Button variant="ghost" size="lg" className="p-1">
+          <MdGTranslate className="h-8 w-8 align-middle" />
+        </Button>
+      </div>
+      <div className="h-20" /> {/* spacer */}
       {/* Conversation List */}
       <ScrollArea className="flex-1 px-2 py-3, overflow-y-auto">
         {/* <div className="space-y-1">
@@ -321,7 +344,6 @@ function CollapsedSidebar({
           ))}
         </div> */}
       </ScrollArea>
-
       {/* Bottom User Profile + Settings */}
       <div className="border-t border-border/50 p-3 -translate-y-9">
         <SettingsButton iconOnly />
@@ -347,10 +369,21 @@ export function ChatSidebar({
   handleNewChat,
 }) {
   const handleDeleteConversation = (_id) => {
-    setConversations(conversations.filter((conv) => conv._id !== _id));
-    if (activeConversationId === _id && conversations.length > 1) {
-      setActiveConversationId(conversations[0]._id);
+    const updatedConversations = conversations.filter(
+      (conv) => conv._id !== _id,
+    );
+
+    setConversations(updatedConversations);
+
+    // If the deleted conversation was active, set a new active id
+    if (activeConversationId === _id) {
+      if (updatedConversations.length > 0) {
+        setActiveConversationId(updatedConversations[0]._id); // set first conversation
+      } else {
+        setActiveConversationId(null); // no conversations left
+      }
     }
+
     deleteConversation(_id);
   };
 
@@ -358,7 +391,9 @@ export function ChatSidebar({
     ...conversations.map((conv) => conv.title.length),
   );
   // e.g., 40 characters
-  const sidebarWidth = isExpanded ? maxConversationLength * 12 : 64;
+  const sidebarWidth = isExpanded
+    ? Math.max(maxConversationLength * 12, 300)
+    : 64;
   // 8px per character, max 300px, collapsed 64px
 
   return (

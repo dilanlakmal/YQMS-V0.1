@@ -47,25 +47,11 @@ export default function ChatInput({
   };
 
   return (
-    <div className=" border-border bg-background">
+    <div className="bg-background border-border">
       <div className="mx-auto max-w-5xl px-4 py-4">
-        {/* MODEL SELECTOR */}
-        <div className="mb-2 flex justify-end">
-          <select
-            value={model}
-            onChange={handleChangeModel}
-            className="bg-muted border border-border rounded-md px-2 py-1 text-xs text-foreground"
-          >
-            {models.map((m) => (
-              <option key={m.name} value={m.name}>
-                {m.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
         {/* INPUT FORM */}
         <form onSubmit={handleSubmit} className="relative">
+          {/* TEXTAREA */}
           <Textarea
             ref={textareaRef}
             value={input}
@@ -73,18 +59,21 @@ export default function ChatInput({
             onKeyDown={handleKeyDown}
             placeholder="Message ChatGPT..."
             className="
-              min-h-[56px]
-              max-h-[200px]
-              resize-none
-              rounded-2xl
-              border-border
-              bg-muted
-              pr-12
-              py-4
-              text-base
-              focus-visible:ring-1
-              focus-visible:ring-ring
-            "
+            hide-scrollbar
+            min-h-[56px]
+            max-h-[500px]
+            w-full
+            resize-none
+            rounded-2xl
+            border-border
+            bg-muted
+            py-4
+            pr-4      /* space for send button */
+            pb-14      /* space for model selector */
+            text-base
+            focus-visible:ring-1
+            focus-visible:ring-ring
+          "
             rows={1}
           />
 
@@ -93,38 +82,83 @@ export default function ChatInput({
             type="submit"
             size="icon"
             disabled={isLoading}
-            onClick={() => setLastMessage(false)} // set processing on click
-            className="absolute bottom-3 right-3 h-9 w-9 rounded-xl"
+            onClick={() => setLastMessage(false)}
+            className="
+            absolute
+            bottom-3
+            right-3
+            h-9 w-9
+            rounded-xl
+            shadow-sm
+          "
           >
             <Send
-              className={`h-4 w-4 ${lastMessage ? "animate-spin text-white-500" : ""}`}
+              className={`h-4 w-4 ${
+                lastMessage ? "animate-spin text-white/70" : ""
+              }`}
             />
           </Button>
+
+          {/* MODEL SELECTOR */}
+          <select
+            value={model}
+            onChange={handleChangeModel}
+            className="
+            absolute
+            bottom-3
+            left-2
+            bg-muted
+            border-border
+            rounded-md
+            px-2 py-1
+            text-xs
+            text-foreground
+            shadow-sm
+          "
+          >
+            {models.map((m) => (
+              <option key={m.name} value={m.name}>
+                {m.name}
+              </option>
+            ))}
+          </select>
         </form>
 
         {/* FOOTNOTE */}
-        <MarqueeText />
+        <p className="mt-2 text-center text-xs text-muted-foreground animate-pulse">
+          ChatGPT can make mistakes. Check important info.
+        </p>
       </div>
     </div>
   );
 }
 
-export function MarqueeText({text = "ChatGPT can make mistakes. Check important info. "}) {
+export function MarqueeText({ text, speed = 50 }) {
+  const containerRef = useRef(null);
+  const textRef = useRef(null);
+  const [distance, setDistance] = useState(0);
+
+  useEffect(() => {
+    if (containerRef.current && textRef.current) {
+      const containerWidth = containerRef.current.offsetWidth;
+      setDistance(containerWidth); // total distance to scroll
+    }
+  }, [text]);
 
   return (
-    <div className="overflow-hidden whitespace-nowrap w-full  border-gray-300">
+    <div ref={containerRef} className="overflow-hidden whitespace-nowrap">
       <motion.div
+        ref={textRef}
         className="inline-block"
-        style={{ display: "inline-block" }}
-        animate={{ x: [-1000, 1000] }} // move in px
+        animate={{ x: [-distance, distance] }}
         transition={{
           repeat: Infinity,
           repeatType: "loop",
-          duration: 30,
           ease: "linear",
+          duration: distance / speed, // speed px per second
         }}
       >
-        {text} {text} {/* duplicate for smooth looping */}
+        {text}
       </motion.div>
     </div>
   );
