@@ -106,6 +106,8 @@ import createQASectionsAqlBuyerConfigModel from "../../models/QA/QASectionsAqlBu
 
 import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMeasurementSpecs.js";
 
+import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
+
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
 //MongoDB Connections
@@ -265,6 +267,9 @@ export const QASectionsAqlBuyerConfig =
 
 export const QASectionsMeasurementSpecs =
   createQASectionsMeasurementSpecsModel(ymProdConnection);
+
+export const QASectionsTemplates =
+  createQASectionsTemplatesModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 

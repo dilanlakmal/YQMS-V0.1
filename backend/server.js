@@ -194,6 +194,11 @@ import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Con
 
 import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_Measurement_Specs_Route.js";
 
+/* ------------------------------
+  PivotY - QA Templates
+------------------------------ */
+import QASections_Templates from "./routes/PivotY/QATemplates/QATemplatesReport_Route.js";
+
 /* -----------------------------
 QA Random Inspection Imports
 ------------------------------ */
@@ -451,6 +456,11 @@ app.use(QASections_AQL_Config);
   PivotY - QA Measurements routes
 ------------------------------ */
 app.use(QASections_Measurement_Specs);
+
+/* ------------------------------
+  PivotY - QA Templates routes
+------------------------------ */
+app.use(QASections_Templates);
 
 /* -----------------------------
   QA Random Inspection Routes
