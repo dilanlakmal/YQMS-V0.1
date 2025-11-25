@@ -91,6 +91,35 @@ export const updateConversationTitle = async (req, res) => {
     }
 }
 
+// UPDATE conversation model
+export const updateConversationModel = async (req, res) => {
+    try {
+        const conversationId = req.params.id;
+        const {model} = req.body;
+
+        if (!model || model.trim() === "") {
+            return res.status(400).json({error: "Model is required"});
+        }
+
+        const updatedConversation = await Conversation.findByIdAndUpdate(
+            conversationId,
+            {model: model.trim()},
+            {new: true}
+        )
+        if (!updatedConversation) {
+            console.error("Conversation not found", updatedConversation)
+            return res.status(4004).json({error: "Conversation not found"})
+        }
+
+        res.status(200).json(updatedConversation);
+        console.info("Update model successfully!",  model);
+
+    } catch (err) {
+        console.error("Error updating conversation title:", err.message);
+        res.status(500).json({error: "Internal server error"});
+    }
+}
+
 // ADD message to conversation
 export const addMessage = async (req, res) => {
     try {

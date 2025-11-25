@@ -13,7 +13,12 @@ import {
   Edit3,
 } from "lucide-react";
 import { cn } from "@/components/chatbot/lib/utils";
-import { deleteConversation, editConversationTitle } from "./lib/api/conversation";
+import {
+  deleteConversation,
+  editConversationTitle,
+} from "./lib/api/conversation";
+import { ChatMessageTyping } from "./ChatMessage";
+import { MdKeyboardArrowRight, MdKeyboardArrowDown } from "react-icons/md";
 
 // Reusable user profile component
 function UserProfile({ userData, center }) {
@@ -21,12 +26,12 @@ function UserProfile({ userData, center }) {
     <div
       className={cn(
         "flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer",
-        center && "justify-center"
+        center && "justify-center",
       )}
     >
       <div className="h-8 w-8 rounded-full overflow-hidden">
         <img
-          src={userData.profile}
+          src={userData.face_photo}
           alt="User Avatar"
           className="h-full w-full object-cover"
         />
@@ -59,6 +64,8 @@ function SettingsButton({ iconOnly }) {
 
 //EDIT function
 export function EditConversationTitle({
+  generateTopic,
+  setGenerateTopic,
   isEditing,
   setIsEditing,
   title,
@@ -106,8 +113,21 @@ export function EditConversationTitle({
       text-sm 
       focus:outline-none"
     />
+  ) : generateTopic ? (
+    <span
+      className="flex-1 truncate text-left text-sm cursor-pointer"
+      title={title}
+    >
+      <ChatMessageTyping
+        message={title}
+        onFinish={() => setGenerateTopic(false)}
+      />
+    </span>
   ) : (
-    <span className="flex-1 truncate text-left text-sm cursor-pointer">
+    <span
+      className="flex-1 truncate text-left text-sm cursor-pointer"
+      title={title}
+    >
       {title}
     </span>
   );
@@ -115,6 +135,8 @@ export function EditConversationTitle({
 
 // Expanded sidebar
 function ExpandedSidebar({
+  generateTopic,
+  setGenerateTopic,
   conversations,
   setConversations,
   activeConversationId,
@@ -126,12 +148,13 @@ function ExpandedSidebar({
   const [hoveredId, setHoveredId] = useState(null);
   const [editingId, setEditingId] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [showAllChats, setShowAllChats] = useState(true);
 
   const updateConversationTitle = async (_id, newTitle) => {
     setConversations((prev) =>
       prev.map((conv) =>
-        conv._id === _id ? { ...conv, title: newTitle } : conv
-      )
+        conv._id === _id ? { ...conv, title: newTitle } : conv,
+      ),
     );
     try {
       await editConversationTitle(_id, newTitle);
@@ -154,86 +177,100 @@ function ExpandedSidebar({
           New chat
         </Button>
       </div>
-
+      <div className="h-60" /> {/* spacer */}
+      <button
+        className="px-3 py-2 flex items-center gap-1 mt-4"
+        onClick={() => setShowAllChats(!showAllChats)}
+      >
+        <span className="text-sm font-medium opacity-50">Your chats</span>
+        {showAllChats ? (
+          <MdKeyboardArrowDown className="w-4 h-4" />
+        ) : (
+          <MdKeyboardArrowRight className="w-4 h-4" />
+        )}
+      </button>
       {/* Conversation List */}
-      <ScrollArea className="flex-1 px-2 py-3 overflow-y-auto">
-        <div className="space-y-1">
-          {conversations.map((conv) => (
-            <div
-              key={conv._id}
-              className="relative group"
-              onMouseEnter={() => setHoveredId(conv._id)}
-              onMouseLeave={() => setHoveredId(null)}
-            >
-              <Button
-                variant={
-                  activeConversationId === conv._id ? "secondary" : "ghost"
-                }
-                className={cn(
-                  "w-full gap-3 py-2.5 h-auto justify-start px-3 transition-all",
-                  activeConversationId === conv._id &&
-                    "bg-secondary/80 font-medium",
-                  "hover:bg-secondary/60"
-                )}
-                onClick={() => onSelectConversation(conv._id)}
+      <ScrollArea className="flex-1 px-2 py-3 overflow-y-auto ">
+        {showAllChats && (
+          <div className="space-y-1">
+            {conversations.map((conv) => (
+              <div
+                key={conv._id}
+                className="relative group"
+                onMouseEnter={() => setHoveredId(conv._id)}
+                onMouseLeave={() => setHoveredId(null)}
               >
-                <MessageSquare className="h-4 w-4 flex-shrink-0" />
-                <EditConversationTitle
-                  isEditing={editingId === conv._id}
-                  setIsEditing={(val) =>
-                    !val ? setEditingId(null) : setEditingId(conv._id)
+                <Button
+                  variant={
+                    activeConversationId === conv._id ? "secondary" : "ghost"
                   }
-                  title={conv.title}
-                  onSave={(newTitle) =>
-                    updateConversationTitle(conv._id, newTitle)
-                  }
-                />
-              </Button>
+                  className={cn(
+                    "w-full gap-3 py-2.5 h-auto justify-start px-3 transition-all",
+                    activeConversationId === conv._id &&
+                      "bg-secondary/80 font-medium",
+                    "hover:bg-secondary/60",
+                  )}
+                  onClick={() => onSelectConversation(conv._id)}
+                >
+                  <MessageSquare className="h-4 w-4 flex-shrink-0" />
+                  <EditConversationTitle
+                    generateTopic={generateTopic}
+                    setGenerateTopic={setGenerateTopic}
+                    isEditing={editingId === conv._id}
+                    setIsEditing={(val) =>
+                      !val ? setEditingId(null) : setEditingId(conv._id)
+                    }
+                    title={conv.title}
+                    onSave={(newTitle) =>
+                      updateConversationTitle(conv._id, newTitle)
+                    }
+                  />
+                </Button>
 
-              {hoveredId === conv._id && (
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 bg-background/95 rounded-md p-1">
-                  {[
-                    {
-                      icon: <Edit3 className="h-3 w-3" />,
-                      onClick: () => {
-                        setEditingId(conv._id);
-                        setIsEditing(true);
+                {hoveredId === conv._id && (
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 bg-background/95 rounded-md p-1">
+                    {[
+                      {
+                        icon: <Edit3 className="h-3 w-3" />,
+                        onClick: () => {
+                          setEditingId(conv._id);
+                          setIsEditing(true);
+                        },
+                        type: "edit",
                       },
-                      type: "edit",
-                    },
-                    {
-                      icon: <Trash2 className="h-3 w-3" />,
-                      onClick: () => onDeleteConversation(conv._id),
-                      type: "delete",
-                    },
-                  ].map((btn) => (
-                    <Button
-                      key={`${conv._id}-${btn.type}`}
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "h-6 w-6",
-                        btn.type === "delete"
-                          ? "hover:bg-destructive hover:text-destructive"
-                          : "hover:bg-secondary"
-                      )}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        btn.onClick();
-                      }}
-                    >
-                      {btn.icon}
-                    </Button>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
+                      {
+                        icon: <Trash2 className="h-3 w-3" />,
+                        onClick: () => onDeleteConversation(conv._id),
+                        type: "delete",
+                      },
+                    ].map((btn) => (
+                      <Button
+                        key={`${conv._id}-${btn.type}`}
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "h-6 w-6",
+                          btn.type === "delete"
+                            ? "hover:bg-destructive hover:text-destructive"
+                            : "hover:bg-secondary",
+                        )}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          btn.onClick();
+                        }}
+                      >
+                        {btn.icon}
+                      </Button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </ScrollArea>
-
       {/* Bottom User Profile + Settings */}
-      <div className="border-t border-border/50 p-3">
+      <div className="border-t border-border/50 p-3 -translate-y-9">
         <SettingsButton />
         <UserProfile userData={userData} />
       </div>
@@ -265,7 +302,7 @@ function CollapsedSidebar({
 
       {/* Conversation List */}
       <ScrollArea className="flex-1 px-2 py-3, overflow-y-auto">
-        <div className="space-y-1">
+        {/* <div className="space-y-1">
           {conversations.map((conv) => (
             <Button
               key={conv._id}
@@ -282,11 +319,11 @@ function CollapsedSidebar({
               <MessageSquare className="h-4 w-4" />
             </Button>
           ))}
-        </div>
+        </div> */}
       </ScrollArea>
 
       {/* Bottom User Profile + Settings */}
-      <div className="border-t border-border/50 p-3 translate-y-[-0.27em]">
+      <div className="border-t border-border/50 p-3 -translate-y-9">
         <SettingsButton iconOnly />
         <UserProfile userData={userData} center />
       </div>
@@ -296,6 +333,8 @@ function CollapsedSidebar({
 
 // Main ChatSidebar Component
 export function ChatSidebar({
+  generateTopic,
+  setGenerateTopic,
   isOpen,
   onClose,
   userData,
@@ -315,6 +354,13 @@ export function ChatSidebar({
     deleteConversation(_id);
   };
 
+  const maxConversationLength = Math.max(
+    ...conversations.map((conv) => conv.title.length),
+  );
+  // e.g., 40 characters
+  const sidebarWidth = isExpanded ? maxConversationLength * 12 : 64;
+  // 8px per character, max 300px, collapsed 64px
+
   return (
     <>
       {/* Mobile Overlay */}
@@ -330,11 +376,13 @@ export function ChatSidebar({
         className={cn(
           "fixed inset-y-0 left-0 z-50 border-r border-border bg-card transition-all duration-300 md:relative md:translate-x-0 shadow-lg",
           isOpen ? "translate-x-0" : "-translate-x-full",
-          isExpanded ? "w-64" : "w-16"
         )}
+        style={{ width: `${sidebarWidth}px` }}
       >
         {isExpanded ? (
           <ExpandedSidebar
+            generateTopic={generateTopic}
+            setGenerateTopic={setGenerateTopic}
             userData={userData}
             conversations={conversations}
             setConversations={setConversations}

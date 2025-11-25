@@ -1,14 +1,14 @@
-import { useState, useEffect, useRef} from "react";
+import { useState, useEffect, useRef } from "react";
 import ChatInterface from "@/components/chatbot/ChatInterface";
 // import {
 //   fetchUserData,
 //   fetchUserConversation,
 //   createConversation
 // } from "@/components/chatbot/lib/chat.js";
-import { 
+import {
   fetchUserConversation,
-  fetchUserProfile, 
-  createConversation 
+  fetchUserProfile,
+  createConversation,
 } from "../components/chatbot/lib/api/conversation";
 
 export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
@@ -30,6 +30,7 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
 
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
+  const [model, setModel] = useState("gpt-oss:120b-cloud");
 
   const initialMessages = [
     {
@@ -49,26 +50,28 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
       } catch (error) {
         console.error("Error fetching user data:", error.message);
       }
-    }
+    };
     loadUserData();
   }, []);
 
   // Fetch or create conversations when userData.emp_id is available
   useEffect(() => {
     if (!userData.emp_id) return; // early return if no emp_id
-    
+
     const loadConversations = async () => {
       try {
         const data = await fetchUserConversation(userData.emp_id);
         if (data?.length) {
           setConversations(data);
           setActiveConversationId(data[0]._id);
+          setModel(data[0].model ?? model);
         } else if (!conversationCreated.current) {
           conversationCreated.current = true;
           const newConversation = {
             userID: userData.emp_id,
             title: "New conversation",
             date: new Date(),
+            model: model,
             messages: initialMessages,
           };
           const created = await createConversation(newConversation);
@@ -78,12 +81,12 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
       } catch (error) {
         console.error("Error loading conversations:", error.message);
       }
-    }
+    };
     loadConversations();
   }, [userData]);
 
   const activeConversation = conversations.find(
-    (c) => c._id === activeConversationId
+    (c) => c._id === activeConversationId,
   );
   const messages = activeConversation?.messages || [];
 
@@ -91,6 +94,8 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
     <ChatInterface
       messages={messages}
       userData={userData}
+      model={model}
+      setModel={setModel}
       initialMessages={initialMessages}
       activeConversationId={activeConversationId}
       setActiveConversationId={setActiveConversationId}

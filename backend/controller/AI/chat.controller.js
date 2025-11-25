@@ -3,10 +3,15 @@ import { Ollama } from "ollama";
 
 export const getChatWithOllama = async(req, res) => {
     const {model, prompt} = req.body;
+    let host = process.env.OLLAMA_API_URL;
+    if (model === "llama3.2:latest"){
+        host = process.env.llama3_2_API_URL;
+        console.log("User use mode:", model)
+    }
 
     try {
         const ollama = new Ollama({
-            host: process.env.OLLAMA_API_URL,
+            host: host,
             headers: {
                 Authorization: "Bearer " + process.env.OLLAMA_API_KEY
             }

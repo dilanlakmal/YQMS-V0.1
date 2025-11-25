@@ -174,14 +174,41 @@
     --tw-ring-color: var(--sidebar-ring);
   }
 
-.blinking-cursor {
-  display: inline-block;
-  width: 1px;
-  background-color: black;
-  animation: blink 1s steps(2, start) infinite;
-}
+  .blinking-cursor {
+    display: inline-block;
+    width: 1px;
+    background-color: black;
+    animation: blink 1s steps(2, start) infinite;
+  }
+
+  .animate-fadeIn {
+    animation: fadeIn 1s ease-out;
+  }
+
+  .animate-slideUp {
+    animation: slideUp 0.6s ease-out;
+  }
+
 
 }
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
 
 @keyframes blink {
   to {

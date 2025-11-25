@@ -5,12 +5,19 @@ import { useState } from "react";
 import { ChatMessage } from "./ChatMessage";
 import { useRef, useEffect } from "react";
 import "./style/index.css";
-import { addMessages, createConversation } from "./lib/api/conversation";
+import {
+  addMessages,
+  createConversation,
+  editConversationTitle,
+} from "./lib/api/conversation";
 import { getOllamaResponse } from "./lib/api/chat";
+import { BsRobot } from "react-icons/bs";
 
 export default function ChatInterface({
   messages,
   userData,
+  model,
+  setModel,
   initialMessages,
   activeConversationId,
   setActiveConversationId,
@@ -23,6 +30,7 @@ export default function ChatInterface({
   const [sidebarExpanded, setSidebarExpanded] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastMessage, setLastMessage] = useState(false);
+  const [generateTopic, setGenerateTopic] = useState(false);
 
   const messagesEndRef = useRef(null);
 
@@ -44,108 +52,139 @@ export default function ChatInterface({
     scrollToBottom();
   }, [messages]);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!input.trim() || isLoading) return;
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
 
-  setIsLoading(true);
+    setIsLoading(true);
 
-  // 1️⃣ Create user message
-  const userMessage = {
-    _id: Date.now().toString(),
-    role: "user",
-    content: input,
-    timestamp: new Date(),
-  };
-
-  // 2️⃣ Add user message to conversation (local)
-  let updatedConversations = conversations.map((conv) =>
-    conv._id === activeConversationId
-      ? { ...conv, messages: [...conv.messages, userMessage] }
-      : conv
-  );
-
-  // save user message to backend
-  const activeUser = updatedConversations.find(
-    (conv) => conv._id === activeConversationId
-  );
-  if (activeUser) {
-    await addMessages(activeConversationId, activeUser.messages);
-  }
-
-  // update UI immediately
-  setConversations(updatedConversations);
-  setInput("");
-
-  try {
-    // 3️⃣ Request LLM response
-    const data = await getOllamaResponse("gpt-oss:120b-cloud", input);
-
-    const assistantMessage = data
-      ? {
-          _id: data.created_at.toString(),
-          role: data.message.role,
-          content: data.message.content,
-          timestamp: new Date(),
-        }
-      : {
-          _id: Date.now().toString(),
-          role: "assistant",
-          content: "No response available right now.",
-          timestamp: new Date(),
-        };
-
-    // 4️⃣ ADD ASSISTANT MESSAGE using updatedConversations (NOT old state)
-    updatedConversations = updatedConversations.map((conv) =>
-      conv._id === activeConversationId
-        ? { ...conv, messages: [...conv.messages, assistantMessage] }
-        : conv
-    );
-
-    const activeAssistant = updatedConversations.find(
-      (conv) => conv._id === activeConversationId
-    );
-
-    if (activeAssistant) {
-      await addMessages(activeConversationId, activeAssistant.messages);
-    }
-
-    setConversations(updatedConversations);
-  } catch (error) {
-    console.error("Error:", error);
-
-    const errorMessage = {
+    const userMessage = {
       _id: Date.now().toString(),
-      role: "assistant",
-      content: "Unable to reach the server.",
+      role: "user",
+      content: input,
       timestamp: new Date(),
     };
 
-    // 5️⃣ Again, build from updatedConversations (NOT old state)
-    updatedConversations = updatedConversations.map((conv) =>
-      conv._id === activeConversationId
-        ? { ...conv, messages: [...conv.messages, errorMessage] }
-        : conv
-    );
+    let updatedConversations = [...conversations];
+    let activeID = activeConversationId;
 
-    const activeErr = updatedConversations.find(
-      (conv) => conv._id === activeConversationId
-    );
-
-    if (activeErr) {
-      await addMessages(activeConversationId, activeErr.messages);
+    // 1️⃣ If no conversations exist, create a new one
+    if (updatedConversations.length === 0) {
+      const newConversation = {
+        userID: userData.emp_id,
+        title: "New conversation",
+        date: new Date(),
+        model: model,
+        messages: [userMessage], // include the user message immediately
+      };
+      const created = await createConversation(newConversation);
+      updatedConversations = [created];
+      activeID = created._id;
+      setActiveConversationId(created._id);
+    } else {
+      // 2️⃣ Add user message to existing conversation
+      updatedConversations = updatedConversations.map((conv) =>
+        conv._id === activeConversationId
+          ? { ...conv, messages: [...(conv.messages || []), userMessage] }
+          : conv,
+      );
     }
 
+    // 3️⃣ Update UI immediately
     setConversations(updatedConversations);
-  } finally {
-    setIsLoading(false);
-    setLastMessage(true);
-  }
-};
+    setInput("");
+
+    try {
+      // 4️⃣ Request assistant response
+      const data = await getOllamaResponse(model, input);
+
+      const topic = await getOllamaResponse(
+        model,
+        `Generate a short topic (exactly three words) for the following text. 
+Return ONLY the topic, nothing else:
+
+${input}`,
+      );
+      const topicText = topic.message.content.trim();
+
+      const assistantMessage = data
+        ? {
+            _id: data.created_at.toString(),
+            role: data.message.role,
+            content: data.message.content,
+            timestamp: new Date(),
+          }
+        : {
+            _id: Date.now().toString(),
+            role: "assistant",
+            content: "No response available right now.",
+            timestamp: new Date(),
+          };
+
+      // 5️⃣ Add assistant message
+      updatedConversations = updatedConversations.map((conv) => {
+        if (conv._id !== activeID) return conv;
+
+        const updateConv = {
+          ...conv,
+          messages: [...conv.messages, assistantMessage],
+        };
+
+        // Update title if new
+        if (updateConv.title === "New conversation") {
+          setGenerateTopic(true);
+          updateConv.title = topicText;
+          editConversationTitle(activeID, topicText); // persist to backend
+        }
+
+        return updateConv;
+      });
+
+      // Save assistant message to backend
+      const activeAssistant = updatedConversations.find(
+        (conv) => conv._id === activeID,
+      );
+      if (activeAssistant) {
+        await addMessages(activeID, activeAssistant.messages);
+      }
+
+      setConversations(updatedConversations);
+    } catch (error) {
+      console.error("Error:", error);
+      const errorMessage = {
+        _id: Date.now().toString(),
+        role: "assistant",
+        content: "Unable to reach the server.",
+        timestamp: new Date(),
+      };
+
+      // 5️⃣ Again, build from updatedConversations (NOT old state)
+      updatedConversations = updatedConversations.map((conv) =>
+        conv._id === activeID
+          ? { ...conv, messages: [...conv.messages, errorMessage] }
+          : conv,
+      );
+
+      const activeErr = updatedConversations.find(
+        (conv) => conv._id === activeID,
+      );
+
+      if (activeErr) {
+        await addMessages(activeID, activeErr.messages);
+      }
+      setConversations(updatedConversations);
+      setLastMessage(false);
+    } finally {
+      setIsLoading(false);
+      setLastMessage(true);
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen">
       <ChatSidebar
+        generateTopic={generateTopic}
+        setGenerateTopic={setGenerateTopic}
         isOpen={sidebarOpen}
         userData={userData}
         onClose={() => setSidebarOpen(false)}
@@ -163,17 +202,15 @@ const handleSubmit = async (e) => {
           <BotHeader onClose={onClose} />
         </div>
         <div className="relative flex-1 flex flex-col items-center">
-          <div className="absolute top-[1%] bottom-1 left-[0%] right-[0%] flex justify-center flex-col">
+          <div className="absolute top-[0%] bottom-1 left-[0%] right-[0%] flex justify-center flex-col bg-background text-foreground">
             <div className="flex-1 overflow-y-auto">
-              <div className="mx-auto max-w-4xl px-4 py-8">
+              <div className="mx-auto max-w-5xl px-4 py-8">
                 {messages.map((message, index) => (
-                  <ChatMessage 
-                    key={message._id} 
-                    message={message} 
-                    lastMessage={
-                      lastMessage && 
-                      (index === messages.length -1)
-                    }
+                  <ChatMessage
+                    userData={userData}
+                    key={message._id}
+                    message={message}
+                    lastMessage={lastMessage && index === messages.length - 1}
                     setLastMessage={setLastMessage}
                   />
                 ))}
@@ -181,7 +218,7 @@ const handleSubmit = async (e) => {
                   <div className="flex gap-4 py-6">
                     <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center flex-shrink-0">
                       <span className="text-primary-foreground text-sm font-semibold">
-                        AI
+                        <BsRobot className="w-8 h-8" />
                       </span>
                     </div>
                     <div className="flex items-center gap-1 pt-1">
@@ -205,6 +242,11 @@ const handleSubmit = async (e) => {
             </div>
             <div className="mt-1">
               <ChatInput
+                activeConversationId={activeConversationId}
+                lastMessage={lastMessage}
+                setLastMessage={setLastMessage}
+                model={model}
+                setModel={setModel}
                 input={input}
                 setInput={setInput}
                 handleSubmit={handleSubmit}
