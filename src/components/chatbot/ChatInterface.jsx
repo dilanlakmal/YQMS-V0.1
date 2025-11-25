@@ -185,6 +185,7 @@ ${input}`,
       <ChatSidebar
         generateTopic={generateTopic}
         setGenerateTopic={setGenerateTopic}
+        setModel={setModel}
         isOpen={sidebarOpen}
         userData={userData}
         onClose={() => setSidebarOpen(false)}

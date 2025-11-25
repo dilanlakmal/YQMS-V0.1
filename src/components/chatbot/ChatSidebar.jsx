@@ -139,6 +139,7 @@ export function EditConversationTitle({
 function ExpandedSidebar({
   generateTopic,
   setGenerateTopic,
+  setModel,
   conversations,
   setConversations,
   activeConversationId,
@@ -164,6 +165,11 @@ function ExpandedSidebar({
       console.error(error);
     }
   };
+  const handleConversationSelection = (_id) => {
+    onSelectConversation(_id);
+    const activeConversation = conversations.find((conv) => conv._id === _id);
+    setModel(activeConversation.model);
+  }
   return (
     <div className="flex h-full flex-col bg-background">
       {/* New Chat Button */}
@@ -223,7 +229,7 @@ function ExpandedSidebar({
                       ? "bg-gray-400 text-white font-semibold border-l-4 border-gray-700"
                       : "bg-transparent text-gray-700 hover:bg-blue-100",
                   )}
-                  onClick={() => onSelectConversation(conv._id)}
+                  onClick={() => handleConversationSelection(conv._id)}
                 >
                   <MessageSquare className="h-4 w-4 flex-shrink-0" />
                   <EditConversationTitle
@@ -357,6 +363,7 @@ function CollapsedSidebar({
 export function ChatSidebar({
   generateTopic,
   setGenerateTopic,
+  setModel,
   isOpen,
   onClose,
   userData,
@@ -418,6 +425,7 @@ export function ChatSidebar({
           <ExpandedSidebar
             generateTopic={generateTopic}
             setGenerateTopic={setGenerateTopic}
+            setModel={setModel}
             userData={userData}
             conversations={conversations}
             setConversations={setConversations}
