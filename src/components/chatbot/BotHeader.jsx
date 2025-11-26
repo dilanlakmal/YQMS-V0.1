@@ -16,12 +16,12 @@ export default function BotHeader({ onClose }) {
       {/* Left: Logo + Title */}
       <div className="flex items-center gap-3">
         <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground text-sm font-semibold">
+          <span className="text-primary-foreground text-sm font-semibold animate-pulse">
             AI
           </span>
         </div>
         <h1
-          className="text-lg font-semibold cursor-pointer hover:underline"
+          className="text-lg font-semibold cursor-pointer hover:underline animate-pulse"
           onClick={() => navigate("/")}
         >
           YQMS
@@ -32,7 +32,7 @@ export default function BotHeader({ onClose }) {
       <div className="bg-gray-500 text-white flex-1 mx-4 overflow-hidden whitespace-nowrap max-w-screen-xl">
         <MarqueeText
           text="Our AI is currently under active development and is gradually gaining more advanced capabilities. It now supports document translation through Azure, allowing you to seamlessly translate content across multiple languages. You can also select from different AI models to generate text or insights tailored to your needs. Additionally, Rasa Pro has been integrated to intelligently handle QC-related questions, providing logical and accurate responses. More features and improvements will be added over time as we continue to enhance the system."
-          speed={60} // 60*3
+          speed={40} // 60*3
         />
       </div>
 

@@ -57,7 +57,7 @@ export default function ChatInput({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Message ChatGPT..."
+            placeholder="Ask anything"
             className="
             hide-scrollbar
             min-h-[56px]
@@ -67,6 +67,7 @@ export default function ChatInput({
             rounded-2xl
             border-border
             bg-muted
+            pl-4
             py-4
             pr-4      /* space for send button */
             pb-14      /* space for model selector */
@@ -90,6 +91,7 @@ export default function ChatInput({
             h-9 w-9
             rounded-xl
             shadow-sm
+            bg-gray-500
           "
           >
             <Send
@@ -150,7 +152,7 @@ export function MarqueeText({ text, speed = 50 }) {
       <motion.div
         ref={textRef}
         className="inline-block"
-        animate={{ x: [-distance, distance] }}
+        animate={{ x: [distance, -distance] }}
         transition={{
           repeat: Infinity,
           repeatType: "loop",
