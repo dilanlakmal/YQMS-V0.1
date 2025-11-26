@@ -3,6 +3,13 @@ import { useState, useEffect } from "react";
 import { marked } from "marked";
 import { LuBot } from "react-icons/lu";
 import DOMPurify from "dompurify";
+import markedKatex from "marked-katex-extension";
+const options = {
+  nonStandard: true
+};
+
+marked.use(markedKatex(options));
+
 
 export function ChatMessage({
   userData,
@@ -90,7 +97,7 @@ export function ChatMessageTyping({ message, speed = 10, onFinish }) {
 }
 
 export function MarkdownViewer({ text = "" }) {
-  const rawHtml = marked(text);
+  const rawHtml = marked.parse(text);
   const safeHtml = DOMPurify.sanitize(rawHtml);
 
   return (
