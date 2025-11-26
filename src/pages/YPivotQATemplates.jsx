@@ -12,7 +12,6 @@ import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQATemplatesReportType from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
 import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
-import YPivotQATemplatesImageEditor from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesImageEditor";
 
 const YPivotQATemplates = () => {
   const { user } = useAuth();
@@ -43,14 +42,6 @@ const YPivotQATemplates = () => {
         component: <YPivotQATemplatesPhotos />,
         gradient: "from-orange-500 to-red-500",
         description: "Photo management"
-      },
-      {
-        id: "editor",
-        label: "Image Editor",
-        icon: <PenTool size={20} />,
-        component: <YPivotQATemplatesImageEditor />,
-        gradient: "from-green-500 to-emerald-500",
-        description: "Image annotation"
       }
     ],
     []
