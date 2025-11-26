@@ -301,7 +301,7 @@ function AppContent() {
     }
   };
 
-  return isChatOpen ? (
+  return (isChatOpen && isAuthenticated) ? (
     <Routes>
       <Route
         path="/chatbot"
