@@ -31,6 +31,7 @@ export default function ChatInterface({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lastMessage, setLastMessage] = useState(false);
   const [generateTopic, setGenerateTopic] = useState(false);
+  const [thinking, setThinking] = useState("");
 
   const messagesEndRef = useRef(null);
 
@@ -101,11 +102,17 @@ export default function ChatInterface({
       const topic = await getOllamaResponse(
         model,
         `Generate a short topic (exactly three words) for the following text. 
-Return ONLY the topic, nothing else:
+        Return ONLY the topic, nothing else:
 
-${input}`,
+        ${input}`,
       );
+
+
       const topicText = topic.message.content.trim();
+
+      if (data?.message?.thinking) {
+        setThinking(data.message.thinking);
+      }
 
       const assistantMessage = data
         ? {
@@ -208,6 +215,8 @@ ${input}`,
               <div className="mx-auto max-w-5xl px-4 py-8">
                 {messages.map((message, index) => (
                   <ChatMessage
+                    thinking={thinking}
+                    setThinking={setThinking}
                     userData={userData}
                     key={message._id}
                     message={message}

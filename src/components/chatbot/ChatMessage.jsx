@@ -12,6 +12,8 @@ marked.use(markedKatex(options));
 
 
 export function ChatMessage({
+  thinking,
+  setThinking,
   userData,
   message,
   lastMessage,
@@ -52,7 +54,12 @@ export function ChatMessage({
           {isUser ? (
             message.content
           ) : lastMessage ? (
-            <ChatMessageTyping
+            thinking ? 
+            <ChatMessageTyping 
+              message={thinking}
+              onFinish={() => setThinking("")}  
+            />
+            : <ChatMessageTyping
               message={message.content}
               onFinish={() => setLastMessage(false)}
             />
