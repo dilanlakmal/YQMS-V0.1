@@ -6,12 +6,13 @@ import {
   User,
   Layout,
   Camera,
-  PenTool
+  MapPin
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQATemplatesReportType from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
 import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
+import YPivotQATemplatesDefectLocationSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectLocationSelection";
 
 const YPivotQATemplates = () => {
   const { user } = useAuth();
@@ -42,6 +43,14 @@ const YPivotQATemplates = () => {
         component: <YPivotQATemplatesPhotos />,
         gradient: "from-orange-500 to-red-500",
         description: "Photo management"
+      },
+      {
+        id: "defects",
+        label: "Defect Locations",
+        icon: <MapPin size={20} />,
+        component: <YPivotQATemplatesDefectLocationSelection />,
+        gradient: "from-pink-500 to-rose-500",
+        description: "Location selection"
       }
     ],
     []
