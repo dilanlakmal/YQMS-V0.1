@@ -14,17 +14,16 @@ const SummaryCard = ({
   let currentMeasurements = [];
 
   if (measurementData && typeof measurementData === "object") {
-    const washType =
-      before_after_wash === "Before Wash" ? "beforeWash" : "afterWash";
+    const washType = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterWash';
     currentMeasurements = measurementData[washType] || [];
     currentMeasurements.forEach((data) => {
       if (data.pcs && Array.isArray(data.pcs)) {
         data.pcs.forEach((pc) => {
           if (pc.measurementPoints && Array.isArray(pc.measurementPoints)) {
             pc.measurementPoints.forEach((point) => {
-              if (point.result === "pass" || point.result === "fail") {
+              if (point.result === 'pass' || point.result === 'fail') {
                 measurementPoints++;
-                if (point.result === "pass") {
+                if (point.result === 'pass') {
                   measurementPass++;
                 }
               }
@@ -53,14 +52,11 @@ const SummaryCard = ({
   const autoSaveMeasurementSummary = async (summary, recordId) => {
     if (!recordId || !summary) return;
     try {
-      await fetch(
-        `${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ summary })
-        }
-      );
+      await fetch(`${API_BASE_URL}/api/qc-washing/measurement-summary-autosave/${recordId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary }),
+      });
     } catch (error) {
       console.error("Failed to auto-save measurement summary:", error);
     }
@@ -78,14 +74,7 @@ const SummaryCard = ({
     };
     autoSaveMeasurementSummary(summary, recordId);
     // eslint-disable-next-line
-  }, [
-    totalCheckedPoints,
-    totalPass,
-    totalFail,
-    passRate,
-    overallResult,
-    recordId
-  ]);
+  }, [totalCheckedPoints, totalPass, totalFail, passRate, overallResult, recordId]);
 
   // UI
   const resultColor =
@@ -113,41 +102,27 @@ const SummaryCard = ({
           <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
             {totalCheckedPoints}
           </div>
-          <div className="text-sm text-blue-700 dark:text-white">
-            Measur Points
-          </div>
+          <div className="text-sm text-blue-700 dark:text-white">Measur Points</div>
         </div>
         <div className="bg-green-50 dark:bg-green-800 border border-green-200 dark:border-green-400 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-green-600 dark:text-green-200">
-            {totalPass}
-          </div>
+          <div className="text-2xl font-bold text-green-600 dark:text-green-200">{totalPass}</div>
           <div className="text-sm text-green-700 dark:text-white">Pass</div>
         </div>
         <div className="bg-red-50 dark:bg-red-700 border border-red-200 dark:border-red-600 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-red-600 dark:text-red-200">
-            {totalFail}
-          </div>
+          <div className="text-2xl font-bold text-red-600 dark:text-red-200">{totalFail}</div>
           <div className="text-sm text-red-700 dark:text-white">Fail</div>
         </div>
         <div className="bg-yellow-50 dark:bg-yellow-700 border border-yellow-200 dark:border-yellow-600 rounded-lg p-4 text-center">
-          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-200">
-            {passRate}%
-          </div>
-          <div className="text-sm text-yellow-700 dark:text-white">
-            Pass Rate
-          </div>
+          <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-200">{passRate}%</div>
+          <div className="text-sm text-yellow-700 dark:text-white">Pass Rate</div>
         </div>
-        <div
-          className={`${resultBgColor} dark:bg-gray-700 dark:border-gray-600 rounded-lg p-4 text-center`}
-        >
+        <div className={`${resultBgColor} dark:bg-gray-700 dark:border-gray-600 rounded-lg p-4 text-center`}>
           <div className={`text-2xl font-bold ${resultColor} dark:text-white`}>
             {overallResult}
           </div>
-          <div className={`text-sm ${resultColor} dark:text-gray-300`}>
-            Result
-          </div>
+          <div className={`text-sm ${resultColor} dark:text-gray-300`}>Result</div>
         </div>
-      </div>
+      </div> 
     </div>
   );
 };

@@ -21,14 +21,14 @@ export const __dirname = path.dirname(__filename);
 export const __backendDir = path.resolve(__dirname, "..");
 
 export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://192.167.12.162:5001";
+  process.env.API_BASE_URL || "https://192.167.6.207:5001";
 
 const options = {
   key: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.12.162-key.pem")
+    path.resolve(path.dirname(__filename), "192.167.6.207-key.pem")
   ),
   cert: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.12.162.pem")
+    path.resolve(path.dirname(__filename), "192.167.6.207.pem")
   )
 };
 
@@ -37,7 +37,7 @@ export const server = https.createServer(options, app);
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: "https://192.167.12.162:3001",
+    origin: "https://192.167.6.207:3001",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -50,7 +50,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.12.162:3001"
+  "https://192.167.6.207:3001"
 ];
 
 // CORS configuration

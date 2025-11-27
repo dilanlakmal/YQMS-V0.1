@@ -1,25 +1,12 @@
-import { useState, useEffect } from "react";
-import {
-  Filter,
-  X,
-  RotateCcw,
-  Calendar,
-  FileText,
-  Palette,
-  User,
-  Building,
-  ClipboardList,
-  Droplets,
-  CheckCircle,
-  Search
-} from "lucide-react";
-import { API_BASE_URL } from "../../../../../config";
+import { useState, useEffect } from 'react';
+import { Filter, X, RotateCcw, Calendar, FileText, Palette, User, Building, ClipboardList, Droplets, CheckCircle, Search } from 'lucide-react';
+import { API_BASE_URL } from '../../../../../config';
 
-const SubmittedWashingDataFilter = ({
-  data,
+const SubmittedWashingDataFilter = ({ 
+  data, 
   filteredData,
-  onFilterChange,
-  onReset,
+  onFilterChange, 
+  onReset, 
   isVisible,
   onToggle,
   users,
@@ -27,25 +14,25 @@ const SubmittedWashingDataFilter = ({
 }) => {
   const [filters, setFilters] = useState({
     dateRange: {
-      startDate: "",
-      endDate: ""
+      startDate: '',
+      endDate: ''
     },
-    orderNo: "",
-    color: "",
-    qcId: "",
-    before_after_wash: "",
-    buyer: "",
-    factoryName: "",
-    reportType: "",
-    washType: ""
+    orderNo: '',
+    color: '',
+    qcId: '',
+    before_after_wash: '',
+    buyer: '',
+    factoryName: '',
+    reportType: '',
+    washType: ''
   });
 
   // Search states for searchable dropdowns
   const [searchStates, setSearchStates] = useState({
-    orderNo: "",
-    qcId: ""
+    orderNo: '',
+    qcId: ''
   });
-
+  
   // Dropdown visibility states
   const [dropdownStates, setDropdownStates] = useState({
     orderNo: false,
@@ -55,68 +42,59 @@ const SubmittedWashingDataFilter = ({
   const getUniqueUsersWithNames = (useFilteredData = false) => {
     if (!users || !Array.isArray(users)) return []; // Prevent crash if users is not an array
     const dataSource = useFilteredData ? filteredData : data;
-    const uniqueUserIds = [
-      ...new Set(dataSource.map((item) => item.userId).filter(Boolean))
-    ];
-    return uniqueUserIds
-      .map((userId) => {
-        const user = users.find(
-          (u) => u.emp_id === userId || u.userId === userId
-        );
-        return {
-          id: userId,
-          display: user ? `${userId} - ${user.eng_name || user.name}` : userId
-        };
-      })
-      .sort((a, b) => a.display.localeCompare(b.display));
+    const uniqueUserIds = [...new Set(dataSource.map(item => item.userId).filter(Boolean))];
+    return uniqueUserIds.map(userId => {
+      const user = users.find(u => u.emp_id === userId || u.userId === userId);
+      return {
+        id: userId,
+        display: user ? `${userId} - ${user.eng_name || user.name}` : userId
+      };
+    }).sort((a, b) => a.display.localeCompare(b.display));
   };
 
   // Extract unique values for dropdown options
   const getUniqueValues = (field, useFilteredData = false) => {
     const dataSource = useFilteredData ? filteredData : data;
     const values = dataSource
-      .map((item) => {
+      .map(item => {
         switch (field) {
-          case "color":
+          case 'color':
             return item.color;
-          case "before_after_wash":
+          case 'before_after_wash':
             return item.before_after_wash;
-          case "buyer":
+          case 'buyer':
             return item.buyer;
-          case "factoryName":
+          case 'factoryName':
             return item.factoryName;
-          case "reportType":
+          case 'reportType':
             return item.reportType;
-          case "washType":
+          case 'washType':
             return item.washType;
-          case "orderNo":
+          case 'orderNo':
             return item.orderNo;
           default:
             return null;
         }
       })
-      .filter((value) => value && value.trim() !== "")
+      .filter(value => value && value.trim() !== '')
       .filter((value, index, self) => self.indexOf(value) === index)
       .sort();
-
+    
     return values;
   };
 
   // Filter options based on search term
   const getFilteredOptions = (field, searchTerm) => {
     const useFilteredData = filteredData && filteredData.length !== data.length;
-    const options =
-      field === "qcId"
-        ? getUniqueUsersWithNames(useFilteredData)
-        : getUniqueValues(field, useFilteredData);
+    const options = field === 'qcId' ? getUniqueUsersWithNames(useFilteredData) : getUniqueValues(field, useFilteredData);
     if (!searchTerm) return options;
-
-    if (field === "qcId") {
-      return options.filter((option) =>
+    
+    if (field === 'qcId') {
+      return options.filter(option => 
         option.display.toLowerCase().includes(searchTerm.toLowerCase())
       );
     } else {
-      return options.filter((option) =>
+      return options.filter(option => 
         option.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -125,20 +103,20 @@ const SubmittedWashingDataFilter = ({
   // Handle filter changes
   const handleFilterChange = (field, value, subField = null) => {
     const newFilters = { ...filters };
-
+    
     if (subField) {
       newFilters[field][subField] = value;
     } else {
       newFilters[field] = value;
     }
-
+    
     setFilters(newFilters);
     onFilterChange(newFilters);
   };
 
   // Handle search input changes
   const handleSearchChange = (field, value) => {
-    setSearchStates((prev) => ({
+    setSearchStates(prev => ({
       ...prev,
       [field]: value
     }));
@@ -147,7 +125,7 @@ const SubmittedWashingDataFilter = ({
 
   // Handle dropdown toggle
   const toggleDropdown = (field) => {
-    setDropdownStates((prev) => {
+    setDropdownStates(prev => {
       const isOpen = !prev[field];
       // Close all dropdowns, then open the target one if it was closed.
       return { orderNo: false, qcId: false, [field]: isOpen };
@@ -156,24 +134,22 @@ const SubmittedWashingDataFilter = ({
 
   // Handle option selection
   const handleOptionSelect = (field, value) => {
-    if (field === "qcId") {
-      const selectedUser = getUniqueUsersWithNames().find(
-        (user) => user.id === value
-      );
-      setSearchStates((prev) => ({
+    if (field === 'qcId') {
+      const selectedUser = getUniqueUsersWithNames().find(user => user.id === value);
+      setSearchStates(prev => ({
         ...prev,
         [field]: selectedUser ? selectedUser.display : value
       }));
       handleFilterChange(field, value);
     } else {
-      setSearchStates((prev) => ({
+      setSearchStates(prev => ({
         ...prev,
         [field]: value
       }));
       handleFilterChange(field, value);
     }
-
-    setDropdownStates((prev) => ({
+    
+    setDropdownStates(prev => ({
       ...prev,
       [field]: false
     }));
@@ -183,23 +159,23 @@ const SubmittedWashingDataFilter = ({
   const handleReset = () => {
     const resetFilters = {
       dateRange: {
-        startDate: "",
-        endDate: ""
+        startDate: '',
+        endDate: ''
       },
-      orderNo: "",
-      color: "",
-      qcId: "",
-      before_after_wash: "",
-      buyer: "",
-      factoryName: "",
-      reportType: "",
-      washType: ""
+      orderNo: '',
+      color: '',
+      qcId: '',
+      before_after_wash: '',
+      buyer: '',
+      factoryName: '',
+      reportType: '',
+      washType: ''
     };
-
+    
     setFilters(resetFilters);
     setSearchStates({
-      orderNo: "",
-      qcId: ""
+      orderNo: '',
+      qcId: ''
     });
     setDropdownStates({
       orderNo: false,
@@ -227,7 +203,7 @@ const SubmittedWashingDataFilter = ({
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (!event.target.closest(".searchable-dropdown")) {
+      if (!event.target.closest('.searchable-dropdown')) {
         setDropdownStates({
           orderNo: false,
           qcId: false
@@ -235,9 +211,9 @@ const SubmittedWashingDataFilter = ({
       }
     };
 
-    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
     return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
 
@@ -263,6 +239,7 @@ const SubmittedWashingDataFilter = ({
       {isVisible && (
         <div className="p-6 bg-gray-50 dark:bg-gray-900">
           <div className="grid grid-cols-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-10 gap-6">
+            
             {/* Date Range Filters */}
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -272,9 +249,7 @@ const SubmittedWashingDataFilter = ({
               <input
                 type="date"
                 value={filters.dateRange.startDate}
-                onChange={(e) =>
-                  handleFilterChange("dateRange", e.target.value, "startDate")
-                }
+                onChange={(e) => handleFilterChange('dateRange', e.target.value, 'startDate')}
                 className="w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
               />
               <Calendar className="absolute left-3 top-10 w-4 h-4 text-gray-400" />
@@ -288,9 +263,7 @@ const SubmittedWashingDataFilter = ({
               <input
                 type="date"
                 value={filters.dateRange.endDate}
-                onChange={(e) =>
-                  handleFilterChange("dateRange", e.target.value, "endDate")
-                }
+                onChange={(e) => handleFilterChange('dateRange', e.target.value, 'endDate')}
                 className="w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
               />
               <Calendar className="absolute left-3 top-10 w-4 h-4 text-gray-400" />
@@ -306,54 +279,40 @@ const SubmittedWashingDataFilter = ({
                 <input
                   type="text"
                   value={searchStates.orderNo}
-                  onChange={(e) =>
-                    handleSearchChange("orderNo", e.target.value)
-                  }
-                  onFocus={() => toggleDropdown("orderNo")}
+                  onChange={(e) => handleSearchChange('orderNo', e.target.value)}
+                  onFocus={() => toggleDropdown('orderNo')}
                   placeholder="MO Number"
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all"
                 />
                 <FileText className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <button
                   type="button"
-                  onClick={() => toggleDropdown("orderNo")}
+                  onClick={() => toggleDropdown('orderNo')}
                   className="absolute inset-y-0 right-0 flex items-center pr-3"
                 >
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-
+                
                 {/* Dropdown Options */}
                 {dropdownStates.orderNo && (
                   <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div
                       className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
-                      onClick={() => handleOptionSelect("orderNo", "")}
+                      onClick={() => handleOptionSelect('orderNo', '')}
                     >
                       All MO Numbers
                     </div>
-                    {getFilteredOptions("orderNo", searchStates.orderNo).map(
-                      (orderNo) => (
-                        <div
-                          key={orderNo}
-                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
-                          onClick={() => handleOptionSelect("orderNo", orderNo)}
-                        >
-                          {orderNo}
-                        </div>
-                      )
-                    )}
+                    {getFilteredOptions('orderNo', searchStates.orderNo).map(orderNo => (
+                      <div
+                        key={orderNo}
+                        className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
+                        onClick={() => handleOptionSelect('orderNo', orderNo)}
+                      >
+                        {orderNo}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -369,54 +328,42 @@ const SubmittedWashingDataFilter = ({
                 <input
                   type="text"
                   value={searchStates.qcId}
-                  onChange={(e) => handleSearchChange("qcId", e.target.value)}
-                  onFocus={() => toggleDropdown("qcId")}
-                  placeholder={loadingUsers ? "Loading..." : " QC/QA ID"}
+                  onChange={(e) => handleSearchChange('qcId', e.target.value)}
+                  onFocus={() => toggleDropdown('qcId')}
+                  placeholder={loadingUsers ? 'Loading...' : ' QC/QA ID'}
                   disabled={loadingUsers}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all disabled:opacity-50"
                 />
                 <User className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <button
                   type="button"
-                  onClick={() => toggleDropdown("qcId")}
+                  onClick={() => toggleDropdown('qcId')}
                   disabled={loadingUsers}
                   className="absolute inset-y-0 right-0 flex items-center pr-3 disabled:opacity-50"
                 >
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </button>
-
+                
                 {/* Dropdown Options */}
                 {dropdownStates.qcId && !loadingUsers && (
                   <div className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div
                       className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
-                      onClick={() => handleOptionSelect("qcId", "")}
+                      onClick={() => handleOptionSelect('qcId', '')}
                     >
                       All QC IDs
                     </div>
-                    {getFilteredOptions("qcId", searchStates.qcId).map(
-                      (user) => (
-                        <div
-                          key={user.id}
-                          className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
-                          onClick={() => handleOptionSelect("qcId", user.id)}
-                        >
-                          {user.display}
-                        </div>
-                      )
-                    )}
+                    {getFilteredOptions('qcId', searchStates.qcId).map(user => (
+                      <div
+                        key={user.id}
+                        className="px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-sm text-gray-900 dark:text-gray-200"
+                        onClick={() => handleOptionSelect('qcId', user.id)}
+                      >
+                        {user.display}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -431,33 +378,18 @@ const SubmittedWashingDataFilter = ({
               <div className="relative">
                 <select
                   value={filters.color}
-                  onChange={(e) => handleFilterChange("color", e.target.value)}
+                  onChange={(e) => handleFilterChange('color', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Colors</option>
-                  {getUniqueValues(
-                    "color",
-                    filteredData && filteredData.length !== data.length
-                  ).map((color) => (
-                    <option key={color} value={color}>
-                      {color}
-                    </option>
+                  {getUniqueValues('color', filteredData && filteredData.length !== data.length).map(color => (
+                    <option key={color} value={color}>{color}</option>
                   ))}
                 </select>
                 <Palette className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>
@@ -471,35 +403,18 @@ const SubmittedWashingDataFilter = ({
               <div className="relative">
                 <select
                   value={filters.before_after_wash}
-                  onChange={(e) =>
-                    handleFilterChange("before_after_wash", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange('before_after_wash', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All</option>
-                  {getUniqueValues(
-                    "before_after_wash",
-                    filteredData && filteredData.length !== data.length
-                  ).map((before_after_wash) => (
-                    <option key={before_after_wash} value={before_after_wash}>
-                      {before_after_wash}
-                    </option>
+                  {getUniqueValues('before_after_wash', filteredData && filteredData.length !== data.length).map(before_after_wash => (
+                    <option key={before_after_wash} value={before_after_wash}>{before_after_wash}</option>
                   ))}
                 </select>
                 <CheckCircle className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>
@@ -539,35 +454,18 @@ const SubmittedWashingDataFilter = ({
               <div className="relative">
                 <select
                   value={filters.factoryName}
-                  onChange={(e) =>
-                    handleFilterChange("factoryName", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange('factoryName', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Factories</option>
-                  {getUniqueValues(
-                    "factoryName",
-                    filteredData && filteredData.length !== data.length
-                  ).map((factory) => (
-                    <option key={factory} value={factory}>
-                      {factory}
-                    </option>
+                  {getUniqueValues('factoryName', filteredData && filteredData.length !== data.length).map(factory => (
+                    <option key={factory} value={factory}>{factory}</option>
                   ))}
                 </select>
                 <Building className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>
@@ -581,35 +479,18 @@ const SubmittedWashingDataFilter = ({
               <div className="relative">
                 <select
                   value={filters.reportType}
-                  onChange={(e) =>
-                    handleFilterChange("reportType", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange('reportType', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Report Types</option>
-                  {getUniqueValues(
-                    "reportType",
-                    filteredData && filteredData.length !== data.length
-                  ).map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
+                  {getUniqueValues('reportType', filteredData && filteredData.length !== data.length).map(type => (
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
                 <ClipboardList className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>
@@ -623,35 +504,18 @@ const SubmittedWashingDataFilter = ({
               <div className="relative">
                 <select
                   value={filters.washType}
-                  onChange={(e) =>
-                    handleFilterChange("washType", e.target.value)
-                  }
+                  onChange={(e) => handleFilterChange('washType', e.target.value)}
                   className="w-full pl-10 pr-8 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent dark:bg-gray-700 dark:text-gray-200 transition-all appearance-none"
                 >
                   <option value="">All Wash Types</option>
-                  {getUniqueValues(
-                    "washType",
-                    filteredData && filteredData.length !== data.length
-                  ).map((type) => (
-                    <option key={type} value={type}>
-                      {type}
-                    </option>
+                  {getUniqueValues('washType', filteredData && filteredData.length !== data.length).map(type => (
+                    <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
                 <Droplets className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <svg
-                    className="w-4 h-4 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 9l-7 7-7-7"
-                    />
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </div>

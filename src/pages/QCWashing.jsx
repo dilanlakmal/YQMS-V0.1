@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
 import { encodeColorForUrl } from "../utils/colorUtils";
 
-const normalizeImageSrc = (src) => {
+const normalizeImageSrc = (src) => {    
   if (!src) return "";
 
   // If it's already a data URL, return as is
@@ -104,68 +104,62 @@ function transformDefectsByPc(savedDefectsByPc) {
 // Helper function to initialize default checkpoint data
 const initializeDefaultCheckpointData = async () => {
   try {
-    const checkpointResponse = await fetch(
-      `${API_BASE_URL}/api/qc-washing-checklist`
-    );
+    const checkpointResponse = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
     const checkpointResult = await checkpointResponse.json();
-
+    
     if (Array.isArray(checkpointResult)) {
       const initialCheckpointData = [];
-
-      checkpointResult.forEach((checkpoint) => {
+      
+      checkpointResult.forEach(checkpoint => {
         // Add main checkpoint
-        const defaultOption = checkpoint.options.find((opt) => opt.isDefault);
-        let defaultRemark = "";
-
+        const defaultOption = checkpoint.options.find(opt => opt.isDefault);
+        let defaultRemark = '';
+        
         if (defaultOption?.hasRemark && defaultOption?.remark) {
-          defaultRemark =
-            typeof defaultOption.remark === "object"
-              ? defaultOption.remark.english || ""
-              : defaultOption.remark || "";
+          defaultRemark = typeof defaultOption.remark === 'object'
+            ? defaultOption.remark.english || ''
+            : defaultOption.remark || '';
         }
-
+        
         initialCheckpointData.push({
           id: `main_${checkpoint._id}`,
           checkpointId: checkpoint._id,
-          type: "main",
+          type: 'main',
           name: checkpoint.name,
           optionType: checkpoint.optionType,
           options: checkpoint.options,
-          decision: defaultOption?.name || "",
+          decision: defaultOption?.name || '',
           remark: defaultRemark,
           comparisonImages: []
         });
-
+        
         // Add subpoints
-        checkpoint.subPoints?.forEach((subPoint) => {
-          const defaultSubOption = subPoint.options.find(
-            (opt) => opt.isDefault
-          );
-          let defaultSubRemark = "";
-
+        checkpoint.subPoints?.forEach(subPoint => {
+          const defaultSubOption = subPoint.options.find(opt => opt.isDefault);
+          let defaultSubRemark = '';
+          
           if (defaultSubOption?.hasRemark && defaultSubOption?.remark) {
-            defaultSubRemark =
-              typeof defaultSubOption.remark === "object"
-                ? defaultSubOption.remark.english || ""
-                : defaultSubOption.remark || "";
+            defaultSubRemark = typeof defaultSubOption.remark === 'object'
+              ? defaultSubOption.remark.english || ''
+              : defaultSubOption.remark || '';
           }
-
+          
           initialCheckpointData.push({
             id: `sub_${checkpoint._id}_${subPoint.id}`,
             checkpointId: checkpoint._id,
             subPointId: subPoint.id,
-            type: "sub",
+            type: 'sub',
             name: subPoint.name,
             parentName: checkpoint.name,
             optionType: subPoint.optionType,
             options: subPoint.options,
-            decision: defaultSubOption?.name || "",
+            decision: defaultSubOption?.name || '',
             remark: defaultSubRemark,
             comparisonImages: []
           });
         });
       });
-
+      
       setCheckpointInspectionData(initialCheckpointData);
     }
   } catch (error) {
@@ -208,28 +202,38 @@ function calculateSummaryData(currentFormData) {
   });
 
   // If no measurement data, fallback to checkedQty from form
+  const checkedQty = parseInt(currentFormData.checkedQty, 10) || 0;
   if (totalCheckedPcs === 0) {
     totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
   }
 
-  // 2. Calculate measurement points and passes (for measurement statistics only)
+  // 2. Calculate measurement points and passes using measurementSizeSummary if available
   let measurementPoints = 0;
   let measurementPass = 0;
 
-  measurementArray.forEach((data) => {
-    if (Array.isArray(data.pcs)) {
-      data.pcs.forEach((pc) => {
-        if (Array.isArray(pc.measurementPoints)) {
-          pc.measurementPoints.forEach((point) => {
-            if (point.result === "pass" || point.result === "fail") {
-              measurementPoints++;
-              if (point.result === "pass") measurementPass++;
-            }
-          });
-        }
-      });
-    }
-  });
+  // Check if measurementSizeSummary exists (same as backend logic)
+  if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
+    currentMeasurementDetails.measurementSizeSummary.forEach(sizeData => {
+      measurementPoints += (sizeData.checkedPoints || 0);
+      measurementPass += (sizeData.totalPass || 0);
+    });
+  } else {
+    // Fallback: Calculate from measurement array
+    measurementArray.forEach((data) => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === "pass" || point.result === "fail") {
+                measurementPoints++;
+                if (point.result === "pass") measurementPass++;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 
   // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
@@ -262,52 +266,25 @@ function calculateSummaryData(currentFormData) {
       ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
-  // 5. Result logic - handle SOP differently
+  // 5. SIMPLIFIED LOGIC - only consider defectDetails.result and pass rate >= 95%
   let overallResult = "Pending";
-  const measurementOverallResult =
-    measurementPoints === 0
-      ? "Pending"
-      : measurementPoints - measurementPass > 0
-      ? "Fail"
-      : "Pass";
-  const defectOverallResult = currentDefectDetails?.result || "Pending";
+  const savedDefectResult = currentDefectDetails?.result || "Pending";
 
-  // Check if this is SOP report type
-  const isSOP =
-    currentFormData.reportType === "SOP" ||
-    currentFormData.reportType === "sop" ||
-    (currentFormData.reportType === "" &&
-      currentFormData.inline === "" &&
-      currentFormData.firstOutput === "");
+  // Calculate measurement pass rate - default to 100% when no measurement points
+  const measurementPassRate =
+    measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
 
-  if (isSOP) {
-    // For SOP, both measurement and defect results must be "Pass"
-    // The measurement result is based on a 95% pass rate threshold.
-    const measurementPassRate =
-      measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-    const isMeasurementPass = measurementPassRate >= 95;
-    const isDefectPass = defectCount === 0 && rejectedDefectPcs === 0;
-
-    if (isMeasurementPass && isDefectPass) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Fail";
-    }
+  // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+  if (savedDefectResult === "Pass" && measurementPassRate >= 95.0) {
+    overallResult = "Pass";
+  } else if (savedDefectResult === "Fail" || (measurementPoints > 0 && measurementPassRate < 95.0)) {
+    overallResult = "Fail";
   } else {
-    // For Inline/First Output: Use measurement + defect logic
-    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-      overallResult = "Fail";
-    } else if (
-      measurementOverallResult === "Pass" &&
-      defectOverallResult === "Pass"
-    ) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Pending";
-    }
+    overallResult = "Pending";
   }
 
   return {
+    checkedQty: checkedQty, // Ensure checkedQty is a number
     totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
@@ -340,30 +317,6 @@ function machineProcessesToObject(machineProcesses) {
     }
   });
   return obj;
-}
-
-function fractionToDecimal(fraction) {
-  if (typeof fraction === "number") return fraction;
-  if (!fraction || typeof fraction !== "string") return 0;
-  // Remove + or - for parsing, but keep sign
-  let sign = 1;
-  let str = fraction.trim();
-  if (str.startsWith("-")) {
-    sign = -1;
-    str = str.slice(1);
-  }
-  if (str.startsWith("+")) {
-    str = str.slice(1);
-  }
-  if (str === "" || str === "-") return 0;
-  if (str.includes("/")) {
-    const [num, den] = str.split("/").map(Number);
-    if (!isNaN(num) && !isNaN(den) && den !== 0) {
-      return sign * (num / den);
-    }
-  }
-  const parsed = parseFloat(str);
-  return isNaN(parsed) ? 0 : sign * parsed;
 }
 
 const QCWashingPage = () => {
@@ -572,17 +525,6 @@ const QCWashingPage = () => {
     }
   });
 
-  // Helper function to get English fiber remarks
-  const getFiberRemarkInEnglish = (decision) => {
-    const englishRemarks = {
-      1: "Cleaning must be done by fabric mill.",
-      2: "YM doing the cleaning, front & back side.",
-      3: "Randomly 2-3 pcs back side hairly can acceptable."
-    };
-
-    return englishRemarks[decision] || "";
-  };
-
   // Helper function to convert English fiber remarks to current language
   const convertEnglishToCurrentLanguage = (englishRemark, t) => {
     const englishToDecisionMap = {
@@ -673,7 +615,7 @@ const QCWashingPage = () => {
       (formData.inline === "Inline" ||
         formData.reportType === "Inline" ||
         formData.firstOutput === "First Output" ||
-        formData.reportType === "First Output") &&
+        formData.reportType === "First Output" || formData.reportType === "SOP") &&
       aql?.acceptedDefect !== undefined
     ) {
       const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
@@ -722,28 +664,26 @@ const QCWashingPage = () => {
       try {
         // Clean and encode the color parameter properly
         const encodedColor = encodeColorForUrl(formData.color);
-
+        
         const response = await fetch(
           `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`
         );
-
+        
         if (!response.ok) {
-          console.warn(
-            `Failed to fetch color order qty: ${response.status} ${response.statusText}`
-          );
+          console.warn(`Failed to fetch color order qty: ${response.status} ${response.statusText}`);
           setColorOrderQty(null);
           return;
         }
-
+        
         const data = await response.json();
         if (data.success) {
           setColorOrderQty(data.colorOrderQty);
         } else {
-          console.warn("Color order qty fetch unsuccessful:", data.message);
+          console.warn('Color order qty fetch unsuccessful:', data.message);
           setColorOrderQty(null);
         }
       } catch (error) {
-        console.error("Error fetching color order qty:", error);
+        console.error('Error fetching color order qty:', error);
         setColorOrderQty(null);
       }
     };
@@ -792,22 +732,20 @@ const QCWashingPage = () => {
   }, [t, inspectionData.length]); // Add inspectionData.length as dependency
 
   useEffect(() => {
-    const fetchCheckpointDefinitions = async () => {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing-checklist`
-        );
-        const result = await response.json();
-        if (Array.isArray(result)) {
-          setCheckpointDefinitions(result);
-        }
-      } catch (error) {
-        console.error("Error fetching checkpoint definitions:", error);
+  const fetchCheckpointDefinitions = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
+      const result = await response.json();
+      if (Array.isArray(result)) {
+        setCheckpointDefinitions(result);
       }
-    };
+    } catch (error) {
+      console.error('Error fetching checkpoint definitions:', error);
+    }
+  };
 
-    fetchCheckpointDefinitions();
-  }, []);
+  fetchCheckpointDefinitions();
+}, []);
 
   // --- Helper Functions ---
   const processMeasurementData = (loadedMeasurements) => {
@@ -1011,12 +949,8 @@ const QCWashingPage = () => {
           ...prev,
           orderQty: orderData.orderQty || "",
           buyer: orderData.buyer || "",
-          color:
-            prev.color ||
-            (orderData.colors && orderData.colors.length > 0
-              ? orderData.colors[0]
-              : "")
-        }));
+          color:""
+      }));
       } else {
         throw new Error(
           orderData.message || "Style/Order not found in master records."
@@ -1035,463 +969,421 @@ const QCWashingPage = () => {
       setIsDataLoading(false);
     }
   };
-  const loadSavedDataById = async (id) => {
-    if (!id) return;
+const loadSavedDataById = async (id) => {
+  if (!id) return;
 
-    setIsDataLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`
-      );
-      const data = await response.json();
+  setIsDataLoading(true);
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/qc-washing/load-saved-by-id/${id}`
+    );
+    const data = await response.json();
 
-      if (!data.success || !data.savedData) {
-        Swal.fire("No saved data found", "", "info");
-        setIsDataLoading(false);
-        return;
-      }
+    if (!data.success || !data.savedData) {
+      Swal.fire("No saved data found", "", "info");
+      setIsDataLoading(false);
+      return;
+    }
 
-      const saved = data.savedData;
+    const saved = data.savedData;
 
-      // Set form data
-      setFormData((prev) => ({
-        ...prev,
-        ...saved,
-        date: saved.date ? saved.date.split("T")[0] : prev.date,
-        before_after_wash: saved.before_after_wash || prev.before_after_wash,
-        orderQty: saved.orderQty || prev.orderQty,
-        buyer: saved.buyer || prev.buyer,
-        aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
-      }));
+    // Set form data
+    setFormData((prev) => ({
+      ...prev,
+      ...saved,
+      date: saved.date ? saved.date.split("T")[0] : prev.date,
+      before_after_wash: saved.before_after_wash || prev.before_after_wash,
+      orderQty: saved.orderQty || prev.orderQty,
+      buyer: saved.buyer || prev.buyer,
+      aql: saved.aql && saved.aql.length > 0 ? saved.aql : prev.aql
+    }));
 
-      // Handle checkpoint inspection data - CORRECTED LOGIC
-      if (
-        saved.inspectionDetails?.checkpointInspectionData &&
-        saved.inspectionDetails.checkpointInspectionData.length > 0
-      ) {
-        try {
-          // First, fetch the checkpoint definitions to get the options
-          const checkpointResponse = await fetch(
-            `${API_BASE_URL}/api/qc-washing-checklist`
-          );
-          const checkpointDefinitions = await checkpointResponse.json();
-
-          if (Array.isArray(checkpointDefinitions)) {
-            const flattenedCheckpointData = [];
-
-            // Process the saved checkpoint data
-            saved.inspectionDetails.checkpointInspectionData.forEach(
-              (savedCheckpoint) => {
-                // Find the checkpoint definition
-                const checkpointDef = checkpointDefinitions.find(
-                  (cp) => cp._id === savedCheckpoint.checkpointId
-                );
-
-                if (checkpointDef) {
-                  // Add main checkpoint
-                  flattenedCheckpointData.push({
-                    id:
-                      savedCheckpoint.id ||
-                      `main_${savedCheckpoint.checkpointId}`,
-                    checkpointId: savedCheckpoint.checkpointId,
-                    type: "main",
-                    name: savedCheckpoint.name || checkpointDef.name,
-                    optionType: checkpointDef.optionType,
-                    options: checkpointDef.options || [],
-                    decision: savedCheckpoint.decision || "",
-                    remark: savedCheckpoint.remark || "",
-                    comparisonImages: (
-                      savedCheckpoint.comparisonImages || []
-                    ).map((img) => ({
-                      file: null,
-                      preview: normalizeImageSrc(img),
-                      name:
-                        typeof img === "string"
-                          ? img.split("/").pop()
-                          : "image.jpg",
-                      source: "upload"
-                    }))
-                  });
-
-                  // Add sub-points if they exist in the saved data
-                  if (
-                    savedCheckpoint.subPoints &&
-                    savedCheckpoint.subPoints.length > 0
-                  ) {
-                    savedCheckpoint.subPoints.forEach((savedSubPoint) => {
-                      const subPointDef = checkpointDef.subPoints?.find(
-                        (sp) => sp.id === savedSubPoint.subPointId
-                      );
-
-                      if (subPointDef) {
-                        flattenedCheckpointData.push({
-                          id:
-                            savedSubPoint.id ||
-                            `sub_${savedCheckpoint.checkpointId}_${savedSubPoint.subPointId}`,
-                          checkpointId: savedCheckpoint.checkpointId,
-                          subPointId: savedSubPoint.subPointId,
-                          type: "sub",
-                          name: savedSubPoint.name || subPointDef.name,
-                          parentName:
-                            savedCheckpoint.name || checkpointDef.name,
-                          optionType: subPointDef.optionType,
-                          options: subPointDef.options || [],
-                          decision: savedSubPoint.decision || "",
-                          remark: savedSubPoint.remark || "",
-                          comparisonImages: (
-                            savedSubPoint.comparisonImages || []
-                          ).map((img) => ({
-                            file: null,
-                            preview: normalizeImageSrc(img),
-                            name:
-                              typeof img === "string"
-                                ? img.split("/").pop()
-                                : "image.jpg",
-                            source: "upload"
-                          }))
-                        });
-                      }
-                    });
-                  } else {
-                    // If no saved sub-points but definition has sub-points, add them with defaults
-                    checkpointDef.subPoints?.forEach((subPointDef) => {
-                      const defaultSubOption = subPointDef.options.find(
-                        (opt) => opt.isDefault
-                      );
-                      let defaultSubRemark = "";
-
-                      if (
-                        defaultSubOption?.hasRemark &&
-                        defaultSubOption?.remark
-                      ) {
-                        defaultSubRemark =
-                          typeof defaultSubOption.remark === "object"
-                            ? defaultSubOption.remark.english || ""
-                            : defaultSubOption.remark || "";
-                      }
-
-                      flattenedCheckpointData.push({
-                        id: `sub_${savedCheckpoint.checkpointId}_${subPointDef.id}`,
-                        checkpointId: savedCheckpoint.checkpointId,
-                        subPointId: subPointDef.id,
-                        type: "sub",
-                        name: subPointDef.name,
-                        parentName: savedCheckpoint.name || checkpointDef.name,
-                        optionType: subPointDef.optionType,
-                        options: subPointDef.options || [],
-                        decision: defaultSubOption?.name || "",
-                        remark: defaultSubRemark,
-                        comparisonImages: []
-                      });
-                    });
-                  }
-                }
-              }
-            );
-
-            // Also add any checkpoints that exist in definitions but not in saved data
-            checkpointDefinitions.forEach((checkpointDef) => {
-              const existsInSaved =
-                saved.inspectionDetails.checkpointInspectionData.find(
-                  (saved) => saved.checkpointId === checkpointDef._id
-                );
-
-              if (!existsInSaved) {
-                // Add main checkpoint with defaults
-                const defaultOption = checkpointDef.options.find(
-                  (opt) => opt.isDefault
-                );
-                let defaultRemark = "";
-
-                if (defaultOption?.hasRemark && defaultOption?.remark) {
-                  defaultRemark =
-                    typeof defaultOption.remark === "object"
-                      ? defaultOption.remark.english || ""
-                      : defaultOption.remark || "";
-                }
-
+    // Handle checkpoint inspection data - CORRECTED LOGIC
+if (
+  saved.inspectionDetails?.checkpointInspectionData &&
+  saved.inspectionDetails.checkpointInspectionData.length > 0
+) {
+  try {
+    // First, fetch the checkpoint definitions to get the options
+    const checkpointResponse = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
+    const checkpointDefinitions = await checkpointResponse.json();
+    
+    if (Array.isArray(checkpointDefinitions)) {
+      const flattenedCheckpointData = [];
+      
+      // Process the saved checkpoint data
+      saved.inspectionDetails.checkpointInspectionData.forEach(savedCheckpoint => {
+        // Find the checkpoint definition
+        const checkpointDef = checkpointDefinitions.find(cp => cp._id === savedCheckpoint.checkpointId);
+        
+        if (checkpointDef) {
+          // Add main checkpoint
+          flattenedCheckpointData.push({
+            id: savedCheckpoint.id || `main_${savedCheckpoint.checkpointId}`,
+            checkpointId: savedCheckpoint.checkpointId,
+            type: 'main',
+            name: savedCheckpoint.name || checkpointDef.name,
+            optionType: checkpointDef.optionType,
+            options: checkpointDef.options || [],
+            decision: savedCheckpoint.decision || '',
+            remark: savedCheckpoint.remark || '',
+            comparisonImages: (savedCheckpoint.comparisonImages || []).map(img => ({
+              file: null,
+              preview: normalizeImageSrc(img),
+              name: typeof img === 'string' ? img.split('/').pop() : 'image.jpg',
+              source: 'upload'
+            }))
+          });
+          
+          // Add sub-points if they exist in the saved data
+          if (savedCheckpoint.subPoints && savedCheckpoint.subPoints.length > 0) {
+            savedCheckpoint.subPoints.forEach(savedSubPoint => {
+              const subPointDef = checkpointDef.subPoints?.find(sp => sp.id === savedSubPoint.subPointId);
+              
+              if (subPointDef) {
                 flattenedCheckpointData.push({
-                  id: `main_${checkpointDef._id}`,
-                  checkpointId: checkpointDef._id,
-                  type: "main",
-                  name: checkpointDef.name,
-                  optionType: checkpointDef.optionType,
-                  options: checkpointDef.options || [],
-                  decision: defaultOption?.name || "",
-                  remark: defaultRemark,
-                  comparisonImages: []
-                });
-
-                // Add sub-points with defaults
-                checkpointDef.subPoints?.forEach((subPointDef) => {
-                  const defaultSubOption = subPointDef.options.find(
-                    (opt) => opt.isDefault
-                  );
-                  let defaultSubRemark = "";
-
-                  if (defaultSubOption?.hasRemark && defaultSubOption?.remark) {
-                    defaultSubRemark =
-                      typeof defaultSubOption.remark === "object"
-                        ? defaultSubOption.remark.english || ""
-                        : defaultSubOption.remark || "";
-                  }
-
-                  flattenedCheckpointData.push({
-                    id: `sub_${checkpointDef._id}_${subPointDef.id}`,
-                    checkpointId: checkpointDef._id,
-                    subPointId: subPointDef.id,
-                    type: "sub",
-                    name: subPointDef.name,
-                    parentName: checkpointDef.name,
-                    optionType: subPointDef.optionType,
-                    options: subPointDef.options || [],
-                    decision: defaultSubOption?.name || "",
-                    remark: defaultSubRemark,
-                    comparisonImages: []
-                  });
+                  id: savedSubPoint.id || `sub_${savedCheckpoint.checkpointId}_${savedSubPoint.subPointId}`,
+                  checkpointId: savedCheckpoint.checkpointId,
+                  subPointId: savedSubPoint.subPointId,
+                  type: 'sub',
+                  name: savedSubPoint.name || subPointDef.name,
+                  parentName: savedCheckpoint.name || checkpointDef.name,
+                  optionType: subPointDef.optionType,
+                  options: subPointDef.options || [],
+                  decision: savedSubPoint.decision || '',
+                  remark: savedSubPoint.remark || '',
+                  comparisonImages: (savedSubPoint.comparisonImages || []).map(img => ({
+                    file: null,
+                    preview: normalizeImageSrc(img),
+                    name: typeof img === 'string' ? img.split('/').pop() : 'image.jpg',
+                    source: 'upload'
+                  }))
                 });
               }
             });
-
-            // Set the flattened checkpoint data
-            setCheckpointInspectionData(flattenedCheckpointData);
+          } else {
+            // If no saved sub-points but definition has sub-points, add them with defaults
+            checkpointDef.subPoints?.forEach(subPointDef => {
+              const defaultSubOption = subPointDef.options.find(opt => opt.isDefault);
+              let defaultSubRemark = '';
+              
+              if (defaultSubOption?.hasRemark && defaultSubOption?.remark) {
+                defaultSubRemark = typeof defaultSubOption.remark === 'object'
+                  ? defaultSubOption.remark.english || ''
+                  : defaultSubOption.remark || '';
+              }
+              
+              flattenedCheckpointData.push({
+                id: `sub_${savedCheckpoint.checkpointId}_${subPointDef.id}`,
+                checkpointId: savedCheckpoint.checkpointId,
+                subPointId: subPointDef.id,
+                type: 'sub',
+                name: subPointDef.name,
+                parentName: savedCheckpoint.name || checkpointDef.name,
+                optionType: subPointDef.optionType,
+                options: subPointDef.options || [],
+                decision: defaultSubOption?.name || '',
+                remark: defaultSubRemark,
+                comparisonImages: []
+              });
+            });
           }
-        } catch (error) {
-          console.error("Error loading checkpoint data:", error);
-          // Fallback to initialize with defaults
-          initializeDefaultCheckpointData();
         }
-      } else {
-        // Initialize with default checkpoint data if no saved checkpoint data
-        initializeDefaultCheckpointData();
-      }
-
-      // Handle machine processes - FIXED LOGIC
-      if (
-        saved.inspectionDetails?.machineProcesses &&
-        saved.inspectionDetails.machineProcesses.length > 0
-      ) {
-        // Process saved machine data
-        saved.inspectionDetails.machineProcesses.forEach((machine) => {
-          const machineType = machine.machineType;
-          const parameters =
-            machineType === "Washing Machine"
-              ? ["temperature", "time", "silicon", "softener"]
-              : ["temperature", "timeCool", "timeHot"];
-
-          parameters.forEach((param) => {
-            if (machine[param]) {
-              const standardValue = machine[param].standardValue;
-              const standardStr =
-                standardValue === null || standardValue === undefined
-                  ? ""
-                  : String(standardValue);
-              const actualValue = machine[param].actualValue;
-              const actualStr =
-                actualValue === null || actualValue === undefined
-                  ? ""
-                  : String(actualValue);
-
-              setStandardValues((prev) => ({
-                ...prev,
-                [machineType]: {
-                  ...prev[machineType],
-                  [param]: standardStr
-                }
-              }));
-
-              setActualValues((prev) => ({
-                ...prev,
-                [machineType]: {
-                  ...prev[machineType],
-                  [param]: actualStr
-                }
-              }));
-
-              setMachineStatus((prev) => ({
-                ...prev,
-                [machineType]: {
-                  ...prev[machineType],
-                  [param]: {
-                    ok: machine[param].status?.ok || false,
-                    no: machine[param].status?.no || false
-                  }
-                }
-              }));
-            }
+      });
+      
+      // Also add any checkpoints that exist in definitions but not in saved data
+      checkpointDefinitions.forEach(checkpointDef => {
+        const existsInSaved = saved.inspectionDetails.checkpointInspectionData.find(
+          saved => saved.checkpointId === checkpointDef._id
+        );
+        
+        if (!existsInSaved) {
+          // Add main checkpoint with defaults
+          const defaultOption = checkpointDef.options.find(opt => opt.isDefault);
+          let defaultRemark = '';
+          
+          if (defaultOption?.hasRemark && defaultOption?.remark) {
+            defaultRemark = typeof defaultOption.remark === 'object'
+              ? defaultOption.remark.english || ''
+              : defaultOption.remark || '';
+          }
+          
+          flattenedCheckpointData.push({
+            id: `main_${checkpointDef._id}`,
+            checkpointId: checkpointDef._id,
+            type: 'main',
+            name: checkpointDef.name,
+            optionType: checkpointDef.optionType,
+            options: checkpointDef.options || [],
+            decision: defaultOption?.name || '',
+            remark: defaultRemark,
+            comparisonImages: []
           });
-        });
-
-        // Set timeCool and timeHot enabled states based on saved data
-        const tumbleDryMachine = saved.inspectionDetails.machineProcesses.find(
-          (m) => m.machineType === "Tumble Dry"
-        );
-
-        if (tumbleDryMachine) {
-          // Check if timeCool has actual values or status
-          const timeCoolHasData =
-            tumbleDryMachine.timeCool &&
-            tumbleDryMachine.timeCool.actualValue !== undefined &&
-            tumbleDryMachine.timeCool.actualValue !== null &&
-            tumbleDryMachine.timeCool.actualValue !== "";
-
-          // Check if timeHot has actual values or status
-          const timeHotHasData =
-            tumbleDryMachine.timeHot &&
-            tumbleDryMachine.timeHot.actualValue !== undefined &&
-            tumbleDryMachine.timeHot.actualValue !== null &&
-            tumbleDryMachine.timeHot.actualValue !== "";
-
-          setTimeCoolEnabled(
-            timeCoolHasData || saved.inspectionDetails.timeCoolEnabled || false
-          );
-          setTimeHotEnabled(
-            timeHotHasData || saved.inspectionDetails.timeHotEnabled || false
-          );
-        } else {
-          // Set from saved inspection details if available
-          setTimeCoolEnabled(saved.inspectionDetails.timeCoolEnabled || false);
-          setTimeHotEnabled(saved.inspectionDetails.timeHotEnabled || false);
+          
+          // Add sub-points with defaults
+          checkpointDef.subPoints?.forEach(subPointDef => {
+            const defaultSubOption = subPointDef.options.find(opt => opt.isDefault);
+            let defaultSubRemark = '';
+            
+            if (defaultSubOption?.hasRemark && defaultSubOption?.remark) {
+              defaultSubRemark = typeof defaultSubOption.remark === 'object'
+                ? defaultSubOption.remark.english || ''
+                : defaultSubOption.remark || '';
+            }
+            
+            flattenedCheckpointData.push({
+              id: `sub_${checkpointDef._id}_${subPointDef.id}`,
+              checkpointId: checkpointDef._id,
+              subPointId: subPointDef.id,
+              type: 'sub',
+              name: subPointDef.name,
+              parentName: checkpointDef.name,
+              optionType: subPointDef.optionType,
+              options: subPointDef.options || [],
+              decision: defaultSubOption?.name || '',
+              remark: defaultSubRemark,
+              comparisonImages: []
+            });
+          });
         }
-      } else {
-        // Initialize with default machine values if no saved machine data
-        setStandardValues({
-          "Washing Machine": {
-            temperature: "",
-            time: "",
-            silicon: "",
-            softener: ""
-          },
-          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
-        });
+      });
+      
+      // Set the flattened checkpoint data
+      setCheckpointInspectionData(flattenedCheckpointData);
+    }
+  } catch (error) {
+    console.error("Error loading checkpoint data:", error);
+    // Fallback to initialize with defaults
+    initializeDefaultCheckpointData();
+  }
+} else {
+  // Initialize with default checkpoint data if no saved checkpoint data
+  initializeDefaultCheckpointData();
+}
 
-        setActualValues({
-          "Washing Machine": {
-            temperature: "",
-            time: "",
-            silicon: "",
-            softener: ""
-          },
-          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
-        });
 
-        setMachineStatus({
-          "Washing Machine": {
-            temperature: { ok: true, no: false },
-            time: { ok: true, no: false },
-            silicon: { ok: true, no: false },
-            softener: { ok: true, no: false }
-          },
-          "Tumble Dry": {
-            temperature: { ok: true, no: false },
-            timeCool: { ok: true, no: false },
-            timeHot: { ok: true, no: false }
+    // Handle machine processes - FIXED LOGIC
+if (
+  saved.inspectionDetails?.machineProcesses &&
+  saved.inspectionDetails.machineProcesses.length > 0
+) {
+  // Process saved machine data
+  saved.inspectionDetails.machineProcesses.forEach((machine) => {
+    const machineType = machine.machineType;
+    const parameters =
+      machineType === "Washing Machine"
+        ? ["temperature", "time", "silicon", "softener"]
+        : ["temperature", "timeCool", "timeHot"];
+    
+    parameters.forEach((param) => {
+      if (machine[param]) {
+        const standardValue = machine[param].standardValue;
+        const standardStr =
+          standardValue === null || standardValue === undefined
+            ? ""
+            : String(standardValue);
+        const actualValue = machine[param].actualValue;
+        const actualStr =
+          actualValue === null || actualValue === undefined
+            ? ""
+            : String(actualValue);
+        
+        setStandardValues((prev) => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: standardStr
           }
-        });
-
-        // Set default enabled states
-        setTimeCoolEnabled(saved.inspectionDetails?.timeCoolEnabled || false);
-        setTimeHotEnabled(saved.inspectionDetails?.timeHotEnabled || false);
+        }));
+        
+        setActualValues((prev) => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: actualStr
+          }
+        }));
+        
+        setMachineStatus((prev) => ({
+          ...prev,
+          [machineType]: {
+            ...prev[machineType],
+            [param]: {
+              ok: machine[param].status?.ok || false,
+              no: machine[param].status?.no || false
+            }
+          }
+        }));
       }
+    });
+  });
 
-      // Handle defect data
-      if (
-        saved.inspectionDetails?.parameters &&
-        saved.inspectionDetails.parameters.length > 0
-      ) {
-        setDefectData(
-          saved.inspectionDetails.parameters.map((param) => ({
-            parameter: param.parameterName || param.parameter || "",
-            checkedQty: param.checkedQty || 0,
-            failedQty: param.defectQty || param.failedQty || 0,
-            passRate: param.passRate || "",
-            result: param.result || "",
-            remark: param.remark || "",
-            ok: param.ok !== undefined ? param.ok : true,
-            no: param.no !== undefined ? param.no : false,
-            acceptedDefect: param.aqlAcceptedDefect || "",
-            checkboxes: param.checkboxes || {}
-          }))
-        );
-      } else {
-        // Initialize with default defect data if no saved defect data
-        setDefectData(normalizeDefectData(defaultDefectData));
-      }
+  // Set timeCool and timeHot enabled states based on saved data
+  const tumbleDryMachine = saved.inspectionDetails.machineProcesses.find(
+    m => m.machineType === "Tumble Dry"
+  );
+  
+  if (tumbleDryMachine) {
+    // Check if timeCool has actual values or status
+    const timeCoolHasData = tumbleDryMachine.timeCool && 
+      (tumbleDryMachine.timeCool.actualValue !== undefined && 
+       tumbleDryMachine.timeCool.actualValue !== null && 
+       tumbleDryMachine.timeCool.actualValue !== "");
+    
+    // Check if timeHot has actual values or status  
+    const timeHotHasData = tumbleDryMachine.timeHot && 
+      (tumbleDryMachine.timeHot.actualValue !== undefined && 
+       tumbleDryMachine.timeHot.actualValue !== null && 
+       tumbleDryMachine.timeHot.actualValue !== "");
+    
+    setTimeCoolEnabled(timeCoolHasData || saved.inspectionDetails.timeCoolEnabled || false);
+    setTimeHotEnabled(timeHotHasData || saved.inspectionDetails.timeHotEnabled || false);
+  } else {
+    // Set from saved inspection details if available
+    setTimeCoolEnabled(saved.inspectionDetails.timeCoolEnabled || false);
+    setTimeHotEnabled(saved.inspectionDetails.timeHotEnabled || false);
+  }
+} else {
+  // Initialize with default machine values if no saved machine data
+  setStandardValues({
+    "Washing Machine": {
+      temperature: "",
+      time: "",
+      silicon: "",
+      softener: ""
+    },
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+  });
+  
+  setActualValues({
+    "Washing Machine": {
+      temperature: "",
+      time: "",
+      silicon: "",
+      softener: ""
+    },
+    "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+  });
+  
+  setMachineStatus({
+    "Washing Machine": {
+      temperature: { ok: true, no: false },
+      time: { ok: true, no: false },
+      silicon: { ok: true, no: false },
+      softener: { ok: true, no: false }
+    },
+    "Tumble Dry": {
+      temperature: { ok: true, no: false },
+      timeCool: { ok: true, no: false },
+      timeHot: { ok: true, no: false }
+    }
+  });
+  
+  // Set default enabled states
+  setTimeCoolEnabled(saved.inspectionDetails?.timeCoolEnabled || false);
+  setTimeHotEnabled(saved.inspectionDetails?.timeHotEnabled || false);
+}
 
-      // Continue with other data loading...
-      setAddedDefects(saved.addedDefects || []);
-      setDefectsByPc(
-        transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
+
+    // Handle defect data
+    if (
+      saved.inspectionDetails?.parameters &&
+      saved.inspectionDetails.parameters.length > 0
+    ) {
+      setDefectData(
+        saved.inspectionDetails.parameters.map((param) => ({
+          parameter: param.parameterName || param.parameter || "",
+          checkedQty: param.checkedQty || 0,
+          failedQty: param.defectQty || param.failedQty || 0,
+          passRate: param.passRate || "",
+          result: param.result || "",
+          remark: param.remark || "",
+          ok: param.ok !== undefined ? param.ok : true,
+          no: param.no !== undefined ? param.no : false,
+          acceptedDefect: param.aqlAcceptedDefect || "",
+          checkboxes: param.checkboxes || {}
+        }))
       );
+    } else {
+      // Initialize with default defect data if no saved defect data
+      setDefectData(normalizeDefectData(defaultDefectData));
+    }
 
-      setUploadedImages(
-        (saved.defectDetails?.additionalImages || [])
-          .filter(Boolean)
-          .map((img) => {
-            if (typeof img === "object" && img !== null) {
-              return {
-                file: null,
-                preview: normalizeImageSrc(img.preview || img),
-                name: img.name || "image.jpg"
-              };
-            }
-            if (typeof img === "string") {
-              return {
-                file: null,
-                preview: normalizeImageSrc(img),
-                name: img.split("/").pop() || "image.jpg"
-              };
-            }
+    // Continue with other data loading...
+    setAddedDefects(saved.addedDefects || []);
+    setDefectsByPc(
+      transformDefectsByPc(saved.defectDetails?.defectsByPc || {})
+    );
+
+    setUploadedImages(
+      (saved.defectDetails?.additionalImages || [])
+        .filter(Boolean)
+        .map((img) => {
+          if (typeof img === "object" && img !== null) {
             return {
               file: null,
-              preview: "",
-              name: "image.jpg"
+              preview: normalizeImageSrc(img.preview || img),
+              name: img.name || "image.jpg"
             };
-          })
-      );
+          }
+          if (typeof img === "string") {
+            return {
+              file: null,
+              preview: normalizeImageSrc(img),
+              name: img.split("/").pop() || "image.jpg"
+            };
+          }
+          return {
+            file: null,
+            preview: "",
+            name: "image.jpg"
+          };
+        })
+    );
 
-      setComment(saved.defectDetails?.comment || "");
+    setComment(saved.defectDetails?.comment || "");
 
-      setMeasurementData({
-        beforeWash: (saved.measurementDetails?.measurement || []).filter(
-          (m) => m.before_after_wash === "beforeWash"
-        ),
-        afterWash: (saved.measurementDetails?.measurement || []).filter(
-          (m) => m.before_after_wash === "afterWash"
-        )
-      });
+    setMeasurementData({
+      beforeWash: (saved.measurementDetails?.measurement || []).filter(
+        (m) => m.before_after_wash === "beforeWash"
+      ),
+      afterWash: (saved.measurementDetails?.measurement || []).filter(
+        (m) => m.before_after_wash === "afterWash"
+      )
+    });
 
-      let sizes = [];
-      if (saved.measurementDetails) {
-        if (Array.isArray(saved.measurementDetails)) {
-          sizes = saved.measurementDetails.map((m) => m.size);
-        } else if (
-          typeof saved.measurementDetails === "object" &&
-          Array.isArray(saved.measurementDetails.measurement)
-        ) {
-          sizes = saved.measurementDetails.measurement.map((m) => m.size);
-        }
+    let sizes = [];
+    if (saved.measurementDetails) {
+      if (Array.isArray(saved.measurementDetails)) {
+        sizes = saved.measurementDetails.map((m) => m.size);
+      } else if (
+        typeof saved.measurementDetails === "object" &&
+        Array.isArray(saved.measurementDetails.measurement)
+      ) {
+        sizes = saved.measurementDetails.measurement.map((m) => m.size);
       }
-
-      setSavedSizes(sizes);
-      setRecordId(saved._id);
-      if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
-
-      Swal.fire({
-        icon: "success",
-        title: "Saved data loaded!",
-        timer: 1200,
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false
-      });
-    } catch (error) {
-      Swal.fire("Error loading saved data", error.message, "error");
-      console.error("Error loading saved data:", error);
-    } finally {
-      setIsDataLoading(false);
     }
-  };
+
+    setSavedSizes(sizes);
+    setRecordId(saved._id);
+    if (saved.savedAt) setLastSaved(new Date(saved.savedAt));
+
+    Swal.fire({
+      icon: "success",
+      title: "Saved data loaded!",
+      timer: 1200,
+      toast: true,
+      position: "top-end",
+      showConfirmButton: false
+    });
+
+  } catch (error) {
+    Swal.fire("Error loading saved data", error.message, "error");
+    console.error("Error loading saved data:", error);
+  } finally {
+    setIsDataLoading(false);
+  }
+};
 
   // --- Form Handlers ---
   const handleInputChange = (field, value) => {
@@ -1799,18 +1691,14 @@ const QCWashingPage = () => {
       // Check if this size+kvalue combination already exists
       const currentArray = measurementData[before_after_wash] || [];
       const existingRecord = currentArray.find(
-        (item) =>
-          item.size === transformedSizeData.size &&
-          item.kvalue === transformedSizeData.kvalue
+        (item) => item.size === transformedSizeData.size && item.kvalue === transformedSizeData.kvalue
       );
 
       // 1. Update local measurement data and saved sizes
       setMeasurementData((prev) => {
         const currentArray = prev[before_after_wash];
         const existingIndex = currentArray.findIndex(
-          (item) =>
-            item.size === transformedSizeData.size &&
-            item.kvalue === transformedSizeData.kvalue
+          (item) => item.size === transformedSizeData.size && item.kvalue === transformedSizeData.kvalue
         );
         if (existingIndex >= 0) {
           // Update existing record
@@ -1848,8 +1736,8 @@ const QCWashingPage = () => {
         return;
       }
 
-      const measurementDetail = {
-        ...transformedSizeData,
+      const measurementDetail = { 
+        ...transformedSizeData, 
         before_after_wash,
         isUpdate: !!existingRecord // Flag to indicate if this is an update
       };
@@ -1892,7 +1780,7 @@ const QCWashingPage = () => {
         formData.before_after_wash === "Before Wash"
           ? "beforeWash"
           : "afterWash";
-
+      
       if (kvalue) {
         // Remove specific size+kvalue combination
         setMeasurementData((prev) => ({
@@ -1901,7 +1789,7 @@ const QCWashingPage = () => {
             (item) => !(item.size === size && item.kvalue === kvalue)
           )
         }));
-
+        
         // Only remove from savedSizes if no other k-values exist for this size
         const remainingRecords = measurementData[before_after_wash].filter(
           (item) => item.size === size && item.kvalue !== kvalue
@@ -1975,21 +1863,14 @@ const QCWashingPage = () => {
   const autoSaveSummary = async (summary, recordId) => {
     if (!recordId || !summary) return;
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ summary })
-        }
-      );
-
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/save-summary/${recordId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary })
+      });
+      
       if (!response.ok) {
-        console.error(
-          "Failed to save summary:",
-          response.status,
-          response.statusText
-        );
+        console.error('Failed to save summary:', response.status, response.statusText);
       }
     } catch (error) {
       console.error("Failed to auto-save summary:", error);
@@ -2023,6 +1904,7 @@ const QCWashingPage = () => {
       autoSaveSummary(summary, recordId);
     }
   };
+
 
   const clearFormData = () => {
     // Reset form data to initial state
@@ -2173,6 +2055,8 @@ const QCWashingPage = () => {
         )
       };
 
+      
+
       const measurementDetails = {
         measurement: [
           ...measurementData.beforeWash.map((item) => ({
@@ -2192,6 +2076,7 @@ const QCWashingPage = () => {
         defectDetails,
         measurementDetails
       });
+
 
       setFormData((prev) => ({
         ...prev,
@@ -2567,35 +2452,7 @@ const QCWashingPage = () => {
       >
         {activeTab === "newInspection" && (
           <>
-            <OverAllSummaryCard
-              summary={{
-                ...formData,
-                checkedQty: Number(formData.checkedQty) || 0,
-                washQty: Number(formData.washQty) || 0,
-                // Include inspection details for proper calculation
-                inspectionDetails: {
-                  checkpointInspectionData: checkpointInspectionData
-                }
-              }}
-              recordId={recordId}
-              onSummaryUpdate={(updatedSummary) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  ...updatedSummary,
-                  // Ensure these critical fields are updated
-                  overallFinalResult: updatedSummary.overallFinalResult,
-                  totalCheckedPcs: updatedSummary.totalCheckedPcs,
-                  rejectedDefectPcs: updatedSummary.rejectedDefectPcs,
-                  totalDefectCount: updatedSummary.totalDefectCount,
-                  defectRate: updatedSummary.defectRate,
-                  defectRatio: updatedSummary.defectRatio
-                }));
-              }}
-              measurementData={formData.measurementDetails}
-              defectDetails={formData.defectDetails}
-              before_after_wash={formData.before_after_wash}
-              showMeasurementTable={showMeasurementTable}
-            />
+            <OverAllSummaryCard summary={formData} />
             <OrderDetailsSection
               onLoadSavedDataById={loadSavedDataById}
               setSavedSizes={setSavedSizes}
@@ -2630,39 +2487,38 @@ const QCWashingPage = () => {
               setIsSaved={setOrderSectionSaved}
             />
 
-            {inspectionSectionVisible &&
-              formData.before_after_wash === "After Wash" && (
-                <InspectionDataSection
-                  onLoadSavedDataById={loadSavedDataById}
-                  inspectionData={inspectionData}
-                  setInspectionData={setInspectionData}
-                  processData={processData}
-                  setProcessData={setProcessData}
-                  defectData={defectData}
-                  isVisible={inspectionContentVisible} // Use content visibility state
-                  onToggle={toggleInspectionSection}
-                  machineType={machineType}
-                  setMachineType={setMachineType}
-                  washQty={formData.washQty}
-                  setDefectData={setDefectData}
-                  recordId={recordId}
-                  washType={formData.washType}
-                  standardValues={standardValues}
-                  setStandardValues={setStandardValues}
-                  actualValues={actualValues}
-                  setActualValues={setActualValues}
-                  machineStatus={machineStatus}
-                  setMachineStatus={setMachineStatus}
-                  normalizeImageSrc={normalizeImageSrc}
-                  checkpointInspectionData={checkpointInspectionData}
-                  setCheckpointInspectionData={setCheckpointInspectionData}
-                  timeCoolEnabled={timeCoolEnabled}
-                  setTimeCoolEnabled={setTimeCoolEnabled}
-                  timeHotEnabled={timeHotEnabled}
-                  setTimeHotEnabled={setTimeHotEnabled}
-                  checkpointDefinitions={checkpointDefinitions}
-                />
-              )}
+            {inspectionSectionVisible && formData.before_after_wash === "After Wash" && (
+              <InspectionDataSection
+                onLoadSavedDataById={loadSavedDataById}
+                inspectionData={inspectionData}
+                setInspectionData={setInspectionData}
+                processData={processData}
+                setProcessData={setProcessData}
+                defectData={defectData}
+                isVisible={inspectionContentVisible} // Use content visibility state
+                onToggle={toggleInspectionSection}
+                machineType={machineType}
+                setMachineType={setMachineType}
+                washQty={formData.washQty}
+                setDefectData={setDefectData}
+                recordId={recordId}
+                washType={formData.washType}
+                standardValues={standardValues}
+                setStandardValues={setStandardValues}
+                actualValues={actualValues}
+                setActualValues={setActualValues}
+                machineStatus={machineStatus}
+                setMachineStatus={setMachineStatus}
+                normalizeImageSrc={normalizeImageSrc}
+                checkpointInspectionData={checkpointInspectionData}
+                setCheckpointInspectionData={setCheckpointInspectionData}
+                timeCoolEnabled={timeCoolEnabled}
+                setTimeCoolEnabled={setTimeCoolEnabled}
+                timeHotEnabled={timeHotEnabled}
+                setTimeHotEnabled={setTimeHotEnabled}
+                checkpointDefinitions={checkpointDefinitions}
+              />
+            )}
 
             {/* Only render when defectSectionVisible is true */}
             {defectSectionVisible && (

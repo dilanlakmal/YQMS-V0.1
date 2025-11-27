@@ -1,19 +1,20 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from 'react';
+import PropTypes from 'prop-types';
 
-const FilterableDropdown = ({
-  value,
-  onChange,
-  options,
-  onFilter,
+const FilterableDropdown = ({ 
+  value, 
+  onChange, 
+  options, 
+  onFilter, 
   placeholder = "Type to search...",
   className = ""
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(value || "");
+  const [searchTerm, setSearchTerm] = useState(value || '');
   const dropdownRef = useRef(null);
 
   useEffect(() => {
-    setSearchTerm(value || "");
+    setSearchTerm(value || '');
   }, [value]);
 
   useEffect(() => {
@@ -22,8 +23,8 @@ const FilterableDropdown = ({
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const handleInputChange = (e) => {
@@ -65,6 +66,14 @@ const FilterableDropdown = ({
       )}
     </div>
   );
+};
+FilterableDropdown.propTypes = {
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  options: PropTypes.array.isRequired,
+  onFilter: PropTypes.func.isRequired,
+  placeholder: PropTypes.string,
+  className: PropTypes.string
 };
 
 export default FilterableDropdown;

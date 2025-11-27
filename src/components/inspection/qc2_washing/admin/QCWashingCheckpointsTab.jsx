@@ -37,17 +37,15 @@ const QCWashingCheckpointsTab = () => {
   const [remarkModalOpen, setRemarkModalOpen] = useState(false);
   const [currentRemarkOption, setCurrentRemarkOption] = useState(null);
   const [remarkData, setRemarkData] = useState({
-    english: "",
-    khmer: "",
-    chinese: ""
+    english: '',
+    khmer: '',
+    chinese: ''
   });
 
   const fetchCheckpoints = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qc-washing-checklist`
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/qc-washing-checklist`);
       setCheckpoints(response.data);
     } catch (error) {
       Swal.fire({
@@ -89,14 +87,14 @@ const QCWashingCheckpointsTab = () => {
     setEditedCheckpoint({
       name: checkpoint.name,
       optionType: checkpoint.optionType,
-      options: checkpoint.options.map((opt) => ({
+      options: checkpoint.options.map(opt => ({ 
         ...opt,
         hasRemark: opt.hasRemark || false,
         remark: opt.remark || null
       })),
-      subPoints: checkpoint.subPoints.map((sub) => ({
+      subPoints: checkpoint.subPoints.map(sub => ({
         ...sub,
-        options: sub.options.map((opt) => ({
+        options: sub.options.map(opt => ({ 
           ...opt,
           hasRemark: opt.hasRemark || false,
           remark: opt.remark || null
@@ -112,27 +110,21 @@ const QCWashingCheckpointsTab = () => {
   };
 
   const updateEditData = (field, value) => {
-    setEditedCheckpoint((prev) => ({ ...prev, [field]: value }));
+    setEditedCheckpoint(prev => ({ ...prev, [field]: value }));
   };
 
-  const updateOption = (
-    optionId,
-    field,
-    value,
-    isSubPoint = false,
-    subPointId = null
-  ) => {
+  const updateOption = (optionId, field, value, isSubPoint = false, subPointId = null) => {
     if (isSubPoint && subPointId) {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
-        subPoints: prev.subPoints.map((sub) =>
-          sub.id === subPointId
+        subPoints: prev.subPoints.map(sub => 
+          sub.id === subPointId 
             ? {
                 ...sub,
-                options: sub.options.map((opt) => {
+                options: sub.options.map(opt => {
                   if (opt.id === optionId) {
                     return { ...opt, [field]: value };
-                  } else if (field === "isDefault" && value) {
+                  } else if (field === 'isDefault' && value) {
                     return { ...opt, isDefault: false };
                   }
                   return opt;
@@ -142,12 +134,12 @@ const QCWashingCheckpointsTab = () => {
         )
       }));
     } else {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
-        options: prev.options.map((opt) => {
+        options: prev.options.map(opt => {
           if (opt.id === optionId) {
             return { ...opt, [field]: value };
-          } else if (field === "isDefault" && value) {
+          } else if (field === 'isDefault' && value) {
             return { ...opt, isDefault: false };
           }
           return opt;
@@ -167,16 +159,16 @@ const QCWashingCheckpointsTab = () => {
     };
 
     if (isSubPoint && subPointId) {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
-        subPoints: prev.subPoints.map((sub) =>
-          sub.id === subPointId
+        subPoints: prev.subPoints.map(sub => 
+          sub.id === subPointId 
             ? { ...sub, options: [...sub.options, newOption] }
             : sub
         )
       }));
     } else {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
         options: [...prev.options, newOption]
       }));
@@ -185,53 +177,33 @@ const QCWashingCheckpointsTab = () => {
 
   const deleteOption = (optionId, isSubPoint = false, subPointId = null) => {
     if (isSubPoint && subPointId) {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
-        subPoints: prev.subPoints.map((sub) =>
-          sub.id === subPointId
-            ? {
-                ...sub,
-                options:
-                  sub.options.filter((opt) => opt.id !== optionId).length > 0
-                    ? sub.options.filter((opt) => opt.id !== optionId)
-                    : [
-                        {
-                          id: Date.now(),
-                          name: "Pass",
-                          isDefault: true,
-                          isFail: false,
-                          hasRemark: false,
-                          remark: null
-                        }
-                      ]
+        subPoints: prev.subPoints.map(sub => 
+          sub.id === subPointId 
+            ? { 
+                ...sub, 
+                options: sub.options.filter(opt => opt.id !== optionId).length > 0
+                  ? sub.options.filter(opt => opt.id !== optionId)
+                  : [{ id: Date.now(), name: "Pass", isDefault: true, isFail: false, hasRemark: false, remark: null }]
               }
             : sub
         )
       }));
     } else {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
-        options:
-          prev.options.filter((opt) => opt.id !== optionId).length > 0
-            ? prev.options.filter((opt) => opt.id !== optionId)
-            : [
-                {
-                  id: Date.now(),
-                  name: "Pass",
-                  isDefault: true,
-                  isFail: false,
-                  hasRemark: false,
-                  remark: null
-                }
-              ]
+        options: prev.options.filter(opt => opt.id !== optionId).length > 0
+          ? prev.options.filter(opt => opt.id !== optionId)
+          : [{ id: Date.now(), name: "Pass", isDefault: true, isFail: false, hasRemark: false, remark: null }]
       }));
     }
   };
 
   const updateSubPoint = (subPointId, field, value) => {
-    setEditedCheckpoint((prev) => ({
+    setEditedCheckpoint(prev => ({
       ...prev,
-      subPoints: prev.subPoints.map((sub) =>
+      subPoints: prev.subPoints.map(sub => 
         sub.id === subPointId ? { ...sub, [field]: value } : sub
       )
     }));
@@ -243,81 +215,43 @@ const QCWashingCheckpointsTab = () => {
       name: "New Sub Point",
       optionType: "passfail",
       options: [
-        {
-          id: Date.now() + 1,
-          name: "Pass",
-          isDefault: true,
-          isFail: false,
-          hasRemark: false,
-          remark: null
-        },
-        {
-          id: Date.now() + 2,
-          name: "Fail",
-          isDefault: false,
-          isFail: true,
-          hasRemark: false,
-          remark: null
-        }
+        { id: Date.now() + 1, name: "Pass", isDefault: true, isFail: false, hasRemark: false, remark: null },
+        { id: Date.now() + 2, name: "Fail", isDefault: false, isFail: true, hasRemark: false, remark: null }
       ]
     };
 
-    setEditedCheckpoint((prev) => ({
+    setEditedCheckpoint(prev => ({
       ...prev,
       subPoints: [...prev.subPoints, newSubPoint]
     }));
   };
 
   const deleteSubPoint = (subPointId) => {
-    setEditedCheckpoint((prev) => ({
+    setEditedCheckpoint(prev => ({
       ...prev,
-      subPoints: prev.subPoints.filter((sub) => sub.id !== subPointId)
+      subPoints: prev.subPoints.filter(sub => sub.id !== subPointId)
     }));
   };
 
   const changeOptionType = (type, isSubPoint = false, subPointId = null) => {
-    const newOptions =
-      type === "passfail"
-        ? [
-            {
-              id: Date.now() + 1,
-              name: "Pass",
-              isDefault: true,
-              isFail: false,
-              hasRemark: false,
-              remark: null
-            },
-            {
-              id: Date.now() + 2,
-              name: "Fail",
-              isDefault: false,
-              isFail: true,
-              hasRemark: false,
-              remark: null
-            }
-          ]
-        : [
-            {
-              id: Date.now() + 1,
-              name: "",
-              isDefault: true,
-              isFail: false,
-              hasRemark: false,
-              remark: null
-            }
-          ];
+    const newOptions = type === "passfail" 
+      ? [
+          { id: Date.now() + 1, name: "Pass", isDefault: true, isFail: false, hasRemark: false, remark: null },
+          { id: Date.now() + 2, name: "Fail", isDefault: false, isFail: true, hasRemark: false, remark: null }
+        ]
+      : [{ id: Date.now() + 1, name: "", isDefault: true, isFail: false, hasRemark: false, remark: null }];
 
     if (isSubPoint && subPointId) {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
-        subPoints: prev.subPoints.map((sub) =>
-          sub.id === subPointId
+        subPoints: prev.subPoints.map(sub => 
+          sub.id === subPointId 
             ? { ...sub, optionType: type, options: newOptions }
             : sub
         )
       }));
     } else {
-      setEditedCheckpoint((prev) => ({
+      setEditedCheckpoint(prev => ({
         ...prev,
         optionType: type,
         options: newOptions
@@ -326,40 +260,31 @@ const QCWashingCheckpointsTab = () => {
   };
 
   // Remark functions
-  const openRemarkModal = (
-    checkpointId,
-    subPointId,
-    optionId,
-    isEditing = false
-  ) => {
+  const openRemarkModal = (checkpointId, subPointId, optionId, isEditing = false) => {
     let option;
-
+    
     if (isEditing) {
       if (!subPointId) {
-        option = editedCheckpoint.options.find((opt) => opt.id === optionId);
+        option = editedCheckpoint.options.find(opt => opt.id === optionId);
       } else {
-        const subPoint = editedCheckpoint.subPoints.find(
-          (sub) => sub.id === subPointId
-        );
-        option = subPoint.options.find((opt) => opt.id === optionId);
+        const subPoint = editedCheckpoint.subPoints.find(sub => sub.id === subPointId);
+        option = subPoint.options.find(opt => opt.id === optionId);
       }
     } else {
-      const checkpoint = checkpoints.find((cp) => cp._id === checkpointId);
+      const checkpoint = checkpoints.find(cp => cp._id === checkpointId);
       if (!subPointId) {
-        option = checkpoint.options.find((opt) => opt.id === optionId);
+        option = checkpoint.options.find(opt => opt.id === optionId);
       } else {
-        const subPoint = checkpoint.subPoints.find(
-          (sub) => sub.id === subPointId
-        );
-        option = subPoint.options.find((opt) => opt.id === optionId);
+        const subPoint = checkpoint.subPoints.find(sub => sub.id === subPointId);
+        option = subPoint.options.find(opt => opt.id === optionId);
       }
     }
 
     setCurrentRemarkOption({ checkpointId, subPointId, optionId, isEditing });
     setRemarkData({
-      english: option.remark?.english || "",
-      khmer: option.remark?.khmer || "",
-      chinese: option.remark?.chinese || ""
+      english: option.remark?.english || '',
+      khmer: option.remark?.khmer || '',
+      chinese: option.remark?.chinese || ''
     });
     setRemarkModalOpen(true);
   };
@@ -367,7 +292,7 @@ const QCWashingCheckpointsTab = () => {
   const closeRemarkModal = () => {
     setRemarkModalOpen(false);
     setCurrentRemarkOption(null);
-    setRemarkData({ english: "", khmer: "", chinese: "" });
+    setRemarkData({ english: '', khmer: '', chinese: '' });
   };
 
   const saveRemark = () => {
@@ -380,18 +305,17 @@ const QCWashingCheckpointsTab = () => {
       return;
     }
 
-    const { checkpointId, subPointId, optionId, isEditing } =
-      currentRemarkOption;
-
+    const { checkpointId, subPointId, optionId, isEditing } = currentRemarkOption;
+    
     if (isEditing) {
       // Update in edit state
       if (!subPointId) {
-        setEditedCheckpoint((prev) => ({
+        setEditedCheckpoint(prev => ({
           ...prev,
-          options: prev.options.map((opt) =>
-            opt.id === optionId
-              ? {
-                  ...opt,
+          options: prev.options.map(opt => 
+            opt.id === optionId 
+              ? { 
+                  ...opt, 
                   hasRemark: true,
                   remark: {
                     english: remarkData.english.trim(),
@@ -403,16 +327,16 @@ const QCWashingCheckpointsTab = () => {
           )
         }));
       } else {
-        setEditedCheckpoint((prev) => ({
+        setEditedCheckpoint(prev => ({
           ...prev,
-          subPoints: prev.subPoints.map((sub) =>
-            sub.id === subPointId
+          subPoints: prev.subPoints.map(sub => 
+            sub.id === subPointId 
               ? {
                   ...sub,
-                  options: sub.options.map((opt) =>
-                    opt.id === optionId
-                      ? {
-                          ...opt,
+                  options: sub.options.map(opt => 
+                    opt.id === optionId 
+                      ? { 
+                          ...opt, 
                           hasRemark: true,
                           remark: {
                             english: remarkData.english.trim(),
@@ -432,32 +356,27 @@ const QCWashingCheckpointsTab = () => {
     closeRemarkModal();
   };
 
-  const removeRemark = (
-    checkpointId,
-    subPointId,
-    optionId,
-    isEditing = false
-  ) => {
+  const removeRemark = (checkpointId, subPointId, optionId, isEditing = false) => {
     if (isEditing) {
       // Remove from edit state
       if (!subPointId) {
-        setEditedCheckpoint((prev) => ({
+        setEditedCheckpoint(prev => ({
           ...prev,
-          options: prev.options.map((opt) =>
-            opt.id === optionId
+          options: prev.options.map(opt => 
+            opt.id === optionId 
               ? { ...opt, hasRemark: false, remark: null }
               : opt
           )
         }));
       } else {
-        setEditedCheckpoint((prev) => ({
+        setEditedCheckpoint(prev => ({
           ...prev,
-          subPoints: prev.subPoints.map((sub) =>
-            sub.id === subPointId
+          subPoints: prev.subPoints.map(sub => 
+            sub.id === subPointId 
               ? {
                   ...sub,
-                  options: sub.options.map((opt) =>
-                    opt.id === optionId
+                  options: sub.options.map(opt => 
+                    opt.id === optionId 
                       ? { ...opt, hasRemark: false, remark: null }
                       : opt
                   )
@@ -489,9 +408,7 @@ const QCWashingCheckpointsTab = () => {
     }
 
     // Validate all options have names
-    const invalidMainOptions = editedCheckpoint.options.some(
-      (opt) => !opt.name || !opt.name.trim()
-    );
+    const invalidMainOptions = editedCheckpoint.options.some(opt => !opt.name || !opt.name.trim());
     if (invalidMainOptions) {
       Swal.fire({
         icon: "warning",
@@ -503,10 +420,7 @@ const QCWashingCheckpointsTab = () => {
 
     // Validate remarks
     for (const option of editedCheckpoint.options) {
-      if (
-        option.hasRemark &&
-        (!option.remark?.english || !option.remark.english.trim())
-      ) {
+      if (option.hasRemark && (!option.remark?.english || !option.remark.english.trim())) {
         Swal.fire({
           icon: "warning",
           title: "Invalid Remark",
@@ -527,9 +441,7 @@ const QCWashingCheckpointsTab = () => {
         return;
       }
 
-      const invalidSubOptions = subPoint.options.some(
-        (opt) => !opt.name || !opt.name.trim()
-      );
+      const invalidSubOptions = subPoint.options.some(opt => !opt.name || !opt.name.trim());
       if (invalidSubOptions) {
         Swal.fire({
           icon: "warning",
@@ -541,10 +453,7 @@ const QCWashingCheckpointsTab = () => {
 
       // Validate sub point remarks
       for (const option of subPoint.options) {
-        if (
-          option.hasRemark &&
-          (!option.remark?.english || !option.remark.english.trim())
-        ) {
+        if (option.hasRemark && (!option.remark?.english || !option.remark.english.trim())) {
           Swal.fire({
             icon: "warning",
             title: "Invalid Remark",
@@ -565,17 +474,14 @@ const QCWashingCheckpointsTab = () => {
         }
       };
 
-      await axios.put(
-        `${API_BASE_URL}/api/qc-washing-checklist/${id}`,
-        updateData
-      );
-
+      await axios.put(`${API_BASE_URL}/api/qc-washing-checklist/${id}`, updateData);
+      
       Swal.fire({
         icon: "success",
         title: t("common.success"),
         text: "Checkpoint updated successfully"
       });
-
+      
       setEditRowId(null);
       setEditedCheckpoint({});
       fetchCheckpoints();
@@ -630,27 +536,19 @@ const QCWashingCheckpointsTab = () => {
 
   const getFailureImpactText = (impact) => {
     switch (impact) {
-      case "any":
-        return "Any Sub Fail = Main Fail";
-      case "all":
-        return "All Sub Fail = Main Fail";
-      case "majority":
-        return "Majority Fail = Main Fail";
-      default:
-        return impact;
+      case 'any': return 'Any Sub Fail = Main Fail';
+      case 'all': return 'All Sub Fail = Main Fail';
+      case 'majority': return 'Majority Fail = Main Fail';
+      default: return impact;
     }
   };
 
   const getFailureImpactColor = (impact) => {
     switch (impact) {
-      case "any":
-        return "text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400";
-      case "all":
-        return "text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-400";
-      case "majority":
-        return "text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400";
-      default:
-        return "text-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-gray-400";
+      case 'any': return 'text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400';
+      case 'all': return 'text-orange-600 bg-orange-50 dark:bg-orange-900/20 dark:text-orange-400';
+      case 'majority': return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20 dark:text-yellow-400';
+      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-700 dark:text-gray-400';
     }
   };
 
@@ -661,35 +559,21 @@ const QCWashingCheckpointsTab = () => {
       <div className="mt-1 p-2 bg-blue-50 dark:bg-blue-900/20 rounded text-xs">
         <div className="space-y-1">
           <div>
-            <span className="font-medium text-blue-700 dark:text-blue-300">
-              EN:
-            </span>
-            <span className="ml-1 text-blue-600 dark:text-blue-400">
-              {remark.english}
-            </span>
+            <span className="font-medium text-blue-700 dark:text-blue-300">EN:</span>
+            <span className="ml-1 text-blue-600 dark:text-blue-400">{remark.english}</span>
           </div>
           {remark.khmer && (
             <div>
-              <span className="font-medium text-blue-700 dark:text-blue-300">
-                KH:
-              </span>
-              <span
-                className="ml-1 text-blue-600 dark:text-blue-400"
-                style={{ fontFamily: "Khmer OS, Arial, sans-serif" }}
-              >
+              <span className="font-medium text-blue-700 dark:text-blue-300">KH:</span>
+              <span className="ml-1 text-blue-600 dark:text-blue-400" style={{ fontFamily: 'Khmer OS, Arial, sans-serif' }}>
                 {remark.khmer}
               </span>
             </div>
           )}
           {remark.chinese && (
             <div>
-              <span className="font-medium text-blue-700 dark:text-blue-300">
-                CN:
-              </span>
-              <span
-                className="ml-1 text-blue-600 dark:text-blue-400"
-                style={{ fontFamily: "SimSun, Arial, sans-serif" }}
-              >
+              <span className="font-medium text-blue-700 dark:text-blue-300">CN:</span>
+              <span className="ml-1 text-blue-600 dark:text-blue-400" style={{ fontFamily: 'SimSun, Arial, sans-serif' }}>
                 {remark.chinese}
               </span>
             </div>
@@ -697,7 +581,7 @@ const QCWashingCheckpointsTab = () => {
         </div>
       </div>
     );
-  };
+    };
 
   const renderOptionsDisplay = (
     options,
@@ -706,30 +590,18 @@ const QCWashingCheckpointsTab = () => {
     subPointId = null,
     checkpointId = null
   ) => {
+
     if (isEditing) {
       return (
         <div className="space-y-2 max-w-md">
           {options.map((option, index) => (
-            <div
-              key={option.id}
-              className="p-2 border rounded bg-gray-50 dark:bg-gray-700"
-            >
+            <div key={option.id} className="p-2 border rounded bg-gray-50 dark:bg-gray-700">
               <div className="flex items-center space-x-2 mb-2">
-                <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[20px]">
-                  {index + 1}.
-                </span>
+                <span className="text-xs text-gray-500 dark:text-gray-400 min-w-[20px]">{index + 1}.</span>
                 <input
                   type="text"
                   value={option.name}
-                  onChange={(e) =>
-                    updateOption(
-                      option.id,
-                      "name",
-                      e.target.value,
-                      isSubPoint,
-                      subPointId
-                    )
-                  }
+                  onChange={(e) => updateOption(option.id, 'name', e.target.value, isSubPoint, subPointId)}
                   className="flex-1 px-2 py-1 text-sm border rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                   placeholder="Option name"
                 />
@@ -738,67 +610,35 @@ const QCWashingCheckpointsTab = () => {
                     <input
                       type="checkbox"
                       checked={option.isDefault}
-                      onChange={(e) =>
-                        updateOption(
-                          option.id,
-                          "isDefault",
-                          e.target.checked,
-                          isSubPoint,
-                          subPointId
-                        )
-                      }
+                      onChange={(e) => updateOption(option.id, 'isDefault', e.target.checked, isSubPoint, subPointId)}
                       className="w-3 h-3 text-green-600"
                     />
-                    <span className="text-green-600 dark:text-green-400">
-                      Def
-                    </span>
+                    <span className="text-green-600 dark:text-green-400">Def</span>
                   </label>
                   <label className="flex items-center space-x-1 text-xs">
                     <input
                       type="checkbox"
                       checked={option.isFail}
-                      onChange={(e) =>
-                        updateOption(
-                          option.id,
-                          "isFail",
-                          e.target.checked,
-                          isSubPoint,
-                          subPointId
-                        )
-                      }
+                      onChange={(e) => updateOption(option.id, 'isFail', e.target.checked, isSubPoint, subPointId)}
                       className="w-3 h-3 text-red-600"
                     />
                     <span className="text-red-600 dark:text-red-400">Fail</span>
                   </label>
                 </div>
-
+                
                 {/* Remark Section */}
                 <div className="flex items-center space-x-1">
                   {option.hasRemark ? (
                     <div className="flex items-center space-x-1">
                       <button
-                        onClick={() =>
-                          openRemarkModal(
-                            checkpointId,
-                            subPointId,
-                            option.id,
-                            true
-                          )
-                        }
+                        onClick={() => openRemarkModal(checkpointId, subPointId, option.id, true)}
                         className="p-1 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
                         title="Edit Remark"
                       >
                         <MessageSquare className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() =>
-                          removeRemark(
-                            checkpointId,
-                            subPointId,
-                            option.id,
-                            true
-                          )
-                        }
+                        onClick={() => removeRemark(checkpointId, subPointId, option.id, true)}
                         className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
                         title="Remove Remark"
                       >
@@ -810,14 +650,7 @@ const QCWashingCheckpointsTab = () => {
                     </div>
                   ) : (
                     <button
-                      onClick={() =>
-                        openRemarkModal(
-                          checkpointId,
-                          subPointId,
-                          option.id,
-                          true
-                        )
-                      }
+                      onClick={() => openRemarkModal(checkpointId, subPointId, option.id, true)}
                       className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
                       title="Add Remark"
                     >
@@ -828,20 +661,16 @@ const QCWashingCheckpointsTab = () => {
 
                 {options.length > 1 && (
                   <button
-                    onClick={() =>
-                      deleteOption(option.id, isSubPoint, subPointId)
-                    }
+                    onClick={() => deleteOption(option.id, isSubPoint, subPointId)}
                     className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
                 )}
               </div>
-
+              
               {/* Display remark if exists */}
-              {option.hasRemark &&
-                option.remark &&
-                renderRemarkDisplay(option.remark)}
+              {option.hasRemark && option.remark && renderRemarkDisplay(option.remark)}
             </div>
           ))}
           <button
@@ -860,9 +689,7 @@ const QCWashingCheckpointsTab = () => {
         {options.map((option, index) => (
           <div key={option.id} className="text-sm">
             <div className="flex items-center space-x-2">
-              <span className="text-gray-500 dark:text-gray-400 min-w-[20px]">
-                {index + 1}.
-              </span>
+              <span className="text-gray-500 dark:text-gray-400 min-w-[20px]">{index + 1}.</span>
               <span className="flex-1 truncate">{option.name}</span>
               <div className="flex items-center space-x-1">
                 {option.isDefault && (
@@ -877,14 +704,7 @@ const QCWashingCheckpointsTab = () => {
                 )}
                 {option.hasRemark && (
                   <button
-                    onClick={() =>
-                      openRemarkModal(
-                        checkpointId,
-                        subPointId,
-                        option.id,
-                        false
-                      )
-                    }
+                    onClick={() => openRemarkModal(checkpointId, subPointId, option.id, false)}
                     className="px-1 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded text-xs hover:bg-blue-200 dark:hover:bg-blue-800/30"
                     title="View Remark"
                   >
@@ -894,39 +714,26 @@ const QCWashingCheckpointsTab = () => {
               </div>
             </div>
             {/* Display remark if exists */}
-            {option.hasRemark &&
-              option.remark &&
-              renderRemarkDisplay(option.remark)}
+            {option.hasRemark && option.remark && renderRemarkDisplay(option.remark)}
           </div>
         ))}
       </div>
     );
   };
 
-  const renderSubPointsDisplay = (
-    subPoints,
-    isEditing = false,
-    checkpointId = null
-  ) => {
+  const renderSubPointsDisplay = (subPoints, isEditing = false, checkpointId = null) => {
     if (isEditing) {
       return (
         <div className="space-y-3 max-w-2xl">
           {subPoints.map((subPoint, index) => (
-            <div
-              key={subPoint.id}
-              className="border rounded p-3 bg-gray-50 dark:bg-gray-700"
-            >
+            <div key={subPoint.id} className="border rounded p-3 bg-gray-50 dark:bg-gray-700">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2 flex-1">
-                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[20px]">
-                    {index + 1}.
-                  </span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[20px]">{index + 1}.</span>
                   <input
                     type="text"
                     value={subPoint.name}
-                    onChange={(e) =>
-                      updateSubPoint(subPoint.id, "name", e.target.value)
-                    }
+                    onChange={(e) => updateSubPoint(subPoint.id, 'name', e.target.value)}
                     className="flex-1 px-2 py-1 border rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                     placeholder="Sub point name"
                   />
@@ -934,9 +741,7 @@ const QCWashingCheckpointsTab = () => {
                 <div className="flex items-center space-x-2">
                   <select
                     value={subPoint.optionType}
-                    onChange={(e) =>
-                      changeOptionType(e.target.value, true, subPoint.id)
-                    }
+                    onChange={(e) => changeOptionType(e.target.value, true, subPoint.id)}
                     className="text-xs px-2 py-1 border rounded dark:bg-gray-800 dark:border-gray-600 dark:text-white"
                   >
                     <option value="passfail">Pass/Fail</option>
@@ -951,13 +756,7 @@ const QCWashingCheckpointsTab = () => {
                 </div>
               </div>
               <div className="ml-6">
-                {renderOptionsDisplay(
-                  subPoint.options,
-                  true,
-                  true,
-                  subPoint.id,
-                  checkpointId
-                )}
+                {renderOptionsDisplay(subPoint.options, true, true, subPoint.id, checkpointId)}
               </div>
             </div>
           ))}
@@ -983,25 +782,16 @@ const QCWashingCheckpointsTab = () => {
     return (
       <div className="space-y-2 max-w-md">
         {subPoints.map((subPoint, index) => (
-          <div
-            key={subPoint.id}
-            className="border-l-4 border-blue-200 dark:border-blue-600 pl-3"
-          >
+          <div key={subPoint.id} className="border-l-4 border-blue-200 dark:border-blue-600 pl-3">
             <div className="flex items-center justify-between mb-1">
               <h5 className="font-medium text-gray-800 dark:text-gray-200 text-sm">
                 {index + 1}. {subPoint.name}
               </h5>
               <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 rounded">
-                {subPoint.optionType === "passfail" ? "P/F" : "Custom"}
+                {subPoint.optionType === 'passfail' ? 'P/F' : 'Custom'}
               </span>
             </div>
-            {renderOptionsDisplay(
-              subPoint.options,
-              false,
-              true,
-              subPoint.id,
-              checkpointId
-            )}
+                        {renderOptionsDisplay(subPoint.options, false, true, subPoint.id, checkpointId)}
           </div>
         ))}
       </div>
@@ -1011,7 +801,7 @@ const QCWashingCheckpointsTab = () => {
   return (
     <div className="space-y-8">
       <QCWashingCheckpointForm onCheckpointAdded={fetchCheckpoints} />
-
+      
       <div className="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-900/20">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -1019,8 +809,7 @@ const QCWashingCheckpointsTab = () => {
               QC Washing Checkpoints ({checkpoints.length})
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              Manage your quality control washing checkpoints with detailed
-              configurations and remarks
+              Manage your quality control washing checkpoints with detailed configurations and remarks
             </p>
           </div>
         </div>
@@ -1032,8 +821,7 @@ const QCWashingCheckpointsTab = () => {
               No checkpoints configured
             </h3>
             <p className="text-gray-500 dark:text-gray-400">
-              Add your first checkpoint to get started with QC washing
-              configuration.
+              Add your first checkpoint to get started with QC washing configuration.
             </p>
           </div>
         ) : (
@@ -1061,7 +849,7 @@ const QCWashingCheckpointsTab = () => {
                   </th>
                 </tr>
               </thead>
-
+              
               <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                 {isLoading ? (
                   <tr>
@@ -1071,10 +859,7 @@ const QCWashingCheckpointsTab = () => {
                   </tr>
                 ) : (
                   checkpoints.map((checkpoint) => (
-                    <tr
-                      key={checkpoint._id}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                    >
+                    <tr key={checkpoint._id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                       {/* Checkpoint Details */}
                       <td className="px-4 py-4 align-top">
                         {editRowId === checkpoint._id ? (
@@ -1082,9 +867,7 @@ const QCWashingCheckpointsTab = () => {
                             <input
                               type="text"
                               value={editedCheckpoint.name}
-                              onChange={(e) =>
-                                updateEditData("name", e.target.value)
-                              }
+                              onChange={(e) => updateEditData('name', e.target.value)}
                               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                               placeholder="Checkpoint name"
                             />
@@ -1103,10 +886,7 @@ const QCWashingCheckpointsTab = () => {
                               {checkpoint.name}
                             </h4>
                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                              Type:{" "}
-                              {checkpoint.optionType === "passfail"
-                                ? "Pass/Fail"
-                                : "Custom"}
+                              Type: {checkpoint.optionType === 'passfail' ? 'Pass/Fail' : 'Custom'}
                             </p>
                           </div>
                         )}
@@ -1114,21 +894,11 @@ const QCWashingCheckpointsTab = () => {
 
                       {/* Main Options */}
                       <td className="px-4 py-4 align-top">
-                        {editRowId === checkpoint._id
-                          ? renderOptionsDisplay(
-                              editedCheckpoint.options,
-                              true,
-                              false,
-                              null,
-                              checkpoint._id
-                            )
-                          : renderOptionsDisplay(
-                              checkpoint.options,
-                              false,
-                              false,
-                              null,
-                              checkpoint._id
-                            )}
+                        {editRowId === checkpoint._id ? (
+                          renderOptionsDisplay(editedCheckpoint.options, true, false, null, checkpoint._id)
+                        ) : (
+                          renderOptionsDisplay(checkpoint.options, false, false, null, checkpoint._id)
+                        )}
                       </td>
 
                       {/* Sub Points */}
@@ -1136,45 +906,29 @@ const QCWashingCheckpointsTab = () => {
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                              Sub Points (
-                              {editRowId === checkpoint._id
-                                ? editedCheckpoint.subPoints.length
-                                : checkpoint.subPoints.length}
-                              )
+                              Sub Points ({editRowId === checkpoint._id ? editedCheckpoint.subPoints.length : checkpoint.subPoints.length})
                             </span>
-                            {(editRowId === checkpoint._id
-                              ? editedCheckpoint.subPoints.length
-                              : checkpoint.subPoints.length) > 0 &&
-                              editRowId !== checkpoint._id && (
-                                <button
-                                  onClick={() =>
-                                    toggleSubPointsVisibility(checkpoint._id)
-                                  }
-                                  className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                                >
-                                  {showSubPoints.has(checkpoint._id) ? (
-                                    <EyeOff className="h-4 w-4" />
-                                  ) : (
-                                    <Eye className="h-4 w-4" />
-                                  )}
-                                </button>
-                              )}
+                            {(editRowId === checkpoint._id ? editedCheckpoint.subPoints.length : checkpoint.subPoints.length) > 0 && editRowId !== checkpoint._id && (
+                              <button
+                                onClick={() => toggleSubPointsVisibility(checkpoint._id)}
+                                className="text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+                              >
+                                {showSubPoints.has(checkpoint._id) ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
+                              </button>
+                            )}
                           </div>
-
-                          {(showSubPoints.has(checkpoint._id) ||
-                            editRowId === checkpoint._id) && (
+                          
+                          {(showSubPoints.has(checkpoint._id) || editRowId === checkpoint._id) && (
                             <div>
-                              {editRowId === checkpoint._id
-                                ? renderSubPointsDisplay(
-                                    editedCheckpoint.subPoints,
-                                    true,
-                                    checkpoint._id
-                                  )
-                                : renderSubPointsDisplay(
-                                    checkpoint.subPoints,
-                                    false,
-                                    checkpoint._id
-                                  )}
+                              {editRowId === checkpoint._id ? (
+                                renderSubPointsDisplay(editedCheckpoint.subPoints, true, checkpoint._id)
+                              ) : (
+                                renderSubPointsDisplay(checkpoint.subPoints, false, checkpoint._id)
+                              )}
                             </div>
                           )}
                         </div>
@@ -1185,27 +939,15 @@ const QCWashingCheckpointsTab = () => {
                         {editRowId === checkpoint._id ? (
                           <select
                             value={editedCheckpoint.failureImpact}
-                            onChange={(e) =>
-                              updateEditData("failureImpact", e.target.value)
-                            }
+                            onChange={(e) => updateEditData('failureImpact', e.target.value)}
                             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                           >
-                            <option value="any">
-                              Any Sub Fail = Main Fail
-                            </option>
-                            <option value="all">
-                              All Sub Fail = Main Fail
-                            </option>
-                            <option value="majority">
-                              Majority Fail = Main Fail
-                            </option>
+                            <option value="any">Any Sub Fail = Main Fail</option>
+                            <option value="all">All Sub Fail = Main Fail</option>
+                            <option value="majority">Majority Fail = Main Fail</option>
                           </select>
                         ) : (
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-medium ${getFailureImpactColor(
-                              checkpoint.failureImpact
-                            )}`}
-                          >
+                          <span className={`px-3 py-1 rounded-full text-xs font-medium ${getFailureImpactColor(checkpoint.failureImpact)}`}>
                             {getFailureImpactText(checkpoint.failureImpact)}
                           </span>
                         )}
@@ -1215,34 +957,20 @@ const QCWashingCheckpointsTab = () => {
                       <td className="px-4 py-4 align-top">
                         <div className="text-sm space-y-1">
                           <div>
-                            <span className="text-gray-500 dark:text-gray-400">
-                              Added by:
-                            </span>
+                            <span className="text-gray-500 dark:text-gray-400">Added by:</span>
                             <br />
-                            <span className="text-gray-900 dark:text-gray-100">
-                              {checkpoint.addedBy?.eng_name || "-"}
-                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">{checkpoint.addedBy?.eng_name || "-"}</span>
                           </div>
                           <div>
-                            <span className="text-gray-500 dark:text-gray-400">
-                              Date:
-                            </span>
+                            <span className="text-gray-500 dark:text-gray-400">Date:</span>
                             <br />
-                            <span className="text-gray-900 dark:text-gray-100">
-                              {checkpoint.createdAt
-                                ? formatDate(checkpoint.createdAt)
-                                : "-"}
-                            </span>
+                            <span className="text-gray-900 dark:text-gray-100">{checkpoint.createdAt ? formatDate(checkpoint.createdAt) : "-"}</span>
                           </div>
                           {checkpoint.updatedBy && (
                             <div>
-                              <span className="text-gray-500 dark:text-gray-400">
-                                Updated by:
-                              </span>
+                              <span className="text-gray-500 dark:text-gray-400">Updated by:</span>
                               <br />
-                              <span className="text-gray-900 dark:text-gray-100">
-                                {checkpoint.updatedBy.eng_name}
-                              </span>
+                              <span className="text-gray-900 dark:text-gray-100">{checkpoint.updatedBy.eng_name}</span>
                             </div>
                           )}
                         </div>
@@ -1282,9 +1010,7 @@ const QCWashingCheckpointsTab = () => {
                               <span>Edit</span>
                             </button>
                             <button
-                              onClick={() =>
-                                handleDelete(checkpoint._id, checkpoint.name)
-                              }
+                              onClick={() => handleDelete(checkpoint._id, checkpoint.name)}
                               disabled={isSaving === checkpoint._id}
                               className="flex items-center space-x-1 px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 disabled:opacity-50 transition-colors duration-200"
                             >
@@ -1313,7 +1039,7 @@ const QCWashingCheckpointsTab = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                {currentRemarkOption?.isEditing ? "Edit Remark" : "View Remark"}
+                {currentRemarkOption?.isEditing ? 'Edit Remark' : 'View Remark'}
               </h3>
               <button
                 onClick={closeRemarkModal}
@@ -1327,27 +1053,19 @@ const QCWashingCheckpointsTab = () => {
               {/* English Remark - Required */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  English Remark{" "}
-                  {currentRemarkOption?.isEditing && (
-                    <span className="text-red-500">*</span>
-                  )}
+                  English Remark {currentRemarkOption?.isEditing && <span className="text-red-500">*</span>}
                 </label>
                 {currentRemarkOption?.isEditing ? (
                   <textarea
                     value={remarkData.english}
-                    onChange={(e) =>
-                      setRemarkData((prev) => ({
-                        ...prev,
-                        english: e.target.value
-                      }))
-                    }
+                    onChange={(e) => setRemarkData(prev => ({ ...prev, english: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows="3"
                     placeholder="Enter English remark (required)"
                   />
                 ) : (
                   <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md min-h-[80px]">
-                    {remarkData.english || "No English remark"}
+                    {remarkData.english || 'No English remark'}
                   </div>
                 )}
               </div>
@@ -1360,23 +1078,18 @@ const QCWashingCheckpointsTab = () => {
                 {currentRemarkOption?.isEditing ? (
                   <textarea
                     value={remarkData.khmer}
-                    onChange={(e) =>
-                      setRemarkData((prev) => ({
-                        ...prev,
-                        khmer: e.target.value
-                      }))
-                    }
+                    onChange={(e) => setRemarkData(prev => ({ ...prev, khmer: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows="3"
                     placeholder="Enter Khmer remark (optional)"
-                    style={{ fontFamily: "Khmer OS, Arial, sans-serif" }}
+                    style={{ fontFamily: 'Khmer OS, Arial, sans-serif' }}
                   />
                 ) : (
-                  <div
+                  <div 
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md min-h-[80px]"
-                    style={{ fontFamily: "Khmer OS, Arial, sans-serif" }}
+                    style={{ fontFamily: 'Khmer OS, Arial, sans-serif' }}
                   >
-                    {remarkData.khmer || "No Khmer remark"}
+                    {remarkData.khmer || 'No Khmer remark'}
                   </div>
                 )}
               </div>
@@ -1384,29 +1097,23 @@ const QCWashingCheckpointsTab = () => {
               {/* Chinese Remark - Optional */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Chinese Remark{" "}
-                  <span className="text-gray-400">(Optional)</span>
+                  Chinese Remark <span className="text-gray-400">(Optional)</span>
                 </label>
                 {currentRemarkOption?.isEditing ? (
                   <textarea
                     value={remarkData.chinese}
-                    onChange={(e) =>
-                      setRemarkData((prev) => ({
-                        ...prev,
-                        chinese: e.target.value
-                      }))
-                    }
+                    onChange={(e) => setRemarkData(prev => ({ ...prev, chinese: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     rows="3"
                     placeholder="Enter Chinese remark (optional)"
-                    style={{ fontFamily: "SimSun, Arial, sans-serif" }}
+                    style={{ fontFamily: 'SimSun, Arial, sans-serif' }}
                   />
                 ) : (
-                  <div
+                  <div 
                     className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md min-h-[80px]"
-                    style={{ fontFamily: "SimSun, Arial, sans-serif" }}
+                    style={{ fontFamily: 'SimSun, Arial, sans-serif' }}
                   >
-                    {remarkData.chinese || "No Chinese remark"}
+                    {remarkData.chinese || 'No Chinese remark'}
                   </div>
                 )}
               </div>
@@ -1417,7 +1124,7 @@ const QCWashingCheckpointsTab = () => {
                 onClick={closeRemarkModal}
                 className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
               >
-                {currentRemarkOption?.isEditing ? "Cancel" : "Close"}
+                {currentRemarkOption?.isEditing ? 'Cancel' : 'Close'}
               </button>
               {currentRemarkOption?.isEditing && (
                 <button

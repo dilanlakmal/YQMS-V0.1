@@ -26,9 +26,7 @@ const QCWashingDefectsTab = () => {
   const fetchDefects = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qc-washing-defects`
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/qc-washing-defects`);
       setDefects(response.data);
     } catch (error) {
       Swal.fire({
@@ -63,10 +61,7 @@ const QCWashingDefectsTab = () => {
   const handleSave = async (id) => {
     setIsSaving(id);
     try {
-      await axios.put(
-        `${API_BASE_URL}/api/qc-washing-defects/${id}`,
-        editedDefect
-      );
+      await axios.put(`${API_BASE_URL}/api/qc-washing-defects/${id}`, editedDefect);
       Swal.fire({
         icon: "success",
         title: t("common.success"),
@@ -209,13 +204,13 @@ const QCWashingDefectsTab = () => {
         <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
           QC Washing Defects List
         </h2>
-
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
               <tr>
                 {[
-                  "code",
+                  "code", 
                   "english",
                   "khmer",
                   "chinese",
@@ -226,12 +221,12 @@ const QCWashingDefectsTab = () => {
                     key={h}
                     className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
                   >
-                    {h.replace(/([A-Z])/g, " $1").trim()}
+                    {h.replace(/([A-Z])/g, ' $1').trim()}
                   </th>
                 ))}
               </tr>
             </thead>
-
+            
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
                 <tr>
@@ -241,21 +236,16 @@ const QCWashingDefectsTab = () => {
                 </tr>
               ) : (
                 defects.map((defect) => (
-                  <tr
-                    key={defect._id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200"
-                  >
+                  <tr key={defect._id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                     {editRowId === defect._id ? (
                       <>
                         {renderEditCell("code", editedDefect.code)}
                         {renderEditCell("english", editedDefect.english)}
                         {renderEditCell("khmer", editedDefect.khmer)}
                         {renderEditCell("chinese", editedDefect.chinese)}
-
-                        <td className="px-4 py-2 text-center text-gray-500 dark:text-gray-400">
-                          ...
-                        </td>
-
+                        
+                        <td className="px-4 py-2 text-center text-gray-500 dark:text-gray-400">...</td>
+                        
                         <td className="px-4 py-2 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleSave(defect._id)}
@@ -278,7 +268,7 @@ const QCWashingDefectsTab = () => {
                         {renderCell(defect.english)}
                         {renderCell(defect.khmer)}
                         {renderCell(defect.chinese)}
-
+                        
                         <td className="px-4 py-2">
                           {defect.image ? (
                             <div className="flex items-center gap-2">
@@ -316,7 +306,7 @@ const QCWashingDefectsTab = () => {
                             className="hidden"
                           />
                         </td>
-
+                        
                         <td className="px-4 py-2 whitespace-nowrap text-center">
                           <button
                             onClick={() => handleEdit(defect)}
