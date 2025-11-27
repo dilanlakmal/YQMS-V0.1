@@ -6,6 +6,8 @@ import createIroningModel from "../../models/Ironing/Ironing.js";
 import createRoleManagmentModel from "../../models/Role/RoleManagment.js";
 import createOPAModel from "../../models/OPA/OPA.js";
 import createPackingModel from "../../models/Packing/Packing.js";
+import createDTOrdersSchema from "../../models/dt_orders.js";
+
 import createQC2DefectPrintModel from "../../models/QC2DefectPrint.js";
 import createUserModel from "../../models/User/User.js";
 import createWashingModel from "../../models/Washing/Washing.js";
@@ -74,7 +76,6 @@ import createSubconSewingQc1ReportModel from "../../models/subcon_sewing_qc1_rep
 import createQCWashingMachineStandard from "../../models/QCWashing/qcWashingStanderd.js";
 import createQC2OlderDefectModel from "../../models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "../../models/QCWashing/QCWashingQtyOld.js";
-import createDTOrdersSchema from "../../models/DT_Orders/dt_orders.js";
 import CuttingInlineOrdersModel from "../../models/Cutting/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 import createYorksysOrdersModel from "../../models/YorkSys/YorksysOrders.js";
@@ -89,6 +90,11 @@ import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
 import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
+import createQASectionsAqlBuyerConfigModel from "../../models/QA/QASectionsAqlBuyerConfig.js";
+
+import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMeasurementSpecs.js";
+
+import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
@@ -115,6 +121,8 @@ ymEcoConnection.on("connected", () =>
 ymEcoConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
 //Collections
+export const DtOrder = createDTOrdersSchema(ymProdConnection);
+
 export const QCRealWashQty = creatQCRealWashQty(ymProdConnection);
 export const UserMain = createUserModel(ymEcoConnection);
 export const UserProd = createUserModel(ymProdConnection);
@@ -197,8 +205,6 @@ export const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
 
-export const DtOrder = createDTOrdersSchema(ymProdConnection);
-
 export const SubConDefect = createSubConDefectsModel(ymProdConnection);
 export const SubconSewingFactory = createSubconSewingFactoryModel(ymProdConnection);
 export const SubconSewingQc1Report = createSubconSewingQc1ReportModel(ymProdConnection);
@@ -219,6 +225,14 @@ export const QASectionsAqlSampleLetters =
   createQASectionsAqlSampleLettersModel(ymProdConnection);
 export const QASectionsAqlValues =
   createQASectionsAqlValuesModel(ymProdConnection);
+export const QASectionsAqlBuyerConfig =
+  createQASectionsAqlBuyerConfigModel(ymProdConnection);
+
+export const QASectionsMeasurementSpecs =
+  createQASectionsMeasurementSpecsModel(ymProdConnection);
+
+export const QASectionsTemplates =
+  createQASectionsTemplatesModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 

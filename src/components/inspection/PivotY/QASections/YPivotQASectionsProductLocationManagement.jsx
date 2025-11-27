@@ -125,7 +125,10 @@ const YPivotQASectionsProductLocationManagement = () => {
     const isMarking = view === "front" ? isMarkingFront : isMarkingBack;
     if (!isMarking) return;
 
+    // Use currentTarget (the image itself) for accurate coordinates
     const rect = e.currentTarget.getBoundingClientRect();
+
+    // Calculate percentage based on the IMAGE dimensions, not the container
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
 
@@ -230,6 +233,7 @@ const YPivotQASectionsProductLocationManagement = () => {
     const imageRef = view === "front" ? frontImageRef : backImageRef;
     if (!imageRef.current) return;
 
+    // Calculate relative to the image element reference
     const rect = imageRef.current.getBoundingClientRect();
     let x = ((e.clientX - rect.left) / rect.width) * 100;
     let y = ((e.clientY - rect.top) / rect.height) * 100;
@@ -550,19 +554,23 @@ const YPivotQASectionsProductLocationManagement = () => {
                 Front View ({config.frontView.locations.length})
               </span>
             </div>
-            <div className="relative h-80 border-2 border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
-              <img
-                src={`${API_BASE_URL}/api/qa-sections-product-location/image/${config.frontView.imagePath
-                  .split("/")
-                  .pop()}`}
-                alt="Front View"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.src =
-                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
-                }}
-              />
-              {renderLocationMarkers(config.frontView.locations, "red")}
+
+            {/* FIXED: Using Flex center + relative inline-block wrapper to ensure perfect positioning */}
+            <div className="h-80 border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
+              <div className="relative inline-block">
+                <img
+                  src={`${API_BASE_URL}/api/qa-sections-product-location/image/${config.frontView.imagePath
+                    .split("/")
+                    .pop()}`}
+                  alt="Front View"
+                  className="max-h-80 w-auto max-w-full object-contain block"
+                  onError={(e) => {
+                    e.target.src =
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                {renderLocationMarkers(config.frontView.locations, "red")}
+              </div>
             </div>
           </div>
 
@@ -574,19 +582,23 @@ const YPivotQASectionsProductLocationManagement = () => {
                 Back View ({config.backView.locations.length})
               </span>
             </div>
-            <div className="relative h-80 border-2 border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900">
-              <img
-                src={`${API_BASE_URL}/api/qa-sections-product-location/image/${config.backView.imagePath
-                  .split("/")
-                  .pop()}`}
-                alt="Back View"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.src =
-                    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
-                }}
-              />
-              {renderLocationMarkers(config.backView.locations, "blue")}
+
+            {/* FIXED: Using Flex center + relative inline-block wrapper */}
+            <div className="h-80 border-2 border-gray-200 dark:border-gray-600 rounded-lg bg-gray-100 dark:bg-gray-900 flex items-center justify-center overflow-hidden">
+              <div className="relative inline-block">
+                <img
+                  src={`${API_BASE_URL}/api/qa-sections-product-location/image/${config.backView.imagePath
+                    .split("/")
+                    .pop()}`}
+                  alt="Back View"
+                  className="max-h-80 w-auto max-w-full object-contain block"
+                  onError={(e) => {
+                    e.target.src =
+                      "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='300'%3E%3Crect fill='%23ddd' width='400' height='300'/%3E%3Ctext fill='%23999' x='50%25' y='50%25' text-anchor='middle' dy='.3em'%3EImage not found%3C/text%3E%3C/svg%3E";
+                  }}
+                />
+                {renderLocationMarkers(config.backView.locations, "blue")}
+              </div>
             </div>
           </div>
         </div>
@@ -824,24 +836,32 @@ const YPivotQASectionsProductLocationManagement = () => {
                     </label>
                   ) : (
                     <div className="space-y-3">
+                      {/* FIXED: Edit Window - Front View */}
+                      {/* Use Flex Center + Relative Inline-Block wrapper */}
                       <div
-                        className="relative border-2 h-96 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900"
+                        className="h-96 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center"
                         onMouseMove={(e) => handleDragMove(e, "front")}
                         onMouseUp={handleDragEnd}
                         onMouseLeave={handleDragEnd}
                       >
-                        <img
-                          ref={frontImageRef}
-                          src={frontImagePreview}
-                          alt="Front View"
-                          className={`w-full h-full object-contain ${
-                            isMarkingFront
-                              ? "cursor-crosshair"
-                              : "cursor-default"
-                          }`}
-                          onClick={(e) => handleImageClick(e, "front")}
-                        />
-                        {renderLocationMarkers(frontLocations, "red", "front")}
+                        <div className="relative inline-block">
+                          <img
+                            ref={frontImageRef}
+                            src={frontImagePreview}
+                            alt="Front View"
+                            className={`max-h-96 w-auto max-w-full object-contain block ${
+                              isMarkingFront
+                                ? "cursor-crosshair"
+                                : "cursor-default"
+                            }`}
+                            onClick={(e) => handleImageClick(e, "front")}
+                          />
+                          {renderLocationMarkers(
+                            frontLocations,
+                            "red",
+                            "front"
+                          )}
+                        </div>
                       </div>
 
                       <div className="flex gap-2">
@@ -988,24 +1008,28 @@ const YPivotQASectionsProductLocationManagement = () => {
                     </label>
                   ) : (
                     <div className="space-y-3">
+                      {/* FIXED: Edit Window - Back View */}
+                      {/* Use Flex Center + Relative Inline-Block wrapper */}
                       <div
-                        className="relative border-2 h-96 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900"
+                        className="h-96 border-2 border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-900 flex items-center justify-center"
                         onMouseMove={(e) => handleDragMove(e, "back")}
                         onMouseUp={handleDragEnd}
                         onMouseLeave={handleDragEnd}
                       >
-                        <img
-                          ref={backImageRef}
-                          src={backImagePreview}
-                          alt="Back View"
-                          className={`w-full h-full object-contain ${
-                            isMarkingBack
-                              ? "cursor-crosshair"
-                              : "cursor-default"
-                          }`}
-                          onClick={(e) => handleImageClick(e, "back")}
-                        />
-                        {renderLocationMarkers(backLocations, "blue", "back")}
+                        <div className="relative inline-block">
+                          <img
+                            ref={backImageRef}
+                            src={backImagePreview}
+                            alt="Back View"
+                            className={`max-h-96 w-auto max-w-full object-contain block ${
+                              isMarkingBack
+                                ? "cursor-crosshair"
+                                : "cursor-default"
+                            }`}
+                            onClick={(e) => handleImageClick(e, "back")}
+                          />
+                          {renderLocationMarkers(backLocations, "blue", "back")}
+                        </div>
                       </div>
 
                       <div className="flex gap-2">

@@ -219,6 +219,18 @@ import QASections_DefectCategory from "./routes/PivotY/QASections/QASections_Def
 import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_ProductLocation_Route.js";
 import QASections_AQL_Sample_Letters from "./routes/PivotY/QASections/QASections_AQL_Sample_Letter_Route.js";
 import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Values_Route.js";
+import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Config_Routes.js";
+
+/* ------------------------------
+  PivotY - QA Measurement Specs
+------------------------------ */
+
+import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_Measurement_Specs_Route.js";
+
+/* ------------------------------
+  PivotY - QA Templates
+------------------------------ */
+import QASections_Templates from "./routes/PivotY/QATemplates/QATemplatesReport_Route.js";
 
 /* -----------------------------
   After Ironing Import
@@ -473,6 +485,17 @@ app.use(QASections_DefectCategory);
 app.use(QASections_ProductLocation);
 app.use(QASections_AQL_Sample_Letters);
 app.use(QASections_AQL_Values);
+app.use(QASections_AQL_Config);
+
+/* ------------------------------
+  PivotY - QA Measurements routes
+------------------------------ */
+app.use(QASections_Measurement_Specs);
+
+/* ------------------------------
+  PivotY - QA Templates routes
+------------------------------ */
+app.use(QASections_Templates);
 
 /* -----------------------------
 AI Routes

@@ -1,132 +1,110 @@
+import React, { useMemo, useState } from "react";
 import {
-  Camera,
-  FileText,
-  Package,
-  TrendingUp,
-  User,
   Shield,
   Sparkles,
-  Circle,
-  Layers,
-  Users,
-  MapPin,
-  CheckSquare,
-  Image as ImageIcon,
-  BookOpen,
-  Sliders
+  User,
+  ShoppingCart, // Main: YorkSys Orders
+  Upload, // Main: Spec Upload
+  Printer, // Main: Print
+  UploadCloud, // Sub: Upload
+  View, // Sub: View
+  Layers, // Sub: Product Type
+  GitMerge, // Sub: Sync,
+  Ruler,
+  FileText
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
-import YPivotQASectionsHeader from "../components/inspection/PivotY/QASections/YPivotQASectionsHeader";
-import YPivotQASectionsPacking from "../components/inspection/PivotY/QASections/YPivotQASectionsPacking";
-import YPivotQASectionsPhotos from "../components/inspection/PivotY/QASections/YPivotQASectionsPhotos";
-import YPivotQASectionsProduct from "../components/inspection/PivotY/QASections/YPivotQASectionsProduct";
 
+// --- EXTERNAL COMPONENT IMPORTS ---
+import UploadYorksysOrders from "./UploadYorksysOrders";
+import UploadWashingSpecs from "./UploadWashingSpecs";
+import Measurement from "./Measurement";
+import QASectionsMeasurementSpecsSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementSpecsSelection";
+import QASectionsMeasurementAWSelection from "../components/inspection/PivotY/QAMeasurement/QASectionsMeasurementAWSelection";
+
+// --- PLACEHOLDER ---
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
-    <div className="p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md min-h-[400px] flex flex-col justify-center items-center">
-      <div className="mb-4 text-indigo-500 dark:text-indigo-400">
-        <Icon size={64} strokeWidth={1.5} />
+    <div className="p-8 bg-white dark:bg-gray-800 rounded-xl shadow-lg min-h-[400px] flex flex-col justify-center items-center text-center animate-fadeIn">
+      <div className="mb-6 p-6 bg-indigo-50 dark:bg-indigo-900/30 rounded-full">
+        <Icon
+          size={64}
+          strokeWidth={1.5}
+          className="text-indigo-500 dark:text-indigo-400"
+        />
       </div>
-      <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-2">
+      <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-100 mb-3">
         {title}
       </h2>
-      <p className="text-gray-600 dark:text-gray-400 text-center">
-        This section is under development.
+      <p className="text-gray-500 dark:text-gray-400 max-w-md">
+        This section is currently under development.
       </p>
     </div>
   );
 };
 
-const YPivotQASections = () => {
+// --- MAIN COMPONENT ---
+const YPivotQAMeasurements = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("header");
-  const [activeSubTab, setActiveSubTab] = useState("buyer");
 
+  // State for Main Tabs
+  const [activeTab, setActiveTab] = useState("yorksys-orders");
+
+  // State for Sub Tabs (Specific to YorkSys Orders)
+  const [activeYorksysSubTab, setActiveYorksysSubTab] = useState("upload");
+
+  // --- Configuration: Main Tabs ---
   const tabs = useMemo(
     () => [
       {
-        id: "header",
-        label: "Header",
+        id: "yorksys-orders",
+        label: "YorkSys Orders",
+        icon: <ShoppingCart size={20} />,
+        component: <UploadYorksysOrders activeSubTab={activeYorksysSubTab} />, // Pass subTab state!
+        description: "Manage Buyer Specs & Orders"
+      },
+      {
+        id: "spec-upload",
+        label: "BW/AW Spec Upload",
+        icon: <Upload size={20} />,
+        component: <UploadWashingSpecs />,
+        description: "Upload Washing Specifications"
+      },
+      {
+        id: "measurement-print",
+        label: "MES. Print",
+        icon: <Printer size={20} />,
+        component: <Measurement />,
+        description: "Print Measurement Reports"
+      },
+      {
+        id: "qa-spec-selection",
+        label: "BW Mes. Specs",
+        icon: <Ruler size={20} />,
+        component: <QASectionsMeasurementSpecsSelection />,
+        description: "Select and Config Measurement Specs"
+      },
+      {
+        id: "qa-aw-spec-selection",
+        label: "AW Mes. Specs",
         icon: <FileText size={20} />,
-        component: <YPivotQASectionsHeader />,
-        gradient: "from-blue-500 to-cyan-500",
-        description: "Manage header information"
-      },
-      {
-        id: "photos",
-        label: "Photos",
-        icon: <Camera size={20} />,
-        component: <YPivotQASectionsPhotos />,
-        gradient: "from-purple-500 to-pink-500",
-        description: "Photo management"
-      },
-      {
-        id: "packing",
-        label: "Packing",
-        icon: <Package size={20} />,
-        component: <YPivotQASectionsPacking />,
-        gradient: "from-orange-500 to-red-500",
-        description: "Packing details"
-      },
-      {
-        id: "production",
-        label: "Production",
-        icon: <TrendingUp size={20} />,
-        component: (
-          <YPivotQASectionsProduct
-            activeSubTab={activeSubTab}
-            setActiveSubTab={setActiveSubTab}
-          />
-        ),
-        gradient: "from-green-500 to-emerald-500",
-        description: "Production management"
+        component: <QASectionsMeasurementAWSelection />,
+        description: "Select Measurement Specs (After Wash)"
       }
     ],
-    [activeSubTab]
+    [activeYorksysSubTab] // Dependency added so component updates when subTab changes
   );
 
-  const subTabs = useMemo(
+  // --- Configuration: Sub Tabs (YorkSys Only) ---
+  const yorksysSubTabs = useMemo(
     () => [
+      { id: "upload", label: "Upload Order", icon: <UploadCloud size={20} /> },
+      { id: "view", label: "View Orders", icon: <View size={20} /> },
+      { id: "productType", label: "Product Type", icon: <Layers size={20} /> },
       {
-        id: "buyer",
-        label: "Buyer",
-        icon: <Users size={20} />
-      },
-      {
-        id: "category",
-        label: "Category",
-        icon: <Layers size={20} />
-      },
-      {
-        id: "product-type",
-        label: "Product Type",
-        icon: <ImageIcon size={20} />
-      },
-      {
-        id: "product-location",
-        label: "Location",
-        icon: <MapPin size={20} />
-      },
-      {
-        id: "defect",
-        label: "Defect",
-        icon: <FileText size={20} />
-      },
-      {
-        id: "buyer-status",
-        label: "Buyer Status",
-        icon: <CheckSquare size={20} />
-      },
-      {
-        id: "aql-term",
-        label: "AQL Term",
-        icon: <BookOpen size={20} />
-      },
-      {
-        id: "aql-config",
-        label: "AQL Config",
-        icon: <Sliders size={20} />
+        id: "cuttingSync",
+        label: "Sync from Cutting",
+        icon: <GitMerge size={20} />
       }
     ],
     []
@@ -141,28 +119,32 @@ const YPivotQASections = () => {
   }, [activeTab, tabs]);
 
   const activeSubTabData = useMemo(() => {
-    return subTabs.find((tab) => tab.id === activeSubTab);
-  }, [activeSubTab, subTabs]);
+    if (activeTab === "yorksys-orders") {
+      return yorksysSubTabs.find((t) => t.id === activeYorksysSubTab);
+    }
+    return null;
+  }, [activeTab, activeYorksysSubTab, yorksysSubTabs]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
-      {/* Animated Background Elements */}
+      {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
         <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      {/* Compact Header Section with Integrated Tabs */}
-      <div className="relative bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-2xl">
+      {/* Header Section */}
+      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
 
         <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
+          {/* ======================= */}
           {/* MOBILE/TABLET LAYOUT (< lg) */}
+          {/* ======================= */}
           <div className="lg:hidden space-y-3">
-            {/* Top Row: Title + User Info */}
+            {/* Top Row: Title + User */}
             <div className="flex items-center justify-between gap-3">
-              {/* Title Section - Compact */}
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
                   <Shield size={20} className="text-white" />
@@ -170,7 +152,7 @@ const YPivotQASections = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
-                      Fin Check | Settings
+                      Fin Check | Measurements
                     </h1>
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
                       <Sparkles size={10} className="text-yellow-300" />
@@ -180,12 +162,11 @@ const YPivotQASections = () => {
                     </div>
                   </div>
                   <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    Configure System Settings
+                    QA Measurement System
                   </p>
                 </div>
               </div>
 
-              {/* User Info - Compact */}
               {user && (
                 <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
                   <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
@@ -203,7 +184,7 @@ const YPivotQASections = () => {
               )}
             </div>
 
-            {/* Main Tabs - Smaller, Scrollable */}
+            {/* Main Tabs - Scrollable */}
             <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
                 {tabs.map((tab) => {
@@ -218,18 +199,13 @@ const YPivotQASections = () => {
                           : "bg-transparent hover:bg-white/20 hover:scale-102"
                       }`}
                     >
-                      {/* Icon */}
                       <div
                         className={`transition-colors duration-300 ${
                           isActive ? "text-indigo-600" : "text-white"
                         }`}
                       >
-                        {React.cloneElement(tab.icon, {
-                          className: "w-4 h-4"
-                        })}
+                        {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
                       </div>
-
-                      {/* Label */}
                       <span
                         className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
                           isActive ? "text-indigo-600" : "text-white"
@@ -237,8 +213,6 @@ const YPivotQASections = () => {
                       >
                         {tab.label}
                       </span>
-
-                      {/* Active Indicator Dot */}
                       {isActive && (
                         <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
                       )}
@@ -248,23 +222,22 @@ const YPivotQASections = () => {
               </div>
             </div>
 
-            {/* Sub Tabs - Only show when Production tab is active */}
-            {activeTab === "production" && (
+            {/* Sub Tabs (Only for YorkSys Orders) */}
+            {activeTab === "yorksys-orders" && (
               <div className="animate-slideDown overflow-x-auto scrollbar-hide -mx-4 px-4">
                 <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
-                  {subTabs.map((subTab) => {
-                    const isActive = activeSubTab === subTab.id;
+                  {yorksysSubTabs.map((subTab) => {
+                    const isActive = activeYorksysSubTab === subTab.id;
                     return (
                       <button
                         key={subTab.id}
-                        onClick={() => setActiveSubTab(subTab.id)}
+                        onClick={() => setActiveYorksysSubTab(subTab.id)}
                         className={`group relative flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all duration-300 ${
                           isActive
                             ? "bg-white shadow-lg scale-105"
                             : "bg-transparent hover:bg-white/20 hover:scale-102"
                         }`}
                       >
-                        {/* Icon */}
                         <div
                           className={`transition-colors duration-300 ${
                             isActive ? "text-indigo-600" : "text-white"
@@ -274,8 +247,6 @@ const YPivotQASections = () => {
                             className: "w-3.5 h-3.5"
                           })}
                         </div>
-
-                        {/* Label */}
                         <span
                           className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
                             isActive ? "text-indigo-600" : "text-white"
@@ -283,8 +254,6 @@ const YPivotQASections = () => {
                         >
                           {subTab.label}
                         </span>
-
-                        {/* Active Indicator Dot */}
                         {isActive && (
                           <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
                         )}
@@ -295,7 +264,7 @@ const YPivotQASections = () => {
               </div>
             )}
 
-            {/* Active Status Indicator - Mobile */}
+            {/* Active Status Indicator */}
             <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
               <div className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -303,23 +272,24 @@ const YPivotQASections = () => {
               </div>
               <div>
                 <p className="text-white font-bold text-xs leading-tight">
-                  {activeTab === "production" && activeSubTabData
+                  {activeTab === "yorksys-orders" && activeSubTabData
                     ? activeSubTabData.label
                     : activeTabData?.label}
                 </p>
                 <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                  Active Section
+                  Active Module
                 </p>
               </div>
             </div>
           </div>
 
-          {/* DESKTOP LAYOUT (>= lg) - ORIGINAL PRESERVED */}
+          {/* ======================= */}
+          {/* DESKTOP LAYOUT (>= lg)  */}
+          {/* ======================= */}
           <div className="hidden lg:flex lg:flex-col lg:gap-0">
             <div className="flex items-center justify-between gap-4">
-              {/* Left Side - Title, Navigation, and Active Status */}
               <div className="flex items-center gap-6 flex-1">
-                {/* Title Section */}
+                {/* Logo Area */}
                 <div className="flex items-center gap-3">
                   <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
                     <Shield size={24} className="text-white" />
@@ -327,7 +297,7 @@ const YPivotQASections = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h1 className="text-2xl font-black text-white tracking-tight">
-                        Fin Check System | Settings
+                        Fin Check System | Measurements
                       </h1>
                       <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
                         <Sparkles size={12} className="text-yellow-300" />
@@ -337,15 +307,16 @@ const YPivotQASections = () => {
                       </div>
                     </div>
                     <p className="text-sm text-indigo-100 font-medium">
-                      Configure System Settings
+                      QA Measurement & Specification System
                     </p>
                   </div>
                 </div>
 
-                {/* Icon Navigation Buttons with Labels */}
+                {/* Navigation Bar */}
                 <div className="flex items-center gap-3">
-                  {/* Main Tabs */}
+                  {/* Main Tabs + Optional Sub Tabs */}
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                    {/* Render Main Tabs */}
                     {tabs.map((tab) => {
                       const isActive = activeTab === tab.id;
                       return (
@@ -358,7 +329,6 @@ const YPivotQASections = () => {
                               : "bg-transparent hover:bg-white/20 hover:scale-102"
                           }`}
                         >
-                          {/* Icon */}
                           <div
                             className={`transition-colors duration-300 ${
                               isActive ? "text-indigo-600" : "text-white"
@@ -368,8 +338,6 @@ const YPivotQASections = () => {
                               className: "w-5 h-5"
                             })}
                           </div>
-
-                          {/* Label */}
                           <span
                             className={`text-xs font-bold transition-colors duration-300 ${
                               isActive ? "text-indigo-600" : "text-white"
@@ -377,37 +345,32 @@ const YPivotQASections = () => {
                           >
                             {tab.label}
                           </span>
-
-                          {/* Active Indicator Dot */}
                           {isActive && (
                             <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
                           )}
                         </button>
                       );
                     })}
-                  </div>
 
-                  {/* Sub Tabs - Only show when Production tab is active */}
-                  {activeTab === "production" && (
-                    <>
-                      {/* Vertical Divider */}
-                      <div className="h-20 w-px bg-white/30"></div>
+                    {/* Sub Tabs (Only for YorkSys Orders) */}
+                    {activeTab === "yorksys-orders" && (
+                      <>
+                        {/* Vertical Divider */}
+                        <div className="h-10 w-px bg-white/30 mx-1"></div>
 
-                      {/* Sub Tabs */}
-                      <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
-                        {subTabs.map((subTab) => {
-                          const isActive = activeSubTab === subTab.id;
+                        {/* YorkSys Sub Tabs */}
+                        {yorksysSubTabs.map((subTab) => {
+                          const isActive = activeYorksysSubTab === subTab.id;
                           return (
                             <button
                               key={subTab.id}
-                              onClick={() => setActiveSubTab(subTab.id)}
+                              onClick={() => setActiveYorksysSubTab(subTab.id)}
                               className={`group relative flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all duration-300 ${
                                 isActive
                                   ? "bg-white shadow-lg scale-105"
                                   : "bg-transparent hover:bg-white/20 hover:scale-102"
                               }`}
                             >
-                              {/* Icon */}
                               <div
                                 className={`transition-colors duration-300 ${
                                   isActive ? "text-indigo-600" : "text-white"
@@ -417,8 +380,6 @@ const YPivotQASections = () => {
                                   className: "w-4 h-4"
                                 })}
                               </div>
-
-                              {/* Label */}
                               <span
                                 className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
                                   isActive ? "text-indigo-600" : "text-white"
@@ -426,19 +387,17 @@ const YPivotQASections = () => {
                               >
                                 {subTab.label}
                               </span>
-
-                              {/* Active Indicator Dot */}
                               {isActive && (
                                 <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
                               )}
                             </button>
                           );
                         })}
-                      </div>
-                    </>
-                  )}
+                      </>
+                    )}
+                  </div>
 
-                  {/* Active Status Indicator */}
+                  {/* Status Indicator */}
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
                     <div className="relative flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -446,19 +405,19 @@ const YPivotQASections = () => {
                     </div>
                     <div>
                       <p className="text-white font-bold text-sm leading-tight">
-                        {activeTab === "production" && activeSubTabData
+                        {activeTab === "yorksys-orders" && activeSubTabData
                           ? activeSubTabData.label
                           : activeTabData?.label}
                       </p>
                       <p className="text-indigo-200 text-xs font-medium leading-tight">
-                        Active Section
+                        Active Module
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
 
-              {/* Right Side - User Info (Compact) */}
+              {/* User Info */}
               {user && (
                 <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
                   <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
@@ -479,17 +438,16 @@ const YPivotQASections = () => {
         </div>
       </div>
 
-      {/* Content Container */}
+      {/* Main Content Area */}
       <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
-          {/* Active Component */}
           <div className="transform transition-all duration-500 ease-out">
             {activeComponent}
           </div>
         </div>
       </div>
 
-      {/* Styles */}
+      {/* Global Styles */}
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -509,7 +467,6 @@ const YPivotQASections = () => {
             transform: translateY(0);
           }
         }
-
         @keyframes slideDown {
           from {
             opacity: 0;
@@ -524,7 +481,6 @@ const YPivotQASections = () => {
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out;
         }
-
         .animate-slideDown {
           animation: slideDown 0.3s ease-out;
         }
@@ -541,11 +497,9 @@ const YPivotQASections = () => {
               transparent 1px
             );
         }
-
         .delay-1000 {
           animation-delay: 1s;
         }
-
         .hover\\:scale-102:hover {
           transform: scale(1.02);
         }
@@ -554,4 +508,4 @@ const YPivotQASections = () => {
   );
 };
 
-export default YPivotQASections;
+export default YPivotQAMeasurements;

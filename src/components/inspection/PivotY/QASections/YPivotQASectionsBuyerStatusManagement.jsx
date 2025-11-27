@@ -11,7 +11,8 @@ import {
   TrendingUp,
   Database,
   Filter as FilterIcon,
-  X
+  X,
+  Ban // Added Icon for visual feedback
 } from "lucide-react";
 import React, { useEffect, useState, useMemo } from "react";
 import Swal from "sweetalert2";
@@ -20,6 +21,9 @@ import { API_BASE_URL } from "../../../../../config";
 const YPivotQASectionsBuyerStatusManagement = () => {
   const [defects, setDefects] = useState([]);
   const [buyers, setBuyers] = useState([]);
+  // New State for Disabled Configs
+  const [disabledConfigs, setDisabledConfigs] = useState({});
+
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -36,9 +40,11 @@ const YPivotQASectionsBuyerStatusManagement = () => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const [defectsRes, buyersRes] = await Promise.all([
+        // Added the 3rd API call to get AQL Configs
+        const [defectsRes, buyersRes, configRes] = await Promise.all([
           axios.get(`${API_BASE_URL}/api/qa-sections-defect-list`),
-          axios.get(`${API_BASE_URL}/api/qa-sections-buyers`)
+          axios.get(`${API_BASE_URL}/api/qa-sections-buyers`),
+          axios.get(`${API_BASE_URL}/api/qa-sections/aql-buyer-config/get`)
         ]);
 
         const sortedDefects = (defectsRes.data.data || []).sort((a, b) => {
@@ -54,7 +60,24 @@ const YPivotQASectionsBuyerStatusManagement = () => {
             a.buyer.localeCompare(b.buyer)
           )
         );
+
+        // --- PROCESS AQL CONFIGS ---
+        // Create a map:
+        const disabledMap = {};
+        if (configRes.data && configRes.data.data) {
+          configRes.data.data.forEach((conf) => {
+            // Check if AQLLevel is 0.01 (Use fuzzy comparison for floats if needed, but exact match is usually fine here)
+            if (conf.AQLLevel === 0.01 && conf.Status === "Minor") {
+              if (!disabledMap[conf.Buyer]) {
+                disabledMap[conf.Buyer] = [];
+              }
+              disabledMap[conf.Buyer].push(conf.Status);
+            }
+          });
+        }
+        setDisabledConfigs(disabledMap);
       } catch (error) {
+        console.error(error);
         Swal.fire("Error", "Failed to load initial data.", "error");
       } finally {
         setIsLoading(false);
@@ -101,6 +124,11 @@ const YPivotQASectionsBuyerStatusManagement = () => {
 
   // Handle changes to checkboxes (Status) - IMMUTABLE UPDATE
   const handleStatusChange = (defectId, buyerName, status) => {
+    // Double check logic: prevent change if disabled config exists
+    if (disabledConfigs[buyerName]?.includes(status)) {
+      return; // Do nothing if disabled
+    }
+
     setHasChanges(true);
     setDefects((prevDefects) =>
       prevDefects.map((defect) => {
@@ -576,6 +604,13 @@ const YPivotQASectionsBuyerStatusManagement = () => {
                                         Minor:
                                           "text-yellow-600 dark:text-yellow-400 focus:ring-yellow-500"
                                       };
+
+                                      // Check if disabled based on AQL config
+                                      const isDisabled =
+                                        disabledConfigs[buyer.buyer]?.includes(
+                                          status
+                                        );
+
                                       return (
                                         <div
                                           key={status}
@@ -585,6 +620,7 @@ const YPivotQASectionsBuyerStatusManagement = () => {
                                             type="checkbox"
                                             id={`${defect._id}-${buyer._id}-${status}`}
                                             checked={isChecked}
+                                            disabled={isDisabled} // Disable input if config matches
                                             onChange={() =>
                                               handleStatusChange(
                                                 defect._id,
@@ -592,13 +628,29 @@ const YPivotQASectionsBuyerStatusManagement = () => {
                                                 status
                                               )
                                             }
-                                            className={`h-4 w-4 rounded border-gray-300 dark:border-gray-600 ${statusColors[status]} focus:ring-2 dark:bg-gray-700 cursor-pointer transition-all`}
+                                            className={`h-4 w-4 rounded border-gray-300 dark:border-gray-600 ${
+                                              statusColors[status]
+                                            } focus:ring-2 dark:bg-gray-700 transition-all ${
+                                              isDisabled
+                                                ? "opacity-50 cursor-not-allowed"
+                                                : "cursor-pointer"
+                                            }`}
                                           />
                                           <label
                                             htmlFor={`${defect._id}-${buyer._id}-${status}`}
-                                            className="text-xs text-gray-700 dark:text-gray-300 font-medium cursor-pointer select-none"
+                                            className={`text-xs font-medium select-none ${
+                                              isDisabled
+                                                ? "text-gray-400 line-through cursor-not-allowed"
+                                                : "text-gray-700 dark:text-gray-300 cursor-pointer"
+                                            }`}
                                           >
                                             {status}
+                                            {isDisabled && (
+                                              <Ban
+                                                size={10}
+                                                className="inline ml-1 text-gray-400"
+                                              />
+                                            )}
                                           </label>
                                         </div>
                                       );
@@ -607,22 +659,68 @@ const YPivotQASectionsBuyerStatusManagement = () => {
                                 </div>
                               </td>
                               <td className="px-4 py-4 bg-white dark:bg-gray-800">
-                                <select
-                                  value={buyerStatus.commonStatus}
-                                  onChange={(e) =>
-                                    handleCommonChange(
-                                      defect._id,
-                                      buyer.buyer,
-                                      e.target.value
-                                    )
-                                  }
-                                  className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-all duration-200 outline-none cursor-pointer"
-                                >
-                                  <option value="">-- Select --</option>
-                                  <option value="Critical">🔴 Critical</option>
-                                  <option value="Major">🟠 Major</option>
-                                  <option value="Minor">🟡 Minor</option>
-                                </select>
+                                {/* 1. Get disabled statuses for this buyer */}
+                                {(() => {
+                                  const disabledStatuses =
+                                    disabledConfigs[buyer.buyer] || [];
+
+                                  return (
+                                    <select
+                                      value={buyerStatus.commonStatus}
+                                      onChange={(e) =>
+                                        handleCommonChange(
+                                          defect._id,
+                                          buyer.buyer,
+                                          e.target.value
+                                        )
+                                      }
+                                      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-800 transition-all duration-200 outline-none cursor-pointer"
+                                    >
+                                      <option value="">-- Select --</option>
+
+                                      {/* Critical (Always enabled based on previous logic) */}
+                                      <option value="Critical">
+                                        🔴 Critical
+                                      </option>
+
+                                      {/* Major - Check if disabled */}
+                                      <option
+                                        value="Major"
+                                        disabled={disabledStatuses.includes(
+                                          "Major"
+                                        )}
+                                        className={
+                                          disabledStatuses.includes("Major")
+                                            ? "text-gray-400 bg-gray-100"
+                                            : ""
+                                        }
+                                      >
+                                        🟠 Major{" "}
+                                        {disabledStatuses.includes("Major")
+                                          ? "(N/A)"
+                                          : ""}
+                                      </option>
+
+                                      {/* Minor - Check if disabled */}
+                                      <option
+                                        value="Minor"
+                                        disabled={disabledStatuses.includes(
+                                          "Minor"
+                                        )}
+                                        className={
+                                          disabledStatuses.includes("Minor")
+                                            ? "text-gray-400 bg-gray-100"
+                                            : ""
+                                        }
+                                      >
+                                        🟡 Minor{" "}
+                                        {disabledStatuses.includes("Minor")
+                                          ? "(N/A)"
+                                          : ""}
+                                      </option>
+                                    </select>
+                                  );
+                                })()}
                               </td>
                             </React.Fragment>
                           );

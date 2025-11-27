@@ -1809,6 +1809,67 @@ async function syncDTOrdersData() {
       // return sizeObject;
     }
 
+    // START NEW HELPER FUNCTION
+    function getOrderedSizeList(orderNo) {
+      const sizeMapping = orderSizeMapping.get(orderNo) || {};
+      const sizeList = [];
+
+      // We iterate explicitly from 10 to 400 to guarantee the "exact order"
+      const sizeSeqs = [
+        "10",
+        "20",
+        "30",
+        "40",
+        "50",
+        "60",
+        "70",
+        "80",
+        "90",
+        "100",
+        "110",
+        "120",
+        "130",
+        "140",
+        "150",
+        "160",
+        "170",
+        "180",
+        "190",
+        "200",
+        "210",
+        "220",
+        "230",
+        "240",
+        "250",
+        "260",
+        "270",
+        "280",
+        "290",
+        "300",
+        "310",
+        "320",
+        "330",
+        "340",
+        "350",
+        "360",
+        "370",
+        "380",
+        "390",
+        "400"
+      ];
+
+      sizeSeqs.forEach((seq) => {
+        // Retrieve the name mapped from the DB (e.g., "XS", "S")
+        const val = sizeMapping[seq];
+        // Only push if value exists (neglects NULL/Empty)
+        if (val && val !== null && val !== "") {
+          sizeList.push(val);
+        }
+      });
+
+      return sizeList;
+    }
+
     function convertSizeObjectToArray(sizeObject, orderNo) {
       const sizeMapping = orderSizeMapping.get(orderNo) || {};
       
@@ -2029,8 +2090,10 @@ function extractSpecsDataAsArray(record, orderNo) {
     orderHeaderResult.recordset.forEach(header => {
       const orderNo = header.Order_No;
       if (!orderMap.has(orderNo)) {
-        const sizeData = extractSizeDataAsObject(header, 'Size_Seq', orderNo);
-        
+        const sizeData = extractSizeDataAsObject(header, "Size_Seq", orderNo);
+
+        const orderedSizeList = getOrderedSizeList(orderNo);
+
         orderMap.set(orderNo, {
           SC_Heading: convertEmptyToNull(header.SC_Heading),
           Factory: convertEmptyToNull(header.Factory),
@@ -2044,6 +2107,7 @@ function extractSpecsDataAsArray(record, orderNo) {
           CustStyle: convertEmptyToNull(header.CustStyle),
           TotalQty: Number(header.OrderQuantity) || 0,
           NoOfSize: Object.keys(sizeData).length,
+          SizeList: orderedSizeList,
           OrderColors: [],
           OrderColorShip: [],
           SizeSpec: []

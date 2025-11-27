@@ -1,132 +1,66 @@
+import React, { useState, useMemo } from "react";
 import {
-  Camera,
   FileText,
-  Package,
-  TrendingUp,
-  User,
-  Shield,
   Sparkles,
-  Circle,
-  Layers,
-  Users,
+  Shield,
+  User,
+  Layout,
+  Camera,
   MapPin,
-  CheckSquare,
-  Image as ImageIcon,
-  BookOpen,
-  Sliders
+  Bug
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
-import YPivotQASectionsHeader from "../components/inspection/PivotY/QASections/YPivotQASectionsHeader";
-import YPivotQASectionsPacking from "../components/inspection/PivotY/QASections/YPivotQASectionsPacking";
-import YPivotQASectionsPhotos from "../components/inspection/PivotY/QASections/YPivotQASectionsPhotos";
-import YPivotQASectionsProduct from "../components/inspection/PivotY/QASections/YPivotQASectionsProduct";
+import YPivotQATemplatesReportType from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesReportType";
+import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
+import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
+import YPivotQATemplatesDefectLocationSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectLocationSelection";
+import YPivotQATemplatesDefectTotalSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectTotalSelection";
 
-const PlaceholderComponent = ({ title, icon: Icon }) => {
-  return (
-    <div className="p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md min-h-[400px] flex flex-col justify-center items-center">
-      <div className="mb-4 text-indigo-500 dark:text-indigo-400">
-        <Icon size={64} strokeWidth={1.5} />
-      </div>
-      <h2 className="text-2xl font-semibold text-gray-700 dark:text-gray-200 mb-2">
-        {title}
-      </h2>
-      <p className="text-gray-600 dark:text-gray-400 text-center">
-        This section is under development.
-      </p>
-    </div>
-  );
-};
-
-const YPivotQASections = () => {
+const YPivotQATemplates = () => {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState("header");
-  const [activeSubTab, setActiveSubTab] = useState("buyer");
+  const [activeTab, setActiveTab] = useState("reports");
 
   const tabs = useMemo(
     () => [
       {
-        id: "header",
-        label: "Header",
+        id: "reports",
+        label: "Reports",
         icon: <FileText size={20} />,
-        component: <YPivotQASectionsHeader />,
+        component: <YPivotQATemplatesReportType />,
         gradient: "from-blue-500 to-cyan-500",
-        description: "Manage header information"
+        description: "Report configuration"
+      },
+      {
+        id: "header",
+        label: "Header Preview",
+        icon: <Layout size={20} />,
+        component: <YPivotQATemplatesHeader />,
+        gradient: "from-purple-500 to-pink-500",
+        description: "Header templates"
       },
       {
         id: "photos",
-        label: "Photos",
+        label: "Photo Sections",
         icon: <Camera size={20} />,
-        component: <YPivotQASectionsPhotos />,
-        gradient: "from-purple-500 to-pink-500",
+        component: <YPivotQATemplatesPhotos />,
+        gradient: "from-orange-500 to-red-500",
         description: "Photo management"
       },
       {
-        id: "packing",
-        label: "Packing",
-        icon: <Package size={20} />,
-        component: <YPivotQASectionsPacking />,
-        gradient: "from-orange-500 to-red-500",
-        description: "Packing details"
+        id: "defects",
+        label: "Defect Locations",
+        icon: <MapPin size={20} />,
+        component: <YPivotQATemplatesDefectLocationSelection />,
+        gradient: "from-pink-500 to-rose-500",
+        description: "Location selection"
       },
       {
-        id: "production",
-        label: "Production",
-        icon: <TrendingUp size={20} />,
-        component: (
-          <YPivotQASectionsProduct
-            activeSubTab={activeSubTab}
-            setActiveSubTab={setActiveSubTab}
-          />
-        ),
-        gradient: "from-green-500 to-emerald-500",
-        description: "Production management"
-      }
-    ],
-    [activeSubTab]
-  );
-
-  const subTabs = useMemo(
-    () => [
-      {
-        id: "buyer",
-        label: "Buyer",
-        icon: <Users size={20} />
-      },
-      {
-        id: "category",
-        label: "Category",
-        icon: <Layers size={20} />
-      },
-      {
-        id: "product-type",
-        label: "Product Type",
-        icon: <ImageIcon size={20} />
-      },
-      {
-        id: "product-location",
-        label: "Location",
-        icon: <MapPin size={20} />
-      },
-      {
-        id: "defect",
-        label: "Defect",
-        icon: <FileText size={20} />
-      },
-      {
-        id: "buyer-status",
-        label: "Buyer Status",
-        icon: <CheckSquare size={20} />
-      },
-      {
-        id: "aql-term",
-        label: "AQL Term",
-        icon: <BookOpen size={20} />
-      },
-      {
-        id: "aql-config",
-        label: "AQL Config",
-        icon: <Sliders size={20} />
+        id: "total_defects",
+        label: "Defect Selection",
+        icon: <Bug size={20} />,
+        component: <YPivotQATemplatesDefectTotalSelection />,
+        gradient: "from-green-500 to-teal-500",
+        description: "Full defect workflow"
       }
     ],
     []
@@ -139,10 +73,6 @@ const YPivotQASections = () => {
   const activeTabData = useMemo(() => {
     return tabs.find((tab) => tab.id === activeTab);
   }, [activeTab, tabs]);
-
-  const activeSubTabData = useMemo(() => {
-    return subTabs.find((tab) => tab.id === activeSubTab);
-  }, [activeSubTab, subTabs]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
@@ -170,7 +100,7 @@ const YPivotQASections = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
-                      Fin Check | Settings
+                      Fin Check | Templates
                     </h1>
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
                       <Sparkles size={10} className="text-yellow-300" />
@@ -180,7 +110,7 @@ const YPivotQASections = () => {
                     </div>
                   </div>
                   <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    Configure System Settings
+                    Manage Inspection Templates
                   </p>
                 </div>
               </div>
@@ -248,53 +178,6 @@ const YPivotQASections = () => {
               </div>
             </div>
 
-            {/* Sub Tabs - Only show when Production tab is active */}
-            {activeTab === "production" && (
-              <div className="animate-slideDown overflow-x-auto scrollbar-hide -mx-4 px-4">
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
-                  {subTabs.map((subTab) => {
-                    const isActive = activeSubTab === subTab.id;
-                    return (
-                      <button
-                        key={subTab.id}
-                        onClick={() => setActiveSubTab(subTab.id)}
-                        className={`group relative flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-lg transition-all duration-300 ${
-                          isActive
-                            ? "bg-white shadow-lg scale-105"
-                            : "bg-transparent hover:bg-white/20 hover:scale-102"
-                        }`}
-                      >
-                        {/* Icon */}
-                        <div
-                          className={`transition-colors duration-300 ${
-                            isActive ? "text-indigo-600" : "text-white"
-                          }`}
-                        >
-                          {React.cloneElement(subTab.icon, {
-                            className: "w-3.5 h-3.5"
-                          })}
-                        </div>
-
-                        {/* Label */}
-                        <span
-                          className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
-                            isActive ? "text-indigo-600" : "text-white"
-                          }`}
-                        >
-                          {subTab.label}
-                        </span>
-
-                        {/* Active Indicator Dot */}
-                        {isActive && (
-                          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
             {/* Active Status Indicator - Mobile */}
             <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
               <div className="relative flex h-2 w-2">
@@ -303,9 +186,7 @@ const YPivotQASections = () => {
               </div>
               <div>
                 <p className="text-white font-bold text-xs leading-tight">
-                  {activeTab === "production" && activeSubTabData
-                    ? activeSubTabData.label
-                    : activeTabData?.label}
+                  {activeTabData?.label}
                 </p>
                 <p className="text-indigo-200 text-[10px] font-medium leading-tight">
                   Active Section
@@ -314,10 +195,10 @@ const YPivotQASections = () => {
             </div>
           </div>
 
-          {/* DESKTOP LAYOUT (>= lg) - ORIGINAL PRESERVED */}
+          {/* DESKTOP LAYOUT (>= lg) */}
           <div className="hidden lg:flex lg:flex-col lg:gap-0">
             <div className="flex items-center justify-between gap-4">
-              {/* Left Side - Title, Navigation, and Active Status */}
+              {/* Left Side - Title & Navigation */}
               <div className="flex items-center gap-6 flex-1">
                 {/* Title Section */}
                 <div className="flex items-center gap-3">
@@ -327,7 +208,7 @@ const YPivotQASections = () => {
                   <div>
                     <div className="flex items-center gap-2 mb-1">
                       <h1 className="text-2xl font-black text-white tracking-tight">
-                        Fin Check System | Settings
+                        Fin Check | Templates
                       </h1>
                       <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
                         <Sparkles size={12} className="text-yellow-300" />
@@ -337,14 +218,13 @@ const YPivotQASections = () => {
                       </div>
                     </div>
                     <p className="text-sm text-indigo-100 font-medium">
-                      Configure System Settings
+                      Manage Inspection Templates & Configurations
                     </p>
                   </div>
                 </div>
 
-                {/* Icon Navigation Buttons with Labels */}
+                {/* Main Tabs */}
                 <div className="flex items-center gap-3">
-                  {/* Main Tabs */}
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
                     {tabs.map((tab) => {
                       const isActive = activeTab === tab.id;
@@ -387,57 +267,6 @@ const YPivotQASections = () => {
                     })}
                   </div>
 
-                  {/* Sub Tabs - Only show when Production tab is active */}
-                  {activeTab === "production" && (
-                    <>
-                      {/* Vertical Divider */}
-                      <div className="h-20 w-px bg-white/30"></div>
-
-                      {/* Sub Tabs */}
-                      <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
-                        {subTabs.map((subTab) => {
-                          const isActive = activeSubTab === subTab.id;
-                          return (
-                            <button
-                              key={subTab.id}
-                              onClick={() => setActiveSubTab(subTab.id)}
-                              className={`group relative flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all duration-300 ${
-                                isActive
-                                  ? "bg-white shadow-lg scale-105"
-                                  : "bg-transparent hover:bg-white/20 hover:scale-102"
-                              }`}
-                            >
-                              {/* Icon */}
-                              <div
-                                className={`transition-colors duration-300 ${
-                                  isActive ? "text-indigo-600" : "text-white"
-                                }`}
-                              >
-                                {React.cloneElement(subTab.icon, {
-                                  className: "w-4 h-4"
-                                })}
-                              </div>
-
-                              {/* Label */}
-                              <span
-                                className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
-                                  isActive ? "text-indigo-600" : "text-white"
-                                }`}
-                              >
-                                {subTab.label}
-                              </span>
-
-                              {/* Active Indicator Dot */}
-                              {isActive && (
-                                <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </>
-                  )}
-
                   {/* Active Status Indicator */}
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
                     <div className="relative flex h-2.5 w-2.5">
@@ -446,9 +275,7 @@ const YPivotQASections = () => {
                     </div>
                     <div>
                       <p className="text-white font-bold text-sm leading-tight">
-                        {activeTab === "production" && activeSubTabData
-                          ? activeSubTabData.label
-                          : activeTabData?.label}
+                        {activeTabData?.label}
                       </p>
                       <p className="text-indigo-200 text-xs font-medium leading-tight">
                         Active Section
@@ -458,7 +285,7 @@ const YPivotQASections = () => {
                 </div>
               </div>
 
-              {/* Right Side - User Info (Compact) */}
+              {/* Right Side - User Info */}
               {user && (
                 <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
                   <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
@@ -510,23 +337,8 @@ const YPivotQASections = () => {
           }
         }
 
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out;
-        }
-
-        .animate-slideDown {
-          animation: slideDown 0.3s ease-out;
         }
 
         .bg-grid-white {
@@ -554,4 +366,4 @@ const YPivotQASections = () => {
   );
 };
 
-export default YPivotQASections;
+export default YPivotQATemplates;

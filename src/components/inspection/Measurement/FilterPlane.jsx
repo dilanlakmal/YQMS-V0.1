@@ -1,13 +1,17 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios';
-import { API_BASE_URL } from '../../../../config.js';
-import { debounce } from 'lodash'; // Assuming lodash is in your project
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import axios from "axios";
+import { API_BASE_URL } from "../../../../config.js";
+import { debounce } from "lodash";
+import { Search, Filter } from "lucide-react";
 
 const FilterPlane = ({ onFilter, loading }) => {
   const [styleNo, setStyleNo] = useState('');
   const [washType, setWashType] = useState('beforeWash');
   const [suggestions, setSuggestions] = useState([]);
   const [isSuggestionsVisible, setIsSuggestionsVisible] = useState(false);
+
+  // Ref to track if the update is from a click (selection) vs typing
+  const isSelectionRef = useRef(false);
 
   // Debounced function to fetch suggestions
   const fetchSuggestions = useCallback(
@@ -24,53 +28,84 @@ const FilterPlane = ({ onFilter, loading }) => {
       } else {
         setSuggestions([]);
       }
-    }, 300), // 300ms delay
+    }, 300),
     []
   );
 
   useEffect(() => {
+    // If this render was caused by a selection, reset the flag and SKIP fetching
+    if (isSelectionRef.current) {
+      isSelectionRef.current = false;
+      return;
+    }
     fetchSuggestions(styleNo);
   }, [styleNo, fetchSuggestions]);
 
   const handleSuggestionClick = (suggestion) => {
+    // 1. Cancel any pending debounce calls
+    fetchSuggestions.cancel();
+    // 2. Set flag to prevent useEffect from searching again
+    isSelectionRef.current = true;
+
     setStyleNo(suggestion);
     setIsSuggestionsVisible(false);
+
+    // Trigger filter
     onFilter({ styleNo: suggestion, washType });
   };
 
   const handleWashTypeChange = (newWashType) => {
     setWashType(newWashType);
-    // If a style number is already selected, re-run the filter with the new wash type
     if (styleNo) {
       onFilter({ styleNo, washType: newWashType });
     }
   };
 
   return (
-    <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-      {/* The form tag is kept for semantic structure, but onSubmit is removed */}
-      <div className="grid sm:grid-cols-3 gap-4 items-end">
-        {/* The surrounding div for the input is changed to a form to prevent layout shifts, 
-            but the onSubmit handler is removed to fix the error. */}
-        <form onSubmit={(e) => e.preventDefault()} className="flex flex-col relative">
-          <label htmlFor="styleNo" className="mb-1 font-semibold text-gray-700">Style No</label>
-          <input
-            id="styleNo"
-            type="text"
-            value={styleNo}
-            className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            onChange={(e) => setStyleNo(e.target.value)}
-            placeholder="e.g., STYLE123"
-            autoComplete="off"
-            onBlur={() => setTimeout(() => setIsSuggestionsVisible(false), 150)} // Hide on blur with a small delay
-          />
+    <div className="bg-white dark:bg-gray-800 p-5 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 max-w-3xl">
+      <div className="flex items-center gap-2 mb-4 text-gray-700 dark:text-gray-200">
+        <Filter className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+        <h3 className="text-sm font-bold uppercase tracking-wider">
+          Filter Options
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 items-end">
+        {/* Style Number Search */}
+        <form
+          onSubmit={(e) => e.preventDefault()}
+          className="flex flex-col relative"
+        >
+          <label
+            htmlFor="styleNo"
+            className="mb-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 uppercase"
+          >
+            Style No
+          </label>
+          <div className="relative">
+            <input
+              id="styleNo"
+              type="text"
+              value={styleNo}
+              className="w-full p-2.5 pl-9 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-500"
+              onChange={(e) => setStyleNo(e.target.value)}
+              placeholder="Search Style (e.g., STYLE123)"
+              autoComplete="off"
+              onBlur={() =>
+                setTimeout(() => setIsSuggestionsVisible(false), 200)
+              }
+            />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 dark:text-gray-500" />
+          </div>
+
+          {/* Suggestions Dropdown */}
           {isSuggestionsVisible && suggestions.length > 0 && (
-            <ul className="absolute top-full left-0 right-0 bg-white border border-gray-300 rounded-md mt-1 z-10 max-h-60 overflow-y-auto shadow-lg">
+            <ul className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg mt-1 z-50 max-h-60 overflow-y-auto shadow-xl">
               {suggestions.map((suggestion, index) => (
                 <li
                   key={index}
-                  className="p-2 cursor-pointer hover:bg-gray-100"
-                  onMouseDown={() => handleSuggestionClick(suggestion)} // Use onMouseDown to fire before onBlur
+                  className="px-4 py-2.5 text-sm text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/50 transition-colors"
+                  onMouseDown={() => handleSuggestionClick(suggestion)}
                 >
                   {suggestion}
                 </li>
@@ -78,13 +113,20 @@ const FilterPlane = ({ onFilter, loading }) => {
             </ul>
           )}
         </form>
+
+        {/* Wash Type Selection */}
         <div className="flex flex-col">
-          <label htmlFor="washType" className="mb-1 font-semibold text-gray-700">Wash Type</label>
+          <label
+            htmlFor="washType"
+            className="mb-1.5 text-xs font-bold text-gray-600 dark:text-gray-400 uppercase"
+          >
+            Wash Type
+          </label>
           <select
             id="washType"
             value={washType}
             onChange={(e) => handleWashTypeChange(e.target.value)}
-            className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="w-full p-2.5 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500 dark:focus:ring-indigo-400 outline-none cursor-pointer transition-all"
           >
             <option value="beforeWash">Before Wash</option>
             <option value="afterWash">After Wash</option>

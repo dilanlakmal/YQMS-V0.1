@@ -85,6 +85,8 @@ import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQA
 import YPivotQASections from "./pages/YPivotQASections.jsx";
 import AfterIroning  from "./pages/AfterIroning.jsx";
 import Translator from "./pages/translator.jsx";
+import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
+import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
@@ -479,6 +481,11 @@ function AppContent() {
               <Route path= "/translator" element={<Translator />} />
 
 
+              <Route
+                path="/qa-measurements"
+                element={<YPivotQAMeasurements />}
+              />
+              <Route path="/qa-templates" element={<YPivotQATemplates />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
