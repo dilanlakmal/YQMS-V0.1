@@ -61,7 +61,7 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
 
   const decimalToFraction = (decimal) => {
     if (decimal === null || decimal === undefined || decimal === '' || isNaN(parseFloat(decimal))) {
-      return 'N/A';
+      return '';
     }
 
     const num = parseFloat(decimal);
