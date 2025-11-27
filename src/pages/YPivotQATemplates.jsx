@@ -6,13 +6,15 @@ import {
   User,
   Layout,
   Camera,
-  MapPin
+  MapPin,
+  Bug
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQATemplatesReportType from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
 import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
 import YPivotQATemplatesDefectLocationSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectLocationSelection";
+import YPivotQATemplatesDefectTotalSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectTotalSelection";
 
 const YPivotQATemplates = () => {
   const { user } = useAuth();
@@ -51,6 +53,14 @@ const YPivotQATemplates = () => {
         component: <YPivotQATemplatesDefectLocationSelection />,
         gradient: "from-pink-500 to-rose-500",
         description: "Location selection"
+      },
+      {
+        id: "total_defects",
+        label: "Defect Selection",
+        icon: <Bug size={20} />,
+        component: <YPivotQATemplatesDefectTotalSelection />,
+        gradient: "from-green-500 to-teal-500",
+        description: "Full defect workflow"
       }
     ],
     []
