@@ -11,9 +11,9 @@ import {
   Trash2
 } from "lucide-react";
 import { read, utils } from "xlsx";
-import { cleanWashingSpecData } from "../components/inspection/qc2_washing/WashingSpecDataCleaning";
-import WashingSpecsDataPreview from "../components/inspection/qc2_washing/WashingSpecsDataPreview";
-import UploadedSpecsView from "../components/inspection/qc2_washing/UploadedSpecsView";
+import { cleanWashingSpecData } from "../components/inspection/BWSpecs/WashingSpecDataCleaning";
+import WashingSpecsDataPreview from "../components/inspection/BWSpecs/WashingSpecsDataPreview";
+import UploadedSpecsView from "../components/inspection/BWSpecs/UploadedSpecsView";
 import { API_BASE_URL } from "../../config";
 
 const UploadWashingSpecs = () => {
