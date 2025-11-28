@@ -7,7 +7,8 @@ import {
   Layout,
   Camera,
   MapPin,
-  Bug
+  Bug,
+  Ruler
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQATemplatesReportType from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesReportType";
@@ -15,6 +16,7 @@ import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates
 import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
 import YPivotQATemplatesDefectLocationSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectLocationSelection";
 import YPivotQATemplatesDefectTotalSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectTotalSelection";
+import YPivotQATemplatesMeasurementSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesMeasurementSelection";
 
 const YPivotQATemplates = () => {
   const { user } = useAuth();
@@ -61,6 +63,14 @@ const YPivotQATemplates = () => {
         component: <YPivotQATemplatesDefectTotalSelection />,
         gradient: "from-green-500 to-teal-500",
         description: "Full defect workflow"
+      },
+      {
+        id: "measurements",
+        label: "Measurements",
+        icon: <Ruler size={20} />,
+        component: <YPivotQATemplatesMeasurementSelection />,
+        gradient: "from-indigo-500 to-violet-500",
+        description: "Measurement specs configuration"
       }
     ],
     []

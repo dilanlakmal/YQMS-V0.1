@@ -288,7 +288,7 @@ function Home() {
         items: [
           {
             path: "/qa-sections",
-            pageId: "qa-sections",
+            //pageId: "qa-sections",
             roles: ["Admin", "QA"],
             image: "assets/Home/FinCheck.png",
             title: t("home.qa_sections"),
@@ -296,7 +296,7 @@ function Home() {
           },
           {
             path: "/qa-measurements",
-            pageId: "qa-measurements",
+            //pageId: "qa-measurements",
             roles: ["Admin", "QA", "QA Clerk", "Washing Clerk"],
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
@@ -304,7 +304,7 @@ function Home() {
           },
           {
             path: "/qa-templates",
-            pageId: "qa-templates",
+            //pageId: "qa-templates",
             image: "assets/Home/qatemplates.png",
             title: t("home.qa_templates"),
             description: "QA Inspection Templates",
@@ -312,7 +312,7 @@ function Home() {
           },
           {
             path: "/y-pivot-inspection",
-            pageId: "y-pivot-inspection",
+            //pageId: "y-pivot-inspection",
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),
             description: "Pivot Y Inspections",
