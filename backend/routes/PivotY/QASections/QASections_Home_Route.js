@@ -37,6 +37,6 @@ router.put("/api/qa-sections-home/:id", UpdateQASectionitem);
  * DELETE
  * Route: Deletes a specific QA section item
  */
-router.delete("api/qa-sections-home/:id", DeleteQASectionitem);
+router.delete("/api/qa-sections-home/:id", DeleteQASectionitem);
 
 export default router;

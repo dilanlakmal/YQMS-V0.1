@@ -549,9 +549,9 @@ app.use((req, res, next) => {
 //   }
 // });
 
-app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
-});
+// app.get("/api/health", (req, res) => {
+//   res.json({ status: "ok" });
+// });
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
