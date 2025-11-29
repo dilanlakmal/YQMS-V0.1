@@ -85,6 +85,7 @@ import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQA
 import YPivotQASections from "./pages/YPivotQASections.jsx";
 import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
 import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
+import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
@@ -479,6 +480,10 @@ function AppContent() {
                 element={<YPivotQAMeasurements />}
               />
               <Route path="/qa-templates" element={<YPivotQATemplates />} />
+              <Route
+                path="/fincheck-inspection"
+                element={<YPivotQAInspection />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

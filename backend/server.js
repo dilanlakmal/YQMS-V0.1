@@ -199,6 +199,11 @@ import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_
 ------------------------------ */
 import QASections_Templates from "./routes/PivotY/QATemplates/QATemplatesReport_Route.js";
 
+/* ------------------------------
+PivotY - Fincheck Inspection
+------------------------------ */
+import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
+
 /* -----------------------------
 QA Random Inspection Imports
 ------------------------------ */
@@ -462,6 +467,11 @@ app.use(QASections_Measurement_Specs);
 ------------------------------ */
 app.use(QASections_Templates);
 
+/* ------------------------------
+PivotY - Fincheck Inspection routes
+------------------------------ */
+app.use(FincheckInspection);
+
 /* -----------------------------
   QA Random Inspection Routes
 ------------------------------ */
@@ -549,9 +559,9 @@ app.use((req, res, next) => {
 //   }
 // });
 
-// app.get("/api/health", (req, res) => {
-//   res.json({ status: "ok" });
-// });
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok" });
+});
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {

@@ -279,7 +279,7 @@ function Home() {
             description: "QA Inspection Templates"
           },
           {
-            path: "/y-pivot-inspection",
+            path: "/fincheck-inspection",
             //pageId: "y-pivot-inspection",
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),
