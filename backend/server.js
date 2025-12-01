@@ -241,6 +241,12 @@ import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIron
   QC Output Imports
 ------------------------------ */
 import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
+
+/* -----------------------------
+  YDT Imports
+------------------------------ */
+/* -----------Cover Page-----------------*/
+import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -507,6 +513,12 @@ app.use(translator);
 After Ironing Routes
 ------------------------------ */
 app.use(afterIroning);
+
+/* -----------------------------
+  YDT Imports
+------------------------------ */
+/* -----------Cover Page-----------------*/
+app.use(CoverPage);
 
 // process.on("SIGINT", async () => {
 //   try {

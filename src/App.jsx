@@ -90,6 +90,7 @@ import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
+import CoverPage from "./pages/coverPage.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -479,7 +480,7 @@ function AppContent() {
               <Route path="/qa-sections" element={<YPivotQASections />} />
               <Route path= "/afterIroning" element={<AfterIroning />} />
               <Route path= "/translator" element={<Translator />} />
-
+              <Route path= "/production-Sheet" element={<CoverPage />} />
 
               <Route
                 path="/qa-measurements"

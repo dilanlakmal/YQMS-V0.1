@@ -505,6 +505,22 @@ function Home() {
         ]
       },
       {
+        id: "ydt",
+        title: "YDT",
+        icon: <ClipboardList className="w-5 h-5 mr-2" />,
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        items: [
+          {
+            path: "/production-Sheet",
+            roles: ["production"],
+            image: "assets/Home/coverPage.png",
+            title: "AI Translator",
+            description: "Maintain the production sheet",
+             version: '0',
+          }
+        ]
+      },
+      {
         id: "ai-section",
         title: "AI-Servicers",
         icon: <ClipboardList className="w-5 h-5 mr-2" />,
