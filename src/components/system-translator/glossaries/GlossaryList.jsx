@@ -267,7 +267,7 @@ export default function GlossaryList({ onDeleteSuccess }) {
                   }}
                   className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
                 >
-                  View/Edit
+                  View/Edit/Add
                 </button>
                 <button
                   onClick={(e) => {
