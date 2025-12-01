@@ -56,3 +56,4 @@ temp/uploads/
 # Ignore the .env file inside the ai_service folder and the virtual environment.
 /ai_service/.env
 /ai_service/venv
+translatedocs.ipynb

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { API_BASE_URL } from "../../../../config";
+import GlossaryEditor from "./GlossaryEditor";
 
 export default function GlossaryList({ onDeleteSuccess }) {
   const [glossaries, setGlossaries] = useState([]);
@@ -7,6 +8,7 @@ export default function GlossaryList({ onDeleteSuccess }) {
   const [error, setError] = useState("");
   const [filterLangPair, setFilterLangPair] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedGlossary, setSelectedGlossary] = useState(null);
 
   useEffect(() => {
     loadGlossaries();
@@ -64,11 +66,31 @@ export default function GlossaryList({ onDeleteSuccess }) {
 
   const handleDownload = async (blobName, fileName) => {
     try {
-      // For now, we'll just show a message since download requires blob storage access
-      // In a full implementation, you'd create a download endpoint
-      alert(`Download functionality for ${fileName} would be implemented here`);
+      const response = await fetch(`${API_BASE_URL}/api/glossaries/${encodeURIComponent(blobName)}/download`);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: "Download failed" }));
+        alert(errorData.error || "Failed to download glossary");
+        return;
+      }
+
+      // Get the blob from response
+      const blob = await response.blob();
+      
+      // Create a temporary URL and trigger download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || blobName;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Download error:", err);
+      alert("Failed to download glossary. Please try again.");
     }
   };
 
@@ -103,6 +125,29 @@ export default function GlossaryList({ onDeleteSuccess }) {
       glossary.languagePair.toLowerCase().includes(searchTerm.toLowerCase());
     return matchesLangPair && matchesSearch;
   });
+
+  const handleViewEdit = (blobName) => {
+    setSelectedGlossary(blobName);
+  };
+
+  const handleBack = () => {
+    setSelectedGlossary(null);
+    loadGlossaries(); // Refresh list when returning
+  };
+
+  const handleUpdateSuccess = () => {
+    loadGlossaries(); // Refresh list after update
+  };
+
+  if (selectedGlossary) {
+    return (
+      <GlossaryEditor
+        blobName={selectedGlossary}
+        onBack={handleBack}
+        onUpdateSuccess={handleUpdateSuccess}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -216,13 +261,28 @@ export default function GlossaryList({ onDeleteSuccess }) {
               </div>
               <div className="flex gap-2">
                 <button
-                  onClick={() => handleDownload(glossary.blobName, glossary.fileName)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewEdit(glossary.blobName);
+                  }}
+                  className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
+                >
+                  View/Edit
+                </button>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(glossary.blobName, glossary.fileName);
+                  }}
                   className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
                 >
                   Download
                 </button>
                 <button
-                  onClick={() => handleDelete(glossary.blobName)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDelete(glossary.blobName);
+                  }}
                   className="text-xs font-medium translator-destructive translator-rounded px-3 py-1.5 hover:translator-destructive-bg-light"
                 >
                   Delete

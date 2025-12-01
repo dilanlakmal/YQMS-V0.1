@@ -86,6 +86,62 @@ export default function FileTranslator() {
     }
   }
 
+  /**
+   * Extract language code from translated filename
+   * Pattern: filename_langCode_UUID.ext
+   * @param {string} filename - Translated filename
+   * @returns {string|null} - Language code (e.g., "km", "en") or null if not found
+   */
+  const extractLanguageCode = (filename) => {
+    // Pattern: filename_langCode_UUID.ext
+    // Match: _langCode_ where langCode is 2-3 lowercase letters
+    const match = filename.match(/_([a-z]{2,3})_[a-z0-9]+\./i);
+    return match ? match[1].toLowerCase() : null;
+  };
+
+  /**
+   * Get language pair display from translated filename
+   * @param {string} translatedFilename - Translated filename
+   * @param {string} defaultSource - Default source language (default: "en")
+   * @returns {string} - Language pair display (e.g., "en→km")
+   */
+  const getLanguagePairDisplay = (translatedFilename, defaultSource = "en") => {
+    const targetLang = extractLanguageCode(translatedFilename);
+    if (targetLang) {
+      return `${defaultSource}→${targetLang}`;
+    }
+    return "";
+  };
+
+  /**
+   * Match input files with their translated counterparts
+   * @param {Array} inputFiles - Source files
+   * @param {Array} translatedFiles - Translated files
+   * @returns {Array} - Array of matched pairs
+   */
+  const matchInputToTranslated = (inputFiles, translatedFiles) => {
+    return inputFiles.map(inputFile => {
+      // Extract base name from input file (remove extension)
+      const inputBase = inputFile.cleanName.replace(/\.[^/.]+$/, "");
+      
+      // Try to find matching translated file
+      // Translated files typically have format: originalName_langCode_UUID.ext
+      const translated = translatedFiles.find(tf => {
+        // Remove language code and UUID from translated filename
+        // Pattern: filename_km_abc123.pdf -> filename
+        const tBase = tf.cleanName.replace(/_[a-z]{2,3}_[a-z0-9]+\./i, ".").replace(/\.[^/.]+$/, "");
+        
+        // Check if translated base matches input base
+        return tBase === inputBase || tf.cleanName.startsWith(inputBase + "_");
+      });
+      
+      return {
+        input: inputFile,
+        translated: translated || null
+      };
+    });
+  };
+
   const downloadBlobFile = async (container, fileName) => {
     try {
       const response = await fetch(
@@ -642,7 +698,7 @@ export default function FileTranslator() {
       {activeTab === "files" && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
-            <h3 className="font-semibold translator-text-foreground">Blob Storage Files</h3>
+            <h3 className="font-semibold translator-text-foreground">Files</h3>
             <button
               onClick={loadBlobFiles}
               disabled={loadingFiles}
@@ -655,87 +711,110 @@ export default function FileTranslator() {
             </button>
           </div>
 
-          {/* Source Files */}
-          <div className="space-y-3">
-            <h4 className="font-medium translator-text-foreground">Source Files (inputdocuments)</h4>
-            {loadingFiles ? (
-              <div className="text-center py-8 translator-muted-foreground">Loading...</div>
-            ) : blobFiles.source.length === 0 ? (
-              <div className="text-center py-8 translator-muted-foreground">No files in source container</div>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {blobFiles.source.map((file, idx) => {
-                  const icon = getFileIcon(file.cleanName)
-                  return (
-                    <div key={idx} className="flex items-center justify-between translator-rounded translator-card translator-border p-3 hover:translator-muted">
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs" style={{ backgroundColor: icon.bg, color: icon.color }}>
-                          {icon.text}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm translator-text-foreground truncate font-medium">{file.cleanName}</p>
-                          <p className="text-xs translator-muted-foreground">
-                            {formatFileSize(file.size)} • {formatDate(file.lastModified)}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => downloadBlobFile("inputdocuments", file.originalName)}
-                          className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
-                        >
-                          Download
-                        </button>
-                        <button
-                          onClick={() => deleteBlobFile("inputdocuments", file.originalName)}
-                          className="text-xs font-medium translator-destructive translator-rounded px-3 py-1.5 hover:translator-destructive-bg-light"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
+          {loadingFiles ? (
+            <div className="text-center py-8 translator-muted-foreground">Loading...</div>
+          ) : blobFiles.source.length === 0 && blobFiles.target.length === 0 ? (
+            <div className="text-center py-8 translator-muted-foreground">No files found</div>
+          ) : (
+            <div className="translator-rounded translator-border translator-card overflow-hidden">
+              {/* Header */}
+              <div className="grid grid-cols-2 translator-border-b bg-muted/30">
+                <div className="px-4 py-3">
+                  <h4 className="font-medium translator-text-foreground">Input Documents</h4>
+                </div>
+                <div className="px-4 py-3 translator-border-l">
+                  <h4 className="font-medium translator-text-foreground">Translated Documents</h4>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Target Files */}
-          <div className="space-y-3">
-            <h4 className="font-medium translator-text-foreground">Translated Files (documentstraslated)</h4>
-            {loadingFiles ? (
-              <div className="text-center py-8 translator-muted-foreground">Loading...</div>
-            ) : blobFiles.target.length === 0 ? (
-              <div className="text-center py-8 translator-muted-foreground">No translated files yet</div>
-            ) : (
-              <div className="space-y-2 max-h-96 overflow-y-auto">
-                {blobFiles.target.map((file, idx) => {
-                  const icon = getFileIcon(file.cleanName)
+              {/* Matched Files */}
+              <div className="max-h-[600px] overflow-y-auto">
+                {matchInputToTranslated(blobFiles.source, blobFiles.target).map((pair, idx) => {
+                  const inputIcon = getFileIcon(pair.input.cleanName);
+                  const translatedIcon = pair.translated ? getFileIcon(pair.translated.cleanName) : null;
+                  
                   return (
-                    <div key={idx} className="flex items-center justify-between translator-rounded translator-card translator-border p-3 hover:translator-muted">
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs" style={{ backgroundColor: icon.bg, color: icon.color }}>
-                          {icon.text}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm translator-text-foreground truncate font-medium">{file.cleanName}</p>
-                          <p className="text-xs translator-muted-foreground">
-                            {formatFileSize(file.size)} • {formatDate(file.lastModified)}
-                          </p>
+                    <div key={idx} className="grid grid-cols-2 translator-border-b hover:bg-muted/20">
+                      {/* Input File Column */}
+                      <div className="px-4 py-3 translator-border-r">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs flex-shrink-0" style={{ backgroundColor: inputIcon.bg, color: inputIcon.color }}>
+                              {inputIcon.text}
+                            </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm translator-text-foreground truncate font-medium">{pair.input.cleanName}</p>
+                              <p className="text-xs translator-muted-foreground">
+                                {formatFileSize(pair.input.size)} • {formatDate(pair.input.lastModified)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 flex-shrink-0">
+                            <button
+                              onClick={() => downloadBlobFile("inputdocuments", pair.input.originalName)}
+                              className="text-xs font-medium translator-primary-text translator-rounded px-2 py-1 hover:opacity-80"
+                            >
+                              Download
+                            </button>
+                            <button
+                              onClick={() => deleteBlobFile("inputdocuments", pair.input.originalName)}
+                              className="text-xs font-medium translator-destructive translator-rounded px-2 py-1 hover:translator-destructive-bg-light"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         </div>
                       </div>
-                      <button
-                        onClick={() => downloadBlobFile("documentstraslated", file.originalName)}
-                        className="text-xs font-medium translator-primary-text translator-rounded px-3 py-1.5 hover:opacity-80"
-                      >
-                        Download
-                      </button>
+
+                      {/* Translated File Column */}
+                      <div className="px-4 py-3">
+                        {pair.translated ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs flex-shrink-0" style={{ backgroundColor: translatedIcon.bg, color: translatedIcon.color }}>
+                                {translatedIcon.text}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm translator-text-foreground truncate font-medium">{pair.translated.cleanName}</p>
+                                  {getLanguagePairDisplay(pair.translated.cleanName) && (
+                                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium translator-rounded bg-primary/10 text-primary whitespace-nowrap">
+                                      {getLanguagePairDisplay(pair.translated.cleanName)}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs translator-muted-foreground">
+                                  {formatFileSize(pair.translated.size)} • {formatDate(pair.translated.lastModified)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => downloadBlobFile("documentstraslated", pair.translated.originalName)}
+                                className="text-xs font-medium translator-primary-text translator-rounded px-2 py-1 hover:opacity-80"
+                              >
+                                Download
+                              </button>
+                              <button
+                                onClick={() => deleteBlobFile("documentstraslated", pair.translated.originalName)}
+                                className="text-xs font-medium translator-destructive translator-rounded px-2 py-1 hover:translator-destructive-bg-light"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center h-full">
+                            <p className="text-sm translator-muted-foreground italic">Not translated yet</p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )
+                  );
                 })}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       )}
       {characterCount !== null && (

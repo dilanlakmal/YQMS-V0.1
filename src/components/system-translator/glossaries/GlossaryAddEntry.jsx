@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import LanguageSelector from "../LanguageSelector";
 import { API_BASE_URL } from "../../../../config";
 
@@ -105,6 +105,8 @@ export default function GlossaryAddEntry({ onAddSuccess }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [existingGlossary, setExistingGlossary] = useState(null);
+  const [checkingGlossary, setCheckingGlossary] = useState(false);
 
   const handleEntryChange = (index, field, value) => {
     const newEntries = [...entries];
@@ -126,6 +128,43 @@ export default function GlossaryAddEntry({ onAddSuccess }) {
   const getValidEntries = () => {
     return entries.filter(e => e.source.trim() && e.target.trim());
   };
+
+  // Check for existing glossary when language pair changes
+  useEffect(() => {
+    const checkExistingGlossary = async () => {
+      if (!sourceLanguage || !targetLanguage) {
+        setExistingGlossary(null);
+        return;
+      }
+
+      setCheckingGlossary(true);
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/glossaries/${sourceLanguage.toLowerCase()}/${targetLanguage.toLowerCase()}`
+        );
+        const data = await response.json();
+
+        if (response.ok && data.success && data.glossaries && data.glossaries.length > 0) {
+          // Use the most recent glossary
+          const mostRecent = data.glossaries[0];
+          setExistingGlossary({
+            blobName: mostRecent.blobName,
+            fileName: mostRecent.fileName,
+            totalEntries: mostRecent.entryCount || null
+          });
+        } else {
+          setExistingGlossary(null);
+        }
+      } catch (err) {
+        console.error("Error checking existing glossary:", err);
+        setExistingGlossary(null);
+      } finally {
+        setCheckingGlossary(false);
+      }
+    };
+
+    checkExistingGlossary();
+  }, [sourceLanguage, targetLanguage]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -215,6 +254,36 @@ export default function GlossaryAddEntry({ onAddSuccess }) {
             />
           </div>
         </div>
+
+        {/* Glossary status feedback */}
+        {sourceLanguage && targetLanguage && (
+          <div className="translator-rounded translator-border translator-card p-3 space-y-1">
+            {checkingGlossary ? (
+              <p className="text-xs translator-muted-foreground">Checking for existing glossary...</p>
+            ) : existingGlossary ? (
+              <div>
+                <p className="text-xs font-semibold translator-text-foreground">
+                  ✓ Existing glossary found
+                </p>
+                <p className="text-xs translator-muted-foreground mt-1">
+                  Entries will be added to: <span className="font-mono">{existingGlossary.fileName}</span>
+                  {existingGlossary.totalEntries !== null && existingGlossary.totalEntries > 0 && (
+                    <span> ({existingGlossary.totalEntries} existing entries)</span>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs font-semibold translator-text-foreground">
+                  + New glossary will be created
+                </p>
+                <p className="text-xs translator-muted-foreground mt-1">
+                  A new glossary file will be created for {sourceLanguage.toUpperCase()} → {targetLanguage.toUpperCase()}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Entry rows */}
         <div className="space-y-4">

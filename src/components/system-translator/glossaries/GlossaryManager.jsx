@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import GlossaryUpload from "./GlossaryUpload";
 import GlossaryList from "./GlossaryList";
-import GlossaryAddEntry from "./GlossaryAddEntry";
 
 export default function GlossaryManager() {
   const [activeTab, setActiveTab] = useState("list");
@@ -14,11 +13,6 @@ export default function GlossaryManager() {
   };
 
   const handleDeleteSuccess = () => {
-    // Refresh list
-    setRefreshKey((prev) => prev + 1);
-  };
-
-  const handleAddSuccess = () => {
     // Refresh list
     setRefreshKey((prev) => prev + 1);
   };
@@ -47,16 +41,6 @@ export default function GlossaryManager() {
         >
           Upload Glossary
         </button>
-        <button
-          onClick={() => setActiveTab("add")}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === "add"
-              ? "translator-primary-text border-b-2 border-primary"
-              : "translator-muted-foreground hover:translator-text-foreground"
-          }`}
-        >
-          Add Entry
-        </button>
       </div>
 
       {/* Tab Content */}
@@ -66,10 +50,6 @@ export default function GlossaryManager() {
 
       {activeTab === "upload" && (
         <GlossaryUpload onUploadSuccess={handleUploadSuccess} />
-      )}
-
-      {activeTab === "add" && (
-        <GlossaryAddEntry onAddSuccess={handleAddSuccess} />
       )}
     </div>
   );

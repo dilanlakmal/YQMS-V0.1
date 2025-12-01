@@ -19,7 +19,8 @@ import {
   generateGlossaryBlobName,
   detectGlossaryFormat,
   expandEntriesWithCaseVariations,
-  parseGlossaryFile
+  parseGlossaryFile,
+  getDisplayEntries
 } from "../../utils/glossaries/glossaryHelper.js";
 import fs from 'fs';
 import { promisify } from 'util';
@@ -33,20 +34,35 @@ const GLOSSARY_CONTAINER = process.env.AZURE_STORAGE_GLOSSARY_CONTAINER || "glos
  * Format: {sourceLang}-{targetLang}-{timestamp}-{uuid}.{ext}
  */
 const parseGlossaryBlobName = (blobName) => {
-  const parts = blobName.split('-');
-  if (parts.length < 4) {
-    return null;
-  }
-  
   const ext = blobName.split('.').pop();
-  const sourceLang = parts[0];
-  const targetLang = parts[1];
-  const timestamp = parts.slice(2, -1).join('-');
-  const uuid = parts[parts.length - 1].replace(`.${ext}`, '');
-  
+  const basename = blobName.replace(`.${ext}`, '');
+
+  // Regex to capture: sourceLang - targetLang(with optional -subtags) - timestamp - uuid
+  const regex = /^([a-z]{2,})(?:-((?:[a-z0-9]{2,}(?:-[a-z0-9]+)*)))-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})-([0-9a-f]{8})$/i;
+  const match = basename.match(regex);
+
+  if (!match) {
+    // Fallback to legacy parsing (may not capture subtags correctly)
+    const parts = basename.split('-');
+    if (parts.length < 4) {
+      return null;
+    }
+
+    return {
+      sourceLang: parts[0],
+      targetLang: parts[1],
+      timestamp: parts.slice(2, -1).join('-'),
+      uuid: parts[parts.length - 1],
+      format: ext,
+      originalName: blobName
+    };
+  }
+
+  const [, sourceLang, targetLangRaw, timestamp, uuid] = match;
+
   return {
-    sourceLang,
-    targetLang,
+    sourceLang: sourceLang.toLowerCase(),
+    targetLang: (targetLangRaw || '').toLowerCase(),
     timestamp,
     uuid,
     format: ext,
@@ -477,6 +493,205 @@ export const getGlossaryUrlEndpoint = async (req, res) => {
     console.error("Get glossary URL endpoint error:", error);
     return res.status(500).json({
       error: "Failed to get glossary URL",
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Download glossary file
+ * GET /api/glossaries/:blobName/download
+ */
+export const downloadGlossary = async (req, res) => {
+  try {
+    const { blobName } = req.params;
+
+    if (!blobName) {
+      return res.status(400).json({
+        error: "blobName parameter is required"
+      });
+    }
+
+    const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
+    const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+
+    if (!storageAccountKey) {
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
+      });
+    }
+
+    // Read glossary content from blob storage
+    const glossaryBuffer = await readBlobContent(
+      GLOSSARY_CONTAINER,
+      blobName,
+      storageAccountName,
+      storageAccountKey
+    );
+
+    // Set headers for file download
+    res.setHeader('Content-Type', 'text/tab-separated-values');
+    res.setHeader('Content-Disposition', `attachment; filename="${blobName}"`);
+    res.setHeader('Content-Length', glossaryBuffer.length);
+
+    // Send file buffer
+    res.send(glossaryBuffer);
+
+  } catch (error) {
+    console.error("Download glossary error:", error);
+    return res.status(500).json({
+      error: "Failed to download glossary",
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Get glossary entries
+ * GET /api/glossaries/:blobName/entries
+ */
+export const getGlossaryEntries = async (req, res) => {
+  try {
+    const { blobName } = req.params;
+    const displayOnly = req.query.displayOnly === 'true';
+
+    if (!blobName) {
+      return res.status(400).json({
+        error: "blobName parameter is required"
+      });
+    }
+
+    const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
+    const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+
+    if (!storageAccountKey) {
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
+      });
+    }
+
+    // Parse blob name to get language pair
+    const metadata = parseGlossaryBlobName(blobName);
+    if (!metadata) {
+      return res.status(400).json({
+        error: "Invalid glossary blob name format"
+      });
+    }
+
+    // Read glossary content from blob storage
+    const glossaryBuffer = await readBlobContent(
+      GLOSSARY_CONTAINER,
+      blobName,
+      storageAccountName,
+      storageAccountKey
+    );
+
+    // Parse entries (always TSV format in storage)
+    const allEntries = await parseGlossaryFile(glossaryBuffer, 'tsv');
+
+    // If displayOnly=true, return only representative entries
+    if (displayOnly) {
+      const { displayEntries, totalEntries, displayCount } = getDisplayEntries(allEntries);
+      return res.status(200).json({
+        success: true,
+        blobName: blobName,
+        sourceLanguage: metadata.sourceLang,
+        targetLanguage: metadata.targetLang,
+        entries: displayEntries,
+        totalEntries: totalEntries,
+        displayEntries: displayCount
+      });
+    }
+
+    // Return all entries (default behavior)
+    return res.status(200).json({
+      success: true,
+      blobName: blobName,
+      sourceLanguage: metadata.sourceLang,
+      targetLanguage: metadata.targetLang,
+      entries: allEntries,
+      totalEntries: allEntries.length
+    });
+
+  } catch (error) {
+    console.error("Get glossary entries error:", error);
+    return res.status(500).json({
+      error: "Failed to get glossary entries",
+      details: error.message
+    });
+  }
+};
+
+/**
+ * Update glossary entries
+ * PUT /api/glossaries/:blobName/entries
+ */
+export const updateGlossaryEntries = async (req, res) => {
+  try {
+    const { blobName } = req.params;
+    const { entries } = req.body;
+
+    if (!blobName) {
+      return res.status(400).json({
+        error: "blobName parameter is required"
+      });
+    }
+
+    if (!entries || !Array.isArray(entries)) {
+      return res.status(400).json({
+        error: "Entries array is required"
+      });
+    }
+
+    // Validate entries structure
+    for (const entry of entries) {
+      if (!entry.source || !entry.target) {
+        return res.status(400).json({
+          error: "Each entry must have both 'source' and 'target' fields"
+        });
+      }
+    }
+
+    const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
+    const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+
+    if (!storageAccountKey) {
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
+      });
+    }
+
+    // Automatically expand entries with case variations and plural forms
+    const expandedEntries = expandEntriesWithCaseVariations(entries);
+    console.log(`Expanded ${entries.length} entries to ${expandedEntries.length} entries with case variations and plural forms`);
+
+    // Convert expanded entries to TSV format
+    const tsvContent = expandedEntries
+      .map(e => `${e.source}\t${e.target}`)
+      .join('\n');
+    const tsvBuffer = Buffer.from(tsvContent, 'utf-8');
+
+    // Update blob in Azure Storage
+    await updateBlobContent(
+      GLOSSARY_CONTAINER,
+      blobName,
+      tsvBuffer,
+      storageAccountName,
+      storageAccountKey
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: "Glossary updated successfully",
+      totalEntries: expandedEntries.length,
+      originalEntries: entries.length,
+      expandedEntries: expandedEntries.length
+    });
+
+  } catch (error) {
+    console.error("Update glossary entries error:", error);
+    return res.status(500).json({
+      error: "Failed to update glossary entries",
       details: error.message
     });
   }

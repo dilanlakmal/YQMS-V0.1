@@ -9,7 +9,10 @@ import {
   getGlossariesByLanguagePair,
   deleteGlossary,
   getGlossaryUrlEndpoint,
-  addEntriesToGlossary
+  addEntriesToGlossary,
+  getGlossaryEntries,
+  updateGlossaryEntries,
+  downloadGlossary
 } from "../../controller/glossaries/glossaryController.js";
 
 const router = express.Router();
@@ -48,11 +51,20 @@ router.post("/api/glossaries/upload", upload.single('glossaryFile'), uploadGloss
 // GET /api/glossaries/list - List all glossaries
 router.get("/api/glossaries/list", listGlossaries);
 
+// GET /api/glossaries/:blobName/url - Get glossary SAS URL (must come before :sourceLang/:targetLang)
+router.get("/api/glossaries/:blobName/url", getGlossaryUrlEndpoint);
+
+// GET /api/glossaries/:blobName/download - Download glossary file (must come before :sourceLang/:targetLang)
+router.get("/api/glossaries/:blobName/download", downloadGlossary);
+
+// GET /api/glossaries/:blobName/entries - Get glossary entries (must come before :sourceLang/:targetLang)
+router.get("/api/glossaries/:blobName/entries", getGlossaryEntries);
+
+// PUT /api/glossaries/:blobName/entries - Update glossary entries (must come before :sourceLang/:targetLang)
+router.put("/api/glossaries/:blobName/entries", updateGlossaryEntries);
+
 // GET /api/glossaries/:sourceLang/:targetLang - Get glossaries for language pair
 router.get("/api/glossaries/:sourceLang/:targetLang", getGlossariesByLanguagePair);
-
-// GET /api/glossaries/:blobName/url - Get glossary SAS URL
-router.get("/api/glossaries/:blobName/url", getGlossaryUrlEndpoint);
 
 // DELETE /api/glossaries/delete - Delete glossary
 router.delete("/api/glossaries/delete", deleteGlossary);

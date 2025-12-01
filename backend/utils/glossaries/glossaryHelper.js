@@ -411,3 +411,156 @@ export const expandEntriesWithCaseVariations = (entries) => {
   return expanded;
 };
 
+/**
+ * Check if a string is in Title Case (first letter of each word capitalized)
+ * @param {string} str - String to check
+ * @returns {boolean} - True if Title Case
+ */
+const isTitleCase = (str) => {
+  if (!str || str.length === 0) return false;
+  const words = str.split(' ');
+  return words.every(word => {
+    if (word.length === 0) return true;
+    return word[0] === word[0].toUpperCase() && word.slice(1) === word.slice(1).toLowerCase();
+  });
+};
+
+/**
+ * Get base form of a word by removing common plural suffixes.
+ * Runs iteratively so words like "tmseses" reduce to "tms".
+ * @param {string} word - Word to get base form of
+ * @returns {string} - Base form (or original if no change)
+ */
+const getBaseForm = (word) => {
+  if (!word || word.length === 0) return word;
+
+  let current = word;
+  let iterations = 0;
+
+  const removePluralOnce = (value) => {
+    const lower = value.toLowerCase();
+
+    // Words ending in 'ies' (cities -> city)
+    if (lower.endsWith('ies') && lower.length > 3) {
+      const withoutIes = value.slice(0, -3);
+      const lastChar = withoutIes[withoutIes.length - 1]?.toLowerCase();
+      if (lastChar && !['a', 'e', 'i', 'o', 'u'].includes(lastChar)) {
+        return withoutIes + 'y';
+      }
+    }
+
+    // Words ending in 'es'
+    if (lower.endsWith('es') && lower.length > 2) {
+      const withoutEs = value.slice(0, -2);
+      const lastChar = withoutEs[withoutEs.length - 1]?.toLowerCase();
+      if (lastChar && ['s', 'x', 'z'].includes(lastChar)) {
+        return withoutEs;
+      }
+      if (lower.endsWith('ches') || lower.endsWith('shes')) {
+        return withoutEs;
+      }
+    }
+
+    // Words ending in 's'
+    if (lower.endsWith('s') && lower.length > 1 && !lower.endsWith('ss')) {
+      return value.slice(0, -1);
+    }
+
+    return value;
+  };
+
+  while (iterations < 5) {
+    const next = removePluralOnce(current);
+    if (next === current) {
+      break;
+    }
+    current = next;
+    iterations += 1;
+  }
+
+  return current;
+};
+
+/**
+ * Normalize source to base form for grouping.
+ * - Converts to lowercase
+ * - Removes plural suffixes on the first word in multi-word phrases
+ */
+const normalizeToBase = (source) => {
+  if (!source) return '';
+
+  const trimmed = source.trim();
+  if (!trimmed) return '';
+
+  const words = trimmed.split(/\s+/);
+  if (words.length === 0) return '';
+
+  const firstWordBase = getBaseForm(words[0]);
+  const normalizedWords = [
+    firstWordBase.toLowerCase(),
+    ...words.slice(1).map((word) => word.toLowerCase())
+  ];
+
+  return normalizedWords.join(' ');
+};
+
+/**
+ * Group entries by base concept (same base form and same target)
+ * Groups case variations and plural forms together
+ * Returns groups with representative entries
+ * @param {Array<{source: string, target: string}>} entries - All entries
+ * @returns {Array<{representative: {source, target}, allVariations: Array<{source, target}>, variationCount: number}>} - Grouped entries
+ */
+export const groupEntriesByBaseConcept = (entries) => {
+  const groups = new Map();
+  
+  entries.forEach(entry => {
+    if (!entry.source || !entry.target) return;
+    
+    // Key: normalized base form + target (groups case and plural variations)
+    const normalizedBase = normalizeToBase(entry.source);
+    const key = `${normalizedBase}\t${entry.target}`;
+    
+    if (!groups.has(key)) {
+      groups.set(key, {
+        normalizedSource: normalizedBase,
+        target: entry.target,
+        allVariations: [entry]
+      });
+    } else {
+      const group = groups.get(key);
+      group.allVariations.push(entry);
+    }
+  });
+
+  // For display, use the normalized source (lowercase singular) as the representative string.
+  return Array.from(groups.values()).map(group => {
+    const representative = {
+      source: group.normalizedSource,
+      target: group.target
+    };
+
+    return {
+      representative,
+      allVariations: group.allVariations,
+      variationCount: group.allVariations.length
+    };
+  });
+};
+
+/**
+ * Get display entries (representatives only) from all entries
+ * @param {Array<{source: string, target: string}>} entries - All entries with variations
+ * @returns {{displayEntries: Array<{source, target}>, totalEntries: number, displayCount: number}} - Display entries and counts
+ */
+export const getDisplayEntries = (entries) => {
+  const groups = groupEntriesByBaseConcept(entries);
+  const displayEntries = groups.map(group => group.representative);
+  
+  return {
+    displayEntries,
+    totalEntries: entries.length,
+    displayCount: displayEntries.length
+  };
+};
+
