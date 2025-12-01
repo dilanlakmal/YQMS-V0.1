@@ -87,16 +87,47 @@ export default function FileTranslator() {
   }
 
   /**
+   * Parse translated filename into base name and language code.
+   * Pattern: base_langCode_uuid.ext
+   * Example: test_with_glossaries_zh-Hans_1234abcd.docx
+   *   -> { baseName: "test_with_glossaries", langCode: "zh-hans" }
+   */
+  const parseTranslatedFileName = (filename) => {
+    if (!filename) {
+      return { baseName: "", langCode: null };
+    }
+
+    const withoutExt = filename.replace(/\.[^/.]+$/, "");
+    const parts = withoutExt.split("_");
+
+    if (parts.length < 3) {
+      // Doesn't match expected pattern; treat whole name as base
+      return { baseName: withoutExt, langCode: null };
+    }
+
+    const guid = parts[parts.length - 1]; // last segment
+    const lang = parts[parts.length - 2]; // second last segment
+    const base = parts.slice(0, parts.length - 2).join("_");
+
+    // Basic guard to ensure this looks like our pattern
+    if (!guid || !lang) {
+      return { baseName: withoutExt, langCode: null };
+    }
+
+    return {
+      baseName: base,
+      langCode: lang.toLowerCase()
+    };
+  };
+
+  /**
    * Extract language code from translated filename
-   * Pattern: filename_langCode_UUID.ext
    * @param {string} filename - Translated filename
-   * @returns {string|null} - Language code (e.g., "km", "en") or null if not found
+   * @returns {string|null} - Language code (e.g., "km", "en", "zh-hans") or null if not found
    */
   const extractLanguageCode = (filename) => {
-    // Pattern: filename_langCode_UUID.ext
-    // Match: _langCode_ where langCode is 2-3 lowercase letters
-    const match = filename.match(/_([a-z]{2,3})_[a-z0-9]+\./i);
-    return match ? match[1].toLowerCase() : null;
+    const { langCode } = parseTranslatedFileName(filename);
+    return langCode || null;
   };
 
   /**
@@ -114,31 +145,74 @@ export default function FileTranslator() {
   };
 
   /**
-   * Match input files with their translated counterparts
-   * @param {Array} inputFiles - Source files
-   * @param {Array} translatedFiles - Translated files
-   * @returns {Array} - Array of matched pairs
+   * Match input files with their translated counterparts.
+   * - If both input and translated exist: pair each translated file with the input.
+   * - If only input exists: show input with \"Not translated yet\" on the right.
+   * - If only translated exists (source deleted from storage): still show the translated file
+   *   with a \"Source file not found\" message on the left.
+   *
+   * @param {Array} inputFiles - Source files from storage
+   * @param {Array} translatedFiles - Translated files from storage
+   * @returns {Array} - Array of matched pairs: { input, translated }
    */
   const matchInputToTranslated = (inputFiles, translatedFiles) => {
-    return inputFiles.map(inputFile => {
-      // Extract base name from input file (remove extension)
-      const inputBase = inputFile.cleanName.replace(/\.[^/.]+$/, "");
-      
-      // Try to find matching translated file
-      // Translated files typically have format: originalName_langCode_UUID.ext
-      const translated = translatedFiles.find(tf => {
-        // Remove language code and UUID from translated filename
-        // Pattern: filename_km_abc123.pdf -> filename
-        const tBase = tf.cleanName.replace(/_[a-z]{2,3}_[a-z0-9]+\./i, ".").replace(/\.[^/.]+$/, "");
-        
-        // Check if translated base matches input base
-        return tBase === inputBase || tf.cleanName.startsWith(inputBase + "_");
-      });
-      
-      return {
-        input: inputFile,
-        translated: translated || null
-      };
+    const pairsMap = new Map();
+
+    // Seed map with all input files
+    inputFiles.forEach((inputFile) => {
+      const baseName = inputFile.cleanName.replace(/\.[^/.]+$/, "");
+      const key = baseName.toLowerCase();
+
+      if (!pairsMap.has(key)) {
+        pairsMap.set(key, { input: null, translatedCandidates: [] });
+      }
+
+      const entry = pairsMap.get(key);
+      entry.input = inputFile;
+    });
+
+    // Add translated files, even if input no longer exists
+    translatedFiles.forEach((tf) => {
+      const { baseName } = parseTranslatedFileName(tf.cleanName);
+      const key = (baseName || "").toLowerCase();
+      if (!key) return;
+
+      if (!pairsMap.has(key)) {
+        pairsMap.set(key, { input: null, translatedCandidates: [] });
+      }
+
+      const entry = pairsMap.get(key);
+      entry.translatedCandidates.push(tf);
+    });
+
+    // Build final array: one row per translated file, plus rows for inputs without translations
+    const pairs = [];
+
+    pairsMap.forEach((value) => {
+      if (value.translatedCandidates.length > 0) {
+        // Create a row for each translated document
+        value.translatedCandidates.forEach((tf) => {
+          pairs.push({
+            input: value.input || null,
+            translated: tf
+          });
+        });
+      } else if (value.input) {
+        // Input with no translations yet
+        pairs.push({
+          input: value.input,
+          translated: null
+        });
+      }
+    });
+
+    // Sort for stable display (by input name or translated base name)
+    return pairs.sort((a, b) => {
+      const nameA =
+        (a.input?.cleanName || parseTranslatedFileName(a.translated?.cleanName || "").baseName || "").toLowerCase();
+      const nameB =
+        (b.input?.cleanName || parseTranslatedFileName(b.translated?.cleanName || "").baseName || "").toLowerCase();
+      return nameA.localeCompare(nameB);
     });
   };
 
@@ -730,40 +804,69 @@ export default function FileTranslator() {
               {/* Matched Files */}
               <div className="max-h-[600px] overflow-y-auto">
                 {matchInputToTranslated(blobFiles.source, blobFiles.target).map((pair, idx) => {
-                  const inputIcon = getFileIcon(pair.input.cleanName);
+                  const hasInput = !!pair.input;
+                  const inputIcon = hasInput
+                    ? getFileIcon(pair.input.cleanName)
+                    : { text: "?", bg: "#E5E7EB", color: "#6B7280" };
                   const translatedIcon = pair.translated ? getFileIcon(pair.translated.cleanName) : null;
                   
                   return (
                     <div key={idx} className="grid grid-cols-2 translator-border-b hover:bg-muted/20">
                       {/* Input File Column */}
                       <div className="px-4 py-3 translator-border-r">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs flex-shrink-0" style={{ backgroundColor: inputIcon.bg, color: inputIcon.color }}>
-                              {inputIcon.text}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm translator-text-foreground truncate font-medium">{pair.input.cleanName}</p>
-                              <p className="text-xs translator-muted-foreground">
-                                {formatFileSize(pair.input.size)} • {formatDate(pair.input.lastModified)}
-                              </p>
+                        {hasInput ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span
+                                className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs flex-shrink-0"
+                                style={{ backgroundColor: inputIcon.bg, color: inputIcon.color }}
+                              >
+                                {inputIcon.text}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm translator-text-foreground truncate font-medium">
+                                  {pair.input.cleanName}
+                                </p>
+                                <p className="text-xs translator-muted-foreground">
+                                  {formatFileSize(pair.input.size)} • {formatDate(pair.input.lastModified)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 flex-shrink-0">
+                              <button
+                                onClick={() => downloadBlobFile("inputdocuments", pair.input.originalName)}
+                                className="text-xs font-medium translator-primary-text translator-rounded px-2 py-1 hover:opacity-80"
+                              >
+                                Download
+                              </button>
+                              <button
+                                onClick={() => deleteBlobFile("inputdocuments", pair.input.originalName)}
+                                className="text-xs font-medium translator-destructive translator-rounded px-2 py-1 hover:translator-destructive-bg-light"
+                              >
+                                Delete
+                              </button>
                             </div>
                           </div>
-                          <div className="flex gap-2 flex-shrink-0">
-                            <button
-                              onClick={() => downloadBlobFile("inputdocuments", pair.input.originalName)}
-                              className="text-xs font-medium translator-primary-text translator-rounded px-2 py-1 hover:opacity-80"
-                            >
-                              Download
-                            </button>
-                            <button
-                              onClick={() => deleteBlobFile("inputdocuments", pair.input.originalName)}
-                              className="text-xs font-medium translator-destructive translator-rounded px-2 py-1 hover:translator-destructive-bg-light"
-                            >
-                              Delete
-                            </button>
+                        ) : (
+                          <div className="flex items-center justify-between opacity-70">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <span
+                                className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs flex-shrink-0"
+                                style={{ backgroundColor: inputIcon.bg, color: inputIcon.color }}
+                              >
+                                {inputIcon.text}
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm translator-muted-foreground font-medium truncate">
+                                  Source file not found in storage
+                                </p>
+                                <p className="text-xs translator-muted-foreground">
+                                  This translation was created from a file that has since been removed.
+                                </p>
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
 
                       {/* Translated File Column */}
