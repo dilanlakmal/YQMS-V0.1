@@ -13,6 +13,13 @@ export const CreateTemplate = async (req, res) => {
       Measurement,
       Header,
       Photos,
+      // New Fields
+      Line,
+      Table,
+      Colors,
+      InspectedQtyMethod,
+      InspectedQty,
+      // Existing
       QualityPlan,
       Conclusion,
       DefectCategoryList
@@ -36,6 +43,11 @@ export const CreateTemplate = async (req, res) => {
       Measurement,
       Header,
       Photos,
+      Line: Line || "Yes",
+      Table: Table || "Yes",
+      Colors: Colors || "Yes",
+      InspectedQtyMethod: InspectedQtyMethod || "NA",
+      InspectedQty: InspectedQty || 0,
       QualityPlan,
       Conclusion,
       DefectCategoryList: DefectCategoryList || []
@@ -53,6 +65,54 @@ export const CreateTemplate = async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// export const CreateTemplate = async (req, res) => {
+//   try {
+//     const {
+//       ReportType,
+//       Measurement,
+//       Header,
+//       Photos,
+//       QualityPlan,
+//       Conclusion,
+//       DefectCategoryList
+//     } = req.body;
+
+//     if (!ReportType) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Report Type is required." });
+//     }
+
+//     // Auto-increment 'no'
+//     const maxDoc = await QASectionsTemplates.findOne()
+//       .sort({ no: -1 })
+//       .select("no");
+//     const nextNo = maxDoc ? maxDoc.no + 1 : 1;
+
+//     const newTemplate = new QASectionsTemplates({
+//       no: nextNo,
+//       ReportType,
+//       Measurement,
+//       Header,
+//       Photos,
+//       QualityPlan,
+//       Conclusion,
+//       DefectCategoryList: DefectCategoryList || []
+//     });
+
+//     await newTemplate.save();
+
+//     res.status(201).json({
+//       success: true,
+//       message: "Report Template created successfully.",
+//       data: newTemplate
+//     });
+//   } catch (error) {
+//     console.error("Error creating template:", error);
+//     res.status(500).json({ success: false, error: error.message });
+//   }
+// };
 
 /**
  * GET All Templates (Sorted by No)

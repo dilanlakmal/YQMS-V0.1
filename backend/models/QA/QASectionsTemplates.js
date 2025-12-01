@@ -31,6 +31,30 @@ const qaSectionsTemplatesSchema = new mongoose.Schema(
       enum: ["Yes", "No"],
       default: "Yes"
     },
+    Line: {
+      type: String,
+      enum: ["Yes", "No"],
+      default: "Yes"
+    },
+    Table: {
+      type: String,
+      enum: ["Yes", "No"],
+      default: "Yes"
+    },
+    Colors: {
+      type: String,
+      enum: ["Yes", "No"],
+      default: "Yes"
+    },
+    InspectedQtyMethod: {
+      type: String,
+      enum: ["NA", "Fixed", "AQL"],
+      default: "NA"
+    },
+    InspectedQty: {
+      type: Number,
+      default: 0
+    },
     QualityPlan: {
       type: String,
       enum: ["Yes", "No"],

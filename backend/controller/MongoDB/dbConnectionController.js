@@ -103,6 +103,8 @@ import createQASectionsProductLocationModel from "../../models/QA/QASectionsProd
 import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
 import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
 import createQASectionsAqlBuyerConfigModel from "../../models/QA/QASectionsAqlBuyerConfig.js";
+import createQASectionsLineModel from "../../models/QA/QASectionsLine.js";
+import createQASectionsTableModel from "../../models/QA/QASectionsTable.js";
 
 import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMeasurementSpecs.js";
 
@@ -264,6 +266,8 @@ export const QASectionsAqlValues =
   createQASectionsAqlValuesModel(ymProdConnection);
 export const QASectionsAqlBuyerConfig =
   createQASectionsAqlBuyerConfigModel(ymProdConnection);
+export const QASectionsLine = createQASectionsLineModel(ymProdConnection);
+export const QASectionsTable = createQASectionsTableModel(ymProdConnection);
 
 export const QASectionsMeasurementSpecs =
   createQASectionsMeasurementSpecsModel(ymProdConnection);

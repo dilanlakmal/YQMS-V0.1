@@ -13,7 +13,9 @@ import {
   CheckSquare,
   Image as ImageIcon,
   BookOpen,
-  Sliders
+  Sliders,
+  Factory,
+  Grid
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -21,6 +23,7 @@ import YPivotQASectionsHeader from "../components/inspection/PivotY/QASections/Y
 import YPivotQASectionsPacking from "../components/inspection/PivotY/QASections/YPivotQASectionsPacking";
 import YPivotQASectionsPhotos from "../components/inspection/PivotY/QASections/YPivotQASectionsPhotos";
 import YPivotQASectionsProduct from "../components/inspection/PivotY/QASections/YPivotQASectionsProduct";
+import YPivotQASectionsSubConFactoryManagement from "../components/inspection/PivotY/QASections/YPivotQASectionsSubConFactoryManagement";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -81,6 +84,14 @@ const YPivotQASections = () => {
         ),
         gradient: "from-green-500 to-emerald-500",
         description: "Production management"
+      },
+      {
+        id: "subcon",
+        label: "Sub-Con Factory",
+        icon: <Factory size={20} />, // You can use Factory icon or Users
+        component: <YPivotQASectionsSubConFactoryManagement />,
+        gradient: "from-teal-500 to-emerald-500", // Choose a distinct gradient
+        description: "Manage Sub-Con Factories & QCs"
       }
     ],
     [activeSubTab]
@@ -92,6 +103,16 @@ const YPivotQASections = () => {
         id: "buyer",
         label: "Buyer",
         icon: <Users size={20} />
+      },
+      {
+        id: "lines",
+        label: "Lines",
+        icon: <Factory size={20} />
+      },
+      {
+        id: "tables",
+        label: "Tables",
+        icon: <Grid size={20} />
       },
       {
         id: "category",
