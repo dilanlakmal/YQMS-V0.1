@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import { API_BASE_URL } from "../../config";
 import OrderDetailsSection from "../components/inspection/qc2_washing/Home/OrderDetailsSection";
@@ -12,6 +12,7 @@ import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
 import { encodeColorForUrl } from "../utils/colorUtils";
+import { Shield, Sparkles, User, ClipboardList, Edit, BarChart3 } from 'lucide-react';
 
 const normalizeImageSrc = (src) => {    
   if (!src) return "";
@@ -2402,166 +2403,368 @@ if (
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
-      <PageTitle />
-      <div className=" border-b border-gray-300 dark:border-gray-700 mb-6 mt-4">
-        <nav className="-mb-px flex justify-center space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => handleTabChange("newInspection")}
-            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === "newInspection"
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-          >
-            New Inspection
-          </button>
-          <button
-            onClick={() => handleTabChange("subConEditQty")}
-            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === "subConEditQty"
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-          >
-            Sub_Con Edit
-          </button>
-          <button
-            onClick={() => handleTabChange("submittedData")}
-            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === "submittedData"
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-          >
-            Daily View
-          </button>
-        </nav>
+  const tabs = [
+    {
+      id: "newInspection",
+      label: "New Inspection",
+      icon: <ClipboardList size={20} />,
+      description: "Create New QC Inspection"
+    },
+    {
+      id: "subConEditQty",
+      label: "Sub_Con Edit",
+      icon: <Edit size={20} />,
+      description: "Edit Sub Contractor Data"
+    },
+    {
+      id: "submittedData",
+      label: "Daily View",
+      icon: <BarChart3 size={20} />,
+      description: "View Daily Reports"
+    }
+  ];
+
+  const activeTabData = tabs.find(tab => tab.id === activeTab);
+
+     return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      <main
-        className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-          activeTab === "submittedData" || activeTab === "subConEditQty"
-            ? "max-w-none px-2 sm:px-4 lg:px-6"
-            : "max-w-7xl px-4 sm:px-6 lg:px-8"
-        }`}
-      >
-        {activeTab === "newInspection" && (
-          <>
-            <OverAllSummaryCard summary={formData} />
-            <OrderDetailsSection
-              onLoadSavedDataById={loadSavedDataById}
-              setSavedSizes={setSavedSizes}
-              formData={formData}
-              setFormData={setFormData}
-              handleInputChange={handleInputChange}
-              fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
-              colorOptions={colorOptions}
-              subFactories={subFactories}
-              user={user}
-              isVisible={orderSectionVisible}
-              onToggle={toggleOrderSection}
-              activateNextSection={activateAllSections}
-              styleSuggestions={styleSuggestions}
-              fetchMatchingStyles={fetchMatchingStyles}
-              setStyleSuggestions={setStyleSuggestions}
-              orderNumbers={filteredOrderNumbers}
-              filterOrderNumbers={filterOrderNumbers}
-              orderNoSuggestions={orderNoSuggestions}
-              showOrderNoSuggestions={showOrderNoSuggestions}
-              setShowOrderNoSuggestions={setShowOrderNoSuggestions}
-              colorOrderQty={colorOrderQty}
-              inspectionData={inspectionData}
-              processData={processData}
-              defectData={defectData}
-              addedDefects={addedDefects}
-              comment={comment}
-              measurementData={measurementData}
-              uploadedImages={uploadedImages}
-              setRecordId={setRecordId}
-              isSaved={orderSectionSaved}
-              setIsSaved={setOrderSectionSaved}
-            />
+      {/* Header Section */}
+      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+        <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
+          
+          {/* MOBILE/TABLET LAYOUT (< lg) */}
+          <div className="lg:hidden space-y-3">
+            {/* Top Row: Title + User */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                  <Shield size={20} className="text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                      QC Washing System
+                    </h1>
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
+                      <Sparkles size={10} className="text-yellow-300" />
+                      <span className="text-[10px] font-bold text-white">
+                        PRO
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
+                    Quality Control & Inspection Management
+                  </p>
+                </div>
+              </div>
+              {user && (
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
+                    <User size={16} className="text-white" />
+                  </div>
+                  <div className="hidden sm:block">
+                    <p className="text-white font-bold text-xs leading-tight">
+                      {user.job_title || "Operator"}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      ID: {user.emp_id}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
 
-            {inspectionSectionVisible && formData.before_after_wash === "After Wash" && (
-              <InspectionDataSection
-                onLoadSavedDataById={loadSavedDataById}
-                inspectionData={inspectionData}
-                setInspectionData={setInspectionData}
-                processData={processData}
-                setProcessData={setProcessData}
-                defectData={defectData}
-                isVisible={inspectionContentVisible} // Use content visibility state
-                onToggle={toggleInspectionSection}
-                machineType={machineType}
-                setMachineType={setMachineType}
-                washQty={formData.washQty}
-                setDefectData={setDefectData}
-                recordId={recordId}
-                washType={formData.washType}
-                standardValues={standardValues}
-                setStandardValues={setStandardValues}
-                actualValues={actualValues}
-                setActualValues={setActualValues}
-                machineStatus={machineStatus}
-                setMachineStatus={setMachineStatus}
-                normalizeImageSrc={normalizeImageSrc}
-                checkpointInspectionData={checkpointInspectionData}
-                setCheckpointInspectionData={setCheckpointInspectionData}
-                timeCoolEnabled={timeCoolEnabled}
-                setTimeCoolEnabled={setTimeCoolEnabled}
-                timeHotEnabled={timeHotEnabled}
-                setTimeHotEnabled={setTimeHotEnabled}
-                checkpointDefinitions={checkpointDefinitions}
-              />
-            )}
+            {/* Tab Navigation - Mobile */}
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                        isActive
+                          ? "bg-white shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      <div
+                        className={`transition-colors duration-300 ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            {/* Only render when defectSectionVisible is true */}
-            {defectSectionVisible && (
-              <DefectDetailsSection
-                onLoadSavedDataById={loadSavedDataById}
-                formData={formData}
-                handleInputChange={handleInputChange}
-                defectOptions={defectOptions}
-                addedDefects={addedDefects}
-                setAddedDefects={setAddedDefects}
-                uploadedImages={uploadedImages}
-                setUploadedImages={setUploadedImages}
-                isVisible={defectContentVisible} // Use content visibility state
-                onToggle={toggleDefectSection}
-                defectStatus={formData.result}
-                recordId={recordId}
-                defectsByPc={defectsByPc}
-                setDefectsByPc={setDefectsByPc}
-                comment={comment}
-                setComment={setComment}
-                normalizeImageSrc={normalizeImageSrc}
-              />
-            )}
+            {/* Active Status Indicator */}
+            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+              <div className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+              </div>
+              <div>
+                <p className="text-white font-bold text-xs leading-tight">
+                  {activeTabData?.label}
+                </p>
+                <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                  Active Module
+                </p>
+              </div>
+            </div>
+          </div>
 
-            {/* Only render when measurementSectionVisible is true */}
-            {measurementSectionVisible && (
-              <MeasurementDetailsSection
-                onLoadSavedDataById={loadSavedDataById}
-                orderNo={formData.orderNo || formData.style}
-                color={formData.color}
-                before_after_wash={formData.before_after_wash}
-                isVisible={measurementContentVisible} // Use content visibility state
-                onToggle={toggleMeasurementSection}
-                savedSizes={savedSizes}
-                setSavedSizes={setSavedSizes}
-                onSizeSubmit={handleSizeSubmit}
-                measurementData={measurementData}
-                showMeasurementTable={showMeasurementTable}
-                onMeasurementEdit={handleMeasurementEdit}
-                onMeasurementChange={handleMeasurementChange}
-                recordId={recordId}
-              />
-            )}
+          {/* DESKTOP LAYOUT (>= lg) */}
+          <div className="hidden lg:flex lg:flex-col lg:gap-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-6 flex-1">
+                {/* Logo Area */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                    <Shield size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h1 className="text-2xl font-black text-white tracking-tight">
+                        QC Washing System
+                      </h1>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
+                        <Sparkles size={12} className="text-yellow-300" />
+                        <span className="text-xs font-bold text-white">
+                          PRO
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-indigo-100 font-medium">
+                      Quality Control & Inspection Management Dashboard
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tab Navigation - Desktop */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                    {tabs.map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => handleTabChange(tab.id)}
+                          className={`group relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-300 ${
+                            isActive
+                              ? "bg-white shadow-lg scale-105"
+                              : "bg-transparent hover:bg-white/20 hover:scale-102"
+                          }`}
+                        >
+                          <div
+                            className={`transition-colors duration-300 ${
+                              isActive ? "text-indigo-600" : "text-white"
+                            }`}
+                          >
+                            {React.cloneElement(tab.icon, {
+                              className: "w-5 h-5"
+                            })}
+                          </div>
+                          <span
+                            className={`text-xs font-bold transition-colors duration-300 ${
+                              isActive ? "text-indigo-600" : "text-white"
+                            }`}
+                          >
+                            {tab.label}
+                          </span>
+                          {isActive && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Status Indicator */}
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+                    <div className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-sm leading-tight">
+                        {activeTabData?.label}
+                      </p>
+                      <p className="text-indigo-200 text-xs font-medium leading-tight">
+                        {activeTabData?.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Info */}
+              {user && (
+                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
+                    <User size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
+                      {user.job_title || "Operator"}
+                    </p>
+                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      ID: {user.emp_id}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
+        <div className="animate-fadeIn">
+          <div className="transform transition-all duration-500 ease-out">
+            {/* Tab Content */}
+            <main
+              className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
+                activeTab === "submittedData" || activeTab === "subConEditQty"
+                  ? "max-w-none px-2 sm:px-4 lg:px-6"
+                  : "max-w-7xl px-4 sm:px-6 lg:px-8"
+              }`}
+            >
+              {activeTab === "newInspection" && (
+                <>
+                  <OverAllSummaryCard summary={formData} />
+
+                  <OrderDetailsSection
+                    onLoadSavedDataById={loadSavedDataById}
+                    setSavedSizes={setSavedSizes}
+                    formData={formData}
+                    setFormData={setFormData}
+                    handleInputChange={handleInputChange}
+                    fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
+                    colorOptions={colorOptions}
+                    subFactories={subFactories}
+                    user={user}
+                    isVisible={orderSectionVisible}
+                    onToggle={toggleOrderSection}
+                    activateNextSection={activateAllSections}
+                    styleSuggestions={styleSuggestions}
+                    fetchMatchingStyles={fetchMatchingStyles}
+                    setStyleSuggestions={setStyleSuggestions}
+                    orderNumbers={filteredOrderNumbers}
+                    filterOrderNumbers={filterOrderNumbers}
+                    orderNoSuggestions={orderNoSuggestions}
+                    showOrderNoSuggestions={showOrderNoSuggestions}
+                    setShowOrderNoSuggestions={setShowOrderNoSuggestions}
+                    colorOrderQty={colorOrderQty}
+                    inspectionData={inspectionData}
+                    processData={processData}
+                    defectData={defectData}
+                    addedDefects={addedDefects}
+                    comment={comment}
+                    measurementData={measurementData}
+                    uploadedImages={uploadedImages}
+                    setRecordId={setRecordId}
+                    isSaved={orderSectionSaved}
+                    setIsSaved={setOrderSectionSaved}
+                  />
+
+                  {inspectionSectionVisible && formData.before_after_wash === "After Wash" && (
+                    <InspectionDataSection
+                      onLoadSavedDataById={loadSavedDataById}
+                      inspectionData={inspectionData}
+                      setInspectionData={setInspectionData}
+                      processData={processData}
+                      setProcessData={setProcessData}
+                      defectData={defectData}
+                      isVisible={inspectionContentVisible}
+                      onToggle={toggleInspectionSection}
+                      machineType={machineType}
+                      setMachineType={setMachineType}
+                      washQty={formData.washQty}
+                      setDefectData={setDefectData}
+                      recordId={recordId}
+                      washType={formData.washType}
+                      standardValues={standardValues}
+                      setStandardValues={setStandardValues}
+                      actualValues={actualValues}
+                      setActualValues={setActualValues}
+                      machineStatus={machineStatus}
+                      setMachineStatus={setMachineStatus}
+                      normalizeImageSrc={normalizeImageSrc}
+                      checkpointInspectionData={checkpointInspectionData}
+                      setCheckpointInspectionData={setCheckpointInspectionData}
+                      timeCoolEnabled={timeCoolEnabled}
+                      setTimeCoolEnabled={setTimeCoolEnabled}
+                      timeHotEnabled={timeHotEnabled}
+                      setTimeHotEnabled={setTimeHotEnabled}
+                      checkpointDefinitions={checkpointDefinitions}
+                    />
+                  )}
+
+                  {defectSectionVisible && (
+                    <DefectDetailsSection
+                      onLoadSavedDataById={loadSavedDataById}
+                      formData={formData}
+                      handleInputChange={handleInputChange}
+                      defectOptions={defectOptions}
+                      addedDefects={addedDefects}
+                      setAddedDefects={setAddedDefects}
+                      uploadedImages={uploadedImages}
+                      setUploadedImages={setUploadedImages}
+                      isVisible={defectContentVisible}
+                      onToggle={toggleDefectSection}
+                      defectStatus={formData.result}
+                      recordId={recordId}
+                      defectsByPc={defectsByPc}
+                      setDefectsByPc={setDefectsByPc}
+                      comment={comment}
+                      setComment={setComment}
+                      normalizeImageSrc={normalizeImageSrc}
+                    />
+                  )}
+
+                  {measurementSectionVisible && (
+                    <MeasurementDetailsSection
+                      onLoadSavedDataById={loadSavedDataById}
+                      orderNo={formData.orderNo || formData.style}
+                      color={formData.color}
+                      before_after_wash={formData.before_after_wash}
+                      isVisible={measurementContentVisible}
+                      onToggle={toggleMeasurementSection}
+                      savedSizes={savedSizes}
+                      setSavedSizes={setSavedSizes}
+                      onSizeSubmit={handleSizeSubmit}
+                      measurementData={measurementData}
+                      showMeasurementTable={showMeasurementTable}
+                      onMeasurementEdit={handleMeasurementEdit}
+                      onMeasurementChange={handleMeasurementChange}
+                      recordId={recordId}
+                    />
+                  )}
 
             <div className="flex justify-end space-x-4">
               <button
@@ -2804,6 +3007,62 @@ if (
         {activeTab === "submittedData" && <SubmittedWashingDataPage />}
         {activeTab === "subConEditQty" && <SubConEdit />}
       </main>
+    </div>
+     </div>
+  </div>
+  <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out;
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+        }
+        .bg-grid-white {
+          background-image: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            );
+        }
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+        .hover\\:scale-102:hover {
+          transform: scale(1.02);
+        }
+      `}</style>
     </div>
   );
 };

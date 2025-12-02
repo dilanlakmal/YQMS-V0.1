@@ -42,6 +42,7 @@ const SubmittedWashingDataPage = () => {
 });
 const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
  const [checkpointDefinitions, setCheckpointDefinitions] = useState([]);
+ 
 
   // Single handleViewDetails function (removed the duplicate)
   const handleViewDetails = (record) => {
@@ -151,6 +152,7 @@ const fetchSubmittedData = async (showLoading = true) => {
   useEffect(() => {
     const processDataForView = async () => {
       if (isLoading || submittedData.length === 0) return;
+      if (isLoading) return;
 
       if (viewMode === 'estimated') {
         const dataToProcess = submittedData.map(record => ({
@@ -202,6 +204,15 @@ const fetchSubmittedData = async (showLoading = true) => {
           setIsProcessing(false);
         }, 100);
       }
+      // The initial data processing is now much simpler.
+      // We just map the submitted data to add a displayWashQty.
+      const initialProcessedData = submittedData.map(record => ({
+        ...record,
+        displayWashQty: record.washQty,
+        isActualWashQty: false, // Default to false
+      }));
+      setProcessedData(initialProcessedData);
+      applyFilters(currentFilters || {}, true, initialProcessedData);
     };
 
     processDataForView();
@@ -660,12 +671,21 @@ const handleDownloadPDF = async (record) => {
       return value && value !== '';
     });
 
-    // If no filters, show last 20 records (most recent)
+    // If no filters, show last 7 days of records (most recent)
     if (!hasFilters) {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0); // Set to the beginning of the day
+
+      filtered = filtered.filter(item => {
+        if (!item.date) return false;
+        const itemDate = new Date(item.date);
+        return itemDate >= sevenDaysAgo;
+      });
+
       // Sort by date descending to get most recent records first
       filtered = filtered.sort((a, b) => new Date(b.date) - new Date(a.date));
       setFilteredData(filtered);
-      setCurrentPage(1);
       return;
     }
     
@@ -812,6 +832,41 @@ const handleDownloadPDF = async (record) => {
     processCurrentPageAQL();
   }, [filteredData, currentPage, itemsPerPage, aqlEndpointAvailable, viewMode]);
 
+  // NEW: useEffect to fetch actual wash qty for the current page
+  useEffect(() => {
+    const fetchActualsForCurrentPage = async () => {
+      // Only run in 'actual' mode and if there's data
+      if (viewMode !== 'actual' || paginatedData.length === 0) return;
+
+      const recordsToUpdate = paginatedData.filter(
+        record => !record.isActualWashQty // Only fetch for records we haven't processed yet
+      );
+
+      if (recordsToUpdate.length === 0) return;
+
+      const updatedRecords = await Promise.all(
+        recordsToUpdate.map(async record => {
+          const washQtyData = await fetchRealWashQty(record);
+          return { ...record, ...washQtyData };
+        })
+      );
+
+      // Merge the updated records back into the main processedData list
+      setProcessedData(prevData => {
+        const newData = [...prevData];
+        updatedRecords.forEach(updatedRecord => {
+          const index = newData.findIndex(item => item._id === updatedRecord._id);
+          if (index !== -1) {
+            newData[index] = updatedRecord;
+          }
+        });
+        return newData;
+      });
+    };
+
+    fetchActualsForCurrentPage();
+  }, [paginatedData, viewMode]); // Runs when the page changes or viewMode switches to 'actual'
+
   useEffect(() => {
     if (viewDetailsModal.isOpen && viewDetailsModal.itemData?._id) {
       const updatedItemData = filteredData.find(
@@ -903,7 +958,7 @@ const handleDownloadPDF = async (record) => {
                 <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
                   (Processing actual data...)
                 </span>
-              )}
+              )}             
             </h2>
              <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
               <button
