@@ -9,7 +9,7 @@ import express from "express";
 import fs from "fs";
 import axios from "axios";
 import https from "https"; // Import https for HTTPS server
-//import http from "http"; // Import http for Socket.io
+import http from "http"; // Import http for Socket.io
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
@@ -135,6 +135,13 @@ import {
   ymProdConnection
 } from "./controller/MongoDB/dbConnectionController.js";
 import qcRealWashQty from "./routes/QC_Real_Wash_Qty/QcRealWashQtyRoute.js";
+import cuttingDefectsRoutes from "./routes/CuttingDefects/cuttingInlineDefectsRoutes.js";
+import cuttingInlineOrdersRoutes from "./routes/CuttingDefects/cuttingInlineOrdersRoutes.js";
+import cuttingInlineReportRoutes from "./routes/CuttingDefects/cuttingInlineReportRoutes.js";
+
+/* ------------------------------
+   Connection String
+------------------------------ */
 
 /* ------------------------------
    Connection String
@@ -147,145 +154,27 @@ const app = express();
 const PORT = 5001;
 
 /* ------------------------------
-   for HTTPS
+   HTTP Server Configuration
 ------------------------------ */
 
-// Load SSL certificates
-const privateKey = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162-key.pem",
-  //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem",
-  //"/usr/local/share/ca-certificates/yorkmars.key",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162.pem",
-  //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem",
-  //"/usr/local/share/ca-certificates/yorkmars.crt",
-  "utf8"
-);
+// Always use HTTP server (no SSL checking)
+const server = http.createServer(app);
+const isHTTPS = false;
 
-const credentials = {
-  key: privateKey,
-  cert: certificate
-};
-
-// Create HTTPS server
-const server = https.createServer(credentials, app);
+console.log("Starting HTTP server (SSL disabled)...");
 
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.12.162:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
+    origin: "http://localhost:3001", // Always use HTTP
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }
 });
 
-// Define allowed origins once
-const allowedOrigins = [
-  "https://192.167.12.85:3001",
-  "http://localhost:3001",
-  "https://localhost:3001",
-  "https://yqms.yaikh.com",
-  "https://192.167.12.162:3001"
-];
-
-// CORS configuration
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("CORS blocked origin:", origin);
-      callback(null, true); // Allow all origins for image proxy
-    }
-  },
-  methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "Cache-Control",
-    "Origin",
-    "X-Requested-With",
-    "Accept",
-    "Pragma",
-    "Expires",
-    "Last-Modified",
-    "If-Modified-Since",
-    "If-None-Match",
-    "ETag"
-  ],
-  exposedHeaders: [
-    "Content-Length",
-    "Content-Type",
-    "Cache-Control",
-    "Last-Modified",
-    "ETag"
-  ],
-  credentials: false, // Set to false for broader compatibility
-  optionsSuccessStatus: 204
-};
-
-// Apply CORS globally
-app.use(cors(corsOptions));
-
-app.use(
-  "/storage",
-  express.static(path.join(__dirname, "public/storage"), {
-    setHeaders: (res, path) => {
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
-);
-
-app.use(
-  "/public",
-  express.static(path.join(__dirname, "../public"), {
-    setHeaders: (res, path) => {
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
-);
-
-// Fallback for missing images
-app.get("/storage/qc2_images/default-placeholder.png", (req, res) => {
-  const transparentPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg==",
-    "base64"
-  );
-  res.set("Content-Type", "image/png");
-  res.set("Cache-Control", "public, max-age=3600");
-  res.send(transparentPng);
-});
-
-// Simplified image proxy endpoint
-app.get("/api/image-proxy/:imageUrl(*)", async (req, res) => {
-  try {
-    const imageUrl = decodeURIComponent(req.params.imageUrl);
-
-    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
-
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      timeout: 10000,
-      httpsAgent,
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
-
-    const contentType = response.headers["content-type"] || "image/jpeg";
-    const base64 = Buffer.from(response.data).toString("base64");
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
-    res.json({ dataUrl });
-  } catch (error) {
-    console.error("Image proxy error:", error.message);
-    res.status(404).json({ error: "Image not found" });
-  }
-});
+app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+app.use("/public", express.static(path.join(__dirname, "../public")));
 
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
@@ -295,10 +184,10 @@ app.use(bodyParser.json());
 
 // // --- Whitelist of allowed origins ---
 // const allowedOrigins = [
-//   "https://172.20.10.14:3001",
-//   "https://192.167.12.162:3001",
-//   "https://192.167.12.162:5001",
-//   "https://yqms.yaikh.com/"
+//   "http://localhost:3001",
+//   "https://localhost:3001",
+//   "http://localhost:5001",
+//   "https://localhost:5001"
 // ];
 
 // const corsOptions = {
@@ -324,7 +213,7 @@ app.use(bodyParser.json());
 
 app.use(
   cors({
-    origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
+    origin: "http://localhost:3001", // Always use HTTP
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -468,6 +357,9 @@ app.use((req, res, next) => {
   Functional routs
 ------------------------------ */
 app.use(qcRealWashQty);
+app.use(cuttingDefectsRoutes);
+app.use(cuttingInlineOrdersRoutes);
+app.use(cuttingInlineReportRoutes);
 
 // /* ------------------------------
 //    YM DataSore SQL
@@ -35472,5 +35364,5 @@ app.get("/api/yorksys-orders/:moNo", async (req, res) => {
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+  console.log(`HTTPS Server is running on http://localhost:${PORT}`);
 });

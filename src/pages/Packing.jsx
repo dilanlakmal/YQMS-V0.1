@@ -103,7 +103,7 @@ const PackingPage = () => {
       }
 
       setScannedData(data);
-      setPassQtyPacking(data.passQtyPacking);
+      setPassQtyPacking(data.passQtyPacking);     
       setIsAdding(true);
       setCountdown(5);
     } catch (err) {

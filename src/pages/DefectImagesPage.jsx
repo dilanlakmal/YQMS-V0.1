@@ -55,7 +55,7 @@ function DefectImagesPage({ defectImages }) {
           </table>
         </div>
       </div>
-    </div>
+    </div>  
   );
 }
 

@@ -2,16 +2,20 @@ import mongoose from "mongoose";
 
 //Schemas
 import creatQCRealWashQty from "../../models/QCRealWashingQty.js";
+import createCuttingInlineDefectModel from "../../models/CuttingInlineDefect.js";
+import createCuttingInlineOrderModel from "../../models/CuttingInlineOrder.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin"
+  // "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?retryWrites=true&w=majority"
+  // "mongodb://localhost:27017/ym_prod"
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/eco_development?authSource=admin"
+  // "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?retryWrites=true&w=majority"
+  // "mongodb://localhost:27017/ym_prod"
 );
 
 //Connection status
@@ -22,7 +26,7 @@ ymProdConnection.on("error", (err) =>
   console.error("❌ unexpected error:", err)
 );
 
-ymEcoConnection.on("connected", () =>
+ymEcoConnection.on("connected", () => 
   console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
 );
 ymEcoConnection.on("error", (err) =>
@@ -31,6 +35,8 @@ ymEcoConnection.on("error", (err) =>
 
 //Collections
 export const QCRealWashQty = creatQCRealWashQty(ymProdConnection);
+export const CuttingInlineDefect = createCuttingInlineDefectModel(ymProdConnection);
+export const CuttingInlineOrder = createCuttingInlineOrderModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {
