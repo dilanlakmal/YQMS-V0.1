@@ -56,4 +56,7 @@ temp/uploads/
 # Ignore the .env file inside the ai_service folder and the virtual environment.
 /ai_service/.env
 /ai_service/venv
+
+# Ignore the non-essential files in ai agent sections
 translatedocs.ipynb
+ai_agent_docs_guide/system_translation_docs.ipynb
