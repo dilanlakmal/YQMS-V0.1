@@ -20,10 +20,10 @@ export default defineConfig({
     open: true,
     https: {
       key: fs.readFileSync(
-        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/backend/Config/192.167.12.162-key.pem"
+        "./backend/Config/192.167.12.162-key.pem"
       ),
       cert: fs.readFileSync(
-        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/backend/Config/192.167.12.162.pem"
+        "./backend/Config/192.167.12.162.pem"
       )
     }
   },
