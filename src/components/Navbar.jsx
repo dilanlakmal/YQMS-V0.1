@@ -13,6 +13,7 @@ import { useTheme } from "./context/ThemeContext";
 import { API_BASE_URL } from "../../config";
 import LanguageSwitcher from "../components/layout/LangSwitch";
 import YQMSAIChatBox from "../pages/YQMSAIChatBox";
+import ChatGuide from "./chatbot/ChatStepIntro"; 
 
 import {
   Layers,
@@ -318,8 +319,12 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
   }, []);
 
   const handleBotClick = () => {
-    setIsChatOpen((prev) => !prev);
-    navigate("/chatbot");
+    const hasSeenGuide = localStorage.getItem("hasSeenGuide");
+    if (hasSeenGuide) {
+      setIsChatOpen((prev) => !prev);
+      navigate("/chatbot");
+    }
+
   };
 
   return  (
@@ -385,12 +390,18 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
             <div className="flex items-center space-x-2 sm:space-x-3">
               <LanguageSwitcher />
               {/* --- ADD THE AI BOT BUTTON HERE --- */}
+              <ChatGuide steps={[
+                {
+                  target: "#botIcon",
+                  content: "Our main chatbot live here"
+                }
+              ]}/>
               <button
                 onClick={handleBotClick}
                 className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors relative"
                 aria-label="Open AI Chat"
               >
-                <Bot className="w-5 h-5" />
+                <Bot id="botIcon" className="w-5 h-5" />
                 {/* Optional: Add a notification dot */}
                 {/* <span className="absolute top-1 right-1 block h-2 w-2 rounded-full bg-blue-500 ring-2 ring-white dark:ring-slate-900" /> */}
               </button>
