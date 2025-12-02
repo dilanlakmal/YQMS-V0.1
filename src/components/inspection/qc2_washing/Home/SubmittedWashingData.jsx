@@ -42,7 +42,68 @@ const SubmittedWashingDataPage = () => {
 });
 const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
  const [checkpointDefinitions, setCheckpointDefinitions] = useState([]);
+
+//  const [isRefreshing, setIsRefreshing] = useState(false);
+// const [refreshStatus, setRefreshStatus] = useState(null);
  
+// const handleRefreshActualWashQty = async () => {
+//   try {
+//     setIsRefreshing(true);
+//     setRefreshStatus(null);
+
+//     const response = await fetch(`${API_BASE_URL}/api/qc-washing/refresh-actual-wash-qty`, {
+//       method: 'POST',
+//       headers: {
+//         'Content-Type': 'application/json',
+//       },
+//     });
+
+//     const result = await response.json();
+
+//     if (result.success) {
+//       setRefreshStatus({
+//         type: 'success',
+//         message: result.message,
+//         details: result.data
+//       });
+
+//       // Show success message
+//       Swal.fire({
+//         title: "Success!",
+//         text: result.message,
+//         icon: "success",
+//         timer: 5000,
+//         showConfirmButton: true,
+//       });
+
+//       // Refresh the current data
+//       await fetchSubmittedData(false); // Refresh data without showing loading
+      
+//       // Reset processed data to trigger re-processing with new actual values
+//       setProcessedData([]);
+      
+//     } else {
+//       throw new Error(result.message || 'Failed to refresh actual wash quantities');
+//     }
+
+//   } catch (error) {
+//     console.error('Error refreshing actual wash quantities:', error);
+//     setRefreshStatus({
+//       type: 'error',
+//       message: error.message
+//     });
+
+//     Swal.fire({
+//       title: "Error!",
+//       text: `Failed to refresh: ${error.message}`,
+//       icon: "error",
+//       timer: 5000,
+//       showConfirmButton: true,
+//     });
+//   } finally {
+//     setIsRefreshing(false);
+//   }
+// };
 
   // Single handleViewDetails function (removed the duplicate)
   const handleViewDetails = (record) => {
@@ -150,101 +211,129 @@ const fetchSubmittedData = async (showLoading = true) => {
   }, []);
 
   useEffect(() => {
-    const processDataForView = async () => {
-      if (isLoading || submittedData.length === 0) return;
-      if (isLoading) return;
+  const processDataForView = async () => {
+    if (isLoading || submittedData.length === 0) return;
 
-      if (viewMode === 'estimated') {
-        const dataToProcess = submittedData.map(record => ({
-          ...record,
-          displayWashQty: record.washQty,
-          isActualWashQty: false,
-        }));
-        setProcessedData(dataToProcess);
-        applyFilters(currentFilters || {}, currentFilters ? false : true, dataToProcess);
-      } else {
-        // Show estimated data immediately, then process actual data in background
-        const estimatedData = submittedData.map(record => ({
-          ...record,
-          displayWashQty: record.washQty,
-          isActualWashQty: false,
-        }));
-        setProcessedData(estimatedData);
-        applyFilters(currentFilters || {}, currentFilters ? false : true, estimatedData);
-        
-        setIsProcessing(true);
-        
-        // Process actual data in background
-        setTimeout(async () => {
-          const BATCH_SIZE = 10;
-          let actualData = [];
-          
-          for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
-            const batch = submittedData.slice(i, i + BATCH_SIZE);
-            const batchResults = await Promise.all(
-              batch.map(async (record) => {
-                const washQtyData = await fetchRealWashQty(record);
-                let finalRecord = { ...record, ...washQtyData };
-                return finalRecord;
-              })
-            );
-            actualData.push(...batchResults);
-            
-            // Update UI progressively
-            if (actualData.length % 20 === 0) {
-              const progressData = [...actualData, ...submittedData.slice(actualData.length).map(r => ({ ...r, displayWashQty: r.washQty, isActualWashQty: false }))];
-              setProcessedData(progressData);
-              applyFilters(currentFilters || {}, false, progressData);
-            }
-          }
-          
-          // Store final processed data and apply current filters
-          setProcessedData(actualData);
-          applyFilters(currentFilters || {}, false, actualData);
-          setIsProcessing(false);
-        }, 100);
-      }
-      // The initial data processing is now much simpler.
-      // We just map the submitted data to add a displayWashQty.
-      const initialProcessedData = submittedData.map(record => ({
+    if (viewMode === 'estimated') {
+      const dataToProcess = submittedData.map(record => ({
         ...record,
         displayWashQty: record.washQty,
-        isActualWashQty: false, // Default to false
+        isActualWashQty: false,
+        displayCheckedQty: record.checkedQty
       }));
-      setProcessedData(initialProcessedData);
-      applyFilters(currentFilters || {}, true, initialProcessedData);
-    };
+      setProcessedData(dataToProcess);
+      applyFilters(currentFilters || {}, currentFilters ? false : true, dataToProcess);
+    } else {
+      // For actual mode, show estimated data first, then process actual data
+      const estimatedData = submittedData.map(record => ({
+        ...record,
+        displayWashQty: record.washQty,
+        isActualWashQty: false,
+        displayCheckedQty: record.checkedQty
+      }));
+      setProcessedData(estimatedData);
+      applyFilters(currentFilters || {}, currentFilters ? false : true, estimatedData);
+      
+      setIsProcessing(true);
+      
+      // Process actual data in background
+      setTimeout(async () => {
+        const BATCH_SIZE = 10;
+        let actualData = [];
+        
+        for (let i = 0; i < submittedData.length; i += BATCH_SIZE) {
+          const batch = submittedData.slice(i, i + BATCH_SIZE);
+          const batchResults = await Promise.all(
+            batch.map(async (record) => {
+              const washQtyData = await fetchRealWashQty(record);
+              return { ...record, ...washQtyData };
+            })
+          );
+          actualData.push(...batchResults);
+          
+          // Update UI progressively
+          if (actualData.length % 20 === 0) {
+            const progressData = [...actualData, ...submittedData.slice(actualData.length).map(r => ({ 
+              ...r, 
+              displayWashQty: r.washQty, 
+              isActualWashQty: false,
+              displayCheckedQty: r.checkedQty
+            }))];
+            setProcessedData(progressData);
+            applyFilters(currentFilters || {}, false, progressData);
+          }
+        }
+        
+        // Store final processed data and apply current filters
+        setProcessedData(actualData);
+        applyFilters(currentFilters || {}, false, actualData);
+        setIsProcessing(false);
+      }, 100);
+    }
+  };
 
-    processDataForView();
-  }, [viewMode, submittedData, isLoading]);
+  processDataForView();
+}, [viewMode, submittedData, isLoading]);
+
 
   const fetchRealWashQty = async (record) => {
-    try {
-      if (record.reportType && (record.reportType.toLowerCase() === 'first output' || record.reportType.toLowerCase() === 'sop')) {
-        const isSOP = record.reportType.toLowerCase() === 'sop';
-        return { 
-          displayWashQty: record.washQty || 0, 
-          isActualWashQty: true, 
-          isFirstOutput: !isSOP, 
-          isSOP: isSOP,
-          originalWashQty: record.washQty || 0, 
-          source: isSOP ? 'sop' : 'first_output' 
-        };
-      }
+  try {
+    // For estimated mode, return original data
+    if (viewMode === 'estimated') {
+      return { 
+        displayWashQty: record.washQty || 0, 
+        isActualWashQty: false, 
+        originalWashQty: record.washQty || 0, 
+        source: 'original',
+        displayCheckedQty: record.checkedQty || 'N/A'
+      };
+    }
 
-      if (!record.reportType || record.reportType.toLowerCase() !== 'inline') {
-        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
-      }
+    // For actual mode, check if record already has actualWashQty
+    if (record.actualWashQty !== undefined && record.actualWashQty !== null) {
+      const actualCheckedQty = record.actualAQLValue?.sampleSize || record.checkedQty || 'N/A';
+      
+      return { 
+        displayWashQty: record.actualWashQty, 
+        isActualWashQty: true, 
+        originalWashQty: record.washQty || 0, 
+        source: 'qcwashing_actual',
+        displayCheckedQty: actualCheckedQty,
+        actualAQLValue: record.actualAQLValue
+      };
+    }
 
+    // Handle special report types
+    if (record.reportType && (record.reportType.toLowerCase() === 'first output' || record.reportType.toLowerCase() === 'sop')) {
+      const isSOP = record.reportType.toLowerCase() === 'sop';
+      return { 
+        displayWashQty: record.washQty || 0, 
+        isActualWashQty: true, 
+        isFirstOutput: !isSOP, 
+        isSOP: isSOP,
+        originalWashQty: record.washQty || 0, 
+        source: isSOP ? 'sop' : 'first_output',
+        displayCheckedQty: record.checkedQty || 'N/A'
+      };
+    }
+
+    // For inline reports without actualWashQty, try to fetch from external source (YM factory)
+    if (record.reportType?.toLowerCase() === 'inline') {
       const factoryName = record.factoryName || '';
-
+      
       if (factoryName.toUpperCase() === 'YM') {
         const dateStr = record.date ? new Date(record.date).toISOString().split('T')[0] : '';
         const styleNo = record.orderNo || '';
         let color = record.color || '';
 
         if (!dateStr || !styleNo || !color) {
-          return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
+          return { 
+            displayWashQty: record.washQty || 0, 
+            isActualWashQty: false, 
+            originalWashQty: record.washQty || 0, 
+            source: 'original',
+            displayCheckedQty: record.checkedQty || 'N/A'
+          };
         }
 
         const colorMatch = color.match(/\[([^\]]+)\]/);
@@ -254,9 +343,13 @@ const fetchSubmittedData = async (showLoading = true) => {
 
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
-          const response = await fetch(`${API_BASE_URL}/api/qc-real-washing-qty/search?` + new URLSearchParams({ inspectionDate: dateStr, styleNo: styleNo, color: color }), {
+          const response = await fetch(`${API_BASE_URL}/api/qc-real-washing-qty/search?` + new URLSearchParams({ 
+            inspectionDate: dateStr, 
+            styleNo: styleNo, 
+            color: color 
+          }), {
             signal: controller.signal
           });
           clearTimeout(timeoutId);
@@ -264,7 +357,14 @@ const fetchSubmittedData = async (showLoading = true) => {
           if (response.ok) {
             const data = await response.json();
             if (data.success && data.found && data.washQty > 0) {
-              return { displayWashQty: data.washQty, isActualWashQty: true, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'qc_real_wash_qty_ym', details: data.details };
+              return { 
+                displayWashQty: data.washQty, 
+                isActualWashQty: true, 
+                originalWashQty: record.washQty || 0, 
+                source: 'qc_real_wash_qty_ym', 
+                details: data.details,
+                displayCheckedQty: record.checkedQty || 'N/A'
+              };
             }
           }
         } catch (error) {
@@ -274,25 +374,41 @@ const fetchSubmittedData = async (showLoading = true) => {
             console.error('Error fetching real wash qty from qc_real_washing_qty:', error);
           }
         }
-        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
       } else {
+        // For non-YM factories, check for edited actual wash qty
         if (record.editedActualWashQty !== null && record.editedActualWashQty !== undefined) {
           return {
             displayWashQty: record.editedActualWashQty,
             isActualWashQty: true,
-            isFirstOutput: false,
             originalWashQty: record.washQty || 0,
             source: 'edited_actual_wash_qty',
-            details: { recordId: record._id, editedValue: record.editedActualWashQty, lastEditedAt: record.lastEditedAt }
+            details: { recordId: record._id, editedValue: record.editedActualWashQty, lastEditedAt: record.lastEditedAt },
+            displayCheckedQty: record.checkedQty || 'N/A'
           };
         }
-        return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'original' };
       }
-    } catch (error) {
-      console.error('Error in fetchRealWashQty:', error);
-      return { displayWashQty: record.washQty || 0, isActualWashQty: false, isFirstOutput: false, originalWashQty: record.washQty || 0, source: 'error' };
     }
-  };
+
+    // Default fallback
+    return { 
+      displayWashQty: record.washQty || 0, 
+      isActualWashQty: false, 
+      originalWashQty: record.washQty || 0, 
+      source: 'original',
+      displayCheckedQty: record.checkedQty || 'N/A'
+    };
+
+  } catch (error) {
+    console.error('Error in fetchRealWashQty:', error);
+    return { 
+      displayWashQty: record.washQty || 0, 
+      isActualWashQty: false, 
+      originalWashQty: record.washQty || 0, 
+      source: 'error',
+      displayCheckedQty: record.checkedQty || 'N/A'
+    };
+  }
+};
 
 
   // Helper function to extract defect details
@@ -958,7 +1074,12 @@ const handleDownloadPDF = async (record) => {
                 <span className="ml-2 text-sm text-blue-600 dark:text-blue-400">
                   (Processing actual data...)
                 </span>
-              )}             
+              )} 
+              {/* {isRefreshing && (
+        <span className="ml-2 text-sm text-orange-600 dark:text-orange-400">
+          (Refreshing actual wash quantities...)
+        </span>
+      )}             */}
             </h2>
              <div className="flex items-center bg-gray-200 dark:bg-gray-700 rounded-full p-1">
               <button
@@ -977,6 +1098,29 @@ const handleDownloadPDF = async (record) => {
               >
                 Actual
               </button>
+              {/* <button
+      onClick={handleRefreshActualWashQty}
+      disabled={isRefreshing || isLoading}
+      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+        isRefreshing || isLoading
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          : 'bg-blue-600 hover:bg-blue-700 text-white'
+      }`}
+    >
+      {isRefreshing ? (
+        <>
+          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+          Refreshing...
+        </>
+      ) : (
+        <>
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Refresh Actual Wash Qty
+        </>
+      )}
+    </button> */}
             </div>
           </div>
           <div className="flex items-center gap-6">
@@ -1005,7 +1149,22 @@ const handleDownloadPDF = async (record) => {
             </div>
           </div>
         </div>
-
+        {/* {refreshStatus && (
+  <div className={`mb-4 p-4 rounded-lg ${
+    refreshStatus.type === 'success' 
+      ? 'bg-green-50 border border-green-200 text-green-800' 
+      : 'bg-red-50 border border-red-200 text-red-800'
+  }`}>
+    <div className="font-medium">{refreshStatus.message}</div>
+    {refreshStatus.details && (
+      <div className="text-sm mt-2">
+        <div>Records processed: {refreshStatus.details.qcRealWashingQty?.total || 0}</div>
+        <div>Records updated: {refreshStatus.details.qcWashing?.modified || 0}</div>
+        <div>Operations executed: {refreshStatus.details.qcWashing?.operations || 0}</div>
+      </div>
+    )}
+  </div>
+)} */}
         {filteredData.length === 0 ? (
           <div className="text-center py-8">
             <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">📋</div>
@@ -1196,7 +1355,9 @@ const handleDownloadPDF = async (record) => {
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.checkedQty || 'N/A'}
+                        {viewMode === 'actual' && record.displayCheckedQty !== undefined 
+                          ? record.displayCheckedQty 
+                          : record.checkedQty || 'N/A'}
                       </td>
 
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">

@@ -24,25 +24,29 @@ import sharp from "sharp";
 // Endpoint to fetch all submitted QC washing data
 export const getAllQCWashingSubmittedData = async (req, res) => {
   try {
-      const submittedData = await QCWashing.find({ 
-        status: { $in: ['submitted', 'processing', 'auto-saved'] }
-      }).sort({ createdAt: -1 });
-  
-      res.json({ 
-        success: true, 
-        data: submittedData,
-        count: submittedData.length
-      });
-  
-    } catch (error) {
-      console.error("Error fetching submitted QC washing data:", error);
-      res.status(500).json({ 
-        success: false, 
-        message: "Failed to fetch submitted data", 
-        error: error.message 
-      });
-    }
+    const submittedData = await QCWashing.find({ 
+      status: { $in: ['submitted', 'processing', 'auto-saved'] }
+    })
+    .select('date orderNo before_after_wash checkedQty washQty totalCheckedPoint totalPass totalFail passRate totalCheckedPcs rejectedDefectPcs totalDefectCount defectRate defectRatio overallFinalResult orderQty colorOrderQty color washType reportType buyer factoryName aql inspectionDetails defectDetails measurementDetails isAutoSave userId status createdAt updatedAt submittedAt inspector actualWashQty actualAQLValue editedActualWashQty lastEditedAt')
+    .sort({ createdAt: -1 });
+
+    res.json({ 
+      success: true, 
+      data: submittedData,
+      count: submittedData.length
+    });
+
+  } catch (error) {
+    console.error("Error fetching submitted QC washing data:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Failed to fetch submitted data", 
+      error: error.message 
+    });
+  }
 };
+
+
 export const getQCWashingImageProxy = async (req, res) => {
   const imageUrl = decodeURIComponent(req.params.imageUrl);
   try {

@@ -8,6 +8,242 @@ import {
   getAqlLevelForBuyer
 } from "../../helpers/helperFunctions.js";
 
+
+// Backend endpoint - add this to your routes
+// export const refreshActualWashQty = async (req, res) => {
+//   try {
+//     console.log('Starting refresh process for actual wash quantities...');
+
+//     // Fetch all records from qc_real_wash_qty collection
+//     const realWashData = await QCRealWashQty.find({}).lean();
+//     console.log(`Found ${realWashData.length} records in qc_real_wash_qty collection`);
+
+//     if (realWashData.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         message: 'No data found in qc_real_wash_qty collection to process',
+//         data: {
+//           qcRealWashingQty: { total: 0 },
+//           qcWashing: { matched: 0, modified: 0, operations: 0 }
+//         }
+//       });
+//     }
+
+//     // Helper function to extract English color name from Chinese[English] format
+//     const extractEnglishColor = (colorString) => {
+//       const match = colorString.match(/\[([^\]]+)\]$/);
+//       if (match) {
+//         return match[1];
+//       }
+//       return colorString;
+//     };
+
+//     // Prepare bulk operations for QCWashing collection with AQL calculation
+//     const bulkOpsWashing = [];
+//     const updateResults = [];
+
+//     for (const record of realWashData) {
+//       try {
+//         // Calculate AQL based on washQty
+//         const washQtyNum = parseInt(record.washQty, 10);
+        
+//         // Get buyer and AQL level
+//         const buyer = await getBuyerFromMoNumber(record.Style_No);
+//         const aqlLevel = getAqlLevelForBuyer(buyer);
+
+//         // Find the AQL chart document where the wash qty falls within the defined range
+//         const aqlChart = await AQLChart.findOne({
+//           Type: "General",
+//           Level: "II",
+//           "LotSize.min": { $lte: washQtyNum },
+//           $or: [{ "LotSize.max": { $gte: washQtyNum } }, { "LotSize.max": null }]
+//         }).lean();
+
+//         let actualAQLValue = null;
+//         if (aqlChart) {
+//           const aqlEntry = aqlChart.AQL.find((aql) => aql.level === aqlLevel);
+//           if (aqlEntry) {
+//             actualAQLValue = {
+//               sampleSize: aqlChart.SampleSize,
+//               acceptedDefect: aqlEntry.AcceptDefect,
+//               rejectedDefect: aqlEntry.RejectDefect,
+//               levelUsed: aqlLevel,
+//               lotSize: washQtyNum,
+//               calculatedAt: new Date()
+//             };
+//           }
+//         }
+
+//         // Convert inspection date to match QCWashing date format
+//         const inspectionDate = new Date(record.inspectionDate);
+//         const startOfDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate());
+//         const endOfDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate() + 1);
+        
+//         // Extract English color name for matching
+//         const englishColor = extractEnglishColor(record.color);
+
+//         // Create filter for QCWashing update with additional conditions
+//         const washingFilter = {
+//           orderNo: record.Style_No,
+//           color: englishColor,
+//           reportType: "Inline",
+//           factoryName: "YM",
+//           date: {
+//             $gte: startOfDay,
+//             $lt: endOfDay
+//           }
+//         };
+
+//         // Check if any records match this filter before updating
+//         const matchingRecords = await QCWashing.find(washingFilter).select('orderNo color date reportType factoryName actualWashQty actualAQLValue').lean();
+
+//         // Store the matching info for later verification
+//         updateResults.push({
+//           Style_No: record.Style_No,
+//           originalColor: record.color,
+//           englishColor: englishColor,
+//           washQty: record.washQty,
+//           matchingRecordsCount: matchingRecords.length,
+//           filter: washingFilter
+//         });
+
+//         // Update QCWashing records that match the criteria
+//         if (matchingRecords.length > 0) {
+//           bulkOpsWashing.push({
+//             updateMany: {
+//               filter: washingFilter,
+//               update: {
+//                 $set: {
+//                   actualWashQty: record.washQty,
+//                   actualAQLValue: actualAQLValue,
+//                   updatedAt: new Date()
+//                 }
+//               }
+//             }
+//           });
+//         } else {
+//           // Try fallback without date filter
+//           const fallbackFilter = {
+//             orderNo: record.Style_No,
+//             color: englishColor,
+//             reportType: "Inline",
+//             factoryName: "YM"
+//           };
+
+//           const fallbackMatches = await QCWashing.find(fallbackFilter).select('orderNo color date reportType factoryName').lean();
+          
+//           if (fallbackMatches.length > 0) {
+//             bulkOpsWashing.push({
+//               updateMany: {
+//                 filter: fallbackFilter,
+//                 update: {
+//                   $set: {
+//                     actualWashQty: record.washQty,
+//                     actualAQLValue: actualAQLValue,
+//                     updatedAt: new Date()
+//                   }
+//                 }
+//               }
+//             });
+//           }
+//         }
+
+//       } catch (aqlError) {
+//         console.error(`Error calculating AQL for Style_No ${record.Style_No}:`, aqlError);
+//         // Continue with the operation but without AQL data
+//         const inspectionDate = new Date(record.inspectionDate);
+//         const startOfDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate());
+//         const endOfDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate() + 1);
+//         const englishColor = extractEnglishColor(record.color);
+        
+//         bulkOpsWashing.push({
+//           updateMany: {
+//             filter: {
+//               orderNo: record.Style_No,
+//               color: englishColor,
+//               reportType: "Inline",
+//               factoryName: "YM",
+//               date: {
+//                 $gte: startOfDay,
+//                 $lt: endOfDay
+//               }
+//             },
+//             update: {
+//               $set: {
+//                 actualWashQty: record.washQty,
+//                 actualAQLValue: null,
+//                 updatedAt: new Date()
+//               }
+//             }
+//           }
+//         });
+//       }
+//     }
+
+//     // Execute bulk operations
+//     const resultWashing = bulkOpsWashing.length > 0 
+//       ? await QCWashing.bulkWrite(bulkOpsWashing) 
+//       : { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 };
+
+//     console.log('QCWashing bulk write result:', {
+//       matchedCount: resultWashing.matchedCount,
+//       modifiedCount: resultWashing.modifiedCount,
+//       upsertedCount: resultWashing.upsertedCount,
+//       operations: bulkOpsWashing.length
+//     });
+
+//     // Verification queries for processed records
+//     const verificationResults = [];
+//     for (const record of realWashData.slice(0, 10)) { // Limit verification to first 10 for performance
+//       const englishColor = extractEnglishColor(record.color);
+//       const verificationQuery = await QCWashing.findOne({
+//         orderNo: record.Style_No,
+//         color: englishColor,
+//         reportType: "Inline",
+//         factoryName: "YM"
+//       }).select('orderNo color actualWashQty actualAQLValue updatedAt reportType factoryName').lean();
+
+//       verificationResults.push({
+//         Style_No: record.Style_No,
+//         originalColor: record.color,
+//         englishColor: englishColor,
+//         found: !!verificationQuery,
+//         actualWashQty: verificationQuery?.actualWashQty,
+//         hasActualAQL: !!verificationQuery?.actualAQLValue,
+//         updatedAt: verificationQuery?.updatedAt
+//       });
+//     }
+
+//     res.status(200).json({
+//       success: true,
+//       message: `Successfully refreshed actual wash quantities. Updated ${resultWashing.modifiedCount} records from ${realWashData.length} source records.`,
+//       data: {
+//         qcRealWashingQty: {
+//           total: realWashData.length
+//         },
+//         qcWashing: {
+//           matched: resultWashing.matchedCount,
+//           modified: resultWashing.modifiedCount,
+//           operations: bulkOpsWashing.length
+//         }
+//       },
+//       debug: {
+//         updateResults: updateResults.slice(0, 10), // Limit debug info
+//         verificationResults: verificationResults,
+//         totalProcessed: realWashData.length
+//       }
+//     });
+
+//   } catch (error) {
+//     console.error('Error refreshing actual wash quantity data:', error);
+//     res.status(500).json({
+//       success: false,
+//       message: 'Internal server error during refresh',
+//       error: error.message
+//     });
+//   }
+// };
+
 export const uploadQcRealWashQty = async (req, res) => {
   try {
     const { data } = req.body;
