@@ -5,6 +5,7 @@ import { Button } from "@/components/Chatbot/ui/button";
 import { Textarea } from "@/components/Chatbot/ui/textarea";
 import { editConversationModel } from "./lib/api/conversation";
 import { motion } from "framer-motion";
+import ChatGuide from "./ChatStepIntro";
 
 export default function ChatInput({
   activeConversationId,
@@ -103,6 +104,7 @@ export default function ChatInput({
 
           {/* MODEL SELECTOR */}
           <select
+            id="modelSelection"
             value={model}
             onChange={handleChangeModel}
             className="

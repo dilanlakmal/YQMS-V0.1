@@ -31,10 +31,11 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [model, setModel] = useState("gpt-oss:120b-cloud");
+  const [currentService, setCurrentService] = useState("");
 
   const initialMessages = [
     {
-      _id: "1",
+      _id: new Date().toISOString(),
       role: "assistant",
       content: "Hello! How can I help you today?",
       timestamp: new Date(),
@@ -92,6 +93,8 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
 
   return (
     <ChatInterface
+      currentService={currentService}
+      setCurrentService={setCurrentService}
       messages={messages}
       userData={userData}
       model={model}

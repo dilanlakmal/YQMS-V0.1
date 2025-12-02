@@ -6,7 +6,7 @@ import axios from "axios";
 // import { Ollama } from "ollama";
 
 
-export async function getOllamaResponse(model, prompt) {
+export async function getOllamaResponse(model, messages) {
 
     const token = getToken();
 
@@ -14,7 +14,7 @@ export async function getOllamaResponse(model, prompt) {
 
     const body = {
         model: model,
-        prompt: prompt
+        messages: messages
     }
     const response = await axios.post(`${API_BASE_URL}/api/ai/chat`, body, {
         headers: {Authorization: `Bearer ${token}`}

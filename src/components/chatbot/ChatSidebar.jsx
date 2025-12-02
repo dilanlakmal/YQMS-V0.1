@@ -21,6 +21,7 @@ import { ChatMessageTyping } from "./ChatMessage";
 import { MdKeyboardArrowRight, MdKeyboardArrowDown } from "react-icons/md";
 import { MdGTranslate } from "react-icons/md";
 import { IoSearch } from "react-icons/io5";
+import ChatGuide from "./ChatStepIntro";
 
 // Reusable user profile component
 function UserProfile({ userData, center }) {
@@ -28,7 +29,7 @@ function UserProfile({ userData, center }) {
     <div
       className={cn(
         "flex items-center gap-3 p-2 rounded-lg hover:bg-secondary/40 transition-colors cursor-pointer",
-        center && "justify-center",
+        center && "justify-center"
       )}
     >
       <div className="h-8 w-8 rounded-full overflow-hidden">
@@ -56,9 +57,13 @@ function SettingsButton({ iconOnly }) {
     <Button
       variant="ghost"
       size={iconOnly ? "icon" : "default"}
-      className="w-full justify-start gap-3 hover:bg-secondary/60 transition-colors"
+      className={cn(
+        "w-full",
+        iconOnly ? "justify-center" : "justify-start",
+        "gap-3 hover:bg-secondary/60 transition-colors"
+      )}
     >
-      <Settings className="h-4 w-4" />
+      <Settings className="h-8 w-8" />
       {!iconOnly && <span className="text-sm">Settings</span>}
     </Button>
   );
@@ -82,6 +87,10 @@ export function EditConversationTitle({
       // inputRef.current.select();
     }
   });
+
+  useEffect(() => {
+    setValue(title);
+  }, [title]);
 
   const handleSave = () => {
     if (value.trim() && value !== title) {
@@ -147,6 +156,7 @@ function ExpandedSidebar({
   onNewChat,
   onDeleteConversation,
   userData,
+  setCurrentService,
 }) {
   const [hoveredId, setHoveredId] = useState(null);
   const [editingId, setEditingId] = useState(null);
@@ -156,8 +166,8 @@ function ExpandedSidebar({
   const updateConversationTitle = async (_id, newTitle) => {
     setConversations((prev) =>
       prev.map((conv) =>
-        conv._id === _id ? { ...conv, title: newTitle } : conv,
-      ),
+        conv._id === _id ? { ...conv, title: newTitle } : conv
+      )
     );
     try {
       await editConversationTitle(_id, newTitle);
@@ -169,12 +179,34 @@ function ExpandedSidebar({
     onSelectConversation(_id);
     const activeConversation = conversations.find((conv) => conv._id === _id);
     setModel(activeConversation.model);
-  }
+    setCurrentService("");
+  };
+
+  const GuideSteps = [
+    {
+      target: "#addNewConversation",
+      content: "You can add new conversation by clicking here",
+    },
+    {
+      target: "#search",
+      content: "Click here to search you history conversations.",
+    },
+    {
+      target: "#translate",
+      content: "This is our demo translation using Azure services.",
+    },
+    {
+      target: "#modelSelection",
+      content: "Click here to change model.",
+    },
+  ];
   return (
     <div className="flex h-full flex-col bg-background">
       {/* New Chat Button */}
+      <ChatGuide steps={GuideSteps} />
       <div className="flex items-center justify-between border-b border-border bg-background px-4 py-3 translate-y-1">
         <Button
+          id="addNewConversation"
           key="new_chat"
           variant="default"
           size="sm"
@@ -186,13 +218,27 @@ function ExpandedSidebar({
         </Button>
       </div>
       <div className="flex items-center h-20 ml-5 gap-3">
-        <Button variant="ghost" size="lg" className="p-1">
+        <Button
+          id="search"
+          variant="ghost"
+          size="lg"
+          className="p-1 w-full justify-start"
+        >
           <IoSearch className="h-8 w-8 align-middle" />
           <span className="font-medium">Search chats</span>
         </Button>
       </div>
-      <div className="flex items-center h-0 ml-5 gap-3">
-        <Button variant="ghost" size="lg" className="p-1">
+      <div className="flex items-center h-0 ml-5 gap-3 ">
+        <Button
+          id="translate"
+          variant="ghost"
+          size="lg"
+          className="p-1 w-full justify-start"
+          onClick={() => {
+            setCurrentService("translator");
+            onSelectConversation("");
+          }}
+        >
           <MdGTranslate className="h-8 w-8 align-middle" />
           <span className="font-medium">Azure translator</span>
         </Button>
@@ -227,7 +273,7 @@ function ExpandedSidebar({
                     "w-full gap-3 py-2.5 h-auto justify-start px-3 transition-all flex items-center relative",
                     activeConversationId === conv._id
                       ? "bg-gray-400 text-white font-semibold border-l-4 border-gray-700"
-                      : "bg-transparent text-gray-700 hover:bg-blue-100",
+                      : "bg-transparent text-gray-700 hover:bg-blue-100"
                   )}
                   onClick={() => handleConversationSelection(conv._id)}
                 >
@@ -271,7 +317,7 @@ function ExpandedSidebar({
                           "h-6 w-6",
                           btn.type === "delete"
                             ? "hover:bg-destructive hover:text-destructive"
-                            : "hover:bg-secondary",
+                            : "hover:bg-secondary"
                         )}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -351,7 +397,7 @@ function CollapsedSidebar({
         </div> */}
       </ScrollArea>
       {/* Bottom User Profile + Settings */}
-      <div className="border-t border-border/50 p-3 -translate-y-9">
+      <div className="border-t border-border/50 p-3 -translate-y-9 flex flex-col items-center justify-center">
         <SettingsButton iconOnly />
         <UserProfile userData={userData} center />
       </div>
@@ -374,10 +420,11 @@ export function ChatSidebar({
   conversations,
   setConversations,
   handleNewChat,
+  setCurrentService,
 }) {
   const handleDeleteConversation = (_id) => {
     const updatedConversations = conversations.filter(
-      (conv) => conv._id !== _id,
+      (conv) => conv._id !== _id
     );
 
     setConversations(updatedConversations);
@@ -395,7 +442,7 @@ export function ChatSidebar({
   };
 
   const maxConversationLength = Math.max(
-    ...conversations.map((conv) => conv.title.length),
+    ...conversations.map((conv) => conv.title.length)
   );
   // e.g., 40 characters
   const sidebarWidth = isExpanded
@@ -417,7 +464,7 @@ export function ChatSidebar({
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 border-r border-border bg-card transition-all duration-300 md:relative md:translate-x-0 shadow-lg",
-          isOpen ? "translate-x-0" : "-translate-x-full",
+          isOpen ? "translate-x-0" : "-translate-x-full"
         )}
         style={{ width: `${sidebarWidth}px` }}
       >
@@ -433,6 +480,7 @@ export function ChatSidebar({
             onSelectConversation={setActiveConversationId}
             onNewChat={handleNewChat}
             onDeleteConversation={handleDeleteConversation}
+            setCurrentService={setCurrentService}
           />
         ) : (
           <CollapsedSidebar

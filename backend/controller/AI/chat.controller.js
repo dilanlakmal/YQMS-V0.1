@@ -2,7 +2,7 @@ import { Ollama } from "ollama";
 
 
 export const getChatWithOllama = async(req, res) => {
-    const {model, prompt} = req.body;
+    const {model, messages} = req.body;
     let host = process.env.OLLAMA_API_URL;
     if (model === "llama3.2:latest"){
         host = process.env.llama3_2_API_URL;
@@ -19,7 +19,7 @@ export const getChatWithOllama = async(req, res) => {
 
         const result = await ollama.chat({
             model,
-            messages: [{role: "user", content: prompt}],
+            messages: messages,
             stream: false
         })
 
