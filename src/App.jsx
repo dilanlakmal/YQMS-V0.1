@@ -32,6 +32,7 @@ import RovingPage from "./pages/Roving";
 import EmpData from "./pages/EmpData.jsx";
 import SystemAdmin from "./pages/SystemAdmin.jsx";
 import SCCPage from "./pages/SCC.jsx";
+import EMBPrinting from "./pages/EMBPrinting.jsx";
 import QAInspectionEvaluation from "./pages/QAInspectionEvaluation.jsx";
 import YQMSProject from "./pages/YQMSProject.jsx";
 import BGradeDefect from "./pages/BGradeDefect.jsx";
@@ -400,6 +401,7 @@ function AppContent() {
               <Route path="/roving" element={<RovingPage />} />
               <Route path="/cutting" element={<CuttingPage />} />
               <Route path="/scc" element={<SCCPage />} />
+              <Route path="/emb-printing" element={<EMBPrinting />} />
               <Route path="/sysadmin" element={<SystemAdmin />} />
               <Route path="/audit" element={<QAAudit />} />
               <Route path="/qa-pivot" element={<QAInspectionEvaluation />} />

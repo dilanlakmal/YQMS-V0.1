@@ -9,7 +9,7 @@ import express from "express";
 import fs from "fs";
 import axios from "axios";
 import https from "https"; // Import https for HTTPS server
-//import http from "http"; // Import http for Socket.io
+import http from "http"; // Import http for Socket.io
 import jwt from "jsonwebtoken";
 import mongoose from "mongoose";
 import multer from "multer";
@@ -95,6 +95,7 @@ import createSubConDefectsModel from "./models/sub_con_defects.js";
 import createSubconSewingQAReportModel from "./models/subconSewingQAReportSchema.js";
 import createSubconSewingFactoryModel from "./models/subcon_sewing_factory.js";
 import createSubconSewingQc1ReportModel from "./models/subcon_sewing_qc1_report.js";
+import createSubconEMBReportModel from "./models/Subcon_EMB_report.js";
 
 import createQCWashingMachineStandard from "./models/qcWashingStanderd.js";
 import createQC2OlderDefectModel from "./models/QC2_Older_Defects.js";
@@ -147,145 +148,27 @@ const app = express();
 const PORT = 5001;
 
 /* ------------------------------
-   for HTTPS
+   HTTP Server Configuration
 ------------------------------ */
 
-// Load SSL certificates
-const privateKey = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162-key.pem",
-  //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175-key.pem",
-  //"/usr/local/share/ca-certificates/yorkmars.key",
-  "utf8"
-);
-const certificate = fs.readFileSync(
-  "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162.pem",
-  //"/Users/dilanlakmal/Downloads/YQMS-Latest-main/192.165.2.175.pem",
-  //"/usr/local/share/ca-certificates/yorkmars.crt",
-  "utf8"
-);
+// Always use HTTP server (no SSL checking)
+const server = http.createServer(app);
+const isHTTPS = false;
 
-const credentials = {
-  key: privateKey,
-  cert: certificate
-};
-
-// Create HTTPS server
-const server = https.createServer(credentials, app);
+console.log("Starting HTTP server (SSL disabled)...");
 
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: "https://192.167.12.162:3001", //"https://192.165.2.175:3001", //"https://localhost:3001"
+    origin: "http://localhost:3001", // Always use HTTP
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
   }
 });
 
-// Define allowed origins once
-const allowedOrigins = [
-  "https://192.167.12.85:3001",
-  "http://localhost:3001",
-  "https://localhost:3001",
-  "https://yqms.yaikh.com",
-  "https://192.167.12.162:3001"
-];
-
-// CORS configuration
-const corsOptions = {
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.log("CORS blocked origin:", origin);
-      callback(null, true); // Allow all origins for image proxy
-    }
-  },
-  methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "Cache-Control",
-    "Origin",
-    "X-Requested-With",
-    "Accept",
-    "Pragma",
-    "Expires",
-    "Last-Modified",
-    "If-Modified-Since",
-    "If-None-Match",
-    "ETag"
-  ],
-  exposedHeaders: [
-    "Content-Length",
-    "Content-Type",
-    "Cache-Control",
-    "Last-Modified",
-    "ETag"
-  ],
-  credentials: false, // Set to false for broader compatibility
-  optionsSuccessStatus: 204
-};
-
-// Apply CORS globally
-app.use(cors(corsOptions));
-
-app.use(
-  "/storage",
-  express.static(path.join(__dirname, "public/storage"), {
-    setHeaders: (res, path) => {
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
-);
-
-app.use(
-  "/public",
-  express.static(path.join(__dirname, "../public"), {
-    setHeaders: (res, path) => {
-      res.header("Access-Control-Allow-Origin", "*");
-      res.header("Cache-Control", "public, max-age=3600");
-    }
-  })
-);
-
-// Fallback for missing images
-app.get("/storage/qc2_images/default-placeholder.png", (req, res) => {
-  const transparentPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChAI9jU77zgAAAABJRU5ErkJggg==",
-    "base64"
-  );
-  res.set("Content-Type", "image/png");
-  res.set("Cache-Control", "public, max-age=3600");
-  res.send(transparentPng);
-});
-
-// Simplified image proxy endpoint
-app.get("/api/image-proxy/:imageUrl(*)", async (req, res) => {
-  try {
-    const imageUrl = decodeURIComponent(req.params.imageUrl);
-
-    const httpsAgent = new https.Agent({ rejectUnauthorized: false });
-
-    const response = await axios.get(imageUrl, {
-      responseType: "arraybuffer",
-      timeout: 10000,
-      httpsAgent,
-      headers: { "User-Agent": "Mozilla/5.0" }
-    });
-
-    const contentType = response.headers["content-type"] || "image/jpeg";
-    const base64 = Buffer.from(response.data).toString("base64");
-    const dataUrl = `data:${contentType};base64,${base64}`;
-
-    res.json({ dataUrl });
-  } catch (error) {
-    console.error("Image proxy error:", error.message);
-    res.status(404).json({ error: "Image not found" });
-  }
-});
+app.use("/storage", express.static(path.join(__dirname, "public/storage")));
+app.use("/public", express.static(path.join(__dirname, "../public")));
 
 app.use(bodyParser.json({ limit: "50mb" }));
 app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
@@ -295,10 +178,10 @@ app.use(bodyParser.json());
 
 // // --- Whitelist of allowed origins ---
 // const allowedOrigins = [
-//   "https://172.20.10.14:3001",
-//   "https://192.167.12.162:3001",
-//   "https://192.167.12.162:5001",
-//   "https://yqms.yaikh.com/"
+//   "http://localhost:3001",
+//   "https://localhost:3001",
+//   "http://localhost:5001",
+//   "https://localhost:5001"
 // ];
 
 // const corsOptions = {
@@ -324,7 +207,7 @@ app.use(bodyParser.json());
 
 app.use(
   cors({
-    origin: "https://192.167.12.162:3001", //["http://localhost:3001", "https://localhost:3001"],
+    origin: "http://localhost:3001", // Always use HTTP
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -354,6 +237,7 @@ app.options("*", cors());
 // ymEcoConnection.on("error", (err) => console.error("unexpected error:", err));
 
 // Define model on connections
+
 
 //const UserMain = createUserModel(ymProdConnection);
 const UserMain = createUserModel(ymEcoConnection);
@@ -411,6 +295,7 @@ const ElasticReport = createElasticReportModel(ymProdConnection);
 const EMBDefect = createEMBDefectModel(ymProdConnection);
 const PrintingDefect = createPrintingDefectModel(ymProdConnection);
 const EMBReport = createEMBReportModel(ymProdConnection);
+const SubconEMBReport = createSubconEMBReportModel(ymProdConnection);
 
 const QADefectsModel = createQADefectsModel(ymProdConnection);
 const QCAccuracyReportModel = createQCAccuracyReportModel(ymProdConnection);
@@ -3809,6 +3694,36 @@ app.get("/api/order-details/:mono", async (req, res) => {
       });
     });
 
+    // Fetch SKU data from yorksys_orders collection
+    let skuDescription = "";
+    let skuNumber = "";
+    let availableSkus = [];
+    try {
+      const yorksysCollection = ymProdConnection.db.collection("yorksys_orders");
+      const yorksysOrder = await yorksysCollection.findOne({
+        moNo: req.params.mono
+      });
+
+      if (yorksysOrder) {
+        skuDescription = yorksysOrder.skuDescription || "";
+        // Get all SKUs from SKUData array
+        if (yorksysOrder.SKUData && yorksysOrder.SKUData.length > 0) {
+          skuNumber = yorksysOrder.SKUData[0].sku || "";
+          availableSkus = yorksysOrder.SKUData.map((skuItem) => ({
+            sku: skuItem.sku || "",
+            color: skuItem.Color || "",
+            qty: skuItem.Qty || 0,
+            etd: skuItem.ETD || "",
+            eta: skuItem.ETA || "",
+            poLine: skuItem.POLine || ""
+          }));
+        }
+      }
+    } catch (skuError) {
+      console.error("Error fetching SKU data from yorksys_orders:", skuError);
+      // Continue without SKU data if there's an error
+    }
+
     const response = {
       engName: order.EngName,
       totalQty: order.TotalQty,
@@ -3831,7 +3746,10 @@ app.get("/api/order-details/:mono", async (req, res) => {
           }))
         };
         return acc;
-      }, {})
+      }, {}),
+      skuDescription: skuDescription,
+      skuNumber: skuNumber,
+      availableSkus: availableSkus
     };
 
     res.json(response);
@@ -15402,6 +15320,99 @@ app.get("/api/aql-details", async (req, res) => {
   }
 });
 
+// Subcon-specific endpoint that always responds with 200 and applies fallback logic me
+app.get("/api/subcon/aql-details", async (req, res) => {
+  try {
+    const { lotSize, type = "General", level = "II", aqlLevel = "1.0" } = req.query;
+
+    if (!lotSize || isNaN(lotSize)) {
+      return res
+        .status(400)
+        .json({ message: "Lot size is required and must be a number" });
+    }
+
+    const lotSizeNum = parseInt(lotSize);
+    const targetLevel = parseFloat(aqlLevel);
+
+    const baseQuery = {
+      Type: type,
+      Level: level,
+      "LotSize.min": { $lte: lotSizeNum },
+      $or: [
+        { "LotSize.max": { $gte: lotSizeNum } },
+        { "LotSize.max": null },
+        { "LotSize.max": { $exists: false } }
+      ]
+    };
+
+    let aqlChart = await AQLChart.findOne(baseQuery).lean();
+    let fallbackApplied = false;
+
+    if (!aqlChart) {
+      aqlChart = await AQLChart.findOne({
+        Type: type,
+        Level: level,
+        "LotSize.min": { $lte: lotSizeNum }
+      })
+        .sort({ "LotSize.min": -1 })
+        .lean();
+      fallbackApplied = !!aqlChart;
+    }
+
+    const baseResponse = {
+      SampleSizeLetterCode: "",
+      SampleSize: null,
+      AcceptDefect: null,
+      RejectDefect: null,
+      fallbackApplied,
+      type,
+      level
+    };
+
+    if (!aqlChart) {
+      return res.json({
+        ...baseResponse,
+        message: "No AQL chart found for the given lot size"
+      });
+    }
+
+    const aqlEntry = Array.isArray(aqlChart.AQL)
+      ? aqlChart.AQL.find((aql) => Number(aql.level) === Number(targetLevel))
+      : null;
+
+    if (!aqlEntry) {
+      return res.json({
+        ...baseResponse,
+        SampleSizeLetterCode: aqlChart.SampleSizeLetterCode || "",
+        SampleSize: aqlChart.SampleSize ?? null,
+        message: `AQL level ${targetLevel} not found for the matching chart.`
+      });
+    }
+
+    res.json({
+      SampleSizeLetterCode: aqlChart.SampleSizeLetterCode || "",
+      SampleSize: aqlChart.SampleSize ?? null,
+      AcceptDefect:
+        typeof aqlEntry.AcceptDefect === "number"
+          ? aqlEntry.AcceptDefect
+          : Number(aqlEntry.AcceptDefect) || null,
+      RejectDefect:
+        typeof aqlEntry.RejectDefect === "number"
+          ? aqlEntry.RejectDefect
+          : Number(aqlEntry.RejectDefect) || null,
+      fallbackApplied,
+      type,
+      level,
+      message: fallbackApplied
+        ? "Returned closest available lot size."
+        : "Exact lot size match."
+    });
+  } catch (error) {
+    console.error("Error fetching Subcon AQL details:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 /* ------------------------------
    User Auth ENDPOINTS
 ------------------------------ */
@@ -19778,6 +19789,7 @@ app.post("/api/scc/emb-report", async (req, res) => {
     ).padStart(2, "0")}`;
 
     const reportData = {
+      // inspectionType: inspectionType || "First Output",
       reportType,
       inspectionDate: new Date(inspectionDate),
       factoryName,
@@ -19846,6 +19858,409 @@ app.post("/api/scc/emb-report", async (req, res) => {
       .json({ message: "Failed to save EMB Report.", error: error.message });
   }
 });
+
+// New endpoint with flexible validation for Subcon EMB Reports
+app.post("/api/scc/subcon-emb-report", async (req, res) => {
+  try {
+    const {
+      _id,
+      inspectionType,
+      reportType,
+      inspectionDate,
+      factoryName,
+      moNo,
+      buyer,
+      buyerStyle,
+      color,
+      skuDescription,
+      skuNumber,
+      totalOrderQty,
+      totalPcs,
+      embDetails,
+      printingDetails,
+      aqlData,
+      defects,
+      defectsQty,
+      defectRate,
+      result,
+      packingResult,
+      workmanshipResult,
+      qualityPlanResult,
+      remarks,
+      checklist,
+      photos,
+      inspector,
+      inspectionTime
+    } = req.body;
+
+    // Flexible validation - only require the most essential fields
+    // Check if fields exist (allow empty strings for some, but require actual values for others)
+    const missingFields = [];
+    
+    // Validate reportType - must be one of: "EMB", "Printing", or "EMB + Print"
+    const validReportTypes = ["EMB", "Printing", "EMB + Print"];
+    if (!reportType || (typeof reportType === 'string' && reportType.trim() === '') || !validReportTypes.includes(reportType)) {
+      missingFields.push("reportType");
+    }
+    // Check inspectionDate - it could be a Date object, ISO string, or other format
+    if (!inspectionDate || (typeof inspectionDate === 'string' && inspectionDate.trim() === '')) {
+      missingFields.push("inspectionDate");
+    }
+    if (!factoryName || (typeof factoryName === 'string' && factoryName.trim() === '')) {
+      missingFields.push("factoryName");
+    }
+    if (!moNo || (typeof moNo === 'string' && moNo.trim() === '')) {
+      missingFields.push("moNo");
+    }
+    // Color is now an array - handle both array and string (for backward compatibility)
+    let colorArray = [];
+    if (Array.isArray(color)) {
+      colorArray = color;
+    } else if (typeof color === 'string' && color.trim() !== '' && !color.includes("All colors selected")) {
+      // Single color string - convert to array
+      colorArray = [color];
+    }
+    // If empty or "All colors selected", colorArray will be empty (which is fine)
+    
+    if (missingFields.length > 0) {
+      console.log("Received payload:", {
+        reportType,
+        inspectionDate,
+        factoryName,
+        moNo,
+        color,
+        hasInspectionDate: !!inspectionDate
+      });
+      return res.status(400).json({
+        message: `Missing required fields: ${missingFields.join(", ")} are required.`,
+        missingFields: missingFields
+      });
+    }
+    
+    // totalOrderQty and aqlData are optional - set defaults if not provided
+    const parsedTotalOrderQty = Number(totalOrderQty);
+    const finalTotalOrderQty = Number.isFinite(parsedTotalOrderQty)
+      ? parsedTotalOrderQty
+      : 0;
+    const finalAqlData = aqlData || {
+      type: "General",
+      level: "II",
+      sampleSizeLetterCode: "",
+      sampleSize: 0,
+      acceptDefect: 0,
+      rejectDefect: 0
+    };
+
+    const now = new Date();
+    const currentInspectionTime = inspectionTime || `${String(now.getHours()).padStart(
+      2,
+      "0"
+    )}:${String(now.getMinutes()).padStart(2, "0")}:${String(
+      now.getSeconds()
+    ).padStart(2, "0")}`;
+
+    // Convert inspectionDate to Date object if it's a string
+    let inspectionDateObj;
+    if (inspectionDate instanceof Date) {
+      inspectionDateObj = inspectionDate;
+    } else if (typeof inspectionDate === 'string' && inspectionDate.trim() !== '') {
+      inspectionDateObj = new Date(inspectionDate);
+      // Check if date is valid
+      if (isNaN(inspectionDateObj.getTime())) {
+        inspectionDateObj = new Date();
+      }
+    } else {
+      inspectionDateObj = new Date();
+    }
+
+    const reportData = {
+      inspectionType: inspectionType || "First Output",
+      reportType,
+      inspectionDate: inspectionDateObj,
+      factoryName,
+      moNo,
+      buyer: buyer || "",
+      buyerStyle: buyerStyle || "",
+      color: colorArray, // Store as array
+      skuDescription: skuDescription || "",
+      // SKU Number is now an array - handle both array and string (for backward compatibility)
+      skuNumber: (() => {
+        if (Array.isArray(skuNumber)) {
+          return skuNumber;
+        } else if (typeof skuNumber === 'string' && 
+                   skuNumber.trim() !== '' && 
+                   !skuNumber.includes("No SKU selected") &&
+                   !skuNumber.includes("All SKUs selected")) {
+          // Single SKU string - convert to array
+          return [skuNumber];
+        }
+        return []; // Empty array if no SKU selected or all SKUs selected
+      })(),
+      totalOrderQty: finalTotalOrderQty,
+      totalPcs: totalPcs ? Number(totalPcs) : 0,
+      // EMB Details - store based on reportType
+      embDetails: embDetails || {
+        speed: "",
+        stitch: "",
+        needleSize: ""
+      },
+      // Printing Details - store based on reportType
+      printingDetails: printingDetails || {
+        method: "",
+        curing: ""
+      },
+      aqlData: {
+        type: finalAqlData.type || "General",
+        level: finalAqlData.level || "II",
+        sampleSizeLetterCode: finalAqlData.sampleSizeLetterCode || "",
+        sampleSize: Number(finalAqlData.sampleSize) || 0,
+        acceptDefect: Number(finalAqlData.acceptDefect) || 0,
+        rejectDefect: Number(finalAqlData.rejectDefect) || 0
+      },
+      defects: defects || [],
+      defectsQty: defectsQty ? Number(defectsQty) : 0,
+      defectRate: defectRate ? Number(defectRate) : 0,
+      result: result || "Pending",
+      packingResult: packingResult || "N/A",
+      workmanshipResult: workmanshipResult || "N/A",
+      qualityPlanResult: qualityPlanResult || "N/A",
+      remarks: remarks?.trim() || "NA",
+      checklist: checklist || {},
+      photos: (() => {
+        // Debug logging
+        console.log("Backend received photos:", {
+          hasPhotos: photos && Object.keys(photos).length > 0,
+          photosType: typeof photos,
+          photosIsObject: photos && typeof photos === 'object',
+          photosKeys: photos ? Object.keys(photos) : [],
+          photosValue: photos
+        });
+        // Ensure photos is always an object, even if empty
+        if (!photos || typeof photos !== 'object' || Array.isArray(photos)) {
+          return {};
+        }
+        return photos;
+      })(),
+      inspector: inspector || "",
+      inspectionTime: currentInspectionTime
+    };
+
+    // Log reportData before saving to verify photos are included
+    console.log("Report data being saved:", {
+      hasPhotos: reportData.photos && Object.keys(reportData.photos).length > 0,
+      photosKeys: reportData.photos ? Object.keys(reportData.photos) : [],
+      photosStructure: reportData.photos
+    });
+
+    let savedReport;
+    if (_id) {
+      // For updates, explicitly mark photos as modified if it's a Mixed type
+      const reportToUpdate = await SubconEMBReport.findById(_id);
+      if (reportToUpdate) {
+        reportToUpdate.set(reportData);
+        // Explicitly mark photos as modified to ensure it's saved
+        if (reportData.photos !== undefined) {
+          reportToUpdate.markModified('photos');
+        }
+        savedReport = await reportToUpdate.save();
+      } else {
+        return res
+          .status(404)
+          .json({ message: "Report not found for update." });
+      }
+    } else {
+      const reportToSave = new SubconEMBReport(reportData);
+      // For new documents, explicitly mark photos as modified if it's a Mixed type
+      if (reportData.photos !== undefined) {
+        reportToSave.markModified('photos');
+      }
+      savedReport = await reportToSave.save();
+    }
+
+    // Log saved report to verify photos were saved
+    console.log("Saved report photos:", {
+      hasPhotos: savedReport.photos && Object.keys(savedReport.photos).length > 0,
+      photosKeys: savedReport.photos ? Object.keys(savedReport.photos) : [],
+      photosStructure: savedReport.photos
+    });
+
+    res
+      .status(201)
+      .json({ message: "Subcon EMB Report saved successfully.", data: savedReport });
+  } catch (error) {
+    console.error("Error saving Subcon EMB Report:", error);
+    if (error.code === 11000) {
+      return res.status(409).json({
+        message: "Duplicate entry. This Subcon EMB report might already exist."
+      });
+    }
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        message: "Validation Error: " + error.message,
+        errors: error.errors
+      });
+    }
+    res
+      .status(500)
+      .json({ message: "Failed to save Subcon EMB Report.", error: error.message });
+  }
+});
+
+// GET endpoint to fetch all Subcon EMB reports
+app.get("/api/scc/subcon-emb-reports", async (req, res) => {
+  try {
+    const { startDate, endDate, factoryName, moNo, inspector } = req.query;
+
+    // Build filter query
+    const filter = {};
+    
+    // Date range filter
+    if (startDate && endDate) {
+      filter.inspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    } else if (startDate) {
+      filter.inspectionDate = { $gte: new Date(startDate) };
+    } else if (endDate) {
+      filter.inspectionDate = { $lte: new Date(endDate) };
+    }
+
+    // Optional filters
+    if (factoryName && factoryName !== "All") {
+      filter.factoryName = factoryName;
+    }
+    if (moNo && moNo !== "All") {
+      filter.moNo = moNo;
+    }
+    if (inspector && inspector !== "All") {
+      filter.inspector = inspector;
+    }
+
+    // Fetch reports, sorted by inspectionDate descending (newest first)
+    const reports = await SubconEMBReport.find(filter)
+      .sort({ inspectionDate: -1 })
+      .lean()
+      .select("-photos -checklist") // Exclude large fields for list view
+      .limit(1000); // Limit to prevent huge responses
+
+    res.json({
+      success: true,
+      data: reports,
+      count: reports.length
+    });
+  } catch (error) {
+    console.error("Error fetching Subcon EMB reports:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch Subcon EMB reports.",
+      error: error.message
+    });
+  }
+});
+
+// GET endpoint to fetch a single Subcon EMB report by ID
+app.get("/api/scc/subcon-emb-report/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const report = await SubconEMBReport.findById(id).lean();
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found."
+      });
+    }
+
+    res.json({
+      success: true,
+      data: report
+    });
+  } catch (error) {
+    console.error("Error fetching Subcon EMB report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch Subcon EMB report.",
+      error: error.message
+    });
+  }
+});
+
+/* ------------------------------
+   End Points - Subcon EMB Printing Image Upload
+------------------------------ */
+
+// 1. Define the absolute destination path for EMB printing images
+const subEmbImagesPath = path.join(__dirname, "public", "storage", "sub-emb-images");
+// Ensure directory exists
+if (!fs.existsSync(subEmbImagesPath)) {
+  fs.mkdirSync(subEmbImagesPath, { recursive: true });
+}
+
+// 2. Use memoryStorage to process the image buffer in RAM before saving
+const subEmbMemoryStorage = multer.memoryStorage();
+const subEmbUpload = multer({
+  storage: subEmbMemoryStorage,
+  limits: { fileSize: 25 * 1024 * 1024 } // 25MB limit
+});
+
+// 3. Endpoint to upload EMB printing images
+app.post(
+  "/api/subcon-emb/upload-image",
+  subEmbUpload.single("imageFile"),
+  async (req, res) => {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded." });
+    }
+
+    try {
+      // Generate a unique filename
+      const { categoryId, moNo, inspectionDate } = req.body;
+
+      // Sanitize categoryId to create a valid filename component
+      const sanitizedCategoryId = (categoryId || "emb-image")
+        .replace(/[\/\\]/g, "-")
+        .replace(/\s+/g, "-")
+        .replace(/[^a-zA-Z0-9._-]/g, "");
+
+      const datePart = inspectionDate
+        ? inspectionDate.replace(/\//g, "-")
+        : new Date().toISOString().split("T")[0];
+      const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+
+      // Build the new filename
+      const newFilename = `sub-emb-${sanitizedCategoryId}-${datePart}-${uniqueSuffix}.webp`;
+      const finalDiskPath = path.join(subEmbImagesPath, newFilename);
+
+      // Use sharp to process the image from the buffer
+      await sharp(req.file.buffer)
+        .resize({
+          width: 1024,
+          height: 1024,
+          fit: "inside",
+          withoutEnlargement: true
+        }) // Resize to max 1024px, don't enlarge small images
+        .webp({ quality: 80 }) // Convert to WebP format with 80% quality
+        .toFile(finalDiskPath); // Save the processed image to disk
+
+      // The public URL that the frontend will use to display the image
+      const publicUrlPath = `${API_BASE_URL}/storage/sub-emb-images/${newFilename}`;
+      res.json({
+        success: true,
+        filePath: publicUrlPath,
+        filename: newFilename
+      });
+    } catch (error) {
+      console.error("Error processing or saving EMB printing image:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to process uploaded image." });
+    }
+  }
+);
 
 /* ------------------------------
    End Points - SCC Elastic Report
@@ -35470,7 +35885,9 @@ app.get("/api/yorksys-orders/:moNo", async (req, res) => {
   }
 });
 
+
+
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+  console.log(`HTTP Server is running on http://localhost:${PORT}`);
 });

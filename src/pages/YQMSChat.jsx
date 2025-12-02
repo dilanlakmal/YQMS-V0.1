@@ -3,7 +3,7 @@ import axios from "axios";
 import io from "socket.io-client";
 import { useAuth } from "../components/authentication/AuthContext";
 
-const API_BASE_URL = "https://192.167.14.32:5001";
+const API_BASE_URL = "http://localhost:5001";
 const socket = io(API_BASE_URL, {
   withCredentials: true,
   extraHeaders: {
