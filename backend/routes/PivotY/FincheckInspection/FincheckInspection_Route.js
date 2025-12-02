@@ -3,7 +3,8 @@ import {
   getInspectionOrderDetails,
   searchInspectionOrders,
   getMultipleOrderDetails,
-  findRelatedOrders
+  findRelatedOrders,
+  getOrderColors
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -25,5 +26,8 @@ router.post(
 
 // Find related orders by base order number
 router.get("/api/fincheck-inspection/find-related-orders", findRelatedOrders);
+
+// Get distinct colors for selected orders
+router.post("/api/fincheck-inspection/order-colors", getOrderColors);
 
 export default router;

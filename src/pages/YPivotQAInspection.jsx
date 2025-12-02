@@ -7,11 +7,13 @@ import {
   Sparkles,
   Package,
   Ruler,
-  CheckSquare
+  CheckSquare,
+  Settings
 } from "lucide-react";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
+import YPivotQAInspectionReportType from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
 import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
 
@@ -39,15 +41,53 @@ const YPivotQAInspection = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("order");
 
+  // ADD: Shared state for order data
+  const [sharedOrderState, setSharedOrderState] = useState({
+    inspectionDate: new Date().toISOString().split("T")[0],
+    orderType: "single",
+    selectedOrders: [],
+    orderData: null
+  });
+
+  // ADD: Handler for order data changes
+  const handleOrderDataChange = useCallback((newState) => {
+    setSharedOrderState((prev) => ({
+      ...prev,
+      ...newState
+    }));
+  }, []);
+
   const tabs = useMemo(
     () => [
       {
         id: "order",
         label: "Order",
         icon: <Package size={18} />,
-        component: <YPivotQAInspectionOrderData />,
+        component: (
+          <YPivotQAInspectionOrderData
+            onOrderDataChange={handleOrderDataChange}
+            externalSelectedOrders={sharedOrderState.selectedOrders}
+            externalOrderData={sharedOrderState.orderData}
+            externalOrderType={sharedOrderState.orderType}
+            externalInspectionDate={sharedOrderState.inspectionDate}
+          />
+        ),
         gradient: "from-blue-500 to-cyan-500",
         description: "Order information"
+      },
+      {
+        id: "report",
+        label: "Report",
+        icon: <Settings size={18} />,
+        component: (
+          <YPivotQAInspectionReportType
+            selectedOrders={sharedOrderState.selectedOrders}
+            orderData={sharedOrderState.orderData}
+            orderType={sharedOrderState.orderType}
+          />
+        ),
+        gradient: "from-purple-500 to-pink-500",
+        description: "Report configuration"
       },
       {
         id: "header",
@@ -96,7 +136,7 @@ const YPivotQAInspection = () => {
         description: "Inspection summary"
       }
     ],
-    []
+    [handleOrderDataChange, sharedOrderState] // <-- ADD THESE DEPENDENCIES
   );
 
   const activeComponent = useMemo(() => {

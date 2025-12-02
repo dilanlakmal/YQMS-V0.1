@@ -114,25 +114,23 @@ import normalNotificationSchema from "../../models/NormalNotification.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  process.env.MongoDB_URI_ym_prod
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  process.env.MongoDB_URI_ym_eco_board
 );
 
 //Connection status
 ymProdConnection.on("connected", () =>
-  console.log("✅ Connected to ym_prod database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_prod database...")
 );
 ymProdConnection.on("error", (err) =>
   console.error("❌ unexpected error:", err)
 );
 
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_eco_board database...")
 );
 ymEcoConnection.on("error", (err) =>
   console.error("❌ unexpected error:", err)

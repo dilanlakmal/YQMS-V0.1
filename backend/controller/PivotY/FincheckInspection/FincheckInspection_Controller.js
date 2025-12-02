@@ -487,3 +487,68 @@ export const findRelatedOrders = async (req, res) => {
     });
   }
 };
+
+// ============================================================
+// Get Distinct Colors for Selected Orders
+// ============================================================
+export const getOrderColors = async (req, res) => {
+  try {
+    const { orderNos } = req.body;
+
+    if (!orderNos || !Array.isArray(orderNos) || orderNos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Order numbers array is required."
+      });
+    }
+
+    // Fetch all orders
+    const dtOrders = await DtOrder.find({ Order_No: { $in: orderNos } })
+      .select("Order_No OrderColors")
+      .lean();
+
+    if (dtOrders.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "No orders found."
+      });
+    }
+
+    // Extract distinct colors
+    const colorMap = new Map();
+
+    dtOrders.forEach((order) => {
+      if (order.OrderColors && Array.isArray(order.OrderColors)) {
+        order.OrderColors.forEach((colorObj) => {
+          const colorName = colorObj.Color?.trim();
+          if (colorName && !colorMap.has(colorName.toLowerCase())) {
+            colorMap.set(colorName.toLowerCase(), {
+              color: colorName,
+              colorCode: colorObj.ColorCode || "",
+              chnColor: colorObj.ChnColor || "",
+              colorKey: colorObj.ColorKey || null
+            });
+          }
+        });
+      }
+    });
+
+    const distinctColors = Array.from(colorMap.values()).sort((a, b) =>
+      a.color.localeCompare(b.color)
+    );
+
+    return res.status(200).json({
+      success: true,
+      data: distinctColors,
+      totalColors: distinctColors.length,
+      ordersProcessed: dtOrders.length
+    });
+  } catch (error) {
+    console.error("Error fetching order colors:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching colors.",
+      error: error.message
+    });
+  }
+};
