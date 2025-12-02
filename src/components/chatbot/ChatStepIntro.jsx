@@ -6,12 +6,12 @@ export default function ChatGuide({steps}) {
 
 
   useEffect( () => {
-    // const hasSeenGuide = localStorage.getItem("hasSeenGuide");
-    const hasSeenGuide = false;
+    const hasSeenGuide = localStorage.getItem("hasSeenGuide");
+    // const hasSeenGuide = false;
 
     if (!hasSeenGuide) {
         setStartGuide(true);
-        localStorage.setItem("hasSeenGuide", "false");
+        localStorage.setItem("hasSeenGuide", "true");
     }
   }, [startGuide]);
 
