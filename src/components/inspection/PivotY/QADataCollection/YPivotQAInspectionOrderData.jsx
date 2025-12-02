@@ -438,104 +438,6 @@ const YPivotQAInspectionOrderData = ({
     }
   }, [orderType]);
 
-  // const YPivotQAInspectionOrderData = ({
-  //   // Props for lifting state to parent
-  //   onOrderDataChange,
-  //   externalSelectedOrders,
-  //   externalOrderData,
-  //   externalOrderType,
-  //   externalInspectionDate
-  // }) => {
-  //   // State
-  //   //   const [inspectionDate, setInspectionDate] = useState(
-  //   //     new Date().toISOString().split("T")[0]
-  //   //   );
-  //   //   const [orderType, setOrderType] = useState("single"); // single, multi, batch
-  //   //   const [selectedOrders, setSelectedOrders] = useState([]); // Array of order numbers
-  //   //   const [orderData, setOrderData] = useState(null);
-  //   const [inspectionDate, setInspectionDateLocal] = useState(
-  //     externalInspectionDate || new Date().toISOString().split("T")[0]
-  //   );
-  //   const [orderType, setOrderTypeLocal] = useState(
-  //     externalOrderType || "single"
-  //   );
-  //   const [selectedOrders, setSelectedOrdersLocal] = useState(
-  //     externalSelectedOrders || []
-  //   );
-  //   const [orderData, setOrderDataLocal] = useState(externalOrderData || null);
-
-  //   const [searchTerm, setSearchTerm] = useState("");
-  //   const [searchResults, setSearchResults] = useState([]);
-
-  //   const [loading, setLoading] = useState(false);
-  //   const [searchLoading, setSearchLoading] = useState(false);
-  //   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
-  //   const [error, setError] = useState(null);
-  //   const skipSearchRef = useRef(false);
-
-  //   // Wrapper functions to notify parent of changes
-  //   const setInspectionDate = (value) => {
-  //     setInspectionDateLocal(value);
-  //     onOrderDataChange?.({
-  //       inspectionDate: value,
-  //       orderType,
-  //       selectedOrders,
-  //       orderData
-  //     });
-  //   };
-
-  //   const setOrderType = (value) => {
-  //     setOrderTypeLocal(value);
-  //     onOrderDataChange?.({
-  //       inspectionDate,
-  //       orderType: value,
-  //       selectedOrders: [],
-  //       orderData: null
-  //     });
-  //   };
-
-  //   const setSelectedOrders = (value) => {
-  //     setSelectedOrdersLocal(value);
-  //     onOrderDataChange?.({
-  //       inspectionDate,
-  //       orderType,
-  //       selectedOrders: value,
-  //       orderData
-  //     });
-  //   };
-
-  //   const setOrderData = (value) => {
-  //     setOrderDataLocal(value);
-  //     onOrderDataChange?.({
-  //       inspectionDate,
-  //       orderType,
-  //       selectedOrders,
-  //       orderData: value
-  //     });
-  //   };
-
-  //   // Add this useEffect after your other useEffects (around line 330)
-  //   useEffect(() => {
-  //     if (orderData) {
-  //       onOrderDataChange?.({
-  //         inspectionDate,
-  //         orderType,
-  //         selectedOrders,
-  //         orderData
-  //       });
-  //     }
-  //   }, [orderData]);
-
-  //   // Reset when order type changes
-  //   useEffect(() => {
-  //     setSelectedOrders([]);
-  //     setOrderData(null);
-  //     setSearchTerm("");
-  //     setSearchResults([]);
-  //     setShowSearchDropdown(false);
-  //     setError(null);
-  //   }, [orderType]);
-
   // Search orders
   const searchOrders = useCallback(
     async (term) => {
@@ -616,43 +518,10 @@ const YPivotQAInspectionOrderData = ({
     }
   };
 
-  //   const fetchSingleOrderDetails = async (moNo) => {
-  //     setLoading(true);
-  //     setError(null);
-  //     try {
-  //       const res = await axios.get(
-  //         `${API_BASE_URL}/api/fincheck-inspection/order-details/${moNo}`
-  //       );
-  //       if (res.data.success) {
-  //         setOrderData({
-  //           ...res.data.data,
-  //           isSingle: true,
-  //           orderBreakdowns: [
-  //             {
-  //               orderNo: moNo,
-  //               totalQty: res.data.data.dtOrder.totalQty,
-  //               colorSizeBreakdown: res.data.data.colorSizeBreakdown,
-  //               yorksysOrder: res.data.data.yorksysOrder
-  //             }
-  //           ]
-  //         });
-  //         setSelectedOrders([moNo]);
-  //         setShowSearchDropdown(false);
-  //         setSearchResults([]);
-  //       }
-  //     } catch (err) {
-  //       console.error("Fetch error:", err);
-  //       setError(err.response?.data?.message || "Failed to fetch order details");
-  //       setOrderData(null);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
   // Fetch multiple order details
   const fetchMultipleOrderDetails = async (orderNos) => {
     if (!orderNos || orderNos.length === 0) {
-      updateState({ orderData: null });
+      updateState({ selectedOrders: [], orderData: null });
       return;
     }
 
@@ -664,7 +533,9 @@ const YPivotQAInspectionOrderData = ({
         { orderNos: orderNos }
       );
       if (res.data.success) {
+        // Include selectedOrders to avoid stale closure issue
         updateState({
+          selectedOrders: orderNos,
           orderData: {
             ...res.data.data,
             isSingle: false
@@ -674,41 +545,11 @@ const YPivotQAInspectionOrderData = ({
     } catch (err) {
       console.error("Fetch error:", err);
       setError(err.response?.data?.message || "Failed to fetch order details");
-      updateState({ orderData: null });
+      updateState({ selectedOrders: orderNos, orderData: null });
     } finally {
       setLoading(false);
     }
   };
-
-  //   const fetchMultipleOrderDetails = async (orderNos) => {
-  //     if (!orderNos || orderNos.length === 0) {
-  //       setOrderData(null);
-  //       return;
-  //     }
-
-  //     setLoading(true);
-  //     setError(null);
-  //     try {
-  //       const res = await axios.post(
-  //         `${API_BASE_URL}/api/fincheck-inspection/multiple-order-details`,
-  //         {
-  //           orderNos: orderNos
-  //         }
-  //       );
-  //       if (res.data.success) {
-  //         setOrderData({
-  //           ...res.data.data,
-  //           isSingle: false
-  //         });
-  //       }
-  //     } catch (err) {
-  //       console.error("Fetch error:", err);
-  //       setError(err.response?.data?.message || "Failed to fetch order details");
-  //       setOrderData(null);
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
 
   // Handle order selection - Single mode
   const handleSelectSingleOrder = (order) => {
@@ -724,26 +565,16 @@ const YPivotQAInspectionOrderData = ({
     setShowSearchDropdown(false);
     setSearchResults([]);
     setSearchTerm("");
-
-    // Update selectedOrders first, then fetch will update orderData
-    updateState({ selectedOrders: group.orderNos });
+    // fetchMultipleOrderDetails will update both selectedOrders and orderData
     fetchMultipleOrderDetails(group.orderNos);
   };
-
-  //   const handleSelectMultiOrder = (group) => {
-  //     setShowSearchDropdown(false);
-  //     setSearchResults([]);
-  //     setSearchTerm("");
-  //     setSelectedOrders(group.orderNos);
-  //     fetchMultipleOrderDetails(group.orderNos);
-  //   };
 
   // Handle order selection - Batch mode
   const handleSelectBatchOrder = (order) => {
     const orderNo = order.Order_No;
     if (!selectedOrders.includes(orderNo)) {
       const newOrders = [...selectedOrders, orderNo];
-      updateState({ selectedOrders: newOrders });
+      // fetchMultipleOrderDetails will update both selectedOrders and orderData
       fetchMultipleOrderDetails(newOrders);
     }
     setShowSearchDropdown(false);
@@ -751,38 +582,16 @@ const YPivotQAInspectionOrderData = ({
     setSearchTerm("");
   };
 
-  //   const handleSelectBatchOrder = (order) => {
-  //     const orderNo = order.Order_No;
-  //     if (!selectedOrders.includes(orderNo)) {
-  //       const newOrders = [...selectedOrders, orderNo];
-  //       setSelectedOrders(newOrders);
-  //       fetchMultipleOrderDetails(newOrders);
-  //     }
-  //     setShowSearchDropdown(false);
-  //     setSearchResults([]);
-  //     setSearchTerm("");
-  //   };
-
   // Remove order from selection
   const handleRemoveOrder = (orderNo) => {
     const newOrders = selectedOrders.filter((o) => o !== orderNo);
     if (newOrders.length > 0) {
-      updateState({ selectedOrders: newOrders });
+      // fetchMultipleOrderDetails will update both selectedOrders and orderData
       fetchMultipleOrderDetails(newOrders);
     } else {
       updateState({ selectedOrders: [], orderData: null });
     }
   };
-
-  //   const handleRemoveOrder = (orderNo) => {
-  //     const newOrders = selectedOrders.filter((o) => o !== orderNo);
-  //     setSelectedOrders(newOrders);
-  //     if (newOrders.length > 0) {
-  //       fetchMultipleOrderDetails(newOrders);
-  //     } else {
-  //       setOrderData(null);
-  //     }
-  //   };
 
   // Clear all selections
   const handleClearAll = () => {
@@ -794,14 +603,6 @@ const YPivotQAInspectionOrderData = ({
     setSearchResults([]);
     setError(null);
   };
-
-  //   const handleClearAll = () => {
-  //     setSelectedOrders([]);
-  //     setOrderData(null);
-  //     setSearchTerm("");
-  //     setSearchResults([]);
-  //     setError(null);
-  //   };
 
   // Refresh data
   const handleRefresh = () => {

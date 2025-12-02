@@ -1,6 +1,7 @@
 import {
   DtOrder,
-  YorksysOrders
+  YorksysOrders,
+  QASectionsAqlBuyerConfig
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -548,6 +549,53 @@ export const getOrderColors = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error while fetching colors.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Get AQL Config for Buyer
+// ============================================================
+export const getAqlConfigByBuyer = async (req, res) => {
+  try {
+    const { buyer } = req.query;
+
+    if (!buyer) {
+      return res.status(400).json({
+        success: false,
+        message: "Buyer is required."
+      });
+    }
+
+    const configs = await QASectionsAqlBuyerConfig.find({
+      Buyer: buyer
+    }).lean();
+
+    if (configs.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: `No AQL configuration found for buyer: ${buyer}`
+      });
+    }
+
+    // Organize by status (Minor, Major, Critical)
+    const organizedConfigs = {
+      Minor: configs.find((c) => c.Status === "Minor") || null,
+      Major: configs.find((c) => c.Status === "Major") || null,
+      Critical: configs.find((c) => c.Status === "Critical") || null
+    };
+
+    return res.status(200).json({
+      success: true,
+      data: configs,
+      organized: organizedConfigs
+    });
+  } catch (error) {
+    console.error("Error fetching AQL config:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching AQL config.",
       error: error.message
     });
   }
