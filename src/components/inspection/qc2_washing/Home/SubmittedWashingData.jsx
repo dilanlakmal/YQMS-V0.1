@@ -573,7 +573,44 @@ const handleDownloadPDF = async (record) => {
       // Continue with empty images - PDF will still generate
     }
 
-    // 3. Fetch checkpoint definitions
+    // 3. CRITICAL FIX: Load inspector image separately through proxy
+    if (inspectorDetails && inspectorDetails.face_photo) {
+      try {
+        document.getElementById('progress-images').innerHTML = 
+          `⏳ Loading inspector image... (${imageStats.loaded}/${imageStats.total} other images loaded)`;
+        
+        // Use the image proxy for inspector photo
+        const inspectorImageUrl = inspectorDetails.face_photo.startsWith('http') 
+          ? inspectorDetails.face_photo 
+          : `${API_BASE_URL}${inspectorDetails.face_photo.startsWith('/') ? '' : '/'}${inspectorDetails.face_photo}`;
+        
+        const inspectorImageResponse = await fetch(`${API_BASE_URL}/api/qc-washing/image-proxy/${encodeURIComponent(inspectorImageUrl)}`, {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          }
+        });
+
+        if (inspectorImageResponse.ok) {
+          const inspectorImageData = await inspectorImageResponse.json();
+          if (inspectorImageData.dataUrl && inspectorImageData.dataUrl.startsWith('data:')) {
+            // Add inspector image to preloaded images
+            preloadedImages[inspectorDetails.face_photo] = inspectorImageData.dataUrl;
+            preloadedImages[inspectorImageUrl] = inspectorImageData.dataUrl;
+            
+            document.getElementById('progress-images').innerHTML = 
+              `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} + inspector image`;
+          }
+        } else {
+          console.warn('Failed to load inspector image through proxy');
+        }
+      } catch (error) {
+        console.warn('Error loading inspector image:', error);
+      }
+    }
+
+    // 4. Fetch checkpoint definitions
     let checkpointDefinitions = [];
     try {
       const response = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
@@ -587,7 +624,7 @@ const handleDownloadPDF = async (record) => {
       console.warn('Failed to fetch checkpoint definitions:', error);
     }
 
-    // 4. Prepare clean data for PDF
+    // 5. Prepare clean data for PDF
     const cleanRecordData = JSON.parse(JSON.stringify(record, (key, value) => {
       if (value === '' || value === null || value === undefined) {
         return undefined;
@@ -595,7 +632,7 @@ const handleDownloadPDF = async (record) => {
       return value;
     }));
 
-    // 5. Generate PDF
+    // 6. Generate PDF
     document.getElementById('progress-pdf').innerHTML = '⏳ Generating PDF document...';
     
     // Wait a moment to ensure all operations are complete
@@ -604,6 +641,9 @@ const handleDownloadPDF = async (record) => {
     try {
       const { pdf } = await import("@react-pdf/renderer");
       const { QcWashingFullReportPDF } = await import("./qcWashingFullReportPDF");
+
+      console.log('Inspector details being passed to PDF:', inspectorDetails); // Debug log
+      console.log('Preloaded images keys:', Object.keys(preloadedImages)); // Debug log
 
       // Create the PDF element with all required props
       const pdfElement = React.createElement(QcWashingFullReportPDF, {
@@ -625,7 +665,7 @@ const handleDownloadPDF = async (record) => {
       // Close loading dialog
       Swal.close();
 
-      // 6. Download the PDF
+      // 7. Download the PDF
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -643,6 +683,7 @@ const handleDownloadPDF = async (record) => {
             <div>✅ PDF downloaded successfully!</div>
             <div class="text-sm text-gray-600 mt-2">
               Inspector details: ${inspectorDetails ? 'Loaded' : 'Not available'}<br>
+              Inspector image: ${inspectorDetails?.face_photo && preloadedImages[inspectorDetails.face_photo] ? 'Loaded' : 'Not available'}<br>
               Images loaded: ${imageStats.loaded}/${imageStats.total}<br>
               PDF size: ${(blob.size / 1024 / 1024).toFixed(2)} MB<br>
               ${imageStats.total > 0 && imageStats.loaded === imageStats.total ? 'All images loaded successfully' : 
@@ -680,7 +721,6 @@ const handleDownloadPDF = async (record) => {
     setIsQcWashingPDF(false);
   }
 };
-
 
   const toggleDropdown = (recordId) => {
     setOpenDropdown(openDropdown === recordId ? null : recordId);

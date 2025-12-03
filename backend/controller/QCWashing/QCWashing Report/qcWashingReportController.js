@@ -46,7 +46,6 @@ export const getAllQCWashingSubmittedData = async (req, res) => {
   }
 };
 
-
 export const getQCWashingImageProxy = async (req, res) => {
   const imageUrl = decodeURIComponent(req.params.imageUrl);
   try {
@@ -325,6 +324,100 @@ export const updateQCWashingQtySub = async (req, res) => {
     });
   }
 };
+
+// Add this route to your server for individual image proxy
+export const getIndividualImageProxy = async (req, res) => {
+  try {
+    const imageUrl = decodeURIComponent(req.params.encodedUrl);
+    console.log('Individual image proxy request for:', imageUrl);
+    
+    // Set CORS headers
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization, Cache-Control, Mode");
+    
+    // Handle local file requests
+    if (imageUrl.startsWith('/storage/') || imageUrl.startsWith('/public/') || imageUrl.startsWith('/uploads/')) {
+      let filePath;
+      
+      if (imageUrl.startsWith('/storage/')) {
+        filePath = path.join(__backendDir, 'public', imageUrl);
+      } else if (imageUrl.startsWith('/public/')) {
+        filePath = path.join(__backendDir, 'public', imageUrl.replace('/public/', ''));
+      } else if (imageUrl.startsWith('/uploads/')) {
+        filePath = path.join(__backendDir, 'public', imageUrl);
+      } else {
+        filePath = path.join(__backendDir, 'public', imageUrl);
+      }
+      
+      console.log('Looking for individual file at:', filePath);
+      
+      if (fs.existsSync(filePath)) {
+        const fileBuffer = fs.readFileSync(filePath);
+        const ext = path.extname(filePath).toLowerCase();
+        
+        let mimeType = 'image/jpeg';
+        if (ext === '.png') mimeType = 'image/png';
+        else if (ext === '.gif') mimeType = 'image/gif';
+        else if (ext === '.webp') mimeType = 'image/webp';
+        
+        const base64 = fileBuffer.toString('base64');
+        const dataUrl = `data:${mimeType};base64,${base64}`;
+        
+        res.json({
+          success: true,
+          dataUrl: dataUrl,
+          mimeType: mimeType,
+          fileSize: fileBuffer.length
+        });
+      } else {
+        console.log('Individual file not found:', filePath);
+        res.status(404).json({
+          success: false,
+          error: 'File not found',
+          path: filePath
+        });
+      }
+    } else {
+      // Handle external URLs
+      const fetch = (await import('node-fetch')).default;
+      const response = await fetch(imageUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        },
+        timeout: 15000
+      });
+      
+      if (response.ok) {
+        const buffer = await response.buffer();
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
+        const base64 = buffer.toString('base64');
+        const dataUrl = `data:${contentType};base64,${base64}`;
+        
+        res.json({
+          success: true,
+          dataUrl: dataUrl,
+          mimeType: contentType,
+          fileSize: buffer.length
+        });
+      } else {
+        res.status(response.status).json({
+          success: false,
+          error: `Failed to fetch image: ${response.statusText}`,
+          status: response.status
+        });
+      }
+    }
+  } catch (error) {
+    console.error('Individual image proxy error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+};
+
 
 
 

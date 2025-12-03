@@ -186,16 +186,6 @@ const SafeText = ({ children, style, ...props }) => {
   return <Text style={style} {...props}>{content}</Text>;
 };
 
-// --- FIXED HELPER FUNCTION TO NORMALIZE IMAGE KEYS ---
-const normalizeImageKey = (src) => {
-  if (typeof src === 'string') {
-    return src.trim();
-  } else if (typeof src === 'object' && src !== null) {
-    return src.originalUrl || src.url || src.src || src.path || JSON.stringify(src);
-  }
-  return JSON.stringify(src);
-};
-
 // --- REUSABLE PDF COMPONENTS ---
 const PdfHeader = ({ orderNo, beforeAfterWash }) => (
   <View style={styles.docHeader} fixed>
@@ -1592,14 +1582,21 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
 );
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
-const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_URL, checkpointDefinitions = [], inspectorDetails = null, preloadedImages = {}  }) => {
+const QcWashingFullReportPDF = ({ 
+  recordData, 
+  comparisonData = null, 
+  API_BASE_URL, 
+  checkpointDefinitions = [], 
+  inspectorDetails = null, 
+  preloadedImages = {},
+  isLoading = false,
+  skipImageLoading = false 
+}) => {
   const [fetchedInspectorDetails, setFetchedInspectorDetails] = React.useState(null);
-  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchInspectorDetails = async () => {
       if (inspectorDetails || !recordData?.userId) {
-        setLoading(false);
         return;
       }
       try {
@@ -1607,9 +1604,7 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
         if (response.ok) setFetchedInspectorDetails(await response.json());
       } catch (error) {
         console.error('Error fetching inspector details:', error);
-      } finally {
-        setLoading(false);
-      }
+      } 
     };
     fetchInspectorDetails();
   }, [recordData?.userId, API_BASE_URL, inspectorDetails]);
@@ -1626,10 +1621,11 @@ const QcWashingFullReportPDF = ({ recordData, comparisonData = null, API_BASE_UR
   );
 
   // Updated SafeImage component
+// In your PDF component, update the SafeImage function
 const SafeImage = ({ src, style, alt }) => {
   const getImageSource = (imgSrc) => {
     if (!imgSrc) {
-      console.log('SafeImage: No source provided');
+      console.log('SafeImage: No source provided for', alt);
       return null;
     }
     
@@ -1644,39 +1640,43 @@ const SafeImage = ({ src, style, alt }) => {
     if (url.startsWith('data:')) {
       return url;
     }
+
     if (!url) {
       return null;
     }
 
-
     // Check if we have preloaded base64 data with exact match
     if (preloadedImages && preloadedImages[url]) {
+      console.log('Found preloaded image for:', url);
       return preloadedImages[url];
     }
 
-    // Try different URL variations
+    // Try different URL variations, especially for inspector images
     const urlVariations = [
       url,
       url.replace('./public/', '/'),
       url.replace('./public', ''),
       url.startsWith('/') ? url.substring(1) : '/' + url,
       url.replace(/^\/+/, '/'),
+      // Add variations for inspector images
+      url.includes('/uploads/') ? url : '/uploads/' + url.split('/').pop(),
+      url.includes('/storage/') ? url : '/storage/' + url.split('/').pop(),
       // Add more variations for defect images
       url.includes('/qc_washing_images/') ? url : '/storage/qc_washing_images/defect/' + url.split('/').pop(),
-      url.includes('/storage/') ? url : '/storage/' + url.split('/').pop(),
     ];
 
     for (const variation of urlVariations) {
       if (preloadedImages[variation]) {
+        console.log('Found preloaded image variation for:', variation);
         return preloadedImages[variation];
       }
     }
 
+    console.log('No preloaded image found for:', url, 'Alt:', alt);
     return null;
   };
 
   const imageUrl = getImageSource(src);
-
   if (!imageUrl) {
     return <ImagePlaceholder style={style} text="No Image" subtext={alt || 'Missing'} />;
   }
@@ -1684,30 +1684,37 @@ const SafeImage = ({ src, style, alt }) => {
   try {
     return <Image src={imageUrl} style={style} />;
   } catch (error) {
+    console.error('Image render error for', alt, ':', error);
     return <ImagePlaceholder style={style} text="Load Error" subtext={error.message} />;
   }
 };
 
+if (isLoading) {
+    return (
+      <Document>
+        <Page style={styles.page}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, color: '#666' }}>Loading report...</Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
 
-if (loading) {
-  return (
-    <Document>
-      <Page style={styles.page}>
-        <Text>Loading report...</Text>
-      </Page>
-    </Document>
-  );
-}
-
-if (!recordData) {
-  return (
-    <Document>
-      <Page style={styles.page}>
-        <Text>No report data available.</Text>
-      </Page>
-    </Document>
-  );
-}
+  if (!recordData || !recordData._id) {
+    return (
+      <Document>
+        <Page style={styles.page}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <Text style={{ fontSize: 16, color: '#ff0000' }}>Error: No report data available</Text>
+            <Text style={{ fontSize: 12, color: '#666', marginTop: 10 }}>
+              Please ensure the record data is properly loaded before generating the PDF.
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
 
   // Detect which data structure we're dealing with
   const hasNewInspectionStructure = recordData.inspectionDetails?.checkpointInspectionData && 
