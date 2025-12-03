@@ -368,12 +368,9 @@ const fetchSubmittedData = async (showLoading = true) => {
             }
           }
         } catch (error) {
-          if (error.name === 'AbortError') {
-            console.warn('Real wash qty request timed out for:', record.orderNo);
-          } else {
             console.error('Error fetching real wash qty from qc_real_washing_qty:', error);
           }
-        }
+        
       } else {
         // For non-YM factories, check for edited actual wash qty
         if (record.editedActualWashQty !== null && record.editedActualWashQty !== undefined) {
@@ -584,31 +581,94 @@ const handleDownloadPDF = async (record) => {
           ? inspectorDetails.face_photo 
           : `${API_BASE_URL}${inspectorDetails.face_photo.startsWith('/') ? '' : '/'}${inspectorDetails.face_photo}`;
         
-        const inspectorImageResponse = await fetch(`${API_BASE_URL}/api/qc-washing/image-proxy/${encodeURIComponent(inspectorImageUrl)}`, {
-          method: 'GET',
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
+        
+        // Try proxy first with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+        
+        try {
+          const inspectorImageResponse = await fetch(
+            `${API_BASE_URL}/api/qc-washing/image-proxy/${encodeURIComponent(inspectorImageUrl)}`, 
+            {
+              method: 'GET',
+              headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+              },
+              signal: controller.signal
+            }
+          );
+          
+          clearTimeout(timeoutId);
+          
+          if (inspectorImageResponse.ok) {
+            const inspectorImageData = await inspectorImageResponse.json();
+            if (inspectorImageData.success && inspectorImageData.dataUrl && inspectorImageData.dataUrl.startsWith('data:')) {
+              // Add inspector image to preloaded images
+              preloadedImages[inspectorDetails.face_photo] = inspectorImageData.dataUrl;
+              preloadedImages[inspectorImageUrl] = inspectorImageData.dataUrl;
+              
+              document.getElementById('progress-images').innerHTML = 
+                `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} + inspector image (via proxy)`;
+              console.log('Inspector image loaded successfully via proxy');
+            } else {
+              throw new Error('Invalid proxy response format');
+            }
+          } else {
+            throw new Error(`Proxy returned ${inspectorImageResponse.status}`);
           }
-        });
+        } catch (proxyError) {
+          console.warn('Proxy failed, trying direct load:', proxyError);
+          clearTimeout(timeoutId);
+          
+          // Fallback: Try direct image loading
+          try {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            await new Promise((resolve, reject) => {
+              const directTimeout = setTimeout(() => reject(new Error('Direct image load timeout')), 5000);
+              img.onload = () => {
+                clearTimeout(directTimeout);
+                resolve();
+              };
+              img.onerror = () => {
+                clearTimeout(directTimeout);
+                reject(new Error('Direct image load failed'));
+              };
+              img.src = inspectorImageUrl;
+            });
 
-        if (inspectorImageResponse.ok) {
-          const inspectorImageData = await inspectorImageResponse.json();
-          if (inspectorImageData.dataUrl && inspectorImageData.dataUrl.startsWith('data:')) {
-            // Add inspector image to preloaded images
-            preloadedImages[inspectorDetails.face_photo] = inspectorImageData.dataUrl;
-            preloadedImages[inspectorImageUrl] = inspectorImageData.dataUrl;
+            // Convert to data URL
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+            preloadedImages[inspectorDetails.face_photo] = dataUrl;
+            preloadedImages[inspectorImageUrl] = dataUrl;
             
             document.getElementById('progress-images').innerHTML = 
-              `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} + inspector image`;
+              `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} + inspector image (direct)`;
+
+          } catch (directError) {
+            console.warn('Direct image load also failed:', directError);
+            document.getElementById('progress-images').innerHTML = 
+              `⚠️ Inspector image failed to load: ${directError.message}`;
           }
-        } else {
-          console.warn('Failed to load inspector image through proxy');
         }
       } catch (error) {
-        console.warn('Error loading inspector image:', error);
+        console.error('Error in inspector image loading:', error);
+        document.getElementById('progress-images').innerHTML = 
+          `⚠️ Inspector image failed to load: ${error.message}`;
       }
+    } else {
+      document.getElementById('progress-images').innerHTML = 
+        `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} (no inspector image)`;
     }
+
 
     // 4. Fetch checkpoint definitions
     let checkpointDefinitions = [];
