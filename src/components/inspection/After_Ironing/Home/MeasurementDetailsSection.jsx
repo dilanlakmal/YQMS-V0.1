@@ -117,22 +117,42 @@ const setKValueForSize = async (size, kValue) => {
   let patternApplied = false;
   let defaultSelectedRows = Array(specs.length).fill(false);
   
-  // Apply pattern function
   const applyPattern = async () => {
     // Load After Ironing measurement points from formData
     if (formData.measurementDetails?.measurement) {
+      const washTypeKey = 'afterIroning';
+      
       const afterWashData = formData.measurementDetails.measurement.find(
-        (m) => m.before_after_wash === 'afterIroning' && m.size === size
+        (m) => m.before_after_wash === washTypeKey && m.size === size
       );
+      
       if (afterWashData && afterWashData.selectedRows) {
         defaultSelectedRows = [...afterWashData.selectedRows];
         patternApplied = true;
       }
     }
-
+    
+    // Use QC Washing data if available
+    if (!patternApplied && qcWashingData.length > 0) {
+      let qcWashingMeasurement = qcWashingData.find(
+        (m) => m.size === size && m.kvalue === kValue
+      );
+      
+      if (!qcWashingMeasurement) {
+        qcWashingMeasurement = qcWashingData.find((m) => m.size === size);
+      }
+      
+      if (qcWashingMeasurement && qcWashingMeasurement.selectedRows && qcWashingMeasurement.selectedRows.length === specs.length) {
+        defaultSelectedRows = [...qcWashingMeasurement.selectedRows];
+        patternApplied = true;
+      }
+    }
+    
     // Use buyerspectemplate if available
     if (!patternApplied && buyerSpecData) {
-      const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, size, 'After Ironing');
+      const buyerWashType = 'After Ironing';
+      
+      const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, size, buyerWashType);
       if (defaultMeasurementPoints.length > 0) {
         defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
         patternApplied = true;
@@ -163,17 +183,17 @@ const setKValueForSize = async (size, kValue) => {
       }
     }
 
-    // If a pattern was found, default to hiding unselected rows. Otherwise, show all.
+    // UPDATED: Always hide unselected rows by default when pattern is applied
     setHideUnselectedRowsBySize(prev => ({
       ...prev,
-      [size]: patternApplied
+      [size]: patternApplied // Hide unselected if pattern applied, show all if no pattern
     }));
-
+    
     // Fallback: If no pattern was applied, ensure all rows are unselected.
     if (!patternApplied) {
       defaultSelectedRows = Array(specs.length).fill(false);
     }
-
+    
     // Apply the selected rows
     setSelectedRowsBySize(prev => ({
       ...prev,
@@ -199,37 +219,9 @@ const setKValueForSize = async (size, kValue) => {
       return newValues;
     });
   };
-  
-  // Execute the pattern application
+
   await applyPattern();
 };
-
-
-
-
-  // Helper function to get default measurement points from buyerspectemplate
-  const getDefaultMeasurementPoints = (buyerSpecData, size, washType) => {
-    if (!buyerSpecData || !buyerSpecData.specData) return [];
-    
-    // Find spec data for the specific size
-    const sizeSpecData = buyerSpecData.specData.find(spec => spec.size === size);
-    if (!sizeSpecData || !sizeSpecData.specDetails) return [];
-    
-    // Extract measurement point names from buyerspectemplate
-    return sizeSpecData.specDetails.map(detail => detail.specName);
-  };
-
-  // Helper function to match measurement points with current specs
-  const getDefaultSelectedRows = (defaultMeasurementPoints, currentSpecs) => {
-    if (!defaultMeasurementPoints || !currentSpecs) return [];
-    
-    return currentSpecs.map(spec => {
-      const specName = spec.MeasurementPointEngName || '';
-      return defaultMeasurementPoints.includes(specName);
-    });
-  };
-
-
 
 
   const getSavedKValuesForSize = (size) => {
@@ -259,7 +251,71 @@ const setKValueForSize = async (size, kValue) => {
     return availableKValues.length > 0 && availableKValues.every(kvalue => savedKValues.includes(kvalue));
   };
 
-  const addSize = async (size) => {
+  // Helper function to get default measurement points from buyerspectemplate
+  const getDefaultMeasurementPoints = (buyerSpecData, size, washType) => {
+    if (!buyerSpecData || !buyerSpecData.specData) return [];
+    
+    // Find spec data for the specific size
+    const sizeSpecData = buyerSpecData.specData.find(spec => spec.size === size);
+    if (!sizeSpecData || !sizeSpecData.specDetails) return [];
+    
+    // Extract measurement point names from buyerspectemplate
+    return sizeSpecData.specDetails.map(detail => detail.specName);
+  };
+
+  // Helper function to match measurement points with current specs
+  const getDefaultSelectedRows = (defaultMeasurementPoints, currentSpecs) => {
+    if (!defaultMeasurementPoints || !currentSpecs) return [];
+    
+    return currentSpecs.map(spec => {
+      const specName = spec.MeasurementPointEngName || '';
+      return defaultMeasurementPoints.includes(specName);
+    });
+  };
+
+  // Add this function to your component
+const fetchQCWashingData = async () => {
+  if (!orderNo || !color) return;
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/api/after-ironing/qc-washing-data?orderNo=${orderNo}&color=${encodeURIComponent(color)}&reportType=SOP`
+    );
+    const data = await response.json();
+
+    if (data.success && data.data.afterIroning.length > 0) {
+      // Store this data to use for pattern application
+      setQCWashingData(data.data.afterIroning);
+    } else {
+      console.log('No QC Washing data found or fetch failed:', data);
+      setQCWashingData([]);
+    }
+  } catch (error) {
+    console.error('Error fetching QC Washing data:', error);
+    setQCWashingData([]);
+  }
+};
+
+
+// Add this state to store QC Washing data
+const [qcWashingData, setQCWashingData] = useState([]);
+
+// Update your useEffect to fetch QC Washing data
+useEffect(() => {
+  if (orderNo && color) { 
+    fetchSizes();
+    fetchMeasurementSpecs();
+    fetchQCWashingData(); // Add this line
+  } else {
+    setSizes([]);
+    setSelectedSizes([]);
+    setMeasurementSpecs({ afterWash: [], afterWashGrouped: {} });
+    setQCWashingData([]); // Add this line
+  }
+}, [orderNo, color]);
+
+
+const addSize = async (size) => {
   const sizeStr = String(size);
   
   if (!selectedSizes.find(s => s.size === sizeStr)) {
@@ -276,6 +332,7 @@ const setKValueForSize = async (size, kValue) => {
     
     const specs = measurementSpecs.afterWashGrouped[currentKValue] || measurementSpecs.afterWash || [];
     
+    
     let patternApplied = false;
     let defaultSelectedRows = Array(specs.length).fill(false);
     
@@ -286,18 +343,74 @@ const setKValueForSize = async (size, kValue) => {
       if (globalPattern && globalPattern.length === specs.length) {
         defaultSelectedRows = [...globalPattern];
         patternApplied = true;
+        return;
       }
       
-      // Priority 2: Use buyerspectemplate
-      if (!patternApplied && buyerSpecData) {
-        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, 'After Ironing');
-        if (defaultMeasurementPoints.length > 0) {
-          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
-          patternApplied = true;
+      // Priority 2: Load from QC Washing data
+      if (!patternApplied && qcWashingData.length > 0) {
+        
+        // Try exact match first
+        let qcWashingMeasurement = qcWashingData.find(
+          (m) => m.size === sizeStr && m.kvalue === currentKValue
+        );
+        
+        // If no exact K-value match, try any measurement for this size
+        if (!qcWashingMeasurement) {
+          qcWashingMeasurement = qcWashingData.find((m) => m.size === sizeStr);
+          console.log(`🔍 No exact K-value match, trying any size match:`, qcWashingMeasurement ? 'Found' : 'Not found');
+        }
+        
+        // If no size match, try the first available measurement with matching specs length
+        if (!qcWashingMeasurement) {
+          qcWashingMeasurement = qcWashingData.find(
+            (m) => m.selectedRows && m.selectedRows.length === specs.length
+          );
+          console.log(`🔍 No size match, trying specs length match:`, qcWashingMeasurement ? 'Found' : 'Not found');
+        }
+        
+        if (qcWashingMeasurement && qcWashingMeasurement.selectedRows) {
+          // Check if lengths match
+          if (qcWashingMeasurement.selectedRows.length === specs.length) {
+            defaultSelectedRows = [...qcWashingMeasurement.selectedRows];
+            patternApplied = true;
+            console.log(`✅ Applied pattern from QC Washing data for size ${sizeStr}:`, defaultSelectedRows);
+            return;
+          }
         }
       }
       
-      // Priority 3: Check saved data for this specific size
+      // Priority 3: Load from formData if available
+      if (!patternApplied && formData.measurementDetails?.measurement) {
+        const washTypeKey = 'afterIroning';
+        
+        const savedFormData = formData.measurementDetails.measurement.find(
+          (m) => m.before_after_wash === washTypeKey && m.size === sizeStr
+        );
+        
+        if (savedFormData && savedFormData.selectedRows) {
+          if (savedFormData.selectedRows.length === specs.length) {
+            defaultSelectedRows = [...savedFormData.selectedRows];
+            patternApplied = true;
+            console.log(`✅ Applied pattern from formData in addSize for ${washTypeKey}:`, defaultSelectedRows);
+            return;
+          }
+        }
+      }
+      
+      // Priority 4: Use buyerspectemplate
+      if (!patternApplied && buyerSpecData) {
+        const buyerWashType = 'After Ironing';
+        
+        const defaultMeasurementPoints = getDefaultMeasurementPoints(buyerSpecData, sizeStr, buyerWashType);
+        if (defaultMeasurementPoints.length > 0) {
+          defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
+          patternApplied = true;
+          console.log(`✅ Applied pattern from buyerSpecData in addSize for ${buyerWashType}:`, defaultSelectedRows);
+          return;
+        }
+      }
+      
+      // Priority 5: Check saved data for this specific size
       if (!patternApplied) {
         const savedDataForThisSize = currentWashMeasurements.filter(m => m.size === sizeStr);
         if (savedDataForThisSize.length > 0) {
@@ -305,52 +418,64 @@ const setKValueForSize = async (size, kValue) => {
           if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
             defaultSelectedRows = [...mostRecentSaved.selectedRows];
             patternApplied = true;
+            console.log('✅ Applied pattern from saved data in addSize:', defaultSelectedRows);
+            return;
           }
         }
-      }
-      
-      // If a pattern was found, default to hiding unselected rows. Otherwise, show all.
-      setHideUnselectedRowsBySize(prev => ({
-        ...prev,
-        [sizeStr]: patternApplied
-      }));
-
-      // Fallback: If no pattern was applied, ensure all rows are unselected.
-      if (!patternApplied) {
-        defaultSelectedRows = Array(specs.length).fill(false);
-      }
-      
-      // Apply the selected rows
-      setSelectedRowsBySize(prev => ({
-        ...prev,
-        [sizeStr]: defaultSelectedRows
-      }));
-      
-      // Initialize measurement values for selected rows
-      if (patternApplied || defaultSelectedRows.some(row => row)) {
-        setMeasurementValues(prevValues => {
-          const newValues = { ...prevValues };
-          
-          defaultSelectedRows.forEach((isSelected, rowIndex) => {
-            if (isSelected) {
-              for (let colIndex = 0; colIndex < 3; colIndex++) {
-                const cellKey = `${sizeStr}-after-${currentKValue}-${rowIndex}-${colIndex}`;
-                if (!newValues[cellKey]) {
-                  newValues[cellKey] = { decimal: 0, fraction: '0' };
-                }
-              }
-            }
-          });
-          
-          return newValues;
-        });
       }
     };
     
     // Execute pattern application
     applyPatternAndValues();
+    
+    // UPDATED: Always hide unselected rows by default when pattern is applied
+    // If no pattern applied, show all rows by default
+    setHideUnselectedRowsBySize(prev => ({
+      ...prev,
+      [sizeStr]: patternApplied // Hide unselected if pattern applied, show all if no pattern
+    }));
+    
+    // Fallback: If no pattern was applied, ensure all rows are unselected
+    if (!patternApplied) {
+      defaultSelectedRows = Array(specs.length).fill(false);
+      console.log('❌ No pattern found in addSize, defaulting to unselected rows');
+    }
+    
+    // Apply the selected rows
+    setSelectedRowsBySize(prev => ({
+      ...prev,
+      [sizeStr]: defaultSelectedRows
+    }));
+    
+    // Initialize measurement values for selected rows
+    if (patternApplied || defaultSelectedRows.some(row => row)) {
+      setMeasurementValues(prevValues => {
+        const newValues = { ...prevValues };
+        
+        defaultSelectedRows.forEach((isSelected, rowIndex) => {
+          if (isSelected) {
+            for (let colIndex = 0; colIndex < 3; colIndex++) {
+              const cellKey = `${sizeStr}-after-${currentKValue}-${rowIndex}-${colIndex}`;
+              if (!newValues[cellKey]) {
+                newValues[cellKey] = { decimal: 0, fraction: '0' };
+              }
+            }
+          }
+        });
+        
+        return newValues;
+      });
+    }
+    
+    console.log(`Final result for size ${sizeStr}:`, {
+      patternApplied,
+      selectedRowsCount: defaultSelectedRows.filter(Boolean).length,
+      totalRows: defaultSelectedRows.length,
+      hideUnselected: patternApplied
+    });
   }
 };
+
 
   // Rest of your functions remain the same...
   const transformMeasurementData = (
@@ -547,54 +672,56 @@ const setKValueForSize = async (size, kValue) => {
   };
 
   const handleEditClick = (sizeToEdit, kvalue) => {
-    const before_after_wash_Key = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterIroning';
-    const dataToEdit = (measurementData[before_after_wash_Key] || []).find(
-      item => item.size === sizeToEdit && item.kvalue === kvalue
-    );
-    if (!dataToEdit) return;
+  const before_after_wash_Key = before_after_wash === 'Before Wash' ? 'beforeWash' : 'afterIroning';
+  const dataToEdit = (measurementData[before_after_wash_Key] || []).find(
+    item => item.size === sizeToEdit && item.kvalue === kvalue
+  );
+  if (!dataToEdit) return;
 
-    // Remove from saved combinations
-    setSavedSizeKValueCombinations(prev => 
-      prev.filter(combo => !(combo.size === sizeToEdit && combo.kvalue === kvalue))
-    );
+  // Remove from saved combinations
+  setSavedSizeKValueCombinations(prev => 
+    prev.filter(combo => !(combo.size === sizeToEdit && combo.kvalue === kvalue))
+  );
 
-    // Mark this size-kvalue combination as being edited FIRST
-    setEditingMeasurements(prev => new Set([...prev, `${sizeToEdit}-${kvalue}`]));
-    
-    // Add to selected sizes if not already there
-    setSelectedSizes(prev => {
-      if (prev.some(s => s.size === sizeToEdit)) {
-        return prev.map(s => s.size === sizeToEdit ? { ...s, qty: dataToEdit.qty } : s);
-      }
-      return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
-    });
-
-    // When editing, default to hiding unselected rows.
-    setHideUnselectedRowsBySize(prev => ({
-      ...prev,
-      [sizeToEdit]: true
-    }));
-
-    // Set the K-value for this specific size directly without validation
-    const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
-    const key = `${sizeToEdit}-${tableType}`;
-    setSizeSpecificKValues(prev => ({
-      ...prev,
-      [key]: kvalue
-    }));
-
-    // Set the active tab to the K-value being edited
-    if (before_after_wash === 'Before Wash') {
-      setActiveBeforeTab(kvalue);
-    } else {
-      setActiveAfterTab(kvalue);
+  // Mark this size-kvalue combination as being edited FIRST
+  setEditingMeasurements(prev => new Set([...prev, `${sizeToEdit}-${kvalue}`]));
+  
+  // Add to selected sizes if not already there
+  setSelectedSizes(prev => {
+    if (prev.some(s => s.size === sizeToEdit)) {
+      return prev.map(s => s.size === sizeToEdit ? { ...s, qty: dataToEdit.qty } : s);
     }
+    return [...prev, { size: sizeToEdit, qty: dataToEdit.qty }];
+  });
 
-    // Hydrate from the saved record BEFORE clearing state
-    // This ensures the data is properly restored
-    hydrateMeasurementUIFromSavedData([dataToEdit], tableType);
-    if (onMeasurementEdit) onMeasurementEdit(sizeToEdit, kvalue);
-  };
+  // UPDATED: When editing, default to hiding unselected rows (since we have a pattern)
+  setHideUnselectedRowsBySize(prev => ({
+    ...prev,
+    [sizeToEdit]: true // Always hide unselected when editing existing data
+  }));
+
+  // Set the K-value for this specific size directly without validation
+  const tableType = before_after_wash === 'Before Wash' ? 'before' : 'after';
+  const key = `${sizeToEdit}-${tableType}`;
+  setSizeSpecificKValues(prev => ({
+    ...prev,
+    [key]: kvalue
+  }));
+
+  // Set the active tab to the K-value being edited
+  if (before_after_wash === 'Before Wash') {
+    setActiveBeforeTab(kvalue);
+  } else {
+    setActiveAfterTab(kvalue);
+  }
+
+  // Hydrate from the saved record BEFORE clearing state
+  // This ensures the data is properly restored
+  hydrateMeasurementUIFromSavedData([dataToEdit], tableType);
+
+  if (onMeasurementEdit) onMeasurementEdit(sizeToEdit, kvalue);
+};
+
 
   useEffect(() => {
   if (orderNo) { 
@@ -1024,7 +1151,6 @@ const setKValueForSize = async (size, kValue) => {
   
   // Validate measurement data
   if (!measurementData) {
-    console.error('Error saving measurement: Missing measurementDetail');
     Swal.fire({
       icon: 'error',
       title: 'Error',

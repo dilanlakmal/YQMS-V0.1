@@ -1247,9 +1247,16 @@ export const savedMeasurementDataSpec = async (req, res) => {
       query.factoryName = factory;
     }
 
-    // For After Wash requests, specifically look for Before Wash data
+    // FIXED: Map wash type correctly
     if (washType === "Before Wash") {
       query.before_after_wash = "Before Wash";
+    } else if (washType === "After Ironing") {
+      // Look for both possible values in the database
+      query.$or = [
+        ...query.$or,
+        { before_after_wash: "After Ironing" },
+        { before_after_wash: "afterIroning" }
+      ];
     }
 
     // Try to find all matching records first (without reportType and factory filters)
@@ -1260,6 +1267,12 @@ export const savedMeasurementDataSpec = async (req, res) => {
 
     if (washType === "Before Wash") {
       basicQuery.before_after_wash = "Before Wash";
+    } else if (washType === "After Ironing") {
+      basicQuery.$or = [
+        ...basicQuery.$or,
+        { before_after_wash: "After Ironing" },
+        { before_after_wash: "afterIroning" }
+      ];
     }
 
     const allRecords = await collection.find(basicQuery).toArray();
@@ -1298,19 +1311,32 @@ export const savedMeasurementDataSpec = async (req, res) => {
               (point) => point.pointName
             );
 
+            // FIXED: Normalize the before_after_wash value
+            let normalizedWashType = measurement.before_after_wash;
+            if (measurement.before_after_wash === 'afterWash' || measurement.before_after_wash === 'After Wash') {
+              normalizedWashType = 'afterIroning';
+            }
+
             // Create a structure that matches what the frontend expects
             extractedMeasurementPoints.push({
               size: measurement.size,
               kvalue: measurement.kvalue,
-              before_after_wash: measurement.before_after_wash,
+              before_after_wash: normalizedWashType, // Use normalized value
               selectedRows: measurement.selectedRows || [],
               measurementPointNames: pointNames,
               // Include the original structure for compatibility
-              ...measurement
+              ...measurement,
+              before_after_wash: normalizedWashType // Override with normalized value
             });
           }
         }
       });
+
+      console.log('Extracted measurement points:', extractedMeasurementPoints.map(m => ({
+        size: m.size,
+        before_after_wash: m.before_after_wash,
+        selectedRows: m.selectedRows?.length
+      })));
 
       res.json({
         success: true,
@@ -2770,7 +2796,7 @@ export const getQCWashingMeasurementData = async (req, res) => {
     if (!orderNo) {
       return res.status(400).json({
         success: false,
-        message: "Order number and color are required"
+        message: "Order number is required"
       });
     }
 
@@ -2785,9 +2811,11 @@ export const getQCWashingMeasurementData = async (req, res) => {
       const dateValue = new Date(date.length === 10 ? date + "T00:00:00.000Z" : date);
       query.date = dateValue;
     }
+
     if (reportType) {
       query.reportType = reportType;
     }
+
     if (factoryName) {
       query.factoryName = factoryName;
     }
@@ -2805,21 +2833,41 @@ export const getQCWashingMeasurementData = async (req, res) => {
       });
     }
 
-    // Extract measurement data for Before Wash and After Wash
+    // FIXED: Extract measurement data with proper mapping
     const measurementData = {
       beforeWash: [],
-      afterWash: []
+      afterWash: [],
+      afterIroning: [] // Add this for After Ironing data
     };
 
     if (qcWashingRecord.measurementDetails?.measurement) {
       qcWashingRecord.measurementDetails.measurement.forEach(measurement => {
+        // Create a copy of the measurement with normalized before_after_wash
+        const normalizedMeasurement = { ...measurement };
+        
+        // Map the before_after_wash values to what the frontend expects
         if (measurement.before_after_wash === 'beforeWash' || measurement.before_after_wash === 'Before Wash') {
-          measurementData.beforeWash.push(measurement);
+          normalizedMeasurement.before_after_wash = 'beforeWash';
+          measurementData.beforeWash.push(normalizedMeasurement);
         } else if (measurement.before_after_wash === 'afterWash' || measurement.before_after_wash === 'After Wash') {
-          measurementData.afterWash.push(measurement);
+          // CRITICAL FIX: Map afterWash to afterIroning for After Ironing component
+          normalizedMeasurement.before_after_wash = 'afterIroning';
+          measurementData.afterIroning.push(normalizedMeasurement);
+          
+          // Also keep the original mapping for backward compatibility
+          measurementData.afterWash.push({ ...measurement });
+        } else if (measurement.before_after_wash === 'afterIroning' || measurement.before_after_wash === 'After Ironing') {
+          normalizedMeasurement.before_after_wash = 'afterIroning';
+          measurementData.afterIroning.push(normalizedMeasurement);
         }
       });
     }
+
+    console.log('Measurement data mapping:', {
+      beforeWash: measurementData.beforeWash.length,
+      afterWash: measurementData.afterWash.length,
+      afterIroning: measurementData.afterIroning.length
+    });
 
     res.json({
       success: true,
@@ -2832,11 +2880,103 @@ export const getQCWashingMeasurementData = async (req, res) => {
         factoryName: qcWashingRecord.factoryName
       }
     });
+
   } catch (error) {
     console.error("Error fetching QC Washing measurement data:", error);
     res.status(500).json({
       success: false,
       message: "Server error while fetching QC Washing measurement data",
+      error: error.message
+    });
+  }
+};
+
+export const getQCWashingDataForAfterIroning = async (req, res) => {
+  try {
+    const { orderNo, color, reportType, factoryName } = req.query;
+
+    if (!orderNo) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number is required"
+      });
+    }
+
+    // Build query to find matching QC Washing record
+    const query = {
+      orderNo: orderNo,
+      status: { $in: ['submitted', 'approved'] }
+    };
+
+    // Add optional filters
+    if (color) query.color = color;
+    if (reportType) query.reportType = reportType;
+    if (factoryName) query.factoryName = factoryName;
+
+    // Find the most recent matching QC Washing record
+    const qcWashingRecord = await QCWashing.findOne(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!qcWashingRecord) {
+      return res.json({
+        success: false,
+        message: "No matching QC Washing record found",
+        data: { afterIroning: [] }
+      });
+    }
+
+    // Extract and transform measurement data specifically for After Ironing
+    const afterIroningData = [];
+
+    if (qcWashingRecord.measurementDetails?.measurement) {
+      qcWashingRecord.measurementDetails.measurement.forEach(measurement => {
+        // Only process After Wash data (which becomes After Ironing data)
+        if (measurement.before_after_wash === 'afterWash' || measurement.before_after_wash === 'After Wash') {
+          const transformedMeasurement = {
+            ...measurement,
+            before_after_wash: 'afterIroning', // Transform to afterIroning
+            // Ensure selectedRows is properly included
+            selectedRows: measurement.selectedRows || [],
+            // Include other important fields
+            size: measurement.size,
+            kvalue: measurement.kvalue || 'NA',
+            qty: measurement.qty || 3
+          };
+          
+          console.log(`Transforming measurement for size ${measurement.size}:`, {
+            originalBeforeAfterWash: measurement.before_after_wash,
+            newBeforeAfterWash: transformedMeasurement.before_after_wash,
+            selectedRowsLength: transformedMeasurement.selectedRows.length,
+            size: transformedMeasurement.size,
+            kvalue: transformedMeasurement.kvalue
+          });
+          
+          afterIroningData.push(transformedMeasurement);
+        }
+      });
+    }
+
+    console.log(`Found ${afterIroningData.length} After Wash measurements to use as After Ironing baseline`);
+
+    res.json({
+      success: true,
+      data: { afterIroning: afterIroningData },
+      recordInfo: {
+        id: qcWashingRecord._id,
+        orderNo: qcWashingRecord.orderNo,
+        color: qcWashingRecord.color,
+        date: qcWashingRecord.date,
+        reportType: qcWashingRecord.reportType,
+        factoryName: qcWashingRecord.factoryName
+      }
+    });
+
+  } catch (error) {
+    console.error("Error fetching QC Washing data for After Ironing:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching QC Washing data for After Ironing",
       error: error.message
     });
   }
