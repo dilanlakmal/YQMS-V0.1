@@ -642,9 +642,6 @@ const handleDownloadPDF = async (record) => {
       const { pdf } = await import("@react-pdf/renderer");
       const { QcWashingFullReportPDF } = await import("./qcWashingFullReportPDF");
 
-      console.log('Inspector details being passed to PDF:', inspectorDetails); // Debug log
-      console.log('Preloaded images keys:', Object.keys(preloadedImages)); // Debug log
-
       // Create the PDF element with all required props
       const pdfElement = React.createElement(QcWashingFullReportPDF, {
         recordData: cleanRecordData,
@@ -885,7 +882,6 @@ const handleDownloadPDF = async (record) => {
                 }
               } else if (aqlResponse.status === 404) {
                 setAqlEndpointAvailable(false);
-                console.warn('AQL endpoint not available, disabling future calls');
               }
             } catch (e) {
               console.error("AQL fetch failed:", e);

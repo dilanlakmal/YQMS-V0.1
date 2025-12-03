@@ -1625,7 +1625,6 @@ const QcWashingFullReportPDF = ({
 const SafeImage = ({ src, style, alt }) => {
   const getImageSource = (imgSrc) => {
     if (!imgSrc) {
-      console.log('SafeImage: No source provided for', alt);
       return null;
     }
     
@@ -1647,7 +1646,6 @@ const SafeImage = ({ src, style, alt }) => {
 
     // Check if we have preloaded base64 data with exact match
     if (preloadedImages && preloadedImages[url]) {
-      console.log('Found preloaded image for:', url);
       return preloadedImages[url];
     }
 
@@ -1667,12 +1665,10 @@ const SafeImage = ({ src, style, alt }) => {
 
     for (const variation of urlVariations) {
       if (preloadedImages[variation]) {
-        console.log('Found preloaded image variation for:', variation);
         return preloadedImages[variation];
       }
     }
 
-    console.log('No preloaded image found for:', url, 'Alt:', alt);
     return null;
   };
 

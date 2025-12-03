@@ -329,7 +329,6 @@ export const updateQCWashingQtySub = async (req, res) => {
 export const getIndividualImageProxy = async (req, res) => {
   try {
     const imageUrl = decodeURIComponent(req.params.encodedUrl);
-    console.log('Individual image proxy request for:', imageUrl);
     
     // Set CORS headers
     res.header("Access-Control-Allow-Origin", "*");
