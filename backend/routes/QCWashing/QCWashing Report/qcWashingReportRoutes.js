@@ -7,6 +7,7 @@ import {
   getqcwashingResult,
   getqcwashingresultFilter,
   updateQCWashingQtySub,
+   getIndividualImageProxy,
 } from '../../../controller/QCWashing/QCWashing Report/qcWashingReportController.js';
 
 const router = express.Router();
@@ -26,6 +27,7 @@ router.get('/api/qc-washing/image-proxy-selected/:id', getQCWashingImgeSelected)
 router.get('/api/qc-washing/results/filters', getqcwashingresultFilter);
 router.get('/api/qc-washing/results', getqcwashingResult);
 router.get('/api/qc-washing/pdf/:id', getqcwashingPDF);
+router.get('/api/qc-washing/image-proxy/:encodedUrl', getIndividualImageProxy);
 
 /* ------------------------------
  Sub-Con Edit Routes
