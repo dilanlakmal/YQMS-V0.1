@@ -2,7 +2,8 @@ import {
   DtOrder,
   YorksysOrders,
   QASectionsAqlBuyerConfig,
-  SubconSewingFactory
+  SubconSewingFactory,
+  QASectionsProductType
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -634,6 +635,159 @@ export const getSubConFactories = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error while fetching sub-con factories.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// NEW: Get Product Type Info for Orders
+// ============================================================
+export const getOrderProductTypeInfo = async (req, res) => {
+  try {
+    const { orderNos } = req.body;
+
+    if (!orderNos || !Array.isArray(orderNos) || orderNos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Order numbers array is required."
+      });
+    }
+
+    // Fetch yorksys orders for the given order numbers
+    const yorksysOrders = await YorksysOrders.find({ moNo: { $in: orderNos } })
+      .select("moNo productType")
+      .lean();
+
+    if (yorksysOrders.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          productType: null,
+          imageURL: null,
+          hasProductType: false
+        }
+      });
+    }
+
+    // Get product types from the orders
+    const productTypes = yorksysOrders
+      .map((order) => order.productType)
+      .filter((pt) => pt && pt.trim() !== "" && pt !== "N/A");
+
+    // If no product type found
+    if (productTypes.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          productType: null,
+          imageURL: null,
+          hasProductType: false
+        }
+      });
+    }
+
+    // Use the first product type
+    const productTypeName = productTypes[0];
+
+    // Find the matching product type in qa_sections_product_type
+    const productTypeDoc = await QASectionsProductType.findOne({
+      EnglishProductName: { $regex: new RegExp(`^${productTypeName}$`, "i") }
+    }).lean();
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        productType: productTypeName,
+        imageURL: productTypeDoc?.imageURL || null,
+        hasProductType: true,
+        productTypeId: productTypeDoc?._id || null,
+        productTypeDetails: productTypeDoc || null
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching order product type info:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching product type info.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// NEW: Get All Product Type Options for Dropdown
+// ============================================================
+export const getProductTypeOptions = async (req, res) => {
+  try {
+    const productTypes = await QASectionsProductType.find()
+      .select(
+        "_id no EnglishProductName KhmerProductName ChineseProductName imageURL"
+      )
+      .sort({ no: 1 })
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: productTypes
+    });
+  } catch (error) {
+    console.error("Error fetching product type options:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching product type options.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// NEW: Update Product Type for Order(s)
+// ============================================================
+export const updateOrderProductType = async (req, res) => {
+  try {
+    const { orderNos, productType } = req.body;
+
+    if (!orderNos || !Array.isArray(orderNos) || orderNos.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Order numbers array is required."
+      });
+    }
+
+    if (!productType) {
+      return res.status(400).json({
+        success: false,
+        message: "Product type is required."
+      });
+    }
+
+    // Update all matching orders in yorksys_orders
+    const result = await YorksysOrders.updateMany(
+      { moNo: { $in: orderNos } },
+      { $set: { productType: productType } }
+    );
+
+    // Get the product type image
+    const productTypeDoc = await QASectionsProductType.findOne({
+      EnglishProductName: { $regex: new RegExp(`^${productType}$`, "i") }
+    }).lean();
+
+    return res.status(200).json({
+      success: true,
+      message: `Product type updated for ${result.modifiedCount} order(s).`,
+      data: {
+        matchedCount: result.matchedCount,
+        modifiedCount: result.modifiedCount,
+        productType: productType,
+        imageURL: productTypeDoc?.imageURL || null
+      }
+    });
+  } catch (error) {
+    console.error("Error updating order product type:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while updating product type.",
       error: error.message
     });
   }

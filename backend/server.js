@@ -238,6 +238,11 @@ import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReport
 import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
 
 /* -----------------------------
+  After Ironing Import
+------------------------------ */
+import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
+
+/* -----------------------------
 Audit Imports
 ------------------------------ */
 import auditAdmin from "./routes/Audit/AuditAdminRoutes.js";
@@ -506,6 +511,11 @@ app.use(qcWashingInspection);
 app.use(qcWashingAdmin);
 app.use(qcWashingReport);
 app.use(qcWashingOldQty);
+
+/* -----------------------------
+After Ironing Routes
+------------------------------ */
+app.use(afterIroning);
 
 /* -----------------------------
 Audit Routes

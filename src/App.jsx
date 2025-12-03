@@ -50,7 +50,7 @@ import CEMasterList from "./pages/CEMasterList.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
-import QCWashingPage from "./pages/QCWashing.jsx";
+
 import PackingList from "./pages/PackingList.jsx";
 import Measurement from "./pages/Measurement.jsx";
 
@@ -77,6 +77,9 @@ import QCAccuracy from "./pages/QCAccuracy.jsx";
 import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
 import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
+
+import QCWashingPage from "./pages/QCWashing.jsx";
+import AfterIroning from "./pages/AfterIroning.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
@@ -472,6 +475,7 @@ function AppContent() {
                 path="/qc2-washing-upload"
                 element={<QC2WashingUpload />}
               />
+              <Route path="/afterIroning" element={<AfterIroning />} />
               <Route path="/packing-list" element={<PackingList />} />
               <Route path="/measurement" element={<Measurement />} />
               <Route path="/qa-sections" element={<YPivotQASections />} />

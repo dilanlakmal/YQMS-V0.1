@@ -10,6 +10,19 @@ const SelectedCategorySchema = new mongoose.Schema(
   { _id: false }
 );
 
+// New Sub-schema for selected photo sections
+const SelectedPhotoSectionSchema = new mongoose.Schema(
+  {
+    PhotoSectionID: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true,
+      ref: "QASectionsPhotos"
+    },
+    SectionName: { type: String, required: true }
+  },
+  { _id: false }
+);
+
 const qaSectionsTemplatesSchema = new mongoose.Schema(
   {
     no: { type: Number, required: true, unique: true },
@@ -51,6 +64,16 @@ const qaSectionsTemplatesSchema = new mongoose.Schema(
       enum: ["NA", "Fixed", "AQL"],
       default: "NA"
     },
+    isCarton: {
+      type: String,
+      enum: ["Yes", "No"],
+      default: "No"
+    },
+    isQCScan: {
+      type: String,
+      enum: ["Yes", "No"],
+      default: "No"
+    },
     InspectedQty: {
       type: Number,
       default: 0
@@ -67,7 +90,10 @@ const qaSectionsTemplatesSchema = new mongoose.Schema(
     },
 
     // List of selected categories
-    DefectCategoryList: [SelectedCategorySchema]
+    DefectCategoryList: [SelectedCategorySchema],
+
+    // List of selected photo sections
+    SelectedPhotoSectionList: [SelectedPhotoSectionSchema]
   },
   {
     collection: "qa_sections_templates",

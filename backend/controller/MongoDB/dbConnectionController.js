@@ -87,6 +87,8 @@ import createQCWashingMachineStandard from "../../models/qcWashingStanderd.js";
 import createQC2OlderDefectModel from "../../models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "../../models/QCWashingQtyOld.js";
 import createQCWorkersModel from "../../models/QCWorkers.js";
+import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
+
 import CuttingInlineOrdersModel from "../../models/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 
@@ -224,6 +226,8 @@ export const QCWashingCheckList =
 export const QCWashingFirstOutput =
   createQCWashingFirstOutputModel(ymProdConnection);
 export const QCWashing = createQCWashingModel(ymProdConnection);
+export const AfterIroning = createAfterIroningModel(ymProdConnection);
+
 export const SupplierIssuesDefect =
   createSupplierIssuesDefectModel(ymProdConnection);
 export const SupplierIssueReport =

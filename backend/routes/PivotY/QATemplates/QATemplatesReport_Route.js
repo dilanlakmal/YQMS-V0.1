@@ -4,7 +4,8 @@ import {
   GetTemplates,
   UpdateTemplate,
   DeleteTemplate,
-  GetCategoriesForSelection
+  GetCategoriesForSelection,
+  GetPhotoSectionsForSelection
 } from "../../../controller/PivotY/QATemplates/QATemplatesReport_Controller.js";
 
 const router = express.Router();
@@ -16,5 +17,11 @@ router.delete("/api/qa-sections-templates/:id", DeleteTemplate);
 
 // Helper to populate the modal
 router.get("/api/qa-sections-templates/categories", GetCategoriesForSelection);
+
+// Helper to populate the modal (Photo Sections)
+router.get(
+  "/api/qa-sections-templates/photo-sections",
+  GetPhotoSectionsForSelection
+);
 
 export default router;

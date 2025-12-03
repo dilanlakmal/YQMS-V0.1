@@ -6,7 +6,10 @@ import {
   findRelatedOrders,
   getOrderColors,
   getAqlConfigByBuyer,
-  getSubConFactories
+  getSubConFactories,
+  getOrderProductTypeInfo,
+  getProductTypeOptions,
+  updateOrderProductType
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -37,5 +40,23 @@ router.get("/api/fincheck-inspection/aql-config", getAqlConfigByBuyer);
 
 // Get Sub-Con Factories
 router.get("/api/fincheck-inspection/subcon-factories", getSubConFactories);
+
+// NEW: Get Product Type Info for Orders
+router.post(
+  "/api/fincheck-inspection/order-product-type",
+  getOrderProductTypeInfo
+);
+
+// NEW: Get All Product Type Options for Dropdown
+router.get(
+  "/api/fincheck-inspection/product-type-options",
+  getProductTypeOptions
+);
+
+// NEW: Update Product Type for Orders
+router.put(
+  "/api/fincheck-inspection/update-product-type",
+  updateOrderProductType
+);
 
 export default router;

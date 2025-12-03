@@ -47,7 +47,8 @@
     "qa_sections": "Fin Check | Settings",
     "qa_templates": "Fin Check | Templates",
     "qa_measurements": "Fin Check | Measurements",
-    "y_pivot_inspection": "Fin Check | Inspection"
+    "y_pivot_inspection": "Fin Check | Inspection",
+    "afterIroning": "After Ironing"
   },
 
   "nav": {
