@@ -730,7 +730,6 @@ const AfterIroning = () => {
         const washingData = await washingResponse.json();
         if (washingData.success && washingData.exists && washingData.record) {
           defaultColor = washingData.record.color;
-          console.log(`Found QC Washing SOP record with color: ${defaultColor}`);
         }
       } catch (washingError) {
         console.log('No QC Washing SOP record found, using first available color');
@@ -911,7 +910,6 @@ const AfterIroning = () => {
 
       setCheckpointInspectionData(mergedCheckpointData);
     } else {
-      console.log('No saved checkpoint data, initializing defaults');
       initializeDefaultCheckpointData(setCheckpointInspectionData);
     }
 
@@ -936,7 +934,6 @@ const AfterIroning = () => {
       );
     } else {
       // Initialize with default defect data
-      console.log('No saved parameters, initializing defaults');
       setDefectData(normalizeDefectData(defaultDefectData));
     }
 
@@ -1017,6 +1014,48 @@ const AfterIroning = () => {
   }
 };
 
+const loadColorSpecificData = async (orderNo, color) => {
+    if (colorDataCache[color]) {
+      const cached = colorDataCache[color];
+      setInspectionData(cached.inspectionData);
+      setDefectData(cached.defectData);
+      setAddedDefects(cached.addedDefects);
+      setComment(cached.comment);
+      setMeasurementData(cached.measurementData);
+      setUploadedImages(cached.uploadedImages);
+      setSavedSizes(cached.savedSizes);
+      setDefectsByPc(cached.defectsByPc);
+      setFormData((prev) => ({
+        ...prev,
+        ...cached.formData
+      }));
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/after-ironing/load-saved-by-color/${orderNo}/${encodeURIComponent(
+          color
+        )}`
+      );
+      const data = await response.json();
+      if (data.success && data.savedData) {
+        loadSavedDataById(data.savedData._id);
+      } else {
+        // No saved data for this color, reset relevant fields
+        setInspectionData(initializeInspectionData(masterChecklist));
+        setDefectData(normalizeDefectData(defaultDefectData));
+        setAddedDefects([]);
+        setComment("");
+        setMeasurementData({ beforeIroning: [], afterIroning: [] });
+        setUploadedImages([]);
+        setSavedSizes([]);
+        setDefectsByPc({});
+      }
+    } catch (error) {
+      console.error("Error loading color-specific data:", error);
+    }
+  };
 
   const handleInputChange = (field, value) => {
     if (field === "orderNo") {
@@ -1325,7 +1364,6 @@ const AfterIroning = () => {
         aql: formData.aql || []
       };
 
-      console.log('Updating record with complete order data:', completeOrderData);
 
       const response = await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
         method: "POST",
@@ -1586,7 +1624,10 @@ const AfterIroning = () => {
     // If measurementSizeSummary is empty, calculate it from measurement data
     if (!measurementDetails.measurementSizeSummary || measurementDetails.measurementSizeSummary.length === 0) {
       const measurementSizeSummary = [];
-      measurementDetails.measurement.forEach(measurement => {
+      // FIX: Ensure measurementDetails.measurement is an array before using forEach
+      const measurements = Array.isArray(measurementDetails.measurement) ? measurementDetails.measurement : [];
+
+      measurements.forEach(measurement => {
         if (measurement.pcs && Array.isArray(measurement.pcs)) {
           let checkedPcs = measurement.pcs.length;
           let checkedPoints = 0;
@@ -1637,7 +1678,6 @@ const AfterIroning = () => {
       washQty: formData.washQty
     });
 
-    console.log('Single calculation result:', summary);
 
     setFormData((prev) => ({
       ...prev,
@@ -1762,7 +1802,7 @@ const tabs = useMemo(() => [
       <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
-        <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
           
           {/* MOBILE/TABLET LAYOUT (< lg) */}
           <div className="lg:hidden space-y-3">
@@ -1968,7 +2008,7 @@ const tabs = useMemo(() => [
       </div>
 
       {/* Main Content Area */}
-      <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
           <div className="transform transition-all duration-500 ease-out">
             {activeTab === "newInspection" && (
@@ -2212,8 +2252,6 @@ const tabs = useMemo(() => [
                         currentMeasurementDetails.measurementSizeSummary = measurementSizeSummary;
                       }
 
-                      console.log('Submitting with current measurement details:', currentMeasurementDetails);
-
                       // Update the record with complete measurement details INCLUDING summary
                       const updateResponse = await fetch(`${API_BASE_URL}/api/after-ironing/orderData-save`, {
                         method: "POST",
@@ -2233,11 +2271,9 @@ const tabs = useMemo(() => [
 
                       const updateResult = await updateResponse.json();
                       if (!updateResult.success) {
-                        console.error('Failed to update record with measurement summary:', updateResult.message);
                         throw new Error('Failed to update measurement summary');
                       }
 
-                      console.log('Successfully updated record with measurement summary');
 
                       // Save inspection data if exists
                       if (inspectionData.length > 0 || checkpointInspectionData.length > 0) {
