@@ -76,7 +76,8 @@ const corsOptions = {
     "Last-Modified",
     "If-Modified-Since",
     "If-None-Match",
-    "ETag"
+    "ETag",
+    "Mode"
   ],
   exposedHeaders: [
     "Content-Length",

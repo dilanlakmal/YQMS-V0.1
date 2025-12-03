@@ -544,7 +544,24 @@ const SubmittedWashingDataPage = () => {
     try {
       setIsQcWashingPDF(true);
 
-      // 1. Fetch inspector details first
+      // Show initial loading message
+      Swal.fire({
+        title: "Preparing PDF Report",
+        html: `
+        <div class="text-left">
+          <div id="progress-inspector">⏳ Loading inspector details...</div>
+          <div id="progress-images">⏳ Loading images...</div>
+          <div id="progress-pdf">⏳ Waiting...</div>
+        </div>
+      `,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // 1. Fetch inspector details
       let inspectorDetails = null;
       if (record.userId) {
         try {
@@ -553,301 +570,240 @@ const SubmittedWashingDataPage = () => {
           );
           if (response.ok) {
             inspectorDetails = await response.json();
+            document.getElementById("progress-inspector").innerHTML =
+              "✅ Inspector details loaded";
+          } else {
+            document.getElementById("progress-inspector").innerHTML =
+              "⚠️ Inspector details not found";
           }
         } catch (error) {
           console.warn("Failed to fetch inspector details:", error);
+          document.getElementById("progress-inspector").innerHTML =
+            "⚠️ Inspector details failed to load";
         }
+      } else {
+        document.getElementById("progress-inspector").innerHTML =
+          "✅ No inspector details needed";
       }
 
-      // 2. Collect all image URLs with enhanced defect image handling
-      const imageUrls = new Set();
+      // 2. Use your existing endpoint to get all images for this record
+      let preloadedImages = {};
+      let imageStats = { total: 0, loaded: 0 };
 
-      const collectImages = (obj, path = "") => {
-        if (!obj) return;
+      try {
+        document.getElementById("progress-images").innerHTML =
+          "⏳ Fetching images from server...";
 
-        if (typeof obj === "string") {
-          // Check if it's an image URL
-          if (
-            obj.includes("/storage/") ||
-            obj.includes("/public/") ||
-            obj.includes("/Uploads/") ||
-            obj.includes("/qc_washing_images/") || // Add this for defect images
-            obj.startsWith("http") ||
-            obj.startsWith("./public/") ||
-            obj.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-          ) {
-            imageUrls.add(obj);
+        const imageResponse = await fetch(
+          `${API_BASE_URL}/api/qc-washing/image-proxy-selected/${record._id}`,
+          {
+            method: "GET",
+            headers: {
+              Accept: "application/json",
+              "Content-Type": "application/json"
+            }
           }
-        } else if (Array.isArray(obj)) {
-          obj.forEach((item, index) =>
-            collectImages(item, `${path}[${index}]`)
+        );
+
+        if (imageResponse.ok) {
+          const imageData = await imageResponse.json();
+          preloadedImages = imageData.images || {};
+          imageStats = {
+            total: imageData.total || 0,
+            loaded: imageData.loaded || 0
+          };
+
+          document.getElementById(
+            "progress-images"
+          ).innerHTML = `✅ Images loaded: ${imageStats.loaded}/${imageStats.total}`;
+        } else {
+          throw new Error(`Failed to fetch images: ${imageResponse.status}`);
+        }
+      } catch (error) {
+        console.error("Error fetching images:", error);
+        document.getElementById(
+          "progress-images"
+        ).innerHTML = `⚠️ Image loading failed: ${error.message}`;
+        // Continue with empty images - PDF will still generate
+      }
+
+      // 3. CRITICAL FIX: Load inspector image separately through proxy
+      if (inspectorDetails && inspectorDetails.face_photo) {
+        try {
+          document.getElementById(
+            "progress-images"
+          ).innerHTML = `⏳ Loading inspector image... (${imageStats.loaded}/${imageStats.total} other images loaded)`;
+
+          // Use the image proxy for inspector photo
+          const inspectorImageUrl = inspectorDetails.face_photo.startsWith(
+            "http"
+          )
+            ? inspectorDetails.face_photo
+            : `${API_BASE_URL}${
+                inspectorDetails.face_photo.startsWith("/") ? "" : "/"
+              }${inspectorDetails.face_photo}`;
+
+          const inspectorImageResponse = await fetch(
+            `${API_BASE_URL}/api/qc-washing/image-proxy/${encodeURIComponent(
+              inspectorImageUrl
+            )}`,
+            {
+              method: "GET",
+              headers: {
+                Accept: "application/json",
+                "Content-Type": "application/json"
+              }
+            }
           );
-        } else if (typeof obj === "object" && obj !== null) {
-          Object.keys(obj).forEach((key) => {
-            collectImages(obj[key], `${path}.${key}`);
-          });
+
+          if (inspectorImageResponse.ok) {
+            const inspectorImageData = await inspectorImageResponse.json();
+            if (
+              inspectorImageData.dataUrl &&
+              inspectorImageData.dataUrl.startsWith("data:")
+            ) {
+              // Add inspector image to preloaded images
+              preloadedImages[inspectorDetails.face_photo] =
+                inspectorImageData.dataUrl;
+              preloadedImages[inspectorImageUrl] = inspectorImageData.dataUrl;
+
+              document.getElementById(
+                "progress-images"
+              ).innerHTML = `✅ Images loaded: ${imageStats.loaded}/${imageStats.total} + inspector image`;
+            }
+          } else {
+            console.warn("Failed to load inspector image through proxy");
+          }
+        } catch (error) {
+          console.warn("Error loading inspector image:", error);
         }
-      };
-
-      // Special handling for defect images which might be nested differently
-      if (record.defectDetails?.defectsByPc) {
-        record.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
-          if (pc.pcDefects) {
-            pc.pcDefects.forEach((defect, defectIndex) => {
-              // Handle defectImages array (captured)
-              if (defect.defectImages && Array.isArray(defect.defectImages)) {
-                defect.defectImages.forEach((img, imgIndex) => {
-                  collectImages(
-                    img,
-                    `record.defectDetails.defectsByPc[${pcIndex}].pcDefects[${defectIndex}].defectImages[${imgIndex}]`
-                  );
-                });
-              }
-
-              // Handle uploadedImages array
-              if (
-                defect.uploadedImages &&
-                Array.isArray(defect.uploadedImages)
-              ) {
-                defect.uploadedImages.forEach((img, imgIndex) => {
-                  collectImages(
-                    img,
-                    `record.defectDetails.defectsByPc[${pcIndex}].pcDefects[${defectIndex}].uploadedImages[${imgIndex}]`
-                  );
-                });
-              }
-            });
-          }
-        });
       }
 
-      // Collect images from record
-      collectImages(record, "record");
-
-      // Special handling for defect images
-      if (record.defectDetails?.defectsByPc) {
-        record.defectDetails.defectsByPc.forEach((pc) => {
-          if (pc.pcDefects) {
-            pc.pcDefects.forEach((defect) => {
-              // Handle defectImages array
-              if (defect.defectImages && Array.isArray(defect.defectImages)) {
-                defect.defectImages.forEach((img) => {
-                  if (typeof img === "string") {
-                    imageUrls.add(img);
-                  } else if (typeof img === "object" && img !== null) {
-                    const imgUrl =
-                      img.url || img.src || img.originalUrl || img.path;
-                    if (imgUrl) {
-                      imageUrls.add(imgUrl);
-                    }
-                  }
-                });
-              }
-
-              // Handle uploadedImages array
-              if (
-                defect.uploadedImages &&
-                Array.isArray(defect.uploadedImages)
-              ) {
-                defect.uploadedImages.forEach((img) => {
-                  if (typeof img === "string") {
-                    imageUrls.add(img);
-                  } else if (typeof img === "object" && img !== null) {
-                    const imgUrl =
-                      img.url || img.src || img.originalUrl || img.path;
-                    if (imgUrl) {
-                      imageUrls.add(imgUrl);
-                    }
-                  }
-                });
-              }
-            });
-          }
-        });
-      }
-
-      // Handle additional images
-      if (
-        record.defectDetails?.additionalImages &&
-        Array.isArray(record.defectDetails.additionalImages)
-      ) {
-        record.defectDetails.additionalImages.forEach((img) => {
-          if (typeof img === "string") {
-            imageUrls.add(img);
-          } else if (typeof img === "object" && img !== null) {
-            const imgUrl = img.url || img.src || img.originalUrl || img.path;
-            if (imgUrl) {
-              imageUrls.add(imgUrl);
-            }
-          }
-        });
-      }
-
-      // Collect inspector face photo
-      if (inspectorDetails?.face_photo) {
-        imageUrls.add(inspectorDetails.face_photo);
-      }
-
-      // 3. Load all images as base64 with retry logic
-      const preloadedImages = {};
-
-      const loadImageWithRetry = async (url, retries = 2, delay = 500) => {
-        for (let i = 0; i <= retries; i++) {
-          try {
-            let imageUrl = url;
-            if (imageUrl.startsWith("./public/")) {
-              imageUrl = imageUrl.replace("./public/", "/");
-            }
-
-            let response;
-            let success = false;
-
-            // Strategy 1: Direct fetch for local URLs
-            if (!imageUrl.startsWith("http")) {
-              try {
-                const fullUrl = imageUrl.startsWith("/")
-                  ? `${API_BASE_URL}${imageUrl}`
-                  : `${API_BASE_URL}/${imageUrl}`;
-                response = await fetch(fullUrl, {
-                  method: "GET",
-                  headers: {
-                    Accept: "image/*,*/*",
-                    "Cache-Control": "no-cache"
-                  }
-                });
-                if (response.ok) success = true;
-              } catch (e) {
-                /* continue to next strategy */
-              }
-            }
-
-            // Strategy 2: Use image proxy
-            if (!success) {
-              const proxyUrl = imageUrl.startsWith("http")
-                ? imageUrl
-                : `${API_BASE_URL}${
-                    imageUrl.startsWith("/") ? "" : "/"
-                  }${imageUrl}`;
-              response = await fetch(
-                `${API_BASE_URL}/api/image-proxy/${encodeURIComponent(
-                  proxyUrl
-                )}`,
-                {
-                  method: "GET",
-                  headers: {
-                    Accept: "application/json",
-                    "Cache-Control": "no-cache"
-                  }
-                }
-              );
-              if (response.ok) success = true;
-            }
-
-            if (success && response.ok) {
-              const contentType = response.headers.get("content-type") || "";
-              if (contentType.includes("application/json")) {
-                const data = await response.json();
-                if (data.dataUrl && data.dataUrl.startsWith("data:")) {
-                  preloadedImages[url] = data.dataUrl;
-                  preloadedImages[imageUrl] = data.dataUrl;
-                  return; // Success, exit loop
-                }
-              } else if (contentType.startsWith("image/")) {
-                const arrayBuffer = await response.arrayBuffer();
-                const base64 = btoa(
-                  String.fromCharCode(...new Uint8Array(arrayBuffer))
-                );
-                const dataUrl = `data:${contentType};base64,${base64}`;
-                preloadedImages[url] = dataUrl;
-                preloadedImages[imageUrl] = dataUrl;
-                return; // Success, exit loop
-              }
-            }
-
-            // If we are here, it means the attempt failed.
-            throw new Error(
-              `Failed to load image after attempt ${i + 1}. Status: ${
-                response?.status
-              }`
-            );
-          } catch (error) {
-            console.warn(
-              `Attempt ${i + 1} failed for ${url}: ${error.message}`
-            );
-            if (i < retries) {
-              await new Promise((resolve) =>
-                setTimeout(resolve, delay * (i + 1))
-              ); // Exponential backoff
-            } else {
-              console.error(`❌ Permanently failed to load image: ${url}`);
-            }
+      // 4. Fetch checkpoint definitions
+      let checkpointDefinitions = [];
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing-checklist`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            checkpointDefinitions = data;
           }
         }
-      };
+      } catch (error) {
+        console.warn("Failed to fetch checkpoint definitions:", error);
+      }
 
-      const imagePromises = Array.from(imageUrls).map((url, index) =>
-        // Add a small delay between starting each image download to avoid overwhelming the server
-        new Promise((resolve) => setTimeout(resolve, index * 50)).then(() =>
-          loadImageWithRetry(url)
-        )
+      // 5. Prepare clean data for PDF
+      const cleanRecordData = JSON.parse(
+        JSON.stringify(record, (key, value) => {
+          if (value === "" || value === null || value === undefined) {
+            return undefined;
+          }
+          return value;
+        })
       );
 
-      await Promise.allSettled(imagePromises);
+      // 6. Generate PDF
+      document.getElementById("progress-pdf").innerHTML =
+        "⏳ Generating PDF document...";
 
-      // 4. Generate PDF
-      const { pdf } = await import("@react-pdf/renderer");
-      const { QcWashingFullReportPDF } = await import(
-        "./qcWashingFullReportPDF"
-      );
+      // Wait a moment to ensure all operations are complete
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      Swal.fire({
-        title: "Generating PDF",
-        text: "Please wait while the report is being created...",
-        allowOutsideClick: false,
-        didOpen: () => {
-          Swal.showLoading();
-        }
-      });
+      try {
+        const { pdf } = await import("@react-pdf/renderer");
+        const { QcWashingFullReportPDF } = await import(
+          "./qcWashingFullReportPDF"
+        );
 
-      const blob = await pdf(
-        React.createElement(QcWashingFullReportPDF, {
-          recordData: record,
+        // Create the PDF element with all required props
+        const pdfElement = React.createElement(QcWashingFullReportPDF, {
+          recordData: cleanRecordData,
           comparisonData: null,
           API_BASE_URL,
-          checkpointDefinitions,
+          checkpointDefinitions: checkpointDefinitions || [],
           preloadedImages,
-          inspectorDetails
-        })
-      ).toBlob();
+          inspectorDetails: inspectorDetails || {},
+          // Add these additional props to ensure proper rendering
+          isLoading: false,
+          skipImageLoading: false
+        });
 
-      Swal.close();
+        const blob = await pdf(pdfElement).toBlob();
 
-      // 5. Download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = `QC_Washing_Report_${record.orderNo}_${record.color}_${
-        new Date().toISOString().split("T")[0]
-      }.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url); // Clean up
+        document.getElementById("progress-pdf").innerHTML =
+          "✅ PDF generated successfully";
 
-      Swal.fire({
-        title: "Success!",
-        text: "PDF downloaded successfully!",
-        icon: "success",
-        timer: 3000,
-        showConfirmButton: false
-      });
+        // Close loading dialog
+        Swal.close();
+
+        // 7. Download the PDF
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `QC_Washing_Report_${record.orderNo || "Unknown"}_${
+          record.color || "Unknown"
+        }_${new Date().toISOString().split("T")[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        // Success message
+        Swal.fire({
+          title: "Success!",
+          html: `
+          <div class="text-left">
+            <div>✅ PDF downloaded successfully!</div>
+            <div class="text-sm text-gray-600 mt-2">
+              Inspector details: ${
+                inspectorDetails ? "Loaded" : "Not available"
+              }<br>
+              Inspector image: ${
+                inspectorDetails?.face_photo &&
+                preloadedImages[inspectorDetails.face_photo]
+                  ? "Loaded"
+                  : "Not available"
+              }<br>
+              Images loaded: ${imageStats.loaded}/${imageStats.total}<br>
+              PDF size: ${(blob.size / 1024 / 1024).toFixed(2)} MB<br>
+              ${
+                imageStats.total > 0 && imageStats.loaded === imageStats.total
+                  ? "All images loaded successfully"
+                  : imageStats.total > 0
+                  ? `${
+                      imageStats.total - imageStats.loaded
+                    } images failed to load`
+                  : "No images found"
+              }
+            </div>
+          </div>
+        `,
+          icon: "success",
+          timer: 5000,
+          showConfirmButton: true
+        });
+      } catch (pdfError) {
+        console.error("PDF generation specific error:", pdfError);
+        throw new Error(`PDF generation failed: ${pdfError.message}`);
+      }
     } catch (error) {
       Swal.fire({
         title: "Error!",
-        text: `Failed to generate PDF: ${error.message}`,
+        html: `
+        <div class="text-left">
+          <div>❌ Failed to generate PDF</div>
+          <div class="text-sm text-gray-600 mt-2">
+            Error: ${error.message}<br>
+            Please check the console for more details.
+          </div>
+        </div>
+      `,
         icon: "error",
-        timer: 5000,
-        showConfirmButton: false
+        timer: 10000,
+        showConfirmButton: true
       });
     } finally {
       setIsQcWashingPDF(false);
@@ -1055,9 +1011,6 @@ const SubmittedWashingDataPage = () => {
                 }
               } else if (aqlResponse.status === 404) {
                 setAqlEndpointAvailable(false);
-                console.warn(
-                  "AQL endpoint not available, disabling future calls"
-                );
               }
             } catch (e) {
               console.error("AQL fetch failed:", e);
