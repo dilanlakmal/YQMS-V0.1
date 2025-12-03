@@ -5,7 +5,8 @@ import {
   getMultipleOrderDetails,
   findRelatedOrders,
   getOrderColors,
-  getAqlConfigByBuyer
+  getAqlConfigByBuyer,
+  getSubConFactories
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -33,5 +34,8 @@ router.post("/api/fincheck-inspection/order-colors", getOrderColors);
 
 // Get AQL configuration by buyer
 router.get("/api/fincheck-inspection/aql-config", getAqlConfigByBuyer);
+
+// Get Sub-Con Factories
+router.get("/api/fincheck-inspection/subcon-factories", getSubConFactories);
 
 export default router;

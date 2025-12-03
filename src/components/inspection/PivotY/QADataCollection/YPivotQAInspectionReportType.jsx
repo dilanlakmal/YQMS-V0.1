@@ -5,21 +5,69 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
-  Ruler,
   Palette,
   Layers,
   Table2,
   GitBranch,
   X,
   Hash,
-  ClipboardList,
-  BarChart3
+  BarChart3,
+  Box,
+  Building,
+  Factory,
+  Truck,
+  MessageSquare,
+  ToggleLeft,
+  ToggleRight
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionBuyerDetermination, {
   determineBuyerFromOrderNo
 } from "./YPivotQAInspectionBuyerDetermination";
+
+// ============================================================
+// Smart Sorting Function for Line/Table Numbers
+// ============================================================
+const smartSort = (a, b) => {
+  const aVal = a.label || a;
+  const bVal = b.label || b;
+
+  // Check if both are pure numbers
+  const aNum = parseFloat(aVal);
+  const bNum = parseFloat(bVal);
+
+  if (!isNaN(aNum) && !isNaN(bNum)) {
+    return aNum - bNum;
+  }
+
+  // Check if both are pure letters (single or multiple)
+  const aIsLetter = /^[A-Za-z]+$/.test(aVal);
+  const bIsLetter = /^[A-Za-z]+$/.test(bVal);
+
+  if (aIsLetter && bIsLetter) {
+    return aVal.localeCompare(bVal);
+  }
+
+  // Alphanumeric sorting (e.g., CK1, CK2, CK10)
+  const aMatch = aVal.match(/^([A-Za-z]*)(\d*)$/);
+  const bMatch = bVal.match(/^([A-Za-z]*)(\d*)$/);
+
+  if (aMatch && bMatch) {
+    const aPrefix = aMatch[1];
+    const bPrefix = bMatch[1];
+    const aNumPart = parseInt(aMatch[2]) || 0;
+    const bNumPart = parseInt(bMatch[2]) || 0;
+
+    if (aPrefix !== bPrefix) {
+      return aPrefix.localeCompare(bPrefix);
+    }
+    return aNumPart - bNumPart;
+  }
+
+  // Default string comparison
+  return String(aVal).localeCompare(String(bVal));
+};
 
 // ============================================================
 // Report Type Card Component
@@ -53,13 +101,12 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
   return (
     <button
       onClick={() => onSelect(template)}
-      className={`w-full p-3 rounded-xl border-2 transition-all text-left ${
+      className={`relative w-full p-3 rounded-xl border-2 transition-all text-left ${
         isSelected
           ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 shadow-lg scale-[1.02]"
           : "border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-indigo-300 hover:shadow-md"
       }`}
     >
-      {/* Report Name */}
       <p
         className={`text-sm font-bold mb-2 truncate ${
           isSelected
@@ -70,8 +117,6 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
       >
         {template.ReportType}
       </p>
-
-      {/* Labels */}
       <div className="flex flex-wrap gap-1">
         <span
           className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white ${measurement.color}`}
@@ -84,8 +129,6 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
           {method.label}
         </span>
       </div>
-
-      {/* Selected Indicator */}
       {isSelected && (
         <div className="absolute top-1 right-1">
           <CheckCircle2 className="w-4 h-4 text-indigo-500" />
@@ -96,120 +139,9 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
 };
 
 // ============================================================
-// Single Select Dropdown Component
+// Searchable Multi Select Dropdown Component
 // ============================================================
-const SingleSelectDropdown = ({
-  label,
-  icon: Icon,
-  options,
-  selectedValue,
-  onSelectionChange,
-  placeholder,
-  loading = false,
-  displayKey = "label",
-  valueKey = "value",
-  color = "indigo"
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const colorClasses = {
-    indigo: {
-      bg: "bg-indigo-50 dark:bg-indigo-900/30",
-      text: "text-indigo-600 dark:text-indigo-400",
-      border: "border-indigo-200 dark:border-indigo-800"
-    },
-    emerald: {
-      bg: "bg-emerald-50 dark:bg-emerald-900/30",
-      text: "text-emerald-600 dark:text-emerald-400",
-      border: "border-emerald-200 dark:border-emerald-800"
-    },
-    purple: {
-      bg: "bg-purple-50 dark:bg-purple-900/30",
-      text: "text-purple-600 dark:text-purple-400",
-      border: "border-purple-200 dark:border-purple-800"
-    }
-  };
-
-  const colors = colorClasses[color] || colorClasses.indigo;
-  const selectedOption = options.find((opt) => opt[valueKey] === selectedValue);
-
-  return (
-    <div className="space-y-2">
-      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-        <Icon className={`w-3.5 h-3.5 ${colors.text}`} />
-        {label}
-      </label>
-
-      <div className="relative">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          disabled={loading}
-          className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
-            loading ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          <span className={!selectedValue ? "text-gray-400" : ""}>
-            {loading
-              ? "Loading..."
-              : selectedOption
-              ? selectedOption[displayKey]
-              : placeholder}
-          </span>
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-          ) : (
-            <ChevronDown
-              className={`w-4 h-4 text-gray-400 transition-transform ${
-                isOpen ? "rotate-180" : ""
-              }`}
-            />
-          )}
-        </button>
-
-        {isOpen && !loading && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setIsOpen(false)}
-            />
-            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-              {options.map((option) => {
-                const isSelected = option[valueKey] === selectedValue;
-                return (
-                  <button
-                    key={option[valueKey]}
-                    onClick={() => {
-                      onSelectionChange(option[valueKey]);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center justify-between ${
-                      isSelected
-                        ? `${colors.bg} ${colors.text}`
-                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300"
-                    }`}
-                  >
-                    <span>{option[displayKey]}</span>
-                    {isSelected && <CheckCircle2 className="w-4 h-4" />}
-                  </button>
-                );
-              })}
-              {options.length === 0 && (
-                <div className="px-3 py-4 text-center text-sm text-gray-500">
-                  No options available
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================
-// Multi-Select Dropdown Component
-// ============================================================
-const MultiSelectDropdown = ({
+const SearchableMultiSelect = ({
   label,
   icon: Icon,
   options,
@@ -217,11 +149,13 @@ const MultiSelectDropdown = ({
   onSelectionChange,
   placeholder,
   loading = false,
+  disabled = false,
   displayKey = "label",
   valueKey = "value",
   color = "indigo"
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const colorClasses = {
     indigo: {
@@ -243,11 +177,22 @@ const MultiSelectDropdown = ({
 
   const colors = colorClasses[color] || colorClasses.indigo;
 
+  // Sort and filter options
+  const sortedAndFilteredOptions = useMemo(() => {
+    let filtered = options;
+    if (searchTerm) {
+      filtered = options.filter((opt) =>
+        String(opt[displayKey]).toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return [...filtered].sort((a, b) => smartSort(a, b));
+  }, [options, searchTerm, displayKey]);
+
   const handleSelectAll = () => {
-    if (selectedValues.length === options.length) {
+    if (selectedValues.length === sortedAndFilteredOptions.length) {
       onSelectionChange([]);
     } else {
-      onSelectionChange(options.map((opt) => opt[valueKey]));
+      onSelectionChange(sortedAndFilteredOptions.map((opt) => opt[valueKey]));
     }
   };
 
@@ -259,6 +204,35 @@ const MultiSelectDropdown = ({
     }
   };
 
+  const handleRemove = (value, e) => {
+    e.stopPropagation();
+    onSelectionChange(selectedValues.filter((v) => v !== value));
+  };
+
+  // Get display labels for selected values (sorted)
+  const selectedLabels = useMemo(() => {
+    return selectedValues
+      .map((val) => {
+        const opt = options.find((o) => o[valueKey] === val);
+        return opt ? opt[displayKey] : val;
+      })
+      .sort(smartSort);
+  }, [selectedValues, options, displayKey, valueKey]);
+
+  if (disabled) {
+    return (
+      <div className="space-y-2">
+        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+          <Icon className="w-3.5 h-3.5 text-gray-400" />
+          {label}
+        </label>
+        <div className="px-3 py-2.5 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-400">
+          N/A
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-2">
       <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
@@ -267,20 +241,21 @@ const MultiSelectDropdown = ({
       </label>
 
       {/* Selected Chips */}
-      {selectedValues.length > 0 && (
+      {selectedLabels.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {selectedValues.map((value) => {
-            const option = options.find((opt) => opt[valueKey] === value);
+          {selectedLabels.map((label, idx) => {
+            const value = selectedValues.find((v) => {
+              const opt = options.find((o) => o[valueKey] === v);
+              return opt && opt[displayKey] === label;
+            });
             return (
               <span
-                key={value}
+                key={idx}
                 className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${colors.bg} ${colors.text}`}
               >
-                {option ? option[displayKey] : value}
+                {label}
                 <button
-                  onClick={() =>
-                    onSelectionChange(selectedValues.filter((v) => v !== value))
-                  }
+                  onClick={(e) => handleRemove(value, e)}
                   className={`p-0.5 rounded-full ${colors.hover}`}
                 >
                   <X className="w-3 h-3" />
@@ -292,10 +267,9 @@ const MultiSelectDropdown = ({
       )}
 
       <div className="relative">
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          disabled={loading}
-          className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all ${
+        <div
+          onClick={() => !loading && setIsOpen(!isOpen)}
+          className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer ${
             loading ? "opacity-50 cursor-not-allowed" : ""
           }`}
         >
@@ -306,12 +280,16 @@ const MultiSelectDropdown = ({
               ? placeholder
               : `${selectedValues.length} selected`}
           </span>
-          <ChevronDown
-            className={`w-4 h-4 text-gray-400 transition-transform ${
-              isOpen ? "rotate-180" : ""
-            }`}
-          />
-        </button>
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+          ) : (
+            <ChevronDown
+              className={`w-4 h-4 text-gray-400 transition-transform ${
+                isOpen ? "rotate-180" : ""
+              }`}
+            />
+          )}
+        </div>
 
         {isOpen && !loading && (
           <>
@@ -319,38 +297,258 @@ const MultiSelectDropdown = ({
               className="fixed inset-0 z-40"
               onClick={() => setIsOpen(false)}
             />
-            <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-              <button
-                onClick={handleSelectAll}
-                className={`w-full px-3 py-2 text-left text-sm font-bold border-b border-gray-200 dark:border-gray-700 ${colors.hover} flex items-center justify-between`}
-              >
-                <span className={colors.text}>
-                  {selectedValues.length === options.length
-                    ? "Deselect All"
-                    : "Select All"}
-                </span>
-              </button>
-              {options.map((option) => {
-                const isSelected = selectedValues.includes(option[valueKey]);
-                return (
-                  <button
-                    key={option[valueKey]}
-                    onClick={() => handleToggle(option[valueKey])}
-                    className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${
-                      isSelected
-                        ? `${colors.bg} ${colors.text}`
-                        : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    }`}
-                  >
-                    <span>{option[displayKey]}</span>
-                    {isSelected && <CheckCircle2 className="w-4 h-4" />}
-                  </button>
-                );
-              })}
+            <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+              {/* Search Input */}
+              <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Type to search..."
+                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+
+              <div className="max-h-48 overflow-y-auto">
+                {/* Select All */}
+                <button
+                  onClick={handleSelectAll}
+                  className={`w-full px-3 py-2 text-left text-sm font-bold border-b border-gray-200 dark:border-gray-700 ${colors.hover} flex items-center justify-between`}
+                >
+                  <span className={colors.text}>
+                    {selectedValues.length === sortedAndFilteredOptions.length
+                      ? "Deselect All"
+                      : "Select All"}
+                  </span>
+                  {selectedValues.length ===
+                    sortedAndFilteredOptions.length && (
+                    <CheckCircle2 className={`w-4 h-4 ${colors.text}`} />
+                  )}
+                </button>
+
+                {sortedAndFilteredOptions.map((option) => {
+                  const isSelected = selectedValues.includes(option[valueKey]);
+                  return (
+                    <button
+                      key={option[valueKey]}
+                      onClick={() => handleToggle(option[valueKey])}
+                      className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${
+                        isSelected
+                          ? `${colors.bg} ${colors.text}`
+                          : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                      }`}
+                    >
+                      <span>{option[displayKey]}</span>
+                      {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                    </button>
+                  );
+                })}
+
+                {sortedAndFilteredOptions.length === 0 && (
+                  <div className="px-3 py-4 text-center text-sm text-gray-500">
+                    {searchTerm ? "No matches found" : "No options available"}
+                  </div>
+                )}
+              </div>
             </div>
           </>
         )}
       </div>
+    </div>
+  );
+};
+
+// ============================================================
+// Searchable Single Select Dropdown Component
+// ============================================================
+const SearchableSingleSelect = ({
+  label,
+  icon: Icon,
+  options,
+  selectedValue,
+  onSelectionChange,
+  placeholder,
+  loading = false,
+  disabled = false,
+  displayKey = "label",
+  valueKey = "value",
+  color = "indigo"
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  const colorClasses = {
+    indigo: {
+      bg: "bg-indigo-50 dark:bg-indigo-900/30",
+      text: "text-indigo-600 dark:text-indigo-400"
+    },
+    purple: {
+      bg: "bg-purple-50 dark:bg-purple-900/30",
+      text: "text-purple-600 dark:text-purple-400"
+    },
+    amber: {
+      bg: "bg-amber-50 dark:bg-amber-900/30",
+      text: "text-amber-600 dark:text-amber-400"
+    }
+  };
+
+  const colors = colorClasses[color] || colorClasses.indigo;
+
+  // Sort and filter options
+  const sortedAndFilteredOptions = useMemo(() => {
+    let filtered = options;
+    if (searchTerm) {
+      filtered = options.filter((opt) =>
+        String(opt[displayKey]).toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    return [...filtered].sort((a, b) => smartSort(a, b));
+  }, [options, searchTerm, displayKey]);
+
+  const selectedOption = options.find((opt) => opt[valueKey] === selectedValue);
+
+  const handleSelect = (option) => {
+    onSelectionChange(option[valueKey]);
+    setSearchTerm("");
+    setIsOpen(false);
+  };
+
+  if (disabled) {
+    return (
+      <div className="space-y-2">
+        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+          <Icon className="w-3.5 h-3.5 text-gray-400" />
+          {label}
+        </label>
+        <div className="px-3 py-2.5 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-400">
+          N/A
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
+        <Icon className={`w-3.5 h-3.5 ${colors.text}`} />
+        {label}
+      </label>
+
+      {/* Selected Chip */}
+      {selectedOption && !isOpen && (
+        <div className="flex items-center gap-1">
+          <span
+            className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${colors.bg} ${colors.text}`}
+          >
+            {selectedOption[displayKey]}
+            <button
+              onClick={() => onSelectionChange(null)}
+              className="p-0.5 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </span>
+        </div>
+      )}
+
+      <div className="relative">
+        <input
+          type="text"
+          value={
+            isOpen
+              ? searchTerm
+              : selectedOption
+              ? selectedOption[displayKey]
+              : ""
+          }
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            if (!isOpen) setIsOpen(true);
+          }}
+          onFocus={() => {
+            setIsOpen(true);
+            setSearchTerm("");
+          }}
+          placeholder={placeholder}
+          disabled={loading}
+          className={`w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${
+            loading ? "opacity-50 cursor-not-allowed" : ""
+          }`}
+        />
+        {loading ? (
+          <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-gray-400" />
+        ) : (
+          <ChevronDown
+            className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 transition-transform pointer-events-none ${
+              isOpen ? "rotate-180" : ""
+            }`}
+          />
+        )}
+
+        {isOpen && !loading && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => {
+                setIsOpen(false);
+                setSearchTerm("");
+              }}
+            />
+            <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
+              {sortedAndFilteredOptions.length > 0 ? (
+                sortedAndFilteredOptions.map((option) => {
+                  const isSelected = option[valueKey] === selectedValue;
+                  return (
+                    <button
+                      key={option[valueKey]}
+                      onClick={() => handleSelect(option)}
+                      className={`w-full px-3 py-2 text-left text-sm transition-colors flex items-center justify-between ${
+                        isSelected
+                          ? `${colors.bg} ${colors.text}`
+                          : "hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300"
+                      }`}
+                    >
+                      <span>{option[displayKey]}</span>
+                      {isSelected && <CheckCircle2 className="w-4 h-4" />}
+                    </button>
+                  );
+                })
+              ) : (
+                <div className="px-3 py-4 text-center text-sm text-gray-500">
+                  {searchTerm ? "No matches found" : "No options available"}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ============================================================
+// Toggle Switch Component
+// ============================================================
+const ToggleSwitch = ({ label, value, onChange, disabled = false }) => {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+        {label}
+      </span>
+      <button
+        onClick={() => !disabled && onChange(!value)}
+        disabled={disabled}
+        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
+        } ${value ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"}`}
+      >
+        <span
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            value ? "translate-x-6" : "translate-x-1"
+          }`}
+        />
+      </button>
     </div>
   );
 };
@@ -369,7 +567,6 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
     );
   }
 
-  // Find matching sample data based on inspected qty
   const findMatchingSample = (config) => {
     if (!config?.SampleData || !inspectedQty) return null;
     return config.SampleData.find(
@@ -385,14 +582,12 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
   const majorSample = findMatchingSample(majorConfig);
   const criticalSample = findMatchingSample(criticalConfig);
 
-  // Use first config for common info
   const baseConfig = minorConfig || majorConfig || criticalConfig;
 
   if (!baseConfig) return null;
 
   return (
     <div className="space-y-4">
-      {/* Header Info */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
         <div className="p-2 bg-gray-100 dark:bg-gray-900 rounded-lg text-center">
           <p className="text-[9px] text-gray-500 uppercase">Type</p>
@@ -432,7 +627,6 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
         </div>
       </div>
 
-      {/* Sample Info */}
       {(minorSample || majorSample || criticalSample) && (
         <div className="grid grid-cols-3 gap-2">
           <div className="p-2 bg-purple-50 dark:bg-purple-900/30 rounded-lg text-center">
@@ -458,7 +652,6 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
         </div>
       )}
 
-      {/* Ac/Re Table */}
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
@@ -475,7 +668,6 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
             </tr>
           </thead>
           <tbody>
-            {/* Minor */}
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-blue-50/50 dark:bg-blue-900/10">
               <td className="px-3 py-2 font-semibold text-blue-700 dark:text-blue-400">
                 Minor
@@ -487,7 +679,6 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
                 {minorSample?.Re ?? "—"}
               </td>
             </tr>
-            {/* Major */}
             <tr className="border-b border-gray-200 dark:border-gray-700 bg-orange-50/50 dark:bg-orange-900/10">
               <td className="px-3 py-2 font-semibold text-orange-700 dark:text-orange-400">
                 Major
@@ -499,7 +690,6 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
                 {majorSample?.Re ?? "—"}
               </td>
             </tr>
-            {/* Critical */}
             <tr className="bg-red-50/50 dark:bg-red-900/10">
               <td className="px-3 py-2 font-semibold text-red-700 dark:text-red-400">
                 Critical
@@ -541,12 +731,24 @@ const YPivotQAInspectionReportType = ({
   const [tables, setTables] = useState([]);
   const [orderColors, setOrderColors] = useState([]);
   const [aqlConfigs, setAqlConfigs] = useState([]);
+  const [subConFactories, setSubConFactories] = useState([]);
 
   // Selection State
-  const [selectedLine, setSelectedLine] = useState(null);
-  const [selectedTable, setSelectedTable] = useState(null);
+  const [selectedLines, setSelectedLines] = useState([]);
+  const [selectedTables, setSelectedTables] = useState([]);
   const [selectedColors, setSelectedColors] = useState([]);
   const [inspectedQty, setInspectedQty] = useState("");
+  const [cartonQty, setCartonQty] = useState("");
+
+  // Supplier State
+  const [isSubCon, setIsSubCon] = useState(false);
+  const [selectedSubConFactory, setSelectedSubConFactory] = useState(null);
+
+  // Shipping Stage (only for AQL)
+  const [shippingStage, setShippingStage] = useState(null);
+
+  // Remarks
+  const [remarks, setRemarks] = useState("");
 
   // Loading States
   const [loadingTemplates, setLoadingTemplates] = useState(false);
@@ -554,7 +756,29 @@ const YPivotQAInspectionReportType = ({
   const [loadingTables, setLoadingTables] = useState(false);
   const [loadingColors, setLoadingColors] = useState(false);
   const [loadingAql, setLoadingAql] = useState(false);
+  const [loadingSubConFactories, setLoadingSubConFactories] = useState(false);
   const [error, setError] = useState(null);
+
+  // Shipping Stage Options
+  const shippingStageOptions = [
+    { value: "D1", label: "D1" },
+    { value: "D2", label: "D2" },
+    { value: "D3", label: "D3" },
+    { value: "D4", label: "D4" },
+    { value: "D5", label: "D5" }
+  ];
+
+  // Check if this is First output Carton report
+  const isFirstOutputCarton = useMemo(() => {
+    return selectedTemplate?.ReportType?.toLowerCase().includes(
+      "first output carton"
+    );
+  }, [selectedTemplate]);
+
+  // Check if AQL method
+  const isAQLMethod = useMemo(() => {
+    return selectedTemplate?.InspectedQtyMethod === "AQL";
+  }, [selectedTemplate]);
 
   // Determine buyer
   const buyer = useMemo(() => {
@@ -578,7 +802,7 @@ const YPivotQAInspectionReportType = ({
     }
   }, []);
 
-  // Fetch Lines
+  // Fetch Lines (YM Lines)
   const fetchLines = useCallback(async () => {
     setLoadingLines(true);
     try {
@@ -652,10 +876,28 @@ const YPivotQAInspectionReportType = ({
     }
   }, [buyer]);
 
+  // Fetch Sub-Con Factories
+  const fetchSubConFactories = useCallback(async () => {
+    setLoadingSubConFactories(true);
+    try {
+      const res = await axios.get(
+        `${API_BASE_URL}/api/fincheck-inspection/subcon-factories`
+      );
+      if (res.data.success) {
+        setSubConFactories(res.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching sub-con factories:", err);
+    } finally {
+      setLoadingSubConFactories(false);
+    }
+  }, []);
+
   // Initial Load
   useEffect(() => {
     fetchTemplates();
-  }, [fetchTemplates]);
+    fetchSubConFactories();
+  }, [fetchTemplates, fetchSubConFactories]);
 
   // Fetch AQL when buyer changes
   useEffect(() => {
@@ -664,17 +906,19 @@ const YPivotQAInspectionReportType = ({
 
   // Fetch data when template changes
   useEffect(() => {
-    if (selectedTemplate?.Line === "Yes") fetchLines();
-    if (selectedTemplate?.Table === "Yes") fetchTables();
+    if (selectedTemplate?.Line === "Yes" && !isSubCon) fetchLines();
+    if (selectedTemplate?.Table === "Yes" && !isSubCon) fetchTables();
     if (selectedTemplate?.Colors === "Yes") fetchOrderColors();
-  }, [selectedTemplate, fetchLines, fetchTables, fetchOrderColors]);
+  }, [selectedTemplate, isSubCon, fetchLines, fetchTables, fetchOrderColors]);
 
   // Reset selections when template changes
   useEffect(() => {
-    setSelectedLine(null);
-    setSelectedTable(null);
+    setSelectedLines([]);
+    setSelectedTables([]);
     setSelectedColors([]);
-    // Set inspected qty from template if Fixed
+    setCartonQty("");
+    setShippingStage(null);
+    setRemarks("");
     if (selectedTemplate?.InspectedQtyMethod === "Fixed") {
       setInspectedQty(selectedTemplate.InspectedQty?.toString() || "");
     } else {
@@ -682,46 +926,80 @@ const YPivotQAInspectionReportType = ({
     }
   }, [selectedTemplate?._id]);
 
+  // Reset line selection when sub-con changes
+  useEffect(() => {
+    setSelectedLines([]);
+    setSelectedTables([]);
+    if (!isSubCon) {
+      setSelectedSubConFactory(null);
+      if (selectedTemplate?.Line === "Yes") fetchLines();
+      if (selectedTemplate?.Table === "Yes") fetchTables();
+    }
+  }, [isSubCon, selectedTemplate, fetchLines, fetchTables]);
+
   // Prepare dropdown options
-  const lineOptions = useMemo(
-    () =>
-      lines.map((line) => ({
-        value: line._id,
-        label: `Line ${line.LineNo}`,
-        lineNo: line.LineNo
-      })),
-    [lines]
-  );
+  const lineOptions = useMemo(() => {
+    if (isSubCon && selectedSubConFactory) {
+      const factory = subConFactories.find(
+        (f) => f._id === selectedSubConFactory
+      );
+      if (factory?.lineList) {
+        return factory.lineList.map((line) => ({
+          value: line,
+          label: line
+        }));
+      }
+      return [];
+    }
+    return lines.map((line) => ({
+      value: line._id,
+      label: line.LineNo
+    }));
+  }, [lines, isSubCon, selectedSubConFactory, subConFactories]);
 
-  const tableOptions = useMemo(
-    () =>
-      tables.map((table) => ({
-        value: table._id,
-        label: `Table ${table.TableNo}`,
-        tableNo: table.TableNo
-      })),
-    [tables]
-  );
+  const tableOptions = useMemo(() => {
+    return tables.map((table) => ({
+      value: table._id,
+      label: table.TableNo
+    }));
+  }, [tables]);
 
-  const colorOptions = useMemo(
-    () =>
-      orderColors.map((color) => ({
-        value: color.color,
-        label: color.color,
-        colorCode: color.colorCode
-      })),
-    [orderColors]
-  );
+  const colorOptions = useMemo(() => {
+    return orderColors.map((color) => ({
+      value: color.color,
+      label: color.color,
+      colorCode: color.colorCode
+    }));
+  }, [orderColors]);
+
+  const subConFactoryOptions = useMemo(() => {
+    return subConFactories.map((factory) => ({
+      value: factory._id,
+      label: factory.factory_second_name
+        ? `${factory.factory} (${factory.factory_second_name})`
+        : factory.factory
+    }));
+  }, [subConFactories]);
 
   // Check if selections are required
   const needsLineOrTable =
     selectedTemplate?.Line === "Yes" || selectedTemplate?.Table === "Yes";
   const needsColors = selectedTemplate?.Colors === "Yes";
 
-  // Handle inspected qty change
+  // Handle input changes
   const handleInspectedQtyChange = (e) => {
     const value = e.target.value.replace(/[^0-9]/g, "");
     setInspectedQty(value);
+  };
+
+  const handleCartonQtyChange = (e) => {
+    const value = e.target.value.replace(/[^0-9]/g, "");
+    setCartonQty(value);
+  };
+
+  const handleRemarksChange = (e) => {
+    const value = e.target.value.slice(0, 250);
+    setRemarks(value);
   };
 
   // If no orders selected
@@ -761,7 +1039,6 @@ const YPivotQAInspectionReportType = ({
             Report Type
           </h3>
         </div>
-
         <div className="p-4">
           {loadingTemplates ? (
             <div className="flex items-center justify-center py-8">
@@ -782,7 +1059,7 @@ const YPivotQAInspectionReportType = ({
         </div>
       </div>
 
-      {/* Line, Table, Color Selections */}
+      {/* Inspection Selection */}
       {selectedTemplate && (needsLineOrTable || needsColors) && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3">
@@ -792,39 +1069,114 @@ const YPivotQAInspectionReportType = ({
             </h3>
           </div>
 
-          <div className="p-4 space-y-4">
+          <div className="p-4 space-y-6">
+            {/* Supplier Section */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Building className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                  Supplier
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Supplier (YM - Fixed) */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                    Supplier
+                  </label>
+                  <div className="px-3 py-2.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm font-bold text-indigo-700 dark:text-indigo-300">
+                    YM
+                  </div>
+                </div>
+
+                {/* Sub-Con Toggle */}
+                <div className="flex items-end pb-1">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl">
+                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      Sub-Con
+                    </span>
+                    <button
+                      onClick={() => setIsSubCon(!isSubCon)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        isSubCon
+                          ? "bg-indigo-600"
+                          : "bg-gray-300 dark:bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isSubCon ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                    <span
+                      className={`text-xs font-bold ${
+                        isSubCon ? "text-indigo-600" : "text-gray-500"
+                      }`}
+                    >
+                      {isSubCon ? "Yes" : "No"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Sub-Con Factory Selection */}
+                {isSubCon && (
+                  <div className="sm:col-span-2">
+                    <SearchableSingleSelect
+                      label="Sub-Con Factory"
+                      icon={Factory}
+                      options={subConFactoryOptions}
+                      selectedValue={selectedSubConFactory}
+                      onSelectionChange={setSelectedSubConFactory}
+                      placeholder="Select factory..."
+                      loading={loadingSubConFactories}
+                      color="amber"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Line, Table, Color Selection */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Line Selection */}
+              {/* Line Selection - Multi Select */}
               {selectedTemplate.Line === "Yes" && (
-                <SingleSelectDropdown
-                  label="Production Line"
+                <SearchableMultiSelect
+                  label="Production Line(s)"
                   icon={GitBranch}
                   options={lineOptions}
-                  selectedValue={selectedLine}
-                  onSelectionChange={setSelectedLine}
-                  placeholder="Select line..."
+                  selectedValues={selectedLines}
+                  onSelectionChange={setSelectedLines}
+                  placeholder={
+                    isSubCon && !selectedSubConFactory
+                      ? "Select factory first..."
+                      : "Select lines..."
+                  }
                   loading={loadingLines}
+                  disabled={isSubCon && !selectedSubConFactory}
                   color="indigo"
                 />
               )}
 
-              {/* Table Selection */}
+              {/* Table Selection - Multi Select (Disabled if Sub-Con) */}
               {selectedTemplate.Table === "Yes" && (
-                <SingleSelectDropdown
-                  label="Inspection Table"
+                <SearchableMultiSelect
+                  label="Inspection Table(s)"
                   icon={Table2}
                   options={tableOptions}
-                  selectedValue={selectedTable}
-                  onSelectionChange={setSelectedTable}
-                  placeholder="Select table..."
+                  selectedValues={selectedTables}
+                  onSelectionChange={setSelectedTables}
+                  placeholder="Select tables..."
                   loading={loadingTables}
+                  disabled={isSubCon}
                   color="purple"
                 />
               )}
 
-              {/* Color Selection */}
+              {/* Color Selection - Multi Select */}
               {selectedTemplate.Colors === "Yes" && (
-                <MultiSelectDropdown
+                <SearchableMultiSelect
                   label="Colors"
                   icon={Palette}
                   options={colorOptions}
@@ -837,37 +1189,105 @@ const YPivotQAInspectionReportType = ({
               )}
             </div>
 
+            {/* Carton Qty - Only for First output Carton */}
+            {isFirstOutputCarton && (
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                  <Box className="w-3.5 h-3.5 text-amber-500" />
+                  Carton Qty
+                  <span className="text-[9px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 px-1.5 py-0.5 rounded ml-1">
+                    Required
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={cartonQty}
+                  onChange={handleCartonQtyChange}
+                  placeholder="Enter carton qty..."
+                  className="w-full sm:w-48 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                />
+              </div>
+            )}
+
             {/* Inspected Qty Input */}
-            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                  <Hash className="w-3.5 h-3.5 text-indigo-500" />
+                  Inspected Qty
+                  {selectedTemplate.InspectedQtyMethod === "Fixed" && (
+                    <span className="text-[9px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-1.5 py-0.5 rounded ml-1">
+                      Fixed
+                    </span>
+                  )}
+                  {selectedTemplate.InspectedQtyMethod === "AQL" && (
+                    <span className="text-[9px] bg-orange-100 dark:bg-orange-900/30 text-orange-600 px-1.5 py-0.5 rounded ml-1">
+                      AQL
+                    </span>
+                  )}
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={inspectedQty}
+                  onChange={handleInspectedQtyChange}
+                  placeholder="Enter inspected qty..."
+                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                {selectedTemplate.InspectedQtyMethod === "Fixed" &&
+                  selectedTemplate.InspectedQty > 0 && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Default: {selectedTemplate.InspectedQty} pcs
+                    </p>
+                  )}
+              </div>
+
+              {/* Shipping Stage - Only for AQL */}
+              {isAQLMethod && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                    <Truck className="w-3.5 h-3.5 text-cyan-500" />
+                    Shipping Stage
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={shippingStage || ""}
+                      onChange={(e) => setShippingStage(e.target.value || null)}
+                      className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none"
+                    >
+                      <option value="">Select stage...</option>
+                      {shippingStageOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Remarks Section */}
+            <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
-                <Hash className="w-3.5 h-3.5 text-indigo-500" />
-                Inspected Qty
-                {selectedTemplate.InspectedQtyMethod === "Fixed" && (
-                  <span className="text-[9px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-1.5 py-0.5 rounded ml-1">
-                    Fixed
-                  </span>
-                )}
-                {selectedTemplate.InspectedQtyMethod === "AQL" && (
-                  <span className="text-[9px] bg-orange-100 dark:bg-orange-900/30 text-orange-600 px-1.5 py-0.5 rounded ml-1">
-                    AQL
-                  </span>
-                )}
+                <MessageSquare className="w-3.5 h-3.5 text-gray-500" />
+                Remarks
+                <span className="text-[9px] text-gray-400 ml-1">
+                  ({remarks.length}/250)
+                </span>
               </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                pattern="[0-9]*"
-                value={inspectedQty}
-                onChange={handleInspectedQtyChange}
-                placeholder="Enter inspected qty..."
-                className="w-full sm:w-48 px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              <textarea
+                value={remarks}
+                onChange={handleRemarksChange}
+                placeholder="Enter any remarks or notes..."
+                maxLength={250}
+                rows={3}
+                className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-gray-500 focus:border-transparent resize-none"
               />
-              {selectedTemplate.InspectedQtyMethod === "Fixed" &&
-                selectedTemplate.InspectedQty > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Default: {selectedTemplate.InspectedQty} pcs
-                  </p>
-                )}
             </div>
           </div>
         </div>
@@ -882,7 +1302,6 @@ const YPivotQAInspectionReportType = ({
               AQL Configuration
             </h3>
           </div>
-
           <div className="p-4">
             {loadingAql ? (
               <div className="flex items-center justify-center py-8">

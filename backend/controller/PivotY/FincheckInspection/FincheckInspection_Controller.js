@@ -1,7 +1,8 @@
 import {
   DtOrder,
   YorksysOrders,
-  QASectionsAqlBuyerConfig
+  QASectionsAqlBuyerConfig,
+  SubconSewingFactory
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -596,6 +597,43 @@ export const getAqlConfigByBuyer = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Internal server error while fetching AQL config.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Get Sub-Con Factories for Dropdown
+// ============================================================
+export const getSubConFactories = async (req, res) => {
+  try {
+    const { search } = req.query;
+
+    let query = {};
+    if (search) {
+      query = {
+        $or: [
+          { factory: { $regex: search, $options: "i" } },
+          { factory_second_name: { $regex: search, $options: "i" } }
+        ]
+      };
+    }
+
+    const factories = await SubconSewingFactory.find(query)
+      .select("_id no factory factory_second_name lineList")
+      .sort({ no: 1 })
+      .limit(50)
+      .lean();
+
+    return res.status(200).json({
+      success: true,
+      data: factories
+    });
+  } catch (error) {
+    console.error("Error fetching sub-con factories:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while fetching sub-con factories.",
       error: error.message
     });
   }
