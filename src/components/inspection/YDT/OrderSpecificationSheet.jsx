@@ -420,7 +420,12 @@ const handleOrderSelect = useCallback(async (orderNo) => {
                 <input
                   type="text"
                   value={orderSearchTerm}
-                  onChange={(e) => setOrderSearchTerm(e.target.value)}
+                  onChange={(e) => {
+                    setOrderSearchTerm(e.target.value);
+                    if (justSelected) {
+                      setJustSelected(false);
+                    }
+                  }}
                   placeholder="Enter Order No"
                   className="flex-1 text-lg font-bold border-0 outline-none bg-transparent"
                 />
