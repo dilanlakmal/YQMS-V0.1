@@ -624,100 +624,96 @@ const handleDownloadPDF = async (record) => {
     }
     
     
-    // 3. Load all images as base64 with enhanced error handling
+    // 3. Load all images as base64 with retry logic
     const preloadedImages = {};
-    const imagePromises = Array.from(imageUrls).map(async (url, index) => {
-      try {
-        // Add delay to prevent overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, index * 100));
-        
-        let imageUrl = url;
-        
-        // Normalize URL
-        if (imageUrl.startsWith('./public/')) {
-          imageUrl = imageUrl.replace('./public/', '/');
-        }
-        
-        
-        let response;
-        let success = false;
-        
-        // Strategy 1: Direct fetch for local URLs
-        if (!imageUrl.startsWith('http')) {
-          try {
-            const fullUrl = imageUrl.startsWith('/') ? `${API_BASE_URL}${imageUrl}` : `${API_BASE_URL}/${imageUrl}`;
-            response = await fetch(fullUrl, {
-              method: 'GET',
-              headers: {
-                'Accept': 'image/*,*/*',
-                'Cache-Control': 'no-cache'
-              }
-            });
-            if (response.ok) {
-              success = true;
+
+    const loadImageWithRetry = async (url, retries = 2, delay = 500) => {
+        for (let i = 0; i <= retries; i++) {
+            try {
+                let imageUrl = url;
+                if (imageUrl.startsWith('./public/')) {
+                    imageUrl = imageUrl.replace('./public/', '/');
+                }
+
+                let response;
+                let success = false;
+
+                // Strategy 1: Direct fetch for local URLs
+                if (!imageUrl.startsWith('http')) {
+                    try {
+                        const fullUrl = imageUrl.startsWith('/') ? `${API_BASE_URL}${imageUrl}` : `${API_BASE_URL}/${imageUrl}`;
+                        response = await fetch(fullUrl, {
+                            method: 'GET',
+                            headers: { 'Accept': 'image/*,*/*', 'Cache-Control': 'no-cache' }
+                        });
+                        if (response.ok) success = true;
+                    } catch (e) { /* continue to next strategy */ }
+                }
+
+                // Strategy 2: Use image proxy
+                if (!success) {
+                    const proxyUrl = imageUrl.startsWith('http') ? imageUrl : `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+                    response = await fetch(`${API_BASE_URL}/api/image-proxy/${encodeURIComponent(proxyUrl)}`, {
+                        method: 'GET',
+                        headers: { 'Accept': 'application/json', 'Cache-Control': 'no-cache' }
+                    });
+                    if (response.ok) success = true;
+                }
+
+                if (success && response.ok) {
+                    const contentType = response.headers.get('content-type') || '';
+                    if (contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (data.dataUrl && data.dataUrl.startsWith('data:')) {
+                            preloadedImages[url] = data.dataUrl;
+                            preloadedImages[imageUrl] = data.dataUrl;
+                            return; // Success, exit loop
+                        }
+                    } else if (contentType.startsWith('image/')) {
+                        const arrayBuffer = await response.arrayBuffer();
+                        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                        const dataUrl = `data:${contentType};base64,${base64}`;
+                        preloadedImages[url] = dataUrl;
+                        preloadedImages[imageUrl] = dataUrl;
+                        return; // Success, exit loop
+                    }
+                }
+
+                // If we are here, it means the attempt failed.
+                throw new Error(`Failed to load image after attempt ${i + 1}. Status: ${response?.status}`);
+
+            } catch (error) {
+                console.warn(`Attempt ${i + 1} failed for ${url}: ${error.message}`);
+                if (i < retries) {
+                    await new Promise(resolve => setTimeout(resolve, delay * (i + 1))); // Exponential backoff
+                } else {
+                    console.error(`❌ Permanently failed to load image: ${url}`);
+                }
             }
-          } catch (error) {
-            console.log(`❌ Direct fetch failed: ${error.message}`);
-          }
         }
-        
-        // Strategy 2: Use image proxy
-        if (!success) {
-          try {
-            const proxyUrl = imageUrl.startsWith('http') ? imageUrl : `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-            response = await fetch(`${API_BASE_URL}/api/image-proxy/${encodeURIComponent(proxyUrl)}`, {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-              }
-            });
-            if (response.ok) {
-              success = true;
-            }
-          } catch (error) {
-            console.log(`❌ Proxy fetch failed: ${error.message}`);
-          }
-        }
-        
-        if (success && response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          
-          if (contentType.includes('application/json')) {
-            // Response is JSON (from proxy)
-            const data = await response.json();
-            if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-              preloadedImages[url] = data.dataUrl;
-              preloadedImages[imageUrl] = data.dataUrl;
-            } else {
-              console.warn(`❌ Invalid JSON response for: ${url}`, data);
-            }
-          } else if (contentType.startsWith('image/')) {
-            // Response is binary image data
-            const arrayBuffer = await response.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-            const dataUrl = `data:${contentType};base64,${base64}`;
-            
-            preloadedImages[url] = dataUrl;
-            preloadedImages[imageUrl] = dataUrl;
-          } else {
-            console.warn(`❌ Unexpected content type: ${contentType} for ${url}`);
-          }
-        } else {
-          console.warn(`❌ Failed to load: ${url} (${response?.status || 'No response'})`);
-        }
-      } catch (error) {
-        console.warn(`❌ Error loading: ${url}`, error.message);
-      }
-    });
-    
+    };
+
+    const imagePromises = Array.from(imageUrls).map((url, index) => 
+        // Add a small delay between starting each image download to avoid overwhelming the server
+        new Promise(resolve => setTimeout(resolve, index * 50)).then(() => loadImageWithRetry(url))
+    );
+
     await Promise.allSettled(imagePromises);
     
     
     // 4. Generate PDF
     const { pdf } = await import("@react-pdf/renderer");
     const { QcWashingFullReportPDF } = await import("./qcWashingFullReportPDF");
-    
+
+    Swal.fire({
+      title: "Generating PDF",
+      text: "Please wait while the report is being created...",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
+
     const blob = await pdf(
       React.createElement(QcWashingFullReportPDF, {
         recordData: record,
@@ -728,7 +724,9 @@ const handleDownloadPDF = async (record) => {
         inspectorDetails,
       })
     ).toBlob();
-    
+
+    Swal.close();
+
     // 5. Download
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -737,7 +735,7 @@ const handleDownloadPDF = async (record) => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    URL.revokeObjectURL(url); // Clean up
     
     Swal.fire({
       title: "Success!",
