@@ -17,7 +17,7 @@ const router = express.Router();
 
 router.get('/api/qc-washing/all-submitted', getAllQCWashingSubmittedData);
 router.get('/api/image-proxy/:imageUrl(*)', getQCWashingImageProxy);
-router.get('/api/image-proxy-selected/:id', getQCWashingImgeSelected);
+router.get('/api/qc-washing/image-proxy-selected/:id', getQCWashingImgeSelected);
 
 /* ------------------------------
  QCWashing Result Routes

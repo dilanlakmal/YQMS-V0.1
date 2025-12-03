@@ -98,7 +98,8 @@ const corsOptions = {
     "Last-Modified",
     "If-Modified-Since",
     "If-None-Match",
-    "ETag"
+    "ETag",
+    "Mode"
   ],
   exposedHeaders: ["Content-Length", "Content-Type", "Cache-Control", "Last-Modified", "ETag"],
   credentials: true, // Set to false for broader compatibility
