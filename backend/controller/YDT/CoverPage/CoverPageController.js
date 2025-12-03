@@ -4,20 +4,14 @@ export const searchOrderNo = async (req, res) => {
   try {
     const { term } = req.query;
     
-    // UNIQUE IDENTIFIER - if you see this, the new code is loaded
-    console.log('🚀 NEW MONGOOSE CODE LOADED - Version 2.0');
     
     // Add validation for search term
     if (!term || term.length < 2) {
       return res.json([]);
     }
     
-    console.log('Searching for term:', term);
-    console.log('DtOrder object:', DtOrder);
-    
     // Check if DtOrder is properly initialized
     if (!DtOrder) {
-      console.error('DtOrder is not properly initialized');
       return res.status(500).json({ 
         error: 'Database connection error',
         message: 'DtOrder model is not initialized' 
@@ -27,7 +21,6 @@ export const searchOrderNo = async (req, res) => {
     let orders;
     
     try {
-      console.log('🔍 Attempting MongoDB query with Mongoose...');
       
       // Improved search - works with both letters and numbers
       const searchTerm = term.trim();
@@ -48,13 +41,9 @@ export const searchOrderNo = async (req, res) => {
       })
       .limit(10)
       .lean();
-        
-      console.log('✅ MongoDB query executed successfully');
-      console.log('📊 Found orders count:', orders.length);
       
       // If no results with the above search, try a more flexible search
       if (orders.length === 0) {
-        console.log('🔄 Trying flexible search...');
         
         // Remove special characters and search
         const cleanTerm = searchTerm.replace(/[^a-zA-Z0-9]/g, '');
@@ -69,11 +58,9 @@ export const searchOrderNo = async (req, res) => {
         .limit(10)
         .lean();
         
-        console.log('📊 Flexible search found:', orders.length);
       }
       
     } catch (queryError) {
-      console.error('❌ MongoDB query error:', queryError);
       return res.status(500).json({ 
         error: 'Database query failed',
         message: queryError.message,
@@ -83,20 +70,12 @@ export const searchOrderNo = async (req, res) => {
 
     // Check if orders exist
     if (!orders || orders.length === 0) {
-      console.log('📭 No documents found');
       return res.json([]);
     }
 
-    console.log('📋 Processing orders:', orders.length);
-
     const suggestions = orders.map((order, index) => {
       try {
-        console.log(`📄 Document ${index}:`, {
-          Order_No: order.Order_No,
-          CustStyle: order.CustStyle,
-          Factory: order.Factory
-        });
-        
+
         return {
           id: order._id,
           orderNo: order.Order_No,
@@ -113,12 +92,9 @@ export const searchOrderNo = async (req, res) => {
       }
     }).filter(suggestion => suggestion !== null);
 
-    console.log('✨ Processed suggestions:', suggestions.length);
     res.json(suggestions);
 
   } catch (error) {
-    console.error('💥 Unexpected error in searchOrderNo:', error);
-    console.error('📚 Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Internal server error',
       message: error.message,
@@ -130,8 +106,6 @@ export const searchOrderNo = async (req, res) => {
 export const getOrderDetails = async (req, res) => {
   try {
     const { orderNo } = req.params;
-    
-    console.log('Fetching order details for:', orderNo);
     
     // Check if DtOrder is properly initialized
     if (!DtOrder) {
@@ -178,7 +152,6 @@ export const getOrderDetails = async (req, res) => {
       originalData: order
     };
 
-    console.log('Order data found:', orderData);
     res.json(orderData);
 
   } catch (error) {
