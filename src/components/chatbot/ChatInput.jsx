@@ -8,6 +8,7 @@ import { motion } from "framer-motion";
 import ChatGuide from "./ChatStepIntro";
 
 export default function ChatInput({
+  conversations,
   activeConversationId,
   lastMessage,
   setLastMessage,
@@ -17,13 +18,22 @@ export default function ChatInput({
   setInput,
   handleSubmit,
   isLoading,
+
 }) {
   const textareaRef = useRef(null);
+  const [historyIndex, setHistoryIndex] = useState(-1);
 
   const models = [
     { name: "gpt-oss:120b-cloud", active: true },
     { name: "llama3.2:latest", active: false },
   ];
+
+  const userMessages = conversations
+    .find(conv => conv._id === activeConversationId)
+    ?.messages
+    ?.filter(msg => msg.role === "user") || [];
+  
+  console.log("User conversation", userMessages)
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -32,12 +42,45 @@ export default function ChatInput({
     }
   };
 
+  const handleKeyUp = (e) => {
+    if (e.key === "ArrowUp") {
+      let newIndex;
+      console.log("History index", historyIndex);
+      if (historyIndex === 0){
+        newIndex = userMessages.length -1;
+      } else {
+        newIndex = Math.max(historyIndex -1, 0);
+      }
+      console.log("New history index", newIndex);
+      setHistoryIndex(newIndex)
+
+      if (newIndex < 0) {
+        setInput("");
+      } else {
+        const message = userMessages[newIndex];
+        setInput(message?.content || "");
+      } 
+    } else if (e.key == "ArrowDown") {
+      const newIndex = Math.min(historyIndex + 1, -1);
+      setHistoryIndex(newIndex);
+
+      if (newIndex === -1) {
+        setInput("");
+      } else {
+        const message = userMessages[userMessages.length + newIndex];
+        setInput(message?.content || "");
+      }
+    }
+  }
   // Auto resize textarea
   useEffect(() => {
     const ta = textareaRef.current;
     if (ta) {
       ta.style.height = "0px";
       ta.style.height = ta.scrollHeight + "px";
+    }
+    if (!model) {
+      setModel(models[0].name);
     }
   }, [input]);
 
@@ -46,6 +89,11 @@ export default function ChatInput({
     setModel(newModel);
     await editConversationModel(activeConversationId, newModel);
   };
+
+  const handleChange = (e) => {
+    setInput(e.target.value);
+    setHistoryIndex(-1);
+  }
 
   return (
     <div className="bg-background border-border">
@@ -56,8 +104,9 @@ export default function ChatInput({
           <Textarea
             ref={textareaRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={handleChange}
             onKeyDown={handleKeyDown}
+            onKeyUp={handleKeyUp}
             placeholder="Ask anything"
             className="
             hide-scrollbar

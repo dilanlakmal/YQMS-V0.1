@@ -21,6 +21,7 @@ import {
   Moon,
   ClipboardList
 } from "lucide-react";
+import { FaRobot, FaGlobe, FaClipboard } from "react-icons/fa";
 
 // --- Theme Hook for Dark Mode ---
 const useTheme = () => {
@@ -440,6 +441,21 @@ function Home() {
             image: "assets/Home/sunrise.png",
             title: "QC1 Sunrise",
             description: "Upload Excel Data"
+          }
+        ]
+      },
+      {
+        id: "ai-services",
+        title: "AI services",
+        icon: <FaRobot className="w-6 h-6 mr-2"/>,
+        bgColor:"bg-blue-50",
+        items: [
+          {
+            title: "Production Instruction Translation",
+            description: "Translate your final report",
+            path: "/ai/production-instruction-translation",
+            image: "assets/Home/icon-instruction.png",
+
           }
         ]
       }

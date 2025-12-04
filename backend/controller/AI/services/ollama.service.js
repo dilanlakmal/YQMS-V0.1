@@ -1,27 +1,119 @@
 import { Ollama } from "ollama";
+import { getMoNumberTools, getMoNumber } from "../qc_assistance/QC.tools.js";
 
+const abortController = new AbortController();
 
-export const getChatWithOllama = async(req, res) => {
-    const {model, prompt} = req.body;
+// Main handler for chat requests
+const handleChatWithOllama = async (req, res) => {
+    const { model, messages, tool } = req.body;
+    let apiHost = process.env.OLLAMA_API_URL;
+
+    if (model === "llama3.2:latest") {
+        apiHost = process.env.LLAMA3_2_API_URL;
+        console.log("User selected model:", model);
+    }
 
     try {
-        const ollama = new Ollama({
-            host: process.env.OLLAMA_API_URL,
+        const ollamaClient = new Ollama({
+            host: apiHost,
             headers: {
-                Authorization: "Bearer " + process.env.OLLAMA_API_KEY
-            }
-        })
+                Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`,
+            },
+            fetch: (url, options) =>
+                fetch(url, {
+                    ...options,
+                    signal: abortController.signal,
+                }),
+        });
 
-        const result = await ollama.chat({
+        let updatedMessages;
+        if (tool){
+            updatedMessages = await selectToolForMessages(messages, ollamaClient);
+        } else {
+            updatedMessages = [...messages];
+        }
+
+        const result = await ollamaClient.chat({
             model,
-            messages: [{role: "user", content: prompt}],
-            stream: false
-        })
+            messages: updatedMessages,
+            stream: false,
+            tools: getMoNumberTools,
+        });
 
         res.status(200).json(result);
+        console.log("Request successful:", result);
     } catch (error) {
-        console.error("Ollama Error", error);
-        res.status(500).json({error: error.messages});
-
+        console.error("Ollama Error:", error);
+        res.status(500).json({ error: error.message || error.toString() });
     }
-}
+};
+
+// Extract tool call information from LLM response
+const getToolCallFromLLM = (llmResponse) => {
+    if (llmResponse?.message?.tool_calls) {
+        const toolCall = llmResponse.message.tool_calls[0]; // Use first tool call
+        console.log("Tool call detected:", toolCall);
+        return toolCall?.function;
+    }
+    return null;
+};
+
+// Select and execute tools as needed
+const selectToolForMessages = async (messages, ollamaClient) => {
+    const executedTools = new Set();
+
+    try {
+        const response = await ollamaClient.chat({
+            model: "qwen3-vl:latest",
+            messages,
+            stream: false,
+            tools: getMoNumberTools,
+        });
+
+        console.log("Tool response from LLM:", response);
+
+        // Keep the assistant message for context
+        if (response?.message) {
+            messages.push({
+                role: 'assistant',
+                content: response.message.content, // just the textual content
+                thinking: response.message.thinking,
+                tool_calls: response.message.tool_calls?.map(tc => ({
+                    function: {
+                        name: tc.function.name,
+                        description: tc.function.description,
+                        parameters: tc.function.parameters ?? {}
+                    },
+                    arguments: tc.arguments ?? {}
+                })) || []
+            });
+        }
+
+        const toolCall = getToolCallFromLLM(response);
+        const toolName = toolCall?.name;
+
+        if (toolName && !executedTools.has(toolName)) {
+            executedTools.add(toolName);
+
+            let toolResult;
+            if (toolName === "getMoNumber") {
+                toolResult = await getMoNumber();
+            }
+
+            messages.push({
+                role: "tool",
+                tool_name: toolName,
+                content: toolResult ?? "",
+            });
+
+            console.log("Messages updated with tool result:", messages);
+        }
+
+        return messages;
+    } catch (error) {
+        console.error("Error selecting tool:", error);
+        return messages;
+    }
+};
+
+export default handleChatWithOllama;

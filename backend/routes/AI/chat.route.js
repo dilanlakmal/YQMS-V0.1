@@ -1,9 +1,9 @@
 import express from "express";
 
-import { getChatWithOllama } from "../../controller/AI/chat.controller.js";
+import { chat } from "../../controller/AI/chat.controller.js";
 
 const router = express.Router();
 
-router.post("/", getChatWithOllama)
+router.post("/", chat)
 
 export default router;

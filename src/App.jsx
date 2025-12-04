@@ -55,7 +55,7 @@ import QCWashingPage from "./pages/QCWashing.jsx";
 import PackingList from "./pages/PackingList.jsx";
 import Measurement from "./pages/Measurement.jsx";
 import YQMSAIChatBox from "./pages/YQMSAIChatBox.jsx";
-
+import ProductionInstructionServices from "./components/ai/services/productionInstructionServices.jsx";
 //Languages
 import "../src/lang/i18n";
 
@@ -311,7 +311,7 @@ function AppContent() {
   ) : (
     <div className="min-h-screen bg-gray-50">
       {isAuthenticated && <Navbar onLogout={handleLogout} isChatOpen={isChatOpen} setIsChatOpen={setIsChatOpen} />}
-      <div className={isAuthenticated ? "pt-16" : ""}>
+      <div className={isAuthenticated ? "pt-16 h-screen" : ""}>
         <Routes>
           {/* Public Routes */}
           <Route path="/register" element={<Register />} />
@@ -493,6 +493,7 @@ function AppContent() {
               <Route path="/packing-list" element={<PackingList />} />
               <Route path="/measurement" element={<Measurement />} />
               <Route path="/qa-sections" element={<YPivotQASections />} />
+              <Route path="/ai/production-instruction-translation" element={<ProductionInstructionServices/>} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

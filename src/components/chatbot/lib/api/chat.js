@@ -3,22 +3,19 @@ import { getToken } from "./conversation";
 import { API_BASE_URL } from "../../../../../config";
 
 import axios from "axios";
-// import { Ollama } from "ollama";
 
 
-export async function getOllamaResponse(model, messages) {
-
+export async function getOllamaResponse(model, messages, tool) {
     const token = getToken();
+    if (!token) throw new Error("Token not found!");
 
-    if (!token) throw Error("Token not found!")
+    const body = { model, messages, tool };
 
-    const body = {
-        model: model,
-        messages: messages
-    }
+
     const response = await axios.post(`${API_BASE_URL}/api/ai/chat`, body, {
-        headers: {Authorization: `Bearer ${token}`}
-    })
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 600000 
+        });
 
     return response.data;
 

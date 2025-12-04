@@ -109,15 +109,21 @@ export default function ChatInterface({
         content: msg.content,
       }));
 
-      const data = await getOllamaResponse(model, messages);
+      const data = await getOllamaResponse(model, messages, true);
 
-      const topic = await getOllamaResponse(model, [
-        {
-          role: "user",
-          content: `Generate a short topic (exactly three words) for the following text. 
-        Return ONLY the topic, nothing else: ${input}`,
-        },
-      ]);
+      let topic;
+      if (activeConversation.title === "New conversation" || !activeConversation.title) {
+          topic = await getOllamaResponse(model, [
+          {
+            role: "user",
+            content: `Generate a short topic (exactly three words) for the following text. 
+          Return ONLY the topic, nothing else: ${input}`,
+          },
+        ], false);
+      } else {
+        topic = activeConversation.title;
+      }
+
 
       const topicText = topic.message.content.trim();
 
@@ -230,6 +236,7 @@ export default function ChatInterface({
           <div className="absolute top-[0%] bottom-1 left-[0%] right-[0%] flex justify-center flex-col bg-background text-foreground">
             {currentService === "" && (
               <ChatService
+                conversations={conversations}
                 thinking={thinking}
                 setThinking={setThinking}
                 userData={userData}
@@ -255,6 +262,7 @@ export default function ChatInterface({
 }
 
 function ChatService({
+  conversations,
   setInput,
   input,
   model,
@@ -315,6 +323,7 @@ function ChatService({
       </div>
       <div className="mt-1">
         <ChatInput
+          conversations={conversations}
           activeConversationId={activeConversationId}
           lastMessage={lastMessage}
           setLastMessage={setLastMessage}
