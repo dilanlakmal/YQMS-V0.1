@@ -33,6 +33,7 @@ import EmpData from "./pages/EmpData.jsx";
 import SystemAdmin from "./pages/SystemAdmin.jsx";
 import SCCPage from "./pages/SCC.jsx";
 import EMBPrinting from "./pages/EMBPrinting.jsx";
+import EMBInspectionView from "./components/inspection/emb_printing/EMBInspectionView";
 import QAInspectionEvaluation from "./pages/QAInspectionEvaluation.jsx";
 import YQMSProject from "./pages/YQMSProject.jsx";
 import BGradeDefect from "./pages/BGradeDefect.jsx";
@@ -402,6 +403,10 @@ function AppContent() {
               <Route path="/cutting" element={<CuttingPage />} />
               <Route path="/scc" element={<SCCPage />} />
               <Route path="/emb-printing" element={<EMBPrinting />} />
+              <Route
+                path="/emb-printing/view-inspection/:reportId"
+                element={<EMBInspectionView />}
+              />
               <Route path="/sysadmin" element={<SystemAdmin />} />
               <Route path="/audit" element={<QAAudit />} />
               <Route path="/qa-pivot" element={<QAInspectionEvaluation />} />

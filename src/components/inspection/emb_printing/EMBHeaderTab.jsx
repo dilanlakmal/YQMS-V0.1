@@ -370,6 +370,27 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
     }
   };
 
+  const handleMachineNoChange = (e) => {
+    const { value } = e.target;
+    if (value === "") {
+      onFormDataChange({ machineNo: "1" });
+      return;
+    }
+
+    const sanitized = value.replace(/[^0-9]/g, "");
+    if (sanitized === "") {
+      onFormDataChange({ machineNo: "1" });
+      return;
+    }
+
+    const numericValue = Number(sanitized);
+    if (!Number.isNaN(numericValue)) {
+      // Clamp value between 1 and 30
+      const clampedValue = Math.max(1, Math.min(30, numericValue));
+      onFormDataChange({ machineNo: String(clampedValue) });
+    }
+  };
+
   const handleNumericInputChange = (e) => {
     const { name, value } = e.target;
     if (value === "") {
@@ -480,6 +501,16 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
     }
   }, [formData.needleSize, onFormDataChange]);
 
+  useEffect(() => {
+    if (
+      formData.machineNo === undefined ||
+      formData.machineNo === null ||
+      formData.machineNo === ""
+    ) {
+      onFormDataChange({ machineNo: "1" });
+    }
+  }, [formData.machineNo, onFormDataChange]);
+
   // Initialize conclusion result fields with default "Pass" value
   useEffect(() => {
     const updates = {};
@@ -498,6 +529,41 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       onFormDataChange(updates);
     }
   }, [formData.packingResult, formData.workmanshipResult, formData.qualityPlanResult, onFormDataChange]);
+
+  // Initialize checklist with default "N/A" values for all items
+  useEffect(() => {
+    const checklistItems = [
+      "orderType",
+      "samplesAvailable",
+      "labAnalysisTesting",
+      "masterCartonRequirements",
+      "dropTest",
+      "price",
+      "hangTags",
+      "labels",
+      "composition"
+    ];
+
+    const currentChecklist = formData.checklist || {};
+    const updates = {};
+    let hasUpdates = false;
+
+    checklistItems.forEach((key) => {
+      if (!currentChecklist[key]) {
+        updates[key] = "N/A";
+        hasUpdates = true;
+      }
+    });
+
+    if (hasUpdates) {
+      onFormDataChange({
+        checklist: {
+          ...currentChecklist,
+          ...updates
+        }
+      });
+    }
+  }, [formData.checklist, onFormDataChange]);
 
   const handleDateChange = (date) => {
     onFormDataChange({ inspectionDate: date });
@@ -1357,6 +1423,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
             qty: data.qty || 0,
             image: data.image || "",
             remarks: data.remarks || "",
+            machineNo: data.machineNo || "1",
             isVisible: data.isVisible !== undefined ? data.isVisible : true,
             garmentNo: data.garmentNo || defectArray.length + 1,
             defectNo: data.defectNo || 1
@@ -1373,6 +1440,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       qty: defect.qty || 0,
       image: defect.image || "",
       remarks: defect.remarks || "",
+      machineNo: defect.machineNo || "1",
       isVisible: defect.isVisible !== undefined ? defect.isVisible : true,
       garmentNo: defect.garmentNo || index + 1,
       defectNo: defect.defectNo || 1
@@ -1396,6 +1464,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       qty: 1,
       image: "",
       remarks: "",
+      machineNo: formData.machineNo || "1",
       isVisible: true,
       garmentNo: categoryData.length + 1,
       defectNo: 1
@@ -1433,6 +1502,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       qty: 1,
       image: "",
       remarks: "",
+      machineNo: formData.machineNo || "1",
       isVisible: true,
       garmentNo: garmentNo,
       defectNo: maxDefectNo + 1
@@ -1491,6 +1561,17 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         if (field === "qty") {
           const parsed = value === "" ? 1 : parseInt(value, 10);
           updated.qty = isNaN(parsed) ? 1 : Math.max(1, parsed);
+        } else if (field === "machineNo") {
+          const sanitized = value.replace(/[^0-9]/g, "");
+          if (sanitized === "") {
+            updated.machineNo = "1";
+          } else {
+            const numericValue = Number(sanitized);
+            if (!Number.isNaN(numericValue)) {
+              const clampedValue = Math.max(1, Math.min(30, numericValue));
+              updated.machineNo = String(clampedValue);
+            }
+          }
         } else if (field === "defectType") {
           updated.defectType = value;
           if (!updated.name || updated.name === defect.defectType) {
@@ -1540,7 +1621,8 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         qty: Number(item.qty) || 0,
         count: Number(item.qty) || 0,
         remarks: item.remarks || "",
-        image: item.image || ""
+        image: item.image || "",
+        machineNo: item.machineNo || "1"
       }));
     };
 
@@ -1718,19 +1800,23 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         embDetails: (formData.reportType === "EMB" || formData.reportType === "EMB + Print") ? {
           speed: toNumberOrNull(formData.speed),
           stitch: toNumberOrNull(formData.stitch),
-          needleSize: toNumberOrNull(formData.needleSize)
+          needleSize: toNumberOrNull(formData.needleSize),
+          machineNo: formData.machineNo || "1"
         } : {
           speed: null,
           stitch: null,
-          needleSize: null
+          needleSize: null,
+          machineNo: null
         },
         // Printing Details - only include if reportType is "Printing" or "EMB + Print"
         printingDetails: (formData.reportType === "Printing" || formData.reportType === "EMB + Print") ? {
           method: formData.printMethod || "",
-          curing: formData.curingMain || ""
+          curingTime: formData.curingTime || "",
+          curingPressure: formData.curingPressure || ""
         } : {
           method: "",
-          curing: ""
+          curingTime: "",
+          curingPressure: ""
         },
         aqlData: formData.aqlData,
         defects: processedDefects,
@@ -1795,6 +1881,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       speed: "",
       stitch: "",
       needleSize: "",
+      machineNo: "",
       // Printing specific fields
       manual: "",
       curing: "",
@@ -1802,7 +1889,8 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       pressure: "",
       shortCutP: "",
       printMethod: "",
-      curingMain: "",
+      curingTime: "",
+      curingPressure: "",
       // Validations and Checklists
       checklist: {},
       // Production data
@@ -1916,19 +2004,23 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         embDetails: (formData.reportType === "EMB" || formData.reportType === "EMB + Print") ? {
           speed: toNumberOrNull(formData.speed),
           stitch: toNumberOrNull(formData.stitch),
-          needleSize: toNumberOrNull(formData.needleSize)
+          needleSize: toNumberOrNull(formData.needleSize),
+          machineNo: formData.machineNo || "1"
         } : {
           speed: null,
           stitch: null,
-          needleSize: null
+          needleSize: null,
+          machineNo: null
         },
         // Printing Details - only include if reportType is "Printing" or "EMB + Print"
         printingDetails: (formData.reportType === "Printing" || formData.reportType === "EMB + Print") ? {
           method: formData.printMethod || "",
-          curing: formData.curingMain || ""
+          curingTime: formData.curingTime || "",
+          curingPressure: formData.curingPressure || ""
         } : {
           method: "",
-          curing: ""
+          curingTime: "",
+          curingPressure: ""
         },
         aqlData: formData.aqlData,
         defects: processedDefects,
@@ -2125,7 +2217,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       {formData.reportType === "EMB" && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <h4 className="text-md font-semibold text-blue-800 mb-4">EMB Details</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label htmlFor="speed" className={labelClasses}>
                 Speed
@@ -2211,24 +2303,31 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
               </div>
             </div>
             <div>
-              <label className={labelClasses}>Curing</label>
-              <div className="flex gap-4 mt-2">
-                {CURING_MAIN_OPTIONS.map((opt) => (
-                  <label key={opt} className="flex items-center cursor-pointer">
-                    <input
-                      type="radio"
-                      name="curingMain"
-                      value={opt}
-                      checked={formData.curingMain === opt}
-                      onChange={handleCuringMainChange}
-                      className="mr-2"
-                    />
-                    <span className="text-sm text-gray-700">{opt}</span>
-                  </label>
-                ))}
-              </div>
+              <label htmlFor="curingTime" className={labelClasses}>Time</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                id="curingTime"
+                name="curingTime"
+                value={formData.curingTime || ""}
+                onChange={handleInputChange}
+                className={inputFieldClasses}
+                placeholder="Enter time"
+              />
             </div>
-            <div></div>
+            <div>
+              <label htmlFor="curingPressure" className={labelClasses}>Pressure</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                id="curingPressure"
+                name="curingPressure"
+                value={formData.curingPressure || ""}
+                onChange={handleInputChange}
+                className={inputFieldClasses}
+                placeholder="Enter pressure"
+              />
+            </div>
 
 
 
@@ -2243,7 +2342,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         <>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h4 className="text-md font-semibold text-blue-800 mb-4">EMB Details</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
                 <label htmlFor="speed" className={labelClasses}>
                   Speed
@@ -2276,9 +2375,9 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
                   placeholder="Enter stitch"
                 />
               </div>
-              <div>
+              {/* <div>
                 <label htmlFor="needleSize" className={labelClasses}>
-                  Needle Size
+                  Needle Size ppp
                 </label>
                 <input
                   type="number"
@@ -2292,7 +2391,23 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
                   className={inputFieldClasses}
                   placeholder="Enter a value between 7 and 16"
                 />
-              </div>
+              </div> */}
+              {/* <div>
+                <label htmlFor="machineNo" className={labelClasses}>
+                  Machine No
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  id="machineNo"
+                  name="machineNo"
+                  value={formData.machineNo || ""}
+                  onChange={handleNumericInputChange}
+                  className={inputFieldClasses}
+                  placeholder="Enter machine number"
+                />
+              </div> */}
             </div>
           </div>
 
@@ -2327,22 +2442,30 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
                 </div>
               </div>
               <div>
-                <label className={labelClasses}>Curing</label>
-                <div className="flex gap-4 mt-2">
-                  {CURING_MAIN_OPTIONS.map((opt) => (
-                    <label key={opt} className="flex items-center cursor-pointer">
-                      <input
-                        type="radio"
-                        name="curingMain"
-                        value={opt}
-                        checked={formData.curingMain === opt}
-                        onChange={handleCuringMainChange}
-                        className="mr-2"
-                      />
-                      <span className="text-sm text-gray-700">{opt}</span>
-                    </label>
-                  ))}
-                </div>
+                <label htmlFor="curingTime" className={labelClasses}>Time</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  id="curingTime"
+                  name="curingTime"
+                  value={formData.curingTime || ""}
+                  onChange={handleInputChange}
+                  className={inputFieldClasses}
+                  placeholder="Enter time"
+                />
+              </div>
+              <div>
+                <label htmlFor="curingPressure" className={labelClasses}>Pressure</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  id="curingPressure"
+                  name="curingPressure"
+                  value={formData.curingPressure || ""}
+                  onChange={handleInputChange}
+                  className={inputFieldClasses}
+                  placeholder="Enter pressure"
+                />
               </div>
 
 
@@ -2804,6 +2927,23 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
                                 </div>
                               </div>
 
+                              {/* Machine No */}
+                              <div>
+                                <label className={labelClasses}>Machine No</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="1"
+                                  max="30"
+                                  className={inputFieldClasses}
+                                  value={defect.machineNo || "1"}
+                                  onChange={(e) =>
+                                    handleDefectChange("emb", defect.id, "machineNo", e.target.value)
+                                  }
+                                  placeholder="Enter machine number (1-30)"
+                                />
+                              </div>
+
                               {/* Remarks - Optional */}
                               <div>
                                 <label className={labelClasses}>Remarks (Optional)</label>
@@ -2962,6 +3102,23 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
                                     />
                                   </div>
                                 </div>
+                              </div>
+
+                              {/* Machine No */}
+                              <div>
+                                <label className={labelClasses}>Machine No</label>
+                                <input
+                                  type="number"
+                                  inputMode="numeric"
+                                  min="1"
+                                  max="30"
+                                  className={inputFieldClasses}
+                                  value={defect.machineNo || "1"}
+                                  onChange={(e) =>
+                                    handleDefectChange("printing", defect.id, "machineNo", e.target.value)
+                                  }
+                                  placeholder="Enter machine number (1-30)"
+                                />
                               </div>
 
                               {/* Remarks - Optional */}

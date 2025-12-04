@@ -47,6 +47,7 @@ const EMBPrintingInspection = () => {
     speed: "",
     stitch: "",
     needleSize: "",
+    machineNo: "",
     // Printing specific fields
     manual: "",
     curing: "",

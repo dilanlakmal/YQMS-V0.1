@@ -20187,6 +20187,74 @@ app.get("/api/scc/subcon-emb-report/:id", async (req, res) => {
   }
 });
 
+// PATCH endpoint to approve a Subcon EMB report
+app.patch("/api/scc/subcon-emb-report/:id/approve", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const report = await SubconEMBReport.findById(id);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found."
+      });
+    }
+
+    // Update status to Approved and result to Pass
+    report.status = "Approved";
+    report.result = "Pass";
+    await report.save();
+
+    res.json({
+      success: true,
+      message: "Inspection report approved successfully.",
+      data: report
+    });
+  } catch (error) {
+    console.error("Error approving Subcon EMB report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to approve Subcon EMB report.",
+      error: error.message
+    });
+  }
+});
+
+// PATCH endpoint to reject a Subcon EMB report
+app.patch("/api/scc/subcon-emb-report/:id/reject", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const report = await SubconEMBReport.findById(id);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found."
+      });
+    }
+
+    // Update status to Rejected and result to Reject
+    report.status = "Rejected";
+    report.result = "Reject";
+    await report.save();
+
+    res.json({
+      success: true,
+      message: "Inspection report rejected successfully.",
+      data: report
+    });
+  } catch (error) {
+    console.error("Error rejecting Subcon EMB report:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to reject Subcon EMB report.",
+      error: error.message
+    });
+  }
+});
+
 /* ------------------------------
    End Points - Subcon EMB Printing Image Upload
 ------------------------------ */

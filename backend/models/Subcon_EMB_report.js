@@ -8,7 +8,8 @@ const defectDetailSchema = new mongoose.Schema(
     qty: { type: Number, required: true, min: 1 },
     count: { type: Number, required: true, min: 1 },
     remarks: { type: String, default: "" },
-    image: { type: String, default: "" }
+    image: { type: String, default: "" },
+    machineNo: { type: String, default: null }
   },
   { _id: false }
 );
@@ -45,7 +46,8 @@ const subconEMBReportSchema = new mongoose.Schema(
     embDetails: {
       speed: { type: Number, default: null },
       stitch: { type: Number, default: null },
-      needleSize: { type: Number, default: null }
+      needleSize: { type: Number, default: null },
+     
     },
 
     // Printing Details (only when reportType is "Printing" or "EMB + Print")
@@ -68,6 +70,11 @@ const subconEMBReportSchema = new mongoose.Schema(
     result: {
       type: String,
       enum: ["Pass", "Reject", "Pending"],
+      default: "Pending"
+    },
+    status: {
+      type: String,
+      enum: ["Pending", "Approved", "Rejected"],
       default: "Pending"
     },
     defects: [defectDetailSchema],

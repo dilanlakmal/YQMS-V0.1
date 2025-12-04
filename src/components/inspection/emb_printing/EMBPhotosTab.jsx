@@ -107,14 +107,16 @@ const ImagePreviewModal = ({ isOpen, image, title, onClose, photos = [], current
 
 const PhotoCategory = ({ title, photos = [], onAddPhoto, onDeletePhoto, onUpdateDescription, onDeleteCategory, showDeleteCategory, isUploading = false }) => {
   const { t } = useTranslation();
-  const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [hovered, setHovered] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
-  const [previewIndex, setPreviewIndex] = useState(0);
-  const [slideIndex, setSlideIndex] = useState(0);
   
-  const handleImageClick = (photo, index) => {
-    setPreviewImage(photo);
-    setPreviewIndex(index);
+  // Only get the first photo (one image per category)
+  const photo = photos.length > 0 ? photos[0] : null;
+  
+  const handleImageClick = () => {
+    if (photo) {
+      setPreviewImage(photo);
+    }
   };
   
   const closePreview = () => {
@@ -122,34 +124,15 @@ const PhotoCategory = ({ title, photos = [], onAddPhoto, onDeletePhoto, onUpdate
   };
   
   const handleNavigate = (direction) => {
-    const newIndex = direction === 'next' 
-      ? (previewIndex + 1) % photos.length 
-      : (previewIndex - 1 + photos.length) % photos.length;
-    
-    setPreviewIndex(newIndex);
-    setPreviewImage(photos[newIndex]);
+    // No navigation needed for single photo
+    closePreview();
   };
-
-  const handleSlideNext = () => {
-    if (slideIndex + 2 < photos.length) {
-      setSlideIndex(slideIndex + 1);
-    }
-  };
-
-  const handleSlidePrev = () => {
-    if (slideIndex > 0) {
-      setSlideIndex(slideIndex - 1);
-    }
-  };
-
-  const visiblePhotos = photos.slice(slideIndex, slideIndex + 2);
-  const showNavigation = photos.length > 2;
 
   return (
-    <div className="mb-6 border border-gray-200 rounded-md overflow-hidden">
+    <div className="border border-gray-200 rounded-md overflow-hidden bg-white h-full flex flex-col">
       <div className="flex justify-between items-center bg-gray-50 px-4 py-3 border-b border-gray-200">
-        <h3 className="font-medium text-gray-700">{title}</h3>
-        <div className="flex space-x-2">
+        <h3 className="font-medium text-gray-700 text-sm truncate flex-1 mr-2" title={title}>{title}</h3>
+        <div className="flex space-x-2 flex-shrink-0">
           {showDeleteCategory && onDeleteCategory && (
             <button
               type="button"
@@ -165,6 +148,7 @@ const PhotoCategory = ({ title, photos = [], onAddPhoto, onDeletePhoto, onUpdate
             onClick={() => onAddPhoto(title)}
             disabled={isUploading}
             className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+            title={photo ? "Replace photo" : "Add photo"}
           >
             {isUploading ? (
               <Loader2 size={18} className="animate-spin" />
@@ -174,85 +158,54 @@ const PhotoCategory = ({ title, photos = [], onAddPhoto, onDeletePhoto, onUpdate
           </button>
         </div>
       </div>
-      <div className="p-4">
-        {photos.length > 0 ? (
-          <div className="relative">
-            {/* Navigation Arrows */}
-            {showNavigation && slideIndex > 0 && (
-              <button
-                type="button"
-                onClick={handleSlidePrev}
-                className="absolute left-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
+      <div className="p-4 flex-1 flex flex-col">
+        {photo ? (
+          <div className="flex flex-col h-full">
+            <div 
+              className="relative group flex-1 min-h-[200px] bg-gray-50 rounded-lg overflow-hidden cursor-pointer"
+              onMouseEnter={() => setHovered(true)}
+              onMouseLeave={() => setHovered(false)}
+              onClick={handleImageClick}
+            >
+              <img
+                src={photo.url || photo.preview || ""}
+                alt={title}
+                className="w-full h-full object-contain"
+              />
+              <div 
+                className={`absolute top-2 right-2 transition-opacity duration-200
+                  ${hovered ? 'opacity-100' : 'opacity-0'}`}
               >
-                <ChevronLeft size={20} className="text-gray-700" />
-              </button>
-            )}
-            
-            {showNavigation && slideIndex + 2 < photos.length && (
-              <button
-                type="button"
-                onClick={handleSlideNext}
-                className="absolute right-0 top-1/2 -translate-y-1/2 z-10 p-2 bg-white rounded-full shadow-lg hover:bg-gray-100 transition-colors"
-              >
-                <ChevronRight size={20} className="text-gray-700" />
-              </button>
-            )}
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {visiblePhotos.map((photo, displayIndex) => {
-              const actualIndex = slideIndex + displayIndex;
-              return (
-              <div
-                key={actualIndex}
-                className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm"
-                onMouseEnter={() => setHoveredIndex(actualIndex)}
-                onMouseLeave={() => setHoveredIndex(null)}
-              >
-                <div className="relative group">
-                  <img
-                    src={photo.url || photo.preview || ""}
-                    alt={`${title} - ${actualIndex + 1}`}
-                    className="w-full h-64 object-contain bg-gray-50 cursor-pointer"
-                    onClick={() => handleImageClick(photo, actualIndex)}
-                  />
-                  <div 
-                    className={`absolute top-2 right-2 transition-opacity duration-200
-                      ${hoveredIndex === actualIndex ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                  >
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeletePhoto(title, actualIndex);
-                      }}
-                      className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Description
-                  </label>
-                  <textarea
-                    value={photo.description || ''}
-                    onChange={(e) => onUpdateDescription(title, actualIndex, e.target.value)}
-                    placeholder="Add description for this image..."
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none"
-                    rows="3"
-                  />
-                  <div className="mt-2 text-xs text-gray-500">
-                    {photo.timestamp ? new Date(photo.timestamp).toLocaleString() : ''}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDeletePhoto(title, 0);
+                  }}
+                  className="p-2 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
-              );
-            })}
+            </div>
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Description
+              </label>
+              <textarea
+                value={photo.description || ''}
+                onChange={(e) => onUpdateDescription(title, 0, e.target.value)}
+                placeholder="Add description for this image..."
+                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm resize-none"
+                rows="3"
+              />
+              <div className="mt-2 text-xs text-gray-500">
+                {photo.timestamp ? new Date(photo.timestamp).toLocaleString() : ''}
+              </div>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-md border-2 border-dashed border-gray-300">
+          <div className="flex flex-col items-center justify-center py-8 px-4 bg-gray-50 rounded-md border-2 border-dashed border-gray-300 flex-1">
             <Camera className="h-12 w-12 text-gray-400 mb-3" />
             <p className="text-sm text-gray-500 text-center mb-2">
               {t("photos.noPhotos", "No photos added yet")}
@@ -285,7 +238,7 @@ const PhotoCategory = ({ title, photos = [], onAddPhoto, onDeletePhoto, onUpdate
         image={previewImage || {}}
         title={title}
         photos={photos}
-        currentIndex={previewIndex}
+        currentIndex={0}
         onClose={closePreview}
         onNavigate={handleNavigate}
       />
@@ -441,8 +394,8 @@ const EMBPhotosTab = ({ formData, onFormDataChange }) => {
       };
 
       const categoryTitle = getCategoryTitle(activeCategory);
-      const currentPhotos = getPhotosForCategory(activeCategory);
-      setPhotosForCategory(activeCategory, [...currentPhotos, newPhoto], categoryTitle);
+      // Replace existing photo with new one (only one photo per category)
+      setPhotosForCategory(activeCategory, [newPhoto], categoryTitle);
 
       setUploadingPhotos((prev) => {
         const newSet = new Set(prev);
@@ -470,11 +423,8 @@ const EMBPhotosTab = ({ formData, onFormDataChange }) => {
     const category = photoCategories.find(cat => cat.title === categoryTitle) ||
                      customCategories.find(cat => cat.title === categoryTitle);
     if (category) {
-      const categoryPhotos = getPhotosForCategory(category.id);
-      if (categoryPhotos.length > 0) {
-        const newCategoryPhotos = categoryPhotos.filter((_, i) => i !== photoIndex);
-        setPhotosForCategory(category.id, newCategoryPhotos);
-      }
+      // Clear the photo array (only one photo per category)
+      setPhotosForCategory(category.id, []);
     }
   };
 
@@ -484,13 +434,12 @@ const EMBPhotosTab = ({ formData, onFormDataChange }) => {
                      customCategories.find(cat => cat.title === categoryTitle);
     if (category) {
       const categoryPhotos = getPhotosForCategory(category.id);
-      if (categoryPhotos[photoIndex]) {
-        const newCategoryPhotos = [...categoryPhotos];
-        newCategoryPhotos[photoIndex] = {
-          ...newCategoryPhotos[photoIndex],
+      if (categoryPhotos.length > 0 && categoryPhotos[0]) {
+        const updatedPhoto = {
+          ...categoryPhotos[0],
           description: description
         };
-        setPhotosForCategory(category.id, newCategoryPhotos);
+        setPhotosForCategory(category.id, [updatedPhoto]);
       }
     }
   };
@@ -571,10 +520,11 @@ const EMBPhotosTab = ({ formData, onFormDataChange }) => {
         capture="environment"
       />
 
-      {/* Default Categories */}
-      {visiblePhotoCategories.length > 0 && (
+      {/* All Categories - Default followed by Custom */}
+      {(visiblePhotoCategories.length > 0 || customCategories.length > 0) && (
         <div>
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Default Categories */}
             {visiblePhotoCategories.map((category) => (
               <PhotoCategory
                 key={category.id}
@@ -588,14 +538,8 @@ const EMBPhotosTab = ({ formData, onFormDataChange }) => {
                 isUploading={uploadingPhotos.has(category.id)}
               />
             ))}
-          </div>
-        </div>
-      )}
-
-      {/* User-created Categories */}
-      {customCategories.length > 0 && (
-        <div>
-          <div className="space-y-4">
+            
+            {/* User-created Categories (appear after default categories) */}
             {customCategories.map((category) => (
               <PhotoCategory
                 key={category.id}

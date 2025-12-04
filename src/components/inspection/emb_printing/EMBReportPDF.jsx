@@ -8,6 +8,7 @@ import {
   Font,
   Image
 } from "@react-pdf/renderer";
+import { API_BASE_URL } from "../../../../config";
 
 // Register Fonts
 Font.register({
@@ -23,87 +24,255 @@ const styles = StyleSheet.create({
   page: {
     fontFamily: "Roboto",
     fontSize: 10,
-    padding: 30,
+    padding: 0,
     backgroundColor: "#ffffff"
   },
-  header: {
-    textAlign: "center",
-    marginBottom: 20,
-    borderBottom: "2px solid #2563eb",
-    paddingBottom: 10
+  // Header Section
+  headerContainer: {
+    padding: 20,
+    paddingTop: 15,
+    borderBottom: "2px solid #e5e7eb"
+  },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 10
+  },
+  headerLeft: {
+    flex: 1
+  },
+  logoArea: {
+    marginBottom: 8
   },
   title: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#1e40af"
-  },
-  subtitle: {
-    fontSize: 12,
-    color: "#6b7280",
-    marginTop: 5
-  },
-  section: {
-    marginBottom: 15
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: "bold",
-    backgroundColor: "#eff6ff",
-    padding: 6,
-    marginBottom: 8,
-    borderLeft: "3px solid #2563eb"
-  },
-  row: {
-    flexDirection: "row",
+    color: "#111827",
     marginBottom: 5
   },
-  label: {
-    width: "30%",
+  inspectionNumbers: {
+    fontSize: 10,
+    color: "#6b7280",
+    marginTop: 3
+  },
+  passButton: {
+    backgroundColor: "#10b981",
+    color: "#ffffff",
+    padding: "8px 20px",
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: "bold"
+  },
+  rejectButton: {
+    backgroundColor: "#ef4444",
+    color: "#ffffff",
+    padding: "8px 20px",
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: "bold"
+  },
+  pendingButton: {
+    backgroundColor: "#f59e0b",
+    color: "#ffffff",
+    padding: "8px 20px",
+    borderRadius: 20,
+    fontSize: 12,
+    fontWeight: "bold"
+  },
+  // Section Headers (Dark Blue)
+  sectionHeader: {
+    backgroundColor: "#1e3a8a",
+    color: "#ffffff",
+    padding: 10,
+    fontSize: 11,
+    fontWeight: "bold",
+    marginTop: 15
+  },
+  // Content Sections
+  contentSection: {
+    padding: 18,
+    backgroundColor: "#ffffff",
+    marginBottom: 15
+  },
+  // Checklist Section - keep together on one page
+  checklistSection: {
+    break: "avoid"
+  },
+  // Date Header Row
+  dateHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: "#f0f4f8",
+    padding: 10,
+    borderBottom: "1px solid #e5e7eb"
+  },
+  dateHeaderItem: {
+    flex: 1,
+    paddingRight: 10,
+    textAlign: "center"
+  },
+  dateHeaderLabel: {
+    fontSize: 9,
+    fontWeight: "bold",
+    color: "#374151",
+    marginBottom: 2,
+    textAlign: "center"
+  },
+  dateHeaderValue: {
+    fontSize: 9,
+    color: "#111827",
+    textAlign: "center"
+  },
+  // Two Column Layout
+  twoColumnRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+    borderBottom: "1px solid #f3f4f6",
+    paddingBottom: 5
+  },
+  twoColumnLabel: {
+    width: "40%",
+    fontWeight: "bold",
+    color: "#374151",
+    fontSize: 9
+  },
+  twoColumnValue: {
+    width: "60%",
+    color: "#111827",
+    fontSize: 9
+  },
+  // Checklist Section
+  checklistRow: {
+    flexDirection: "row",
+    marginBottom: 7,
+    paddingBottom: 6,
+    borderBottom: "1px solid #f3f4f6",
+    break: false
+  },
+  checklistLabel: {
+    width: "50%",
+    fontSize: 9,
+    color: "#374151"
+  },
+  checklistValue: {
+    width: "50%",
+    fontSize: 9,
+    color: "#059669",
+    fontWeight: "bold",
+    textAlign: "center"
+  },
+  // Table Styles
+  table: {
+    width: "100%",
+    marginTop: 10,
+    marginBottom: 10
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderBottom: "1px solid #d1d5db"
+  },
+  tableHeader: {
+    backgroundColor: "#f3f4f6",
+    padding: 8,
+    fontSize: 9,
+    fontWeight: "bold",
+    borderRight: "1px solid #d1d5db",
+    textAlign: "center"
+  },
+  tableCell: {
+    padding: 8,
+    fontSize: 9,
+    borderRight: "1px solid #d1d5db",
+    textAlign: "center"
+  },
+  // Conclusion Section
+  conclusionBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 12,
+    backgroundColor: "#ffffff",
+    marginBottom: 8
+  },
+  conclusionLabel: {
+    fontSize: 10,
     fontWeight: "bold",
     color: "#374151"
   },
-  value: {
-    width: "70%",
-    color: "#111827"
+  conclusionValue: {
+    fontSize: 12,
+    fontWeight: "bold"
   },
-  table: {
-    display: "table",
-    width: "auto",
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRightWidth: 0,
-    borderBottomWidth: 0,
+  passValue: {
+    color: "#059669"
+  },
+  rejectValue: {
+    color: "#dc2626"
+  },
+  // Defect Summary Table
+  defectSummaryTable: {
+    width: "100%",
+    marginTop: 10,
+    backgroundColor: "#f9fafb"
+  },
+  defectSummaryRow: {
+    flexDirection: "row",
+    borderBottom: "1px solid #d1d5db"
+  },
+  defectSummaryHeader: {
+    backgroundColor: "#e5e7eb",
+    padding: 8,
+    fontSize: 9,
+    fontWeight: "bold",
+    borderRight: "1px solid #d1d5db",
+    textAlign: "center"
+  },
+  defectSummaryCell: {
+    padding: 8,
+    fontSize: 9,
+    borderRight: "1px solid #d1d5db",
+    textAlign: "center"
+  },
+  // AQL Table
+  aqlTable: {
+    width: "100%",
     marginTop: 10
   },
-  tableRow: {
-    flexDirection: "row"
+  aqlRow: {
+    flexDirection: "row",
+    borderBottom: "1px solid #d1d5db"
   },
-  tableColHeader: {
+  aqlHeader: {
     backgroundColor: "#f3f4f6",
     padding: 6,
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
+    fontSize: 8,
     fontWeight: "bold",
-    textAlign: "center",
-    fontSize: 9
+    borderRight: "1px solid #d1d5db",
+    textAlign: "center"
   },
-  tableCol: {
+  aqlCell: {
     padding: 6,
-    borderStyle: "solid",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderLeftWidth: 0,
-    borderTopWidth: 0,
-    textAlign: "center",
-    fontSize: 9
+    fontSize: 8,
+    borderRight: "1px solid #d1d5db",
+    textAlign: "center"
   },
+  // Footer
+  footer: {
+    position: "absolute",
+    bottom: 20,
+    left: 20,
+    right: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    fontSize: 8,
+    color: "#6b7280",
+    borderTop: "1px solid #e5e7eb",
+    paddingTop: 8
+  },
+  // Badge Styles
   badge: {
-    padding: "3px 8px",
-    borderRadius: 10,
+    padding: "4px 12px",
+    borderRadius: 12,
     fontSize: 9,
     fontWeight: "bold",
     textAlign: "center"
@@ -116,42 +285,164 @@ const styles = StyleSheet.create({
     backgroundColor: "#fee2e2",
     color: "#991b1b"
   },
-  pendingBadge: {
-    backgroundColor: "#fef3c7",
-    color: "#92400e"
+  naBadge: {
+    backgroundColor: "#f3f4f6",
+    color: "#6b7280"
   },
-  footer: {
-    position: "absolute",
-    bottom: 30,
-    left: 30,
-    right: 30,
-    textAlign: "center",
+  // Photo Styles
+  photoCategory: {
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottom: "none"
+  },
+  photoCategoryTitle: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#374151",
+    marginBottom: 15,
+    marginTop: 5,
+    paddingTop: 12
+  },
+  photoGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap"
+  },
+  photoRow: {
+    flexDirection: "row",
+    marginBottom: 15
+  },
+  photoRowWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    marginBottom: 15
+  },
+  photoItem: {
+    marginBottom: 20
+  },
+  // Dynamic photo item widths based on photos per row
+  photoItem1PerRow: {
+    width: "48%",
+    marginRight: "2%",
+    marginLeft: "1%"
+  },
+  photoItem2PerRow: {
+    width: "49%",
+    marginRight: "1%"
+  },
+  photoItem3PerRow: {
+    width: "31%",
+    marginRight: "2%",
+    marginLeft: "0.5%"
+  },
+  photoItem4PerRow: {
+    width: "23%",
+    marginRight: "1.5%",
+    marginLeft: "0.5%"
+  },
+  photoImageContainer: {
+    width: "100%",
+    backgroundColor: "#f9fafb",
+    border: "2px dashed #d1d5db",
+    borderRadius: 4,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    overflow: "hidden"
+  },
+  // Dynamic image container heights based on photos per row
+  photoImageContainer1PerRow: {
+    height: 280,
+    minHeight: 280
+  },
+  photoImageContainer2PerRow: {
+    height: 280,
+    minHeight: 280
+  },
+  photoImageContainer3PerRow: {
+    height: 230,
+    minHeight: 230
+  },
+  photoImageContainer4PerRow: {
+    height: 180,
+    minHeight: 180
+  },
+  photoImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    maxWidth: "100%",
+    maxHeight: "100%"
+  },
+  photoDescription: {
     fontSize: 8,
-    color: "#9ca3af",
-    borderTop: "1px solid #e5e7eb",
-    paddingTop: 10
+    color: "#6b7280",
+    marginTop: 6,
+    textAlign: "center",
+    paddingHorizontal: 4
   }
 });
 
-const EMBReportPDF = ({ report }) => {
+// Helper function to normalize image URLs - use image-proxy for better compatibility
+const normalizeImageUrl = (imageUrl) => {
+  if (!imageUrl || typeof imageUrl !== 'string') return null;
+  
+  // If already a data URI, return as is
+  if (imageUrl.startsWith("data:")) {
+    return imageUrl;
+  }
+  
+  // Build the full URL first
+  let fullUrl = imageUrl;
+  
+  // If already a full URL, use it
+  if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+    fullUrl = imageUrl;
+  } 
+  // If starts with /storage/, prepend API_BASE_URL
+  else if (imageUrl.startsWith("/storage/")) {
+    fullUrl = `${API_BASE_URL}${imageUrl}`;
+  }
+  // If starts with /, prepend API_BASE_URL
+  else if (imageUrl.startsWith("/")) {
+    fullUrl = `${API_BASE_URL}${imageUrl}`;
+  }
+  // Otherwise, assume it's a filename and prepend the storage path
+  else {
+    fullUrl = `${API_BASE_URL}/storage/sub-emb-images/${imageUrl}`;
+  }
+  
+  // Use image-proxy endpoint for better compatibility with @react-pdf/renderer
+  // This helps with CORS and ensures images load properly
+  return `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
+};
+
+const EMBReportPDF = ({ report, isPrinting = false }) => {
   if (!report) {
     console.warn("EMBReportPDF: No report data provided");
     return null;
   }
 
-  // Debug: Log report data to verify structure
-  console.log("EMBReportPDF - Report data:", {
-    inspectionType: report.inspectionType,
-    reportType: report.reportType,
-    inspectionDate: report.inspectionDate,
-    factoryName: report.factoryName,
-    moNo: report.moNo,
-    totalPcs: report.totalPcs,
-    defectsQty: report.defectsQty,
-    result: report.result,
-    hasAqlData: !!report.aqlData,
-    hasDefects: !!report.defects && report.defects.length > 0
-  });
+  // Debug: Log report data only when printing
+  if (isPrinting) {
+    console.log("EMBReportPDF - Report data:", {
+      inspectionType: report.inspectionType,
+      reportType: report.reportType,
+      inspectionDate: report.inspectionDate,
+      factoryName: report.factoryName,
+      moNo: report.moNo,
+      totalPcs: report.totalPcs,
+      defectsQty: report.defectsQty,
+      result: report.result,
+      hasAqlData: !!report.aqlData,
+      hasDefects: !!report.defects && report.defects.length > 0,
+      hasChecklist: !!report.checklist,
+      hasPhotos: !!report.photos,
+      photosKeys: report.photos ? Object.keys(report.photos) : [],
+      photosCount: report.photos ? Object.keys(report.photos).length : 0,
+      photosStructure: report.photos ? typeof report.photos : "none"
+    });
+  }
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -160,7 +451,7 @@ const EMBReportPDF = ({ report }) => {
       if (isNaN(date.getTime())) return "N/A";
       return date.toLocaleDateString("en-US", {
         year: "numeric",
-        month: "long",
+        month: "short",
         day: "numeric"
       });
     } catch (error) {
@@ -169,8 +460,102 @@ const EMBReportPDF = ({ report }) => {
     }
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "N/A";
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const year = date.getFullYear();
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12; // the hour '0' should be '12'
+      const formattedHours = String(hours).padStart(2, "0");
+      return `${month}/${day}/${year}, ${formattedHours}:${minutes} ${ampm}`;
+    } catch (error) {
+      return "N/A";
+    }
+  };
+
   const formatTime = (timeString) => {
     return timeString || "N/A";
+  };
+
+  const formatInspectionDateTime = (dateString, timeString) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return "N/A";
+
+      // Format given timeString (if provided) as 12-hour
+      if (timeString) {
+        // Assume timeString is in "HH:mm" or "H:mm" or "HH:mm:ss" or similar format
+        // Extract hours and minutes
+        const timeParts = timeString.split(":");
+        let hours = parseInt(timeParts[0], 10);
+        let minutes = timeParts[1] ? String(timeParts[1]).padStart(2, "0") : "00";
+        let ampm = hours >= 12 ? "PM" : "AM";
+        let formattedHours = hours % 12;
+        formattedHours = formattedHours ? formattedHours : 12; // the hour '0' should be '12'
+        formattedHours = String(formattedHours).padStart(2, "0");
+        const formattedTime = `${formattedHours}:${minutes} ${ampm}`;
+
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        const year = date.getFullYear();
+        return `${month}/${day}/${year}, ${formattedTime}`;
+      }
+
+      // Otherwise, format the date's time in 12-hour format
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      const day = String(date.getDate()).padStart(2, "0");
+      const year = date.getFullYear();
+      let hours = date.getHours();
+      const minutes = String(date.getMinutes()).padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12;
+      const formattedHours = String(hours).padStart(2, "0");
+      return `${month}/${day}/${year}, ${formattedHours}:${minutes} ${ampm}`;
+    } catch (error) {
+      return "N/A";
+    }
+  };
+
+  const getStatusButtonStyle = (status) => {
+    switch (status?.toLowerCase()) {
+      case "approved":
+        return styles.passButton;
+      case "rejected":
+        return styles.rejectButton;
+      default:
+        return styles.pendingButton;
+    }
+  };
+
+  const getResultButtonStyle = (result) => {
+    switch (result?.toLowerCase()) {
+      case "pass":
+        return styles.passButton;
+      case "reject":
+        return styles.rejectButton;
+      default:
+        return styles.pendingButton;
+    }
+  };
+
+  const getResultTextStyle = (result) => {
+    switch (result?.toLowerCase()) {
+      case "pass":
+        return styles.passValue;
+      case "reject":
+        return styles.rejectValue;
+      default:
+        return {};
+    }
   };
 
   const getResultBadgeStyle = (result) => {
@@ -180,206 +565,691 @@ const EMBReportPDF = ({ report }) => {
       case "reject":
         return styles.rejectBadge;
       default:
-        return styles.pendingBadge;
+        return styles.naBadge;
     }
   };
 
+  // Calculate defect counts by category
+  const calculateDefectCounts = () => {
+    if (!report.defects || report.defects.length === 0) {
+      return { critical: 0, major: 0, minor: 0 };
+    }
+    
+    let critical = 0, major = 0, minor = 0;
+    report.defects.forEach(defect => {
+      const category = defect.category?.toLowerCase() || "";
+      const qty = defect.qty || defect.count || 0;
+      
+      if (category.includes("critical")) {
+        critical += qty;
+      } else if (category.includes("major")) {
+        major += qty;
+      } else {
+        minor += qty;
+      }
+    });
+    
+    return { critical, major, minor };
+  };
+
+  const defectCounts = calculateDefectCounts();
+
+  // Checklist items mapping
+  const checklistItems = [
+    { key: "orderType", label: "Order Type" },
+    { key: "samplesAvailable", label: "Samples Available" },
+    { key: "labAnalysisTesting", label: "Lab Analysis & Testing" },
+    { key: "masterCartonRequirements", label: "Master Carton Requirements" },
+    { key: "dropTest", label: "Drop Test" },
+    { key: "price", label: "Price" },
+    { key: "hangTags", label: "Hang Tags" },
+    { key: "labels", label: "Labels" },
+    { key: "composition", label: "Composition" }
+  ];
+
+  // Helper function to group photos by category - only first photo per category (matching EMBInspectionView)
+  const groupPhotosByCategory = () => {
+    if (!report.photos) return [];
+    
+    const categories = [];
+    
+    // Get all photo categories - Object.keys() preserves insertion order in modern JavaScript
+    const photoKeys = Object.keys(report.photos);
+    
+    // Process each category and get only the first photo
+    photoKeys.forEach(categoryId => {
+      const category = report.photos[categoryId];
+      const categoryTitle = category?.categoryTitle || categoryId;
+      let photos = [];
+      
+      if (Array.isArray(category?.photos)) {
+        photos = category.photos;
+      } else if (Array.isArray(category)) {
+        photos = category;
+      }
+      
+      // Get only the first photo (matching EMBInspectionView.jsx logic)
+      if (photos.length > 0) {
+        const firstPhoto = photos[0];
+        const rawImageUrl = firstPhoto.url || firstPhoto.preview || firstPhoto;
+        if (rawImageUrl && typeof rawImageUrl === 'string') {
+          categories.push({
+            categoryId,
+            categoryTitle,
+            photos: [{
+              ...firstPhoto,
+              categoryTitle,
+              categoryId,
+              rawImageUrl,
+              index: 0
+            }],
+            totalPhotosInCategory: photos.length // Keep track of total for display
+          });
+        }
+      }
+    });
+    
+    return categories;
+  };
+
+  // Simplified: Always 2 photos per row (matching EMBInspectionView.jsx grid-cols-2)
+  const getPhotosPerRow = () => {
+    return 2; // Always 2 columns like the view component
+  };
+
+  // Get style for photo item based on photos per row
+  const getPhotoItemStyle = (photosPerRow) => {
+    switch (photosPerRow) {
+      case 1:
+        return [styles.photoItem, styles.photoItem1PerRow];
+      case 2:
+        return [styles.photoItem, styles.photoItem2PerRow];
+      case 3:
+        return [styles.photoItem, styles.photoItem3PerRow];
+      case 4:
+        return [styles.photoItem, styles.photoItem4PerRow];
+      default:
+        return [styles.photoItem, styles.photoItem2PerRow];
+    }
+  };
+
+  // Get style for image container based on photos per row
+  const getPhotoImageContainerStyle = (photosPerRow) => {
+    switch (photosPerRow) {
+      case 1:
+        return [styles.photoImageContainer, styles.photoImageContainer1PerRow];
+      case 2:
+        return [styles.photoImageContainer, styles.photoImageContainer2PerRow];
+      case 3:
+        return [styles.photoImageContainer, styles.photoImageContainer3PerRow];
+      case 4:
+        return [styles.photoImageContainer, styles.photoImageContainer4PerRow];
+      default:
+        return [styles.photoImageContainer, styles.photoImageContainer2PerRow];
+    }
+  };
+
+  // Group photos by category
+  const photoCategories = groupPhotosByCategory();
+  
+  // Calculate total photos for summary
+  const totalPhotos = photoCategories.reduce((sum, cat) => sum + cat.photos.length, 0);
+  
+  // Calculate total photos on a page
+  const getPagePhotoCount = (page) => {
+    return page.reduce((sum, category) => {
+      return sum + (category.displayPhotos?.length || 0);
+    }, 0);
+  };
+
+  // Split categories into pages: 2 columns, 4-6 photos per page (matching EMBInspectionView.jsx)
+  const splitCategoriesIntoPages = (categories) => {
+    const pages = [];
+    const MAX_PHOTOS_PER_PAGE = 6; // 2 columns x 3 rows = 6 photos max per page
+    
+    categories.forEach((category) => {
+      // Each category has only 1 photo (first photo only)
+      if (pages.length === 0) {
+        pages.push([{ ...category, displayPhotos: category.photos }]);
+      } else {
+        const currentPage = pages[pages.length - 1];
+        const currentPagePhotoCount = getPagePhotoCount(currentPage);
+        
+        // If adding this category would exceed max photos per page, create new page
+        if (currentPagePhotoCount + category.photos.length > MAX_PHOTOS_PER_PAGE) {
+          pages.push([{ ...category, displayPhotos: category.photos }]);
+        } else {
+          // Add to current page
+          currentPage.push({ ...category, displayPhotos: category.photos });
+        }
+      }
+    });
+    
+    // Filter out empty pages
+    return pages.filter(page => {
+      return page.length > 0 && page.some(category => 
+        category.displayPhotos && category.displayPhotos.length > 0
+      );
+    });
+  };
+  
+  const photoPages = splitCategoriesIntoPages(photoCategories);
+  // Calculate total pages: Header+Inspection Details (1) + Checklists (1 if exists) + Conclusion (1) + Photo pages
+  const hasChecklists = report.checklist && Object.keys(report.checklist).length > 0;
+  const totalPages = 1 + (hasChecklists ? 1 : 0) + 1 + photoPages.length;
+
+  // Debug: Log photo information
+  if (isPrinting) {
+    console.log("EMBReportPDF - Photo Debug:", {
+      totalPhotos,
+      totalCategories: photoCategories.length,
+      categories: photoCategories.map(cat => ({
+        title: cat.categoryTitle,
+        photoCount: cat.photos.length
+      })),
+      totalPages
+    });
+  }
+
   return (
     <Document>
+      {/* Page 1: Header + Inspection Details */}
       <Page size="A4" style={styles.page}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.title}>
-            {report.inspectionType || "First Output"} - {report.reportType || "EMB"} Report
-          </Text>
-          <Text style={styles.subtitle}>
-            Inspection Date: {formatDate(report.inspectionDate)}
-          </Text>
-        </View>
-
-        {/* General Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>General Information</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Factory:</Text>
-            <Text style={styles.value}>{report.factoryName || "N/A"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>MO Number:</Text>
-            <Text style={styles.value}>{report.moNo || "N/A"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Buyer:</Text>
-            <Text style={styles.value}>{report.buyer || "N/A"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Buyer Style:</Text>
-            <Text style={styles.value}>{report.buyerStyle || "N/A"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Color:</Text>
-            <Text style={styles.value}>
-              {Array.isArray(report.color) ? report.color.join(", ") : report.color || "N/A"}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>SKU Number:</Text>
-            <Text style={styles.value}>
-              {Array.isArray(report.skuNumber) ? report.skuNumber.join(", ") : report.skuNumber || "N/A"}
-            </Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Inspector:</Text>
-            <Text style={styles.value}>{report.inspector || "N/A"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Inspection Time:</Text>
-            <Text style={styles.value}>{formatTime(report.inspectionTime)}</Text>
-          </View>
-        </View>
-
-        {/* EMB Details */}
-        {(report.reportType === "EMB" || report.reportType === "EMB + Print") && report.embDetails && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>EMB Details</Text>
-            <View style={styles.row}>
-              <Text style={styles.label}>Speed:</Text>
-              <Text style={styles.value}>{report.embDetails.speed || "N/A"}</Text>
+        {/* Header Section */}
+        <View style={styles.headerContainer}>
+          <View style={styles.headerRow}>
+            <View style={styles.headerLeft}>
+              <Text style={styles.title}>
+                {report.inspectionType || "First Output"}{report.reportType === "EMB + Print" ? " - EMB + Print" : report.reportType === "Printing" ? " - Printing" : " - EMB"}
+              </Text>
+              <Text style={styles.inspectionNumbers}>
+                Inspection #: {report.moNo || "N/A"} | Group #: {report._id?.slice(-6) || "N/A"}
+              </Text>
             </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Stitch:</Text>
-              <Text style={styles.value}>{report.embDetails.stitch || "N/A"}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Needle Size:</Text>
-              <Text style={styles.value}>{report.embDetails.needleSize || "N/A"}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Printing Details */}
-        {(report.reportType === "Printing" || report.reportType === "EMB + Print") && report.printingDetails && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Printing Details</Text>
-            <View style={styles.row}>
-              <Text style={styles.label}>Method:</Text>
-              <Text style={styles.value}>{report.printingDetails.method || "N/A"}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Curing:</Text>
-              <Text style={styles.value}>{report.printingDetails.curing || "N/A"}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* AQL Sampling Plan */}
-        {report.aqlData && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>AQL Sampling Plan</Text>
-            <View style={styles.row}>
-              <Text style={styles.label}>Code Letter:</Text>
-              <Text style={styles.value}>{report.aqlData.sampleSizeLetterCode || "N/A"}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Sample Size:</Text>
-              <Text style={styles.value}>{report.aqlData.sampleSize || "N/A"}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Accept (Ac):</Text>
-              <Text style={styles.value}>{report.aqlData.acceptDefect ?? "N/A"}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={styles.label}>Reject (Re):</Text>
-              <Text style={styles.value}>{report.aqlData.rejectDefect ?? "N/A"}</Text>
-            </View>
-          </View>
-        )}
-
-        {/* Inspection Results */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Inspection Results dfhdfhfdh</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Total Pcs:</Text>
-            <Text style={styles.value}>{report.totalPcs || 0}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Defects Qty:</Text>
-            <Text style={styles.value}>{report.defectsQty || 0}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Defect Rate:</Text>
-            <Text style={styles.value}>{report.defectRate ? `${report.defectRate.toFixed(2)}%` : "0.00%"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Result:</Text>
-            <View style={[styles.badge, getResultBadgeStyle(report.result)]}>
-              <Text>{report.result || "Pending"}</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Defects Table */}
-        {report.defects && report.defects.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Defects</Text>
-            <View style={styles.table}>
-              <View style={styles.tableRow}>
-                <Text style={[styles.tableColHeader, { width: "10%" }]}>Category</Text>
-                <Text style={[styles.tableColHeader, { width: "30%" }]}>Defect Type</Text>
-                <Text style={[styles.tableColHeader, { width: "10%" }]}>Qty</Text>
-                <Text style={[styles.tableColHeader, { width: "50%" }]}>Remarks</Text>
+            <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+              <View style={getStatusButtonStyle(report.status)}>
+                <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "bold" }}>
+                  {report.status || "Pending"}
+                </Text>
               </View>
-              {report.defects.map((defect, index) => (
-                <View key={index} style={styles.tableRow}>
-                  <Text style={[styles.tableCol, { width: "10%" }]}>
-                    {defect.category || "N/A"}
-                  </Text>
-                  <Text style={[styles.tableCol, { width: "30%" }]}>
-                    {defect.defectType || defect.name || "N/A"}
-                  </Text>
-                  <Text style={[styles.tableCol, { width: "10%" }]}>
-                    {defect.qty || defect.count || 0}
-                  </Text>
-                  <Text style={[styles.tableCol, { width: "50%" }]}>
-                    {defect.remarks || "-"}
-                  </Text>
-                </View>
-              ))}
+              <View style={getResultButtonStyle(report.result)}>
+                <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "bold" }}>
+                  {report.result || "Pending"}
+                </Text>
+              </View>
             </View>
           </View>
-        )}
+        </View>
 
-        {/* Conclusion */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Conclusion</Text>
-          <View style={styles.row}>
-            <Text style={styles.label}>Packing Result:</Text>
-            <Text style={styles.value}>{report.packingResult || "N/A"}</Text>
+        {/* Inspection Details Section */}
+        <View>
+          <View style={styles.sectionHeader}>
+            <Text style={{ color: "#ffffff" }}>Inspection Details</Text>
           </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Workmanship Result:</Text>
-            <Text style={styles.value}>{report.workmanshipResult || "N/A"}</Text>
-          </View>
-          <View style={styles.row}>
-            <Text style={styles.label}>Quality Plan Result:</Text>
-            <Text style={styles.value}>{report.qualityPlanResult || "N/A"}</Text>
-          </View>
-          {report.remarks && report.remarks !== "NA" && (
-            <View style={styles.row}>
-              <Text style={styles.label}>Remarks:</Text>
-              <Text style={styles.value}>{report.remarks}</Text>
+          {/* Date Header Row */}
+          <View style={styles.dateHeaderRow}>
+            <View style={styles.dateHeaderItem}>
+              <Text style={styles.dateHeaderLabel}>Scheduled Inspection Date:</Text>
+              <Text style={styles.dateHeaderValue}>{formatDateTime(report.inspectionDate)}</Text>
             </View>
-          )}
+            <View style={styles.dateHeaderItem}>
+              <Text style={styles.dateHeaderLabel}>Inspection Time:</Text>
+              <Text style={styles.dateHeaderValue}>{formatInspectionDateTime(report.inspectionDate, report.inspectionTime)}</Text>
+            </View>
+          
+          </View>
+          {/* Main Details Section */}
+          <View style={styles.contentSection}>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Report Type:</Text>
+              <Text style={styles.twoColumnValue}>
+                {report.inspectionType || "First Output"} - {report.reportType || "EMB"}
+              </Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Factory Name:</Text>
+              <Text style={styles.twoColumnValue}>{report.factoryName || "N/A"}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Inspector:</Text>
+              <Text style={styles.twoColumnValue}>{report.inspector || "N/A"}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>MO Number:</Text>
+              <Text style={styles.twoColumnValue}>{report.moNo || "N/A"}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Buyer:</Text>
+              <Text style={styles.twoColumnValue}>{report.buyer || "N/A"}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Buyer Style:</Text>
+              <Text style={styles.twoColumnValue}>{report.buyerStyle || "N/A"}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Color:</Text>
+              <Text style={styles.twoColumnValue}>
+                {Array.isArray(report.color) ? report.color.join(", ") : report.color || "N/A"}
+              </Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>SKU #:</Text>
+              <Text style={styles.twoColumnValue}>
+                {Array.isArray(report.skuNumber) ? report.skuNumber.join(", ") : report.skuNumber || "N/A"}
+              </Text>
+            </View>
+          
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Sample Inspected:</Text>
+              <Text style={styles.twoColumnValue}>{report.aqlData?.sampleSize || report.totalPcs || 0}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Total PO Items Qty:</Text>
+              <Text style={styles.twoColumnValue}>{report.totalOrderQty || 0}</Text>
+            </View>
+            <View style={styles.twoColumnRow}>
+              <Text style={styles.twoColumnLabel}>Inspected Qty (Pcs):</Text>
+              <Text style={styles.twoColumnValue}>{report.totalPcs || 0}</Text>
+            </View>
+            {(report.reportType === "EMB" || report.reportType === "EMB + Print") && report.embDetails && (
+              <>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>EMB Speed:</Text>
+                  <Text style={styles.twoColumnValue}>{report.embDetails.speed || "N/A"}</Text>
+                </View>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>EMB Stitch:</Text>
+                  <Text style={styles.twoColumnValue}>{report.embDetails.stitch || "N/A"}</Text>
+                </View>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>EMB Needle Size:</Text>
+                  <Text style={styles.twoColumnValue}>{report.embDetails.needleSize || "N/A"}</Text>
+                </View>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>EMB Machine No:</Text>
+                  <Text style={styles.twoColumnValue}>{report.embDetails.machineNo || "N/A"}</Text>
+                </View>
+              </>
+            )}
+            {(report.reportType === "Printing" || report.reportType === "EMB + Print") && report.printingDetails && (
+              <>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>Printing Method:</Text>
+                  <Text style={styles.twoColumnValue}>{report.printingDetails.method || "N/A"}</Text>
+                </View>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>Curing Time:</Text>
+                  <Text style={styles.twoColumnValue}>{report.printingDetails.curingTime || "N/A"}</Text>
+                </View>
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>Curing Pressure:</Text>
+                  <Text style={styles.twoColumnValue}>{report.printingDetails.curingPressure || "N/A"}</Text>
+                </View>
+              </>
+            )}
+          </View>
         </View>
 
         {/* Footer */}
-        <Text style={styles.footer}>
-          Generated on {new Date().toLocaleDateString("en-US")} | EMB/Printing Inspection Report
-        </Text>
+        <View style={styles.footer}>
+          <Text>Page 1 of {totalPages}</Text>
+          <Text>Powered by YaiKh</Text>
+        </View>
       </Page>
+
+      {/* Page 2: Checklists Section (if exists) */}
+      {report.checklist && Object.keys(report.checklist).length > 0 && (
+        <Page size="A4" style={styles.page}>
+          <View style={styles.checklistSection}>
+            <View style={styles.sectionHeader}>
+              <Text style={{ color: "#ffffff" }}>Checklists</Text>
+            </View>
+            <View style={styles.contentSection}>
+              {checklistItems.map((item) => {
+                const value = report.checklist[item.key];
+                if (!value) return null;
+                return (
+                  <View key={item.key} style={styles.checklistRow}>
+                    <Text style={styles.checklistLabel}>{item.label}:</Text>
+                    <Text style={styles.checklistValue}>{value}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text>Page {hasChecklists ? 2 : 1} of {totalPages}</Text>
+            <Text>Powered by Pivot88</Text>
+          </View>
+        </Page>
+      )}
+
+            {/* Photo Pages - 2 columns, one photo per category (matching EMBInspectionView.jsx) */}
+            {photoPages.map((pageCategories, pageIndex) => {
+        // Double-check that this page has actual content before rendering
+        const hasContent = pageCategories.some(category => 
+          category.displayPhotos && category.displayPhotos.length > 0
+        );
+        
+        if (!hasContent) return null;
+        
+        return (
+          <Page key={`photo-page-${pageIndex + 1}`} size="A4" style={styles.page}>
+            {/* Photos Section */}
+            <View>
+              <View style={styles.sectionHeader}>
+                <Text style={{ color: "#ffffff" }}>Photos{pageIndex > 0 ? " (Continued)" : ""}</Text>
+              </View>
+              <View style={[styles.contentSection, { padding: 20, paddingTop: 20 }]}>
+                
+                {/* Display photos in 2-column grid (matching EMBInspectionView.jsx) */}
+                {(() => {
+                  // Filter valid categories
+                  const validCategories = pageCategories.filter(cat => 
+                    cat.displayPhotos && cat.displayPhotos.length > 0
+                  );
+                  
+                  // Group into rows of 2
+                  const rows = [];
+                  for (let i = 0; i < validCategories.length; i += 2) {
+                    rows.push(validCategories.slice(i, i + 2));
+                  }
+                  
+                  return rows.map((row, rowIndex) => (
+                    <View key={`row-${rowIndex}`} style={{ flexDirection: "row", marginBottom: 20, gap: 20 }}>
+                      {row.map((category) => {
+                        const photo = category.displayPhotos[0];
+                        if (!photo) return null;
+                        
+                        const imageUrl = normalizeImageUrl(photo.rawImageUrl);
+                        if (!imageUrl) return null;
+                        
+                        return (
+                          <View 
+                            key={`category-${category.categoryId}`} 
+                            style={{
+                              width: "48%"
+                            }}
+                          >
+                            {/* Category title header */}
+                            <View style={{
+                              paddingBottom: 8,
+                              marginBottom: 8
+                            }}>
+                              <Text style={{
+                                fontSize: 11,
+                                fontWeight: "bold",
+                                color: "#374151"
+                              }}>
+                                {category.categoryTitle} ({category.totalPhotosInCategory || 1})
+                              </Text>
+                            </View>
+                            
+                            {/* Photo container - no border, left-aligned */}
+                            <View style={{ marginBottom: 12 }}>
+                              <View style={{ alignItems: "flex-start" }}>
+                                <Image
+                                  src={imageUrl}
+                                  style={{
+                                    maxWidth: "100%",
+                                    maxHeight: 200,
+                                    objectFit: "contain"
+                                  }}
+                                  crossOrigin="anonymous"
+                                />
+                              </View>
+                              
+                              {/* Description - simplified */}
+                              {photo.description && (
+                                <View style={{ marginTop: 8 }}>
+                                  <Text style={{
+                                    fontSize: 9,
+                                    color: "#4b5563"
+                                  }}>
+                                    {photo.description}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ));
+                })()}
+              </View>
+            </View>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text>Page {hasChecklists ? pageIndex + 4 : pageIndex + 3} of {totalPages}</Text>
+              <Text>Powered by Pivot88</Text>
+            </View>
+          </Page>
+        );
+      })}
+
+      {/* Page 3: Conclusion Section */}
+      <Page size="A4" style={styles.page}>
+        <View>
+          <View style={styles.sectionHeader}>
+            <Text style={{ color: "#ffffff" }}>Conclusion</Text>
+          </View>
+          <View style={styles.contentSection}>
+            {/* Inspection Result Bar */}
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Inspection Result</Text>
+              <Text style={[styles.conclusionValue, getResultTextStyle(report.result)]}>
+                {report.result || "Pending"}
+              </Text>
+            </View>
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Approval Status</Text>
+              <Text style={[styles.conclusionValue, getResultTextStyle(report.result)]}>
+                {report.result === "Pass" ? "Accepted" : report.result === "Reject" ? "Rejected" : "Pending"}
+              </Text>
+            </View>
+
+            {/* Checklist Results */}
+            {/* <View style={{ marginTop: 10, marginBottom: 10 }}>
+              <View style={styles.twoColumnRow}>
+                <Text style={styles.twoColumnLabel}>Checklists</Text>
+                <View style={[styles.badge, styles.passBadge]}>
+                  <Text>PASS</Text>
+                </View>
+              </View>
+              <View style={styles.twoColumnRow}>
+                <Text style={styles.twoColumnLabel}>Packing, Packaging & Labelling</Text>
+                <View style={[styles.badge, getResultBadgeStyle(report.packingResult)]}>
+                  <Text>{report.packingResult || "N/A"}</Text>
+                </View>
+              </View>
+              <View style={styles.twoColumnRow}>
+                <Text style={styles.twoColumnLabel}>Workmanship</Text>
+                <View style={[styles.badge, getResultBadgeStyle(report.workmanshipResult)]}>
+                  <Text>{report.workmanshipResult || "N/A"}</Text>
+                </View>
+              </View>
+              <View style={styles.twoColumnRow}>
+                <Text style={styles.twoColumnLabel}>Quality Plan</Text>
+                <View style={[styles.badge, getResultBadgeStyle(report.qualityPlanResult)]}>
+                  <Text>{report.qualityPlanResult || "N/A"}</Text>
+                </View>
+              </View>
+            </View> */}
+
+            {/* Defect Summary Table */}
+            {/* <View style={styles.defectSummaryTable}>
+              <View style={styles.defectSummaryRow}>
+                <Text style={[styles.defectSummaryHeader, { width: "50%" }]}>PASS</Text>
+                <Text style={[styles.defectSummaryHeader, { width: "16.67%" }]}>Critical</Text>
+                <Text style={[styles.defectSummaryHeader, { width: "16.67%" }]}>Major</Text>
+                <Text style={[styles.defectSummaryHeader, { width: "16.67%" }]}>Minor</Text>
+              </View>
+              <View style={styles.defectSummaryRow}>
+                <Text style={[styles.defectSummaryCell, { width: "50%" }]}>Total Product + Quality Plan Defects</Text>
+                <Text style={[styles.defectSummaryCell, { width: "16.67%" }]}>{defectCounts.critical}</Text>
+                <Text style={[styles.defectSummaryCell, { width: "16.67%" }]}>{defectCounts.major}</Text>
+                <Text style={[styles.defectSummaryCell, { width: "16.67%" }]}>{defectCounts.minor}</Text>
+              </View>
+              <View style={styles.defectSummaryRow}>
+                <Text style={[styles.defectSummaryCell, { width: "50%" }]}>Accept/Reject Qty</Text>
+                <Text style={[styles.defectSummaryCell, { width: "16.67%" }]}>
+                  {defectCounts.critical === 0 ? "0/1" : "1/0"}
+                </Text>
+                <Text style={[styles.defectSummaryCell, { width: "16.67%" }]}>
+                  {defectCounts.major === 0 ? "0/1" : "1/0"}
+                </Text>
+                <Text style={[styles.defectSummaryCell, { width: "16.67%" }]}>
+                  {defectCounts.minor === 0 ? "0/1" : "1/0"}
+                </Text>
+              </View>
+            </View> */}
+
+            {/* Additional Info */}
+            <View style={{ marginTop: 10 }}>
+              <View style={styles.twoColumnRow}>
+                <Text style={styles.twoColumnLabel}>Total Defective Units:</Text>
+                <Text style={styles.twoColumnValue}>{report.defectsQty || 0}</Text>
+              </View>
+              {report.remarks && report.remarks !== "NA" && (
+                <View style={styles.twoColumnRow}>
+                  <Text style={styles.twoColumnLabel}>Comments:</Text>
+                  <Text style={styles.twoColumnValue}>{report.remarks}</Text>
+                </View>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Footer */}
+        <View style={styles.footer}>
+          <Text>Page {hasChecklists ? 3 : 2} of {totalPages}</Text>
+          <Text>Powered by Pivot88</Text>
+        </View>
+      </Page>
+
+        {/* Packing, Packaging & Labelling Section - Removed */}
+        {/* <View>
+          <View style={styles.sectionHeader}>
+            <Text style={{ color: "#ffffff" }}>Packing, Packaging & Labelling</Text>
+          </View>
+          <View style={styles.contentSection}>
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Total Defective Units</Text>
+              <Text style={styles.conclusionValue}>{report.defectsQty || 0}</Text>
+            </View>
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Inspection Result</Text>
+              <View style={[styles.badge, getResultBadgeStyle(report.packingResult)]}>
+                <Text>{report.packingResult || "N/A"}</Text>
+              </View>
+            </View>
+          </View>
+        </View> */}
+
+        {/* Workmanship Section */}
+        {/* <View>
+          <View style={styles.sectionHeader}>
+            <Text style={{ color: "#ffffff" }}>Workmanship</Text>
+          </View>
+          <View style={styles.contentSection}>
+            Sample Size & AQL Table
+            <View style={styles.aqlTable}>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlHeader, { width: "20%" }]}>Inspection Method</Text>
+                <Text style={[styles.aqlHeader, { width: "15%" }]}>Inspection Level</Text>
+                <Text style={[styles.aqlHeader, { width: "13%" }]}>Critical</Text>
+                <Text style={[styles.aqlHeader, { width: "13%" }]}>Major</Text>
+                <Text style={[styles.aqlHeader, { width: "13%" }]}>Minor</Text>
+                <Text style={[styles.aqlHeader, { width: "13%" }]}>Qty Inspected</Text>
+                <Text style={[styles.aqlHeader, { width: "13%" }]}>Sample Inspected</Text>
+              </View>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlCell, { width: "20%" }]}>normal</Text>
+                <Text style={[styles.aqlCell, { width: "15%" }]}>{report.aqlData?.level || "II"}</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>0.010</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>1.500</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>0.010</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>{report.totalPcs || 0}</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>{report.aqlData?.sampleSize || 0}</Text>
+              </View>
+            </View>
+
+            Section Conclusion Table
+            <View style={[styles.aqlTable, { marginTop: 10 }]}>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlHeader, { width: "33.33%" }]}>Critical</Text>
+                <Text style={[styles.aqlHeader, { width: "33.33%" }]}>Major</Text>
+                <Text style={[styles.aqlHeader, { width: "33.33%" }]}>Minor</Text>
+              </View>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>Total Defects</Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>Total Defects</Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>Total Defects</Text>
+              </View>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>{defectCounts.critical}</Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>{defectCounts.major}</Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>{defectCounts.minor}</Text>
+              </View>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>Accept/Reject Qty</Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>Accept/Reject Qty</Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>Accept/Reject Qty</Text>
+              </View>
+              <View style={styles.aqlRow}>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>
+                  {defectCounts.critical === 0 ? "0/1" : "1/0"}
+                </Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>
+                  {defectCounts.major === 0 ? "0/1" : "1/0"}
+                </Text>
+                <Text style={[styles.aqlCell, { width: "33.33%" }]}>
+                  {defectCounts.minor === 0 ? "0/1" : "1/0"}
+                </Text>
+              </View>
+            </View>
+
+            Total Defective Units & Result
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Total Defective Units</Text>
+              <Text style={styles.conclusionValue}>{report.defectsQty || 0}</Text>
+            </View>
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Inspection Result</Text>
+              <View style={[styles.badge, getResultBadgeStyle(report.workmanshipResult)]}>
+                <Text>{report.workmanshipResult || "N/A"}</Text>
+              </View>
+            </View>
+          </View>
+        </View> */}
+
+        {/* Quality Plan Section */}
+        {/* <View>
+          <View style={styles.sectionHeader}>
+            <Text style={{ color: "#ffffff" }}>Quality Plan (Quality Plan尺寸表 - ANF)</Text>
+          </View>
+          <View style={styles.contentSection}>
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Total Defective Units</Text>
+              <Text style={styles.conclusionValue}>0</Text>
+            </View>
+            <View style={styles.conclusionBar}>
+              <Text style={styles.conclusionLabel}>Inspection Result</Text>
+              <View style={[styles.badge, getResultBadgeStyle(report.qualityPlanResult)]}>
+                <Text>{report.qualityPlanResult || "N/A"}</Text>
+              </View>
+            </View>
+          </View>
+        </View> */}
+
+
+
     </Document>
   );
 };
 
 export default EMBReportPDF;
-
