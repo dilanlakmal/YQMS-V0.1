@@ -15,7 +15,7 @@ import {
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor";
 
-const YPivotQATemplatesPhotos = () => {
+const YPivotQATemplatesPhotos = ({ allowedSectionIds = [] }) => {
   const [sections, setSections] = useState([]);
   const [filteredSections, setFilteredSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -49,11 +49,19 @@ const YPivotQATemplatesPhotos = () => {
   }, []);
 
   useEffect(() => {
+    let result = sections;
+
+    // 1. Filter by Report Type Configuration (if allowedSectionIds is provided)
+    if (allowedSectionIds && allowedSectionIds.length > 0) {
+      result = result.filter((section) =>
+        allowedSectionIds.includes(section._id)
+      );
+    }
+
+    // 2. Filter by Search Query
     if (searchQuery.trim() === "") {
-      setFilteredSections(sections);
-    } else {
       const query = searchQuery.toLowerCase();
-      const filtered = sections
+      result = result
         .map((section) => ({
           ...section,
           itemList: section.itemList.filter((item) =>
@@ -61,9 +69,10 @@ const YPivotQATemplatesPhotos = () => {
           )
         }))
         .filter((section) => section.itemList.length > 0);
-      setFilteredSections(filtered);
     }
-  }, [searchQuery, sections]);
+
+    setFilteredSections(result);
+  }, [searchQuery, sections, allowedSectionIds]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -72,7 +81,7 @@ const YPivotQATemplatesPhotos = () => {
         `${API_BASE_URL}/api/qa-sections-photos`
       );
       setSections(response.data.data);
-      setFilteredSections(response.data.data);
+      //setFilteredSections(response.data.data);
     } catch (error) {
       console.error("Error fetching photo sections:", error);
     } finally {

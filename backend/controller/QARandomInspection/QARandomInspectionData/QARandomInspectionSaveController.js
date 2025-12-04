@@ -58,9 +58,10 @@ export const saveQAAccuracyImage = async (req, res) => {
       .webp({ quality: 80 })
       .toFile(finalDiskPath);
 
-    const publicUrl = `${API_BASE_URL}/storage/qa_accuracy/${newFilename}`;
+    // --- Return relative URL instead of absolute URL ---
+    const relativeUrl = `/storage/qa_accuracy/${newFilename}`;
 
-    res.json({ success: true, filePath: publicUrl });
+    res.json({ success: true, filePath: relativeUrl });
   } catch (error) {
     console.error("Error in /api/qa-accuracy/upload-image:", error);
     res.status(500).json({

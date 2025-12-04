@@ -15,7 +15,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
 import YPivotQAInspectionReportType from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
-import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPhotos";
+import YPivotQAInspectionPhotosDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPhotosDetermination";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -49,9 +49,24 @@ const YPivotQAInspection = () => {
     orderData: null
   });
 
+  // ADD: Shared state for Report Configuration
+  const [sharedReportState, setSharedReportState] = useState({
+    selectedTemplate: null,
+    // Add other fields you might need in other tabs (lines, tables, etc.)
+    config: {}
+  });
+
   // ADD: Handler for order data changes
   const handleOrderDataChange = useCallback((newState) => {
     setSharedOrderState((prev) => ({
+      ...prev,
+      ...newState
+    }));
+  }, []);
+
+  // ADD: Handler for report data changes
+  const handleReportDataChange = useCallback((newState) => {
+    setSharedReportState((prev) => ({
       ...prev,
       ...newState
     }));
@@ -84,6 +99,7 @@ const YPivotQAInspection = () => {
             selectedOrders={sharedOrderState.selectedOrders}
             orderData={sharedOrderState.orderData}
             orderType={sharedOrderState.orderType}
+            onReportDataChange={handleReportDataChange}
           />
         ),
         gradient: "from-purple-500 to-pink-500",
@@ -101,7 +117,11 @@ const YPivotQAInspection = () => {
         id: "photos",
         label: "Photos",
         icon: <Camera size={18} />,
-        component: <YPivotQATemplatesPhotos />,
+        component: (
+          <YPivotQAInspectionPhotosDetermination
+            reportData={sharedReportState}
+          />
+        ),
         gradient: "from-orange-500 to-red-500",
         description: "Photo documentation"
       },
@@ -136,7 +156,12 @@ const YPivotQAInspection = () => {
         description: "Inspection summary"
       }
     ],
-    [handleOrderDataChange, sharedOrderState] // <-- ADD THESE DEPENDENCIES
+    [
+      handleOrderDataChange,
+      sharedOrderState,
+      handleReportDataChange,
+      sharedReportState
+    ]
   );
 
   const activeComponent = useMemo(() => {

@@ -722,7 +722,8 @@ const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
 const YPivotQAInspectionReportType = ({
   selectedOrders = [],
   orderData = null,
-  orderType = "single"
+  orderType = "single",
+  onReportDataChange
 }) => {
   // State
   const [reportTemplates, setReportTemplates] = useState([]);
@@ -936,6 +937,38 @@ const YPivotQAInspectionReportType = ({
       if (selectedTemplate?.Table === "Yes") fetchTables();
     }
   }, [isSubCon, selectedTemplate, fetchLines, fetchTables]);
+
+  useEffect(() => {
+    if (onReportDataChange) {
+      onReportDataChange({
+        selectedTemplate,
+        // You can pass other derived state here if needed for other tabs
+        config: {
+          selectedLines,
+          selectedTables,
+          selectedColors,
+          inspectedQty,
+          cartonQty,
+          isSubCon,
+          selectedSubConFactory,
+          shippingStage,
+          remarks
+        }
+      });
+    }
+  }, [
+    selectedTemplate,
+    selectedLines,
+    selectedTables,
+    selectedColors,
+    inspectedQty,
+    cartonQty,
+    isSubCon,
+    selectedSubConFactory,
+    shippingStage,
+    remarks,
+    onReportDataChange
+  ]);
 
   // Prepare dropdown options
   const lineOptions = useMemo(() => {
