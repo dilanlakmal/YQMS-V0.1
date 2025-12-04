@@ -84,12 +84,10 @@ export const getQCWashingImageProxy = async (req, res) => {
       responseStatus: error.response?.status,
       code: error.code
     });
-    res
-      .status(404)
-      .json({
-        error: "Image not found or failed to process",
-        details: error.message
-      });
+    res.status(404).json({
+      error: "Image not found or failed to process",
+      details: error.message
+    });
   }
 };
 export const getQCWashingImgeSelected = async (req, res) => {
@@ -98,7 +96,7 @@ export const getQCWashingImgeSelected = async (req, res) => {
     const record = await QCWashing.findById(id);
     if (!record) return res.status(404).json({ error: "Record not found" });
 
-    const API_BASE = process.env.API_BASE_URL || "https://192.167.12.85:5000";
+    const API_BASE = process.env.API_BASE_URL;
     const collectedUrls = new Set();
 
     // Small helper to clean URLs
