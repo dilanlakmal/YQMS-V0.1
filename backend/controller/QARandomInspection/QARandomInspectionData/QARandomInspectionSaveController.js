@@ -34,7 +34,7 @@ export const saveQAAccuracyImage = async (req, res) => {
       "qa_accuracy"
     );
     // Ensure the directory exists
-    await fsPromises.mkdir(qaAccuracyUploadPath, { recursive: true });
+    //await fsPromises.mkdir(qaAccuracyUploadPath, { recursive: true });
 
     // Sanitize metadata for a unique and safe filename
     const sanitizedImageType = sanitize(imageType); // 'defect' or 'additional'
