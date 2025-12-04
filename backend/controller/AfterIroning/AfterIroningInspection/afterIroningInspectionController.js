@@ -2718,7 +2718,7 @@ export const checkAfterIroningRecord = async (req, res) => {
     const query = {
       orderNo: orderNo,
       reportType:"SOP",
-      status: { $in: ['submitted', 'approved'] } // Only check completed records
+      status: { $in: ['submitted', 'approved', 'processing'] } // Only check completed records
     };
 
     
