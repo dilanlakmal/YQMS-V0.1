@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
-import Swal from "sweetalert2"; // Import SweetAlert2
+import Swal from "sweetalert2";
 import {
   Plus,
   Edit,
@@ -15,7 +15,8 @@ import {
   XCircle,
   Camera,
   Box,
-  ScanLine
+  ScanLine,
+  Ship
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -41,6 +42,7 @@ const YPivotQATemplatesReportType = () => {
     Line: "Yes",
     Table: "Yes",
     Colors: "Yes",
+    ShippingStage: "Yes", // New Field
     InspectedQtyMethod: "NA",
     isCarton: "No",
     isQCScan: "No",
@@ -93,6 +95,7 @@ const YPivotQATemplatesReportType = () => {
       Line: template.Line || "Yes",
       Table: template.Table || "Yes",
       Colors: template.Colors || "Yes",
+      ShippingStage: template.ShippingStage || "Yes", // Map new field
       InspectedQtyMethod: template.InspectedQtyMethod || "NA",
       isCarton: template.isCarton || "No",
       isQCScan: template.isQCScan || "No",
@@ -107,7 +110,6 @@ const YPivotQATemplatesReportType = () => {
   };
 
   const handleDelete = async (id) => {
-    // SweetAlert Confirmation
     const result = await Swal.fire({
       title: "Are you sure?",
       text: "Do you want to delete this template?",
@@ -121,7 +123,6 @@ const YPivotQATemplatesReportType = () => {
     if (result.isConfirmed) {
       try {
         await axios.delete(`${API_BASE_URL}/api/qa-sections-templates/${id}`);
-
         Swal.fire({
           icon: "success",
           title: "Deleted!",
@@ -129,7 +130,6 @@ const YPivotQATemplatesReportType = () => {
           timer: 1500,
           showConfirmButton: false
         });
-
         fetchData();
       } catch (error) {
         console.error("Delete error:", error);
@@ -250,6 +250,10 @@ const YPivotQATemplatesReportType = () => {
     );
   };
 
+  // Shared class for table headers to allow wrapping
+  const headerClass =
+    "px-2 py-3 text-center whitespace-normal break-words leading-tight";
+
   return (
     <div className="space-y-6 animate-fadeIn pb-20">
       {/* Top Bar */}
@@ -276,35 +280,43 @@ const YPivotQATemplatesReportType = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-4 py-3 w-10 text-center">No</th>
-                <th className="px-4 py-3 min-w-[150px]">Report Type</th>
-                <th className="px-2 py-3 text-center">Meas.</th>
-                <th className="px-2 py-3 text-center">Head</th>
-                <th className="px-2 py-3 text-center">Pics</th>
-                <th className="px-4 py-3 min-w-[200px]">Defect Categories</th>
-                <th className="px-4 py-3 min-w-[250px]">Photo Sections</th>
-                <th className="px-2 py-3 text-center">Line</th>
-                <th className="px-2 py-3 text-center">Tab</th>
-                <th className="px-2 py-3 text-center">Col</th>
-                <th className="px-2 py-3 text-center">Meth</th>
-                <th className="px-2 py-3 text-center">Qty</th>
-                <th className="px-2 py-3 text-center">Ctn</th>
-                <th className="px-2 py-3 text-center">Scan</th>
-                <th className="px-2 py-3 text-center">Q.Plan</th>
-                <th className="px-2 py-3 text-center">Conc</th>
+                <th className={`${headerClass} w-10`}>No</th>
+                <th className="px-4 py-3 min-w-[150px] whitespace-normal break-words leading-tight">
+                  Report Type
+                </th>
+                <th className={headerClass}>Meas.</th>
+                <th className={headerClass}>Head</th>
+                <th className={headerClass}>Pics</th>
+                <th className="px-4 py-3 min-w-[180px] whitespace-normal break-words leading-tight">
+                  Defect Categories
+                </th>
+                <th className="px-4 py-3 min-w-[200px] whitespace-normal break-words leading-tight">
+                  Photo Sections
+                </th>
+                <th className={headerClass}>Line</th>
+                <th className={headerClass}>Tab</th>
+                <th className={headerClass}>Col</th>
+                {/* New Stage Column */}
+                <th className={headerClass}>Stage</th>
+                <th className={headerClass}>Meth</th>
+                <th className={headerClass}>Qty</th>
+                <th className={headerClass}>Ctn</th>
+                <th className={headerClass}>Scan</th>
+                <th className={headerClass}>Q.Plan</th>
+                <th className={headerClass}>Conc</th>
                 <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan="17" className="text-center py-10">
+                  <td colSpan="18" className="text-center py-10">
                     <Loader className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
                   </td>
                 </tr>
               ) : templates.length === 0 ? (
                 <tr>
-                  <td colSpan="17" className="text-center py-10 text-gray-500">
+                  <td colSpan="18" className="text-center py-10 text-gray-500">
                     No templates found.
                   </td>
                 </tr>
@@ -342,9 +354,9 @@ const YPivotQATemplatesReportType = () => {
                         ))}
                       </div>
                     </td>
-                    {/* Photo Sections (Grid Layout for 3 max per row) */}
+                    {/* Photo Sections (Max 2 cards logic) */}
                     <td className="px-4 py-4">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-1">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1">
                         {t.SelectedPhotoSectionList &&
                         t.SelectedPhotoSectionList.length > 0 ? (
                           t.SelectedPhotoSectionList.map((p) => (
@@ -358,7 +370,7 @@ const YPivotQATemplatesReportType = () => {
                             </span>
                           ))
                         ) : (
-                          <span className="text-gray-400 text-[10px] italic col-span-3">
+                          <span className="text-gray-400 text-[10px] italic col-span-2">
                             None
                           </span>
                         )}
@@ -372,6 +384,10 @@ const YPivotQATemplatesReportType = () => {
                     </td>
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Colors || "Yes"} />
+                    </td>
+                    {/* New Stage Column */}
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.ShippingStage || "Yes"} />
                     </td>
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.InspectedQtyMethod || "NA"} />
@@ -418,7 +434,6 @@ const YPivotQATemplatesReportType = () => {
       {/* --- Modal --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          {/* Increased width to max-w-6xl */}
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl flex flex-col max-h-[95vh]">
             {/* Modal Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
@@ -466,11 +481,16 @@ const YPivotQATemplatesReportType = () => {
                     "Line",
                     "Table",
                     "Colors",
+                    "ShippingStage", // Added here for the loop
                     "QualityPlan",
                     "Conclusion"
                   ].map((field) => (
                     <div key={field}>
-                      <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase">
+                      <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase flex items-center gap-1">
+                        {/* Add icon for ShippingStage specifically */}
+                        {field === "ShippingStage" && (
+                          <Ship className="w-3 h-3" />
+                        )}
                         {field.replace(/([A-Z])/g, " $1").trim()}
                       </label>
                       <select

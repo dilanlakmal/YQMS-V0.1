@@ -20,7 +20,8 @@ export const __dirname = path.dirname(__filename);
 // Define a base directory for the backend root
 export const __backendDir = path.resolve(__dirname, "..");
 
-export const API_BASE_URL = process.env.API_BASE_URL;
+export const API_BASE_URL =
+  process.env.API_BASE_URL || "https://192.167.6.207:5001";
 
 const options = {
   key: fs.readFileSync(

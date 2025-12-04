@@ -59,6 +59,11 @@ const qaSectionsTemplatesSchema = new mongoose.Schema(
       enum: ["Yes", "No"],
       default: "Yes"
     },
+    ShippingStage: {
+      type: String,
+      enum: ["Yes", "No"],
+      default: "Yes"
+    },
     InspectedQtyMethod: {
       type: String,
       enum: ["NA", "Fixed", "AQL"],
