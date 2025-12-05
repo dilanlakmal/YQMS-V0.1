@@ -468,7 +468,6 @@ export const saveAfterIroningOrderData = async (req, res) => {
 
     // CRITICAL FIX: If _id is provided, update that specific record
     if (formData._id) {
-      console.log("Updating existing record with ID:", formData._id);
       record = await AfterIroning.findById(formData._id);
 
       if (record) {
@@ -497,7 +496,6 @@ export const saveAfterIroningOrderData = async (req, res) => {
         Object.assign(record, updateData);
         await record.save();
 
-        console.log("Successfully updated existing record");
         return res.json({ success: true, id: record._id });
       } else {
         console.log("Record with provided _id not found, creating new record");
@@ -525,13 +523,11 @@ export const saveAfterIroningOrderData = async (req, res) => {
       if (formData.reportType) query.reportType = formData.reportType;
       if (formData.ironingType) query.ironingType = formData.ironingType;
 
-      console.log("Searching for existing record with query:", query);
       record = await AfterIroning.findOne(query);
     }
 
     if (!record) {
       // Create new record
-      console.log("Creating new record");
       record = new AfterIroning({
         ...formData,
         date: dateValue,
@@ -543,7 +539,6 @@ export const saveAfterIroningOrderData = async (req, res) => {
       });
     } else {
       // Update existing record
-      console.log("Updating found record:", record._id);
       Object.assign(record, {
         ...formData,
         date: dateValue,
@@ -561,7 +556,6 @@ export const saveAfterIroningOrderData = async (req, res) => {
     }
 
     await record.save();
-    console.log("Record saved successfully:", record._id);
 
     res.json({ success: true, id: record._id });
   } catch (err) {
@@ -626,11 +620,7 @@ export const saveAfterIroningInspectionData = async (req, res) => {
       // Create URL for database storage
       const imageUrl = `${serverBaseUrl}/storage/after_ironing_images/inspection/${newFilename}`;
       fileMap[file.fieldname] = imageUrl;
-
-      console.log(`Saved image: ${file.fieldname} -> ${imageUrl}`);
     }
-
-    console.log("FileMap:", fileMap);
 
     // Find or create the record
     let record = await AfterIroning.findById(recordId);
@@ -653,9 +643,6 @@ export const saveAfterIroningInspectionData = async (req, res) => {
           const mainPattern = new RegExp(`^checkpointImages_${idx}_\\d+$`);
           if (mainPattern.test(fieldName)) {
             mainCheckpointImages.push(fileMap[fieldName]);
-            console.log(
-              `Found main checkpoint image: ${fieldName} -> ${fileMap[fieldName]}`
-            );
           }
         });
 
@@ -692,10 +679,6 @@ export const saveAfterIroningInspectionData = async (req, res) => {
 
         // Update the main checkpoint images
         item.comparisonImages = mainCheckpointImages;
-        console.log(
-          `Main checkpoint ${idx} final images:`,
-          mainCheckpointImages
-        );
 
         // Handle sub-point comparison images
         if (item.subPoints && Array.isArray(item.subPoints)) {
@@ -714,9 +697,6 @@ export const saveAfterIroningInspectionData = async (req, res) => {
               );
               if (subPattern.test(fieldName)) {
                 subPointImages.push(fileMap[fieldName]);
-                console.log(
-                  `Found sub-point image: ${fieldName} -> ${fileMap[fieldName]}`
-                );
               }
             });
 
@@ -753,10 +733,6 @@ export const saveAfterIroningInspectionData = async (req, res) => {
 
             // Update the sub-point images
             subPoint.comparisonImages = subPointImages;
-            console.log(
-              `Sub-point ${idx}-${subIdx} final images:`,
-              subPointImages
-            );
           });
         }
       });
@@ -786,11 +762,6 @@ export const saveAfterIroningInspectionData = async (req, res) => {
 
     // Save and log the final data
     await record.save();
-
-    console.log(
-      "Final checkpoint data saved:",
-      JSON.stringify(groupedCheckpointData, null, 2)
-    );
 
     res.json({
       success: true,
@@ -1025,11 +996,7 @@ export const saveAfterIroningDefectData = async (req, res) => {
       await fs.promises.writeFile(fullFilePath, file.buffer);
       const imageUrl = `${serverBaseUrl}/storage/after_ironing_images/defect/${newFilename}`;
       fileMap[file.fieldname] = imageUrl;
-
-      console.log(`Saved defect image: ${file.fieldname} -> ${imageUrl}`);
     }
-
-    console.log("Defect FileMap:", fileMap);
 
     // CRITICAL FIX: Initialize additionalImages array if it doesn't exist
     if (!defectDetails.additionalImages) {
@@ -1064,9 +1031,6 @@ export const saveAfterIroningDefectData = async (req, res) => {
               );
               if (defectPattern.test(fieldName)) {
                 defectImages.push(fileMap[fieldName]);
-                console.log(
-                  `Found defect image: ${fieldName} -> ${fileMap[fieldName]}`
-                );
               }
             });
 
@@ -1106,18 +1070,10 @@ export const saveAfterIroningDefectData = async (req, res) => {
 
             // Replace the original defect with the processed one
             pc.pcDefects[defectIdx] = processedDefect;
-
-            console.log(
-              `Defect ${pcIdx}-${defectIdx} final data:`,
-              processedDefect
-            );
           });
         }
       });
     }
-
-    // Process additional images - ENHANCED LOGIC
-    console.log("Processing additional images...");
 
     const additionalImages = [...(defectDetails.additionalImages || [])];
 
@@ -1126,9 +1082,6 @@ export const saveAfterIroningDefectData = async (req, res) => {
       const additionalPattern = /^additionalImages_\d+$/;
       if (additionalPattern.test(fieldName)) {
         additionalImages.push(fileMap[fieldName]);
-        console.log(
-          `Found additional image: ${fieldName} -> ${fileMap[fieldName]}`
-        );
       }
     });
 
@@ -1207,11 +1160,6 @@ export const saveAfterIroningDefectData = async (req, res) => {
         .json({ success: false, message: "Record not found" });
     }
 
-    console.log(
-      "Final defect details saved:",
-      JSON.stringify(defectDetails, null, 2)
-    );
-
     res.json({ success: true, data: doc.defectDetails });
   } catch (err) {
     console.error("Defect details save error:", err);
@@ -1262,8 +1210,6 @@ export const updateAfterIroningDefectData = async (req, res) => {
       await fs.promises.writeFile(fullFilePath, file.buffer);
       const imageUrl = `${serverBaseUrl}/storage/after_ironing_images/defect/${newFilename}`;
       fileMap[file.fieldname] = imageUrl;
-
-      console.log(`Updated defect image: ${file.fieldname} -> ${imageUrl}`);
     }
 
     // CRITICAL FIX: Initialize additionalImages array if it doesn't exist
@@ -1296,9 +1242,6 @@ export const updateAfterIroningDefectData = async (req, res) => {
               );
               if (defectPattern.test(fieldName)) {
                 defectImages.push(fileMap[fieldName]);
-                console.log(
-                  `Found updated defect image: ${fieldName} -> ${fileMap[fieldName]}`
-                );
               }
             });
 
@@ -1334,11 +1277,6 @@ export const updateAfterIroningDefectData = async (req, res) => {
 
             processedDefect.defectImages = defectImages;
             pc.pcDefects[defectIdx] = processedDefect;
-
-            console.log(
-              `Updated defect ${pcIdx}-${defectIdx} final data:`,
-              processedDefect
-            );
           });
         }
       });
@@ -1351,9 +1289,6 @@ export const updateAfterIroningDefectData = async (req, res) => {
       const additionalPattern = /^additionalImages_\d+$/;
       if (additionalPattern.test(fieldName)) {
         additionalImages.push(fileMap[fieldName]);
-        console.log(
-          `Found updated additional image: ${fieldName} -> ${fileMap[fieldName]}`
-        );
       }
     });
 
@@ -1431,11 +1366,6 @@ export const updateAfterIroningDefectData = async (req, res) => {
         .json({ success: false, message: "Record not found" });
     }
 
-    console.log(
-      "Final updated defect details saved:",
-      JSON.stringify(defectDetails, null, 2)
-    );
-
     res.json({ success: true, data: doc.defectDetails });
   } catch (err) {
     console.error("Defect details update error:", err);
@@ -1464,9 +1394,16 @@ export const savedMeasurementDataSpec = async (req, res) => {
       query.factoryName = factory;
     }
 
-    // For After Wash requests, specifically look for Before Wash data
+    // FIXED: Map wash type correctly
     if (washType === "Before Wash") {
       query.before_after_wash = "Before Wash";
+    } else if (washType === "After Ironing") {
+      // Look for both possible values in the database
+      query.$or = [
+        ...query.$or,
+        { before_after_wash: "After Ironing" },
+        { before_after_wash: "afterIroning" }
+      ];
     }
 
     // Try to find all matching records first (without reportType and factory filters)
@@ -1477,6 +1414,12 @@ export const savedMeasurementDataSpec = async (req, res) => {
 
     if (washType === "Before Wash") {
       basicQuery.before_after_wash = "Before Wash";
+    } else if (washType === "After Ironing") {
+      basicQuery.$or = [
+        ...basicQuery.$or,
+        { before_after_wash: "After Ironing" },
+        { before_after_wash: "afterIroning" }
+      ];
     }
 
     const allRecords = await collection.find(basicQuery).toArray();
@@ -1515,15 +1458,25 @@ export const savedMeasurementDataSpec = async (req, res) => {
               (point) => point.pointName
             );
 
+            // FIXED: Normalize the before_after_wash value
+            let normalizedWashType = measurement.before_after_wash;
+            if (
+              measurement.before_after_wash === "afterWash" ||
+              measurement.before_after_wash === "After Wash"
+            ) {
+              normalizedWashType = "afterIroning";
+            }
+
             // Create a structure that matches what the frontend expects
             extractedMeasurementPoints.push({
               size: measurement.size,
               kvalue: measurement.kvalue,
-              before_after_wash: measurement.before_after_wash,
+              before_after_wash: normalizedWashType, // Use normalized value
               selectedRows: measurement.selectedRows || [],
               measurementPointNames: pointNames,
               // Include the original structure for compatibility
-              ...measurement
+              ...measurement,
+              before_after_wash: normalizedWashType // Override with normalized value
             });
           }
         }
@@ -1859,12 +1812,6 @@ export const saveAfterIroningSummary = async (req, res) => {
     // 4. CRITICAL FIX: Determine overall result
     const defectResult = qcRecord.defectDetails?.result || "Pass";
 
-    console.log("Backend overall result calculation:", {
-      passRate,
-      defectResult,
-      reportType: qcRecord.reportType
-    });
-
     let newOverallFinalResult;
 
     // Prioritize the result sent from the frontend if it's valid ('Pass' or 'Fail')
@@ -1873,24 +1820,12 @@ export const saveAfterIroningSummary = async (req, res) => {
       ["Pass", "Fail"].includes(summary.overallFinalResult)
     ) {
       newOverallFinalResult = summary.overallFinalResult;
-      console.log("Using overall result from frontend:", newOverallFinalResult);
     } else {
       // Fallback to backend recalculation if frontend result is not provided or invalid
       newOverallFinalResult =
         passRate >= 95 && defectResult === "Pass" ? "Pass" : "Fail";
-      console.log(
-        "Recalculating overall result on backend:",
-        newOverallFinalResult
-      );
     }
 
-    console.log("Backend final calculation result:", {
-      condition1: `Pass Rate ${passRate}% >= 95%: ${passRate >= 95}`,
-      condition2: `Defect Result "${defectResult}" === "Pass": ${
-        defectResult === "Pass"
-      }`,
-      finalResult: newOverallFinalResult
-    });
     // 5. Update ALL calculated fields with fresh values
     qcRecord.totalCheckedPcs = totalCheckedPcs;
     qcRecord.rejectedDefectPcs = rejectedDefectPcs;
@@ -1915,8 +1850,6 @@ export const saveAfterIroningSummary = async (req, res) => {
 
     // Save the record
     await qcRecord.save();
-
-    console.log("Saved overall result:", qcRecord.overallFinalResult);
 
     res.json({
       success: true,
@@ -2443,10 +2376,6 @@ export const saveAfterIroningMeasurementData = async (req, res) => {
       });
     }
 
-    console.log(
-      `Updating measurement for record ${recordId} (status: ${record.status})`
-    );
-
     if (!record.measurementDetails) {
       record.measurementDetails = {
         measurement: [],
@@ -2468,12 +2397,8 @@ export const saveAfterIroningMeasurementData = async (req, res) => {
     if (measurementIndex !== -1) {
       record.measurementDetails.measurement[measurementIndex] =
         measurementDetail;
-      console.log(`Updated existing measurement at index ${measurementIndex}`);
     } else {
       record.measurementDetails.measurement.push(measurementDetail);
-      console.log(
-        `Added new measurement for size ${measurementDetail.size}, kvalue ${measurementDetail.kvalue}`
-      );
     }
 
     // Find existing summary index
@@ -2493,16 +2418,9 @@ export const saveAfterIroningMeasurementData = async (req, res) => {
     if (summaryIndex !== -1) {
       record.measurementDetails.measurementSizeSummary[summaryIndex] =
         summaryData;
-      console.log(`Updated existing summary at index ${summaryIndex}`);
     } else {
       record.measurementDetails.measurementSizeSummary.push(summaryData);
-      console.log(
-        `Added new summary for size ${measurementDetail.size}, kvalue ${measurementDetail.kvalue}`
-      );
     }
-
-    // CRITICAL FIX: Recalculate overall summary for all records (not just submitted)
-    console.log("Recalculating overall summary...");
 
     // Recalculate top-level summary from measurementSizeSummary
     let totalCheckedPoint = 0;
@@ -2538,13 +2456,6 @@ export const saveAfterIroningMeasurementData = async (req, res) => {
     const measurementResult = passRate >= 95 ? "Pass" : "Fail";
     const defectResult = record.defectDetails?.result || "Pass";
 
-    console.log("Overall result recalculation:", {
-      passRate,
-      measurementResult,
-      defectResult,
-      reportType: record.reportType
-    });
-
     // let newOverallResult;
 
     const newOverallResult =
@@ -2553,23 +2464,8 @@ export const saveAfterIroningMeasurementData = async (req, res) => {
     record.overallFinalResult = newOverallResult;
     record.markModified("overallFinalResult");
 
-    console.log("Updated overall summary:", {
-      totalCheckedPoint,
-      totalPass,
-      totalFail,
-      passRate,
-      overallFinalResult: newOverallResult
-    });
-
     record.savedAt = new Date();
     await record.save();
-
-    console.log("Saved measurement details with summary:", {
-      measurement: record.measurementDetails.measurement.length,
-      summary: record.measurementDetails.measurementSizeSummary.length,
-      recordStatus: record.status,
-      finalOverallResult: record.overallFinalResult
-    });
 
     res.json({
       success: true,
@@ -2708,9 +2604,6 @@ export const saveAfterIroning = async (req, res) => {
       });
     }
 
-    // CRITICAL FIX: Always recalculate the final result on submission to ensure data integrity.
-    // This uses the same logic as saveAfterIroningSummary.
-
     // 1. Calculate pass rate from the most recent data.
     const passRate = recordToSubmit.passRate ?? 100; // Use the already calculated passRate on the record.
 
@@ -2720,12 +2613,6 @@ export const saveAfterIroning = async (req, res) => {
     // 3. Determine the final overall result.
     const newOverallFinalResult =
       passRate >= 95 && defectResult === "Pass" ? "Pass" : "Fail";
-
-    console.log("Final submission calculation:", {
-      passRate,
-      defectResult,
-      finalResult: newOverallFinalResult
-    });
 
     recordToSubmit.overallFinalResult = newOverallFinalResult;
 
@@ -2965,7 +2852,7 @@ export const checkAfterIroningRecord = async (req, res) => {
     const query = {
       orderNo: orderNo,
       reportType: "SOP",
-      status: { $in: ["submitted", "approved"] } // Only check completed records
+      status: { $in: ["submitted", "approved", "processing"] } // Only check completed records
     };
 
     // Find the most recent matching record
@@ -3041,7 +2928,7 @@ export const getQCWashingMeasurementData = async (req, res) => {
     if (!orderNo) {
       return res.status(400).json({
         success: false,
-        message: "Order number and color are required"
+        message: "Order number is required"
       });
     }
 
@@ -3058,9 +2945,11 @@ export const getQCWashingMeasurementData = async (req, res) => {
       );
       query.date = dateValue;
     }
+
     if (reportType) {
       query.reportType = reportType;
     }
+
     if (factoryName) {
       query.factoryName = factoryName;
     }
@@ -3078,24 +2967,41 @@ export const getQCWashingMeasurementData = async (req, res) => {
       });
     }
 
-    // Extract measurement data for Before Wash and After Wash
+    // FIXED: Extract measurement data with proper mapping
     const measurementData = {
       beforeWash: [],
-      afterWash: []
+      afterWash: [],
+      afterIroning: [] // Add this for After Ironing data
     };
 
     if (qcWashingRecord.measurementDetails?.measurement) {
       qcWashingRecord.measurementDetails.measurement.forEach((measurement) => {
+        // Create a copy of the measurement with normalized before_after_wash
+        const normalizedMeasurement = { ...measurement };
+
+        // Map the before_after_wash values to what the frontend expects
         if (
           measurement.before_after_wash === "beforeWash" ||
           measurement.before_after_wash === "Before Wash"
         ) {
-          measurementData.beforeWash.push(measurement);
+          normalizedMeasurement.before_after_wash = "beforeWash";
+          measurementData.beforeWash.push(normalizedMeasurement);
         } else if (
           measurement.before_after_wash === "afterWash" ||
           measurement.before_after_wash === "After Wash"
         ) {
-          measurementData.afterWash.push(measurement);
+          // CRITICAL FIX: Map afterWash to afterIroning for After Ironing component
+          normalizedMeasurement.before_after_wash = "afterIroning";
+          measurementData.afterIroning.push(normalizedMeasurement);
+
+          // Also keep the original mapping for backward compatibility
+          measurementData.afterWash.push({ ...measurement });
+        } else if (
+          measurement.before_after_wash === "afterIroning" ||
+          measurement.before_after_wash === "After Ironing"
+        ) {
+          normalizedMeasurement.before_after_wash = "afterIroning";
+          measurementData.afterIroning.push(normalizedMeasurement);
         }
       });
     }
@@ -3116,6 +3022,89 @@ export const getQCWashingMeasurementData = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Server error while fetching QC Washing measurement data",
+      error: error.message
+    });
+  }
+};
+
+export const getQCWashingDataForAfterIroning = async (req, res) => {
+  try {
+    const { orderNo, color, reportType, factoryName } = req.query;
+
+    if (!orderNo) {
+      return res.status(400).json({
+        success: false,
+        message: "Order number is required"
+      });
+    }
+
+    // Build query to find matching QC Washing record
+    const query = {
+      orderNo: orderNo,
+      status: { $in: ["submitted", "approved"] }
+    };
+
+    // Add optional filters
+    if (color) query.color = color;
+    if (reportType) query.reportType = reportType;
+    if (factoryName) query.factoryName = factoryName;
+
+    // Find the most recent matching QC Washing record
+    const qcWashingRecord = await QCWashing.findOne(query)
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (!qcWashingRecord) {
+      return res.json({
+        success: false,
+        message: "No matching QC Washing record found",
+        data: { afterIroning: [] }
+      });
+    }
+
+    // Extract and transform measurement data specifically for After Ironing
+    const afterIroningData = [];
+
+    if (qcWashingRecord.measurementDetails?.measurement) {
+      qcWashingRecord.measurementDetails.measurement.forEach((measurement) => {
+        // Only process After Wash data (which becomes After Ironing data)
+        if (
+          measurement.before_after_wash === "afterWash" ||
+          measurement.before_after_wash === "After Wash"
+        ) {
+          const transformedMeasurement = {
+            ...measurement,
+            before_after_wash: "afterIroning", // Transform to afterIroning
+            // Ensure selectedRows is properly included
+            selectedRows: measurement.selectedRows || [],
+            // Include other important fields
+            size: measurement.size,
+            kvalue: measurement.kvalue || "NA",
+            qty: measurement.qty || 3
+          };
+
+          afterIroningData.push(transformedMeasurement);
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      data: { afterIroning: afterIroningData },
+      recordInfo: {
+        id: qcWashingRecord._id,
+        orderNo: qcWashingRecord.orderNo,
+        color: qcWashingRecord.color,
+        date: qcWashingRecord.date,
+        reportType: qcWashingRecord.reportType,
+        factoryName: qcWashingRecord.factoryName
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching QC Washing data for After Ironing:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server error while fetching QC Washing data for After Ironing",
       error: error.message
     });
   }
