@@ -5,10 +5,6 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronDown,
-  Palette,
-  Layers,
-  Table2,
-  GitBranch,
   X,
   Hash,
   BarChart3,
@@ -16,58 +12,13 @@ import {
   Building,
   Factory,
   Truck,
-  MessageSquare,
-  ToggleLeft,
-  ToggleRight
+  MessageSquare
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionBuyerDetermination, {
   determineBuyerFromOrderNo
 } from "./YPivotQAInspectionBuyerDetermination";
-
-// ============================================================
-// Smart Sorting Function for Line/Table Numbers
-// ============================================================
-const smartSort = (a, b) => {
-  const aVal = a.label || a;
-  const bVal = b.label || b;
-
-  // Check if both are pure numbers
-  const aNum = parseFloat(aVal);
-  const bNum = parseFloat(bVal);
-
-  if (!isNaN(aNum) && !isNaN(bNum)) {
-    return aNum - bNum;
-  }
-
-  // Check if both are pure letters (single or multiple)
-  const aIsLetter = /^[A-Za-z]+$/.test(aVal);
-  const bIsLetter = /^[A-Za-z]+$/.test(bVal);
-
-  if (aIsLetter && bIsLetter) {
-    return aVal.localeCompare(bVal);
-  }
-
-  // Alphanumeric sorting (e.g., CK1, CK2, CK10)
-  const aMatch = aVal.match(/^([A-Za-z]*)(\d*)$/);
-  const bMatch = bVal.match(/^([A-Za-z]*)(\d*)$/);
-
-  if (aMatch && bMatch) {
-    const aPrefix = aMatch[1];
-    const bPrefix = bMatch[1];
-    const aNumPart = parseInt(aMatch[2]) || 0;
-    const bNumPart = parseInt(bMatch[2]) || 0;
-
-    if (aPrefix !== bPrefix) {
-      return aPrefix.localeCompare(bPrefix);
-    }
-    return aNumPart - bNumPart;
-  }
-
-  // Default string comparison
-  return String(aVal).localeCompare(String(bVal));
-};
 
 // ============================================================
 // Report Type Card Component
@@ -139,230 +90,6 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
 };
 
 // ============================================================
-// Searchable Multi Select Dropdown Component
-// ============================================================
-const SearchableMultiSelect = ({
-  label,
-  icon: Icon,
-  options,
-  selectedValues,
-  onSelectionChange,
-  placeholder,
-  loading = false,
-  disabled = false,
-  displayKey = "label",
-  valueKey = "value",
-  color = "indigo"
-}) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-
-  const colorClasses = {
-    indigo: {
-      bg: "bg-indigo-50 dark:bg-indigo-900/30",
-      text: "text-indigo-600 dark:text-indigo-400",
-      hover: "hover:bg-indigo-100 dark:hover:bg-indigo-900/50"
-    },
-    emerald: {
-      bg: "bg-emerald-50 dark:bg-emerald-900/30",
-      text: "text-emerald-600 dark:text-emerald-400",
-      hover: "hover:bg-emerald-100 dark:hover:bg-emerald-900/50"
-    },
-    purple: {
-      bg: "bg-purple-50 dark:bg-purple-900/30",
-      text: "text-purple-600 dark:text-purple-400",
-      hover: "hover:bg-purple-100 dark:hover:bg-purple-900/50"
-    }
-  };
-
-  const colors = colorClasses[color] || colorClasses.indigo;
-
-  // Sort and filter options
-  const sortedAndFilteredOptions = useMemo(() => {
-    let filtered = options;
-    if (searchTerm) {
-      filtered = options.filter((opt) =>
-        String(opt[displayKey]).toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-    return [...filtered].sort((a, b) => smartSort(a, b));
-  }, [options, searchTerm, displayKey]);
-
-  const handleSelectAll = (e) => {
-    e.preventDefault();
-    if (selectedValues.length === sortedAndFilteredOptions.length) {
-      onSelectionChange([]);
-    } else {
-      onSelectionChange(sortedAndFilteredOptions.map((opt) => opt[valueKey]));
-    }
-  };
-
-  const handleToggle = (value, e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (selectedValues.includes(value)) {
-      onSelectionChange(selectedValues.filter((v) => v !== value));
-    } else {
-      onSelectionChange([...selectedValues, value]);
-    }
-  };
-
-  const handleRemove = (value, e) => {
-    e.stopPropagation();
-    onSelectionChange(selectedValues.filter((v) => v !== value));
-  };
-
-  // Get display labels for selected values (sorted)
-  const selectedLabels = useMemo(() => {
-    return selectedValues
-      .map((val) => {
-        const opt = options.find((o) => o[valueKey] === val);
-        return opt ? opt[displayKey] : val;
-      })
-      .sort(smartSort);
-  }, [selectedValues, options, displayKey, valueKey]);
-
-  if (disabled) {
-    return (
-      <div className="space-y-2">
-        <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-          <Icon className="w-3.5 h-3.5 text-gray-400" />
-          {label}
-        </label>
-        <div className="px-3 py-2.5 bg-gray-100 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-400">
-          N/A
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-2">
-      <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5">
-        <Icon className={`w-3.5 h-3.5 ${colors.text}`} />
-        {label}
-      </label>
-
-      {/* Selected Chips */}
-      {selectedLabels.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {selectedLabels.map((label, idx) => {
-            const value = selectedValues.find((v) => {
-              const opt = options.find((o) => o[valueKey] === v);
-              return opt && opt[displayKey] === label;
-            });
-            return (
-              <span
-                key={idx}
-                className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium ${colors.bg} ${colors.text}`}
-              >
-                {label}
-                <button
-                  onClick={(e) => handleRemove(value, e)}
-                  className={`p-0.5 rounded-full ${colors.hover}`}
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            );
-          })}
-        </div>
-      )}
-
-      <div className="relative">
-        <div
-          onClick={() => !loading && setIsOpen(!isOpen)}
-          className={`w-full flex items-center justify-between px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 cursor-pointer ${
-            loading ? "opacity-50 cursor-not-allowed" : ""
-          }`}
-        >
-          <span className={selectedValues.length === 0 ? "text-gray-400" : ""}>
-            {loading
-              ? "Loading..."
-              : selectedValues.length === 0
-              ? placeholder
-              : `${selectedValues.length} selected`}
-          </span>
-          {loading ? (
-            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-          ) : (
-            <ChevronDown
-              className={`w-4 h-4 text-gray-400 transition-transform ${
-                isOpen ? "rotate-180" : ""
-              }`}
-            />
-          )}
-        </div>
-
-        {isOpen && !loading && (
-          <>
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setIsOpen(false)}
-            />
-            <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden">
-              {/* Search Input */}
-              <div className="p-2 border-b border-gray-200 dark:border-gray-700">
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Type to search..."
-                  className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  onClick={(e) => e.stopPropagation()}
-                />
-              </div>
-
-              <div className="max-h-48 overflow-y-auto">
-                {/* Select All */}
-                <button
-                  onClick={handleSelectAll}
-                  className={`w-full px-3 py-2 text-left text-sm font-bold border-b border-gray-200 dark:border-gray-700 ${colors.hover} flex items-center justify-between`}
-                >
-                  <span className={colors.text}>
-                    {selectedValues.length === sortedAndFilteredOptions.length
-                      ? "Deselect All"
-                      : "Select All"}
-                  </span>
-                  {selectedValues.length ===
-                    sortedAndFilteredOptions.length && (
-                    <CheckCircle2 className={`w-4 h-4 ${colors.text}`} />
-                  )}
-                </button>
-
-                {sortedAndFilteredOptions.map((option) => {
-                  const isSelected = selectedValues.includes(option[valueKey]);
-                  return (
-                    <button
-                      key={option[valueKey]}
-                      onClick={(e) => handleToggle(option[valueKey], e)}
-                      className={`w-full px-3 py-2 text-left text-sm flex items-center justify-between ${
-                        isSelected
-                          ? `${colors.bg} ${colors.text}`
-                          : "hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                      }`}
-                    >
-                      <span>{option[displayKey]}</span>
-                      {isSelected && <CheckCircle2 className="w-4 h-4" />}
-                    </button>
-                  );
-                })}
-
-                {sortedAndFilteredOptions.length === 0 && (
-                  <div className="px-3 py-4 text-center text-sm text-gray-500">
-                    {searchTerm ? "No matches found" : "No options available"}
-                  </div>
-                )}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// ============================================================
 // Searchable Single Select Dropdown Component
 // ============================================================
 const SearchableSingleSelect = ({
@@ -386,10 +113,6 @@ const SearchableSingleSelect = ({
       bg: "bg-indigo-50 dark:bg-indigo-900/30",
       text: "text-indigo-600 dark:text-indigo-400"
     },
-    purple: {
-      bg: "bg-purple-50 dark:bg-purple-900/30",
-      text: "text-purple-600 dark:text-purple-400"
-    },
     amber: {
       bg: "bg-amber-50 dark:bg-amber-900/30",
       text: "text-amber-600 dark:text-amber-400"
@@ -398,21 +121,20 @@ const SearchableSingleSelect = ({
 
   const colors = colorClasses[color] || colorClasses.indigo;
 
-  // Sort and filter options
-  const sortedAndFilteredOptions = useMemo(() => {
+  const sortedOptions = useMemo(() => {
     let filtered = options;
     if (searchTerm) {
       filtered = options.filter((opt) =>
         String(opt[displayKey]).toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    return [...filtered].sort((a, b) => smartSort(a, b));
+    return filtered;
   }, [options, searchTerm, displayKey]);
 
   const selectedOption = options.find((opt) => opt[valueKey] === selectedValue);
 
   const handleSelect = (option, e) => {
-    e.stopPropagation(); // Stop propagation to prevent immediate reopening if contained within a focusable area
+    e.stopPropagation();
     onSelectionChange(option[valueKey]);
     setSearchTerm("");
     setIsOpen(false);
@@ -479,7 +201,7 @@ const SearchableSingleSelect = ({
           }}
           placeholder={placeholder}
           disabled={loading}
-          readOnly={!isOpen && !!selectedOption} // Make readonly when selected to prevent typing over unless opened
+          readOnly={!isOpen && !!selectedOption}
           className={`w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent cursor-pointer ${
             loading ? "opacity-50 cursor-not-allowed" : ""
           }`}
@@ -505,8 +227,8 @@ const SearchableSingleSelect = ({
               }}
             />
             <div className="absolute z-[100] mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto">
-              {sortedAndFilteredOptions.length > 0 ? (
-                sortedAndFilteredOptions.map((option) => {
+              {sortedOptions.length > 0 ? (
+                sortedOptions.map((option) => {
                   const isSelected = option[valueKey] === selectedValue;
                   return (
                     <button
@@ -532,32 +254,6 @@ const SearchableSingleSelect = ({
           </>
         )}
       </div>
-    </div>
-  );
-};
-
-// ============================================================
-// Toggle Switch Component
-// ============================================================
-const ToggleSwitch = ({ label, value, onChange, disabled = false }) => {
-  return (
-    <div className="flex items-center justify-between gap-3">
-      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-        {label}
-      </span>
-      <button
-        onClick={() => !disabled && onChange(!value)}
-        disabled={disabled}
-        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-          disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"
-        } ${value ? "bg-indigo-600" : "bg-gray-300 dark:bg-gray-600"}`}
-      >
-        <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-            value ? "translate-x-6" : "translate-x-1"
-          }`}
-        />
-      </button>
     </div>
   );
 };
@@ -732,51 +428,43 @@ const YPivotQAInspectionReportType = ({
   selectedOrders = [],
   orderData = null,
   orderType = "single",
-  onReportDataChange
+  onReportDataChange,
+  savedState = {}
 }) => {
-  // State
   const [reportTemplates, setReportTemplates] = useState([]);
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [lines, setLines] = useState([]);
-  const [tables, setTables] = useState([]);
-  const [orderColors, setOrderColors] = useState([]);
+  const [selectedTemplate, setSelectedTemplate] = useState(
+    savedState?.selectedTemplate || null
+  );
+
+  // Configuration State
+  const [inspectedQty, setInspectedQty] = useState(
+    savedState?.config?.inspectedQty || ""
+  );
+  const [cartonQty, setCartonQty] = useState(
+    savedState?.config?.cartonQty || ""
+  );
+  const [shippingStage, setShippingStage] = useState(
+    savedState?.config?.shippingStage || null
+  );
+  const [remarks, setRemarks] = useState(savedState?.config?.remarks || "");
+
+  // Supplier State
+  const [isSubCon, setIsSubCon] = useState(
+    savedState?.config?.isSubCon || false
+  );
+  const [selectedSubConFactory, setSelectedSubConFactory] = useState(
+    savedState?.config?.selectedSubConFactory || null
+  );
+
+  // Data State
   const [aqlConfigs, setAqlConfigs] = useState([]);
   const [subConFactories, setSubConFactories] = useState([]);
 
-  // Selection State
-  const [selectedLines, setSelectedLines] = useState([]);
-  const [selectedTables, setSelectedTables] = useState([]);
-  const [selectedColors, setSelectedColors] = useState([]);
-  const [inspectedQty, setInspectedQty] = useState("");
-  const [cartonQty, setCartonQty] = useState("");
-
-  // Supplier State
-  const [isSubCon, setIsSubCon] = useState(false);
-  const [selectedSubConFactory, setSelectedSubConFactory] = useState(null);
-
-  // Shipping Stage
-  const [shippingStage, setShippingStage] = useState(null);
-
-  // Remarks
-  const [remarks, setRemarks] = useState("");
-
   // Loading States
   const [loadingTemplates, setLoadingTemplates] = useState(false);
-  const [loadingLines, setLoadingLines] = useState(false);
-  const [loadingTables, setLoadingTables] = useState(false);
-  const [loadingColors, setLoadingColors] = useState(false);
   const [loadingAql, setLoadingAql] = useState(false);
   const [loadingSubConFactories, setLoadingSubConFactories] = useState(false);
   const [error, setError] = useState(null);
-
-  // Shipping Stage Options
-  const shippingStageOptions = [
-    { value: "D1", label: "D1" },
-    { value: "D2", label: "D2" },
-    { value: "D3", label: "D3" },
-    { value: "D4", label: "D4" },
-    { value: "D5", label: "D5" }
-  ];
 
   // Determine buyer
   const buyer = useMemo(() => {
@@ -784,177 +472,139 @@ const YPivotQAInspectionReportType = ({
     return determineBuyerFromOrderNo(selectedOrders[0]).buyer;
   }, [selectedOrders]);
 
+  // Determine Total Order Qty for Validation
+  const maxOrderQty = useMemo(() => {
+    return orderData?.dtOrder?.totalQty || 0;
+  }, [orderData]);
+
+  // --- Calculations ---
+
+  // Calculate the actual AQL Sample Size based on the Inspected Qty (Lot Size)
+  const aqlSampleSize = useMemo(() => {
+    if (!aqlConfigs || aqlConfigs.length === 0 || !inspectedQty) return 0;
+
+    // Usually standardizing on one config (e.g., Major) to get sample size from the table
+    // Adjust logic if your AQL config structure differs
+    const majorConfig =
+      aqlConfigs.find((c) => c.Status === "Major") ||
+      aqlConfigs.find((c) => c.Status === "Minor");
+    if (!majorConfig?.SampleData) return 0;
+
+    const qty = parseInt(inspectedQty);
+    const sample = majorConfig.SampleData.find(
+      (s) => qty >= s.Min && qty <= s.Max
+    );
+
+    return sample ? sample.SampleSize : 0;
+  }, [aqlConfigs, inspectedQty]);
+
+  // --- Effects ---
+
   // Fetch Report Templates
-  const fetchTemplates = useCallback(async () => {
-    setLoadingTemplates(true);
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/qa-sections-templates`);
-      if (res.data.success) {
-        setReportTemplates(res.data.data);
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setLoadingTemplates(true);
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/qa-sections-templates`
+        );
+        if (res.data.success) {
+          setReportTemplates(res.data.data);
+        }
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load report templates");
+      } finally {
+        setLoadingTemplates(false);
       }
-    } catch (err) {
-      console.error("Error fetching templates:", err);
-      setError("Failed to load report templates");
-    } finally {
-      setLoadingTemplates(false);
-    }
+    };
+    fetchTemplates();
   }, []);
 
-  // Fetch Lines (YM Lines)
-  const fetchLines = useCallback(async () => {
-    setLoadingLines(true);
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/qa-sections-lines`);
-      if (res.data.success) {
-        setLines(res.data.data.filter((line) => line.Active));
+  // Fetch Sub-Con Factories
+  useEffect(() => {
+    const fetchSubConFactories = async () => {
+      setLoadingSubConFactories(true);
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/subcon-factories`
+        );
+        if (res.data.success) {
+          setSubConFactories(res.data.data);
+        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingSubConFactories(false);
       }
-    } catch (err) {
-      console.error("Error fetching lines:", err);
-    } finally {
-      setLoadingLines(false);
-    }
+    };
+    fetchSubConFactories();
   }, []);
-
-  // Fetch Tables
-  const fetchTables = useCallback(async () => {
-    setLoadingTables(true);
-    try {
-      const res = await axios.get(`${API_BASE_URL}/api/qa-sections-tables`);
-      if (res.data.success) {
-        setTables(res.data.data.filter((table) => table.Active));
-      }
-    } catch (err) {
-      console.error("Error fetching tables:", err);
-    } finally {
-      setLoadingTables(false);
-    }
-  }, []);
-
-  // Fetch Order Colors
-  const fetchOrderColors = useCallback(async () => {
-    if (!selectedOrders?.length) {
-      setOrderColors([]);
-      return;
-    }
-    setLoadingColors(true);
-    try {
-      const res = await axios.post(
-        `${API_BASE_URL}/api/fincheck-inspection/order-colors`,
-        { orderNos: selectedOrders }
-      );
-      if (res.data.success) {
-        setOrderColors(res.data.data);
-      }
-    } catch (err) {
-      console.error("Error fetching colors:", err);
-    } finally {
-      setLoadingColors(false);
-    }
-  }, [selectedOrders]);
 
   // Fetch AQL Config
-  const fetchAqlConfig = useCallback(async () => {
+  useEffect(() => {
     if (!buyer || buyer === "Unknown") {
       setAqlConfigs([]);
       return;
     }
-    setLoadingAql(true);
-    try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${buyer}`
-      );
-      if (res.data.success) {
-        setAqlConfigs(res.data.data);
+    const fetchAqlConfig = async () => {
+      setLoadingAql(true);
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${buyer}`
+        );
+        if (res.data.success) {
+          setAqlConfigs(res.data.data);
+        }
+      } catch (err) {
+        console.error(err);
+        setAqlConfigs([]);
+      } finally {
+        setLoadingAql(false);
       }
-    } catch (err) {
-      console.error("Error fetching AQL config:", err);
-      setAqlConfigs([]);
-    } finally {
-      setLoadingAql(false);
-    }
+    };
+    fetchAqlConfig();
   }, [buyer]);
 
-  // Fetch Sub-Con Factories
-  const fetchSubConFactories = useCallback(async () => {
-    setLoadingSubConFactories(true);
-    try {
-      const res = await axios.get(
-        `${API_BASE_URL}/api/fincheck-inspection/subcon-factories`
-      );
-      if (res.data.success) {
-        setSubConFactories(res.data.data);
-      }
-    } catch (err) {
-      console.error("Error fetching sub-con factories:", err);
-    } finally {
-      setLoadingSubConFactories(false);
-    }
-  }, []);
-
-  // Initial Load
+  // Reset factory if not subcon
   useEffect(() => {
-    fetchTemplates();
-    fetchSubConFactories();
-  }, [fetchTemplates, fetchSubConFactories]);
-
-  // Fetch AQL when buyer changes
-  useEffect(() => {
-    fetchAqlConfig();
-  }, [fetchAqlConfig]);
-
-  // Fetch data when template changes
-  useEffect(() => {
-    if (selectedTemplate?.Line === "Yes" && !isSubCon) fetchLines();
-    if (selectedTemplate?.Table === "Yes" && !isSubCon) fetchTables();
-    if (selectedTemplate?.Colors === "Yes") fetchOrderColors();
-  }, [selectedTemplate, isSubCon, fetchLines, fetchTables, fetchOrderColors]);
+    if (!isSubCon) setSelectedSubConFactory(null);
+  }, [isSubCon]);
 
   // Logic: Reset and Auto-fill Inputs based on Template
   useEffect(() => {
     if (!selectedTemplate) return;
 
-    // Reset Selections
-    setSelectedLines([]);
-    setSelectedTables([]);
-    setSelectedColors([]);
-    setCartonQty("");
-    setShippingStage(null);
-    setRemarks("");
+    const savedId = savedState?.selectedTemplate?._id;
+    const currentId = selectedTemplate._id;
+    const isRestoring = savedId === currentId;
 
-    // Logic for Inspected Qty
     if (selectedTemplate.InspectedQtyMethod === "AQL") {
-      // If AQL, user must enter manually
-      setInspectedQty("");
+      // If switching TO an AQL template (not restoring), clear the input.
+      if (!isRestoring) {
+        setInspectedQty("");
+      }
     } else {
-      // If Fixed (or others), auto-fill from template but allow edit
-      const defaultQty = selectedTemplate.InspectedQty
-        ? selectedTemplate.InspectedQty.toString()
-        : "";
-      setInspectedQty(defaultQty);
+      // Fixed / NA Method
+      if (!isRestoring) {
+        setInspectedQty(selectedTemplate.InspectedQty?.toString() || "");
+      } else {
+        if (inspectedQty === "" && selectedTemplate.InspectedQty) {
+          setInspectedQty(selectedTemplate.InspectedQty.toString());
+        }
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTemplate?._id]);
 
-  // Reset line selection when sub-con changes
-  useEffect(() => {
-    setSelectedLines([]);
-    setSelectedTables([]);
-    if (!isSubCon) {
-      setSelectedSubConFactory(null);
-      if (selectedTemplate?.Line === "Yes") fetchLines();
-      if (selectedTemplate?.Table === "Yes") fetchTables();
-    }
-  }, [isSubCon, selectedTemplate, fetchLines, fetchTables]);
-
-  // Pass data to parent
+  // Pass data to parent including calculated AQL Sample Size
   useEffect(() => {
     if (onReportDataChange) {
       onReportDataChange({
         selectedTemplate,
         config: {
-          selectedLines,
-          selectedTables,
-          selectedColors,
-          inspectedQty,
+          inspectedQty, // This is user input Lot Size
+          aqlSampleSize, // This is the calculated Sample Size for AQL
           cartonQty,
           isSubCon,
           selectedSubConFactory,
@@ -965,10 +615,8 @@ const YPivotQAInspectionReportType = ({
     }
   }, [
     selectedTemplate,
-    selectedLines,
-    selectedTables,
-    selectedColors,
     inspectedQty,
+    aqlSampleSize,
     cartonQty,
     isSubCon,
     selectedSubConFactory,
@@ -976,41 +624,6 @@ const YPivotQAInspectionReportType = ({
     remarks,
     onReportDataChange
   ]);
-
-  // Prepare dropdown options
-  const lineOptions = useMemo(() => {
-    if (isSubCon && selectedSubConFactory) {
-      const factory = subConFactories.find(
-        (f) => f._id === selectedSubConFactory
-      );
-      if (factory?.lineList) {
-        return factory.lineList.map((line) => ({
-          value: line,
-          label: line
-        }));
-      }
-      return [];
-    }
-    return lines.map((line) => ({
-      value: line._id,
-      label: line.LineNo
-    }));
-  }, [lines, isSubCon, selectedSubConFactory, subConFactories]);
-
-  const tableOptions = useMemo(() => {
-    return tables.map((table) => ({
-      value: table._id,
-      label: table.TableNo
-    }));
-  }, [tables]);
-
-  const colorOptions = useMemo(() => {
-    return orderColors.map((color) => ({
-      value: color.color,
-      label: color.color,
-      colorCode: color.colorCode
-    }));
-  }, [orderColors]);
 
   const subConFactoryOptions = useMemo(() => {
     return subConFactories.map((factory) => ({
@@ -1021,20 +634,31 @@ const YPivotQAInspectionReportType = ({
     }));
   }, [subConFactories]);
 
-  // Visibility Flags based on Template Schema
-  const showLine = selectedTemplate?.Line === "Yes";
-  const showTable = selectedTemplate?.Table === "Yes";
-  const showColors = selectedTemplate?.Colors === "Yes";
+  const shippingStageOptions = [
+    { value: "D1", label: "D1" },
+    { value: "D2", label: "D2" },
+    { value: "D3", label: "D3" },
+    { value: "D4", label: "D4" },
+    { value: "D5", label: "D5" }
+  ];
+
+  // Visibility Flags
+  const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
   const showShippingStage = selectedTemplate?.ShippingStage === "Yes";
   const showCarton = selectedTemplate?.isCarton === "Yes";
-
-  // Show section if ANY config is required (Inspected Qty is always shown if a template is selected)
   const showConfigurationSection = selectedTemplate !== null;
 
-  // Handle input changes
+  // Handle input changes with VALIDATION
   const handleInspectedQtyChange = (e) => {
-    const value = e.target.value.replace(/[^0-9]/g, "");
-    setInspectedQty(value);
+    const rawVal = e.target.value.replace(/[^0-9]/g, "");
+    const val = parseInt(rawVal) || 0;
+
+    if (maxOrderQty > 0 && val > maxOrderQty) {
+      // Cap at max qty
+      setInspectedQty(maxOrderQty.toString());
+    } else {
+      setInspectedQty(rawVal);
+    }
   };
 
   const handleCartonQtyChange = (e) => {
@@ -1108,134 +732,81 @@ const YPivotQAInspectionReportType = ({
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3">
             <h3 className="text-white font-bold text-sm flex items-center gap-2">
-              <Layers className="w-4 h-4" />
-              Inspection Selection
+              <Box className="w-4 h-4" />
+              Inspection Details
             </h3>
           </div>
 
           <div className="p-4 space-y-6">
-            {/* Supplier Section - Only show if Line or Table is needed */}
-            {(showLine || showTable) && (
-              <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                  <Building className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                  <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
-                    Supplier
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {/* Supplier (YM - Fixed) */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
-                      Supplier
-                    </label>
-                    <div className="px-3 py-2.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm font-bold text-indigo-700 dark:text-indigo-300">
-                      YM
-                    </div>
-                  </div>
-
-                  {/* Sub-Con Toggle */}
-                  <div className="flex items-end pb-1">
-                    <div className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl">
-                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                        Sub-Con
-                      </span>
-                      <button
-                        onClick={() => setIsSubCon(!isSubCon)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          isSubCon
-                            ? "bg-indigo-600"
-                            : "bg-gray-300 dark:bg-gray-600"
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                            isSubCon ? "translate-x-6" : "translate-x-1"
-                          }`}
-                        />
-                      </button>
-                      <span
-                        className={`text-xs font-bold ${
-                          isSubCon ? "text-indigo-600" : "text-gray-500"
-                        }`}
-                      >
-                        {isSubCon ? "Yes" : "No"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Sub-Con Factory Selection */}
-                  {isSubCon && (
-                    <div className="sm:col-span-2">
-                      <SearchableSingleSelect
-                        label="Sub-Con Factory"
-                        icon={Factory}
-                        options={subConFactoryOptions}
-                        selectedValue={selectedSubConFactory}
-                        onSelectionChange={setSelectedSubConFactory}
-                        placeholder="Select factory..."
-                        loading={loadingSubConFactories}
-                        color="amber"
-                      />
-                    </div>
-                  )}
-                </div>
+            {/* Supplier Section */}
+            <div className="p-4 bg-gray-50 dark:bg-gray-900 rounded-xl space-y-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Building className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">
+                  Supplier
+                </span>
               </div>
-            )}
 
-            {/* Line, Table, Color Selection Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Line Selection */}
-              {showLine && (
-                <SearchableMultiSelect
-                  label="Production Line(s)"
-                  icon={GitBranch}
-                  options={lineOptions}
-                  selectedValues={selectedLines}
-                  onSelectionChange={setSelectedLines}
-                  placeholder={
-                    isSubCon && !selectedSubConFactory
-                      ? "Select factory first..."
-                      : "Select lines..."
-                  }
-                  loading={loadingLines}
-                  disabled={isSubCon && !selectedSubConFactory}
-                  color="indigo"
-                />
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Supplier (YM - Fixed) */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5">
+                    Supplier
+                  </label>
+                  <div className="px-3 py-2.5 bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-800 rounded-xl text-sm font-bold text-indigo-700 dark:text-indigo-300">
+                    YM
+                  </div>
+                </div>
 
-              {/* Table Selection */}
-              {showTable && (
-                <SearchableMultiSelect
-                  label="Inspection Table(s)"
-                  icon={Table2}
-                  options={tableOptions}
-                  selectedValues={selectedTables}
-                  onSelectionChange={setSelectedTables}
-                  placeholder="Select tables..."
-                  loading={loadingTables}
-                  disabled={isSubCon}
-                  color="purple"
-                />
-              )}
+                {/* Sub-Con Toggle */}
+                <div className="flex items-end pb-1">
+                  <div className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl">
+                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                      Sub-Con
+                    </span>
+                    <button
+                      onClick={() => setIsSubCon(!isSubCon)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        isSubCon
+                          ? "bg-indigo-600"
+                          : "bg-gray-300 dark:bg-gray-600"
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                          isSubCon ? "translate-x-6" : "translate-x-1"
+                        }`}
+                      />
+                    </button>
+                    <span
+                      className={`text-xs font-bold ${
+                        isSubCon ? "text-indigo-600" : "text-gray-500"
+                      }`}
+                    >
+                      {isSubCon ? "Yes" : "No"}
+                    </span>
+                  </div>
+                </div>
 
-              {/* Color Selection */}
-              {showColors && (
-                <SearchableMultiSelect
-                  label="Colors"
-                  icon={Palette}
-                  options={colorOptions}
-                  selectedValues={selectedColors}
-                  onSelectionChange={setSelectedColors}
-                  placeholder="Select colors..."
-                  loading={loadingColors}
-                  color="emerald"
-                />
-              )}
+                {/* Sub-Con Factory Selection */}
+                {isSubCon && (
+                  <div className="sm:col-span-2">
+                    <SearchableSingleSelect
+                      label="Sub-Con Factory"
+                      icon={Factory}
+                      options={subConFactoryOptions}
+                      selectedValue={selectedSubConFactory}
+                      onSelectionChange={setSelectedSubConFactory}
+                      placeholder="Select factory..."
+                      loading={loadingSubConFactories}
+                      color="amber"
+                    />
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Carton Qty - Only if Template says Yes */}
+            {/* Carton Qty */}
             {showCarton && (
               <div>
                 <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
@@ -1259,41 +830,34 @@ const YPivotQAInspectionReportType = ({
 
             {/* Inspected Qty & Shipping Stage */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Inspected Qty */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
-                  <Hash className="w-3.5 h-3.5 text-indigo-500" />
-                  Inspected Qty
-                  {selectedTemplate.InspectedQtyMethod === "Fixed" && (
-                    <span className="text-[9px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 px-1.5 py-0.5 rounded ml-1">
-                      Fixed (Editable)
-                    </span>
-                  )}
-                  {selectedTemplate.InspectedQtyMethod === "AQL" && (
+              {/* Inspected Qty - Hidden if Fixed */}
+              {isAQL && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                    <Hash className="w-3.5 h-3.5 text-indigo-500" />
+                    Inspected Qty (Lot Size)
                     <span className="text-[9px] bg-orange-100 dark:bg-orange-900/30 text-orange-600 px-1.5 py-0.5 rounded ml-1">
                       AQL
                     </span>
-                  )}
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={inspectedQty}
-                  onChange={handleInspectedQtyChange}
-                  placeholder="Enter inspected qty..."
-                  className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-                {selectedTemplate.InspectedQtyMethod === "Fixed" &&
-                  inspectedQty !==
-                    selectedTemplate.InspectedQty?.toString() && (
-                    <p className="text-xs text-amber-500 mt-1">
-                      Modified from default ({selectedTemplate.InspectedQty})
-                    </p>
-                  )}
-              </div>
+                    {maxOrderQty > 0 && (
+                      <span className="text-[9px] text-gray-400 ml-auto">
+                        (Max: {maxOrderQty})
+                      </span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={inspectedQty}
+                    onChange={handleInspectedQtyChange}
+                    placeholder="Enter Lot Size..."
+                    className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-bold text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </div>
+              )}
 
-              {/* Shipping Stage - Only if Template says Yes */}
+              {/* Shipping Stage */}
               {showShippingStage && (
                 <div>
                   <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
@@ -1342,7 +906,7 @@ const YPivotQAInspectionReportType = ({
       )}
 
       {/* AQL Configuration Table */}
-      {selectedTemplate && (
+      {selectedTemplate && isAQL && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3">
             <h3 className="text-white font-bold text-sm flex items-center gap-2">

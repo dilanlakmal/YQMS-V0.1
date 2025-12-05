@@ -8,7 +8,8 @@ import {
   Package,
   Ruler,
   CheckSquare,
-  Settings
+  Settings,
+  Info
 } from "lucide-react";
 import React, { useMemo, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -16,6 +17,7 @@ import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataC
 import YPivotQAInspectionReportType from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
 import YPivotQAInspectionPhotosDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPhotosDetermination";
+import YPivotQAInspectionLineTableColorConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionLineTableColorConfig";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -41,7 +43,7 @@ const YPivotQAInspection = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("order");
 
-  // ADD: Shared state for order data
+  // Shared state for order data
   const [sharedOrderState, setSharedOrderState] = useState({
     inspectionDate: new Date().toISOString().split("T")[0],
     orderType: "single",
@@ -49,14 +51,15 @@ const YPivotQAInspection = () => {
     orderData: null
   });
 
-  // ADD: Shared state for Report Configuration
+  // Shared state for Report Configuration
+  // Note: lineTableConfig is added to store data from the new tab
   const [sharedReportState, setSharedReportState] = useState({
     selectedTemplate: null,
-    // Add other fields you might need in other tabs (lines, tables, etc.)
-    config: {}
+    config: {}, // Stores inspectedQty, subCon info, etc.
+    lineTableConfig: [] // Stores the rows/groups from the Info tab
   });
 
-  // ADD: Handler for order data changes
+  // Handler for order data changes
   const handleOrderDataChange = useCallback((newState) => {
     setSharedOrderState((prev) => ({
       ...prev,
@@ -64,7 +67,7 @@ const YPivotQAInspection = () => {
     }));
   }, []);
 
-  // ADD: Handler for report data changes
+  // Handler for report data changes (Merges state)
   const handleReportDataChange = useCallback((newState) => {
     setSharedReportState((prev) => ({
       ...prev,
@@ -100,6 +103,7 @@ const YPivotQAInspection = () => {
             orderData={sharedOrderState.orderData}
             orderType={sharedOrderState.orderType}
             onReportDataChange={handleReportDataChange}
+            savedState={sharedReportState}
           />
         ),
         gradient: "from-purple-500 to-pink-500",
@@ -124,6 +128,20 @@ const YPivotQAInspection = () => {
         ),
         gradient: "from-orange-500 to-red-500",
         description: "Photo documentation"
+      },
+      {
+        id: "info",
+        label: "Info",
+        icon: <Info size={18} />,
+        component: (
+          <YPivotQAInspectionLineTableColorConfig
+            reportData={sharedReportState}
+            orderData={sharedOrderState}
+            onUpdate={handleReportDataChange}
+          />
+        ),
+        gradient: "from-teal-500 to-cyan-500",
+        description: "Detailed Configuration"
       },
       {
         id: "measurement",
