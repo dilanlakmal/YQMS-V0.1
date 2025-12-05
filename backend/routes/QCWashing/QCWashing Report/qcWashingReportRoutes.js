@@ -7,9 +7,7 @@ import {
   getqcwashingResult,
   getqcwashingresultFilter,
   updateQCWashingQtySub,
-   getIndividualImageProxy,
-
-   debugQCWashingData
+   getIndividualImageProxy
 } from '../../../controller/QCWashing/QCWashing Report/qcWashingReportController.js';
 
 const router = express.Router();
