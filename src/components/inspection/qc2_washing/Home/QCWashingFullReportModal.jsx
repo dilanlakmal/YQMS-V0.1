@@ -395,7 +395,8 @@ const getImageUrl = (imagePath) => {
                         <p className="text-lg font-bold text-green-900 dark:text-green-100">{processedReportData.buyer || 'N/A'}</p>
                       </div>
                     </div>
-                  </div>
+                  </div> 
+
                 </div>
               </div>
 
@@ -1327,6 +1328,53 @@ const getImageUrl = (imagePath) => {
                           </div>
                         </div>
                       )}
+                      <div className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+  <div className="flex items-center">
+    <div className="bg-purple-500 p-2 rounded-lg">
+      <ClipboardCheck className="w-5 h-5 text-white" />
+    </div>
+    <div className="ml-3">
+      <p className="text-xs font-medium text-purple-600 dark:text-purple-300 uppercase tracking-wide">Reference Sample Approve Date</p>
+      <p className="text-lg font-bold text-purple-900 dark:text-purple-100">
+        {(() => {
+          const approveDate = processedReportData.inspectionDetails?.referenceSampleApproveDate;
+          if (!approveDate) return 'N/A';
+          try {
+            let dateObj;
+            let dateString = approveDate;
+            
+            // Handle MongoDB's extended JSON format for dates
+            if (typeof approveDate === 'object' && approveDate !== null && approveDate.$date) {
+              dateString = approveDate.$date;
+            }
+            
+            // Create a date object. The string is assumed to be in UTC format.
+            dateObj = new Date(dateString);
+            
+            if (isNaN(dateObj.getTime())) {
+              console.warn('Invalid approve date:', approveDate);
+              return 'Invalid Date';
+            }
+            
+            // Format the date using UTC parts to avoid timezone shifts.
+            const formattedDate = dateObj.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              timeZone: 'UTC' // Important: interpret the date in UTC
+            });
+            
+            return formattedDate;
+          } catch (error) {
+            console.error('Date parsing error:', error, 'for value:', approveDate);
+            return 'Error parsing date';
+          }
+        })()}
+      </p>
+    </div>
+  </div>
+</div>
+
 
                     </div>
                   </div>

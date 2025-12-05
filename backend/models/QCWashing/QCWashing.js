@@ -230,7 +230,16 @@ const QCWashingSchema = new mongoose.Schema({
     
     // Machine settings
     timeCoolEnabled: { type: Boolean, default: false },
-    timeHotEnabled: { type: Boolean, default: false }
+    timeHotEnabled: { type: Boolean, default: false },
+
+    referenceSampleApproveDate: { 
+      type: Date, 
+     default: function() {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+        return now;
+      }
+    }
   },
   defectDetails: {
     checkedQty: Number,

@@ -228,6 +228,8 @@ const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] 
   setShowRecordsList(true);
 };
 
+
+
 // Modal or list component
 const RecordsListModal = () => (
   showRecordsList && (
@@ -863,7 +865,7 @@ const RecordsListModal = () => (
                               )}
                               {machine.silicon && machine.silicon.actualValue && (
                                 <div className="flex items-center">
-                                                                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                                  <div className={`w-2 h-2 rounded-full mr-2 ${
                                     machine.silicon.status?.ok ? 'bg-green-500' : 'bg-red-500'
                                   }`}></div>
                                   <span>Silicon: {machine.silicon.actualValue}g</span>
@@ -883,6 +885,52 @@ const RecordsListModal = () => (
                       </div>
                     </div>
                   )}
+                 <div className="bg-white dark:bg-gray-700 rounded-lg p-4 border border-gray-200 dark:border-gray-600 shadow-sm">
+                    <div className="flex items-center">
+                      <ClipboardCheck className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+                      <div className="ml-3">
+                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Sample Approve Date</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">
+                          {(() => {
+                            const approveDate = itemData.inspectionDetails?.referenceSampleApproveDate;
+
+                            if (!approveDate) return 'N/A';
+
+                            try {
+                              let dateObj;
+                              let dateString = approveDate;
+
+                              // Handle MongoDB's extended JSON format for dates
+                              if (typeof approveDate === 'object' && approveDate !== null && approveDate.$date) {
+                                dateString = approveDate.$date;
+                              }
+
+                              // Create a date object. The string is assumed to be in UTC format.
+                              dateObj = new Date(dateString);
+
+                              if (isNaN(dateObj.getTime())) {
+                                console.warn('Invalid approve date:', approveDate);
+                                return 'Invalid Date';
+                              }
+
+                              // Format the date using UTC parts to avoid timezone shifts.
+                              const formattedDate = dateObj.toLocaleDateString('en-US', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                timeZone: 'UTC' // Important: interpret the date in UTC
+                              });
+
+                              return formattedDate;
+                            } catch (error) {
+                              console.error('Date parsing error:', error, 'for value:', approveDate);
+                              return 'Error parsing date';
+                            }
+                          })()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

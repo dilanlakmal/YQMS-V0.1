@@ -302,6 +302,7 @@ export const saveQCWashingInspectionData = async (req, res) => {
       const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
       const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
       const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
+      const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
 
       if (!recordId) {
         return res
@@ -445,7 +446,16 @@ export const saveQCWashingInspectionData = async (req, res) => {
         })),
         // Add machine settings
         timeCoolEnabled,
-        timeHotEnabled
+        timeHotEnabled,
+        referenceSampleApproveDate: referenceSampleApproveDate ? (() => {
+        const date = new Date(referenceSampleApproveDate);
+        date.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+        return date;
+      })() : (() => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+        return now;
+      })()
       };
 
       record.savedAt = new Date();
@@ -515,6 +525,7 @@ export const updateQCWashingInspectionData = async (req, res) => {
       const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
       const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
       const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
+       const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
 
       if (!recordId) {
         return res
@@ -642,7 +653,16 @@ export const updateQCWashingInspectionData = async (req, res) => {
         })),
         // Update machine settings
         timeCoolEnabled,
-        timeHotEnabled
+        timeHotEnabled,
+       referenceSampleApproveDate: referenceSampleApproveDate ? (() => {
+        const date = new Date(referenceSampleApproveDate);
+        date.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+        return date;
+      })() : (() => {
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
+        return now;
+      })()
       };
 
       record.savedAt = new Date();

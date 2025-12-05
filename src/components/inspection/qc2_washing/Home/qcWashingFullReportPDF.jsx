@@ -246,6 +246,45 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
               <Text style={styles.infoLabel}>Wash Qty:</Text>
               <Text style={styles.infoValue}>{safeString(recordData.washQty)}</Text>
             </View>
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Approve Date:</Text>
+              <Text style={styles.infoValue}>
+                {(() => {
+                  const approveDate = recordData.inspectionDetails?.referenceSampleApproveDate;
+                  if (!approveDate) return 'N/A';
+                  try {
+                    let dateObj;
+                    let dateString = approveDate;
+                    
+                    // Handle MongoDB's extended JSON format for dates
+                    if (typeof approveDate === 'object' && approveDate !== null && approveDate.$date) {
+                      dateString = approveDate.$date;
+                    }
+                    
+                    // Create a date object. The string is assumed to be in UTC format.
+                    dateObj = new Date(dateString);
+                    
+                    if (isNaN(dateObj.getTime())) {
+                      console.warn('Invalid approve date:', approveDate);
+                      return 'Invalid Date';
+                    }
+                    
+                    // Format the date using UTC parts to avoid timezone shifts.
+                    const formattedDate = dateObj.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      timeZone: 'UTC' // Important: interpret the date in UTC
+                    });
+                    
+                    return formattedDate;
+                  } catch (error) {
+                    console.error('Date parsing error:', error, 'for value:', approveDate);
+                    return 'Error parsing date';
+                  }
+                })()}
+              </Text>
+            </View>
           </View>
         </View>
         

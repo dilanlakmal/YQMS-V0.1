@@ -27,7 +27,6 @@ export const getAllQCWashingSubmittedData = async (req, res) => {
     const submittedData = await QCWashing.find({ 
       status: { $in: ['submitted', 'processing', 'auto-saved'] }
     })
-    .select('date orderNo before_after_wash checkedQty washQty totalCheckedPoint totalPass totalFail passRate totalCheckedPcs rejectedDefectPcs totalDefectCount defectRate defectRatio overallFinalResult orderQty colorOrderQty color washType reportType buyer factoryName aql inspectionDetails defectDetails measurementDetails isAutoSave userId status createdAt updatedAt submittedAt inspector actualWashQty actualAQLValue editedActualWashQty lastEditedAt')
     .sort({ createdAt: -1 });
 
     res.json({ 
@@ -35,7 +34,6 @@ export const getAllQCWashingSubmittedData = async (req, res) => {
       data: submittedData,
       count: submittedData.length
     });
-
   } catch (error) {
     console.error("Error fetching submitted QC washing data:", error);
     res.status(500).json({ 
@@ -45,7 +43,6 @@ export const getAllQCWashingSubmittedData = async (req, res) => {
     });
   }
 };
-
 export const getQCWashingImageProxy = async (req, res) => {
   const imageUrl = decodeURIComponent(req.params.imageUrl);
   try {
@@ -188,58 +185,59 @@ export const getqcwashingresultFilter = async (req, res) => {
 // QC Washing results endpoint
 export const getqcwashingResult = async (req, res) => {
   try {
-      const {
-        startDate,
-        endDate,
-        buyer,
-        moNo,
-        color,
-        qcID
-      } = req.query;
-  
-      let matchQuery = {};
-  
-      // Date filtering
-      if (startDate || endDate) {
-        matchQuery.createdAt = {};
-        if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
-        if (endDate) matchQuery.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
-      }
-  
-      // Other filters
-      if (buyer) matchQuery.buyer = { $regex: new RegExp(buyer, 'i') };
-      if (moNo) matchQuery.orderNo = { $regex: new RegExp(moNo, 'i') };
-      if (color) matchQuery.color = { $regex: new RegExp(color, 'i') };
-      if (qcID) matchQuery.userId = qcID;
-  
-      const results = await QCWashing.find(matchQuery)
-        .sort({ createdAt: -1 })
-        .limit(1000); // Limit to prevent performance issues
-  
-      res.json(results);
-    } catch (error) {
-      console.error('Error fetching QC Washing results:', error);
-      res.status(500).json({ error: 'Failed to fetch QC Washing results' });
-    }
-};
+    const {
+      startDate,
+      endDate,
+      buyer,
+      moNo,
+      color,
+      qcID
+    } = req.query;
 
+    let matchQuery = {};
+
+    // Date filtering
+    if (startDate || endDate) {
+      matchQuery.createdAt = {};
+      if (startDate) matchQuery.createdAt.$gte = new Date(startDate);
+      if (endDate) matchQuery.createdAt.$lte = new Date(endDate + 'T23:59:59.999Z');
+    }
+
+    // Other filters
+    if (buyer) matchQuery.buyer = { $regex: new RegExp(buyer, 'i') };
+    if (moNo) matchQuery.orderNo = { $regex: new RegExp(moNo, 'i') };
+    if (color) matchQuery.color = { $regex: new RegExp(color, 'i') };
+    if (qcID) matchQuery.userId = qcID;
+
+    const results = await QCWashing.find(matchQuery)
+      // Remove .select() to get ALL fields
+      .sort({ createdAt: -1 })
+      .limit(1000);
+
+    res.json(results);
+  } catch (error) {
+    console.error('Error fetching QC Washing results:', error);
+    res.status(500).json({ error: 'Failed to fetch QC Washing results' });
+  }
+};
 // Light QC Washing PDF Generator
 export const getqcwashingPDF = async (req, res) => {
   try {
     const { id } = req.params;
     const [record, checkpointDefinitions] = await Promise.all([
-      QCWashing.findById(id),
+      QCWashing.findById(id), // Remove .select() to get ALL fields
       QCWashingCheckList.find({})
     ]);
 
     if (!record) return res.status(404).json({ error: "Record not found" });
 
     const { QcWashingFullReportPDF } = await import("../src/components/inspection/qc2_washing/Home/qcWashingFullReportPDF.jsx");
+
     const pdfBuffer = await renderToBuffer(
       React.createElement(QcWashingFullReportPDF, {
         recordData: record,
         checkpointDefinitions,
-        preloadedImages: {}, // no need to load images
+        preloadedImages: {},
         skipImageLoading: true
       })
     );
@@ -250,6 +248,7 @@ export const getqcwashingPDF = async (req, res) => {
       `attachment; filename="QC_Washing_Report_${record.orderNo}_${record.color}.pdf"`
     );
     res.send(pdfBuffer);
+
   } catch (error) {
     console.error("PDF generation failed:", error);
     res.status(500).json({ error: "Failed to generate PDF", details: error.message });
@@ -324,7 +323,6 @@ export const updateQCWashingQtySub = async (req, res) => {
     });
   }
 };
-
 // Add this route to your server for individual image proxy
 export const getIndividualImageProxy = async (req, res) => {
   try {
@@ -416,6 +414,11 @@ export const getIndividualImageProxy = async (req, res) => {
     });
   }
 };
+
+
+
+
+
 
 
 
