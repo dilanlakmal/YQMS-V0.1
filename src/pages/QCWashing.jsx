@@ -2391,17 +2391,17 @@ if (
     }
   }, [recordId, masterChecklist.length]);
 
-  const PageTitle = () => (
-    <div className="text-center">
-      <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
-        Yorkmars (Cambodia) Garment MFG Co., LTD
-      </h1>
-      <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
-        QC Washing
-        {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
-      </p>
-    </div>
-  );
+  // const PageTitle = () => (
+  //   <div className="text-center">
+  //     <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+  //       Yorkmars (Cambodia) Garment MFG Co., LTD
+  //     </h1>
+  //     <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
+  //       QC Washing
+  //       {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
+  //     </p>
+  //   </div>
+  // );
 
   const tabs = [
     {
@@ -2645,8 +2645,7 @@ if (
       {/* Main Content Area */}
       <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
-          <div className="transform transition-all duration-500 ease-out">
-            {/* Tab Content */}
+          {/* Tab Content */}
             <main
               className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
                 activeTab === "submittedData" || activeTab === "subConEditQty"
@@ -3007,7 +3006,6 @@ if (
         {activeTab === "submittedData" && <SubmittedWashingDataPage />}
         {activeTab === "subConEditQty" && <SubConEdit />}
       </main>
-    </div>
      </div>
   </div>
   <style >{`
