@@ -180,22 +180,6 @@ const YPivotQATemplatesMeasurementSelection = () => {
           all.map((s) => s.kValue).filter((k) => k && k !== "NA")
         );
         setKValuesList(Array.from(kSet).sort());
-
-        console.log("- K values found:", Array.from(kSet));
-
-        // Debug: Check if specs have different values per K value
-        if (all.length > 0) {
-          const samplePoint = all[0].MeasurementPointEngName;
-          const sampleSpecs = all.filter(
-            (s) => s.MeasurementPointEngName === samplePoint
-          );
-          console.log(
-            `- Sample point "${samplePoint}" has ${sampleSpecs.length} K value variants`
-          );
-          sampleSpecs.forEach((s) => {
-            console.log(`  K=${s.kValue}: Specs=`, s.Specs?.slice(0, 2));
-          });
-        }
       } else {
         all = data.AllAfterWashSpecs || [];
         selected = data.selectedAfterWashSpecs || [];
@@ -242,24 +226,6 @@ const YPivotQATemplatesMeasurementSelection = () => {
     console.log("handleSaveConfig:");
     console.log("- Selected IDs count:", selectedIds.length);
     console.log("- Filtered specs count:", filtered.length);
-    console.log("- Full specs list count:", fullSpecsList.length);
-
-    // Debug: Show unique measurement points vs total specs
-    const uniqueNames = [
-      ...new Set(filtered.map((s) => s.MeasurementPointEngName))
-    ];
-    console.log("- Unique measurement points:", uniqueNames.length);
-    console.log("- Point names:", uniqueNames);
-
-    // Debug: Show K value distribution
-    if (measConfig === "Before") {
-      const kValueCounts = {};
-      filtered.forEach((s) => {
-        const k = s.kValue || "NA";
-        kValueCounts[k] = (kValueCounts[k] || 0) + 1;
-      });
-      console.log("- K value distribution:", kValueCounts);
-    }
 
     setSelectedSpecsList(filtered);
     setIsConfigured(true);
@@ -280,12 +246,6 @@ const YPivotQATemplatesMeasurementSelection = () => {
       selectedSpecs: filtered, // Selected specs (all K value variants)
       isSaveAll: false
     };
-
-    console.log("Saving to server:", {
-      moNo: payload.moNo,
-      allSpecsCount: payload.allSpecs.length,
-      selectedSpecsCount: payload.selectedSpecs.length
-    });
 
     try {
       const response = await axios.post(`${API_BASE_URL}${endpoint}`, payload);
@@ -321,7 +281,6 @@ const YPivotQATemplatesMeasurementSelection = () => {
   };
 
   const handleEditMeasurement = (measurement, index) => {
-    //console.log("Editing measurement:", measurement);
     setEditingMeasurementIndex(index);
     setEditingMeasurementData(measurement); // Store the full measurement data
     setSelectedSize(measurement.size);
@@ -642,11 +601,14 @@ const YPivotQATemplatesMeasurementSelection = () => {
     );
   };
 
+  // ==========================================================================
+  // RENDER MEASUREMENTS TAB
+  // ==========================================================================
   const renderMeasurementsTab = () => {
     return (
       <YPivotQATemplatesMeasurementResultsTab
         savedMeasurements={savedMeasurements}
-        specsData={displayMode === "all" ? fullSpecsList : selectedSpecsList}
+        specsData={fullSpecsList}
         onEditMeasurement={handleEditMeasurement}
       />
     );

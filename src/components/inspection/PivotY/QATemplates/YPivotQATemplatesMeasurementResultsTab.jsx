@@ -1,4 +1,3 @@
-// YPivotQATemplatesMeasurementResultsTab.jsx
 import React from "react";
 import {
   Edit3,
@@ -8,15 +7,16 @@ import {
   TrendingDown,
   Users,
   Target,
-  AlertTriangle,
-  BarChart3
+  BarChart3,
+  Trash2 // <--- Imported Trash2
 } from "lucide-react";
 import { calculateMeasurementStats } from "./YPivotQATemplatesHelpers";
 
 const YPivotQATemplatesMeasurementResultsTab = ({
   savedMeasurements,
   specsData,
-  onEditMeasurement
+  onEditMeasurement,
+  onDeleteMeasurement // <--- Added prop here
 }) => {
   if (!savedMeasurements || savedMeasurements.length === 0) {
     return (
@@ -80,12 +80,24 @@ const YPivotQATemplatesMeasurementResultsTab = ({
                       {measurement.kValue && ` • K: ${measurement.kValue}`}
                     </p>
                   </div>
-                  <button
-                    onClick={() => onEditMeasurement(measurement, index)}
-                    className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
-                  >
-                    <Edit3 className="w-4 h-4" />
-                  </button>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => onEditMeasurement(measurement, index)}
+                      className="p-2 bg-white/20 hover:bg-white/30 rounded-full text-white transition-colors"
+                      title="Edit"
+                    >
+                      <Edit3 className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onDeleteMeasurement(index)}
+                      className="p-2 bg-white/20 hover:bg-red-500 rounded-full text-white transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
 
