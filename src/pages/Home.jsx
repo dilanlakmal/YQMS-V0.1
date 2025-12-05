@@ -182,7 +182,8 @@ function Home() {
             title: t("home.qcWashing"),
             description: "Washing Report",
              version: '0.1',
-          },{
+          },
+          {
             path: "/afterIroning",
             roles: ["QC Washing"],
             image: "assets/Home/after_ironing.png",

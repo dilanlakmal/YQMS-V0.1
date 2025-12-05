@@ -319,7 +319,9 @@ const handleOrderSelect = useCallback(async (orderNo) => {
   if (orderData.sizes) {
     const sizeTableData = [{
       orderTotalQty: orderData.quantity || 0,
-      sizeDetails: ''
+      sizeDetails: '',
+      sizes: orderData.sizes || [],        
+      colors: orderData.colors || [] 
     }];
     setSizeTable(sizeTableData);
   }
@@ -395,6 +397,61 @@ const handleOrderSelect = useCallback(async (orderNo) => {
 
   // Calculate totals
   const styleTableTotal = styleTable.reduce((sum, row) => sum + (parseInt(row.quantity) || 0), 0);
+
+  const handleSave = async () => {
+  try {
+    setLoading(true);
+
+     const preparedSizeTable = sizeTable.map(item => ({
+      orderTotalQty: item.orderTotalQty || 0,
+      sizeDetails: item.sizeDetails || '',
+      sizes: item.sizes || (selectedOrder?.sizes || []),
+      colors: item.colors || styleTable.flatMap(styleRow => styleRow.colors)
+    }));
+
+    const dataToSave = {
+      orderNo: formData.orderNo,
+      customerStyle: formData.customerStyle,
+      poNumber: formData.poNumber,
+      quantity: formData.quantity,
+      retailSingle: formData.retailSingle,
+      majorPoints: formData.majorPoints,
+      testInstructions: formData.testInstructions,
+      uploadedImage: uploadedImage,
+      styleTable: styleTable,
+     sizeTable: preparedSizeTable,
+      stampData: stampData,
+      createdBy: 'user' 
+    };
+
+    const response = await fetch(`${API_BASE_URL}/api/coverPage/save`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(dataToSave)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.success) {
+      alert('Cover page saved successfully!');
+      console.log('Saved cover page:', result.data);
+    } else {
+      throw new Error(result.message || 'Failed to save cover page');
+    }
+
+  } catch (error) {
+    console.error('Error saving cover page:', error);
+    alert(`Failed to save cover page: ${error.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
@@ -819,9 +876,13 @@ const handleOrderSelect = useCallback(async (orderNo) => {
 
         {/* Save Button */}
         <div className="mt-4 flex justify-center">
-          <button className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold">
+          <button 
+            onClick={handleSave}
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50"
+          >
             <Save size={20} />
-            Save Specification Sheet
+            {loading ? 'Saving...' : 'Save Specification Sheet'}
           </button>
         </div>
       </div>
