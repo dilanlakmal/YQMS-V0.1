@@ -2010,7 +2010,6 @@ const tabs = useMemo(() => [
       {/* Main Content Area */}
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
-          <div className="transform transition-all duration-500 ease-out">
             {activeTab === "newInspection" && (
               <>
             <OverAllSummaryCard
@@ -2453,7 +2452,7 @@ const tabs = useMemo(() => [
 
         {activeTab === "submittedData" && <SubmittedDataPage />}
         {/* {activeTab === "subConEditQty" && <SubConEdit />} */}
-      </div>
+     
     </div>
     </div>
     <style>{`
