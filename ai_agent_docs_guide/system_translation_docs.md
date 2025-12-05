@@ -65,6 +65,14 @@ Ensure consistent terminology across all company documents.
 ### 4. Monitoring Costs
 -   **Cost Estimation**: The system provides an estimated cost before processing large files.
 -   **Logs**: Check the translation logs (if enabled) to see usage per user or department.
+-   **Cost Tracking Log**: Detailed cost tracking is available in the CSV file located at `logs/translation-costs/translation-costs.csv`. This file records every translation job with the following details:
+    -   **Date & Time**: When the translation was performed.
+    -   **Job ID**: Unique identifier for the translation job.
+    -   **File Name**: Name of the file translated.
+    -   **Source/Target Language**: Languages involved in the translation.
+    -   **Characters Charged**: The number of characters billed for the translation.
+    -   **Cost (USD)**: The calculated cost based on the character count and current Azure rates.
+    -   **Status**: Outcome of the translation (e.g., Success, Failed).
 -   **Budgeting**: Monitor your Azure subscription usage to ensure you stay within budget.
 
 ---
