@@ -29,21 +29,35 @@ const styles = StyleSheet.create({
   },
   // Header Section
   headerContainer: {
+    
     padding: 20,
     paddingTop: 15,
     borderBottom: "2px solid #e5e7eb"
   },
   headerRow: {
+   
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     marginBottom: 10
   },
   headerLeft: {
-    flex: 1
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16
   },
   logoArea: {
-    marginBottom: 8
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  logo: {
+    width: 80,
+    height: 80,
+    objectFit: "contain"
+  },
+  headerTextContainer: {
+    flex: 1
   },
   title: {
     fontSize: 20,
@@ -380,6 +394,81 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
     paddingHorizontal: 4
+  },
+  // Defect Styles
+  defectItem: {
+    marginBottom: 20,
+    width: "48%",
+    marginRight: "2%"
+  },
+  defectImageContainer: {
+    width: "100%",
+    backgroundColor: "#f9fafb",
+    border: "2px dashed #d1d5db",
+    borderRadius: 4,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 10,
+    overflow: "hidden",
+    height: 200,
+    minHeight: 200
+  },
+  defectImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "contain",
+    maxWidth: "100%",
+    maxHeight: "100%"
+  },
+  defectInfo: {
+    marginTop: 8,
+    fontSize: 8,
+    color: "#374151",
+    width: "100%"
+  },
+  defectInfoRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 6,
+    paddingBottom: 4,
+    borderBottom: "1px solid #f3f4f6",
+    width: "100%"
+  },
+  defectInfoLabel: {
+    fontWeight: "bold",
+    color: "#6b7280",
+    fontSize: 8,
+    flex: 1
+  },
+  defectInfoValue: {
+    color: "#111827",
+    fontSize: 8,
+    flex: 1,
+    textAlign: "right"
+  },
+  defectRemarks: {
+    width: "100%"
+  },
+  defectRemarksRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    width: "100%"
+  },
+  defectRemarksLabel: {
+    fontWeight: "bold",
+    fontSize: 8,
+    color: "#6b7280",
+    flex: 0,
+    marginRight: 8,
+    minWidth: 60
+  },
+  defectRemarksText: {
+    fontSize: 8,
+    color: "#4b5563",
+    flex: 1,
+    textAlign: "right"
   }
 });
 
@@ -734,9 +823,26 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
   };
   
   const photoPages = splitCategoriesIntoPages(photoCategories);
-  // Calculate total pages: Header+Inspection Details (1) + Checklists (1 if exists) + Conclusion (1) + Photo pages
+  
+  // Split defects into pages: 2 columns, 6 defects per page
+  const splitDefectsIntoPages = (defects) => {
+    if (!defects || defects.length === 0) return [];
+    
+    const pages = [];
+    const MAX_DEFECTS_PER_PAGE = 6; // 2 columns x 3 rows = 6 defects max per page
+    
+    for (let i = 0; i < defects.length; i += MAX_DEFECTS_PER_PAGE) {
+      pages.push(defects.slice(i, i + MAX_DEFECTS_PER_PAGE));
+    }
+    
+    return pages;
+  };
+  
+  const defectsPages = splitDefectsIntoPages(report.defects || []);
+  
+  // Calculate total pages: Header+Inspection Details (1) + Checklists (1 if exists) + Photo pages + Defects pages + Conclusion (1)
   const hasChecklists = report.checklist && Object.keys(report.checklist).length > 0;
-  const totalPages = 1 + (hasChecklists ? 1 : 0) + 1 + photoPages.length;
+  const totalPages = 1 + (hasChecklists ? 1 : 0) + photoPages.length + defectsPages.length + 1;
 
   // Debug: Log photo information
   if (isPrinting) {
@@ -759,12 +865,20 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
         <View style={styles.headerContainer}>
           <View style={styles.headerRow}>
             <View style={styles.headerLeft}>
-              <Text style={styles.title}>
-                {report.inspectionType || "First Output"}{report.reportType === "EMB + Print" ? " - EMB + Print" : report.reportType === "Printing" ? " - Printing" : " - EMB"}
-              </Text>
-              <Text style={styles.inspectionNumbers}>
-                Inspection #: {report.moNo || "N/A"} | Group #: {report._id?.slice(-6) || "N/A"}
-              </Text>
+              <View style={styles.logoArea}>
+                <Image
+                  src="/assets/Img/sub-emb-pdf/photo_2025-12-05_09-58-53.jpg"
+                  style={styles.logo}
+                />
+              </View>
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.title}>
+                  {`${report.inspectionType || "First Output"}${report.reportType === "EMB + Print" ? " - EMB + Print" : report.reportType === "Printing" ? " - Printing" : " - EMB"}`}
+                </Text>
+                <Text style={styles.inspectionNumbers}>
+                  {`Inspection #: ${report.moNo || "N/A"} | Group #: ${report._id?.slice(-6) || "N/A"}`}
+                </Text>
+              </View>
             </View>
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
               <View style={getStatusButtonStyle(report.status)}>
@@ -803,7 +917,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Report Type:</Text>
               <Text style={styles.twoColumnValue}>
-                {report.inspectionType || "First Output"} - {report.reportType || "EMB"}
+                {`${report.inspectionType || "First Output"} - ${report.reportType || "EMB"}`}
               </Text>
             </View>
             <View style={styles.twoColumnRow}>
@@ -921,7 +1035,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
           {/* Footer */}
           <View style={styles.footer}>
             <Text>Page {hasChecklists ? 2 : 1} of {totalPages}</Text>
-            <Text>Powered by Pivot88</Text>
+            <Text>Powered by YaiKh</Text>
           </View>
         </Page>
       )}
@@ -1024,14 +1138,143 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text>Page {hasChecklists ? pageIndex + 4 : pageIndex + 3} of {totalPages}</Text>
-              <Text>Powered by Pivot88</Text>
+              <Text>Page {hasChecklists ? pageIndex + 3 : pageIndex + 2} of {totalPages}</Text>
+              <Text>Powered by YaiKh</Text>
             </View>
           </Page>
         );
       })}
 
-      {/* Page 3: Conclusion Section */}
+      {/* Defects Pages */}
+      {defectsPages.map((pageDefects, pageIndex) => {
+        if (!pageDefects || pageDefects.length === 0) return null;
+        
+        return (
+          <Page key={`defects-page-${pageIndex + 1}`} size="A4" style={styles.page}>
+            {/* Defects Section */}
+            <View>
+              <View style={styles.sectionHeader}>
+                <Text style={{ color: "#ffffff" }}>Defects{pageIndex > 0 ? " (Continued)" : ""}</Text>
+              </View>
+              <View style={[styles.contentSection, { padding: 20, paddingTop: 20 }]}>
+                {/* Display defects in 2-column grid */}
+                {(() => {
+                  // Group into rows of 2
+                  const rows = [];
+                  for (let i = 0; i < pageDefects.length; i += 2) {
+                    rows.push(pageDefects.slice(i, i + 2));
+                  }
+                  
+                  return rows.map((row, rowIndex) => (
+                    <View key={`defect-row-${rowIndex}`} style={{ flexDirection: "row", marginBottom: 20, gap: 20 }}>
+                      {row.map((defect, defectIndex) => {
+                        const imageUrl = normalizeImageUrl(defect.image);
+                        
+                        return (
+                          <View 
+                            key={`defect-${pageIndex}-${defectIndex}`} 
+                            style={{
+                              width: "48%",
+                              alignItems: imageUrl ? "center" : "flex-start"
+                            }}
+                          >
+                            {/* Defect header */}
+                            <View style={{
+                              paddingBottom: 8,
+                              marginBottom: 8,
+                              width: "100%"
+                            }}>
+                              <Text style={{
+                                fontSize: 11,
+                                fontWeight: "bold",
+                                color: "#374151",
+                                textAlign: "center"
+                              }}>
+                                {`${defect.category || "N/A"} - ${defect.name || defect.defectType || "N/A"}`}
+                              </Text>
+                            </View>
+                            
+                            {/* Defect image container - centered */}
+                            {imageUrl && (
+                              <View style={{
+                                marginBottom: 12,
+                                width: "100%",
+                                // backgroundColor: "#f9fafb",
+                                border: "2px dashed #d1d5db",
+                                borderRadius: 4,
+                                padding: 10,
+                                minHeight: 200,
+                                alignItems: "center",
+                                justifyContent: "center"
+                              }}>
+                                <Image
+                                  src={imageUrl}
+                                  style={{
+                                    maxWidth: "100%",
+                                    maxHeight: 200,
+                                    width: "auto",
+                                    height: "auto",
+                                    objectFit: "contain"
+                                  }}
+                                  crossOrigin="anonymous"
+                                />
+                              </View>
+                            )}
+                            
+                            {/* Defect info - width matches image container if image exists */}
+                            <View style={[
+                              styles.defectInfo,
+                              {
+                                width: imageUrl ? "100%" : "100%",
+                                alignItems: imageUrl ? "center" : "flex-start"
+                              }
+                            ]}>
+                              <View style={styles.defectInfoRow}>
+                                <Text style={styles.defectInfoLabel}>Category:</Text>
+                                <Text style={styles.defectInfoValue}>{defect.category || "N/A"}</Text>
+                              </View>
+                              <View style={styles.defectInfoRow}>
+                                <Text style={styles.defectInfoLabel}>Defect Type:</Text>
+                                <Text style={styles.defectInfoValue}>{defect.defectType || defect.name || "N/A"}</Text>
+                              </View>
+                              <View style={styles.defectInfoRow}>
+                                <Text style={styles.defectInfoLabel}>Quantity:</Text>
+                                <Text style={styles.defectInfoValue}>{defect.qty || defect.count || 0}</Text>
+                              </View>
+                              {defect.machineNo && (
+                                <View style={styles.defectInfoRow}>
+                                  <Text style={styles.defectInfoLabel}>Machine No:</Text>
+                                  <Text style={styles.defectInfoValue}>{defect.machineNo}</Text>
+                                </View>
+                              )}
+                              {defect.remarks && defect.remarks.trim() !== "" && (
+                                <View style={styles.defectRemarks}>
+                                  <View style={styles.defectRemarksRow}>
+                                    <Text style={styles.defectRemarksLabel}>Remarks:</Text>
+                                    <Text style={styles.defectRemarksText}>{defect.remarks}</Text>
+                                  </View>
+                                </View>
+                              )}
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  ));
+                })()}
+              </View>
+            </View>
+
+            {/* Footer */}
+            <View style={styles.footer}>
+              <Text>Page {hasChecklists ? photoPages.length + pageIndex + 3 : photoPages.length + pageIndex + 2} of {totalPages}</Text>
+              <Text>Powered by YaiKh</Text>
+            </View>
+          </Page>
+        );
+      })}
+
+      {/* Conclusion Section */}
       <Page size="A4" style={styles.page}>
         <View>
           <View style={styles.sectionHeader}>
@@ -1126,8 +1369,8 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>Page {hasChecklists ? 3 : 2} of {totalPages}</Text>
-          <Text>Powered by Pivot88</Text>
+          <Text>Page {totalPages} of {totalPages}</Text>
+          <Text>Powered by YaiKh</Text>
         </View>
       </Page>
 

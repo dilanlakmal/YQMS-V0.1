@@ -5,6 +5,8 @@ import {
   BrowserRouter as Router,
   Routes
 } from "react-router-dom";
+import { Toaster } from "react-hot-toast";
+import { toastConfig } from "./utils/toast";
 
 import "./App.css";
 import Navbar from "./components/Navbar";
@@ -81,6 +83,7 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
+
 
 export const BluetoothContext = createContext(null);
 
@@ -284,6 +287,10 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster 
+        position="bottom-right"
+        toastOptions={toastConfig}
+      />
       {isAuthenticated && <Navbar onLogout={handleLogout} />}
       <div className={isAuthenticated ? "pt-16" : ""}>
         <Routes>

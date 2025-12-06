@@ -17,9 +17,9 @@ import {
 } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { PDFDownloadLink, pdf } from "@react-pdf/renderer";
+import { pdf } from "@react-pdf/renderer";
 import EMBReportPDF from "./EMBReportPDF";
-import toast, { Toaster } from "react-hot-toast";
+import showToast from "../../../utils/toast";
 import ConfirmDialog from "./ComfirmModal/ConfirmDialog";
 
 
@@ -31,10 +31,20 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
   const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 7)));
   const [endDate, setEndDate] = useState(new Date());
   const [searchTerm, setSearchTerm] = useState("");
+  // Pending filters (what user selects)
   const [filterFactoryName, setFilterFactoryName] = useState("");
   const [filterMoNumber, setFilterMoNumber] = useState("");
   const [filterBuyer, setFilterBuyer] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterInspector, setFilterInspector] = useState("");
+  const [filterResult, setFilterResult] = useState("");
+  // Applied filters (what actually filters the data)
+  const [appliedFactoryName, setAppliedFactoryName] = useState("");
+  const [appliedMoNumber, setAppliedMoNumber] = useState("");
+  const [appliedBuyer, setAppliedBuyer] = useState("");
+  const [appliedStatus, setAppliedStatus] = useState("");
+  const [appliedInspector, setAppliedInspector] = useState("");
+  const [appliedResult, setAppliedResult] = useState("");
   const [openMenuId, setOpenMenuId] = useState(null);
   const [selectedReport, setSelectedReport] = useState({});
   const [loadingPdf, setLoadingPdf] = useState({});
@@ -102,7 +112,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
       }
     } catch (err) {
       console.error("Error fetching report details:", err);
-      toast.error("Failed to load report details. Please try again.");
+      showToast.error("Failed to load report details. Please try again.");
     } finally {
       if (showLoading) {
         setLoadingPdf(prev => ({ ...prev, [reportId]: false }));
@@ -113,37 +123,70 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
 
   const handleDownloadPDF = async (report) => {
     setOpenMenuId(null);
-    const reportData = await fetchReportDetails(report._id, true);
-    if (!reportData) {
-      toast.error("Failed to load report data for download.");
-      return;
-    }
-
+    
     try {
-      // Generate PDF blob
-      const blob = await pdf(
-        <EMBReportPDF 
-          report={reportData} 
-          isPrinting={false} 
-        />
-      ).toBlob();
-      
-      // Create download link and trigger download
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `EMB_Report_${report.moNo || report._id}_${new Date().toISOString().split("T")[0]}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      
-      // Clean up
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      toast.success("PDF download started.");
+      const reportData = await fetchReportDetails(report._id, true);
+      if (!reportData) {
+        showToast.error("Failed to load report data for download.");
+        return;
+      }
+   
+      // Show loading toast
+      const loadingToast = showToast.loading("Generating PDF...");
+
+      try {
+        // Generate PDF blob with timeout
+        // Note: EMBReportPDF component includes defects pages (same as print PDF)
+        const pdfPromise = pdf(
+          <EMBReportPDF 
+            report={reportData} 
+            isPrinting={false} 
+          />
+        ).toBlob();
+        
+        // Add timeout to prevent hanging
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("PDF generation timeout. Please check your internet connection and try again.")), 60000)
+        );
+        
+        const blob = await Promise.race([pdfPromise, timeoutPromise]);
+        
+        // Dismiss loading toast
+        showToast.dismiss(loadingToast);
+        
+        // Create download link and trigger download
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `EMB_Report_${report.moNo || report._id}_${new Date().toISOString().split("T")[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        
+        // Clean up
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 100);
+        
+        showToast.success("PDF download started.");
+      } catch (pdfError) {
+        showToast.dismiss(loadingToast);
+        console.error("Error generating PDF for download:", pdfError);
+        
+        // More specific error messages
+        if (pdfError.message && pdfError.message.includes("timeout")) {
+          showToast.error("PDF generation timed out. Please check your internet connection and try again.");
+        } else if (pdfError.message && pdfError.message.includes("network") || pdfError.message && pdfError.message.includes("fetch")) {
+          showToast.error("Network error. Please check your internet connection and try again.");
+        } else if (pdfError.message && pdfError.message.includes("image") || pdfError.message && pdfError.message.includes("CORS")) {
+          showToast.error("Error loading images. Please check your internet connection and try again.");
+        } else {
+          showToast.error(pdfError.message || "Failed to generate PDF. Please try again.");
+        }
+      }
     } catch (error) {
-      console.error("Error generating PDF for download:", error);
-      toast.error("Failed to generate PDF. Please try again.");
+      console.error("Error in handleDownloadPDF:", error);
+      showToast.error("Failed to load report data. Please try again.");
     }
   };
 
@@ -151,7 +194,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
     setOpenMenuId(null);
     const reportData = await fetchReportDetails(report._id, true);
     if (!reportData) {
-      toast.error("Failed to load report data for printing.");
+      showToast.error("Failed to load report data for printing.");
       return;
     }
 
@@ -217,7 +260,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           );
           
           if (response.data.success) {
-            toast.success("Inspection has been approved successfully.");
+            showToast.success("Inspection has been approved successfully.");
             setOpenMenuId(null);
             fetchReports();
           } else {
@@ -225,7 +268,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           }
         } catch (err) {
           console.error("Error approving inspection:", err);
-          toast.error(err.response?.data?.message || err.message || "Failed to approve inspection. Please try again.");
+          showToast.error(err.response?.data?.message || err.message || "Failed to approve inspection. Please try again.");
         }
       }
     });
@@ -247,7 +290,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           );
           
           if (response.data.success) {
-            toast.success("Inspection has been rejected successfully.");
+            showToast.success("Inspection has been rejected successfully.");
             setOpenMenuId(null);
             fetchReports();
           } else {
@@ -255,12 +298,35 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           }
         } catch (err) {
           console.error("Error rejecting inspection:", err);
-          toast.error(err.response?.data?.message || err.message || "Failed to reject inspection. Please try again.");
+          showToast.error(err.response?.data?.message || err.message || "Failed to reject inspection. Please try again.");
         }
       }
     });
   };
 
+  const handleApplyFilters = () => {
+    // Validate that at least one filter is selected
+    const hasActiveFilters = 
+      filterFactoryName.trim() !== "" ||
+      filterMoNumber.trim() !== "" ||
+      filterBuyer.trim() !== "" ||
+      filterStatus.trim() !== "" ||
+      filterInspector.trim() !== "" ||
+      filterResult.trim() !== "";
+    
+    if (!hasActiveFilters) {
+      showToast.error("Please select at least one filter before applying.");
+      return;
+    }
+    
+    setAppliedFactoryName(filterFactoryName);
+    setAppliedMoNumber(filterMoNumber);
+    setAppliedBuyer(filterBuyer);
+    setAppliedStatus(filterStatus);
+    setAppliedInspector(filterInspector);
+    setAppliedResult(filterResult);
+    showToast.success("Filters applied successfully.");
+  };
 
   useEffect(() => {
     fetchReports();
@@ -380,7 +446,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
         };
       } catch (error) {
         console.error("Error generating PDF:", error);
-        toast.error("Failed to generate PDF. Please try again.");
+        showToast.error("Failed to generate PDF. Please try again.");
         setPrintReportData(null);
       }
     };
@@ -430,25 +496,50 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
   const uniqueMoNumbers = [...new Set(reports.map(r => r.moNo).filter(Boolean))].sort();
   const uniqueBuyers = [...new Set(reports.map(r => r.buyerStyle).filter(Boolean))].sort();
   const uniqueStatuses = [...new Set(reports.map(r => r.status).filter(Boolean))].sort();
+  const uniqueInspectors = [...new Set(reports.map(r => r.inspector).filter(Boolean))].sort();
+  const uniqueResults = [...new Set(reports.map(r => r.result).filter(Boolean))].sort();
 
   const filteredReports = reports.filter((report) => {
+    // Filter by Date Range
+    if (report.inspectionDate) {
+      const reportDate = new Date(report.inspectionDate);
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      
+      if (reportDate < start || reportDate > end) {
+        return false;
+      }
+    }
+    
     // Filter by Factory Name
-    if (filterFactoryName && report.factoryName !== filterFactoryName) {
+    if (appliedFactoryName && report.factoryName !== appliedFactoryName) {
       return false;
     }
     
     // Filter by MO Number
-    if (filterMoNumber && report.moNo !== filterMoNumber) {
+    if (appliedMoNumber && report.moNo !== appliedMoNumber) {
       return false;
     }
     
     // Filter by Buyer
-    if (filterBuyer && report.buyerStyle !== filterBuyer) {
+    if (appliedBuyer && report.buyerStyle !== appliedBuyer) {
       return false;
     }
     
     // Filter by Status
-    if (filterStatus && report.status !== filterStatus) {
+    if (appliedStatus && report.status !== appliedStatus) {
+      return false;
+    }
+    
+    // Filter by Inspector
+    if (appliedInspector && report.inspector !== appliedInspector) {
+      return false;
+    }
+    
+    // Filter by Result
+    if (appliedResult && report.result !== appliedResult) {
       return false;
     }
     
@@ -563,30 +654,6 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
 
   return (
     <>
-      <Toaster 
-        position="bottom-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 2000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
-        }}
-      />
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
@@ -601,9 +668,18 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
       <div className="space-y-6">
       {/* Filters Section */}
       <div className="bg-white rounded-lg border shadow-sm p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
-          {t("embPrinting.reports.filters", "Filters")}
-        </h3>
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-800">
+            {t("embPrinting.reports.filters", "Filters")}
+          </h3>
+          <button
+            onClick={handleApplyFilters}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center gap-2"
+          >
+            <CheckCircle size={18} />
+            Apply Filter
+          </button>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -682,6 +758,23 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t("embPrinting.reports.inspector", "Inspector")}
+            </label>
+            <select
+              value={filterInspector}
+              onChange={(e) => setFilterInspector(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Inspectors</option>
+              {uniqueInspectors.map((inspector) => (
+                <option key={inspector} value={inspector}>
+                  {inspector}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
               {t("embPrinting.reports.status", "Status")}
             </label>
             <select
@@ -693,6 +786,23 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
               {uniqueStatuses.map((status) => (
                 <option key={status} value={status}>
                   {status}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t("embPrinting.reports.result", "Result")}
+            </label>
+            <select
+              value={filterResult}
+              onChange={(e) => setFilterResult(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Results</option>
+              {uniqueResults.map((result) => (
+                <option key={result} value={result}>
+                  {result}
                 </option>
               ))}
             </select>
@@ -712,10 +822,10 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
               />
             </div>
           </div> */}
-          <div className="flex items-end gap-2">
+          <div className="col-span-1 md:col-span-2 lg:col-span-4 flex items-end justify-end gap-2">
             <button
               onClick={fetchReports}
-              className="flex-1 flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
               <RefreshCw size={18} className="mr-2" />
               {t("embPrinting.reports.refresh", "Refresh")}
@@ -726,6 +836,14 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
                 setFilterMoNumber("");
                 setFilterBuyer("");
                 setFilterStatus("");
+                setFilterInspector("");
+                setFilterResult("");
+                setAppliedFactoryName("");
+                setAppliedMoNumber("");
+                setAppliedBuyer("");
+                setAppliedStatus("");
+                setAppliedInspector("");
+                setAppliedResult("");
                 setSearchTerm("");
               }}
               className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors"
@@ -918,44 +1036,27 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
                                 Reject Inspection
                               </button>
                               <div className="border-t border-gray-200 my-0.5"></div>
-                              {loadingPdf[report._id] ? (
-                                <div className="w-full text-left px-4 py-1.5 text-sm text-gray-500 flex items-center gap-2">
-                                  <Loader2 size={16} className="animate-spin text-blue-600" />
-                                  Loading PDF data...
-                                </div>
-                              ) : selectedReport[report._id] ? (
-                                <div 
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setOpenMenuId(null);
-                                  }}
-                                >
-                                  <PDFDownloadLink
-                                    document={<EMBReportPDF report={selectedReport[report._id]} isPrinting={false} />}
-                                    fileName={`EMB_Report_${report.moNo}_${new Date().toISOString().split("T")[0]}.pdf`}
-                                    className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
-                                  >
-                                    {({ loading: pdfLoading }) => (
-                                      <>
-                                        <Download size={16} className="text-blue-600" />
-                                        {pdfLoading ? "Generating PDF..." : "Download PDF"}
-                                      </>
-                                    )}
-                                  </PDFDownloadLink>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDownloadPDF(report);
-                                  }}
-                                  className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors"
-                                >
-                                  <Download size={16} className="text-blue-600" />
-                                  Download PDF
-                                </button>
-                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDownloadPDF(report);
+                                }}
+                                disabled={loadingPdf[report._id]}
+                                className="w-full text-left px-4 py-1.5 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {loadingPdf[report._id] ? (
+                                  <>
+                                    <Loader2 size={16} className="animate-spin text-blue-600" />
+                                    Loading PDF...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download size={16} className="text-blue-600" />
+                                    Download PDF
+                                  </>
+                                )}
+                              </button>
                               <button
                                 type="button"
                                 onClick={(e) => {

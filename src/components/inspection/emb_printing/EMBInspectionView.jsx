@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
-import toast, { Toaster } from "react-hot-toast";
+import showToast from "../../../utils/toast";
 import ConfirmDialog from "./ComfirmModal/ConfirmDialog";
 
 const EMBInspectionView = () => {
@@ -179,7 +179,7 @@ const EMBInspectionView = () => {
               result: "Pass"
             }));
             
-            toast.success("Inspection has been approved successfully.");
+            showToast.success("Inspection has been approved successfully.");
             
             // Refresh the report data
             const fetchReport = async () => {
@@ -200,7 +200,7 @@ const EMBInspectionView = () => {
           }
         } catch (err) {
           console.error("Error approving inspection:", err);
-          toast.error(err.response?.data?.message || err.message || "Failed to approve inspection. Please try again.");
+          showToast.error(err.response?.data?.message || err.message || "Failed to approve inspection. Please try again.");
         } finally {
           setProcessing(false);
         }
@@ -232,7 +232,7 @@ const EMBInspectionView = () => {
               result: "Reject"
             }));
             
-            toast.success("Inspection has been rejected successfully.");
+            showToast.success("Inspection has been rejected successfully.");
             
             // Refresh the report data
             const fetchReport = async () => {
@@ -253,7 +253,7 @@ const EMBInspectionView = () => {
           }
         } catch (err) {
           console.error("Error rejecting inspection:", err);
-          toast.error(err.response?.data?.message || err.message || "Failed to reject inspection. Please try again.");
+          showToast.error(err.response?.data?.message || err.message || "Failed to reject inspection. Please try again.");
         } finally {
           setProcessing(false);
         }
@@ -321,30 +321,6 @@ const EMBInspectionView = () => {
 
   return (
     <>
-      <Toaster 
-        position="top-right"
-        toastOptions={{
-          duration: 3000,
-          style: {
-            background: '#363636',
-            color: '#fff',
-          },
-          success: {
-            duration: 2000,
-            iconTheme: {
-              primary: '#10b981',
-              secondary: '#fff',
-            },
-          },
-          error: {
-            duration: 3000,
-            iconTheme: {
-              primary: '#ef4444',
-              secondary: '#fff',
-            },
-          },
-        }}
-      />
       <ConfirmDialog
         isOpen={confirmDialog.isOpen}
         onClose={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
@@ -358,17 +334,24 @@ const EMBInspectionView = () => {
       />
       <div className="min-h-screen bg-gray-50">
       {/* Header with Action Buttons */}
-      <div className="bg-white border-b shadow-sm sticky top-0 z-10">
+      <div className="bg-white border-b shadow-sm  top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-xl font-bold text-gray-800">
-                {report.inspectionType || "First Output"}
-                {report.reportType === "EMB + Print" ? " - EMB + Print" : report.reportType === "Printing" ? " - Printing" : " - EMB"}
-              </h1>
-              <p className="text-sm text-gray-500">
-                Inspection #: {report.moNo || "N/A"} | Group #: {report._id?.slice(-6) || "N/A"}
-              </p>
+            <div className="flex-1 flex items-center gap-4">
+              <img
+                src="/assets/Img/sub-emb-pdf/photo_2025-12-05_09-58-53.jpg"
+                alt="Logo"
+                className="w-20 h-20 object-contain"
+              />
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">
+                  {report.inspectionType || "First Output"}
+                  {report.reportType === "EMB + Print" ? " - EMB + Print" : report.reportType === "Printing" ? " - Printing" : " - EMB"}
+                </h1>
+                <p className="text-sm text-gray-500 mt-1">
+                  Inspection #: {report.moNo || "N/A"} | Group #: {report._id?.slice(-6) || "N/A"}
+                </p>
+              </div>
             </div>
             <div className="flex gap-2" style={{ margin: 0, padding: 0 }}>
               <button
@@ -614,19 +597,127 @@ const EMBInspectionView = () => {
           );
         })()}
 
-        {/* Conclusion Section */}
+        {/* Defects Section */}
+        {report.defects && report.defects.length > 0 && (
+          <div className="bg-white rounded-lg shadow-sm mb-6">
+            <div className="bg-blue-900 text-white px-4 py-2 rounded-t-lg">
+              <h2 className="text-lg font-bold">Defects</h2>
+            </div>
+            <div className="p-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {report.defects.map((defect, index) => {
+                  const imageUrl = normalizeImageUrl(defect.image);
+                  
+                  return (
+                    <div key={index} className="border border-gray-200 rounded-md bg-white shadow-sm">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <h3 className="font-medium text-gray-700 text-sm">
+                          {defect.category || "N/A"} - {defect.name || defect.defectType || "N/A"}
+                        </h3>
+                      </div>
+                      <div className="p-4">
+                        {imageUrl && (
+                          <img
+                            src={imageUrl}
+                            alt={defect.name || defect.defectType || "Defect"}
+                            className="w-full h-48 object-contain mb-3 rounded border border-gray-200"
+                            onError={(e) => {
+                              e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="200" height="200"%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" fill="%23999"%3EImage not available%3C/text%3E%3C/svg%3E';
+                            }}
+                          />
+                        )}
+                        <div className="space-y-2 text-sm">
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">Category:</span>
+                            <span className="text-gray-900">{defect.category || "N/A"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">Defect Type:</span>
+                            <span className="text-gray-900">{defect.defectType || defect.name || "N/A"}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="font-medium text-gray-700">Quantity:</span>
+                            <span className="text-gray-900">{defect.qty || defect.count || 0}</span>
+                          </div>
+                          {defect.machineNo && (
+                            <div className="flex justify-between">
+                              <span className="font-medium text-gray-700">Machine No:</span>
+                              <span className="text-gray-900">{defect.machineNo}</span>
+                            </div>
+                          )}
+                          {defect.remarks && defect.remarks.trim() !== "" && (
+                            <div className="mt-2 pt-2 border-t border-gray-200">
+                              <div className="font-medium text-gray-700 mb-1">Remarks:</div>
+                              <p className="text-gray-600 bg-gray-50 px-3 py-2 rounded border border-gray-200 text-xs">
+                                {defect.remarks}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+      
+        {/* Packing, Packaging & Labelling Section */}
         <div className="bg-white rounded-lg shadow-sm mb-6">
+          <div className="bg-blue-900 text-white px-4 py-2 rounded-t-lg">
+            <h2 className="text-lg font-bold">Packing, Packaging & Labelling</h2>
+          </div>
+          <div className="p-4">
+            <div className="space-y-4">
+              <div className="bg-gray-50 p-4 rounded">
+                <div className="grid grid-cols-7 gap-2 text-xs mb-2">
+                  <div className="font-bold text-center">Inspection Method</div>
+                  <div className="font-bold text-center">Inspection Level</div>
+                  <div className="font-bold text-center">Critical</div>
+                  <div className="font-bold text-center">Major</div>
+                  <div className="font-bold text-center">Minor</div>
+                  <div className="font-bold text-center">Carton Qty</div>
+                  <div className="font-bold text-center">Sample Size (Ctns)</div>
+                </div>
+                <div className="grid grid-cols-7 gap-2 text-xs text-center">
+                  <div>normal</div>
+                  <div>{report.aqlData?.level || "II"}</div>
+                  <div>0.010</div>
+                  <div>1.500</div>
+                  <div>0.010</div>
+                  <div>0</div>
+                  <div>0</div>
+                </div>
+              </div>
+              <div className="flex justify-between items-center border-t pt-4">
+                <span className="font-bold text-gray-700">Total Defective Units</span>
+                <span className="text-lg font-bold">{report.defectsQty || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-gray-700">Inspection Result</span>
+                <span className={`px-3 py-1 text-sm font-bold rounded-full ${getResultBadgeClass(report.packingResult)}`}>
+                  {report.packingResult || "N/A"}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+          {/* Conclusion Section */}
+          <div className="bg-white rounded-lg shadow-sm mb-6">
           <div className="bg-blue-900 text-white px-4 py-2 rounded-t-lg">
             <h2 className="text-lg font-bold">Conclusion</h2>
           </div>
           <div className="p-4">
             <div className="space-y-4">
-              <div className="flex justify-between items-center border-b pb-2">
+              {/* <div className="flex justify-between items-center border-b pb-2">
                 <span className="font-bold text-gray-700">Inspection Result</span>
                 <span className={`px-3 py-1 text-sm font-bold rounded-full ${getResultBadgeClass(report.result)}`}>
                   {report.result || "Pending"}
                 </span>
-              </div>
+              </div> */}
               {/* <div className="flex justify-between items-center border-b pb-2">
                 <span className="font-bold text-gray-700">Approval Status</span>
                 <span className={`px-3 py-1 text-sm font-bold rounded-full ${getResultBadgeClass(report.result)}`}>
@@ -634,10 +725,7 @@ const EMBInspectionView = () => {
                 </span>
               </div> */}
               <div className="mt-4 space-y-2">
-                <div className="flex justify-between items-center border-b pb-2">
-                  <span className="font-bold text-gray-700">Checklists</span>
-                  <span className="px-3 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800">PASS</span>
-                </div>
+                
                 <div className="flex justify-between items-center border-b pb-2">
                   <span className="font-bold text-gray-700">Packing, Packaging & Labelling</span>
                   <span className={`px-3 py-1 text-xs font-bold rounded-full ${getResultBadgeClass(report.packingResult)}`}>
@@ -688,46 +776,6 @@ const EMBInspectionView = () => {
           </div>
         </div>
 
-        {/* Packing, Packaging & Labelling Section */}
-        <div className="bg-white rounded-lg shadow-sm mb-6">
-          <div className="bg-blue-900 text-white px-4 py-2 rounded-t-lg">
-            <h2 className="text-lg font-bold">Packing, Packaging & Labelling</h2>
-          </div>
-          <div className="p-4">
-            <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded">
-                <div className="grid grid-cols-7 gap-2 text-xs mb-2">
-                  <div className="font-bold text-center">Inspection Method</div>
-                  <div className="font-bold text-center">Inspection Level</div>
-                  <div className="font-bold text-center">Critical</div>
-                  <div className="font-bold text-center">Major</div>
-                  <div className="font-bold text-center">Minor</div>
-                  <div className="font-bold text-center">Carton Qty</div>
-                  <div className="font-bold text-center">Sample Size (Ctns)</div>
-                </div>
-                <div className="grid grid-cols-7 gap-2 text-xs text-center">
-                  <div>normal</div>
-                  <div>{report.aqlData?.level || "II"}</div>
-                  <div>0.010</div>
-                  <div>1.500</div>
-                  <div>0.010</div>
-                  <div>0</div>
-                  <div>0</div>
-                </div>
-              </div>
-              <div className="flex justify-between items-center border-t pt-4">
-                <span className="font-bold text-gray-700">Total Defective Units</span>
-                <span className="text-lg font-bold">{report.defectsQty || 0}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-gray-700">Inspection Result</span>
-                <span className={`px-3 py-1 text-sm font-bold rounded-full ${getResultBadgeClass(report.packingResult)}`}>
-                  {report.packingResult || "N/A"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
 
         {/* Workmanship Section */}
         <div className="bg-white rounded-lg shadow-sm mb-6">

@@ -5,11 +5,11 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Search, Eye, EyeOff, Upload, Camera, X, Trash2, Plus, ChevronDown, AlertTriangle, CheckCircle, FileText, ListChecks, Users, Lock } from "lucide-react";
 import Webcam from "react-webcam";
 import axios from "axios";
-import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 import { useAuth } from "../../authentication/AuthContext";
 import ValidationChecklist from "./ValidationChecklist";
 import { getAqlDetails } from "../qc_accuracy/aqlHelper";
+import showToast from "../../../utils/toast";
 
 const FACTORY_NAMES = ["Tong Chai", "WEL", "Da Feng", "Sunwahyu"];
 
@@ -329,14 +329,12 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
     }
 
     if (missingFields.length > 0) {
-      Swal.fire({
-        icon: "error",
-        title: t("embPrinting.validation.missingFieldsTitle", "Missing Required Fields"),
-        html: `${t(
+      showToast.error(
+        `${t(
           "embPrinting.validation.missingFieldsMessage",
           "Please fill out the following fields before submitting:"
-        )}<br/><strong>${missingFields.join(", ")}</strong>`
-      });
+        )} ${missingFields.join(", ")}`
+      );
       return false;
     }
     return true;
@@ -2055,14 +2053,9 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       );
 
       // Show success notification
-      await Swal.fire({
-        icon: "success",
-        title: t("embPrinting.conclusion.reportSaved", "Report saved successfully"),
-        text: response.data?.message || "Your inspection report has been submitted successfully.",
-        confirmButtonColor: "#3085d6",
-        timer: 2000,
-        timerProgressBar: true
-      });
+      showToast.success(
+        response.data?.message || t("embPrinting.conclusion.reportSaved", "Report saved successfully")
+      );
 
       // Reset form after successful submission
       resetForm();
@@ -2073,12 +2066,9 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
       console.error("Error details:", error.response?.data);
 
       // Show error notification
-      Swal.fire({
-        icon: "error",
-        title: t("embPrinting.conclusion.errorSubmitting", "Failed to submit report"),
-        text: error.response?.data?.message || error.message || "An error occurred while submitting the report. Please try again.",
-        confirmButtonColor: "#3085d6"
-      });
+      showToast.error(
+        error.response?.data?.message || error.message || t("embPrinting.conclusion.errorSubmitting", "Failed to submit report")
+      );
     } finally {
       if (setIsSubmitting) {
         setIsSubmitting(false);
