@@ -21,7 +21,9 @@ const YPivotQATemplatesMeasurementResultsTab = ({
   onDeleteMeasurement,
   activeGroup // Pass active group context to know which cards are editable
 }) => {
-  // 1. Group measurements by groupId (Session Context)
+  // ==========================================================================
+  // Group measurements by groupId (Session Context)
+  // ==========================================================================
   const groupedMeasurements = useMemo(() => {
     const groups = {};
     const noContext = []; // For legacy measurements without group ID
@@ -34,6 +36,10 @@ const YPivotQATemplatesMeasurementResultsTab = ({
             line: m.line,
             table: m.table,
             color: m.color,
+            // Use resolved names if available, fall back to IDs
+            lineName: m.lineName || m.line,
+            tableName: m.tableName || m.table,
+            colorName: m.colorName || m.color,
             qcUser: m.qcUser,
             measurements: []
           };
@@ -61,7 +67,9 @@ const YPivotQATemplatesMeasurementResultsTab = ({
     );
   }
 
-  // 2. Helper to render a measurement card
+  // ==========================================================================
+  // Helper to render a measurement card
+  // ==========================================================================
   const renderCard = (measurement, index, isEditable) => {
     // Calculate Stats
     const stats = calculateMeasurementStats(
@@ -316,10 +324,23 @@ const YPivotQATemplatesMeasurementResultsTab = ({
 
   return (
     <div className="p-4 space-y-8 max-w-6xl mx-auto">
-      {/* Render Groups */}
+      {/* 3. Render Groups */}
       {groupedMeasurements.groups.map((group) => {
         // Is this group the currently active one?
         const isGroupActive = activeGroup && activeGroup.id === group.id;
+
+        // Construct dynamic header label
+        // Only include parts that actually exist (filter out null/undefined/empty)
+        const headerParts = [
+          group.lineName ? `Line ${group.lineName}` : null,
+          group.tableName ? `Table ${group.tableName}` : null,
+          group.colorName ? `Color ${group.colorName}` : null
+        ].filter(Boolean); // Removes nulls
+
+        const headerLabel =
+          headerParts.length > 0
+            ? headerParts.join(" / ")
+            : "Inspection Session"; // Fallback
 
         return (
           <div key={group.id} className="space-y-3">
@@ -348,7 +369,7 @@ const YPivotQATemplatesMeasurementResultsTab = ({
                       : "text-gray-600 dark:text-gray-300"
                   }`}
                 >
-                  Line {group.line} / Table {group.table} / Color {group.color}
+                  {headerLabel}
                 </h4>
                 {group.qcUser && (
                   <p className="text-xs text-gray-500">
@@ -379,7 +400,7 @@ const YPivotQATemplatesMeasurementResultsTab = ({
         );
       })}
 
-      {/* Render Legacy / No Context Measurements (if any) */}
+      {/* 4. Render Legacy / No Context Measurements (if any) */}
       {groupedMeasurements.noContext.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-3 pb-2 border-b-2 border-gray-200 dark:border-gray-700">

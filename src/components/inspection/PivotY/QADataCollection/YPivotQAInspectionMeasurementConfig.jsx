@@ -227,12 +227,17 @@ const YPivotQAInspectionMeasurementConfig = ({
 
   const handleSaveMeasurement = (data) => {
     // Inject active group info into the measurement data
+    // Use resolved Names from activeGroup
     const enhancedData = {
       ...data,
       groupId: activeGroup?.id,
-      line: activeGroup?.line,
+      line: activeGroup?.line, // Keep IDs for DB ref
       table: activeGroup?.table,
       color: activeGroup?.color,
+      // Also save readable names for UI display history
+      lineName: activeGroup?.lineName,
+      tableName: activeGroup?.tableName,
+      colorName: activeGroup?.colorName,
       qcUser: activeGroup?.activeQC
     };
 
@@ -380,14 +385,32 @@ const YPivotQAInspectionMeasurementConfig = ({
         </div>
       </div>
 
-      {/* Active Context Banner */}
+      {/* Active Context Banner - UPDATED TO SHOW NAMES CONDITIONALLY */}
       {activeGroup ? (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-xl flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Play className="w-4 h-4 text-green-600 dark:text-green-400 fill-current" />
-            <div className="text-sm font-bold text-green-800 dark:text-green-300">
-              Active: Line {activeGroup.line} / Table {activeGroup.table} /
-              Color {activeGroup.color}
+            <div className="text-sm font-bold text-green-800 dark:text-green-300 flex flex-wrap gap-1">
+              <span className="mr-1">Active:</span>
+
+              {/* Conditional Rendering of Context Parts */}
+              {activeGroup.lineName && (
+                <span className="bg-white/50 px-1.5 rounded border border-green-200">
+                  Line {activeGroup.lineName}
+                </span>
+              )}
+
+              {activeGroup.tableName && (
+                <span className="bg-white/50 px-1.5 rounded border border-green-200">
+                  Table {activeGroup.tableName}
+                </span>
+              )}
+
+              {activeGroup.colorName && (
+                <span className="bg-white/50 px-1.5 rounded border border-green-200">
+                  Color {activeGroup.colorName}
+                </span>
+              )}
             </div>
           </div>
           {activeGroup.activeQC && (

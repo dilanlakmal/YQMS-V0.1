@@ -21,7 +21,7 @@ import { API_BASE_URL } from "../../../../../config";
 import EmpQRCodeScanner from "../../qc_roving/EmpQRCodeScanner";
 
 // ============================================================
-// Helper: Searchable Dropdown (Unchanged)
+// Helper: Searchable Dropdown
 // ============================================================
 const SearchableSingleSelect = ({
   label,
@@ -126,7 +126,7 @@ const SearchableSingleSelect = ({
 };
 
 // ============================================================
-// Helper: QC User Search Component (Unchanged)
+// Helper: QC User Search Component
 // ============================================================
 const QCUserSearch = ({ onSelect }) => {
   const [term, setTerm] = useState("");
@@ -227,7 +227,7 @@ const QCUserSearch = ({ onSelect }) => {
 };
 
 // ============================================================
-// Main Component: Line / Table / Color Configuration
+// Main Component
 // ============================================================
 const YPivotQAInspectionLineTableColorConfig = ({
   reportData,
@@ -248,7 +248,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [activeGroupIndex, setActiveGroupIndex] = useState(null);
 
-  // -- Loading Resources (Lines, Tables, Colors) --
+  // Loading Resources
   useEffect(() => {
     const fetchResources = async () => {
       try {
@@ -327,13 +327,11 @@ const YPivotQAInspectionLineTableColorConfig = ({
     if (selectedTemplate) fetchResources();
   }, [selectedTemplate, config, orderData]);
 
-  // -- AQL Sync Effect --
-  // Forces the first row qty to match the calculated Sample Size if AQL
+  // AQL Sync
   useEffect(() => {
     if (isAQL && groups.length > 0) {
       const firstGroup = groups[0];
       const firstAssignment = firstGroup.assignments[0];
-
       if (firstAssignment.qty !== aqlSampleSize.toString()) {
         const updated = [...groups];
         updated[0].assignments[0].qty = aqlSampleSize.toString();
@@ -343,7 +341,6 @@ const YPivotQAInspectionLineTableColorConfig = ({
     }
   }, [isAQL, aqlSampleSize, groups, onUpdate]);
 
-  // -- Auto Calculation for Total Qty (Header) --
   const totalDisplayQty = useMemo(() => {
     if (isAQL) return aqlSampleSize;
     return groups.reduce((total, group) => {
@@ -355,14 +352,12 @@ const YPivotQAInspectionLineTableColorConfig = ({
     }, 0);
   }, [groups, isAQL, aqlSampleSize]);
 
-  // -- Handlers --
-
+  // Handlers
   const handleAddGroup = () => {
     let defaultRowQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
       defaultRowQty = selectedTemplate.InspectedQty.toString();
     }
-
     const newGroup = {
       id: Date.now(),
       line: "",
@@ -422,8 +417,30 @@ const YPivotQAInspectionLineTableColorConfig = ({
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
 
+    // Determine active name values if this group is currently active
     if (activeGroup?.id === updated[index].id) {
-      onSetActiveGroup(updated[index]);
+      // We need to re-resolve names because IDs just changed
+      const newLineName =
+        lines.find((l) => l.value === updated[index].line)?.label ||
+        updated[index].line ||
+        "";
+      const newTableName =
+        tables.find((t) => t.value === updated[index].table)?.label ||
+        updated[index].table ||
+        "";
+      const newColorName =
+        orderColors.find((c) => c.value === updated[index].color)?.label ||
+        updated[index].color ||
+        "";
+
+      onSetActiveGroup({
+        ...updated[index],
+        lineName: newLineName,
+        tableName: newTableName,
+        colorName: newColorName,
+        activeAssignmentId: activeGroup.activeAssignmentId,
+        activeQC: activeGroup.activeQC
+      });
     }
   };
 
@@ -442,12 +459,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
         return;
       }
     }
-
     let defaultRowQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
       defaultRowQty = selectedTemplate.InspectedQty.toString();
     }
-
     const updated = [...groups];
     updated[groupIndex].assignments.push({
       id: Date.now(),
@@ -492,7 +507,6 @@ const YPivotQAInspectionLineTableColorConfig = ({
     const isDuplicate = group.assignments.some(
       (a) => a.qcUser && a.qcUser.emp_id === userData.emp_id
     );
-
     if (isDuplicate) {
       Swal.fire({
         icon: "error",
@@ -501,7 +515,6 @@ const YPivotQAInspectionLineTableColorConfig = ({
       });
       return;
     }
-
     const emptySlotIndex = group.assignments.findIndex((a) => !a.qcUser);
     if (emptySlotIndex !== -1) {
       handleUpdateAssignment(groupIndex, emptySlotIndex, "qcUser", userData);
@@ -521,6 +534,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     setActiveGroupIndex(null);
   };
 
+  // --- ACTIVATE GROUP HANDLER (UPDATED TO RESOLVE NAMES) ---
   const handleActivateGroup = (group, assignment = null) => {
     if (selectedTemplate.Line === "Yes" && !group.line)
       return Swal.fire("Missing Info", "Please select a Line.", "warning");
@@ -529,8 +543,21 @@ const YPivotQAInspectionLineTableColorConfig = ({
     if (selectedTemplate.Colors === "Yes" && !group.color)
       return Swal.fire("Missing Info", "Please select a Color.", "warning");
 
+    // Resolve human readable names from IDs
+    const lineName =
+      lines.find((l) => l.value === group.line)?.label || group.line || "";
+    const tableName =
+      tables.find((t) => t.value === group.table)?.label || group.table || "";
+    const colorName =
+      orderColors.find((c) => c.value === group.color)?.label ||
+      group.color ||
+      "";
+
     const context = {
       ...group,
+      lineName,
+      tableName,
+      colorName,
       activeAssignmentId: assignment?.id,
       activeQC: assignment?.qcUser
     };
@@ -598,11 +625,14 @@ const YPivotQAInspectionLineTableColorConfig = ({
                 Active Inspection Session
               </p>
               <p className="text-xs text-green-700 dark:text-green-400">
-                Line:{" "}
-                {lines.find((l) => l.value === activeGroup.line)?.label ||
-                  activeGroup.line ||
-                  "-"}{" "}
-                • Color: {activeGroup.color || "-"}
+                {/* Use Resolved Names in Banner */}
+                {activeGroup.lineName && `Line: ${activeGroup.lineName}`}
+                {activeGroup.lineName && activeGroup.tableName && " • "}
+                {activeGroup.tableName && `Table: ${activeGroup.tableName}`}
+                {(activeGroup.lineName || activeGroup.tableName) &&
+                  activeGroup.colorName &&
+                  " • "}
+                {activeGroup.colorName && `Color: ${activeGroup.colorName}`}
               </p>
             </div>
           </div>
