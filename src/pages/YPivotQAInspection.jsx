@@ -56,6 +56,7 @@ const YPivotQAInspection = () => {
   // Shared state for Report Configuration
   const [sharedReportState, setSharedReportState] = useState({
     selectedTemplate: null,
+    headerData: {},
     config: {},
     lineTableConfig: [],
     measurementData: {},
@@ -73,6 +74,17 @@ const YPivotQAInspection = () => {
   // Handler for report data changes
   const handleReportDataChange = useCallback((newState) => {
     setSharedReportState((prev) => ({ ...prev, ...newState }));
+  }, []);
+
+  // Handler for header updates
+  const handleHeaderDataUpdate = useCallback((headerUpdates) => {
+    setSharedReportState((prev) => ({
+      ...prev,
+      headerData: {
+        ...prev.headerData,
+        ...headerUpdates
+      }
+    }));
   }, []);
 
   // Handler specifically for measurement updates
@@ -140,7 +152,12 @@ const YPivotQAInspection = () => {
         id: "header",
         label: "Header",
         icon: <FileText size={18} />,
-        component: <YPivotQATemplatesHeader />,
+        component: (
+          <YPivotQATemplatesHeader
+            headerData={sharedReportState.headerData}
+            onUpdateHeaderData={handleHeaderDataUpdate}
+          />
+        ),
         gradient: "from-purple-500 to-pink-500",
         description: "Inspection header"
       },
@@ -221,6 +238,7 @@ const YPivotQAInspection = () => {
       sharedOrderState,
       handleReportDataChange,
       sharedReportState,
+      handleHeaderDataUpdate,
       handleMeasurementDataUpdate,
       handleDefectDataUpdate,
       handleSetActiveGroup,
