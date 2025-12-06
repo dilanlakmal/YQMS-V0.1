@@ -13,7 +13,8 @@ import {
   Loader2,
   Search,
   Hash,
-  PauseCircle
+  PauseCircle,
+  CopyPlus // Imported for the Add All Colors button
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -227,7 +228,7 @@ const QCUserSearch = ({ onSelect }) => {
 };
 
 // ============================================================
-// Main Component
+// Main Component: Line / Table / Color Configuration
 // ============================================================
 const YPivotQAInspectionLineTableColorConfig = ({
   reportData,
@@ -240,6 +241,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
   const aqlSampleSize = config?.aqlSampleSize || 0;
 
+  // -- State --
   const [groups, setGroups] = useState(reportData.lineTableConfig || []);
   const [lines, setLines] = useState([]);
   const [tables, setTables] = useState([]);
@@ -327,11 +329,12 @@ const YPivotQAInspectionLineTableColorConfig = ({
     if (selectedTemplate) fetchResources();
   }, [selectedTemplate, config, orderData]);
 
-  // AQL Sync
+  // -- AQL Sync Effect --
   useEffect(() => {
     if (isAQL && groups.length > 0) {
       const firstGroup = groups[0];
       const firstAssignment = firstGroup.assignments[0];
+
       if (firstAssignment.qty !== aqlSampleSize.toString()) {
         const updated = [...groups];
         updated[0].assignments[0].qty = aqlSampleSize.toString();
@@ -341,6 +344,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     }
   }, [isAQL, aqlSampleSize, groups, onUpdate]);
 
+  // -- Auto Calculation for Total Qty (Header) --
   const totalDisplayQty = useMemo(() => {
     if (isAQL) return aqlSampleSize;
     return groups.reduce((total, group) => {
@@ -352,12 +356,14 @@ const YPivotQAInspectionLineTableColorConfig = ({
     }, 0);
   }, [groups, isAQL, aqlSampleSize]);
 
-  // Handlers
+  // -- Handlers --
+
   const handleAddGroup = () => {
     let defaultRowQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
       defaultRowQty = selectedTemplate.InspectedQty.toString();
     }
+
     const newGroup = {
       id: Date.now(),
       line: "",
@@ -368,6 +374,63 @@ const YPivotQAInspectionLineTableColorConfig = ({
     const updated = [...groups, newGroup];
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
+  };
+
+  // --- NEW: Add All Colors Handler ---
+  // Only executed if button is clicked
+  const handleAddAllColors = () => {
+    if (orderColors.length === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "No Colors Found",
+        text: "There are no colors available to add."
+      });
+      return;
+    }
+
+    // Default Row Quantity
+    let defaultRowQty = "";
+    if (!isAQL && selectedTemplate.InspectedQty) {
+      defaultRowQty = selectedTemplate.InspectedQty.toString();
+    }
+
+    // Filter out colors that are already present in existing groups
+    // This prevents adding duplicate color cards if some already exist
+    const existingColors = new Set(groups.map((g) => g.color));
+    const colorsToAdd = orderColors.filter((c) => !existingColors.has(c.value));
+
+    if (colorsToAdd.length === 0) {
+      Swal.fire({
+        icon: "info",
+        title: "No New Colors",
+        text: "All available colors are already added.",
+        timer: 1500,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    const newGroups = colorsToAdd.map((colorObj, index) => ({
+      id: Date.now() + index, // Ensure unique ID base
+      line: "", // No line based on requirements
+      table: "", // No table based on requirements
+      color: colorObj.value,
+      assignments: [
+        { id: Date.now() + index + 1000, qcUser: null, qty: defaultRowQty }
+      ]
+    }));
+
+    const updated = [...groups, ...newGroups];
+    setGroups(updated);
+    onUpdate({ lineTableConfig: updated });
+
+    Swal.fire({
+      icon: "success",
+      title: "Colors Added",
+      text: `Added ${newGroups.length} configuration groups for remaining colors.`,
+      timer: 1500,
+      showConfirmButton: false
+    });
   };
 
   const handleRemoveGroup = (index) => {
@@ -417,9 +480,8 @@ const YPivotQAInspectionLineTableColorConfig = ({
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
 
-    // Determine active name values if this group is currently active
     if (activeGroup?.id === updated[index].id) {
-      // We need to re-resolve names because IDs just changed
+      // Re-resolve names if active group modified
       const newLineName =
         lines.find((l) => l.value === updated[index].line)?.label ||
         updated[index].line ||
@@ -459,10 +521,12 @@ const YPivotQAInspectionLineTableColorConfig = ({
         return;
       }
     }
+
     let defaultRowQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
       defaultRowQty = selectedTemplate.InspectedQty.toString();
     }
+
     const updated = [...groups];
     updated[groupIndex].assignments.push({
       id: Date.now(),
@@ -507,6 +571,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     const isDuplicate = group.assignments.some(
       (a) => a.qcUser && a.qcUser.emp_id === userData.emp_id
     );
+
     if (isDuplicate) {
       Swal.fire({
         icon: "error",
@@ -515,6 +580,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
       });
       return;
     }
+
     const emptySlotIndex = group.assignments.findIndex((a) => !a.qcUser);
     if (emptySlotIndex !== -1) {
       handleUpdateAssignment(groupIndex, emptySlotIndex, "qcUser", userData);
@@ -534,7 +600,6 @@ const YPivotQAInspectionLineTableColorConfig = ({
     setActiveGroupIndex(null);
   };
 
-  // --- ACTIVATE GROUP HANDLER (UPDATED TO RESOLVE NAMES) ---
   const handleActivateGroup = (group, assignment = null) => {
     if (selectedTemplate.Line === "Yes" && !group.line)
       return Swal.fire("Missing Info", "Please select a Line.", "warning");
@@ -543,7 +608,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     if (selectedTemplate.Colors === "Yes" && !group.color)
       return Swal.fire("Missing Info", "Please select a Color.", "warning");
 
-    // Resolve human readable names from IDs
+    // Resolve human readable names
     const lineName =
       lines.find((l) => l.value === group.line)?.label || group.line || "";
     const tableName =
@@ -578,6 +643,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const showTable = selectedTemplate.Table === "Yes";
   const showColors = selectedTemplate.Colors === "Yes";
   const showQC = selectedTemplate.isQCScan === "Yes";
+
+  // Check conditions for "Add All Colors" button
+  const canAddAllColors =
+    showColors && !showLine && !showTable && orderColors.length > 0;
 
   return (
     <div className="space-y-6 pb-20">
@@ -877,12 +946,25 @@ const YPivotQAInspectionLineTableColorConfig = ({
           </div>
         )}
 
-        <button
-          onClick={handleAddGroup}
-          className="w-full py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50"
-        >
-          <Plus className="w-5 h-5" /> Add New Configuration Group
-        </button>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleAddGroup}
+            className="flex-1 py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 transition-colors"
+          >
+            <Plus className="w-5 h-5" /> Add New Configuration Group
+          </button>
+
+          {/* Conditional Render for Add All Colors */}
+          {canAddAllColors && (
+            <button
+              onClick={handleAddAllColors}
+              className="flex-1 py-4 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-dashed border-indigo-300 dark:border-indigo-700 rounded-xl flex items-center justify-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+            >
+              <CopyPlus className="w-5 h-5" /> Add All Colors (
+              {orderColors.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {isScannerOpen && (
