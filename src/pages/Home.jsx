@@ -171,7 +171,7 @@ function Home() {
           },
           {
             path: "/afterIroning",
-            roles: ["QC Washing"],
+            roles: ["QC Ironing"],
             image: "assets/Home/after_ironing.png",
             title: t("home.afterIroning"),
             description: "After Ironing Report"
