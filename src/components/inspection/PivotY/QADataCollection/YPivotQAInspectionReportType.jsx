@@ -12,7 +12,8 @@ import {
   Building,
   Factory,
   Truck,
-  MessageSquare
+  MessageSquare,
+  Layers
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
@@ -20,9 +21,7 @@ import YPivotQAInspectionBuyerDetermination, {
   determineBuyerFromOrderNo
 } from "./YPivotQAInspectionBuyerDetermination";
 
-// ============================================================
-// Report Type Card Component
-// ============================================================
+// ReportTypeCard (Unchanged)
 const ReportTypeCard = ({ template, isSelected, onSelect }) => {
   const getMeasurementLabel = (measurement) => {
     switch (measurement) {
@@ -89,9 +88,7 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
   );
 };
 
-// ============================================================
-// Searchable Single Select Dropdown Component
-// ============================================================
+// SearchableSingleSelect (Unchanged)
 const SearchableSingleSelect = ({
   label,
   icon: Icon,
@@ -258,9 +255,7 @@ const SearchableSingleSelect = ({
   );
 };
 
-// ============================================================
-// AQL Config Table Component
-// ============================================================
+// AQLConfigTable (Unchanged)
 const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
   if (!aqlConfigs || aqlConfigs.length === 0) {
     return (
@@ -456,6 +451,11 @@ const YPivotQAInspectionReportType = ({
     savedState?.config?.selectedSubConFactory || null
   );
 
+  // Product Type State
+  const [selectedProductTypeId, setSelectedProductTypeId] = useState(
+    savedState?.config?.productTypeId || null
+  );
+
   // Data State
   const [aqlConfigs, setAqlConfigs] = useState([]);
   const [subConFactories, setSubConFactories] = useState([]);
@@ -609,7 +609,8 @@ const YPivotQAInspectionReportType = ({
           isSubCon,
           selectedSubConFactory,
           shippingStage,
-          remarks
+          remarks,
+          productTypeId: selectedProductTypeId // <--- FIX 4: Pass ID to parent config
         }
       });
     }
@@ -622,6 +623,7 @@ const YPivotQAInspectionReportType = ({
     selectedSubConFactory,
     shippingStage,
     remarks,
+    selectedProductTypeId, // Dependency
     onReportDataChange
   ]);
 
@@ -671,6 +673,11 @@ const YPivotQAInspectionReportType = ({
     setRemarks(value);
   };
 
+  // <--- FIX 5: Callback to update local state from child
+  const handleProductTypeUpdate = useCallback((id) => {
+    setSelectedProductTypeId(id);
+  }, []);
+
   if (!selectedOrders?.length) {
     return (
       <div className="space-y-4">
@@ -697,6 +704,7 @@ const YPivotQAInspectionReportType = ({
         selectedOrders={selectedOrders}
         orderData={orderData}
         orderType={orderType}
+        onProductTypeUpdate={handleProductTypeUpdate} // <--- FIX 6: Pass callback
       />
 
       {/* Report Type Selection */}

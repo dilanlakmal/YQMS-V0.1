@@ -19,6 +19,7 @@ import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates
 import YPivotQAInspectionPhotosDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPhotosDetermination";
 import YPivotQAInspectionLineTableColorConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionLineTableColorConfig";
 import YPivotQAInspectionMeasurementConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementConfig";
+import YPivotQAInspectionDefectConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectConfig";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -57,7 +58,8 @@ const YPivotQAInspection = () => {
     selectedTemplate: null,
     config: {},
     lineTableConfig: [],
-    measurementData: {} // ADDED: Persist measurement state
+    measurementData: {},
+    defectData: {}
   });
 
   // State for Active Inspection Context (Activated via Play button)
@@ -80,6 +82,17 @@ const YPivotQAInspection = () => {
       measurementData: {
         ...prev.measurementData,
         ...measurementUpdates
+      }
+    }));
+  }, []);
+
+  // Handler for defect updates
+  const handleDefectDataUpdate = useCallback((defectUpdates) => {
+    setSharedReportState((prev) => ({
+      ...prev,
+      defectData: {
+        ...prev.defectData,
+        ...defectUpdates
       }
     }));
   }, []);
@@ -179,8 +192,15 @@ const YPivotQAInspection = () => {
         id: "defects",
         label: "Defects",
         icon: <ClipboardCheck size={18} />,
+        // Updated Component with props
         component: (
-          <PlaceholderComponent title="Defects Section" icon={ClipboardCheck} />
+          <YPivotQAInspectionDefectConfig
+            selectedOrders={sharedOrderState.selectedOrders}
+            orderData={sharedOrderState.orderData}
+            reportData={sharedReportState}
+            activeGroup={activeGroup}
+            onUpdateDefectData={handleDefectDataUpdate}
+          />
         ),
         gradient: "from-red-500 to-rose-500",
         description: "Defect recording"
@@ -202,6 +222,7 @@ const YPivotQAInspection = () => {
       handleReportDataChange,
       sharedReportState,
       handleMeasurementDataUpdate,
+      handleDefectDataUpdate,
       handleSetActiveGroup,
       activeGroup
     ]
