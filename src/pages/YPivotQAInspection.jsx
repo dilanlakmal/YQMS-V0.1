@@ -57,6 +57,7 @@ const YPivotQAInspection = () => {
   const [sharedReportState, setSharedReportState] = useState({
     selectedTemplate: null,
     headerData: {},
+    photoData: {},
     config: {},
     lineTableConfig: [],
     measurementData: {},
@@ -83,6 +84,17 @@ const YPivotQAInspection = () => {
       headerData: {
         ...prev.headerData,
         ...headerUpdates
+      }
+    }));
+  }, []);
+
+  // Handler for photo updates
+  const handlePhotoDataUpdate = useCallback((photoUpdates) => {
+    setSharedReportState((prev) => ({
+      ...prev,
+      photoData: {
+        ...prev.photoData,
+        ...photoUpdates
       }
     }));
   }, []);
@@ -165,9 +177,11 @@ const YPivotQAInspection = () => {
         id: "photos",
         label: "Photos",
         icon: <Camera size={18} />,
+        // Pass the props to the Determination wrapper
         component: (
           <YPivotQAInspectionPhotosDetermination
             reportData={sharedReportState}
+            onUpdatePhotoData={handlePhotoDataUpdate}
           />
         ),
         gradient: "from-orange-500 to-red-500",
@@ -239,6 +253,7 @@ const YPivotQAInspection = () => {
       handleReportDataChange,
       sharedReportState,
       handleHeaderDataUpdate,
+      handlePhotoDataUpdate,
       handleMeasurementDataUpdate,
       handleDefectDataUpdate,
       handleSetActiveGroup,
