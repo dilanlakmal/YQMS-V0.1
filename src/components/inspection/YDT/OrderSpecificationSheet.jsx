@@ -402,6 +402,17 @@ const handleOrderSelect = useCallback(async (orderNo) => {
   try {
     setLoading(true);
 
+    let empId = 'unknown_user';
+    try {
+      const userDataString = localStorage.getItem('user');
+      if (userDataString) {
+        const userData = JSON.parse(userDataString);
+        empId = userData?.emp_id || 'unknown_user';
+      }
+    } catch (error) {
+      console.error("Failed to parse user data from localStorage", error);
+    }
+
      const preparedSizeTable = sizeTable.map(item => ({
       orderTotalQty: item.orderTotalQty || 0,
       sizeDetails: item.sizeDetails || '',
@@ -417,11 +428,12 @@ const handleOrderSelect = useCallback(async (orderNo) => {
       retailSingle: formData.retailSingle,
       majorPoints: formData.majorPoints,
       testInstructions: formData.testInstructions,
+      testInstructionsHTML: formData.testInstructions,
       uploadedImage: uploadedImage,
       styleTable: styleTable,
      sizeTable: preparedSizeTable,
       stampData: stampData,
-      createdBy: 'user' 
+      createdBy: empId
     };
 
     const response = await fetch(`${API_BASE_URL}/api/coverPage/save`, {
@@ -539,7 +551,7 @@ const handleOrderSelect = useCallback(async (orderNo) => {
             </div>
 
             {/* Right Column - Order Details */}
-            <div className="border-r-2 border-b-2 border-black">
+            <div className="border-b-2 border-black">
               <div className="grid grid-rows-4">
                 <div className="border-b border-black p-2 grid grid-cols-2">
                   <span className="font-semibold">Customer Style:</span>
@@ -555,7 +567,7 @@ const handleOrderSelect = useCallback(async (orderNo) => {
                     type="text"
                     value={formData.poNumber}
                     onChange={(e) => handlePONumberChange(e.target.value)}
-                    className="border-0 outline-none bg-transparent border-black"
+                    className="border-2 outline-none bg-transparent border-black "
                   />
                 </div>
                 <div className="p-2 grid grid-cols-2">
@@ -573,7 +585,7 @@ const handleOrderSelect = useCallback(async (orderNo) => {
               <textarea
                 value={formData.majorPoints}
                 onChange={(e) => setFormData(prev => ({...prev, majorPoints: e.target.value}))}
-                className="w-full border-0 outline-none bg-transparent resize-none"
+                className="border-2 w-full outline-none bg-transparent resize-none"
                 rows={2}
                 placeholder="Enter major points here..."
               />
@@ -583,11 +595,11 @@ const handleOrderSelect = useCallback(async (orderNo) => {
             <div>
               <div className="border-black p-2">
                 <span className="font-semibold">Retail Single:</span>
-                <input
-                  type="text"
+                <textarea
                   value={formData.retailSingle}
                   onChange={(e) => setFormData(prev => ({...prev, retailSingle: e.target.value}))}
-                  className="w-full border-0 outline-none bg-transparent mt-1"
+                  className="w-full border-2 outline-none bg-transparent mt-1"
+                  rows={2}
                 />
               </div>
             </div>
@@ -711,15 +723,15 @@ const handleOrderSelect = useCallback(async (orderNo) => {
 
                     <td className="border border-black p-1">
                       <div className="flex items-center gap-2">
-                        <input
-                          type="text"
+                        <textarea
                           value={row.remarks}
                           onChange={(e) => {
                             const newData = [...styleTable];
                             newData[index].remarks = e.target.value;
                             setStyleTable(newData);
                           }}
-                          className="flex-1 border-0 outline-none bg-transparent text-xs"
+                          className="flex-1 border-2 outline-none bg-transparent text-xs"
+                          rows={7}
                         />
                         {styleTable.length > 1 && (
                           <button
@@ -832,7 +844,7 @@ const handleOrderSelect = useCallback(async (orderNo) => {
                               newData[rowIndex].sizeDetails = e.target.value;
                               setSizeTable(newData);
                             }}
-                            className="w-full border-0 outline-none bg-transparent text-xs resize-none"
+                            className="w-full border-2 outline-none bg-transparent text-xs resize-none"
                             rows={10}
                             placeholder="Enter size details, measurements, or notes..."
                           />

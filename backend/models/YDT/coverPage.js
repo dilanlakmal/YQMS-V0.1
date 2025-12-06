@@ -27,6 +27,10 @@ const createCoverPageSchema = (connection) => {
       type: String,
       default: ''
     },
+    testInstructionsHTML: {
+      type: String,
+      default: ''
+    },
     uploadedImage: {
       type: String,
       default: null

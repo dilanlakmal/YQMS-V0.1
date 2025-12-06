@@ -4,6 +4,7 @@ import {
   Sparkles,
   User,
   FileText,
+  FileImage,
   Upload,
   Search,
   Settings
@@ -12,6 +13,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 
 // Import your separated components
 import OrderSpecificationSheet from "../components/inspection/YDT/OrderSpecificationSheet";
+import SketchTechnicalSheet from "../components/inspection/YDT/sketchTechnicalSheet";
 
 const CoverPage = () => {
   const { user } = useAuth();
@@ -19,6 +21,7 @@ const CoverPage = () => {
 
   // FIXED: Move component creation outside of useMemo to prevent recreation
   const orderSpecificationComponent = useMemo(() => <OrderSpecificationSheet />, []);
+  const sketchTechnicalComponent = useMemo(() => <SketchTechnicalSheet />, []);
 
   // Tab configuration
   const tabs = useMemo(() => [
@@ -29,7 +32,14 @@ const CoverPage = () => {
       component: orderSpecificationComponent, // Use the memoized component
       description: "Create Order Specification Documents"
     },
-  ], [orderSpecificationComponent]); // Add as dependency
+    {
+      id: "sketch-technical-sheet",
+      label: "Sketch Technical Sheet",
+      icon: <FileImage size={20} />,
+      component: sketchTechnicalComponent, // Use the memoized component
+      description: "Create Sketch Technical Documents"
+    },
+  ], [orderSpecificationComponent, sketchTechnicalComponent]); // Add as dependency
 
   const activeTabData = useMemo(() => {
     return tabs.find((tab) => tab.id === activeTab);
