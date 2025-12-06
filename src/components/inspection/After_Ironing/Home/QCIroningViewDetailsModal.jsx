@@ -3,7 +3,7 @@ import { X, Package, Droplets, Target, CheckCircle, XCircle, TrendingUp, BarChar
 import { getToleranceAsFraction } from "./fractionConverter";
 import { API_BASE_URL } from "../../../../../config";
 
-const QCWashingViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] }) => {
+const QCIroningViewDetailsModal = ({ isOpen, onClose, itemData, allRecords = [] }) => {
   const [washQuantityData, setWashQuantityData] = useState({
     alreadyWashedQty: 0,
     remainingQty: 0,
@@ -260,7 +260,7 @@ const RecordsListModal = () => (
                     Date
                   </th>
                   <th className="border border-gray-300 dark:border-gray-600 px-3 py-2 text-left dark:text-white text-sm">
-                    Wash Qty <span className="text-xs text-gray-400">
+                    Irone Qty <span className="text-xs text-gray-400">
                       ({itemData.isActualWashQty ? 'Actual' : 'Estimated'})
                     </span>
                   </th>
@@ -340,7 +340,7 @@ const RecordsListModal = () => (
                 <p className="font-semibold text-lg dark:text-white">{selectedRecords.length}</p>
               </div>
               <div className="text-center">
-                <p className="text-gray-600 dark:text-gray-400">Total Washed</p>
+                <p className="text-gray-600 dark:text-gray-400">Total Ironed</p>
                 <p className="font-semibold text-lg dark:text-white">
                   {selectedRecords.reduce((sum, record) => sum + (parseInt(record.displayWashQty ?? record.washQty) || 0), 0)}
                 </p>
@@ -366,7 +366,7 @@ const RecordsListModal = () => (
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-white dark:bg-gray-800 z-10">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-            QC-Washing Detail View
+          Ironing Detail View
           </h2>
           <div className="flex items-center gap-4">
             {inspectorDetails && (
@@ -393,11 +393,11 @@ const RecordsListModal = () => (
         </div>
 
         <div className="p-6">
-          {/* Wash Quantity Tracking Section */}
+          {/* Ironing Quantity Tracking Section */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100 flex items-center">
               <Calculator className="w-5 h-5 mr-2" />
-              Wash Quantity Tracking
+              Ironing Quantity Tracking
             </h3>
             <div
               className={`grid grid-cols-1 ${
@@ -418,7 +418,7 @@ const RecordsListModal = () => (
                 <div className="flex items-center">
                   <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-green-600 dark:text-green-300">Already Washed Qty</p>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-300">Already Ironed Qty</p>
                     <p className="text-2xl font-bold text-green-900 dark:text-green-100">{washQuantityData.alreadyWashedQty}</p>
                   </div>
                 </div>
@@ -524,7 +524,7 @@ const RecordsListModal = () => (
                   <div className="flex items-center">
                     <Droplets className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
                     <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Wash Type</p>
+                      <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Ironing Type</p>
                       <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{itemData.washType || 'N/A'}</p>
                     </div>
                   </div>
@@ -544,7 +544,7 @@ const RecordsListModal = () => (
                 <div className="flex items-center">
                   <Target className="w-8 h-8 text-amber-600 dark:text-amber-400" />
                   <div className="ml-3">
-                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Wash Stage</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-300">Iron Stage</p>
                     <p className={`text-lg font-semibold capitalize ${
                       itemData.before_after_wash === 'before wash' 
                         ? 'text-amber-900 dark:text-amber-100' 
@@ -611,7 +611,7 @@ const RecordsListModal = () => (
                     <Droplets className="w-8 h-8 text-cyan-600 dark:text-cyan-400" />
                     <div className="ml-3">
                       <p className="text-sm font-medium text-cyan-600 dark:text-cyan-300">
-                        Wash Qty {itemData.isActualWashQty && <span className="text-green-500">(Actual)</span>}
+                        Iron Qty {itemData.isActualWashQty && <span className="text-green-500">(Actual)</span>}
                       </p>
                       <p className="text-2xl font-bold text-cyan-900 dark:text-cyan-100">{itemData.displayWashQty ?? itemData.washQty}</p>
                     </div>
@@ -863,7 +863,7 @@ const RecordsListModal = () => (
                               )}
                               {machine.silicon && machine.silicon.actualValue && (
                                 <div className="flex items-center">
-                                                                    <div className={`w-2 h-2 rounded-full mr-2 ${
+                                  <div className={`w-2 h-2 rounded-full mr-2 ${
                                     machine.silicon.status?.ok ? 'bg-green-500' : 'bg-red-500'
                                   }`}></div>
                                   <span>Silicon: {machine.silicon.actualValue}g</span>
@@ -1012,6 +1012,6 @@ const RecordsListModal = () => (
   );
 };
 
-export default QCWashingViewDetailsModal;
+export default QCIroningViewDetailsModal;
 
                                   

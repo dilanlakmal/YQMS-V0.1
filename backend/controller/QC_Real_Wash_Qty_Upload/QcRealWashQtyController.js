@@ -275,35 +275,12 @@ export const uploadQcRealWashQty = async (req, res) => {
       return colorString; // Return as-is if no brackets found
     };
 
-    // DEBUG: Log the input data
-    console.log('Input data sample:', {
-      Style_No: data[0].Style_No,
-      color: data[0].color,
-      extractedEnglishColor: extractEnglishColor(data[0].color),
-      inspectionDate: data[0].inspectionDate,
-      QC_Id: data[0].QC_Id,
-      washQty: data[0].washQty
-    });
-
     // DEBUG: Check what QCWashing records exist for this Style_No with filters
     const existingRecords = await QCWashing.find({
       orderNo: data[0].Style_No,
       reportType: "Inline",
       factoryName: "YM"
     }).select('orderNo color date reportType factoryName actualWashQty actualAQLValue').lean();
-
-    console.log(`Existing QCWashing records for orderNo "${data[0].Style_No}" with reportType="Inline" and factoryName="YM":`, existingRecords.length);
-    existingRecords.forEach((record, index) => {
-      console.log(`Record ${index + 1}:`, {
-        orderNo: record.orderNo,
-        color: record.color,
-        date: record.date,
-        reportType: record.reportType,
-        factoryName: record.factoryName,
-        actualWashQty: record.actualWashQty,
-        hasActualAQL: !!record.actualAQLValue
-      });
-    });
 
     // Prepare bulk operations for QCRealWashQty collection
     const bulkOpsRealWash = data.map(record => ({
@@ -337,12 +314,6 @@ export const uploadQcRealWashQty = async (req, res) => {
         const buyer = await getBuyerFromMoNumber(record.Style_No);
         const aqlLevel = getAqlLevelForBuyer(buyer);
 
-        console.log('AQL Calculation for Style_No:', record.Style_No, {
-          washQty: washQtyNum,
-          buyer: buyer,
-          aqlLevel: aqlLevel
-        });
-
         // Find the AQL chart document where the wash qty falls within the defined range
         const aqlChart = await AQLChart.findOne({
           Type: "General",
@@ -364,7 +335,6 @@ export const uploadQcRealWashQty = async (req, res) => {
               lotSize: washQtyNum,
               calculatedAt: new Date()
             };
-            console.log('AQL Value calculated for Style_No:', record.Style_No, actualAQLValue);
           } else {
             console.log('No AQL entry found for level:', aqlLevel, 'Style_No:', record.Style_No);
           }
@@ -379,14 +349,6 @@ export const uploadQcRealWashQty = async (req, res) => {
         
         // Extract English color name for matching
         const englishColor = extractEnglishColor(record.color);
-        
-        console.log('Color matching for Style_No:', record.Style_No, {
-          originalColor: record.color,
-          extractedEnglishColor: englishColor,
-          inspectionDate: record.inspectionDate,
-          startOfDay: startOfDay,
-          endOfDay: endOfDay
-        });
 
         // Create filter for QCWashing update with additional conditions
         const washingFilter = {
@@ -400,22 +362,8 @@ export const uploadQcRealWashQty = async (req, res) => {
           }
         };
 
-        console.log('QCWashing filter for Style_No:', record.Style_No, washingFilter);
-
         // Check if any records match this filter before updating
         const matchingRecords = await QCWashing.find(washingFilter).select('orderNo color date reportType factoryName actualWashQty actualAQLValue').lean();
-        console.log(`Records matching filter for Style_No "${record.Style_No}":`, matchingRecords.length);
-        matchingRecords.forEach((matchedRecord, index) => {
-          console.log(`Matching record ${index + 1}:`, {
-            orderNo: matchedRecord.orderNo,
-            color: matchedRecord.color,
-            date: matchedRecord.date,
-            reportType: matchedRecord.reportType,
-            factoryName: matchedRecord.factoryName,
-            currentActualWashQty: matchedRecord.actualWashQty,
-            currentActualAQL: matchedRecord.actualAQLValue
-          });
-        });
 
         // Store the matching info for later verification
         updateResults.push({
@@ -442,7 +390,6 @@ export const uploadQcRealWashQty = async (req, res) => {
             }
           });
         } else {
-          console.log(`No matching records found for Style_No "${record.Style_No}" with color "${englishColor}"`);
           
           // Try fallback without date filter
           const fallbackFilter = {
@@ -453,10 +400,8 @@ export const uploadQcRealWashQty = async (req, res) => {
           };
 
           const fallbackMatches = await QCWashing.find(fallbackFilter).select('orderNo color date reportType factoryName').lean();
-          console.log(`Fallback matches (no date filter) for Style_No "${record.Style_No}":`, fallbackMatches.length);
           
           if (fallbackMatches.length > 0) {
-            console.log('Adding fallback update without date filter');
             bulkOpsWashing.push({
               updateMany: {
                 filter: fallbackFilter,
@@ -473,7 +418,6 @@ export const uploadQcRealWashQty = async (req, res) => {
         }
 
       } catch (aqlError) {
-        console.error(`Error calculating AQL for Style_No ${record.Style_No}:`, aqlError);
         // Continue with the operation but without AQL data
         const inspectionDate = new Date(record.inspectionDate);
         const startOfDay = new Date(inspectionDate.getFullYear(), inspectionDate.getMonth(), inspectionDate.getDate());
@@ -510,12 +454,6 @@ export const uploadQcRealWashQty = async (req, res) => {
       bulkOpsWashing.length > 0 ? QCWashing.bulkWrite(bulkOpsWashing) : { matchedCount: 0, modifiedCount: 0, upsertedCount: 0 }
     ]);
 
-    console.log('QCWashing bulk write result:', {
-      matchedCount: resultWashing.matchedCount,
-      modifiedCount: resultWashing.modifiedCount,
-      upsertedCount: resultWashing.upsertedCount,
-      operations: bulkOpsWashing.length
-    });
 
     // Verification queries for each processed record
     const verificationResults = [];
@@ -538,16 +476,7 @@ export const uploadQcRealWashQty = async (req, res) => {
         updatedAt: verificationQuery?.updatedAt
       });
 
-      console.log(`Verification for Style_No "${record.Style_No}", color "${englishColor}":`, {
-        found: !!verificationQuery,
-        orderNo: verificationQuery?.orderNo,
-        color: verificationQuery?.color,
-        reportType: verificationQuery?.reportType,
-        factoryName: verificationQuery?.factoryName,
-        actualWashQty: verificationQuery?.actualWashQty,
-        hasActualAQL: !!verificationQuery?.actualAQLValue,
-        updatedAt: verificationQuery?.updatedAt
-      });
+     
     }
 
     res.status(200).json({
@@ -751,7 +680,6 @@ export const getrealWashQty =  async (req, res) => {
     // Parse the inspection date
     const searchDate = new Date(inspectionDate);
     
-    // Create flexible color matching - search for colors that contain the search term
     // This handles cases like "BLACK" matching "黑色[BLACK]"
     const colorRegex = new RegExp(color.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
     

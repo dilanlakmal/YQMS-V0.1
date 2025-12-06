@@ -237,7 +237,7 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
               <Text style={styles.infoValue}>{safeString(recordData.colorOrderQty)}</Text>
             </View>
             <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Wash Type:</Text>
+              <Text style={styles.infoLabel}>Iron Type:</Text>
               <Text style={styles.infoValue}>{safeString(recordData.washType)}</Text>
             </View>
             <View style={styles.infoBlock}>
@@ -253,7 +253,7 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
               <Text style={styles.infoValue}>{safeString(recordData.buyer)}</Text>
             </View>
             <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Wash Qty:</Text>
+              <Text style={styles.infoLabel}>Iron Qty:</Text>
               <Text style={styles.infoValue}>{safeString(recordData.washQty)}</Text>
             </View>
           </View>
@@ -1322,7 +1322,7 @@ const BeforeAfterComparisonSection = ({ recordData, comparisonData, API_BASE_URL
   
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Before vs After Wash Comparison</Text>
+      <Text style={styles.sectionTitle}>Before, After Wash and After Ironing Comparison</Text>
       <View style={{ marginBottom: 10 }}>
         <Text style={{ fontSize: 8, color: "#6b7280" }}>
           Before: {safeString(secondaryData.before_after_wash)} ({safeString(secondaryData.reportType)}) | After: {safeString(primaryData.before_after_wash)} ({safeString(primaryData.reportType)})

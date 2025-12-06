@@ -2681,7 +2681,7 @@ export const checkAfterIroningRecord = async (req, res) => {
 export const getAllSubmittedAfterIroningData = async (req, res) => {
   try {
     const submittedRecords = await AfterIroning.find({
-      status: { $in: ['submitted', 'approved'] }
+      status: { $in: ['submitted', 'approved', 'processing'] }
     })
     .sort({ submittedAt: -1, createdAt: -1 })
     .lean();
