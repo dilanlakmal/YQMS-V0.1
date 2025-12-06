@@ -1,27 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { Buffer } from 'buffer';
 import { API_BASE_URL } from '../../../../../config'; 
-import { MoreVertical, Eye, FileText, Download, Trash2 } from 'lucide-react';
+import { MoreVertical, Eye, FileText, Download } from 'lucide-react';
 import SubmittedWashingDataFilter from './SubmittedIroningDataFilter';
 import QCWashingViewDetailsModal from './QCIroningViewDetailsModal'; 
 import AfterIroningFullReportModal from './AfterIroningFullReportModal';
-import { PDFDownloadLink} from '@react-pdf/renderer';
 import Swal from 'sweetalert2';
 
 // Polyfill Buffer for client-side PDF generation
 window.Buffer = window.Buffer || Buffer;
 
-
-const SubmittedWashingDataPage = () => {
+const  SubmittedIroningDataPage = () => {
   const [submittedData, setSubmittedData] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [currentFilters, setCurrentFilters] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState(null);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
-
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -35,16 +31,15 @@ const SubmittedWashingDataPage = () => {
     isOpen: false,
     itemData: null
   });
- const [fullReportModal, setFullReportModal] = useState({
-  isOpen: false,
-  recordData: null
-});
-const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
- const [checkpointDefinitions, setCheckpointDefinitions] = useState([]);
+  const [fullReportModal, setFullReportModal] = useState({
+    isOpen: false,
+    recordData: null
+  });
+  const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
+  const [checkpointDefinitions, setCheckpointDefinitions] = useState([]);
 
-  // Single handleViewDetails function (removed the duplicate)
+  // Single handleViewDetails function
   const handleViewDetails = (record) => {
-    // Ensure the record passed is the one from the currently rendered (and processed) data
     setViewDetailsModal({
       isOpen: true,
       itemData: record,
@@ -58,53 +53,51 @@ const [isqcWashingPDF, setIsQcWashingPDF] = useState(false);
     });
   };
 
-// Add this function to close the modal
-const handleCloseFullReport = () => {
-  setFullReportModal({
-    isOpen: false,
-    recordData: null
-  });
-}
-
-
-// Update the data fetching logic
-const fetchSubmittedData = async (showLoading = true) => {
-  try {
-    if (showLoading) setIsLoading(true);
-    setError(null);
-    
-    const response = await fetch(
-      `${API_BASE_URL}/api/after-ironing/all-submitted`
-    );
-    
-    if (!response.ok) {
-      if (response.status === 404) {
-        setError("Report feature is not yet implemented on the server.");
-      } else {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return;
-    }
-    
-    const data = await response.json();
-    
-    if (data.success) {
-      setSubmittedData(data.data || []);
-    } else {
-      setError(data.message || "Failed to fetch submitted data.");
-    }
-  } catch (err) {
-    if (err.message.includes('404')) {
-      setError("Report feature is not yet implemented on the server.");
-    } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
-      setError("Could not connect to server. Please check your connection.");
-    } else {
-      setError(`Error: ${err.message}`);
-    }
-  } finally {
-    if (showLoading) setIsLoading(false);
+  const handleCloseFullReport = () => {
+    setFullReportModal({
+      isOpen: false,
+      recordData: null
+    });
   }
-};
+
+  // Update the data fetching logic
+  const fetchSubmittedData = async (showLoading = true) => {
+    try {
+      if (showLoading) setIsLoading(true);
+      setError(null);
+      
+      const response = await fetch(
+        `${API_BASE_URL}/api/after-ironing/all-submitted`
+      );
+      
+      if (!response.ok) {
+        if (response.status === 404) {
+          setError("Report feature is not yet implemented on the server.");
+        } else {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return;
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setSubmittedData(data.data || []);
+      } else {
+        setError(data.message || "Failed to fetch submitted data.");
+      }
+    } catch (err) {
+      if (err.message.includes('404')) {
+        setError("Report feature is not yet implemented on the server.");
+      } else if (err.name === 'TypeError' && err.message.includes('fetch')) {
+        setError("Could not connect to server. Please check your connection.");
+      } else {
+        setError(`Error: ${err.message}`);
+      }
+    } finally {
+      if (showLoading) setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchSubmittedData();
@@ -122,6 +115,7 @@ const fetchSubmittedData = async (showLoading = true) => {
         console.error("Failed to fetch checkpoint definitions", e);
       }
     };
+
     fetchDefinitions();
   }, []);
 
@@ -132,13 +126,12 @@ const fetchSubmittedData = async (showLoading = true) => {
         const response = await fetch(`${API_BASE_URL}/api/users`);
         if (response.ok) {
           const data = await response.json();
-          // Ensure that `users` is always an array to prevent crashes
           const usersArray = data.users || (Array.isArray(data) ? data : []);
           setUsers(usersArray);
         }
       } catch (error) {
         console.error('Error fetching users:', error);
-        setUsers([]); // On error, ensure it's an empty array
+        setUsers([]);
       } finally {
         setLoadingUsers(false);
       }
@@ -151,16 +144,12 @@ const fetchSubmittedData = async (showLoading = true) => {
     if (!isLoading) {
       applyFilters(currentFilters || {}, false, submittedData);
     }
-  }, [submittedData, currentFilters, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
-
-
-
+  }, [submittedData, currentFilters, isLoading]);
 
   // Helper function to extract defect details
   const getDefectDetails = (record) => {
     const defects = [];
     
-    // Check defectsByPc in defectDetails
     if (record.defectDetails?.defectsByPc && Array.isArray(record.defectDetails.defectsByPc)) {
       record.defectDetails.defectsByPc.forEach(pc => {
         if (pc.pcDefects && Array.isArray(pc.pcDefects)) {
@@ -190,7 +179,6 @@ const fetchSubmittedData = async (showLoading = true) => {
     let plusToleranceFail = 0;
     let minusToleranceFail = 0;
 
-    // Use the measurementSizeSummary if available (more accurate)
     if (record.measurementDetails?.measurementSizeSummary && Array.isArray(record.measurementDetails.measurementSizeSummary)) {
       record.measurementDetails.measurementSizeSummary.forEach(summary => {
         checkedPoints += summary.checkedPoints || 0;
@@ -200,7 +188,6 @@ const fetchSubmittedData = async (showLoading = true) => {
         minusToleranceFail += summary.minusToleranceFailCount || 0;
       });
     } else if (record.measurementDetails?.measurement) {
-      // Fallback to calculating from measurement data
       record.measurementDetails.measurement.forEach(measurement => {
         if (measurement.pcs && Array.isArray(measurement.pcs)) {
           measurement.pcs.forEach(pc => {
@@ -212,7 +199,6 @@ const fetchSubmittedData = async (showLoading = true) => {
                     totalPass++;
                   } else {
                     totalFail++;
-                    // Determine if it's plus or minus tolerance fail
                     if (point.measured_value_decimal > point.tolerancePlus) {
                       plusToleranceFail++;
                     } else if (point.measured_value_decimal < point.toleranceMinus) {
@@ -237,448 +223,313 @@ const fetchSubmittedData = async (showLoading = true) => {
   };
 
   const handleFullReport = (record) => {
-  setFullReportModal({
-    isOpen: true,
-    recordData: record
-  });
-};
-
-// Skip image conversion due to CORS issues - use placeholders
-const convertImageToBase64 = async (imagePath, API_BASE_URL) => {
-  if (!imagePath) return null;
-  
-  // If it's already base64, return it
-  if (imagePath.startsWith('data:image/')) {
-    return imagePath;
-  }
-  return null;
-};
-
-
-// Process images for PDF rendering
-const processImagesInRecord = async (record, API_BASE_URL) => {
-  try {
-    const processedRecord = JSON.parse(JSON.stringify(record)); // Deep clone
-    
-    
-    // Process defect images
-    if (processedRecord.defectDetails?.defectsByPc) {
-      
-      for (let pcIndex = 0; pcIndex < processedRecord.defectDetails.defectsByPc.length; pcIndex++) {
-        const pcDefect = processedRecord.defectDetails.defectsByPc[pcIndex];
-        
-        if (pcDefect.pcDefects) {
-          
-          for (let defectIndex = 0; defectIndex < pcDefect.pcDefects.length; defectIndex++) {
-            const defect = pcDefect.pcDefects[defectIndex];
-            
-            if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              
-              const processedImages = [];
-              for (const imagePath of defect.defectImages) {
-                // Skip if already base64
-                if (imagePath && imagePath.startsWith('data:image/')) {
-                  processedImages.push(imagePath);
-                  continue;
-                }
-                
-                // For CORS-blocked images, add placeholder info
-                processedImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'defect' });
-              }
-              
-              // IMPORTANT: Assign the processed images back to the correct location
-              processedRecord.defectDetails.defectsByPc[pcIndex].pcDefects[defectIndex].defectImages = processedImages;
-            }
-          }
-        }
-      }
-    }
-
-    // Process additional images
-    if (processedRecord.defectDetails?.additionalImages && Array.isArray(processedRecord.defectDetails.additionalImages)) {
-      const processedAdditionalImages = [];
-      for (const imagePath of processedRecord.defectDetails.additionalImages) {
-        // Skip if already base64
-        if (imagePath && imagePath.startsWith('data:image/')) {
-          processedAdditionalImages.push(imagePath);
-          continue;
-        }
-        
-        processedAdditionalImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'additional' });
-      }
-      
-      // IMPORTANT: Assign the processed images back
-      processedRecord.defectDetails.additionalImages = processedAdditionalImages;
-    }
-
-    // Process inspection images
-    if (processedRecord.inspectionDetails?.checkedPoints) {
-      for (let pointIndex = 0; pointIndex < processedRecord.inspectionDetails.checkedPoints.length; pointIndex++) {
-        const point = processedRecord.inspectionDetails.checkedPoints[pointIndex];
-        
-        // Process point image
-        if (point.image) {
-          try {
-            if (!point.image.startsWith('data:image/')) {
-              const processedImage = await convertImageToBase64(point.image, API_BASE_URL);
-              processedRecord.inspectionDetails.checkedPoints[pointIndex].image = processedImage || null;
-            }
-          } catch (error) {
-            processedRecord.inspectionDetails.checkedPoints[pointIndex].image = null;
-          }
-        }
-
-        // Process comparison images in inspection points
-        if (point.comparison && Array.isArray(point.comparison)) {
-          const processedComparisonImages = [];
-          for (const imagePath of point.comparison) {
-            if (imagePath.startsWith('data:image/')) {
-              processedComparisonImages.push(imagePath);
-            } else {
-              processedComparisonImages.push({ isPlaceholder: true, originalUrl: imagePath, type: 'comparison' });
-            }
-          }
-          processedRecord.inspectionDetails.checkedPoints[pointIndex].comparison = processedComparisonImages;
-        }
-      }
-    }
-
-    // Process machine process images
-    if (processedRecord.inspectionDetails?.machineProcesses) {
-      for (let machineIndex = 0; machineIndex < processedRecord.inspectionDetails.machineProcesses.length; machineIndex++) {
-        const machine = processedRecord.inspectionDetails.machineProcesses[machineIndex];
-        if (machine.image) {
-          try {
-            if (!machine.image.startsWith('data:image/')) {
-              const processedImage = await convertImageToBase64(machine.image, API_BASE_URL);
-              processedRecord.inspectionDetails.machineProcesses[machineIndex].image = processedImage || null;
-            }
-          } catch (error) {
-            processedRecord.inspectionDetails.machineProcesses[machineIndex].image = null;
-          }
-        }
-      }
-    }
-    
-    return processedRecord;
-  } catch (error) {
-    console.error('❌ Error processing images in record:', error);
-    return record; // Return original record if processing fails
-  }
-};
-
-// Add delete function
-const handleDelete = async (record) => {
-  try {
-    const result = await Swal.fire({
-      title: 'Are you sure?',
-      text: `Delete After Ironing record for ${record.orderNo} - ${record.color}?`,
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Yes, delete it!'
+    setFullReportModal({
+      isOpen: true,
+      recordData: record
     });
+  };
 
-    if (result.isConfirmed) {
-      const response = await fetch(`${API_BASE_URL}/api/after-ironing/delete/${record._id}`, {
-        method: 'DELETE'
-      });
-
-      if (response.ok) {
-        await Swal.fire({
-          title: 'Deleted!',
-          text: 'After Ironing record has been deleted.',
-          icon: 'success',
-          timer: 2000,
-          showConfirmButton: false
-        });
-        
-        // Refresh the data
-        fetchSubmittedData(false);
-      } else {
-        throw new Error('Failed to delete record');
-      }
-    }
-  } catch (error) {
-    Swal.fire({
-      title: 'Error!',
-      text: `Failed to delete record: ${error.message}`,
-      icon: 'error',
-      timer: 3000,
-      showConfirmButton: false
-    });
-  }
-};
-
-const handleDownloadPDF = async (record) => {
-  try {
-    setIsQcWashingPDF(true);
-    
-    // 1. Fetch inspector details first
-    let inspectorDetails = null;
-    if (record.userId) {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/users/${record.userId}`);
-        if (response.ok) {
-          inspectorDetails = await response.json();
-        }
-      } catch (error) {
-        console.warn('Failed to fetch inspector details:', error);
-      }
-    }
-    
-    // 2. Collect all image URLs with enhanced defect image handling
-    const imageUrls = new Set();
-    
-    const collectImages = (obj, path = '') => {
-      if (!obj) return;
+  // Updated handleDownloadPDF function
+  const handleDownloadPDF = async (record) => {
+    try {
+      setIsQcWashingPDF(true);
       
-      if (typeof obj === 'string') {
-        // Check if it's an image URL
-        if (obj.includes('/storage/') || 
-            obj.includes('/public/') || 
-            obj.includes('/Uploads/') ||
-            obj.includes('/qc_washing_images/') || // Add this for defect images
-            obj.startsWith('http') || 
-            obj.startsWith('./public/') ||
-            obj.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
-          imageUrls.add(obj);
-        }
-      } else if (Array.isArray(obj)) {
-        obj.forEach((item, index) => collectImages(item, `${path}[${index}]`));
-      } else if (typeof obj === 'object' && obj !== null) {
-        Object.keys(obj).forEach(key => {
-          collectImages(obj[key], `${path}.${key}`);
-        });
-      }
-    };
-    
-    // Special handling for defect images which might be nested differently
-    if (record.defectDetails?.defectsByPc) {
-      record.defectDetails.defectsByPc.forEach((pc, pcIndex) => {
-        if (pc.pcDefects) {
-          pc.pcDefects.forEach((defect, defectIndex) => {
-            // Handle defectImages array (captured)
-            if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              defect.defectImages.forEach((img, imgIndex) => {
-                collectImages(img, `record.defectDetails.defectsByPc[${pcIndex}].pcDefects[${defectIndex}].defectImages[${imgIndex}]`);
-              });
-            }
-            
-            // Handle uploadedImages array
-            if (defect.uploadedImages && Array.isArray(defect.uploadedImages)) {
-              defect.uploadedImages.forEach((img, imgIndex) => {
-                collectImages(img, `record.defectDetails.defectsByPc[${pcIndex}].pcDefects[${defectIndex}].uploadedImages[${imgIndex}]`);
-              });
-            }
-          });
-        }
+      // Show initial loading message
+      Swal.fire({
+        title: "Preparing PDF Report",
+        html: `
+          <div class="text-left">
+            <div id="progress-inspector">⏳ Loading inspector details...</div>
+            <div id="progress-images">⏳ Loading images...</div>
+            <div id="progress-pdf">⏳ Waiting...</div>
+          </div>
+        `,
+        allowOutsideClick: false,
+        showConfirmButton: false,
+        didOpen: () => {
+          Swal.showLoading();
+        },
       });
-    }
 
-    // Collect images from record
-    collectImages(record, 'record');
-    
-    // Special handling for defect images
-    if (record.defectDetails?.defectsByPc) {
-      record.defectDetails.defectsByPc.forEach((pc) => {
-        if (pc.pcDefects) {
-          pc.pcDefects.forEach((defect) => {
-            // Handle defectImages array
-            if (defect.defectImages && Array.isArray(defect.defectImages)) {
-              defect.defectImages.forEach((img) => {
-                if (typeof img === 'string') {
-                  imageUrls.add(img);
-                } else if (typeof img === 'object' && img !== null) {
-                  const imgUrl = img.url || img.src || img.originalUrl || img.path;
-                  if (imgUrl) {
-                    imageUrls.add(imgUrl);
-                  }
-                }
-              });
-            }
-            
-            // Handle uploadedImages array
-            if (defect.uploadedImages && Array.isArray(defect.uploadedImages)) {
-              defect.uploadedImages.forEach((img) => {
-                if (typeof img === 'string') {
-                  imageUrls.add(img);
-                } else if (typeof img === 'object' && img !== null) {
-                  const imgUrl = img.url || img.src || img.originalUrl || img.path;
-                  if (imgUrl) {
-                    imageUrls.add(imgUrl);
-                  }
-                }
-              });
-            }
-          });
-        }
-      });
-    }
-    
-    // Handle additional images
-    if (record.defectDetails?.additionalImages && Array.isArray(record.defectDetails.additionalImages)) {
-      record.defectDetails.additionalImages.forEach((img, index) => {
-        if (typeof img === 'string') {
-          imageUrls.add(img);
-        } else if (typeof img === 'object' && img !== null) {
-          const imgUrl = img.url || img.src || img.originalUrl || img.path;
-          if (imgUrl) {
-            imageUrls.add(imgUrl);
-          }
-        }
-      });
-    }
-    
-    // Collect inspector face photo
-    if (inspectorDetails?.face_photo) {
-      imageUrls.add(inspectorDetails.face_photo);
-    }
-    
-    
-    // 3. Load all images as base64 with enhanced error handling
-    const preloadedImages = {};
-    const imagePromises = Array.from(imageUrls).map(async (url, index) => {
-      try {
-        // Add delay to prevent overwhelming the server
-        await new Promise(resolve => setTimeout(resolve, index * 100));
-        
-        let imageUrl = url;
-        
-        // Normalize URL
-        if (imageUrl.startsWith('./public/')) {
-          imageUrl = imageUrl.replace('./public/', '/');
-        }
-        
-        
-        let response;
-        let success = false;
-        
-        // Strategy 1: Direct fetch for local URLs
-        if (!imageUrl.startsWith('http')) {
-          try {
-            const fullUrl = imageUrl.startsWith('/') ? `${API_BASE_URL}${imageUrl}` : `${API_BASE_URL}/${imageUrl}`;
-            response = await fetch(fullUrl, {
-              method: 'GET',
-              headers: {
-                'Accept': 'image/*,*/*',
-                'Cache-Control': 'no-cache'
-              }
-            });
-            if (response.ok) {
-              success = true;
-            }
-          } catch (error) {
-            console.log(`❌ Direct fetch failed: ${error.message}`);
-          }
-        }
-        
-        // Strategy 2: Use image proxy
-        if (!success) {
-          try {
-            const proxyUrl = imageUrl.startsWith('http') ? imageUrl : `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
-            response = await fetch(`${API_BASE_URL}/api/image-proxy/${encodeURIComponent(proxyUrl)}`, {
-              method: 'GET',
-              headers: {
-                'Accept': 'application/json',
-                'Cache-Control': 'no-cache'
-              }
-            });
-            if (response.ok) {
-              success = true;
-            }
-          } catch (error) {
-            console.log(`❌ Proxy fetch failed: ${error.message}`);
-          }
-        }
-        
-        if (success && response.ok) {
-          const contentType = response.headers.get('content-type') || '';
-          
-          if (contentType.includes('application/json')) {
-            // Response is JSON (from proxy)
-            const data = await response.json();
-            if (data.dataUrl && data.dataUrl.startsWith('data:')) {
-              preloadedImages[url] = data.dataUrl;
-              preloadedImages[imageUrl] = data.dataUrl;
-            } else {
-              console.warn(`❌ Invalid JSON response for: ${url}`, data);
-            }
-          } else if (contentType.startsWith('image/')) {
-            // Response is binary image data
-            const arrayBuffer = await response.arrayBuffer();
-            const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-            const dataUrl = `data:${contentType};base64,${base64}`;
-            
-            preloadedImages[url] = dataUrl;
-            preloadedImages[imageUrl] = dataUrl;
+      // 1. Fetch inspector details
+      let inspectorDetails = null;
+      if (record.userId) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/users/${record.userId}`);
+          if (response.ok) {
+            inspectorDetails = await response.json();
+            document.getElementById('progress-inspector').innerHTML = '✅ Inspector details loaded';
           } else {
-            console.warn(`❌ Unexpected content type: ${contentType} for ${url}`);
+            document.getElementById('progress-inspector').innerHTML = '⚠️ Inspector details not found';
           }
-        } else {
-          console.warn(`❌ Failed to load: ${url} (${response?.status || 'No response'})`);
+        } catch (error) {
+          console.warn('Failed to fetch inspector details:', error);
+          document.getElementById('progress-inspector').innerHTML = '⚠️ Inspector details failed to load';
+        }
+      } else {
+        document.getElementById('progress-inspector').innerHTML = '✅ No inspector details needed';
+      }
+
+      // 2. Collect and process images manually (fallback approach)
+      let preloadedImages = {};
+      let imageStats = { total: 0, loaded: 0 };
+      
+      try {
+        document.getElementById('progress-images').innerHTML = '⏳ Processing images...';
+        
+        // Collect all image URLs from the record
+        const imageUrls = new Set();
+        
+        const collectImages = (obj, path = '') => {
+          if (!obj) return;
+          
+          if (typeof obj === 'string') {
+            // Check if it's an image URL
+            if (obj.includes('/storage/') || 
+                obj.includes('/public/') || 
+                obj.includes('/Uploads/') ||
+                obj.includes('/qc_washing_images/') ||
+                obj.includes('/after_ironing_images/') ||
+                obj.startsWith('http') || 
+                obj.startsWith('./public/') ||
+                obj.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+              imageUrls.add(obj);
+            }
+          } else if (Array.isArray(obj)) {
+            obj.forEach((item, index) => collectImages(item, `${path}[${index}]`));
+          } else if (typeof obj === 'object' && obj !== null) {
+            Object.keys(obj).forEach(key => {
+              collectImages(obj[key], `${path}.${key}`);
+            });
+          }
+        };
+
+        // Collect images from record
+        collectImages(record, 'record');
+        
+        // Add inspector image if available
+        if (inspectorDetails && inspectorDetails.face_photo) {
+          imageUrls.add(inspectorDetails.face_photo);
+        }
+
+        imageStats.total = imageUrls.size;
+        
+        // Process images with fallback approach
+        const imagePromises = Array.from(imageUrls).map(async (url, index) => {
+          try {
+            // Add delay to prevent overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, index * 50));
+            
+            let imageUrl = url;
+            
+            // Normalize URL
+            if (imageUrl.startsWith('./public/')) {
+              imageUrl = imageUrl.replace('./public/', '/');
+            }
+            
+            // Try different approaches to load the image
+            let success = false;
+            
+            // Strategy 1: Try QC Washing image proxy as fallback (if available)
+            try {
+              const proxyUrl = imageUrl.startsWith('http') ? imageUrl : `${API_BASE_URL}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
+              const response = await fetch(`${API_BASE_URL}/api/qc-washing/image-proxy/${encodeURIComponent(proxyUrl)}`, {
+                method: 'GET',
+                headers: {
+                  'Accept': 'application/json',
+                  'Cache-Control': 'no-cache'
+                }
+              });
+              
+              if (response.ok) {
+                const data = await response.json();
+                if (data.success && data.dataUrl && data.dataUrl.startsWith('data:')) {
+                  preloadedImages[url] = data.dataUrl;
+                  preloadedImages[imageUrl] = data.dataUrl;
+                  imageStats.loaded++;
+                  success = true;
+                }
+              }
+            } catch (error) {
+              // QC Washing proxy not available, continue to next strategy
+            }
+            
+            // Strategy 2: Try direct fetch for local URLs
+            if (!success && !imageUrl.startsWith('http')) {
+              try {
+                const fullUrl = imageUrl.startsWith('/') ? `${API_BASE_URL}${imageUrl}` : `${API_BASE_URL}/${imageUrl}`;
+                const response = await fetch(fullUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Accept': 'image/*,*/*',
+                    'Cache-Control': 'no-cache'
+                  }
+                });
+                
+                if (response.ok) {
+                  const contentType = response.headers.get('content-type') || '';
+                  if (contentType.startsWith('image/')) {
+                    const arrayBuffer = await response.arrayBuffer();
+                    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+                    const dataUrl = `data:${contentType};base64,${base64}`;
+                    
+                    preloadedImages[url] = dataUrl;
+                    preloadedImages[imageUrl] = dataUrl;
+                    imageStats.loaded++;
+                    success = true;
+                  }
+                }
+              } catch (error) {
+                // Direct fetch failed, continue
+              }
+            }
+            
+            // Strategy 3: For external URLs, try CORS-enabled direct loading
+            if (!success && imageUrl.startsWith('http')) {
+              try {
+                console.warn(`Skipping external image due to CORS: ${imageUrl}`);
+              } catch (error) {
+                // External image failed
+              }
+            }
+            
+          } catch (error) {
+            console.warn(`Failed to load image: ${url}`, error.message);
+          }
+        });
+        
+        await Promise.allSettled(imagePromises);
+        
+        document.getElementById('progress-images').innerHTML = 
+          `✅ Images processed: ${imageStats.loaded}/${imageStats.total}`;
+          
+      } catch (error) {
+        console.error('Error processing images:', error);
+        document.getElementById('progress-images').innerHTML = 
+          `⚠️ Image processing failed: ${error.message}`;
+        // Continue with empty images - PDF will still generate
+      }
+
+      // 3. Fetch checkpoint definitions
+      let checkpointDefinitions = [];
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/after-ironing-checkpoint-definitions`);
+        if (response.ok) {
+          const data = await response.json();
+          if (Array.isArray(data)) {
+            checkpointDefinitions = data;
+          }
         }
       } catch (error) {
-        console.warn(`❌ Error loading: ${url}`, error.message);
+        console.warn('Failed to fetch checkpoint definitions:', error);
+        // Try fallback to QC washing definitions
+        try {
+          const fallbackResponse = await fetch(`${API_BASE_URL}/api/qc-washing-checklist`);
+          if (fallbackResponse.ok) {
+            const fallbackData = await fallbackResponse.json();
+            if (Array.isArray(fallbackData)) {
+              checkpointDefinitions = fallbackData;
+            }
+          }
+        } catch (fallbackError) {
+          console.warn('Fallback checkpoint definitions also failed:', fallbackError);
+        }
       }
-    });
-    
-    await Promise.allSettled(imagePromises);
-    
-    
-    // 4. Generate PDF
-    const { pdf } = await import("@react-pdf/renderer");
-    const { QcWashingFullReportPDF } = await import("./qcIroningFullReportPDF");
-    
-    const blob = await pdf(
-      React.createElement(QcWashingFullReportPDF, {
-        recordData: record,
-        comparisonData: null,
-        API_BASE_URL,
-        checkpointDefinitions,
-        preloadedImages,
-        inspectorDetails,
-        reportTitle: "After Ironing Report"
-      })
-    ).toBlob();
-    
-    // 5. Download
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `After_Ironing_Report_${record.orderNo}_${record.color}_${new Date().toISOString().split('T')[0]}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    Swal.fire({
-      title: "Success!",
-      text: "After Ironing PDF downloaded successfully!",
-      icon: "success",
-      timer: 3000,
-      showConfirmButton: false,
-    });
-    
-  } catch (error) {
-    Swal.fire({
-      title: "Error!",
-      text: `Failed to generate After Ironing PDF: ${error.message}`,
-      icon: "error",
-      timer: 5000,
-      showConfirmButton: false,
-    });
-  } finally {
-    setIsQcWashingPDF(false);
-  }
-};
+
+      // 4. Prepare clean data for PDF
+      const cleanRecordData = JSON.parse(JSON.stringify(record, (key, value) => {
+        if (value === '' || value === null || value === undefined) {
+          return undefined;
+        }
+        return value;
+      }));
+
+      // 5. Generate PDF
+      document.getElementById('progress-pdf').innerHTML = '⏳ Generating PDF document...';
+      
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      try {
+        const { pdf } = await import("@react-pdf/renderer");
+        const { QcWashingFullReportPDF } = await import("./qcIroningFullReportPDF");
+
+        const pdfElement = React.createElement(QcWashingFullReportPDF, {
+          recordData: cleanRecordData,
+          comparisonData: null,
+          API_BASE_URL,
+          checkpointDefinitions: checkpointDefinitions || [],
+          preloadedImages,
+          inspectorDetails: inspectorDetails || {},
+          reportTitle: "After Ironing Report",
+          isLoading: false,
+          skipImageLoading: false
+        });
+
+        const blob = await pdf(pdfElement).toBlob();
+        document.getElementById('progress-pdf').innerHTML = '✅ PDF generated successfully';
+        
+        Swal.close();
+
+        // 6. Download the PDF
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `After_Ironing_Report_${record.orderNo || 'Unknown'}_${record.color || 'Unknown'}_${new Date().toISOString().split('T')[0]}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        // Success message
+        Swal.fire({
+          title: "Success!",
+          html: `
+            <div class="text-left">
+              <div>✅ PDF downloaded successfully!</div>
+              <div class="text-sm text-gray-600 mt-2">
+                Inspector details: ${inspectorDetails ? 'Loaded' : 'Not available'}<br>
+                Images processed: ${imageStats.loaded}/${imageStats.total}<br>
+                PDF size: ${(blob.size / 1024 / 1024).toFixed(2)} MB<br>
+                ${imageStats.total > 0 && imageStats.loaded === imageStats.total ? 'All images loaded successfully' : 
+                  imageStats.total > 0 ? `${imageStats.total - imageStats.loaded} images failed to load (will show as placeholders)` : 'No images found'}
+              </div>
+            </div>
+          `,
+          icon: "success",
+          timer: 5000,
+          showConfirmButton: true,
+        });
+
+      } catch (pdfError) {
+        console.error('PDF generation specific error:', pdfError);
+        throw new Error(`PDF generation failed: ${pdfError.message}`);
+      }
+
+    } catch (error) {
+      Swal.fire({
+        title: "Error!",
+        html: `
+          <div class="text-left">
+            <div>❌ Failed to generate PDF</div>
+            <div class="text-sm text-gray-600 mt-2">
+              Error: ${error.message}<br>
+              Please check the console for more details.
+            </div>
+          </div>
+        `,
+        icon: "error",
+        timer: 10000,
+        showConfirmButton: true,
+      });
+    } finally {
+      setIsQcWashingPDF(false);
+    }
+  };
 
   const toggleDropdown = (recordId) => {
     setOpenDropdown(openDropdown === recordId ? null : recordId);
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = () => {
       setOpenDropdown(null);
@@ -726,11 +577,9 @@ const handleDownloadPDF = async (record) => {
     if (filters.qcId) {
       const searchTerm = filters.qcId.toLowerCase();
       filtered = filtered.filter(item => {
-        // Check if the search term is in the user ID
         if (item.userId?.toLowerCase().includes(searchTerm)) {
           return true;
         }
-        // Check if the search term is in the user's name
         const user = users.find(u => u.emp_id === item.userId || u.userId === item.userId);
         if (user && user.eng_name?.toLowerCase().includes(searchTerm)) {
           return true;
@@ -738,11 +587,6 @@ const handleDownloadPDF = async (record) => {
         return false;
       });
     }
-
-    // Buyer filter
-    // if (filters.buyer) {
-    //   filtered = filtered.filter(item => item.buyer === filters.buyer);
-    // }
 
     // Factory name filter
     if (filters.factoryName) {
@@ -929,9 +773,6 @@ const handleDownloadPDF = async (record) => {
                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                    Factory
                   </th>
-                   {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
-                   Buyer
-                  </th> */}
                    <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                   Wash Type
                   </th>
@@ -941,7 +782,7 @@ const handleDownloadPDF = async (record) => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                    Ironing Type
                   </th>
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
+                                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                     MO No
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
@@ -953,9 +794,6 @@ const handleDownloadPDF = async (record) => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                     Total Order Qty
                   </th>
-                  {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
-                    Color Order Qty
-                  </th> */}
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                    Ironing Qty
                   </th>
@@ -992,8 +830,6 @@ const handleDownloadPDF = async (record) => {
                 {/* Sub-header row for complex columns */}
                 <tr className="bg-gray-100 dark:bg-gray-600">
                   <th className="px-3 py-2"></th>
-                  {/* <th className="px-3 py-2"></th> */}
-                  {/* <th className="px-3 py-2"></th> */}
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
                   <th className="px-3 py-2"></th>
@@ -1045,9 +881,6 @@ const handleDownloadPDF = async (record) => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {record.factoryName || 'N/A'}
                       </td>
-                      {/* <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
-                        {record.buyer || 'N/A'}
-                      </td> */}
                        <td className="px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-200">
                         {(record.washType || 'N/A').replace(' Wash', '')}
                       </td>
@@ -1069,17 +902,12 @@ const handleDownloadPDF = async (record) => {
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.orderQty || 'N/A'}
                       </td>
-                      {/* <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
-                        {record.colorOrderQty || 'N/A'}
-                      </td> */}
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.washQty || 'N/A'}
                       </td>
-
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {record.checkedQty || 'N/A'}
                       </td>
-
                       <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-200">
                         {totalDefectCount}
                       </td>
@@ -1092,7 +920,6 @@ const handleDownloadPDF = async (record) => {
                             : (record.passRate || 0);
                           
                           const status = passRateValue >= 95 ? 'Pass' : 'Fail';
-
                           return (
                             <div>
                               <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -1219,17 +1046,6 @@ const handleDownloadPDF = async (record) => {
                                 <Download size={16} className="mr-3" />
                                 {isqcWashingPDF ? 'Generating PDF...' : 'Download PDF'}
                               </button>
-                              {/* <hr className="my-1 border-gray-200 dark:border-gray-600" />
-                              <button
-                                onClick={() => {
-                                  handleDelete(record);
-                                  setOpenDropdown(null);
-                                }}
-                                className="flex items-center w-full px-4 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20"
-                              >
-                                <Trash2 size={16} className="mr-3" />
-                                Delete
-                              </button> */}
                             </div>
                           </div>
                         )}
@@ -1306,15 +1122,17 @@ const handleDownloadPDF = async (record) => {
         allRecords={filteredData}
       />
 
-      {/* Full Report Modal - ADD THIS */}
-    <AfterIroningFullReportModal
-      isOpen={fullReportModal.isOpen}
-      onClose={handleCloseFullReport}
+      {/* Full Report Modal */}
+      <AfterIroningFullReportModal
+        isOpen={fullReportModal.isOpen}
+        onClose={handleCloseFullReport}
         recordData={fullReportModal.recordData}
         checkpointDefinitions={checkpointDefinitions}
-    />
+      />
     </div>
   );
 };
 
-export default SubmittedWashingDataPage;
+export default SubmittedIroningDataPage;
+
+                
