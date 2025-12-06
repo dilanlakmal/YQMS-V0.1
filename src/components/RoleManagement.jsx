@@ -275,7 +275,8 @@ export default function RoleManagement() {
     "QC Washing",
     "QC1 Sub Con",
     "Measurement",
-    "Fin Check Measurements"
+    "Fin Check Measurements",
+    "QC Ironing"
   ];
 
   // Prepare sorted table data for rendering
