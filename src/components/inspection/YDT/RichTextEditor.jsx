@@ -24,10 +24,10 @@ const RichTextEditor = ({
   const [showFontSizePicker, setShowFontSizePicker] = useState(false);
   const [showFontFamilyPicker, setShowFontFamilyPicker] = useState(false);
   const [wordCount, setWordCount] = useState(0);
-  const [currentFontSize, setCurrentFontSize] = useState('10');
-  const [currentFontFamily, setCurrentFontFamily] = useState('Times New Roman'); 
+  const [currentFontSize, setCurrentFontSize] = useState('12');
+  const [currentFontFamily, setCurrentFontFamily] = useState('Arial');
   
-  // NEW: State to track active formatting
+  // State to track active formatting
   const [activeFormats, setActiveFormats] = useState({
     bold: false,
     italic: false,
@@ -58,11 +58,15 @@ const RichTextEditor = ({
     '#FFFFFF', '#F0F0F0', '#DCDCDC', '#D3D3D3', '#A9A9A9', '#696969', '#2F4F4F'
   ];
 
-  // NEW: Function to check active formatting states
+  // ✅ FIXED: Better function to check active formatting states
   const updateActiveFormats = () => {
     if (!editorRef.current) return;
 
     try {
+      // Save current selection
+      const selection = window.getSelection();
+      if (selection.rangeCount === 0) return;
+
       const newActiveFormats = {
         bold: document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),
@@ -78,60 +82,81 @@ const RichTextEditor = ({
       
       setActiveFormats(newActiveFormats);
 
-      const selection = window.getSelection();
-      if (selection.rangeCount > 0) {
-        const range = selection.getRangeAt(0);
-        let element = range.commonAncestorContainer;
+      // Get current font properties
+      const range = selection.getRangeAt(0);
+      let element = range.commonAncestorContainer;
+      
+      if (element.nodeType === Node.TEXT_NODE) {
+        element = element.parentElement;
+      }
+
+      // Traverse up to find font styling
+      while (element && element !== editorRef.current) {
+        const computedStyle = window.getComputedStyle(element);
         
-        // If it's a text node, get its parent element
-        if (element.nodeType === Node.TEXT_NODE) {
-          element = element.parentElement;
+        // Get font size
+        const fontSize = computedStyle.fontSize;
+        if (fontSize) {
+          const sizeValue = parseInt(fontSize.replace('px', ''));
+          setCurrentFontSize(sizeValue.toString());
         }
 
-        // Traverse up to find font styling
-        while (element && element !== editorRef.current) {
-          const computedStyle = window.getComputedStyle(element);
-          
-          // Get font size
-          const fontSize = computedStyle.fontSize;
-          if (fontSize) {
-            // Convert px to number (remove 'px' suffix)
-            const sizeValue = parseInt(fontSize.replace('px', ''));
-            setCurrentFontSize(sizeValue.toString());
-          }
-
-          // Get font family
-          const fontFamily = computedStyle.fontFamily;
-          if (fontFamily) {
-            // Clean up font family name (remove quotes and get first font)
-            const cleanFontFamily = fontFamily.split(',')[0].replace(/['"]/g, '').trim();
-            setCurrentFontFamily(cleanFontFamily);
-          }
-
-          element = element.parentElement;
+        // Get font family
+        const fontFamily = computedStyle.fontFamily;
+        if (fontFamily) {
+          const cleanFontFamily = fontFamily.split(',')[0].replace(/['"]/g, '').trim();
+          setCurrentFontFamily(cleanFontFamily);
         }
+
+        element = element.parentElement;
       }
     } catch (error) {
-      // Some browsers might not support all queryCommandState calls
       console.warn('Error checking command states:', error);
     }
   };
 
+  // ✅ FIXED: Better content synchronization
   useEffect(() => {
     if (editorRef.current && value !== editorRef.current.innerHTML) {
+      const selection = window.getSelection();
+      const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+      const startOffset = range ? range.startOffset : 0;
+      const endOffset = range ? range.endOffset : 0;
+
       editorRef.current.innerHTML = value;
       updateWordCount();
+
+      // Restore cursor position if possible
+      try {
+        if (range && editorRef.current.firstChild) {
+          const newRange = document.createRange();
+          const textNode = editorRef.current.firstChild;
+          if (textNode.nodeType === Node.TEXT_NODE) {
+            newRange.setStart(textNode, Math.min(startOffset, textNode.textContent.length));
+            newRange.setEnd(textNode, Math.min(endOffset, textNode.textContent.length));
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+          }
+        }
+      } catch (e) {
+        // Ignore cursor restoration errors
+      }
     }
   }, [value]);
 
-  // NEW: Add event listeners for selection change
+  // Event listeners for selection change
   useEffect(() => {
     const handleSelectionChange = () => {
-      updateActiveFormats();
+      if (document.activeElement === editorRef.current) {
+        updateActiveFormats();
+      }
     };
 
-    const handleKeyUp = () => {
-      updateActiveFormats();
+    const handleKeyUp = (e) => {
+      // Update on specific keys that might change formatting
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
+        updateActiveFormats();
+      }
     };
 
     const handleMouseUp = () => {
@@ -143,7 +168,7 @@ const RichTextEditor = ({
     if (editorRef.current) {
       editorRef.current.addEventListener('keyup', handleKeyUp);
       editorRef.current.addEventListener('mouseup', handleMouseUp);
-      editorRef.current.addEventListener('focus', handleSelectionChange);
+      editorRef.current.addEventListener('focus', updateActiveFormats);
     }
 
     return () => {
@@ -151,27 +176,58 @@ const RichTextEditor = ({
       if (editorRef.current) {
         editorRef.current.removeEventListener('keyup', handleKeyUp);
         editorRef.current.removeEventListener('mouseup', handleMouseUp);
-        editorRef.current.removeEventListener('focus', handleSelectionChange);
+        editorRef.current.removeEventListener('focus', updateActiveFormats);
       }
     };
   }, []);
 
+  // ✅ FIXED: Better command handling with proper focus management
   const handleCommand = (command, value = null) => {
-    if (editorRef.current) {
-      editorRef.current.focus();
-      
-      setTimeout(() => {
+    if (!editorRef.current) return;
+
+    // Ensure editor has focus
+    editorRef.current.focus();
+
+    // Special handling for lists to fix the issue
+    if (command === 'insertUnorderedList' || command === 'insertOrderedList') {
+      // Check if we're already in a list
+      const selection = window.getSelection();
+      if (selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+        let element = range.commonAncestorContainer;
+        
+        if (element.nodeType === Node.TEXT_NODE) {
+          element = element.parentElement;
+        }
+
+        // Check if we're inside a list
+        const isInList = element.closest('ul, ol');
+        
+        if (isInList) {
+          // If we're in a list, remove it first
+          document.execCommand(command, false, value);
+        } else {
+          // If we're not in a list, create one
+          document.execCommand(command, false, value);
+        }
+      } else {
         document.execCommand(command, false, value);
-        handleContentChange();
-        // Update active formats after command execution
-        setTimeout(updateActiveFormats, 10);
-      }, 10);
+      }
+    } else {
+      // Regular command execution
+      document.execCommand(command, false, value);
     }
+
+    // Update content and formatting state
+    handleContentChange();
+    setTimeout(updateActiveFormats, 10);
   };
 
+  // ✅ FIXED: Better content change handling
   const handleContentChange = () => {
     if (editorRef.current && onChange) {
-      onChange(editorRef.current.innerHTML);
+      const content = editorRef.current.innerHTML;
+      onChange(content);
       updateWordCount();
     }
   };
@@ -184,44 +240,75 @@ const RichTextEditor = ({
     }
   };
 
+  // ✅ IMPROVED: Better table insertion
   const insertTable = () => {
     const rows = prompt('Number of rows:', '3');
     const cols = prompt('Number of columns:', '3');
-    if (rows && cols) {
-      let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%;">';
+    if (rows && cols && parseInt(rows) > 0 && parseInt(cols) > 0) {
+      let tableHTML = '<table border="1" style="border-collapse: collapse; width: 100%; margin: 10px 0;">';
       for (let i = 0; i < parseInt(rows); i++) {
         tableHTML += '<tr>';
         for (let j = 0; j < parseInt(cols); j++) {
-          tableHTML += '<td style="padding: 8px; border: 1px solid #ccc;">&nbsp;</td>';
+          tableHTML += '<td style="padding: 8px; border: 1px solid #ccc; min-width: 50px;">&nbsp;</td>';
         }
         tableHTML += '</tr>';
       }
-      tableHTML += '</table>';
+      tableHTML += '</table><p>&nbsp;</p>'; // Add paragraph after table
       handleCommand('insertHTML', tableHTML);
     }
   };
 
   const insertLink = () => {
-    const url = prompt('Enter URL:');
-    if (url) {
-      handleCommand('createLink', url);
+    const selection = window.getSelection();
+    const selectedText = selection.toString();
+    const url = prompt('Enter URL:', 'https://');
+    
+    if (url && url !== 'https://') {
+      if (selectedText) {
+        handleCommand('createLink', url);
+      } else {
+        const linkText = prompt('Enter link text:', url);
+        if (linkText) {
+          handleCommand('insertHTML', `<a href="${url}" target="_blank">${linkText}</a>`);
+        }
+      }
     }
   };
 
   const insertImage = () => {
-    const url = prompt('Enter image URL:');
-    if (url) {
-      handleCommand('insertImage', url);
+    const url = prompt('Enter image URL:', 'https://');
+    if (url && url !== 'https://') {
+      const alt = prompt('Enter alt text (optional):', '');
+      handleCommand('insertHTML', `<img src="${url}" alt="${alt}" style="max-width: 100%; height: auto;" />`);
     }
   };
 
+  // ✅ IMPROVED: Better export with proper HTML structure
   const exportToHTML = () => {
     const content = editorRef.current.innerHTML;
-    const blob = new Blob([content], { type: 'text/html' });
+    const fullHTML = `<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Rich Text Document</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; margin: 20px; }
+        table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+        table td, table th { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        blockquote { border-left: 4px solid #ccc; margin: 10px 0; padding-left: 16px; color: #666; }
+        pre { background-color: #f5f5f5; border: 1px solid #ccc; border-radius: 4px; padding: 10px; font-family: 'Courier New', monospace; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    ${content}
+</body>
+</html>`;
+    
+    const blob = new Blob([fullHTML], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'document.html';
+    a.download = `document_${new Date().toISOString().slice(0, 10)}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -232,28 +319,39 @@ const RichTextEditor = ({
       const reader = new FileReader();
       reader.onload = (e) => {
         if (editorRef.current) {
-          editorRef.current.innerHTML = e.target.result;
+          let content = e.target.result;
+          
+          // If it's a full HTML document, extract body content
+          if (content.includes('<body>')) {
+            const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+            if (bodyMatch) {
+              content = bodyMatch[1];
+            }
+          }
+          
+          editorRef.current.innerHTML = content;
           handleContentChange();
         }
       };
       reader.readAsText(file);
     }
+    // Reset file input
+    event.target.value = '';
   };
 
-  // UPDATED: ToolbarButton now accepts and uses active prop
   const ToolbarButton = ({ onClick, active = false, children, title, disabled = false }) => (
     <button
       type="button"
       onMouseDown={(e) => {
         e.preventDefault();
-        onClick();
+        if (!disabled) onClick();
       }}
       title={title}
       disabled={disabled}
       className={`p-2 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
         active 
-          ? 'bg-blue-500 text-white shadow-md' // Active state styling
-          : 'text-gray-600 hover:bg-gray-200' // Inactive state styling
+          ? 'bg-blue-500 text-white shadow-md' 
+          : 'text-gray-600 hover:bg-gray-200'
       }`}
     >
       {children}
@@ -324,9 +422,9 @@ const RichTextEditor = ({
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => setShowFontFamilyPicker(!showFontFamilyPicker)}
-                className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 min-w-[100px] text-left"
+                className="px-3 py-1 border border-gray-300 rounded text-sm hover:bg-gray-100 min-w-[120px] text-left"
               >
-                Font
+                {currentFontFamily}
               </button>
               {showFontFamilyPicker && (
                 <div className="absolute top-full left-0 mt-1 bg-white border border-gray-300 rounded shadow-lg z-50 max-h-40 overflow-y-auto min-w-[150px]">
@@ -337,9 +435,12 @@ const RichTextEditor = ({
                       onMouseDown={(e) => e.preventDefault()}
                       onClick={() => {
                         handleCommand('fontName', font);
+                        setCurrentFontFamily(font);
                         setShowFontFamilyPicker(false);
                       }}
-                      className="block w-full px-3 py-2 text-left hover:bg-gray-100 text-sm"
+                      className={`block w-full px-3 py-2 text-left hover:bg-gray-100 text-sm ${
+                        currentFontFamily === font ? 'bg-blue-100 font-semibold' : ''
+                      }`}
                       style={{ fontFamily: font }}
                     >
                       {font}
@@ -387,24 +488,24 @@ const RichTextEditor = ({
 
           {/* Second Row */}
           <div className="flex flex-wrap items-center gap-1">
-            {/* Text Formatting - NOW WITH ACTIVE STATES */}
+            {/* Text Formatting */}
             <ToolbarButton 
               onClick={() => handleCommand('bold')} 
-              title="Bold"
+              title="Bold (Ctrl+B)"
               active={activeFormats.bold}
             >
               <Bold size={16} />
             </ToolbarButton>
             <ToolbarButton 
               onClick={() => handleCommand('italic')} 
-              title="Italic"
+              title="Italic (Ctrl+I)"
               active={activeFormats.italic}
             >
               <Italic size={16} />
             </ToolbarButton>
             <ToolbarButton 
               onClick={() => handleCommand('underline')} 
-              title="Underline"
+              title="Underline (Ctrl+U)"
               active={activeFormats.underline}
             >
               <Underline size={16} />
@@ -488,7 +589,7 @@ const RichTextEditor = ({
 
             <Separator />
 
-            {/* Alignment - NOW WITH ACTIVE STATES */}
+            {/* Alignment */}
             <ToolbarButton 
               onClick={() => handleCommand('justifyLeft')} 
               title="Align Left"
@@ -520,7 +621,7 @@ const RichTextEditor = ({
 
             <Separator />
 
-            {/* Lists and Indentation - NOW WITH ACTIVE STATES */}
+            {/* Lists and Indentation */}
             <ToolbarButton 
               onClick={() => handleCommand('insertUnorderedList')} 
               title="Bullet List"
@@ -567,12 +668,40 @@ const RichTextEditor = ({
           </div>
         </div>
 
-        {/* Editor */}
+        {/* ✅ IMPROVED: Editor with better event handling */}
         <div
           ref={editorRef}
           contentEditable
           onInput={handleContentChange}
           onBlur={handleContentChange}
+          onKeyDown={(e) => {
+            // Handle keyboard shortcuts
+            if (e.ctrlKey || e.metaKey) {
+              switch (e.key.toLowerCase()) {
+                case 'b':
+                  e.preventDefault();
+                  handleCommand('bold');
+                  break;
+                case 'i':
+                  e.preventDefault();
+                  handleCommand('italic');
+                  break;
+                case 'u':
+                  e.preventDefault();
+                  handleCommand('underline');
+                  break;
+                case 'z':
+                  if (e.shiftKey) {
+                    e.preventDefault();
+                    handleCommand('redo');
+                  } else {
+                    e.preventDefault();
+                    handleCommand('undo');
+                  }
+                  break;
+              }
+            }
+          }}
           className="rich-text-editor p-4 outline-none overflow-y-auto focus:ring-2 focus:ring-blue-500 focus:ring-inset"
           style={{ height, minHeight: '200px' }}
           data-placeholder={placeholder}
@@ -588,8 +717,8 @@ const RichTextEditor = ({
         )}
       </div>
 
-      {/* Global Styles */}
-      <style >{`
+      {/* ✅ IMPROVED: Global Styles with better list styling */}
+      <style>{`
         .rich-text-editor:empty:before {
           content: attr(data-placeholder);
           color: #9ca3af;
@@ -608,6 +737,7 @@ const RichTextEditor = ({
           border: 1px solid #ccc;
           padding: 8px;
           text-align: left;
+          min-width: 50px;
         }
         .rich-text-editor blockquote {
           border-left: 4px solid #ccc;
@@ -622,6 +752,42 @@ const RichTextEditor = ({
           padding: 10px;
           font-family: 'Courier New', monospace;
           overflow-x: auto;
+        }
+        .rich-text-editor ul,
+        .rich-text-editor ol {
+          margin: 10px 0;
+          padding-left: 30px;
+        }
+        .rich-text-editor ul li {
+          list-style-type: disc;
+          margin: 5px 0;
+        }
+        .rich-text-editor ol li {
+          list-style-type: decimal;
+          margin: 5px 0;
+        }
+        .rich-text-editor ul ul li {
+          list-style-type: circle;
+        }
+        .rich-text-editor ul ul ul li {
+          list-style-type: square;
+        }
+        .rich-text-editor p {
+          margin: 5px 0;
+        }
+        .rich-text-editor h1, .rich-text-editor h2, .rich-text-editor h3,
+        .rich-text-editor h4, .rich-text-editor h5, .rich-text-editor h6 {
+          margin: 10px 0 5px 0;
+          font-weight: bold;
+        }
+        .rich-text-editor a {
+          color: #0066cc;
+          text-decoration: underline;
+        }
+        .rich-text-editor img {
+          max-width: 100%;
+          height: auto;
+          margin: 5px 0;
         }
       `}</style>
     </>
