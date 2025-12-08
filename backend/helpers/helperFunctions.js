@@ -817,19 +817,11 @@ export const processImageBuffer = async (buffer, filename, directory) => {
     // Create the full path to the storage directory
     const uploadPath = path.join(__backendDir, "public", "storage", directory);
     
-    // Ensure directory exists
-    if (!fs.existsSync(uploadPath)) {
-      fs.mkdirSync(uploadPath, { recursive: true });
-      console.log(`Created directory: ${uploadPath}`);
-    }
-    
     // Create the full file path
     const filePath = path.join(uploadPath, filename);
     
     // Write the buffer to the file
     fs.writeFileSync(filePath, buffer);
-    
-    console.log(`Image saved successfully: ${filePath}`);
     
     // Return the relative path for API URL (this gets saved in DB)
     return `/storage/${directory}/${filename}`;

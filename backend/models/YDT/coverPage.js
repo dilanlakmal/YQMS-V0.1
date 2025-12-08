@@ -2,6 +2,54 @@
 import mongoose from 'mongoose';
 
 const createCoverPageSchema = (connection) => {
+  const SketchTechnicalSchema = new mongoose.Schema({
+    // Header information
+    styleId: { type: String, default: '' },
+    shortDesc: { type: String, default: '' },
+    department: { type: String, default: '' },
+    initialDcDate: { type: Date, default: Date.now },
+    commodity: { type: String, default: '' },
+    season: { type: String, default: '' },
+    vendor3d: { type: String, default: 'No' },
+    
+    // Style details
+    styleStatus: { type: String, default: 'In Work' },
+    longDescription: { type: String, default: '' },
+    
+    // Approval and sizing
+    finalFitApproval: { type: String, default: '' },
+    sizeRange: [{ type: String }],
+    availableSizes: [{ type: String }],
+    targetCost: { type: String, default: '' },
+    targetUnits: { type: String, default: '' },
+    plannedColors: { type: String, default: '' },
+    deliveryCount: { type: String, default: '' },
+    
+    fitType: { type: String, default: 'Regular' },
+    coll1: { type: String, default: '' },
+    coll2: { type: String, default: '' },
+    retailPrice: { type: String, default: '' },
+    floorSet: { type: Date, default: Date.now },
+    sizeCurve: { type: String, default: '' },
+    
+    // Order-related fields
+    buyerEngName: { type: String, default: '' },
+    custStyle: { type: String, default: '' },
+    orderQty: { type: String, default: '' },
+    
+    // Canvas and image data
+    mainSketchImage: { type: String, default: null },
+    secondaryImage: { type: String, default: null },
+    canvasData: { type: Array, default: [] },
+    
+    // Metadata
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+    createdBy: { type: String, default: 'system' },
+  }, {
+    _id: true,
+    timestamps: true
+  });
   const CoverPageItemSchema = new mongoose.Schema({
     poNumber: {
       type: String,
@@ -109,6 +157,7 @@ const createCoverPageSchema = (connection) => {
       unique: true
     },
     coverPages: [CoverPageItemSchema],
+    sketchTechnical: [SketchTechnicalSchema], 
     createdAt: {
       type: Date,
       default: Date.now

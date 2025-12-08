@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import {API_BASE_URL} from "../../../../config.js";
 import RichTextEditor from '../YDT/RichTextEditor.jsx';
+import Swal from 'sweetalert2';
 
 // Move ColorDropdown OUTSIDE of CoverPage component
 const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrderColors }) => {
@@ -451,7 +452,14 @@ const handleOrderSelect = useCallback(async (orderNo) => {
     const result = await response.json();
 
     if (result.success) {
-      alert('Cover page saved successfully!');
+      await Swal.fire({
+        icon: 'success',
+        title: 'Success!',
+        text: 'Cover page saved successfully!',
+        confirmButtonColor: '#10b981',
+        timer: 2000,
+        timerProgressBar: true
+      });
       console.log('Saved cover page:', result.data);
     } else {
       throw new Error(result.message || 'Failed to save cover page');
@@ -459,7 +467,12 @@ const handleOrderSelect = useCallback(async (orderNo) => {
 
   } catch (error) {
     console.error('Error saving cover page:', error);
-    alert(`Failed to save cover page: ${error.message}`);
+    await Swal.fire({
+      icon: 'error',
+      title: 'Oops...',
+      text: `Failed to save: ${error.message}`,
+      confirmButtonColor: '#ef4444'
+    });
   } finally {
     setLoading(false);
   }

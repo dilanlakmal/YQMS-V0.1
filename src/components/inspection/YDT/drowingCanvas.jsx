@@ -645,7 +645,18 @@ useEffect(() => {
 
   useEffect(() => {
     redrawCanvas();
+    // ✅ Expose drawnObjects to window for saving
+    window.drawnObjects = drawnObjects;
   }, [drawnObjects, selectedObjects, redrawCanvas]);
+
+  // ✅ Expose redraw function to window
+  useEffect(() => {
+    window.redrawCanvas = redrawCanvas;
+    return () => {
+      delete window.redrawCanvas;
+      delete window.drawnObjects;
+    };
+  }, [redrawCanvas]);
 
   // Save to history
   const saveToHistory = useCallback(() => {
