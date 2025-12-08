@@ -149,7 +149,6 @@ export const checkAfterIroningSubmittedStyle = async (req, res) => {
       exists: false,
       message: "No conflicting submitted records found"
     });
-
   } catch (error) {
     console.error("Error checking submitted style-color:", error);
     res.status(500).json({
@@ -210,7 +209,6 @@ export const checkQCWashingRecord = async (req, res) => {
         message: "No QC Washing record found"
       });
     }
-
   } catch (error) {
     console.error("Error checking QC Washing record:", error);
     res.status(500).json({
@@ -2419,7 +2417,6 @@ export const saveAfterIroning = async (req, res) => {
       submissionId: recordToSubmit._id,
       message: "After Ironing data submitted successfully"
     });
-
   } catch (error) {
     console.error("Submit error:", error);
     res.status(500).json({
@@ -2787,7 +2784,6 @@ export const getQCWashingMeasurementData = async (req, res) => {
         factoryName: qcWashingRecord.factoryName
       }
     });
-
   } catch (error) {
     console.error("Error fetching QC Washing measurement data:", error);
     res.status(500).json({
@@ -2868,7 +2864,6 @@ export const getQCWashingDataForAfterIroning = async (req, res) => {
         factoryName: qcWashingRecord.factoryName
       }
     });
-
   } catch (error) {
     console.error("Error fetching QC Washing data for After Ironing:", error);
     res.status(500).json({

@@ -383,7 +383,6 @@ const AfterIroning = () => {
     return englishRemark;
   };
 
-
   useEffect(() => {
     fetchSubFactories();
     fetchAfterIroningDefects();
@@ -552,7 +551,6 @@ const AfterIroning = () => {
 
     fetchCheckpointDefinitions();
   }, []);
-
 
   const initializeInspectionData = (checklist = []) => {
     if (!Array.isArray(checklist)) return [];
@@ -1583,7 +1581,6 @@ const loadColorSpecificData = async (orderNo, color) => {
     setInspectionContentVisible(false);
     setDefectContentVisible(false);
     setMeasurementContentVisible(false);
-
 
     setIsDataLoading(false);
 

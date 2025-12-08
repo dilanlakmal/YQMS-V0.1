@@ -189,7 +189,7 @@ function Home() {
             image: "assets/Home/after_ironing.png",
             title: t("home.afterIroning"),
             description: "After Ironing Report",
-             version: '0',
+             version: '0.1',
           },
            {
             path: "/measurement",
@@ -312,7 +312,7 @@ function Home() {
             version: '0',
           },
           {
-            path: "/y-pivot-inspection",
+            path: "/fincheck-inspection",
             //pageId: "y-pivot-inspection",
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),

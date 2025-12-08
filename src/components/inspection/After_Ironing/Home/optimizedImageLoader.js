@@ -27,23 +27,15 @@ export const normalizeImageUrl = (src) => {
 
 export const generateImageKeys = (url) => {
   const keys = new Set([url]);
-  
-  if (url.includes('192.167.12.85:5000')) {
-    const path = url.split('192.167.12.85:5000')[1];
+
+  if (url.includes("yqms.yaikh.com")) {
+    const path = url.split("yqms.yaikh.com")[1];
     if (path) {
       keys.add(path);
-      keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
+      keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
     }
   }
-  
-  if (url.includes('yqms.yaikh.com')) {
-    const path = url.split('yqms.yaikh.com')[1];
-    if (path) {
-      keys.add(path);
-      keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
-    }
-  }
-  
+
   return Array.from(keys);
 };
 

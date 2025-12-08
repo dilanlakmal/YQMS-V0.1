@@ -196,11 +196,25 @@ const YPivotQATemplatesDefectTotalSelection = () => {
       return;
     }
 
+    // ---Check for duplicates ---
+    // If trying to add a new one (index is null), check if it already exists
+    if (index === null) {
+      const existingIndex = selectedDefects.findIndex(
+        (d) => d.defectId === defect._id
+      );
+
+      if (existingIndex !== -1) {
+        // If it exists, switch to "Edit" mode for the existing entry
+        // You can also add an alert here if you want to notify the user
+        index = existingIndex;
+      }
+    }
+
     let initialStatus = "";
     let initialQty = 1;
 
     if (index !== null) {
-      // Edit
+      // Edit (Either clicked edit button OR switched from duplicate check)
       const existing = selectedDefects[index];
       initialStatus = existing.status;
       initialQty = existing.qty;
@@ -212,7 +226,7 @@ const YPivotQATemplatesDefectTotalSelection = () => {
       });
       setEditingIndex(index);
     } else {
-      // New
+      // New (Truly new defect)
       const buyerRule = defect.statusByBuyer.find(
         (r) => r.buyerName === orderData.buyerName
       );

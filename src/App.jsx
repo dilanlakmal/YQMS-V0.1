@@ -77,6 +77,9 @@ import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
 import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
+import QCWashingPage from "./pages/QCWashing.jsx";
+import AfterIroning from "./pages/AfterIroning.jsx";
+
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
@@ -87,6 +90,7 @@ import AfterIroning  from "./pages/AfterIroning.jsx";
 import Translator from "./pages/translator.jsx";
 import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
 import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
+import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
@@ -475,6 +479,7 @@ function AppContent() {
                 path="/qc2-washing-upload"
                 element={<QC2WashingUpload />}
               />
+              <Route path="/afterIroning" element={<AfterIroning />} />
               <Route path="/packing-list" element={<PackingList />} />
               <Route path="/measurement" element={<Measurement />} />
               <Route path="/qa-sections" element={<YPivotQASections />} />
@@ -487,6 +492,10 @@ function AppContent() {
                 element={<YPivotQAMeasurements />}
               />
               <Route path="/qa-templates" element={<YPivotQATemplates />} />
+              <Route
+                path="/fincheck-inspection"
+                element={<YPivotQAInspection />}
+              />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

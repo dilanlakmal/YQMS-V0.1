@@ -115,7 +115,6 @@ const  SubmittedIroningDataPage = () => {
         console.error("Failed to fetch checkpoint definitions", e);
       }
     };
-
     fetchDefinitions();
   }, []);
 
@@ -782,7 +781,7 @@ const  SubmittedIroningDataPage = () => {
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-28 whitespace-normal">
                    Ironing Type
                   </th>
-                                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
+                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">
                     MO No
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider w-24 whitespace-normal">

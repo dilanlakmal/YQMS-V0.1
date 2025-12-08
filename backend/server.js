@@ -220,6 +220,8 @@ import QASections_ProductLocation from "./routes/PivotY/QASections/QASections_Pr
 import QASections_AQL_Sample_Letters from "./routes/PivotY/QASections/QASections_AQL_Sample_Letter_Route.js";
 import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Values_Route.js";
 import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Config_Routes.js";
+import QASections_Line from "./routes/PivotY/QASections/QASections_Line_Route.js";
+import QASections_Table from "./routes/PivotY/QASections/QASections_Table_Route.js";
 
 /* ------------------------------
   PivotY - QA Measurement Specs
@@ -232,10 +234,16 @@ import QASections_Measurement_Specs from "./routes/PivotY/QASections/QASections_
 ------------------------------ */
 import QASections_Templates from "./routes/PivotY/QATemplates/QATemplatesReport_Route.js";
 
+/* ------------------------------
+PivotY - Fincheck Inspection
+------------------------------ */
+import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
+
 /* -----------------------------
   After Ironing Import
 ------------------------------ */
 import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
+
 
 /* -----------------------------
   QC Output Imports
@@ -493,6 +501,8 @@ app.use(QASections_ProductLocation);
 app.use(QASections_AQL_Sample_Letters);
 app.use(QASections_AQL_Values);
 app.use(QASections_AQL_Config);
+app.use(QASections_Line);
+app.use(QASections_Table);
 
 /* ------------------------------
   PivotY - QA Measurements routes
@@ -503,6 +513,11 @@ app.use(QASections_Measurement_Specs);
   PivotY - QA Templates routes
 ------------------------------ */
 app.use(QASections_Templates);
+
+/* ------------------------------
+PivotY - Fincheck Inspection routes
+------------------------------ */
+app.use(FincheckInspection);
 
 /* -----------------------------
 AI Routes

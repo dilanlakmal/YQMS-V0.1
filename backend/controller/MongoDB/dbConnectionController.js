@@ -77,6 +77,7 @@ import createQCWashingMachineStandard from "../../models/QCWashing/qcWashingStan
 import createQC2OlderDefectModel from "../../models/QC2_Older_Defects.js";
 import createQCWashingQtyOldSchema from "../../models/QCWashing/QCWashingQtyOld.js";
 import CuttingInlineOrdersModel from "../../models/Cutting/CuttingInlineOrders.js";
+import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 import createYorksysOrdersModel from "../../models/YorkSys/YorksysOrders.js";
 import createQASectionsProductType from "../../models/QA/QASectionsProductType.js";
@@ -85,12 +86,13 @@ import createQASectionsPhotosModel from "../../models/QA/QASectionsPhotos.js";
 import createQASectionsPackingModel from "../../models/QA/QASectionsPacking.js";
 import createQASectionsDefectListModel from "../../models/QA/QASectionsDefectList.js";
 import createQASectionsDefectCategoryModel from "../../models/QA/QASectionsDefectCategory.js";
-import createAfterIroningModel from "../../models/AfterIroning/AfterIroning.js";
 import createQASectionsBuyerModel from "../../models/QA/QASectionsBuyer.js";
 import createQASectionsProductLocationModel from "../../models/QA/QASectionsProductLocation.js";
 import createQASectionsAqlSampleLettersModel from "../../models/QA/QASectionsAqlSampleLetters.js";
 import createQASectionsAqlValuesModel from "../../models/QA/QASectionsAqlValues.js";
 import createQASectionsAqlBuyerConfigModel from "../../models/QA/QASectionsAqlBuyerConfig.js";
+import createQASectionsLineModel from "../../models/QA/QASectionsLine.js";
+import createQASectionsTableModel from "../../models/QA/QASectionsTable.js";
 
 import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMeasurementSpecs.js";
 
@@ -103,8 +105,7 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  process.env.MongoDB_URI_ym_prod
 );
 //Connection status
 ymProdConnection.on("connected", () =>
@@ -114,12 +115,11 @@ ymProdConnection.on("error", (err) => console.error("❌ unexpected error:", err
 
 
 export const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  process.env.MongoDB_URI_ym_eco_board
 );
 //Connection status
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database in 192.167.1.10:29000...")
+  console.log("✅ Connected to ym_eco_board database...")
 );
 ymEcoConnection.on("error", (err) => console.error("❌ unexpected error:", err));
 
@@ -204,6 +204,7 @@ export const SupplierIssuesDefect = createSupplierIssuesDefectModel(ymProdConnec
 export const SupplierIssueReport = createSupplierIssueReportModel(ymProdConnection);
 export const SubconSewingQAReport = createSubconSewingQAReportModel(ymProdConnection);
 export const QCWashingMachineStandard = createQCWashingMachineStandard(ymProdConnection);
+export const AfterIroning = createAfterIroningModel(ymProdConnection);
 export const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
@@ -220,7 +221,6 @@ export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
 export const QASectionsDefectCategory = createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList = createQASectionsDefectListModel(ymProdConnection);
-export const AfterIroning = createAfterIroningModel(ymProdConnection);
 export const QASectionsBuyer = createQASectionsBuyerModel(ymProdConnection);
 export const QASectionsProductLocation =
   createQASectionsProductLocationModel(ymProdConnection);
@@ -230,6 +230,8 @@ export const QASectionsAqlValues =
   createQASectionsAqlValuesModel(ymProdConnection);
 export const QASectionsAqlBuyerConfig =
   createQASectionsAqlBuyerConfigModel(ymProdConnection);
+export const QASectionsLine = createQASectionsLineModel(ymProdConnection);
+export const QASectionsTable = createQASectionsTableModel(ymProdConnection);
 
 export const QASectionsMeasurementSpecs =
   createQASectionsMeasurementSpecsModel(ymProdConnection);

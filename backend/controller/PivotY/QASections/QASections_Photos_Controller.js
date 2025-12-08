@@ -201,6 +201,61 @@ export const DeletePhotoSection = async (req, res) => {
 };
 
 /**
+ * POST /api/qa-sections-photos/:id/items
+ * Controller: Adds a new item to an existing photo section
+ */
+export const AddPhotoSectionItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { itemName, maxCount } = req.body;
+
+    if (!itemName || maxCount === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "itemName and maxCount are required"
+      });
+    }
+
+    const section = await QASectionsPhotos.findById(id);
+
+    if (!section) {
+      return res.status(404).json({
+        success: false,
+        message: "Photo section not found"
+      });
+    }
+
+    // Get the highest item number and increment
+    const maxItemNo =
+      section.itemList.length > 0
+        ? Math.max(...section.itemList.map((item) => item.no))
+        : 0;
+
+    const newItem = {
+      no: maxItemNo + 1,
+      itemName,
+      maxCount: parseInt(maxCount)
+    };
+
+    section.itemList.push(newItem);
+    await section.save();
+
+    return res.status(201).json({
+      success: true,
+      message: "Item added successfully",
+      data: section
+    });
+  } catch (error) {
+    console.error("Error adding item:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add item",
+      error: error.message
+    });
+  }
+};
+
+/**
  * DELETE /api/qa-sections-photos/:id/items/:itemNo
  * Controller: Deletes a specific item from a photo section
  */

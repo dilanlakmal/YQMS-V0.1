@@ -1,7 +1,4 @@
-import {
-  UserMain,
-  RoleManagment,                
-} from "../MongoDB/dbConnectionController.js";
+import { UserMain, RoleManagment } from "../MongoDB/dbConnectionController.js";
 
 // POST /api/role-management
 export const manageRole = async (req, res) => {
@@ -53,7 +50,9 @@ export const manageRole = async (req, res) => {
     }
 
     await roleDoc.save();
-    res.json({ message: `Role ${roleDoc._id ? "updated" : "added"} successfully` });
+    res.json({
+      message: `Role ${roleDoc._id ? "updated" : "added"} successfully`
+    });
   } catch (error) {
     console.error("Error saving role:", error);
     res.status(500).json({ message: "Failed to save role" });
@@ -299,23 +298,116 @@ export const updateUserRoles = async (req, res) => {
 // Get user roles
 export const getUserRole = async (req, res) => {
   try {
-      const { empId } = req.params;
-      const roles = [];
-  
-      // Find all roles where this user exists
-      const userRoles = await RoleManagment.find({
-        "users.emp_id": empId,
-      });
-  
-      userRoles.forEach((role) => {
-        if (!["Super Admin", "Admin"].includes(role.role)) {
-          roles.push(role.role);
-        }
-      });
-  
-      res.json({ roles });
-    } catch (error) {
-      console.error("Error fetching user roles:", error);
-      res.status(500).json({ message: "Failed to fetch user roles" });
+    const { empId } = req.params;
+    const roles = [];
+
+    // Find all roles where this user exists
+    const userRoles = await RoleManagment.find({
+      "users.emp_id": empId
+    });
+
+    userRoles.forEach((role) => {
+      if (!["Super Admin", "Admin"].includes(role.role)) {
+        roles.push(role.role);
+      }
+    });
+
+    res.json({ roles });
+  } catch (error) {
+    console.error("Error fetching user roles:", error);
+    res.status(500).json({ message: "Failed to fetch user roles" });
+  }
+};
+
+// GET /api/role-management/search
+export const searchRoles = async (req, res) => {
+  try {
+    const { query, type } = req.query; // type: 'role', 'emp_id', 'name', 'job_title'
+
+    let roles = await RoleManagment.find({}).sort({ role: 1 });
+
+    if (query && type) {
+      const searchQuery = query.toLowerCase();
+
+      switch (type) {
+        case "role":
+          roles = roles.filter((r) =>
+            r.role.toLowerCase().includes(searchQuery)
+          );
+          break;
+        case "emp_id":
+          roles = roles
+            .filter((r) =>
+              r.users.some((u) => u.emp_id?.toLowerCase().includes(searchQuery))
+            )
+            .map((r) => ({
+              ...r.toObject(),
+              users: r.users.filter((u) =>
+                u.emp_id?.toLowerCase().includes(searchQuery)
+              )
+            }));
+          break;
+        case "name":
+          roles = roles
+            .filter((r) =>
+              r.users.some(
+                (u) =>
+                  u.name?.toLowerCase().includes(searchQuery) ||
+                  u.eng_name?.toLowerCase().includes(searchQuery)
+              )
+            )
+            .map((r) => ({
+              ...r.toObject(),
+              users: r.users.filter(
+                (u) =>
+                  u.name?.toLowerCase().includes(searchQuery) ||
+                  u.eng_name?.toLowerCase().includes(searchQuery)
+              )
+            }));
+          break;
+        case "job_title":
+          roles = roles
+            .filter((r) =>
+              r.users.some((u) =>
+                u.job_title?.toLowerCase().includes(searchQuery)
+              )
+            )
+            .map((r) => ({
+              ...r.toObject(),
+              users: r.users.filter((u) =>
+                u.job_title?.toLowerCase().includes(searchQuery)
+              )
+            }));
+          break;
+        default:
+          break;
+      }
     }
+
+    res.json(roles);
+  } catch (error) {
+    console.error("Error searching roles:", error);
+    res.status(500).json({ message: "Failed to search roles" });
+  }
+};
+
+// GET /api/role-management/user-search/:empId
+export const getUserRoleDetails = async (req, res) => {
+  try {
+    const { empId } = req.params;
+
+    const rolesWithUser = await RoleManagment.find({
+      "users.emp_id": empId
+    });
+
+    const result = rolesWithUser.map((role) => ({
+      role: role.role,
+      user: role.users.find((u) => u.emp_id === empId)
+    }));
+
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching user role details:", error);
+    res.status(500).json({ message: "Failed to fetch user role details" });
+  }
 };

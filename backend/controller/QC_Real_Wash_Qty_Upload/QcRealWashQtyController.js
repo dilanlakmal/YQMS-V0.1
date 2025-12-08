@@ -8,7 +8,6 @@ import {
   getAqlLevelForBuyer
 } from "../../helpers/helperFunctions.js";
 
-
 // Backend endpoint - add this to your routes
 // export const refreshActualWashQty = async (req, res) => {
 //   try {

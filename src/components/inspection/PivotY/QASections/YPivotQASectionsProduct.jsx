@@ -6,7 +6,9 @@ import {
   CheckSquare,
   Image as ImageIcon,
   BookOpen,
-  Sliders
+  Sliders,
+  Factory,
+  Grid
 } from "lucide-react";
 import React, { useMemo } from "react";
 import YPivotQASectionsProductCategory from "./YPivotQASectionsProductCategory";
@@ -17,6 +19,8 @@ import YPivotQASectionsProductDefectManagement from "./YPivotQASectionsProductDe
 import YPivotQASectionsProductLocationManagement from "./YPivotQASectionsProductLocationManagement";
 import YPivotQASectionsAQLTerminology from "./YPivotQASectionsAQLTerminology";
 import YPivotQASectionsAQLBuyerConfig from "./YPivotQASectionsAQLBuyerConfig";
+import YPivotQASectionsLineConfig from "./YPivotQASectionsLineConfig";
+import YPivotQASectionsTableConfig from "./YPivotQASectionsTableConfig";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -43,6 +47,18 @@ const YPivotQASectionsProduct = ({ activeSubTab, setActiveSubTab }) => {
         label: "Buyer Management",
         icon: <Users size={16} />,
         component: <YPivotQASectionsBuyerManagement />
+      },
+      {
+        id: "lines",
+        label: "Line Management",
+        icon: <Factory size={16} />,
+        component: <YPivotQASectionsLineConfig />
+      },
+      {
+        id: "tables",
+        label: "Table Management",
+        icon: <Grid size={16} />,
+        component: <YPivotQASectionsTableConfig />
       },
       {
         id: "category",

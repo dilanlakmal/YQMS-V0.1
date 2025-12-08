@@ -1013,5 +1013,3 @@ const RecordsListModal = () => (
 };
 
 export default QCIroningViewDetailsModal;
-
-                                  

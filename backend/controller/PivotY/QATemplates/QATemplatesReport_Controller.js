@@ -1,6 +1,7 @@
 import {
   QASectionsTemplates,
-  QASectionsDefectCategory
+  QASectionsDefectCategory,
+  QASectionsPhotos
 } from "../../MongoDB/dbConnectionController.js";
 
 /**
@@ -13,9 +14,18 @@ export const CreateTemplate = async (req, res) => {
       Measurement,
       Header,
       Photos,
+      Line,
+      Table,
+      Colors,
+      ShippingStage,
+      InspectedQtyMethod,
+      isCarton,
+      isQCScan,
+      InspectedQty,
       QualityPlan,
       Conclusion,
-      DefectCategoryList
+      DefectCategoryList,
+      SelectedPhotoSectionList
     } = req.body;
 
     if (!ReportType) {
@@ -36,9 +46,18 @@ export const CreateTemplate = async (req, res) => {
       Measurement,
       Header,
       Photos,
+      Line: Line || "Yes",
+      Table: Table || "Yes",
+      Colors: Colors || "Yes",
+      ShippingStage: ShippingStage || "Yes",
+      InspectedQtyMethod: InspectedQtyMethod || "NA",
+      isCarton: isCarton || "No",
+      isQCScan: isQCScan || "No",
+      InspectedQty: InspectedQty || 0,
       QualityPlan,
       Conclusion,
-      DefectCategoryList: DefectCategoryList || []
+      DefectCategoryList: DefectCategoryList || [],
+      SelectedPhotoSectionList: SelectedPhotoSectionList || []
     });
 
     await newTemplate.save();
@@ -126,6 +145,21 @@ export const GetCategoriesForSelection = async (req, res) => {
     // We reuse the existing collection but this is a specific helper for this UI
     const categories = await QASectionsDefectCategory.find().sort({ no: 1 });
     res.status(200).json({ success: true, data: categories });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
+ * HELPER: Get All Photo Sections (For the Modal Checkboxes)
+ */
+export const GetPhotoSectionsForSelection = async (req, res) => {
+  try {
+    // Select only what we need for the UI
+    const photoSections = await QASectionsPhotos.find()
+      .select("sectionName itemList")
+      .sort({ sectionName: 1 });
+    res.status(200).json({ success: true, data: photoSections });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }

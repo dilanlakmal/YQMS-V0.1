@@ -1,21 +1,108 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
 import {
   Camera,
   Upload,
-  Image as ImageIcon,
   X,
   Search,
   XCircle,
   Loader,
   ChevronDown,
   ChevronUp,
-  Edit3
+  Edit3,
+  MessageSquare,
+  Trash2,
+  Save
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor";
 
-const YPivotQATemplatesPhotos = () => {
+// ==============================================================================
+// INTERNAL COMPONENT: REMARK MODAL
+// ==============================================================================
+const RemarkModal = ({ isOpen, onClose, onSave, initialText, title }) => {
+  const [text, setText] = useState(initialText || "");
+
+  useEffect(() => {
+    if (isOpen) setText(initialText || "");
+  }, [isOpen, initialText]);
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 w-full max-w-md rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden transform transition-all scale-100">
+        {/* Header */}
+        <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+          <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2 text-sm">
+            <MessageSquare className="w-4 h-4 text-indigo-500" />
+            Remark:{" "}
+            <span className="font-normal text-gray-600 dark:text-gray-400 truncate max-w-[200px]">
+              {title}
+            </span>
+          </h3>
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5">
+          <textarea
+            className="w-full h-40 p-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm text-gray-800 dark:text-gray-200 resize-none"
+            placeholder="Type remark here (max 250 chars)..."
+            maxLength={250}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+          />
+          <div className="flex justify-end mt-2">
+            <span
+              className={`text-xs ${
+                text.length >= 250 ? "text-red-500" : "text-gray-400"
+              }`}
+            >
+              {text.length}/250
+            </span>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex justify-end gap-3">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-bold text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(text)}
+            disabled={!text.trim()}
+            className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            <Save className="w-4 h-4" /> Save
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ==============================================================================
+// MAIN COMPONENT
+// ==============================================================================
+const YPivotQATemplatesPhotos = ({
+  allowedSectionIds = [],
+  reportData,
+  onUpdatePhotoData
+}) => {
+  // Access saved state from parent
+  const savedState = reportData?.photoData || {};
+
   const [sections, setSections] = useState([]);
   const [filteredSections, setFilteredSections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -23,12 +110,33 @@ const YPivotQATemplatesPhotos = () => {
   const [expandedSections, setExpandedSections] = useState(new Set());
   const [deviceType, setDeviceType] = useState("desktop");
 
+  // Data State (Synced with Parent)
+  const [capturedImages, setCapturedImages] = useState(
+    savedState.capturedImages || {}
+  );
+  const [remarks, setRemarks] = useState(savedState.remarks || {}); // { "sectionId_itemNo": "remark text" }
+
   // Image editor state
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [currentEditContext, setCurrentEditContext] = useState(null);
 
-  // Store complete image data: { sectionId_itemNo_index: { url, history, imgSrc } }
-  const [capturedImages, setCapturedImages] = useState({});
+  // Remark Modal State
+  const [remarkModal, setRemarkModal] = useState({
+    isOpen: false,
+    key: null, // unique key: sectionId_itemNo
+    title: ""
+  });
+
+  // Sync Helper
+  const updateParent = (updates) => {
+    if (onUpdatePhotoData) {
+      onUpdatePhotoData({
+        capturedImages,
+        remarks,
+        ...updates
+      });
+    }
+  };
 
   // Device detection
   useEffect(() => {
@@ -44,16 +152,37 @@ const YPivotQATemplatesPhotos = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  // Fetch Data
   useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/qa-sections-photos`
+        );
+        setSections(response.data.data);
+      } catch (error) {
+        console.error("Error fetching photo sections:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
     fetchData();
   }, []);
 
+  // Filtering Logic
   useEffect(() => {
-    if (searchQuery.trim() === "") {
-      setFilteredSections(sections);
-    } else {
+    let result = sections;
+
+    if (allowedSectionIds && allowedSectionIds.length > 0) {
+      result = result.filter((section) =>
+        allowedSectionIds.includes(section._id)
+      );
+    }
+
+    if (searchQuery.trim() !== "") {
       const query = searchQuery.toLowerCase();
-      const filtered = sections
+      result = result
         .map((section) => ({
           ...section,
           itemList: section.itemList.filter((item) =>
@@ -61,24 +190,12 @@ const YPivotQATemplatesPhotos = () => {
           )
         }))
         .filter((section) => section.itemList.length > 0);
-      setFilteredSections(filtered);
     }
-  }, [searchQuery, sections]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qa-sections-photos`
-      );
-      setSections(response.data.data);
-      setFilteredSections(response.data.data);
-    } catch (error) {
-      console.error("Error fetching photo sections:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setFilteredSections(result);
+  }, [searchQuery, sections, allowedSectionIds]);
+
+  // --- Handlers ---
 
   const toggleSection = (sectionId) => {
     setExpandedSections((prev) => {
@@ -96,6 +213,8 @@ const YPivotQATemplatesPhotos = () => {
     setSearchQuery("");
   };
 
+  // --- Image Handlers ---
+
   const openImageEditor = (
     mode,
     sectionId,
@@ -108,7 +227,7 @@ const YPivotQATemplatesPhotos = () => {
       sectionId,
       itemNo,
       imageIndex,
-      existingData // { imgSrc, history } for re-editing
+      existingData
     });
     setShowImageEditor(true);
   };
@@ -123,26 +242,27 @@ const YPivotQATemplatesPhotos = () => {
       const { sectionId, itemNo, imageIndex } = currentEditContext;
       const key = `${sectionId}_${itemNo}_${imageIndex}`;
 
-      setCapturedImages((prev) => ({
-        ...prev,
+      const newImages = {
+        ...capturedImages,
         [key]: {
-          url: imageDataUrl, // Final rendered image with annotations
-          history: editHistory, // Edit history for re-editing
-          imgSrc: originalImgSrc // Original image source
+          url: imageDataUrl,
+          history: editHistory,
+          imgSrc: originalImgSrc
         }
-      }));
+      };
 
+      setCapturedImages(newImages);
+      updateParent({ capturedImages: newImages });
       handleImageEditorClose();
     }
   };
 
   const removeImage = (sectionId, itemNo, imageIndex) => {
     const key = `${sectionId}_${itemNo}_${imageIndex}`;
-    setCapturedImages((prev) => {
-      const updated = { ...prev };
-      delete updated[key];
-      return updated;
-    });
+    const newImages = { ...capturedImages };
+    delete newImages[key];
+    setCapturedImages(newImages);
+    updateParent({ capturedImages: newImages });
   };
 
   const editExistingImage = (e, sectionId, itemNo, imageIndex) => {
@@ -158,7 +278,38 @@ const YPivotQATemplatesPhotos = () => {
     }
   };
 
-  // Memoized function to get images for an item
+  // --- Remark Handlers ---
+
+  const openRemarkModal = (sectionId, itemNo, itemName) => {
+    setRemarkModal({
+      isOpen: true,
+      key: `${sectionId}_${itemNo}`,
+      title: itemName
+    });
+  };
+
+  const handleSaveRemark = (text) => {
+    const { key } = remarkModal;
+    if (key) {
+      const newRemarks = { ...remarks, [key]: text };
+      setRemarks(newRemarks);
+      updateParent({ remarks: newRemarks });
+    }
+    setRemarkModal({ isOpen: false, key: null, title: "" });
+  };
+
+  const clearRemark = (sectionId, itemNo) => {
+    if (window.confirm("Clear this remark?")) {
+      const key = `${sectionId}_${itemNo}`;
+      const newRemarks = { ...remarks };
+      delete newRemarks[key];
+      setRemarks(newRemarks);
+      updateParent({ remarks: newRemarks });
+    }
+  };
+
+  // --- Utilities ---
+
   const getImagesForItem = useMemo(() => {
     return (sectionId, itemNo) => {
       const images = [];
@@ -188,7 +339,6 @@ const YPivotQATemplatesPhotos = () => {
     return index;
   };
 
-  // Grid columns based on device
   const getGridCols = () => {
     if (deviceType === "mobile") return "grid-cols-1";
     if (deviceType === "tablet") return "grid-cols-2";
@@ -205,7 +355,7 @@ const YPivotQATemplatesPhotos = () => {
 
   return (
     <div className="space-y-4 pb-20 animate-fadeIn">
-      {/* Compact Header with Search Only */}
+      {/* Header Search */}
       <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-xl p-4 shadow-lg">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -238,7 +388,7 @@ const YPivotQATemplatesPhotos = () => {
                 key={section._id}
                 className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden"
               >
-                {/* Main Section Header - Clickable */}
+                {/* Main Section Header */}
                 <button
                   onClick={() => toggleSection(section._id)}
                   className="w-full flex items-center justify-between p-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
@@ -263,7 +413,7 @@ const YPivotQATemplatesPhotos = () => {
                   )}
                 </button>
 
-                {/* Sub-cards Grid - Expandable */}
+                {/* Sub-cards Grid */}
                 {isExpanded && (
                   <div
                     className={`grid ${getGridCols()} gap-3 p-3 bg-gray-50 dark:bg-gray-900/50 border-t border-gray-200 dark:border-gray-700`}
@@ -271,30 +421,75 @@ const YPivotQATemplatesPhotos = () => {
                     {section.itemList.map((item) => {
                       const images = getImagesForItem(section._id, item.no);
                       const canAddMore = images.length < item.maxCount;
+                      const remarkKey = `${section._id}_${item.no}`;
+                      const currentRemark = remarks[remarkKey];
 
                       return (
                         <div
                           key={item.no}
                           className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow"
                         >
-                          {/* Sub-card Title */}
-                          <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                          {/* Sub-card Title + Remark Button */}
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-2 min-w-0 flex-1">
                               <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded text-xs font-bold">
                                 {item.no}
                               </span>
-                              <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate">
+                              <h4
+                                className="text-xs font-semibold text-gray-700 dark:text-gray-200 truncate"
+                                title={item.itemName}
+                              >
                                 {item.itemName}
                               </h4>
                             </div>
-                            <span className="flex-shrink-0 text-xs font-bold text-gray-500 dark:text-gray-400 ml-2">
+
+                            {/* Remark Button */}
+                            {currentRemark ? (
+                              <div className="flex items-center bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden h-6 ml-2 flex-shrink-0">
+                                <button
+                                  onClick={() =>
+                                    openRemarkModal(
+                                      section._id,
+                                      item.no,
+                                      item.itemName
+                                    )
+                                  }
+                                  className="px-2 h-full text-[10px] font-bold text-amber-700 dark:text-amber-400 hover:bg-amber-100 transition-colors border-r border-amber-200 dark:border-amber-800"
+                                >
+                                  Remark
+                                </button>
+                                <button
+                                  onClick={() =>
+                                    clearRemark(section._id, item.no)
+                                  }
+                                  className="px-1.5 h-full text-amber-600 hover:text-red-500 hover:bg-red-50 transition-colors"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                onClick={() =>
+                                  openRemarkModal(
+                                    section._id,
+                                    item.no,
+                                    item.itemName
+                                  )
+                                }
+                                className="ml-2 p-1 text-gray-400 hover:text-indigo-500 hover:bg-indigo-50 rounded-md transition-all"
+                                title="Add Remark"
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            <span className="flex-shrink-0 text-xs font-bold text-gray-500 dark:text-gray-400 ml-2 border-l pl-2 border-gray-200 dark:border-gray-700">
                               {images.length}/{item.maxCount}
                             </span>
                           </div>
 
-                          {/* Images Container - Horizontal Scroll */}
+                          {/* Images Container */}
                           <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600">
-                            {/* Existing Images - Click to Edit */}
                             {images.map(({ key, data, index }) => (
                               <div
                                 key={key}
@@ -313,13 +508,9 @@ const YPivotQATemplatesPhotos = () => {
                                   alt={`Photo ${index + 1}`}
                                   className="w-full h-full object-cover rounded-lg border-2 border-gray-300 dark:border-gray-600 group-hover:border-indigo-400 transition-colors"
                                 />
-
-                                {/* Edit Overlay */}
                                 <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
                                   <Edit3 className="w-5 h-5 text-white" />
                                 </div>
-
-                                {/* Delete Button */}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -329,18 +520,14 @@ const YPivotQATemplatesPhotos = () => {
                                 >
                                   <X className="w-3 h-3" />
                                 </button>
-
-                                {/* Number Badge */}
                                 <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded backdrop-blur-sm font-bold">
                                   #{index + 1}
                                 </div>
                               </div>
                             ))}
 
-                            {/* Add New Image - Combined Rectangle */}
                             {canAddMore && (
                               <div className="flex-shrink-0 w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors">
-                                {/* Camera Button - Top Half */}
                                 <button
                                   onClick={() =>
                                     openImageEditor(
@@ -354,8 +541,6 @@ const YPivotQATemplatesPhotos = () => {
                                 >
                                   <Camera className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors" />
                                 </button>
-
-                                {/* Upload Button - Bottom Half */}
                                 <button
                                   onClick={() =>
                                     openImageEditor(
@@ -371,22 +556,6 @@ const YPivotQATemplatesPhotos = () => {
                                 </button>
                               </div>
                             )}
-
-                            {/* Max Reached Indicator */}
-                            {!canAddMore && (
-                              <div className="flex-shrink-0 w-20 h-20 flex items-center justify-center border-2 border-green-300 dark:border-green-700 rounded-lg bg-green-50 dark:bg-green-900/20">
-                                <div className="text-center">
-                                  <div className="w-6 h-6 mx-auto mb-1 bg-green-500 rounded-full flex items-center justify-center">
-                                    <span className="text-white text-xs">
-                                      ✓
-                                    </span>
-                                  </div>
-                                  <span className="text-[9px] font-bold text-green-600 dark:text-green-400">
-                                    Max
-                                  </span>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
                       );
@@ -398,23 +567,11 @@ const YPivotQATemplatesPhotos = () => {
           })}
         </div>
       ) : (
-        // Empty State
         <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-700">
           <Search className="w-12 h-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
           <h3 className="text-sm font-bold text-gray-600 dark:text-gray-300 mb-1">
             No Results Found
           </h3>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-            Try different search terms
-          </p>
-          {searchQuery && (
-            <button
-              onClick={clearSearch}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs rounded-lg font-semibold transition-colors"
-            >
-              Clear Search
-            </button>
-          )}
         </div>
       )}
 
@@ -428,11 +585,14 @@ const YPivotQATemplatesPhotos = () => {
         />
       )}
 
-      {/* Preview Badge */}
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-gray-900/90 text-white text-xs px-4 py-2 rounded-full shadow-lg backdrop-blur-sm z-40 border border-gray-700 flex items-center gap-2">
-        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-        <span className="font-semibold">Preview Mode</span>
-      </div>
+      {/* Remark Modal */}
+      <RemarkModal
+        isOpen={remarkModal.isOpen}
+        onClose={() => setRemarkModal((prev) => ({ ...prev, isOpen: false }))}
+        onSave={handleSaveRemark}
+        initialText={remarkModal.key ? remarks[remarkModal.key] : ""}
+        title={remarkModal.title}
+      />
 
       <style jsx>{`
         @keyframes fadeIn {

@@ -4,10 +4,10 @@ const loadingPromises = new Map();
 
 export const normalizeImageUrl = (src) => {
   if (!src) return null;
-  
-  if (typeof src === 'string') {
-    if (src.startsWith('data:')) return src;
-    if (src.startsWith('{')) {
+
+  if (typeof src === "string") {
+    if (src.startsWith("data:")) return src;
+    if (src.startsWith("{")) {
       try {
         const parsed = JSON.parse(src);
         return parsed.originalUrl || parsed.url || parsed.src || parsed.path;
@@ -17,51 +17,42 @@ export const normalizeImageUrl = (src) => {
     }
     return src.trim();
   }
-  
-  if (typeof src === 'object' && src !== null) {
+
+  if (typeof src === "object" && src !== null) {
     return src.originalUrl || src.url || src.src || src.path;
   }
-  
+
   return null;
 };
 
 export const generateImageKeys = (url) => {
   const keys = new Set([url]);
-  
-  if (url.includes('192.167.12.85:5000')) {
-    const path = url.split('192.167.12.85:5000')[1];
+
+  if (url.includes("yqms.yaikh.com")) {
+    const path = url.split("yqms.yaikh.com")[1];
     if (path) {
       keys.add(path);
-      keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
+      keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
     }
   }
-  
-  if (url.includes('yqms.yaikh.com')) {
-    const path = url.split('yqms.yaikh.com')[1];
-    if (path) {
-      keys.add(path);
-      keys.add(path.startsWith('/') ? path.substring(1) : '/' + path);
-    }
-  }
-  
+
   return Array.from(keys);
 };
 
 const loadImageOptimized = async (imageUrl, API_BASE_URL) => {
   try {
-    if (imageUrl.startsWith('data:')) {
+    if (imageUrl.startsWith("data:")) {
       return imageUrl;
     }
 
     let cleanUrl = imageUrl;
-    if (cleanUrl.startsWith('/')) {
+    if (cleanUrl.startsWith("/")) {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
 
-    
-    const response = await fetch( {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
+    const response = await fetch({
+      method: "GET",
+      headers: { Accept: "application/json" },
       signal: AbortSignal.timeout(3000) // 3s timeout
     });
 
@@ -103,20 +94,22 @@ export const loadImageAsBase64 = async (src, API_BASE_URL) => {
 
 export const collectAllImageUrls = (recordData, inspectorDetails) => {
   const imageUrls = new Set();
-  
+
   const collectImages = (images) => {
     if (!Array.isArray(images)) return;
-    images.forEach(img => {
+    images.forEach((img) => {
       const url = normalizeImageUrl(img);
       if (url) imageUrls.add(url);
     });
   };
 
   // Collect defect images
-  recordData.defectDetails?.defectsByPc?.forEach(pc => {
-    pc.pcDefects?.forEach(defect => {
+  recordData.defectDetails?.defectsByPc?.forEach((pc) => {
+    pc.pcDefects?.forEach((defect) => {
       collectImages(defect.defectImages || defect.capturedImages || []);
-      collectImages(defect.uploadedImages || defect.uploaded_images || defect.images || []);
+      collectImages(
+        defect.uploadedImages || defect.uploaded_images || defect.images || []
+      );
     });
   });
 
@@ -124,23 +117,25 @@ export const collectAllImageUrls = (recordData, inspectorDetails) => {
   collectImages(recordData.defectDetails?.additionalImages || []);
 
   // Collect inspection images
-  recordData.inspectionDetails?.checkpointInspectionData?.forEach(checkpoint => {
-    collectImages(checkpoint.comparisonImages || []);
-    collectImages(checkpoint.uploadedImages || []);
-    checkpoint.subPoints?.forEach(subPoint => {
-      collectImages(subPoint.comparisonImages || []);
-      collectImages(subPoint.uploadedImages || []);
-    });
-  });
+  recordData.inspectionDetails?.checkpointInspectionData?.forEach(
+    (checkpoint) => {
+      collectImages(checkpoint.comparisonImages || []);
+      collectImages(checkpoint.uploadedImages || []);
+      checkpoint.subPoints?.forEach((subPoint) => {
+        collectImages(subPoint.comparisonImages || []);
+        collectImages(subPoint.uploadedImages || []);
+      });
+    }
+  );
 
   // Collect legacy inspection images
-  recordData.inspectionDetails?.checkedPoints?.forEach(point => {
+  recordData.inspectionDetails?.checkedPoints?.forEach((point) => {
     collectImages(point.comparison || []);
     collectImages(point.uploadedImages || []);
   });
 
   // Collect machine images
-  recordData.inspectionDetails?.machineProcesses?.forEach(machine => {
+  recordData.inspectionDetails?.machineProcesses?.forEach((machine) => {
     if (machine.image) {
       const url = normalizeImageUrl(machine.image);
       if (url) imageUrls.add(url);
@@ -156,9 +151,13 @@ export const collectAllImageUrls = (recordData, inspectorDetails) => {
   return Array.from(imageUrls);
 };
 
-export const loadImagesInBatches = async (imageUrls, API_BASE_URL, batchSize = 5) => {
+export const loadImagesInBatches = async (
+  imageUrls,
+  API_BASE_URL,
+  batchSize = 5
+) => {
   const imageMap = {};
-  
+
   for (let i = 0; i < imageUrls.length; i += batchSize) {
     const batch = imageUrls.slice(i, i + batchSize);
     const batchPromises = batch.map(async (url) => {
@@ -166,7 +165,7 @@ export const loadImagesInBatches = async (imageUrls, API_BASE_URL, batchSize = 5
         const base64 = await loadImageAsBase64(url, API_BASE_URL);
         if (base64) {
           const keys = generateImageKeys(url);
-          keys.forEach(key => {
+          keys.forEach((key) => {
             imageMap[key] = base64;
           });
         }
@@ -174,12 +173,12 @@ export const loadImagesInBatches = async (imageUrls, API_BASE_URL, batchSize = 5
         // Silently fail individual images
       }
     });
-    
+
     await Promise.allSettled(batchPromises);
-    
+
     // Small delay between batches to prevent server overload
     if (i + batchSize < imageUrls.length) {
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
   }
 

@@ -680,7 +680,6 @@ export const derivedBuyerLogic = {
   }
 };
 
-
 //AfterIroning Overall summary card calculation
 export const calculateOverallSummary = (data) => {
   const {

@@ -219,7 +219,6 @@ const setKValueForSize = async (size, kValue) => {
       return newValues;
     });
   };
-
   await applyPattern();
 };
 
@@ -357,7 +356,6 @@ const addSize = async (size) => {
         // If no exact K-value match, try any measurement for this size
         if (!qcWashingMeasurement) {
           qcWashingMeasurement = qcWashingData.find((m) => m.size === sizeStr);
-          console.log(`🔍 No exact K-value match, trying any size match:`, qcWashingMeasurement ? 'Found' : 'Not found');
         }
         
         // If no size match, try the first available measurement with matching specs length
@@ -365,7 +363,6 @@ const addSize = async (size) => {
           qcWashingMeasurement = qcWashingData.find(
             (m) => m.selectedRows && m.selectedRows.length === specs.length
           );
-          console.log(`🔍 No size match, trying specs length match:`, qcWashingMeasurement ? 'Found' : 'Not found');
         }
         
         if (qcWashingMeasurement && qcWashingMeasurement.selectedRows) {
@@ -373,7 +370,6 @@ const addSize = async (size) => {
           if (qcWashingMeasurement.selectedRows.length === specs.length) {
             defaultSelectedRows = [...qcWashingMeasurement.selectedRows];
             patternApplied = true;
-            console.log(`✅ Applied pattern from QC Washing data for size ${sizeStr}:`, defaultSelectedRows);
             return;
           }
         }
@@ -391,7 +387,6 @@ const addSize = async (size) => {
           if (savedFormData.selectedRows.length === specs.length) {
             defaultSelectedRows = [...savedFormData.selectedRows];
             patternApplied = true;
-            console.log(`✅ Applied pattern from formData in addSize for ${washTypeKey}:`, defaultSelectedRows);
             return;
           }
         }
@@ -405,7 +400,6 @@ const addSize = async (size) => {
         if (defaultMeasurementPoints.length > 0) {
           defaultSelectedRows = getDefaultSelectedRows(defaultMeasurementPoints, specs);
           patternApplied = true;
-          console.log(`✅ Applied pattern from buyerSpecData in addSize for ${buyerWashType}:`, defaultSelectedRows);
           return;
         }
       }
@@ -418,7 +412,6 @@ const addSize = async (size) => {
           if (mostRecentSaved.selectedRows && mostRecentSaved.selectedRows.length === specs.length) {
             defaultSelectedRows = [...mostRecentSaved.selectedRows];
             patternApplied = true;
-            console.log('✅ Applied pattern from saved data in addSize:', defaultSelectedRows);
             return;
           }
         }
@@ -438,7 +431,6 @@ const addSize = async (size) => {
     // Fallback: If no pattern was applied, ensure all rows are unselected
     if (!patternApplied) {
       defaultSelectedRows = Array(specs.length).fill(false);
-      console.log('❌ No pattern found in addSize, defaulting to unselected rows');
     }
     
     // Apply the selected rows
@@ -467,12 +459,6 @@ const addSize = async (size) => {
       });
     }
     
-    console.log(`Final result for size ${sizeStr}:`, {
-      patternApplied,
-      selectedRowsCount: defaultSelectedRows.filter(Boolean).length,
-      totalRows: defaultSelectedRows.length,
-      hideUnselected: patternApplied
-    });
   }
 };
 

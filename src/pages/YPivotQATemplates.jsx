@@ -8,7 +8,8 @@ import {
   Camera,
   MapPin,
   Bug,
-  Ruler
+  Ruler,
+  ClipboardCheck
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQATemplatesReportType from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesReportType";
@@ -17,6 +18,7 @@ import YPivotQATemplatesPhotos from "../components/inspection/PivotY/QATemplates
 import YPivotQATemplatesDefectLocationSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectLocationSelection";
 import YPivotQATemplatesDefectTotalSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesDefectTotalSelection";
 import YPivotQATemplatesMeasurementSelection from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesMeasurementSelection";
+import YPivotQATemplatesPPSheet from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesPPSheet";
 
 const YPivotQATemplates = () => {
   const { user } = useAuth();
@@ -71,6 +73,14 @@ const YPivotQATemplates = () => {
         component: <YPivotQATemplatesMeasurementSelection />,
         gradient: "from-indigo-500 to-violet-500",
         description: "Measurement specs configuration"
+      },
+      {
+        id: "pp_sheet",
+        label: "PP Sheet",
+        icon: <ClipboardCheck size={20} />,
+        component: <YPivotQATemplatesPPSheet />,
+        gradient: "from-blue-600 to-cyan-600",
+        description: "Pre-production meeting report"
       }
     ],
     []

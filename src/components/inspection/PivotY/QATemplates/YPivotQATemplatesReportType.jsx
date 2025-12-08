@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
+import Swal from "sweetalert2";
 import {
   Plus,
   Edit,
@@ -11,7 +12,11 @@ import {
   Loader,
   FileText,
   CheckCircle,
-  XCircle
+  XCircle,
+  Camera,
+  Box,
+  ScanLine,
+  Ship
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -19,6 +24,7 @@ const YPivotQATemplatesReportType = () => {
   // --- State ---
   const [templates, setTemplates] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [photoSections, setPhotoSections] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
@@ -33,9 +39,18 @@ const YPivotQATemplatesReportType = () => {
     Measurement: "No",
     Header: "Yes",
     Photos: "Yes",
+    Line: "Yes",
+    Table: "Yes",
+    Colors: "Yes",
+    ShippingStage: "Yes", // New Field
+    InspectedQtyMethod: "NA",
+    isCarton: "No",
+    isQCScan: "No",
+    InspectedQty: 0,
     QualityPlan: "Yes",
     Conclusion: "Yes",
-    DefectCategoryList: [] // Array of category objects
+    DefectCategoryList: [],
+    SelectedPhotoSectionList: []
   };
   const [formData, setFormData] = useState(initialFormState);
 
@@ -43,14 +58,17 @@ const YPivotQATemplatesReportType = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [tplRes, catRes] = await Promise.all([
+      const [tplRes, catRes, photoRes] = await Promise.all([
         axios.get(`${API_BASE_URL}/api/qa-sections-templates`),
-        axios.get(`${API_BASE_URL}/api/qa-sections-templates/categories`)
+        axios.get(`${API_BASE_URL}/api/qa-sections-templates/categories`),
+        axios.get(`${API_BASE_URL}/api/qa-sections-templates/photo-sections`)
       ]);
       setTemplates(tplRes.data.data);
       setCategories(catRes.data.data);
+      setPhotoSections(photoRes.data.data);
     } catch (error) {
       console.error("Error loading data:", error);
+      Swal.fire("Error", "Failed to load data.", "error");
     } finally {
       setLoading(false);
     }
@@ -74,23 +92,49 @@ const YPivotQATemplatesReportType = () => {
       Measurement: template.Measurement,
       Header: template.Header,
       Photos: template.Photos,
+      Line: template.Line || "Yes",
+      Table: template.Table || "Yes",
+      Colors: template.Colors || "Yes",
+      ShippingStage: template.ShippingStage || "Yes", // Map new field
+      InspectedQtyMethod: template.InspectedQtyMethod || "NA",
+      isCarton: template.isCarton || "No",
+      isQCScan: template.isQCScan || "No",
+      InspectedQty: template.InspectedQty || 0,
       QualityPlan: template.QualityPlan,
       Conclusion: template.Conclusion,
-      DefectCategoryList: template.DefectCategoryList || []
+      DefectCategoryList: template.DefectCategoryList || [],
+      SelectedPhotoSectionList: template.SelectedPhotoSectionList || []
     });
     setIsEditing(true);
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this template?"))
-      return;
-    try {
-      await axios.delete(`${API_BASE_URL}/api/qa-sections-templates/${id}`);
-      fetchData();
-    } catch (error) {
-      console.error("Delete error:", error);
-      alert("Failed to delete.");
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "Do you want to delete this template?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it!"
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await axios.delete(`${API_BASE_URL}/api/qa-sections-templates/${id}`);
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: "Template deleted successfully",
+          timer: 1500,
+          showConfirmButton: false
+        });
+        fetchData();
+      } catch (error) {
+        console.error("Delete error:", error);
+        Swal.fire("Error", "Failed to delete template.", "error");
+      }
     }
   };
 
@@ -100,12 +144,10 @@ const YPivotQATemplatesReportType = () => {
     );
     let newList;
     if (exists) {
-      // Remove
       newList = formData.DefectCategoryList.filter(
         (c) => c.categoryId !== cat._id
       );
     } else {
-      // Add (store snapshot)
       newList = [
         ...formData.DefectCategoryList,
         {
@@ -118,6 +160,27 @@ const YPivotQATemplatesReportType = () => {
     setFormData({ ...formData, DefectCategoryList: newList });
   };
 
+  const handlePhotoSectionToggle = (section) => {
+    const exists = formData.SelectedPhotoSectionList.find(
+      (p) => p.PhotoSectionID === section._id
+    );
+    let newList;
+    if (exists) {
+      newList = formData.SelectedPhotoSectionList.filter(
+        (p) => p.PhotoSectionID !== section._id
+      );
+    } else {
+      newList = [
+        ...formData.SelectedPhotoSectionList,
+        {
+          PhotoSectionID: section._id,
+          SectionName: section.sectionName
+        }
+      ];
+    }
+    setFormData({ ...formData, SelectedPhotoSectionList: newList });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSaving(true);
@@ -127,24 +190,42 @@ const YPivotQATemplatesReportType = () => {
           `${API_BASE_URL}/api/qa-sections-templates/${formData._id}`,
           formData
         );
+        Swal.fire({
+          icon: "success",
+          title: "Updated!",
+          text: "Report Template updated successfully.",
+          timer: 1500,
+          showConfirmButton: false
+        });
       } else {
         await axios.post(`${API_BASE_URL}/api/qa-sections-templates`, formData);
+        Swal.fire({
+          icon: "success",
+          title: "Saved!",
+          text: "New Report Template created successfully.",
+          timer: 1500,
+          showConfirmButton: false
+        });
       }
       setIsModalOpen(false);
       fetchData();
     } catch (error) {
       console.error("Save error:", error);
-      alert("Failed to save template.");
+      Swal.fire(
+        "Error",
+        error.response?.data?.message || "Failed to save template.",
+        "error"
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   // --- UI Components ---
-
   const StatusBadge = ({ val }) => {
     const isYes = val === "Yes";
     const isMeas = val === "Before" || val === "After";
+    const isMethod = val === "Fixed" || val === "AQL";
 
     let colorClass =
       "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400";
@@ -154,7 +235,7 @@ const YPivotQATemplatesReportType = () => {
       colorClass =
         "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400";
       icon = <CheckCircle className="w-3 h-3" />;
-    } else if (isMeas) {
+    } else if (isMeas || isMethod) {
       colorClass =
         "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400";
       icon = <FileText className="w-3 h-3" />;
@@ -169,8 +250,12 @@ const YPivotQATemplatesReportType = () => {
     );
   };
 
+  // Shared class for table headers to allow wrapping
+  const headerClass =
+    "px-2 py-3 text-center whitespace-normal break-words leading-tight";
+
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn pb-20">
       {/* Top Bar */}
       <div className="flex justify-between items-center">
         <div>
@@ -195,27 +280,43 @@ const YPivotQATemplatesReportType = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <tr>
-                <th className="px-6 py-3 w-16 text-center">No</th>
-                <th className="px-6 py-3">Report Type</th>
-                <th className="px-6 py-3 text-center">Measurement</th>
-                <th className="px-6 py-3 text-center">Header</th>
-                <th className="px-6 py-3 text-center">Photos</th>
-                <th className="px-6 py-3">Defect Categories</th>
-                <th className="px-6 py-3 text-center">Quality Plan</th>
-                <th className="px-6 py-3 text-center">Conclusion</th>
-                <th className="px-6 py-3 text-right">Actions</th>
+                <th className={`${headerClass} w-10`}>No</th>
+                <th className="px-4 py-3 min-w-[150px] whitespace-normal break-words leading-tight">
+                  Report Type
+                </th>
+                <th className={headerClass}>Meas.</th>
+                <th className={headerClass}>Head</th>
+                <th className={headerClass}>Pics</th>
+                <th className="px-4 py-3 min-w-[180px] whitespace-normal break-words leading-tight">
+                  Defect Categories
+                </th>
+                <th className="px-4 py-3 min-w-[200px] whitespace-normal break-words leading-tight">
+                  Photo Sections
+                </th>
+                <th className={headerClass}>Line</th>
+                <th className={headerClass}>Tab</th>
+                <th className={headerClass}>Col</th>
+                {/* New Stage Column */}
+                <th className={headerClass}>Stage</th>
+                <th className={headerClass}>Meth</th>
+                <th className={headerClass}>Qty</th>
+                <th className={headerClass}>Ctn</th>
+                <th className={headerClass}>Scan</th>
+                <th className={headerClass}>Q.Plan</th>
+                <th className={headerClass}>Conc</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-10">
+                  <td colSpan="18" className="text-center py-10">
                     <Loader className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
                   </td>
                 </tr>
               ) : templates.length === 0 ? (
                 <tr>
-                  <td colSpan="9" className="text-center py-10 text-gray-500">
+                  <td colSpan="18" className="text-center py-10 text-gray-500">
                     No templates found.
                   </td>
                 </tr>
@@ -225,22 +326,23 @@ const YPivotQATemplatesReportType = () => {
                     key={t._id}
                     className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
                   >
-                    <td className="px-6 py-4 text-center font-mono text-gray-500 dark:text-gray-400">
+                    <td className="px-4 py-4 text-center font-mono text-gray-500 dark:text-gray-400">
                       {t.no}
                     </td>
-                    <td className="px-6 py-4 font-bold text-gray-800 dark:text-gray-100">
+                    <td className="px-4 py-4 font-bold text-gray-800 dark:text-gray-100">
                       {t.ReportType}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Measurement} />
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Header} />
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Photos} />
                     </td>
-                    <td className="px-6 py-4">
+                    {/* Defect Categories */}
+                    <td className="px-4 py-4">
                       <div className="flex flex-wrap gap-1">
                         {t.DefectCategoryList.map((c) => (
                           <span
@@ -252,13 +354,60 @@ const YPivotQATemplatesReportType = () => {
                         ))}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    {/* Photo Sections (Max 2 cards logic) */}
+                    <td className="px-4 py-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-1">
+                        {t.SelectedPhotoSectionList &&
+                        t.SelectedPhotoSectionList.length > 0 ? (
+                          t.SelectedPhotoSectionList.map((p) => (
+                            <span
+                              key={p.PhotoSectionID}
+                              className="px-1.5 py-0.5 bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 text-[10px] rounded border border-teal-100 dark:border-teal-800 flex items-center gap-1 truncate"
+                              title={p.SectionName}
+                            >
+                              <Camera className="w-3 h-3 flex-shrink-0" />
+                              <span className="truncate">{p.SectionName}</span>
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-gray-400 text-[10px] italic col-span-2">
+                            None
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.Line || "Yes"} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.Table || "Yes"} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.Colors || "Yes"} />
+                    </td>
+                    {/* New Stage Column */}
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.ShippingStage || "Yes"} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.InspectedQtyMethod || "NA"} />
+                    </td>
+                    <td className="px-2 py-4 text-center font-mono text-gray-700 dark:text-gray-300">
+                      {t.InspectedQty || 0}
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.isCarton || "No"} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.isQCScan || "No"} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.QualityPlan} />
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Conclusion} />
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-4 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
                           onClick={() => handleEdit(t)}
@@ -285,7 +434,7 @@ const YPivotQATemplatesReportType = () => {
       {/* --- Modal --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-3xl flex flex-col max-h-[90vh]">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-6xl flex flex-col max-h-[95vh]">
             {/* Modal Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
               <h3 className="text-xl font-bold text-gray-800 dark:text-white">
@@ -324,9 +473,42 @@ const YPivotQATemplatesReportType = () => {
                 </div>
 
                 {/* Settings Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {/* Basic Yes/No Fields */}
+                  {[
+                    "Header",
+                    "Photos",
+                    "Line",
+                    "Table",
+                    "Colors",
+                    "ShippingStage", // Added here for the loop
+                    "QualityPlan",
+                    "Conclusion"
+                  ].map((field) => (
+                    <div key={field}>
+                      <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase flex items-center gap-1">
+                        {/* Add icon for ShippingStage specifically */}
+                        {field === "ShippingStage" && (
+                          <Ship className="w-3 h-3" />
+                        )}
+                        {field.replace(/([A-Z])/g, " $1").trim()}
+                      </label>
+                      <select
+                        value={formData[field]}
+                        onChange={(e) =>
+                          setFormData({ ...formData, [field]: e.target.value })
+                        }
+                        className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                      >
+                        <option value="Yes">Yes</option>
+                        <option value="No">No</option>
+                      </select>
+                    </div>
+                  ))}
+
+                  {/* Measurement Field */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase">
                       Measurement
                     </label>
                     <select
@@ -337,71 +519,82 @@ const YPivotQATemplatesReportType = () => {
                           Measurement: e.target.value
                         })
                       }
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="No">No</option>
-                      <option value="Before">Before Wash</option>
-                      <option value="After">After Wash</option>
+                      <option value="Before">Before</option>
+                      <option value="After">After</option>
                     </select>
                   </div>
+
+                  {/* Inspected Method */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Header (Checklist)
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase">
+                      Insp. Method
                     </label>
                     <select
-                      value={formData.Header}
-                      onChange={(e) =>
-                        setFormData({ ...formData, Header: e.target.value })
-                      }
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
-                    >
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Photos
-                    </label>
-                    <select
-                      value={formData.Photos}
-                      onChange={(e) =>
-                        setFormData({ ...formData, Photos: e.target.value })
-                      }
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
-                    >
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Quality Plan
-                    </label>
-                    <select
-                      value={formData.QualityPlan}
+                      value={formData.InspectedQtyMethod}
                       onChange={(e) =>
                         setFormData({
                           ...formData,
-                          QualityPlan: e.target.value
+                          InspectedQtyMethod: e.target.value
                         })
                       }
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="NA">NA</option>
+                      <option value="Fixed">Fixed</option>
+                      <option value="AQL">AQL</option>
+                    </select>
+                  </div>
+
+                  {/* Inspected Qty */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase">
+                      Insp. Qty
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={formData.InspectedQty}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          InspectedQty: parseInt(e.target.value) || 0
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* isCarton */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase flex items-center gap-1">
+                      <Box className="w-3 h-3" /> is Carton
+                    </label>
+                    <select
+                      value={formData.isCarton}
+                      onChange={(e) =>
+                        setFormData({ ...formData, isCarton: e.target.value })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
                     </select>
                   </div>
+
+                  {/* isQCScan */}
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                      Conclusion
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase flex items-center gap-1">
+                      <ScanLine className="w-3 h-3" /> is QC Scan
                     </label>
                     <select
-                      value={formData.Conclusion}
+                      value={formData.isQCScan}
                       onChange={(e) =>
-                        setFormData({ ...formData, Conclusion: e.target.value })
+                        setFormData({ ...formData, isQCScan: e.target.value })
                       }
-                      className="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white outline-none"
+                      className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="Yes">Yes</option>
                       <option value="No">No</option>
@@ -409,12 +602,12 @@ const YPivotQATemplatesReportType = () => {
                   </div>
                 </div>
 
-                {/* Defect Categories Grid */}
+                {/* --- Defect Categories Section --- */}
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
                   <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-3">
                     Include Defect Categories
                   </label>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                     {categories.map((cat) => {
                       const isSelected = formData.DefectCategoryList.some(
                         (c) => c.categoryId === cat._id
@@ -437,17 +630,64 @@ const YPivotQATemplatesReportType = () => {
                           ) : (
                             <Square className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                           )}
-                          <div>
-                            <span className="block font-bold text-gray-800 dark:text-gray-100 text-sm">
+                          <div className="min-w-0">
+                            <span className="block font-bold text-gray-800 dark:text-gray-100 text-sm truncate">
                               {cat.no}. {cat.CategoryCode}
                             </span>
-                            <span className="block text-xs text-gray-500 dark:text-gray-400 truncate max-w-[120px]">
+                            <span className="block text-xs text-gray-500 dark:text-gray-400 truncate">
                               {cat.CategoryNameEng}
                             </span>
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                </div>
+
+                {/* --- Photo Sections Selection --- */}
+                <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+                  <label className="block text-sm font-bold text-gray-800 dark:text-gray-200 mb-3 flex items-center gap-2">
+                    <Camera className="w-4 h-4" /> Include Photo Sections
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {photoSections.map((section) => {
+                      const isSelected = formData.SelectedPhotoSectionList.some(
+                        (p) => p.PhotoSectionID === section._id
+                      );
+                      return (
+                        <div
+                          key={section._id}
+                          onClick={() => handlePhotoSectionToggle(section)}
+                          className={`
+                            flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all
+                            ${
+                              isSelected
+                                ? "bg-teal-50 dark:bg-teal-900/20 border-teal-500 dark:border-teal-400 shadow-sm"
+                                : "bg-gray-50 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:bg-white dark:hover:bg-gray-700"
+                            }
+                          `}
+                        >
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-teal-600 dark:text-teal-400 flex-shrink-0" />
+                          ) : (
+                            <Square className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <span className="block font-bold text-gray-800 dark:text-gray-100 text-sm truncate">
+                              {section.sectionName}
+                            </span>
+                            <span className="block text-xs text-gray-500 dark:text-gray-400">
+                              {section.itemList.length} items
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {photoSections.length === 0 && (
+                      <div className="col-span-3 text-center text-sm text-gray-500 py-2">
+                        No photo sections available to select.
+                      </div>
+                    )}
                   </div>
                 </div>
               </form>
@@ -472,7 +712,11 @@ const YPivotQATemplatesReportType = () => {
                 ) : (
                   <Save className="w-4 h-4" />
                 )}
-                {isSaving ? "Saving..." : "Save Template"}
+                {isSaving
+                  ? "Saving..."
+                  : isEditing
+                  ? "Update Template"
+                  : "Save Template"}
               </button>
             </div>
           </div>

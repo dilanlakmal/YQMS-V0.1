@@ -1,4 +1,4 @@
-import express from 'express';
+import express from "express";
 import {
   getAllQCWashingSubmittedData,
   getQCWashingImageProxy,
@@ -33,6 +33,6 @@ router.get('/api/qc-washing/image-proxy/:encodedUrl', getIndividualImageProxy);
  Sub-Con Edit Routes
 ------------------------------ */
 
-router.put('/api/qc-washing/update-edited-wash-qty/:id', updateQCWashingQtySub);
+router.put("/api/qc-washing/update-edited-wash-qty/:id", updateQCWashingQtySub);
 
 export default router;
