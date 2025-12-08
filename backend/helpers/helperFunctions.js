@@ -13,6 +13,7 @@ import {
   //  __dirname, 
    __backendDir
   } from "../Config/appConfig.js";
+  import fs from 'fs';
 
 export const normalizeDateString = (dateStr) => {
    if (!dateStr) return null;
@@ -99,6 +100,10 @@ export const sanitize = (input) => {
 //   const v = n % 100;
 //   return n + (s[(v - 20) % 10] || s[v] || s[0] || "th");
 // }
+export const cleanup = (input) => {
+  if (typeof input !== "string") input = String(input);
+  return input;
+};
 
 export const formatDate = (date) => {
   const d = new Date(date);
@@ -675,7 +680,180 @@ export const derivedBuyerLogic = {
   }
 };
 
+//AfterIroning Overall summary card calculation
+export const calculateOverallSummary = (data) => {
+  const {
+    defectDetails = {},
+    measurementDetails = {},
+    checkedQty = 0,
+    ironingQty = 0,
+    washQty = 0
+  } = data;
 
+  // 1. Calculate totalCheckedPcs from measurement data
+  let totalCheckedPcs = 0;
+  const measurementArray = measurementDetails.measurement || [];
+  
+  measurementArray.forEach((measurement) => {
+    if (typeof measurement.qty === "number" && measurement.qty > 0) {
+      totalCheckedPcs += measurement.qty;
+    }
+  });
 
+  // Fallback to checkedQty if no measurement data
+  if (totalCheckedPcs === 0) {
+    totalCheckedPcs = parseInt(checkedQty, 10) || 0;
+  }
 
+  // 2. Calculate measurement points and passes
+  let measurementPoints = 0;
+  let measurementPass = 0;
 
+  // Use measurementSizeSummary if available (most accurate)
+  if (measurementDetails.measurementSizeSummary?.length > 0) {
+    measurementDetails.measurementSizeSummary.forEach(sizeData => {
+      measurementPoints += (sizeData.checkedPoints || 0);
+      measurementPass += (sizeData.totalPass || 0);
+    });
+  } else {
+    // Fallback: Calculate from measurement array
+    measurementArray.forEach((data) => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === "pass" || point.result === "fail") {
+                measurementPoints++;
+                if (point.result === "pass") measurementPass++;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
+
+  // 3. Calculate defect statistics
+  const rejectedDefectPcs = Array.isArray(defectDetails.defectsByPc)
+    ? defectDetails.defectsByPc.length
+    : 0;
+    
+  const totalDefectCount = defectDetails.defectsByPc
+    ? defectDetails.defectsByPc.reduce((sum, pc) => {
+        return sum + (Array.isArray(pc.pcDefects)
+          ? pc.pcDefects.reduce((defSum, defect) =>
+              defSum + (parseInt(defect.defectQty, 10) || 0), 0)
+          : 0);
+      }, 0)
+    : 0;
+
+  // 4. Calculate rates
+  const defectRate = totalCheckedPcs > 0
+    ? Number(((totalDefectCount / totalCheckedPcs) * 100).toFixed(1))
+    : 0;
+    
+  const defectRatio = totalCheckedPcs > 0
+    ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
+    : 0;
+
+  const passRate = measurementPoints > 0 
+    ? Math.round((measurementPass / measurementPoints) * 100) 
+    : 100;
+
+  // 5. SINGLE OVERALL RESULT CALCULATION
+  const defectResult = defectDetails.result || "Pass";
+  const overallFinalResult = (passRate >= 95 && defectResult === "Pass") ? "Pass" : "Fail";
+
+  return {
+    totalCheckedPcs,
+    rejectedDefectPcs,
+    totalDefectCount,
+    defectRate,
+    defectRatio,
+    totalCheckedPoint: measurementPoints,
+    totalPass: measurementPass,
+    totalFail: measurementPoints - measurementPass,
+    passRate,
+    overallFinalResult,
+    // For compatibility
+    overallResult: overallFinalResult
+  };
+};
+
+//translator imagers
+export const tanslatorImage
+ = multer({ 
+  storage: multer.memoryStorage(), // Store in memory instead of disk
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
+
+const coverPageStorage = multer.memoryStorage();
+
+export const uploadCoverPageImage = multer({
+  storage: coverPageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+    }
+  }
+});
+
+export const processImageBuffer = async (buffer, filename, directory) => {
+  try {
+    // Create the full path to the storage directory
+    const uploadPath = path.join(__backendDir, "public", "storage", directory);
+    
+    // Create the full file path
+    const filePath = path.join(uploadPath, filename);
+    
+    // Ensure the directory exists. If not, create it.
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    // Write the buffer to the file
+    fs.writeFileSync(filePath, buffer);
+    
+    // Return the relative path for API URL (this gets saved in DB)
+    return `/storage/${directory}/${filename}`;
+  } catch (error) {
+    console.error('Error in processImageBuffer:', error);
+    throw new Error(`Failed to process image: ${error.message}`);
+  }
+};
+
+// Enhanced image validation
+export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
+  try {
+    if (!buffer) return { isValid: true };
+    
+    const sizeInMB = buffer.length / (1024 * 1024);
+    
+    if (sizeInMB > maxSizeInMB) {
+      return { 
+        isValid: false, 
+        error: `Image size exceeds ${maxSizeInMB}MB limit` 
+      };
+    }
+    
+    return { isValid: true };
+  } catch (error) {
+    return { 
+      isValid: false, 
+      error: 'Error validating image buffer' 
+    };
+  }
+};
