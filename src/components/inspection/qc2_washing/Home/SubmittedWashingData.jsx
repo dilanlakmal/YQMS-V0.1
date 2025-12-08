@@ -87,8 +87,7 @@ const SubmittedWashingDataPage = () => {
 
   //   } catch (error) {
   //     console.error('Error refreshing actual wash quantities:', error);
-  //   
-  freshStatus({
+  //     setRefreshStatus({
   //       type: 'error',
   //       message: error.message
   //     });

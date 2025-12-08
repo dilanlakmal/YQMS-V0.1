@@ -105,7 +105,8 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_prod
+  // process.env.MongoDB_URI_ym_prod
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
 );
 //Connection status
 ymProdConnection.on("connected", () =>
@@ -115,7 +116,8 @@ ymProdConnection.on("error", (err) => console.error("❌ unexpected error:", err
 
 
 export const ymEcoConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_eco_board
+  // process.env.MongoDB_URI_ym_eco_board
+  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
 );
 //Connection status
 ymEcoConnection.on("connected", () =>

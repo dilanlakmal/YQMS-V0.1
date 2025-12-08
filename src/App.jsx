@@ -77,7 +77,6 @@ import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
 import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
-import QCWashingPage from "./pages/QCWashing.jsx";
 import AfterIroning from "./pages/AfterIroning.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
@@ -86,7 +85,6 @@ import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQA
 
 
 import YPivotQASections from "./pages/YPivotQASections.jsx";
-import AfterIroning  from "./pages/AfterIroning.jsx";
 import Translator from "./pages/translator.jsx";
 import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
 import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
