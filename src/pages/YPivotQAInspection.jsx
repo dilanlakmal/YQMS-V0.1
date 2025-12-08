@@ -14,12 +14,12 @@ import {
 import React, { useMemo, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
-import YPivotQAInspectionReportType from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionReportType";
 import YPivotQATemplatesHeader from "../components/inspection/PivotY/QATemplates/YPivotQATemplatesHeader";
 import YPivotQAInspectionPhotosDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPhotosDetermination";
 import YPivotQAInspectionLineTableColorConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionLineTableColorConfig";
 import YPivotQAInspectionMeasurementConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementConfig";
 import YPivotQAInspectionDefectConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectConfig";
+import YPivotQAInspectionSummary from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionSummary";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -139,26 +139,13 @@ const YPivotQAInspection = () => {
             externalOrderData={sharedOrderState.orderData}
             externalOrderType={sharedOrderState.orderType}
             externalInspectionDate={sharedOrderState.inspectionDate}
+            // NEW: Pass report-related props
+            onReportDataChange={handleReportDataChange}
+            savedReportState={sharedReportState}
           />
         ),
         gradient: "from-blue-500 to-cyan-500",
-        description: "Order information"
-      },
-      {
-        id: "report",
-        label: "Report",
-        icon: <Settings size={18} />,
-        component: (
-          <YPivotQAInspectionReportType
-            selectedOrders={sharedOrderState.selectedOrders}
-            orderData={sharedOrderState.orderData}
-            orderType={sharedOrderState.orderType}
-            onReportDataChange={handleReportDataChange}
-            savedState={sharedReportState}
-          />
-        ),
-        gradient: "from-purple-500 to-pink-500",
-        description: "Report configuration"
+        description: "Order & Report configuration"
       },
       {
         id: "header",
@@ -177,7 +164,6 @@ const YPivotQAInspection = () => {
         id: "photos",
         label: "Photos",
         icon: <Camera size={18} />,
-        // Pass the props to the Determination wrapper
         component: (
           <YPivotQAInspectionPhotosDetermination
             reportData={sharedReportState}
@@ -196,8 +182,8 @@ const YPivotQAInspection = () => {
             reportData={sharedReportState}
             orderData={sharedOrderState}
             onUpdate={handleReportDataChange}
-            onSetActiveGroup={handleSetActiveGroup} // Passed down
-            activeGroup={activeGroup} // Passed down
+            onSetActiveGroup={handleSetActiveGroup}
+            activeGroup={activeGroup}
           />
         ),
         gradient: "from-teal-500 to-cyan-500",
@@ -213,7 +199,7 @@ const YPivotQAInspection = () => {
             orderData={sharedOrderState.orderData}
             reportData={sharedReportState}
             onUpdateMeasurementData={handleMeasurementDataUpdate}
-            activeGroup={activeGroup} // Passed down
+            activeGroup={activeGroup}
           />
         ),
         gradient: "from-green-500 to-emerald-500",
@@ -223,7 +209,6 @@ const YPivotQAInspection = () => {
         id: "defects",
         label: "Defects",
         icon: <ClipboardCheck size={18} />,
-        // Updated Component with props
         component: (
           <YPivotQAInspectionDefectConfig
             selectedOrders={sharedOrderState.selectedOrders}
@@ -241,7 +226,10 @@ const YPivotQAInspection = () => {
         label: "Summary",
         icon: <CheckSquare size={18} />,
         component: (
-          <PlaceholderComponent title="Summary Section" icon={CheckSquare} />
+          <YPivotQAInspectionSummary
+            orderData={sharedOrderState}
+            reportData={sharedReportState}
+          />
         ),
         gradient: "from-indigo-500 to-violet-500",
         description: "Inspection summary"

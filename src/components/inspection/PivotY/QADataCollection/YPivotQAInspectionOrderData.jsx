@@ -22,10 +22,15 @@ import {
   RefreshCw,
   Link2,
   Plus,
-  Boxes
+  Boxes,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
+
+// Import the Report Type component
+import YPivotQAInspectionReportType from "./YPivotQAInspectionReportType";
 
 // ============================================================
 // Sub-Components
@@ -326,7 +331,10 @@ const YPivotQAInspectionOrderData = ({
   externalSelectedOrders,
   externalOrderData,
   externalOrderType,
-  externalInspectionDate
+  externalInspectionDate,
+  // New props for Report Type integration
+  onReportDataChange,
+  savedReportState = {}
 }) => {
   // Use external state if provided, otherwise use local state
   const [inspectionDateLocal, setInspectionDateLocal] = useState(
@@ -358,6 +366,9 @@ const YPivotQAInspectionOrderData = ({
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [error, setError] = useState(null);
   const skipSearchRef = useRef(false);
+
+  // State to control visibility of order details
+  const [showOrderDetails, setShowOrderDetails] = useState(false);
 
   // Track previous orderType to detect actual changes
   const prevOrderTypeRef = useRef(orderType);
@@ -409,6 +420,8 @@ const YPivotQAInspectionOrderData = ({
         selectedOrders: [],
         orderData: null
       });
+      // Reset show order details when order type changes
+      setShowOrderDetails(false);
     },
     [updateState]
   );
@@ -508,6 +521,8 @@ const YPivotQAInspectionOrderData = ({
 
         setShowSearchDropdown(false);
         setSearchResults([]);
+        // Reset show order details when new order is selected
+        setShowOrderDetails(false);
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -541,6 +556,8 @@ const YPivotQAInspectionOrderData = ({
             isSingle: false
           }
         });
+        // Reset show order details when new orders are selected
+        setShowOrderDetails(false);
       }
     } catch (err) {
       console.error("Fetch error:", err);
@@ -590,6 +607,7 @@ const YPivotQAInspectionOrderData = ({
       fetchMultipleOrderDetails(newOrders);
     } else {
       updateState({ selectedOrders: [], orderData: null });
+      setShowOrderDetails(false);
     }
   };
 
@@ -602,6 +620,7 @@ const YPivotQAInspectionOrderData = ({
     setSearchTerm("");
     setSearchResults([]);
     setError(null);
+    setShowOrderDetails(false);
   };
 
   // Refresh data
@@ -872,213 +891,242 @@ const YPivotQAInspectionOrderData = ({
         </div>
       )}
 
-      {/* Order Data Display */}
+      {/* Order Data Toggle Section */}
       {orderData && !loading && (
-        <div className="space-y-4 animate-fadeIn">
-          {/* Order Information */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-            <div className="bg-gradient-to-r from-blue-500 to-cyan-600 px-4 py-3 flex items-center justify-between">
-              <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Order Information
-              </h3>
-              {!orderData.isSingle && (
-                <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-medium">
-                  {selectedOrders.length} Orders Combined
-                </span>
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+          <button
+            onClick={() => setShowOrderDetails(!showOrderDetails)}
+            className="w-full bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-700 hover:to-slate-800 px-4 py-3 flex items-center justify-between rounded-t-2xl transition-all"
+          >
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4 text-white" />
+              <h3 className="text-white font-bold text-sm">Order Data</h3>
+              <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
+                {selectedOrders.length}{" "}
+                {selectedOrders.length === 1 ? "Order" : "Orders"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/70">
+                {showOrderDetails ? "Click to hide" : "Click to view details"}
+              </span>
+              {showOrderDetails ? (
+                <EyeOff className="w-5 h-5 text-white" />
+              ) : (
+                <Eye className="w-5 h-5 text-white" />
               )}
             </div>
+          </button>
 
-            <div className="p-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
-                <InfoCard
-                  icon={Tag}
-                  label="Cust. Style"
-                  value={orderData.dtOrder?.custStyle}
-                  color="indigo"
-                />
-                <InfoCard
-                  icon={User}
-                  label="Customer"
-                  value={orderData.dtOrder?.customer}
-                  color="purple"
-                />
-                <InfoCard
-                  icon={Building2}
-                  label="Factory"
-                  value={orderData.dtOrder?.factory}
-                  color="blue"
-                />
-                <InfoCard
-                  icon={Hash}
-                  label="Total Qty"
-                  value={orderData.dtOrder?.totalQty?.toLocaleString()}
-                  color="emerald"
-                />
-                <InfoCard
-                  icon={Globe}
-                  label="Origin"
-                  value={orderData.dtOrder?.origin}
-                  color="orange"
-                />
-                <InfoCard
-                  icon={Truck}
-                  label="Mode"
-                  value={orderData.dtOrder?.mode}
-                  color="pink"
-                />
-                <InfoCard
-                  icon={Users}
-                  label="Sales Team"
-                  value={orderData.dtOrder?.salesTeamName}
-                  color="indigo"
-                />
-                <InfoCard
-                  icon={MapPin}
-                  label="Country"
-                  value={orderData.dtOrder?.country}
-                  color="purple"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Yorksys Order Info */}
-          {orderData.yorksysOrder && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-              <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-4 py-3">
-                <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                  <Layers className="w-4 h-4" />
-                  Additional Order Details
-                </h3>
-              </div>
-
-              <div className="p-4">
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
-                  <InfoCard
-                    icon={Tag}
-                    label="SKU Description"
-                    value={orderData.yorksysOrder.skuDescription}
-                    color="purple"
-                  />
-                  <InfoCard
-                    icon={MapPin}
-                    label="Destination"
-                    value={orderData.yorksysOrder.destination}
-                    color="blue"
-                  />
-                  <InfoCard
-                    icon={Calendar}
-                    label="Season"
-                    value={orderData.yorksysOrder.season}
-                    color="orange"
-                  />
-                  <InfoCard
-                    icon={Shirt}
-                    label="Product Type"
-                    value={orderData.yorksysOrder.productType}
-                    color="pink"
-                  />
-                </div>
-
-                {orderData.yorksysOrder.fabricContent &&
-                  orderData.yorksysOrder.fabricContent.length > 0 && (
-                    <div className="p-2.5 bg-gray-50 dark:bg-gray-900 rounded-xl">
-                      <p className="text-[9px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
-                        Fabric Content
-                      </p>
-                      <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
-                        {formatFabricContent(
-                          orderData.yorksysOrder.fabricContent
-                        )}
-                      </p>
-                    </div>
-                  )}
-              </div>
-            </div>
-          )}
-
-          {/* Color/Size Breakdown - Per Order */}
-          {orderData.orderBreakdowns &&
-            orderData.orderBreakdowns.length > 0 && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-                <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between">
+          {/* Collapsible Content */}
+          {showOrderDetails && (
+            <div className="p-4 space-y-4 animate-fadeIn">
+              {/* Order Information */}
+              <div className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                <div className="bg-gradient-to-r from-blue-500 to-cyan-600 px-4 py-2.5 flex items-center justify-between rounded-t-xl">
                   <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                    <Package className="w-4 h-4" />
-                    Order Qty by Color & Size
+                    <Building2 className="w-4 h-4" />
+                    Order Information
                   </h3>
-                  <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-medium">
-                    {orderData.orderBreakdowns.length}{" "}
-                    {orderData.orderBreakdowns.length === 1
-                      ? "Order"
-                      : "Orders"}
-                  </span>
+                  {!orderData.isSingle && (
+                    <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-medium">
+                      {selectedOrders.length} Orders Combined
+                    </span>
+                  )}
                 </div>
-                <div className="p-4 space-y-4">
-                  {orderData.orderBreakdowns.map((breakdown, index) => (
-                    <div
-                      key={breakdown.orderNo}
-                      className={
-                        index > 0
-                          ? "pt-4 border-t border-gray-200 dark:border-gray-700"
-                          : ""
-                      }
-                    >
-                      <ColorSizeBreakdownTable
-                        data={breakdown.colorSizeBreakdown}
-                        orderNo={
-                          orderData.orderBreakdowns.length > 1
-                            ? breakdown.orderNo
-                            : null
-                        }
+
+                <div className="p-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+                    <InfoCard
+                      icon={Tag}
+                      label="Cust. Style"
+                      value={orderData.dtOrder?.custStyle}
+                      color="indigo"
+                    />
+                    <InfoCard
+                      icon={User}
+                      label="Customer"
+                      value={orderData.dtOrder?.customer}
+                      color="purple"
+                    />
+                    <InfoCard
+                      icon={Building2}
+                      label="Factory"
+                      value={orderData.dtOrder?.factory}
+                      color="blue"
+                    />
+                    <InfoCard
+                      icon={Hash}
+                      label="Total Qty"
+                      value={orderData.dtOrder?.totalQty?.toLocaleString()}
+                      color="emerald"
+                    />
+                    <InfoCard
+                      icon={Globe}
+                      label="Origin"
+                      value={orderData.dtOrder?.origin}
+                      color="orange"
+                    />
+                    <InfoCard
+                      icon={Truck}
+                      label="Mode"
+                      value={orderData.dtOrder?.mode}
+                      color="pink"
+                    />
+                    <InfoCard
+                      icon={Users}
+                      label="Sales Team"
+                      value={orderData.dtOrder?.salesTeamName}
+                      color="indigo"
+                    />
+                    <InfoCard
+                      icon={MapPin}
+                      label="Country"
+                      value={orderData.dtOrder?.country}
+                      color="purple"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Yorksys Order Info */}
+              {orderData.yorksysOrder && (
+                <div className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-600 px-4 py-2.5 rounded-t-xl">
+                    <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                      <Layers className="w-4 h-4" />
+                      Additional Order Details
+                    </h3>
+                  </div>
+
+                  <div className="p-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 mb-3">
+                      <InfoCard
+                        icon={Tag}
+                        label="SKU Description"
+                        value={orderData.yorksysOrder.skuDescription}
+                        color="purple"
+                      />
+                      <InfoCard
+                        icon={MapPin}
+                        label="Destination"
+                        value={orderData.yorksysOrder.destination}
+                        color="blue"
+                      />
+                      <InfoCard
+                        icon={Calendar}
+                        label="Season"
+                        value={orderData.yorksysOrder.season}
+                        color="orange"
+                      />
+                      <InfoCard
+                        icon={Shirt}
+                        label="Product Type"
+                        value={orderData.yorksysOrder.productType}
+                        color="pink"
                       />
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-          {/* SKU Data - Per Order */}
-          {orderData.orderBreakdowns &&
-            orderData.orderBreakdowns.some(
-              (b) => b.yorksysOrder?.skuData?.length > 0
-            ) && (
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
-                <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-3 flex items-center justify-between">
-                  <h3 className="text-white font-bold text-sm flex items-center gap-2">
-                    <Hash className="w-4 h-4" />
-                    Order Data by SKU
-                  </h3>
+                    {orderData.yorksysOrder.fabricContent &&
+                      orderData.yorksysOrder.fabricContent.length > 0 && (
+                        <div className="p-2.5 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
+                          <p className="text-[9px] font-bold text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">
+                            Fabric Content
+                          </p>
+                          <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                            {formatFabricContent(
+                              orderData.yorksysOrder.fabricContent
+                            )}
+                          </p>
+                        </div>
+                      )}
+                  </div>
                 </div>
-                <div className="p-4 space-y-4">
-                  {orderData.orderBreakdowns
-                    .filter((b) => b.yorksysOrder?.skuData?.length > 0)
-                    .map((breakdown, index) => (
-                      <div
-                        key={breakdown.orderNo}
-                        className={
-                          index > 0
-                            ? "pt-4 border-t border-gray-200 dark:border-gray-700"
-                            : ""
-                        }
-                      >
-                        <SKUDataTable
-                          skuData={breakdown.yorksysOrder.skuData}
-                          orderNo={
-                            orderData.orderBreakdowns.length > 1
-                              ? breakdown.orderNo
-                              : null
+              )}
+
+              {/* Color/Size Breakdown - Per Order */}
+              {orderData.orderBreakdowns &&
+                orderData.orderBreakdowns.length > 0 && (
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2.5 flex items-center justify-between rounded-t-xl">
+                      <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                        <Package className="w-4 h-4" />
+                        Order Qty by Color & Size
+                      </h3>
+                      <span className="text-xs bg-white/20 text-white px-2 py-1 rounded-full font-medium">
+                        {orderData.orderBreakdowns.length}{" "}
+                        {orderData.orderBreakdowns.length === 1
+                          ? "Order"
+                          : "Orders"}
+                      </span>
+                    </div>
+                    <div className="p-3 space-y-4">
+                      {orderData.orderBreakdowns.map((breakdown, index) => (
+                        <div
+                          key={breakdown.orderNo}
+                          className={
+                            index > 0
+                              ? "pt-4 border-t border-gray-200 dark:border-gray-700"
+                              : ""
                           }
-                        />
-                      </div>
-                    ))}
-                </div>
-              </div>
-            )}
+                        >
+                          <ColorSizeBreakdownTable
+                            data={breakdown.colorSizeBreakdown}
+                            orderNo={
+                              orderData.orderBreakdowns.length > 1
+                                ? breakdown.orderNo
+                                : null
+                            }
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+              {/* SKU Data - Per Order */}
+              {orderData.orderBreakdowns &&
+                orderData.orderBreakdowns.some(
+                  (b) => b.yorksysOrder?.skuData?.length > 0
+                ) && (
+                  <div className="bg-gray-50 dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <div className="bg-gradient-to-r from-emerald-500 to-teal-600 px-4 py-2.5 flex items-center justify-between rounded-t-xl">
+                      <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                        <Hash className="w-4 h-4" />
+                        Order Data by SKU
+                      </h3>
+                    </div>
+                    <div className="p-3 space-y-4">
+                      {orderData.orderBreakdowns
+                        .filter((b) => b.yorksysOrder?.skuData?.length > 0)
+                        .map((breakdown, index) => (
+                          <div
+                            key={breakdown.orderNo}
+                            className={
+                              index > 0
+                                ? "pt-4 border-t border-gray-200 dark:border-gray-700"
+                                : ""
+                            }
+                          >
+                            <SKUDataTable
+                              skuData={breakdown.yorksysOrder.skuData}
+                              orderNo={
+                                orderData.orderBreakdowns.length > 1
+                                  ? breakdown.orderNo
+                                  : null
+                              }
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty State - Only show when no orders selected */}
       {!selectedOrders.length && !loading && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-12 flex flex-col items-center justify-center">
           <div className="p-4 bg-indigo-100 dark:bg-indigo-900/30 rounded-full mb-4">
@@ -1096,6 +1144,20 @@ const YPivotQAInspectionOrderData = ({
               "Search and select multiple orders for combined inspection."}
           </p>
         </div>
+      )}
+
+      {/* ============================================================ */}
+      {/* Report Type Section - Integrated from YPivotQAInspectionReportType */}
+      {/* Only show when orders are selected */}
+      {/* ============================================================ */}
+      {selectedOrders.length > 0 && orderData && !loading && (
+        <YPivotQAInspectionReportType
+          selectedOrders={selectedOrders}
+          orderData={orderData}
+          orderType={orderType}
+          onReportDataChange={onReportDataChange}
+          savedState={savedReportState}
+        />
       )}
 
       {/* Styles */}
