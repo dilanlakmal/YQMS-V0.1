@@ -82,8 +82,23 @@ const CoverPage = () => {
                     </div>
                   </div>
                   <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    Quality Control Documentation
+                    Quality Documentation
                   </p>
+                </div>
+                {/* Active Status Indicator */}
+                <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-xs leading-tight">
+                      {activeTabData?.label}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      Active Module
+                    </p>
+                  </div>
                 </div>
               </div>
               {user && (
@@ -101,6 +116,7 @@ const CoverPage = () => {
                   </div>
                 </div>
               )}
+              
             </div>
 
             {/* Main Tabs - Scrollable */}
@@ -140,22 +156,6 @@ const CoverPage = () => {
                 })}
               </div>
             </div>
-
-            {/* Active Status Indicator */}
-            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
-              <div className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-xs leading-tight">
-                  {activeTabData?.label}
-                </p>
-                <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                  Active Module
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* DESKTOP LAYOUT (>= lg) */}
@@ -178,7 +178,7 @@ const CoverPage = () => {
                       </div>
                     </div>
                     <p className="text-sm text-indigo-100 font-medium">
-                      Quality Control Documentation System
+                      Quality Documentation
                     </p>
                   </div>
                 </div>

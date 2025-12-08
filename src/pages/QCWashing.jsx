@@ -2485,8 +2485,23 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                     </div>
                   </div>
                   <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    Quality Control & Inspection Management
+                   Washing Inspection 
                   </p>
+                </div>
+                {/* Active Status Indicator */}
+                <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-xs leading-tight">
+                      {activeTabData?.label}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      Active Module
+                    </p>
+                  </div>
                 </div>
               </div>
               {user && (
@@ -2541,22 +2556,6 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                     </button>
                   );
                 })}
-              </div>
-            </div>
-
-            {/* Active Status Indicator */}
-            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
-              <div className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-xs leading-tight">
-                  {activeTabData?.label}
-                </p>
-                <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                  Active Module
-                </p>
               </div>
             </div>
           </div>

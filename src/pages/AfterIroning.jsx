@@ -1828,6 +1828,22 @@ const tabs = useMemo(() => [
                     Yorkmars (Cambodia) Garment MFG Co., LTD
                   </p>
                 </div>
+                
+                {/* Active Status Indicator */}
+                <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-xs leading-tight">
+                      {activeTabData?.label}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      Active Module
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {user && (
@@ -1885,21 +1901,6 @@ const tabs = useMemo(() => [
               </div>
             </div>
 
-            {/* Active Status Indicator */}
-            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
-              <div className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-              </div>
-              <div>
-                <p className="text-white font-bold text-xs leading-tight">
-                  {activeTabData?.label}
-                </p>
-                <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                  Active Module
-                </p>
-              </div>
-            </div>
           </div>
 
           {/* DESKTOP LAYOUT (>= lg) */}

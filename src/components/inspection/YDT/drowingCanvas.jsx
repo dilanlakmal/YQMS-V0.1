@@ -35,6 +35,7 @@ const DrawingCanvas = ({
   const [history, setHistory] = useState([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   
+  const [isDirty, setIsDirty] = useState(false);
   // Grid
   const [showGrid, setShowGrid] = useState(false);
   const [gridSize, setGridSize] = useState(20);
@@ -232,6 +233,12 @@ useEffect(() => {
       
       // Check if image object already exists
       const existingImageIndex = drawnObjects.findIndex(obj => obj.type === 'image' && obj.id.includes('background'));
+      const existingImage = existingImageIndex >= 0 ? drawnObjects[existingImageIndex] : null;
+
+      // If image exists and the source is the same, do nothing.
+      if (existingImage && existingImage.data.src === backgroundImage) {
+        return;
+      }
       
       const imageObject = createDrawnObject('image', {
         x: imageX,
@@ -645,18 +652,7 @@ useEffect(() => {
 
   useEffect(() => {
     redrawCanvas();
-    // ✅ Expose drawnObjects to window for saving
-    window.drawnObjects = drawnObjects;
   }, [drawnObjects, selectedObjects, redrawCanvas]);
-
-  // ✅ Expose redraw function to window
-  useEffect(() => {
-    window.redrawCanvas = redrawCanvas;
-    return () => {
-      delete window.redrawCanvas;
-      delete window.drawnObjects;
-    };
-  }, [redrawCanvas]);
 
   // Save to history
   const saveToHistory = useCallback(() => {
@@ -668,6 +664,7 @@ useEffect(() => {
     const newHistory = history.slice(0, historyIndex + 1);
     newHistory.push(historyState);
     setHistory(newHistory);
+    setIsDirty(true); // Mark canvas as dirty when history is saved
     setHistoryIndex(newHistory.length - 1);
   }, [drawnObjects, history, historyIndex]);
 

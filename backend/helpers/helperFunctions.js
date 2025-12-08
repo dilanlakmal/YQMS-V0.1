@@ -820,6 +820,11 @@ export const processImageBuffer = async (buffer, filename, directory) => {
     // Create the full file path
     const filePath = path.join(uploadPath, filename);
     
+    // Ensure the directory exists. If not, create it.
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
     // Write the buffer to the file
     fs.writeFileSync(filePath, buffer);
     
@@ -853,9 +858,3 @@ export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
     };
   }
 };
-
-
-
-
-
-
