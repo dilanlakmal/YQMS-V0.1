@@ -515,7 +515,7 @@ function Home() {
             path: "/production-Sheet",
             roles: ["production"],
             image: "assets/Home/coverPage.png",
-            title: "AI Translator",
+            title: "Cover Page",
             description: "Maintain the production sheet",
              version: '0',
           }

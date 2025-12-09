@@ -18,8 +18,6 @@ const saveBase64Image = async (base64Data, orderNo, poNumber, baseUrl) => {
   try {
     if (!base64Data) return null;
 
-    console.log('Processing base64 image for:', orderNo, poNumber);
-
     // Extract the base64 data and file extension
     const matches = base64Data.match(/^data:image\/([a-zA-Z]+);base64,(.+)$/);
     if (!matches) {
@@ -41,15 +39,11 @@ const saveBase64Image = async (base64Data, orderNo, poNumber, baseUrl) => {
     // Generate unique filename
     const fileName = `${orderNo}_${poNumber}_${uuidv4()}.${fileExtension}`;
     
-    console.log('Saving base64 image as:', fileName);
-    
     // Use your existing processImageBuffer helper (this saves to filesystem)
     const relativePath = await processImageBuffer(buffer, fileName, 'coverpage');
     
     // Create full URL for database storage
     const fullUrl = `${baseUrl}${relativePath}`;
-    
-    console.log('Base64 image saved with full URL:', fullUrl);
     
     return fullUrl; // Return full URL instead of relative path
     
@@ -62,7 +56,6 @@ const saveBase64Image = async (base64Data, orderNo, poNumber, baseUrl) => {
 // Helper function to save uploaded file buffer
 const saveImageBuffer = async (buffer, originalName, orderNo, poNumber, baseUrl) => {
   try {
-    console.log('Processing uploaded file for:', orderNo, poNumber);
 
     // Validate buffer size
     const validation = validateImageBuffer(buffer, 5);
@@ -76,15 +69,12 @@ const saveImageBuffer = async (buffer, originalName, orderNo, poNumber, baseUrl)
     // Generate unique filename
     const fileName = `${orderNo}_${poNumber}_${uuidv4()}${fileExtension}`;
     
-    console.log('Saving uploaded file as:', fileName);
     
     // Use your existing processImageBuffer helper (this saves to filesystem)
     const relativePath = await processImageBuffer(buffer, fileName, 'coverpage');
     
     // Create full URL for database storage
     const fullUrl = `${baseUrl}${relativePath}`;
-    
-    console.log('Uploaded file saved with full URL:', fullUrl);
     
     return fullUrl; // Return full URL instead of relative path
     
@@ -116,7 +106,6 @@ const deleteImageFile = (imageUrl) => {
     
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
-      console.log(`Image deleted: ${fileName}`);
     }
   } catch (error) {
     console.error('Error deleting image:', error);
