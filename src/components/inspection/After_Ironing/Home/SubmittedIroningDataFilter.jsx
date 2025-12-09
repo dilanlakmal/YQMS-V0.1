@@ -273,7 +273,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative searchable-dropdown">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <FileText className="w-4 h-4 mr-1" />
-                MO Number
+                MONo
               </label>
               <div className="relative">
                 <input
@@ -398,7 +398,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <CheckCircle className="w-4 h-4 mr-1" />
-                Ironing Type
+               Type
               </label>
               <div className="relative">
                 <select
@@ -449,7 +449,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Building className="w-4 h-4 mr-1" />
-                Factory Name
+                Factory
               </label>
               <div className="relative">
                 <select
@@ -474,7 +474,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <ClipboardList className="w-4 h-4 mr-1" />
-                Report Type
+                Report 
               </label>
               <div className="relative">
                 <select
@@ -499,7 +499,7 @@ const SubmittedWashingDataFilter = ({
             <div className="relative">
               <label className="flex items-center text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 <Droplets className="w-4 h-4 mr-1" />
-                Wash Type
+               Irong
               </label>
               <div className="relative">
                 <select
