@@ -435,7 +435,28 @@ const  SubmittedIroningDataPage = () => {
         }
       }
 
-      // 4. Prepare clean data for PDF
+      // 4. Fetch washing comparison data
+      let washingComparisonData = null;
+      if (record.measurementDetails?.measurement?.length > 0) {
+        try {
+          const response = await fetch(`${API_BASE_URL}/api/after-ironing/qc-washing-measurement?${new URLSearchParams({
+            orderNo: record.orderNo,
+            date: record.date,
+            reportType: record.reportType,
+            factoryName: record.factoryName
+          })}`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success) {
+              washingComparisonData = data.data;
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to fetch washing comparison data:', error);
+        }
+      }
+
+      // 5. Prepare clean data for PDF
       const cleanRecordData = JSON.parse(JSON.stringify(record, (key, value) => {
         if (value === '' || value === null || value === undefined) {
           return undefined;
@@ -443,7 +464,7 @@ const  SubmittedIroningDataPage = () => {
         return value;
       }));
 
-      // 5. Generate PDF
+      // 6. Generate PDF
       document.getElementById('progress-pdf').innerHTML = '⏳ Generating PDF document...';
       
       await new Promise(resolve => setTimeout(resolve, 1000));
@@ -459,6 +480,7 @@ const  SubmittedIroningDataPage = () => {
           checkpointDefinitions: checkpointDefinitions || [],
           preloadedImages,
           inspectorDetails: inspectorDetails || {},
+          washingComparisonData: washingComparisonData,
           reportTitle: "After Ironing Report",
           isLoading: false,
           skipImageLoading: false

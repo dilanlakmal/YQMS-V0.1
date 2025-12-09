@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Fragment } from "react";
 import {
   Document,
   Font,
@@ -808,6 +808,119 @@ const ComparisonSection = ({ recordData, comparisonData }) => (
   </View>
 );
 
+// Washing Measurement Comparison Section - Separate table per size
+const WashingComparisonSection = ({ washingData, afterIroningData }) => {
+  if (!washingData?.afterWash?.length && !afterIroningData?.length) {
+    return (
+      <View style={styles.section} wrap={false}>
+        <Text style={styles.sectionTitle}>Measurement Comparison</Text>
+        <Text style={{ textAlign: "center", color: "#6b7280", fontSize: 9, padding: 10 }}>
+          No measurement comparison data available.
+        </Text>
+      </View>
+    );
+  }
+
+  const sizeMap = new Map();
+  
+  const extractData = (data, stage) => {
+    if (!data || !Array.isArray(data)) return;
+    data.forEach(measurement => {
+      const size = measurement.size;
+      if (!sizeMap.has(size)) {
+        sizeMap.set(size, { points: new Map(), pieces: new Set() });
+      }
+      const sizeData = sizeMap.get(size);
+      
+      measurement.pcs?.forEach((pc, pcIndex) => {
+        const pcNumber = pc.pcNumber || (pcIndex + 1);
+        sizeData.pieces.add(pcNumber);
+        
+        pc.measurementPoints?.forEach(point => {
+          const pointName = point.pointName;
+          if (!sizeData.points.has(pointName)) {
+            sizeData.points.set(pointName, {
+              pointName,
+              specs: point.specs,
+              toleranceMinus: point.toleranceMinus,
+              tolerancePlus: point.tolerancePlus,
+              pieces: new Map()
+            });
+          }
+          const pointData = sizeData.points.get(pointName);
+          if (!pointData.pieces.has(pcNumber)) {
+            pointData.pieces.set(pcNumber, { afterWash: null, afterIroning: null });
+          }
+          pointData.pieces.get(pcNumber)[stage] = {
+            fraction: point.measured_value_fraction || '0',
+            result: point.result
+          };
+        });
+      });
+    });
+  };
+  
+  if (washingData?.afterWash?.length) extractData(washingData.afterWash, 'afterWash');
+  if (afterIroningData?.length) extractData(afterIroningData, 'afterIroning');
+  
+  const hasAfterWash = washingData?.afterWash?.length > 0;
+  const hasAfterIroning = afterIroningData?.length > 0;
+  const stageCount = (hasAfterWash ? 1 : 0) + (hasAfterIroning ? 1 : 0);
+
+  return (
+    <Fragment>
+      {Array.from(sizeMap.entries()).map(([size, sizeData], sizeIndex) => {
+        const piecesArr = Array.from(sizeData.pieces).sort((a, b) => a - b);
+        const pointsArr = Array.from(sizeData.points.values());
+        const stageWidth = stageCount > 0 ? Math.floor(60 / stageCount) : 30;
+        
+        return (
+          <View key={sizeIndex} style={styles.section} wrap={false}>
+            <Text style={styles.sectionTitle}>Measurement Comparison - Size: {size}</Text>
+            <View style={styles.table}>
+              {/* Header Row 1: Point, Tol+, Tol-, Spec, Stage Headers */}
+              <View style={styles.tableRow} fixed>
+                <Text style={[styles.tableColHeader, styles.textLeft, { width: "20%" }]}>Point</Text>
+                <Text style={[styles.tableColHeader, { width: "6%" }]}>Tol+</Text>
+                <Text style={[styles.tableColHeader, { width: "6%" }]}>Tol-</Text>
+                <Text style={[styles.tableColHeader, { width: "8%" }]}>Spec</Text>
+                {hasAfterWash && <Text style={[styles.tableColHeader, { width: `${stageWidth}%`, backgroundColor: "#dcfce7", color: "#166534" }]}>After Wash</Text>}
+                {hasAfterIroning && <Text style={[styles.tableColHeader, { width: `${stageWidth}%`, backgroundColor: "#e0e7ff", color: "#4338ca" }]}>After Ironing</Text>}
+              </View>
+              {/* Header Row 2: PC Numbers */}
+              <View style={styles.tableRow} fixed>
+                <Text style={[styles.tableColHeader, { width: "20%" }]}></Text>
+                <Text style={[styles.tableColHeader, { width: "6%" }]}></Text>
+                <Text style={[styles.tableColHeader, { width: "6%" }]}></Text>
+                <Text style={[styles.tableColHeader, { width: "8%" }]}></Text>
+                {hasAfterWash && piecesArr.map(pc => <Text key={`aw-${pc}`} style={[styles.tableColHeader, { width: `${stageWidth/piecesArr.length}%`, fontSize: 6, backgroundColor: "#f0fdf4" }]}>PC{pc}</Text>)}
+                {hasAfterIroning && piecesArr.map(pc => <Text key={`ai-${pc}`} style={[styles.tableColHeader, { width: `${stageWidth/piecesArr.length}%`, fontSize: 6, backgroundColor: "#eef2ff" }]}>PC{pc}</Text>)}
+              </View>
+              {/* Data Rows */}
+              {pointsArr.map((point, index) => (
+                <View key={index} style={styles.tableRow}>
+                  <Text style={[styles.tableCol, styles.textLeft, { width: "20%", fontSize: 7 }]}>{safeString(point.pointName)}</Text>
+                  <Text style={[styles.tableCol, { width: "6%", fontSize: 6 }]}>{decimalToFraction(point.tolerancePlus)}</Text>
+                  <Text style={[styles.tableCol, { width: "6%", fontSize: 6 }]}>{decimalToFraction(point.toleranceMinus)}</Text>
+                  <Text style={[styles.tableCol, { width: "8%", fontSize: 6 }]}>{safeString(point.specs)}</Text>
+                  {hasAfterWash && piecesArr.map(pc => {
+                    const m = point.pieces.get(pc)?.afterWash;
+                    return <Text key={`aw-${pc}`} style={[styles.tableCol, { width: `${stageWidth/piecesArr.length}%`, fontSize: 6 }, m ? (m.result === 'pass' ? { backgroundColor: "#dcfce7", color: "#166534" } : { backgroundColor: "#fee2e2", color: "#991b1b" }) : {}]}>{m ? m.fraction : '-'}</Text>;
+                  })}
+                  {hasAfterIroning && piecesArr.map(pc => {
+                    const m = point.pieces.get(pc)?.afterIroning;
+                    return <Text key={`ai-${pc}`} style={[styles.tableCol, { width: `${stageWidth/piecesArr.length}%`, fontSize: 6 }, m ? (m.result === 'pass' ? { backgroundColor: "#dcfce7", color: "#166534" } : { backgroundColor: "#fee2e2", color: "#991b1b" }) : {}]}>{m ? m.fraction : '-'}</Text>;
+                  })}
+                </View>
+              ))}
+            </View>
+          </View>
+        );
+      })}
+    </Fragment>
+  );
+};
+
 // --- MAIN PDF DOCUMENT COMPONENT ---
 const QcWashingFullReportPDF = ({ 
   recordData, 
@@ -816,6 +929,7 @@ const QcWashingFullReportPDF = ({
   checkpointDefinitions = [], 
   inspectorDetails = null, 
   preloadedImages = {},
+  washingComparisonData = null, // Add this new prop
   reportTitle = "After Ironing Report",
   isLoading = false,
   skipImageLoading = false 
@@ -1003,6 +1117,21 @@ const QcWashingFullReportPDF = ({
           <MeasurementDetailTable sizeData={sizeData} />
         </Page>
       ))}
+
+      {/* Measurement Comparison Page */}
+      {(washingComparisonData || measurements.length > 0) && (
+        <Page style={styles.page} orientation="landscape">
+          <PdfHeader 
+            orderNo={recordData.orderNo || "N/A"} 
+            beforeAfterWash="After Ironing"
+          />
+          <Text style={styles.pageHeader}>Measurement Comparison</Text>
+          <WashingComparisonSection 
+            washingData={washingComparisonData} 
+            afterIroningData={measurements}
+          />
+        </Page>
+      )}
 
       {/* Before vs After Comparison Page */}
       {comparisonData && comparisonData.measurementDetails?.measurement && 
