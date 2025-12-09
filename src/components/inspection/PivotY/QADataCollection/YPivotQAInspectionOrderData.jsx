@@ -24,13 +24,15 @@ import {
   Plus,
   Boxes,
   Eye,
-  EyeOff
+  EyeOff,
+  ClipboardList
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
 
 // Import the Report Type component
 import YPivotQAInspectionReportType from "./YPivotQAInspectionReportType";
+import YPivotQualityPlan from "./YPivotQualityPlan";
 
 // ============================================================
 // Sub-Components
@@ -323,6 +325,37 @@ const SelectedOrdersChips = ({ orders, onRemove }) => {
   );
 };
 
+// Inspection Type Toggle Component
+const InspectionTypeToggle = ({ inspectionType, setInspectionType }) => {
+  const types = [
+    { id: "first", label: "First Inspection", color: "emerald" },
+    { id: "re", label: "Re-Inspection", color: "amber" }
+  ];
+
+  return (
+    <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
+      {types.map((type) => {
+        const isActive = inspectionType === type.id;
+        return (
+          <button
+            key={type.id}
+            onClick={() => setInspectionType(type.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all flex-1 justify-center ${
+              isActive
+                ? type.color === "emerald"
+                  ? "bg-white dark:bg-gray-700 shadow-md text-emerald-600 dark:text-emerald-400"
+                  : "bg-white dark:bg-gray-700 shadow-md text-amber-600 dark:text-amber-400"
+                : "text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50"
+            }`}
+          >
+            {type.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+};
+
 // ============================================================
 // Main Component
 // ============================================================
@@ -334,7 +367,10 @@ const YPivotQAInspectionOrderData = ({
   externalInspectionDate,
   // New props for Report Type integration
   onReportDataChange,
-  savedReportState = {}
+  savedReportState = {},
+  externalInspectionType,
+  onQualityPlanChange,
+  qualityPlanData = {}
 }) => {
   // Use external state if provided, otherwise use local state
   const [inspectionDateLocal, setInspectionDateLocal] = useState(
@@ -343,6 +379,9 @@ const YPivotQAInspectionOrderData = ({
   const [orderTypeLocal, setOrderTypeLocal] = useState("single");
   const [selectedOrdersLocal, setSelectedOrdersLocal] = useState([]);
   const [orderDataLocal, setOrderDataLocal] = useState(null);
+
+  // Add inspection type local state (after other local states)
+  const [inspectionTypeLocal, setInspectionTypeLocal] = useState("first");
 
   // Determine which values to use (external props take priority)
   const inspectionDate =
@@ -357,6 +396,12 @@ const YPivotQAInspectionOrderData = ({
       : selectedOrdersLocal;
   const orderData =
     externalOrderData !== undefined ? externalOrderData : orderDataLocal;
+
+  // Determine inspection type (after other determine statements)
+  const inspectionType =
+    externalInspectionType !== undefined
+      ? externalInspectionType
+      : inspectionTypeLocal;
 
   // Other state (always local)
   const [searchTerm, setSearchTerm] = useState("");
@@ -388,7 +433,11 @@ const YPivotQAInspectionOrderData = ({
             ? updates.selectedOrders
             : selectedOrders,
         orderData:
-          updates.orderData !== undefined ? updates.orderData : orderData
+          updates.orderData !== undefined ? updates.orderData : orderData,
+        inspectionType:
+          updates.inspectionType !== undefined
+            ? updates.inspectionType
+            : inspectionType
       };
 
       // Update local state
@@ -398,11 +447,20 @@ const YPivotQAInspectionOrderData = ({
       if (updates.selectedOrders !== undefined)
         setSelectedOrdersLocal(updates.selectedOrders);
       if (updates.orderData !== undefined) setOrderDataLocal(updates.orderData);
+      if (updates.inspectionType !== undefined)
+        setInspectionTypeLocal(updates.inspectionType);
 
       // Notify parent
       onOrderDataChange?.(newState);
     },
-    [inspectionDate, orderType, selectedOrders, orderData, onOrderDataChange]
+    [
+      inspectionDate,
+      orderType,
+      selectedOrders,
+      orderData,
+      inspectionType,
+      onOrderDataChange
+    ]
   );
 
   // Wrapper functions
@@ -436,6 +494,14 @@ const YPivotQAInspectionOrderData = ({
   const setOrderData = useCallback(
     (value) => {
       updateState({ orderData: value });
+    },
+    [updateState]
+  );
+
+  // Add setInspectionType wrapper function (after other wrapper functions):
+  const setInspectionType = useCallback(
+    (value) => {
+      updateState({ inspectionType: value });
     },
     [updateState]
   );
@@ -744,7 +810,7 @@ const YPivotQAInspectionOrderData = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Inspection Date */}
             <div>
               <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
@@ -756,6 +822,18 @@ const YPivotQAInspectionOrderData = ({
                 value={inspectionDate}
                 onChange={(e) => setInspectionDate(e.target.value)}
                 className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            {/* Inspection Type */}
+            <div>
+              <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
+                <ClipboardList className="w-3.5 h-3.5 text-emerald-500" />
+                Inspection
+              </label>
+              <InspectionTypeToggle
+                inspectionType={inspectionType}
+                setInspectionType={setInspectionType}
               />
             </div>
 
@@ -1151,13 +1229,29 @@ const YPivotQAInspectionOrderData = ({
       {/* Only show when orders are selected */}
       {/* ============================================================ */}
       {selectedOrders.length > 0 && orderData && !loading && (
-        <YPivotQAInspectionReportType
-          selectedOrders={selectedOrders}
-          orderData={orderData}
-          orderType={orderType}
-          onReportDataChange={onReportDataChange}
-          savedState={savedReportState}
-        />
+        // <YPivotQAInspectionReportType
+        //   selectedOrders={selectedOrders}
+        //   orderData={orderData}
+        //   orderType={orderType}
+        //   onReportDataChange={onReportDataChange}
+        //   savedState={savedReportState}
+        // />
+        <>
+          <YPivotQAInspectionReportType
+            selectedOrders={selectedOrders}
+            orderData={orderData}
+            orderType={orderType}
+            onReportDataChange={onReportDataChange}
+            savedState={savedReportState}
+          />
+
+          {/* Quality Plan - Only shows if template has QualityPlan="Yes" */}
+          <YPivotQualityPlan
+            selectedTemplate={savedReportState?.selectedTemplate}
+            qualityPlanData={qualityPlanData}
+            onQualityPlanChange={onQualityPlanChange}
+          />
+        </>
       )}
 
       {/* Styles */}

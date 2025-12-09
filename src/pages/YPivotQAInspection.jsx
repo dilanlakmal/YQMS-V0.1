@@ -50,7 +50,8 @@ const YPivotQAInspection = () => {
     inspectionDate: new Date().toISOString().split("T")[0],
     orderType: "single",
     selectedOrders: [],
-    orderData: null
+    orderData: null,
+    inspectionType: "first"
   });
 
   // Shared state for Report Configuration
@@ -64,6 +65,13 @@ const YPivotQAInspection = () => {
     defectData: {}
   });
 
+  // Add new state for quality plan (after sharedReportState):
+  const [qualityPlanData, setQualityPlanData] = useState({
+    productionStatus: {},
+    packingList: {},
+    accountedPercentage: "0.00"
+  });
+
   // State for Active Inspection Context (Activated via Play button)
   const [activeGroup, setActiveGroup] = useState(null);
 
@@ -75,6 +83,11 @@ const YPivotQAInspection = () => {
   // Handler for report data changes
   const handleReportDataChange = useCallback((newState) => {
     setSharedReportState((prev) => ({ ...prev, ...newState }));
+  }, []);
+
+  // Add after other handlers:
+  const handleQualityPlanChange = useCallback((newData) => {
+    setQualityPlanData(newData);
   }, []);
 
   // Handler for header updates
@@ -139,9 +152,12 @@ const YPivotQAInspection = () => {
             externalOrderData={sharedOrderState.orderData}
             externalOrderType={sharedOrderState.orderType}
             externalInspectionDate={sharedOrderState.inspectionDate}
+            externalInspectionType={sharedOrderState.inspectionType}
             // NEW: Pass report-related props
             onReportDataChange={handleReportDataChange}
             savedReportState={sharedReportState}
+            onQualityPlanChange={handleQualityPlanChange} // Add this
+            qualityPlanData={qualityPlanData} // Add this
           />
         ),
         gradient: "from-blue-500 to-cyan-500",
@@ -245,7 +261,9 @@ const YPivotQAInspection = () => {
       handleMeasurementDataUpdate,
       handleDefectDataUpdate,
       handleSetActiveGroup,
-      activeGroup
+      activeGroup,
+      handleQualityPlanChange, // Add this
+      qualityPlanData // Add this
     ]
   );
 
