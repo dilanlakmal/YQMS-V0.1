@@ -2717,10 +2717,10 @@ export const getQCWashingMeasurementData = async (req, res) => {
     };
 
     // Add optional filters if provided
-    if (date) {
-      const dateValue = new Date(date.length === 10 ? date + "T00:00:00.000Z" : date);
-      query.date = dateValue;
-    }
+    // if (date) {
+    //   const dateValue = new Date(date.length === 10 ? date + "T00:00:00.000Z" : date);
+    //   query.date = dateValue;
+    // }
 
     if (reportType) {
       query.reportType = reportType;
@@ -2779,7 +2779,7 @@ export const getQCWashingMeasurementData = async (req, res) => {
       recordInfo: {
         id: qcWashingRecord._id,
         orderNo: qcWashingRecord.orderNo,
-        date: qcWashingRecord.date,
+        // date: qcWashingRecord.date,
         reportType: qcWashingRecord.reportType,
         factoryName: qcWashingRecord.factoryName
       }

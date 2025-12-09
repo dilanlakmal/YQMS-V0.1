@@ -877,8 +877,14 @@ const handleDownloadPDF = async (record) => {
   ) => {
     let filtered = [...dataToFilter];
 
+    // Check if there are any active filters. An active filter is one that is not null, undefined, or an empty string.
+    // For dateRange, we need to check its inner properties.
+    const hasFilters = Object.values(filters).some(
+      (v) => v && (typeof v !== "object" || (v.startDate || v.endDate))
+    );
+
     // If no filters, show last 7 days of records (most recent)
-    if (!hasFilters) {
+    if (!Object.keys(filters).length || !hasFilters) {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       sevenDaysAgo.setHours(0, 0, 0, 0); // Set to the beginning of the day
