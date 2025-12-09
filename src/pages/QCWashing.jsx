@@ -2484,16 +2484,14 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                       </span>
                     </div>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                   Washing Inspection 
-                  </p>
-                  <div className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-                  </div>
-                  <div>
-                    <p className="text-white font-bold text-xs leading-tight">
-                      {activeTabData?.label} - Active
+                  {/* Active Tab Indicator - Inline with title */}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                    </div>
+                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                      {activeTabData?.label} • Active
                     </p>
                   </div>
                 </div>
