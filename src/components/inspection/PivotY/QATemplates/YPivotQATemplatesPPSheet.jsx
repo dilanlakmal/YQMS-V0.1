@@ -14,7 +14,6 @@ import {
   Save,
   Check,
   X,
-  Minus,
   Search,
   User,
   Loader2
@@ -169,48 +168,89 @@ const UserSearchInput = ({ label, selectedUsers, onChange }) => {
   );
 };
 
+// Define default state outside to ensure consistency
+const DEFAULT_FORM_STATE = {
+  date: new Date().toISOString().split("T")[0],
+  style: "",
+  qty: "",
+  materials: {
+    ppSizeSet: "OK",
+    approvalFullSizeSpec: "OK",
+    sampleComments: "OK",
+    handFeelStandard: "OK",
+    approvalWashingStandard: "OK",
+    approvalSwatches: "OK",
+    approvalTrimCard: "OK",
+    approvalPrintEmb: "OK",
+    fabricInspectionResult: "Pass",
+    other: ""
+  },
+  riskAnalysis: [{ risk: "", action: "" }],
+  criticalOperations: [""],
+  otherComments: [""],
+  attendance: {
+    merchandiser: [],
+    technical: [],
+    cutting: [],
+    qaqc: [],
+    sewing: [],
+    mechanic: [],
+    ironing: [],
+    packing: []
+  }
+};
+
 // --- MAIN COMPONENT ---
-const YPivotQATemplatesPPSheet = () => {
-  // State
-  const [formData, setFormData] = useState({
-    date: new Date().toISOString().split("T")[0],
-    style: "",
-    qty: "",
-
-    // Checklist Items
-    materials: {
-      ppSizeSet: "OK",
-      approvalFullSizeSpec: "OK",
-      sampleComments: "OK",
-      handFeelStandard: "OK",
-      approvalWashingStandard: "OK",
-      approvalSwatches: "OK",
-      approvalTrimCard: "OK",
-      approvalPrintEmb: "OK",
-      fabricInspectionResult: "Pass",
-      other: ""
-    },
-
-    // Dynamic Tables
-    riskAnalysis: [{ risk: "", action: "" }],
-    criticalOperations: [""],
-    otherComments: [""],
-
-    // Attendance (Arrays for Multi-Select)
-    attendance: {
-      merchandiser: [],
-      technical: [],
-      cutting: [],
-      qaqc: [],
-      sewing: [],
-      mechanic: [],
-      ironing: [],
-      packing: []
+const YPivotQATemplatesPPSheet = ({
+  prefilledData,
+  savedState,
+  onDataChange
+}) => {
+  // 1. ROBUST INITIALIZATION
+  // We merge savedState with DEFAULT_FORM_STATE.
+  // This ensures that if 'riskAnalysis' is somehow missing in savedState, it defaults to [{risk:"", action:""}]
+  // instead of crashing or being undefined.
+  const [formData, setFormData] = useState(() => {
+    if (savedState) {
+      return {
+        ...DEFAULT_FORM_STATE,
+        ...savedState,
+        // Deep merge specific objects to be safe
+        materials: { ...DEFAULT_FORM_STATE.materials, ...savedState.materials },
+        attendance: {
+          ...DEFAULT_FORM_STATE.attendance,
+          ...savedState.attendance
+        }
+      };
     }
+    return DEFAULT_FORM_STATE;
   });
 
-  // --- Handlers ---
+  // 2. AUTO-FILL LOGIC (Only updates Style/Qty/Date if valid and different)
+  useEffect(() => {
+    if (prefilledData) {
+      setFormData((prev) => {
+        // Only update if the field is currently empty OR if we want to force sync
+        // Here we prioritize prefilled data if it exists, but we preserve other fields
+        return {
+          ...prev,
+          style: prefilledData.style || prev.style,
+          qty: prefilledData.qty || prev.qty,
+          date: prefilledData.date || prev.date
+        };
+      });
+    }
+  }, [prefilledData]);
 
+  // 3. PERSISTENCE LOGIC (Lift State Up)
+  // Whenever formData changes (user types), send it up to parent
+  useEffect(() => {
+    if (onDataChange) {
+      onDataChange(formData);
+    }
+  }, [formData, onDataChange]);
+
+  // --- Handlers (Unchanged) ---
   const handleMaterialChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -225,7 +265,6 @@ const YPivotQATemplatesPPSheet = () => {
     }));
   };
 
-  // Dynamic Row Handlers
   const addRiskRow = () => {
     setFormData((prev) => ({
       ...prev,
@@ -267,7 +306,6 @@ const YPivotQATemplatesPPSheet = () => {
   };
 
   // --- Render Helpers ---
-
   const colorMap = {
     indigo: "from-indigo-500 to-indigo-600",
     blue: "from-blue-500 to-blue-600",
@@ -290,7 +328,6 @@ const YPivotQATemplatesPPSheet = () => {
     </div>
   );
 
-  // Helper for Status Buttons (√, X, NA)
   const StatusSelector = ({
     value,
     onChange,
@@ -350,9 +387,15 @@ const YPivotQATemplatesPPSheet = () => {
             </label>
             <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
               <Package className="w-4 h-4 text-indigo-500" />
-              <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                {formData.style || "---"}
-              </span>
+              <input
+                type="text"
+                value={formData.style}
+                onChange={(e) =>
+                  setFormData({ ...formData, style: e.target.value })
+                }
+                className="bg-transparent text-sm font-bold text-gray-800 dark:text-gray-200 outline-none w-full"
+                placeholder="---"
+              />
             </div>
           </div>
           <div>
@@ -361,9 +404,15 @@ const YPivotQATemplatesPPSheet = () => {
             </label>
             <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
               <Layers className="w-4 h-4 text-emerald-500" />
-              <span className="text-sm font-bold text-gray-800 dark:text-gray-200">
-                {formData.qty || "---"}
-              </span>
+              <input
+                type="text"
+                value={formData.qty}
+                onChange={(e) =>
+                  setFormData({ ...formData, qty: e.target.value })
+                }
+                className="bg-transparent text-sm font-bold text-gray-800 dark:text-gray-200 outline-none w-full"
+                placeholder="---"
+              />
             </div>
           </div>
           <div>
@@ -453,7 +502,6 @@ const YPivotQATemplatesPPSheet = () => {
                   key={idx}
                   className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
                 >
-                  {/* Left Column */}
                   <td className="px-6 py-3 text-gray-700 dark:text-gray-300 font-medium">
                     {row[0].label}
                   </td>
@@ -466,7 +514,6 @@ const YPivotQATemplatesPPSheet = () => {
                           handleMaterialChange(row[0].key, e.target.value)
                         }
                         className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-indigo-500"
-                        placeholder="Type here..."
                       />
                     ) : (
                       <StatusSelector
@@ -482,8 +529,6 @@ const YPivotQATemplatesPPSheet = () => {
                       />
                     )}
                   </td>
-
-                  {/* Right Column */}
                   <td className="px-6 py-3 text-gray-700 dark:text-gray-300 font-medium">
                     {row[1].label}
                   </td>
@@ -496,7 +541,6 @@ const YPivotQATemplatesPPSheet = () => {
                           handleMaterialChange(row[1].key, e.target.value)
                         }
                         className="w-full p-2 text-sm border rounded dark:bg-gray-700 dark:border-gray-600 outline-none focus:border-indigo-500"
-                        placeholder="Type here..."
                       />
                     ) : (
                       <StatusSelector
@@ -531,7 +575,6 @@ const YPivotQATemplatesPPSheet = () => {
             <div>Risk Analysis 风险分析</div>
             <div>Risk Preventive Action 预防风险措施</div>
           </div>
-
           <div className="space-y-3">
             {formData.riskAnalysis.map((row, index) => (
               <div
@@ -562,7 +605,6 @@ const YPivotQATemplatesPPSheet = () => {
                   <button
                     onClick={() => removeRiskRow(index)}
                     className="absolute -top-2 -right-2 p-1.5 bg-red-500 text-white rounded-full shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                    title="Remove Row"
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -570,7 +612,6 @@ const YPivotQATemplatesPPSheet = () => {
               </div>
             ))}
           </div>
-
           <button
             onClick={addRiskRow}
             className="mt-4 w-full py-2 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-gray-500 hover:text-orange-500 hover:border-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/10 transition-all flex items-center justify-center gap-2 font-medium text-sm"

@@ -10,7 +10,8 @@ import {
   CheckSquare,
   Settings,
   Info,
-  Lock
+  Lock,
+  FileSpreadsheet
 } from "lucide-react";
 import React, { useMemo, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -21,6 +22,7 @@ import YPivotQAInspectionLineTableColorConfig from "../components/inspection/Piv
 import YPivotQAInspectionMeasurementConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementConfig";
 import YPivotQAInspectionDefectConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectConfig";
 import YPivotQAInspectionSummary from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionSummary";
+import YPivotQAInspectionPPSheetDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDetermination";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -79,6 +81,14 @@ const YPivotQAInspection = () => {
 
   // State for Active Inspection Context (Activated via Play button)
   const [activeGroup, setActiveGroup] = useState(null);
+
+  // NEW: State to persist PP Sheet data across tab switches
+  const [ppSheetData, setPPSheetData] = useState(null);
+
+  // NEW: Handler to update PP Sheet data
+  const handlePPSheetUpdate = useCallback((newData) => {
+    setPPSheetData(newData);
+  }, []);
 
   // NEW: Handler for save complete
   const handleSaveComplete = useCallback((savedData) => {
@@ -193,6 +203,28 @@ const YPivotQAInspection = () => {
         description: "Order & Report configuration",
         requiresSave: false // Order tab doesn't require prior save
       },
+      ...(sharedReportState.selectedTemplate?.ReportType === "Pilot Run-Sewing"
+        ? [
+            {
+              id: "pp_sheet",
+              label: "PP Sheet",
+              icon: <FileSpreadsheet size={18} />,
+              component: (
+                <YPivotQAInspectionPPSheetDetermination
+                  orderData={sharedOrderState.orderData}
+                  selectedOrders={sharedOrderState.selectedOrders}
+                  inspectionDate={sharedOrderState.inspectionDate}
+                  // Pass the persisted state and the updater function
+                  savedState={ppSheetData}
+                  onUpdate={handlePPSheetUpdate}
+                />
+              ),
+              gradient: "from-indigo-600 to-blue-600",
+              description: "Pre-Production Meeting Sheet",
+              requiresSave: true
+            }
+          ]
+        : []),
       {
         id: "header",
         label: "Header",
