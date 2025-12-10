@@ -23,7 +23,8 @@ import {
   RefreshCw,
   Layers,
   MessageSquare,
-  Images
+  Images,
+  BarChart3
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -32,6 +33,7 @@ import YPivotQATemplatesDefectLocationSelection from "../QATemplates/YPivotQATem
 import YPivotQATemplatesImageEditor from "../QATemplates/YPivotQATemplatesImageEditor";
 // Import buyer determination function
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
+import YPivotQAInspectionDefectSummary from "./YPivotQAInspectionDefectSummary";
 
 const MAX_IMAGES_PER_DEFECT = 5;
 
@@ -1139,6 +1141,17 @@ const YPivotQAInspectionDefectConfig = ({
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab("summary")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+              activeTab === "summary"
+                ? "bg-white dark:bg-gray-600 shadow text-indigo-600"
+                : "text-gray-500"
+            }`}
+          >
+            <BarChart3 className="w-3.5 h-3.5" />
+            Summary
+          </button>
         </div>
       </div>
 
@@ -1146,6 +1159,14 @@ const YPivotQAInspectionDefectConfig = ({
 
       {activeTab === "list" && renderListTab()}
       {activeTab === "results" && renderResultsTab()}
+      {activeTab === "summary" && (
+        <YPivotQAInspectionDefectSummary
+          savedDefects={savedDefects}
+          activeGroup={activeGroup}
+          reportData={reportData}
+          selectedOrders={selectedOrders}
+        />
+      )}
 
       {isConfigOpen && currentDefectTemplate && renderConfigModal()}
 
