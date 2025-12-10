@@ -112,7 +112,13 @@ import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMea
 
 import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
 
+import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
+
 import normalNotificationSchema from "../../models/NormalNotification.js";
+
+//YDT Models
+/*------------- Cover page ----------------*/
+import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
@@ -277,7 +283,14 @@ export const QASectionsMeasurementSpecs =
 export const QASectionsTemplates =
   createQASectionsTemplatesModel(ymProdConnection);
 
+export const FincheckInspectionReports =
+  createFincheckInspectionReportsModel(ymProdConnection);
+
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
+
+//YDT Exported Models
+/*------------- Cover page ----------------*/
+export const CoverPage = createCoverPageSchema(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

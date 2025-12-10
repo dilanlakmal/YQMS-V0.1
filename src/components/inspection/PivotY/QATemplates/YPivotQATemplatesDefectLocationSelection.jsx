@@ -8,7 +8,8 @@ import {
   AlertCircle,
   Trash2,
   RefreshCw,
-  Image as ImageIcon
+  Image as ImageIcon,
+  MessageSquare
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -122,7 +123,8 @@ const YPivotQATemplatesDefectLocationSelection = ({
           locationNo: location.LocationNo,
           locationName: location.LocationName,
           view: viewType,
-          position: "Outside" // Default
+          position: "Outside", // Default
+          remark: "" // Initialize empty remark
         }
       ]);
     }
@@ -132,6 +134,17 @@ const YPivotQATemplatesDefectLocationSelection = ({
     setSelectedLocations((prev) =>
       prev.map((item) =>
         item.uniqueId === uniqueId ? { ...item, position: newPosition } : item
+      )
+    );
+  };
+
+  // NEW: Update remark for a specific location
+  const updateLocationRemark = (uniqueId, newRemark) => {
+    // Limit to 250 characters
+    const limitedRemark = newRemark.slice(0, 250);
+    setSelectedLocations((prev) =>
+      prev.map((item) =>
+        item.uniqueId === uniqueId ? { ...item, remark: limitedRemark } : item
       )
     );
   };
@@ -396,6 +409,38 @@ const YPivotQATemplatesDefectLocationSelection = ({
                               <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
+                        </div>
+
+                        {/* Remark Input Section */}
+                        <div className="mt-3">
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <MessageSquare className="w-3 h-3 text-gray-400" />
+                            <label className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+                              Remark
+                            </label>
+                            <span
+                              className={`text-[9px] ml-auto ${
+                                (item.remark?.length || 0) >= 250
+                                  ? "text-red-500"
+                                  : "text-gray-400"
+                              }`}
+                            >
+                              {item.remark?.length || 0}/250
+                            </span>
+                          </div>
+                          <textarea
+                            value={item.remark || ""}
+                            onChange={(e) =>
+                              updateLocationRemark(
+                                item.uniqueId,
+                                e.target.value
+                              )
+                            }
+                            placeholder="Add remark for this location..."
+                            maxLength={250}
+                            rows={2}
+                            className="w-full px-2.5 py-2 text-xs bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all"
+                          />
                         </div>
                       </div>
                     ))}

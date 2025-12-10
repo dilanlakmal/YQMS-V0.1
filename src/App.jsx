@@ -93,6 +93,8 @@ import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
 
+import CoverPage from "./pages/coverPage.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -488,6 +490,8 @@ function AppContent() {
                 path="/fincheck-inspection"
                 element={<YPivotQAInspection />}
               />
+
+              <Route path="/production-Sheet" element={<CoverPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -792,3 +792,66 @@ export const tanslatorImage = multer({
     }
   }
 });
+
+//YDT - Cover Page
+const coverPageStorage = multer.memoryStorage();
+
+export const uploadCoverPageImage = multer({
+  storage: coverPageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+    }
+  }
+});
+
+export const processImageBuffer = async (buffer, filename, directory) => {
+  try {
+    // Create the full path to the storage directory
+    const uploadPath = path.join(__backendDir, "public", "storage", directory);
+
+    // Create the full file path
+    const filePath = path.join(uploadPath, filename);
+
+    // Ensure the directory exists. If not, create it.
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    // Write the buffer to the file
+    fs.writeFileSync(filePath, buffer);
+
+    // Return the relative path for API URL (this gets saved in DB)
+    return `/storage/${directory}/${filename}`;
+  } catch (error) {
+    console.error("Error in processImageBuffer:", error);
+    throw new Error(`Failed to process image: ${error.message}`);
+  }
+};
+
+// Enhanced image validation
+export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {
+  try {
+    if (!buffer) return { isValid: true };
+
+    const sizeInMB = buffer.length / (1024 * 1024);
+
+    if (sizeInMB > maxSizeInMB) {
+      return {
+        isValid: false,
+        error: `Image size exceeds ${maxSizeInMB}MB limit`
+      };
+    }
+
+    return { isValid: true };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: "Error validating image buffer"
+    };
+  }
+};

@@ -9,7 +9,8 @@ import {
   Ruler,
   CheckSquare,
   Settings,
-  Info
+  Info,
+  Lock
 } from "lucide-react";
 import React, { useMemo, useState, useCallback } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -45,6 +46,10 @@ const YPivotQAInspection = () => {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("order");
 
+  // NEW: Report saved state
+  const [savedReportData, setSavedReportData] = useState(null);
+  const [isReportSaved, setIsReportSaved] = useState(false);
+
   // Shared state for order data
   const [sharedOrderState, setSharedOrderState] = useState({
     inspectionDate: new Date().toISOString().split("T")[0],
@@ -74,6 +79,26 @@ const YPivotQAInspection = () => {
 
   // State for Active Inspection Context (Activated via Play button)
   const [activeGroup, setActiveGroup] = useState(null);
+
+  // NEW: Handler for save complete
+  const handleSaveComplete = useCallback((savedData) => {
+    setSavedReportData(savedData);
+    setIsReportSaved(true);
+  }, []);
+
+  // NEW: Handle tab change with validation
+  const handleTabChange = useCallback(
+    (tabId) => {
+      // If trying to leave "order" tab and report is not saved
+      if (activeTab === "order" && tabId !== "order" && !isReportSaved) {
+        // Could show a warning or prevent navigation
+        // For now, we just block it
+        return;
+      }
+      setActiveTab(tabId);
+    },
+    [activeTab, isReportSaved]
+  );
 
   // Handler for order data changes
   const handleOrderDataChange = useCallback((newState) => {
@@ -158,10 +183,15 @@ const YPivotQAInspection = () => {
             savedReportState={sharedReportState}
             onQualityPlanChange={handleQualityPlanChange} // Add this
             qualityPlanData={qualityPlanData} // Add this
+            user={user}
+            onSaveComplete={handleSaveComplete}
+            savedReportId={savedReportData?.reportId}
+            isReportSaved={isReportSaved}
           />
         ),
         gradient: "from-blue-500 to-cyan-500",
-        description: "Order & Report configuration"
+        description: "Order & Report configuration",
+        requiresSave: false // Order tab doesn't require prior save
       },
       {
         id: "header",
@@ -174,7 +204,8 @@ const YPivotQAInspection = () => {
           />
         ),
         gradient: "from-purple-500 to-pink-500",
-        description: "Inspection header"
+        description: "Inspection header",
+        requiresSave: true // Requires save before access
       },
       {
         id: "photos",
@@ -187,7 +218,8 @@ const YPivotQAInspection = () => {
           />
         ),
         gradient: "from-orange-500 to-red-500",
-        description: "Photo documentation"
+        description: "Photo documentation",
+        requiresSave: true
       },
       {
         id: "info",
@@ -203,7 +235,8 @@ const YPivotQAInspection = () => {
           />
         ),
         gradient: "from-teal-500 to-cyan-500",
-        description: "Detailed Configuration"
+        description: "Detailed Configuration",
+        requiresSave: true
       },
       {
         id: "measurement",
@@ -219,7 +252,8 @@ const YPivotQAInspection = () => {
           />
         ),
         gradient: "from-green-500 to-emerald-500",
-        description: "Measurement data"
+        description: "Measurement data",
+        requiresSave: true
       },
       {
         id: "defects",
@@ -235,7 +269,8 @@ const YPivotQAInspection = () => {
           />
         ),
         gradient: "from-red-500 to-rose-500",
-        description: "Defect recording"
+        description: "Defect recording",
+        requiresSave: true
       },
       {
         id: "summary",
@@ -248,7 +283,8 @@ const YPivotQAInspection = () => {
           />
         ),
         gradient: "from-indigo-500 to-violet-500",
-        description: "Inspection summary"
+        description: "Inspection summary",
+        requiresSave: true
       }
     ],
     [
@@ -263,7 +299,11 @@ const YPivotQAInspection = () => {
       handleSetActiveGroup,
       activeGroup,
       handleQualityPlanChange, // Add this
-      qualityPlanData // Add this
+      qualityPlanData, // Add this
+      user,
+      handleSaveComplete,
+      savedReportData,
+      isReportSaved
     ]
   );
 
@@ -344,6 +384,52 @@ const YPivotQAInspection = () => {
               <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 min-w-max">
                 {tabs.map((tab) => {
                   const isActive = activeTab === tab.id;
+                  const isLocked = tab.requiresSave && !isReportSaved;
+
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => !isLocked && handleTabChange(tab.id)}
+                      disabled={isLocked}
+                      className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                        isActive
+                          ? "bg-white shadow-lg scale-105"
+                          : isLocked
+                          ? "bg-transparent opacity-50 cursor-not-allowed"
+                          : "bg-transparent hover:bg-white/20"
+                      }`}
+                      title={
+                        isLocked
+                          ? "Save order data first to access this tab"
+                          : tab.description
+                      }
+                    >
+                      <div
+                        className={`transition-colors duration-300 ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {isLocked ? (
+                          <Lock className="w-4 h-4" />
+                        ) : (
+                          React.cloneElement(tab.icon, { className: "w-4 h-4" })
+                        )}
+                      </div>
+                      <span
+                        className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+                {/* {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
                   return (
                     <button
                       key={tab.id}
@@ -373,7 +459,7 @@ const YPivotQAInspection = () => {
                       )}
                     </button>
                   );
-                })}
+                })} */}
               </div>
             </div>
           </div>

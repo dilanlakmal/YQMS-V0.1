@@ -279,6 +279,14 @@ import PackingList from "./routes/PackingList/packingListRoutes.js";
 import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 
 /* -----------------------------
+  YDT Imports
+------------------------------ */
+/* -----------Cover Page-----------------*/
+import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
+/* -----------Sketch Technical-----------------*/
+import sketchTechnical from "./routes/YDT/CoverPage/sketchTechnicalRoutes.js";
+
+/* -----------------------------
   User Routes
 ------------------------------ */
 app.use(auth);
@@ -551,6 +559,14 @@ app.use(PackingList);
   QC Output Routes
 ------------------------------ */
 app.use(QCOutputRoute);
+
+/* -----------------------------
+  YDT Imports
+------------------------------ */
+/* -----------Cover Page-----------------*/
+app.use(CoverPage);
+/* -----------Sketch Technical-----------------*/
+app.use(sketchTechnical);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
