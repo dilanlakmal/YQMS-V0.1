@@ -19,6 +19,7 @@ import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesSpecsConfigModal from "../QATemplates/YPivotQATemplatesSpecsConfigModal";
 import YPivotQATemplatesMeasurementGridModal from "../QATemplates/YPivotQATemplatesMeasurementGridModal";
 import YPivotQATemplatesMeasurementResultsTab from "../QATemplates/YPivotQATemplatesMeasurementResultsTab";
+import YPivotQAInspectionMeasurementSummary from "./YPivotQAInspectionMeasurementSummary";
 
 const YPivotQAInspectionMeasurementConfig = ({
   selectedOrders,
@@ -356,6 +357,16 @@ const YPivotQAInspectionMeasurementConfig = ({
               </span>
             )}
           </button>
+          <button
+            onClick={() => setInternalTab("summary")}
+            className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+              internalTab === "summary"
+                ? "bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-300"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+            }`}
+          >
+            Summary
+          </button>
         </div>
       </div>
 
@@ -606,6 +617,18 @@ const YPivotQAInspectionMeasurementConfig = ({
             selectedSpecsList={selectedSpecsList}
             onEditMeasurement={handleEditMeasurement}
             onDeleteMeasurement={handleDeleteMeasurement}
+            activeGroup={activeGroup}
+          />
+        </div>
+      )}
+
+      {/* --- SUMMARY TAB --- */}
+      {internalTab === "summary" && (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <YPivotQAInspectionMeasurementSummary
+            savedMeasurements={savedMeasurements}
+            specsData={fullSpecsList}
+            selectedSpecsList={selectedSpecsList}
             activeGroup={activeGroup}
           />
         </div>
