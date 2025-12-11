@@ -843,6 +843,25 @@ const YPivotQAInspectionMeasurementConfig = ({
     }
   };
 
+  // Add these useMemo hooks after the kValuesList state
+  const filteredFullSpecsList = useMemo(() => {
+    if (measConfig === "Before" && selectedKValue) {
+      return fullSpecsList.filter(
+        (s) => s.kValue === selectedKValue || s.kValue === "NA"
+      );
+    }
+    return fullSpecsList;
+  }, [fullSpecsList, selectedKValue, measConfig]);
+
+  const filteredSelectedSpecsList = useMemo(() => {
+    if (measConfig === "Before" && selectedKValue) {
+      return selectedSpecsList.filter(
+        (s) => s.kValue === selectedKValue || s.kValue === "NA"
+      );
+    }
+    return selectedSpecsList;
+  }, [selectedSpecsList, selectedKValue, measConfig]);
+
   const handleSaveConfig = async (selectedIds) => {
     const filtered = fullSpecsList.filter((s) => selectedIds.includes(s.id));
     setSelectedSpecsList(filtered);
@@ -1262,12 +1281,13 @@ const YPivotQAInspectionMeasurementConfig = ({
             <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 h-full max-h-[500px] flex flex-col">
               <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
-                Critical Points Preview ({selectedSpecsList.length})
+                {/* Critical Points Preview ({selectedSpecsList.length}) */}
+                Critical Points Preview ({filteredSelectedSpecsList.length})
               </h4>
 
               <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                {selectedSpecsList.length > 0 ? (
-                  selectedSpecsList.map((spec, idx) => (
+                {filteredSelectedSpecsList.length > 0 ? (
+                  filteredSelectedSpecsList.map((spec, idx) => (
                     <div
                       key={spec.id || idx}
                       className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700"
@@ -1348,8 +1368,10 @@ const YPivotQAInspectionMeasurementConfig = ({
           setEditingMeasurementIndex(null);
           setEditingMeasurementData(null);
         }}
-        specsData={fullSpecsList}
-        selectedSpecsList={selectedSpecsList}
+        // specsData={fullSpecsList}
+        // selectedSpecsList={selectedSpecsList}
+        specsData={filteredFullSpecsList}
+        selectedSpecsList={filteredSelectedSpecsList}
         selectedSize={selectedSize}
         selectedKValue={selectedKValue}
         measType={measConfig}

@@ -556,6 +556,14 @@ const YPivotQATemplatesMeasurementResultsTab = ({
     );
   }
 
+  // Helper to filter specs by K value
+  const getFilteredSpecs = (specs, kValue) => {
+    if (kValue) {
+      return specs.filter((s) => s.kValue === kValue || s.kValue === "NA");
+    }
+    return specs;
+  };
+
   // FIXED: Calculate stats with correct logic
   // - Total Points = ALL specs count × enabled pcs (not just touched ones)
   // - If value is 0 (default/not touched) = Pass Point
@@ -785,7 +793,7 @@ const YPivotQATemplatesMeasurementResultsTab = ({
       ? calculateSubStats(
           item.allData.measurements,
           item.allData.enabledPcs,
-          specsData,
+          getFilteredSpecs(specsData, item.kValue),
           item.size
         )
       : null;
@@ -794,10 +802,28 @@ const YPivotQATemplatesMeasurementResultsTab = ({
       ? calculateSubStats(
           item.criticalData.measurements,
           item.criticalData.enabledPcs,
-          selectedSpecsList,
+          getFilteredSpecs(selectedSpecsList, item.kValue),
           item.size
         )
       : null;
+
+    // const allStats = hasAll
+    //   ? calculateSubStats(
+    //       item.allData.measurements,
+    //       item.allData.enabledPcs,
+    //       specsData,
+    //       item.size
+    //     )
+    //   : null;
+
+    // const criticalStats = hasCritical
+    //   ? calculateSubStats(
+    //       item.criticalData.measurements,
+    //       item.criticalData.enabledPcs,
+    //       selectedSpecsList,
+    //       item.size
+    //     )
+    //   : null;
 
     // Calculate overall stats for the card header
     const overallFailPcs =
@@ -1031,7 +1057,8 @@ const YPivotQATemplatesMeasurementResultsTab = ({
         const allStats = calculateSubStats(
           item.allData.measurements,
           item.allData.enabledPcs,
-          specsData,
+          //specsData,
+          getFilteredSpecs(specsData, item.kValue),
           item.size
         );
         totalPoints += allStats.totalPoints;
@@ -1047,7 +1074,8 @@ const YPivotQATemplatesMeasurementResultsTab = ({
         const critStats = calculateSubStats(
           item.criticalData.measurements,
           item.criticalData.enabledPcs,
-          selectedSpecsList,
+          //selectedSpecsList,
+          getFilteredSpecs(selectedSpecsList, item.kValue),
           item.size
         );
         totalPoints += critStats.totalPoints;
