@@ -214,7 +214,7 @@ const YPivotQAInspection = () => {
                   orderData={sharedOrderState.orderData}
                   selectedOrders={sharedOrderState.selectedOrders}
                   inspectionDate={sharedOrderState.inspectionDate}
-                  // Pass the persisted state and the updater function
+                  // ADD THESE TWO LINES:
                   savedState={ppSheetData}
                   onUpdate={handlePPSheetUpdate}
                 />
