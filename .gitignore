@@ -60,3 +60,5 @@ temp/uploads/
 # Ignore the non-essential files in ai agent sections
 translatedocs.ipynb
 ai_agent_docs_guide/system_translation_docs.ipynb
+ai_agent_docs_guide/Logo_team_yai.png
+ai_agent_docs_guide/company_logo.jpg
