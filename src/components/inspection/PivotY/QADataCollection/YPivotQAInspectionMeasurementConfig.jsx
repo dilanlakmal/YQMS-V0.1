@@ -24,26 +24,20 @@ const YPivotQAInspectionMeasurementConfig = ({
   selectedOrders,
   orderData,
   reportData,
-  onUpdateMeasurementData, // Sync prop from Parent
-  activeGroup // Prop from parent
+  onUpdateMeasurementData,
+  activeGroup
 }) => {
-  // --- Derived Props ---
   const activeMoNo =
     selectedOrders && selectedOrders.length > 0 ? selectedOrders[0] : null;
   const activeReportTemplate = reportData?.selectedTemplate;
   const measConfig = activeReportTemplate?.Measurement || "No";
 
-  // Access saved measurement state from parent
   const savedState = reportData?.measurementData || {};
 
-  // --- Internal Navigation State ---
   const [internalTab, setInternalTab] = useState("specs");
-
-  // --- Loading State ---
   const [loading, setLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
-  // --- Data State (Restored from Parent if available) ---
   const [fullSpecsList, setFullSpecsList] = useState(
     savedState.fullSpecsList || []
   );
@@ -60,20 +54,15 @@ const YPivotQAInspectionMeasurementConfig = ({
   const [orderSizes, setOrderSizes] = useState(savedState.orderSizes || []);
   const [kValuesList, setKValuesList] = useState(savedState.kValuesList || []);
 
-  // --- Selection State ---
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedKValue, setSelectedKValue] = useState("");
   const [displayMode, setDisplayMode] = useState("selected");
 
-  // --- Modal State ---
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isGridOpen, setIsGridOpen] = useState(false);
   const [editingMeasurementIndex, setEditingMeasurementIndex] = useState(null);
   const [editingMeasurementData, setEditingMeasurementData] = useState(null);
 
-  // ==========================================================================
-  // SYNC HELPER
-  // ==========================================================================
   const updateParent = (updates) => {
     if (onUpdateMeasurementData) {
       onUpdateMeasurementData({
@@ -89,11 +78,6 @@ const YPivotQAInspectionMeasurementConfig = ({
     }
   };
 
-  // ==========================================================================
-  // EFFECTS
-  // ==========================================================================
-
-  // Auto-Load Data
   useEffect(() => {
     if (!activeMoNo || !activeReportTemplate || measConfig === "No") {
       setInitialLoadDone(true);
@@ -112,17 +96,11 @@ const YPivotQAInspectionMeasurementConfig = ({
     };
 
     initData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeMoNo, activeReportTemplate?._id]);
 
-  // Reset selection when active group changes
   useEffect(() => {
     setSelectedSize("");
   }, [activeGroup?.id]);
-
-  // ==========================================================================
-  // LOGIC
-  // ==========================================================================
 
   const extractSizesFromOrderData = () => {
     if (!orderData) return [];
@@ -192,10 +170,6 @@ const YPivotQAInspectionMeasurementConfig = ({
     }
   };
 
-  // ==========================================================================
-  // HANDLERS
-  // ==========================================================================
-
   const handleSaveConfig = async (selectedIds) => {
     const filtered = fullSpecsList.filter((s) => selectedIds.includes(s.id));
     setSelectedSpecsList(filtered);
@@ -226,15 +200,12 @@ const YPivotQAInspectionMeasurementConfig = ({
   };
 
   const handleSaveMeasurement = (data) => {
-    // Inject active group info into the measurement data
-    // Use resolved Names from activeGroup
     const enhancedData = {
       ...data,
       groupId: activeGroup?.id,
-      line: activeGroup?.line, // Keep IDs for DB ref
+      line: activeGroup?.line,
       table: activeGroup?.table,
       color: activeGroup?.color,
-      // Also save readable names for UI display history
       lineName: activeGroup?.lineName,
       tableName: activeGroup?.tableName,
       colorName: activeGroup?.colorName,
@@ -288,22 +259,27 @@ const YPivotQAInspectionMeasurementConfig = ({
     setIsGridOpen(true);
   };
 
-  // --- FILTERED DISABLE CHECK ---
+  // ⭐ MODIFIED: Check if size + displayMode combination is disabled
   const isSizeDisabled = (size) => {
-    // If no active group, we can't contextually disable, so don't disable anything
     if (!activeGroup) return false;
 
-    // Filter measurements to ONLY those belonging to the CURRENT ACTIVE GROUP
     const contextMeasurements = savedMeasurements.filter(
       (m) => m.groupId === activeGroup.id
     );
 
     if (measConfig !== "Before") {
-      return contextMeasurements.some((m) => m.size === size);
+      // For After Wash: check size + displayMode combination
+      return contextMeasurements.some(
+        (m) => m.size === size && m.displayMode === displayMode
+      );
     } else {
+      // For Before Wash: check size + kValue + displayMode combination
       if (!selectedKValue) return false;
       return contextMeasurements.some(
-        (m) => m.size === size && m.kValue === selectedKValue
+        (m) =>
+          m.size === size &&
+          m.kValue === selectedKValue &&
+          m.displayMode === displayMode
       );
     }
   };
@@ -339,7 +315,6 @@ const YPivotQAInspectionMeasurementConfig = ({
 
   return (
     <div className="space-y-4 animate-fadeIn">
-      {/* Header - ORIGINAL STYLING PRESERVED */}
       <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
@@ -355,7 +330,6 @@ const YPivotQAInspectionMeasurementConfig = ({
           </p>
         </div>
 
-        {/* Tab Buttons - ORIGINAL STYLING PRESERVED */}
         <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
           <button
             onClick={() => setInternalTab("specs")}
@@ -385,27 +359,22 @@ const YPivotQAInspectionMeasurementConfig = ({
         </div>
       </div>
 
-      {/* Active Context Banner - UPDATED TO SHOW NAMES CONDITIONALLY */}
       {activeGroup ? (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-xl flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Play className="w-4 h-4 text-green-600 dark:text-green-400 fill-current" />
             <div className="text-sm font-bold text-green-800 dark:text-green-300 flex flex-wrap gap-1">
               <span className="mr-1">Active:</span>
-
-              {/* Conditional Rendering of Context Parts */}
               {activeGroup.lineName && (
                 <span className="bg-white/50 px-1.5 rounded border border-green-200">
                   Line {activeGroup.lineName}
                 </span>
               )}
-
               {activeGroup.tableName && (
                 <span className="bg-white/50 px-1.5 rounded border border-green-200">
                   Table {activeGroup.tableName}
                 </span>
               )}
-
               {activeGroup.colorName && (
                 <span className="bg-white/50 px-1.5 rounded border border-green-200">
                   Color {activeGroup.colorName}
@@ -449,7 +418,6 @@ const YPivotQAInspectionMeasurementConfig = ({
         </div>
       )}
 
-      {/* --- CONTENT: SPECS TAB --- */}
       {internalTab === "specs" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <div className="lg:col-span-1 space-y-4">
@@ -471,7 +439,6 @@ const YPivotQAInspectionMeasurementConfig = ({
               </div>
 
               <div className="space-y-4">
-                {/* K Value (Conditional) */}
                 {measConfig === "Before" && kValuesList.length > 0 && (
                   <div>
                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center gap-2">
@@ -486,7 +453,7 @@ const YPivotQAInspectionMeasurementConfig = ({
                       value={selectedKValue}
                       onChange={(e) => {
                         setSelectedKValue(e.target.value);
-                        setSelectedSize(""); // Reset size when K changes
+                        setSelectedSize("");
                       }}
                       disabled={!canSelectSizeAndK}
                       className={`w-full p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm ${
@@ -505,7 +472,6 @@ const YPivotQAInspectionMeasurementConfig = ({
                   </div>
                 )}
 
-                {/* Size Selection */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center gap-2">
                     Size
@@ -537,14 +503,18 @@ const YPivotQAInspectionMeasurementConfig = ({
                               : ""
                           }
                         >
-                          {s} {disabled ? "(Completed)" : ""}
+                          {s}{" "}
+                          {disabled
+                            ? `(${
+                                displayMode === "selected" ? "Critical" : "All"
+                              } Done)`
+                            : ""}
                         </option>
                       );
                     })}
                   </select>
                 </div>
 
-                {/* Display Mode Toggle - ORIGINAL STYLING */}
                 <div className="pt-2">
                   <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                     <button
@@ -555,7 +525,7 @@ const YPivotQAInspectionMeasurementConfig = ({
                           : "text-gray-500 dark:text-gray-400"
                       }`}
                     >
-                      Selected ({selectedSpecsList.length})
+                      Critical ({selectedSpecsList.length})
                     </button>
                     <button
                       onClick={() => setDisplayMode("all")}
@@ -628,20 +598,19 @@ const YPivotQAInspectionMeasurementConfig = ({
         </div>
       )}
 
-      {/* --- RESULTS TAB --- */}
       {internalTab === "results" && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <YPivotQATemplatesMeasurementResultsTab
             savedMeasurements={savedMeasurements}
             specsData={fullSpecsList}
+            selectedSpecsList={selectedSpecsList}
             onEditMeasurement={handleEditMeasurement}
             onDeleteMeasurement={handleDeleteMeasurement}
-            activeGroup={activeGroup} // Passed to disable editing of inactive groups
+            activeGroup={activeGroup}
           />
         </div>
       )}
 
-      {/* --- MODALS --- */}
       <YPivotQATemplatesSpecsConfigModal
         isOpen={isConfigModalOpen}
         onClose={() => setIsConfigModalOpen(false)}
@@ -659,6 +628,7 @@ const YPivotQAInspectionMeasurementConfig = ({
           setEditingMeasurementData(null);
         }}
         specsData={displayMode === "all" ? fullSpecsList : selectedSpecsList}
+        selectedSpecsList={selectedSpecsList}
         selectedSize={selectedSize}
         selectedKValue={selectedKValue}
         displayMode={displayMode}

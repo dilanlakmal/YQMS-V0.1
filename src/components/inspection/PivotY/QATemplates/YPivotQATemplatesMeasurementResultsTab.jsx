@@ -10,23 +10,23 @@ import {
   BarChart3,
   Trash2,
   Layers,
-  Lock
+  Lock,
+  Star,
+  List
 } from "lucide-react";
 import { calculateMeasurementStats } from "./YPivotQATemplatesHelpers";
 
 const YPivotQATemplatesMeasurementResultsTab = ({
   savedMeasurements,
   specsData,
+  selectedSpecsList, // ⭐ NEW: Pass to know which are critical points
   onEditMeasurement,
   onDeleteMeasurement,
-  activeGroup // Pass active group context to know which cards are editable
+  activeGroup
 }) => {
-  // ==========================================================================
-  // Group measurements by groupId (Session Context)
-  // ==========================================================================
   const groupedMeasurements = useMemo(() => {
     const groups = {};
-    const noContext = []; // For legacy measurements without group ID
+    const noContext = [];
 
     savedMeasurements.forEach((m) => {
       if (m.groupId) {
@@ -36,7 +36,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
             line: m.line,
             table: m.table,
             color: m.color,
-            // Use resolved names if available, fall back to IDs
             lineName: m.lineName || m.line,
             tableName: m.tableName || m.table,
             colorName: m.colorName || m.color,
@@ -67,11 +66,7 @@ const YPivotQATemplatesMeasurementResultsTab = ({
     );
   }
 
-  // ==========================================================================
-  // Helper to render a measurement card
-  // ==========================================================================
   const renderCard = (measurement, index, isEditable) => {
-    // Calculate Stats
     const stats = calculateMeasurementStats(
       measurement,
       specsData,
@@ -87,6 +82,9 @@ const YPivotQATemplatesMeasurementResultsTab = ({
         ? Math.round((stats.totalOkPcs / stats.pcsCount) * 100)
         : 0;
 
+    // ⭐ Display mode for card
+    const isCritical = measurement.displayMode === "selected";
+
     return (
       <div
         key={index}
@@ -96,7 +94,7 @@ const YPivotQATemplatesMeasurementResultsTab = ({
             : "border-gray-300 dark:border-gray-600 opacity-75 grayscale-[0.5]"
         }`}
       >
-        {/* Card Header */}
+        {/* ⭐ MODIFIED: Card Header with displayMode badge */}
         <div
           className={`p-4 ${
             stats.totalFailPoints === 0
@@ -118,13 +116,26 @@ const YPivotQATemplatesMeasurementResultsTab = ({
                 Size: {measurement.size}
                 {!isEditable && <Lock className="w-3 h-3 text-gray-300" />}
               </h4>
-              <p className="text-white/80 text-xs mt-0.5">
-                {measurement.measType} Wash
-                {measurement.kValue && ` • K: ${measurement.kValue}`}
-              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-white/80 text-xs">
+                  {measurement.measType} Wash
+                  {measurement.kValue && ` • K: ${measurement.kValue}`}
+                </p>
+                {/* ⭐ Display Mode Badge */}
+                {isCritical ? (
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-white/30 text-white px-2 py-0.5 rounded-full font-bold">
+                    <Star className="w-3 h-3 fill-current" />
+                    Critical
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-[10px] bg-white/30 text-white px-2 py-0.5 rounded-full font-bold">
+                    <List className="w-3 h-3" />
+                    All Points
+                  </span>
+                )}
+              </div>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex items-center gap-2">
               <button
                 onClick={() =>
@@ -156,9 +167,7 @@ const YPivotQATemplatesMeasurementResultsTab = ({
           </div>
         </div>
 
-        {/* Stats Grid */}
         <div className="p-4 space-y-4">
-          {/* 1. Points Summary */}
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
               <Target className="w-4 h-4 mx-auto text-blue-500 mb-1" />
@@ -189,7 +198,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
             </div>
           </div>
 
-          {/* 2. Pcs Summary */}
           <div className="grid grid-cols-3 gap-2">
             <div className="text-center p-2 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
               <Users className="w-4 h-4 mx-auto text-indigo-500 mb-1" />
@@ -220,7 +228,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
             </div>
           </div>
 
-          {/* 3. Tolerance Direction */}
           {stats.totalFailPoints > 0 && (
             <div className="grid grid-cols-2 gap-2">
               <div className="flex items-center gap-2 p-2 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
@@ -248,7 +255,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
             </div>
           )}
 
-          {/* 4. Progress Bars */}
           <div>
             <div className="flex items-center justify-between text-xs mb-1">
               <span className="text-gray-500 dark:text-gray-400">
@@ -312,7 +318,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
           </div>
         </div>
 
-        {/* Timestamp */}
         <div className="px-4 py-2 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-700">
           <p className="text-[10px] text-gray-400 text-center">
             {new Date(measurement.timestamp).toLocaleString()}
@@ -324,27 +329,22 @@ const YPivotQATemplatesMeasurementResultsTab = ({
 
   return (
     <div className="p-4 space-y-8 max-w-6xl mx-auto">
-      {/* 3. Render Groups */}
       {groupedMeasurements.groups.map((group) => {
-        // Is this group the currently active one?
         const isGroupActive = activeGroup && activeGroup.id === group.id;
 
-        // Construct dynamic header label
-        // Only include parts that actually exist (filter out null/undefined/empty)
         const headerParts = [
           group.lineName ? `Line ${group.lineName}` : null,
           group.tableName ? `Table ${group.tableName}` : null,
           group.colorName ? `Color ${group.colorName}` : null
-        ].filter(Boolean); // Removes nulls
+        ].filter(Boolean);
 
         const headerLabel =
           headerParts.length > 0
             ? headerParts.join(" / ")
-            : "Inspection Session"; // Fallback
+            : "Inspection Session";
 
         return (
           <div key={group.id} className="space-y-3">
-            {/* Group Header */}
             <div
               className={`flex items-center gap-3 pb-2 border-b-2 ${
                 isGroupActive
@@ -388,10 +388,8 @@ const YPivotQATemplatesMeasurementResultsTab = ({
               )}
             </div>
 
-            {/* Cards Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {group.measurements.map((m) => {
-                // Find original index in the main array for delete/edit actions
                 const originalIndex = savedMeasurements.indexOf(m);
                 return renderCard(m, originalIndex, isGroupActive);
               })}
@@ -400,7 +398,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
         );
       })}
 
-      {/* 4. Render Legacy / No Context Measurements (if any) */}
       {groupedMeasurements.noContext.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center gap-3 pb-2 border-b-2 border-gray-200 dark:border-gray-700">
@@ -414,7 +411,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {groupedMeasurements.noContext.map((m) => {
               const originalIndex = savedMeasurements.indexOf(m);
-              // Legacy items are locked if a specific group is active to force context discipline
               return renderCard(m, originalIndex, !activeGroup);
             })}
           </div>

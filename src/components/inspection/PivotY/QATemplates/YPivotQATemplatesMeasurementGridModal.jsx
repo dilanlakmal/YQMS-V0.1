@@ -8,7 +8,8 @@ import {
   Search,
   Check,
   AlertTriangle,
-  Edit3
+  Edit3,
+  Star
 } from "lucide-react";
 import MeasurementNumPad from "../../cutting/MeasurementNumPad";
 import {
@@ -20,38 +21,32 @@ const YPivotQATemplatesMeasurementGridModal = ({
   isOpen,
   onClose,
   specsData,
+  selectedSpecsList, // ⭐ NEW: Pass selected specs list to identify critical points
   selectedSize,
   selectedKValue,
   initialQty = 3,
   displayMode = "selected",
   onSave,
   measType,
-  editingData = null, // Existing measurement data for editing
-  isEditing = false // Flag to indicate edit mode
+  editingData = null,
+  isEditing = false
 }) => {
-  // --- Local State ---
   const [qty, setQty] = useState(initialQty);
   const [measurements, setMeasurements] = useState({});
   const [activePcsIndices, setActivePcsIndices] = useState(new Set([0]));
   const [activeCell, setActiveCell] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Initialize measurements - either with existing data (editing) or fresh zeros (new)
   useEffect(() => {
     if (isOpen && specsData.length > 0) {
       if (isEditing && editingData) {
-        // =====================================================================
-        // EDITING MODE: Load existing measurement data
-        // =====================================================================
         console.log(
           "Loading existing measurement data for editing:",
           editingData
         );
 
-        // Set quantity from existing data
         setQty(editingData.qty || initialQty);
 
-        // Set active pcs indices from existing data
         if (editingData.selectedPcs) {
           if (editingData.selectedPcs === "ALL") {
             const allIndices = new Set(
@@ -67,7 +62,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
           setActivePcsIndices(new Set([0]));
         }
 
-        // Load existing measurements - deep clone to avoid mutation
         if (
           editingData.measurements &&
           Object.keys(editingData.measurements).length > 0
@@ -78,7 +72,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
           console.log("Loaded measurements:", loadedMeasurements);
           setMeasurements(loadedMeasurements);
         } else {
-          // Initialize with zeros if no measurements exist
           const initialMeasurements = {};
           specsData.forEach((spec) => {
             initialMeasurements[spec.id] = {};
@@ -89,9 +82,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
           setMeasurements(initialMeasurements);
         }
       } else {
-        // =====================================================================
-        // NEW MODE: Initialize with fresh zero values
-        // =====================================================================
         console.log("Initializing fresh measurement data");
         setQty(initialQty);
         const initialMeasurements = {};
@@ -105,23 +95,19 @@ const YPivotQATemplatesMeasurementGridModal = ({
         setActivePcsIndices(new Set([0]));
       }
 
-      // Reset search when modal opens
       setSearchTerm("");
     }
   }, [isOpen, specsData, isEditing, editingData, initialQty]);
 
-  // Filter specs based on K value and search
   const filteredSpecs = useMemo(() => {
     let specs = specsData;
 
-    // Filter by K value for Before Wash
     if (selectedKValue && measType === "Before") {
       specs = specs.filter(
         (s) => s.kValue === selectedKValue || s.kValue === "NA"
       );
     }
 
-    // Filter by search term
     if (searchTerm) {
       specs = specs.filter(
         (s) =>
@@ -136,6 +122,12 @@ const YPivotQATemplatesMeasurementGridModal = ({
 
     return specs;
   }, [specsData, selectedKValue, measType, searchTerm]);
+
+  // ⭐ NEW: Helper to check if a spec is critical (in selectedSpecsList)
+  const isCriticalSpec = (spec) => {
+    if (!selectedSpecsList || selectedSpecsList.length === 0) return false;
+    return selectedSpecsList.some((s) => s.id === spec.id);
+  };
 
   if (!isOpen) return null;
 
@@ -187,11 +179,9 @@ const YPivotQATemplatesMeasurementGridModal = ({
     onClose();
   };
 
-  // Handle qty change - ensure measurements object has all columns
   const handleQtyChange = (newQty) => {
     setQty(newQty);
 
-    // Add new columns to measurements if needed
     setMeasurements((prev) => {
       const updated = { ...prev };
       specsData.forEach((spec) => {
@@ -208,7 +198,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
     });
   };
 
-  // Check completion stats
   const getCompletionStats = () => {
     let total = 0;
     let filled = 0;
@@ -232,7 +221,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
 
   const completionStats = getCompletionStats();
 
-  // Render Table Rows
   const renderRows = () => {
     return filteredSpecs.map((spec, index) => {
       const specValueObj = spec.Specs?.find((s) => s.size === selectedSize);
@@ -244,45 +232,60 @@ const YPivotQATemplatesMeasurementGridModal = ({
 
       const specId = spec.id || index;
 
+      // ⭐ Check if this spec is critical
+      const isCritical = displayMode === "all" && isCriticalSpec(spec);
+
       return (
         <tr
           key={specId}
           className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
         >
-          {/* Measurement Point Name */}
-          <td className="p-2 sm:p-3 border-r border-gray-200 dark:border-gray-700 sticky left-0 bg-white dark:bg-gray-900 z-[5]">
+          {/* ⭐ MODIFIED: Measurement Point Name with conditional styling */}
+          <td
+            className={`p-2 sm:p-3 border-r border-gray-200 dark:border-gray-700 sticky left-0 z-[5] ${
+              isCritical
+                ? "bg-blue-50 dark:bg-blue-900/30"
+                : "bg-white dark:bg-gray-900"
+            }`}
+          >
             <div className="max-w-[120px] sm:max-w-[200px]">
-              <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 line-clamp-2">
-                {spec.MeasurementPointEngName}
-              </span>
+              <div className="flex items-center gap-2">
+                {isCritical && (
+                  <Star className="w-3 h-3 text-blue-500 fill-current flex-shrink-0" />
+                )}
+                <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 line-clamp-2">
+                  {spec.MeasurementPointEngName}
+                </span>
+              </div>
               {spec.MeasurementPointChiName && (
                 <span className="text-[10px] text-gray-400 block truncate">
                   {spec.MeasurementPointChiName}
                 </span>
               )}
+              {isCritical && (
+                <span className="inline-block mt-1 text-[9px] bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold">
+                  CRITICAL
+                </span>
+              )}
             </div>
           </td>
 
-          {/* Tol - */}
           <td className="p-1 sm:p-2 text-center text-xs font-mono border-r dark:border-gray-700 bg-red-50 dark:bg-red-900/20">
             <span className="text-red-600 dark:text-red-400">
               -{tolMinusDisplay}
             </span>
           </td>
 
-          {/* Spec Value */}
           <td className="p-1 sm:p-2 text-center text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200 border-r dark:border-gray-700 bg-blue-50 dark:bg-blue-900/20">
             {specValueDisplay}
           </td>
 
-          {/* Tol + */}
           <td className="p-1 sm:p-2 text-center text-xs font-mono border-r dark:border-gray-700 bg-green-50 dark:bg-green-900/20">
             <span className="text-green-600 dark:text-green-400">
               +{tolPlusDisplay}
             </span>
           </td>
 
-          {/* Pcs Columns */}
           {Array.from({ length: qty }).map((_, pcsIndex) => {
             const currentVal = measurements[specId]?.[pcsIndex] || {
               decimal: 0,
@@ -336,12 +339,12 @@ const YPivotQATemplatesMeasurementGridModal = ({
 
   return createPortal(
     <div className="fixed inset-0 z-[100] bg-white dark:bg-gray-900 flex flex-col h-[100dvh] animate-fadeIn">
-      {/* Header */}
+      {/* ⭐ MODIFIED: Header with displayMode label */}
       <div className="flex-shrink-0 px-4 sm:px-6 py-3 sm:py-4 bg-gradient-to-r from-indigo-600 to-purple-600 flex justify-between items-center shadow-lg safe-area-top">
         <div className="flex-1 min-w-0">
           <h2 className="text-white font-bold text-base sm:text-xl truncate flex items-center gap-2">
             {isEditing && <Edit3 className="w-4 h-4 sm:w-5 sm:h-5" />}
-            {isEditing ? "Edit Measurement" : "Measurement Entry"}
+            {displayMode === "selected" ? "Critical Points" : "All Points"}
           </h2>
           <div className="flex flex-wrap gap-2 mt-1">
             <span className="text-xs bg-white/20 text-white px-2 py-0.5 rounded-full">
@@ -370,10 +373,8 @@ const YPivotQATemplatesMeasurementGridModal = ({
         </button>
       </div>
 
-      {/* Controls Bar */}
       <div className="flex-shrink-0 p-3 sm:p-4 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-          {/* Search */}
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input
@@ -386,7 +387,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Qty Control */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase">
                 Qty:
@@ -410,7 +410,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
               </div>
             </div>
 
-            {/* Progress */}
             <div className="hidden sm:flex items-center gap-2">
               <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
                 <div
@@ -426,7 +425,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
         </div>
       </div>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse">
           <thead className="sticky top-0 z-10 bg-gray-100 dark:bg-gray-800 shadow-sm">
@@ -444,7 +442,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
                 Tol+
               </th>
 
-              {/* Pcs Headers with Checkboxes */}
               {Array.from({ length: qty }).map((_, i) => (
                 <th
                   key={i}
@@ -494,7 +491,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
         )}
       </div>
 
-      {/* Footer */}
       <div className="flex-shrink-0 p-3 sm:p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 safe-area-bottom">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 text-sm">
@@ -530,7 +526,6 @@ const YPivotQATemplatesMeasurementGridModal = ({
         </div>
       </div>
 
-      {/* NumPad */}
       {activeCell && (
         <MeasurementNumPad
           onClose={() => setActiveCell(null)}
