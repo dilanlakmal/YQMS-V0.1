@@ -116,6 +116,8 @@ import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspec
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
+import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
+
 //YDT Models
 /*------------- Cover page ----------------*/
 import createCoverPageSchema from "../../models/YDT/coverPage.js";
@@ -287,6 +289,8 @@ export const FincheckInspectionReports =
   createFincheckInspectionReportsModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
+
+export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
 
 //YDT Exported Models
 /*------------- Cover page ----------------*/

@@ -262,6 +262,12 @@ import supplierIssueReport from "./routes/SupplierIssue/supplierIssueReportRoute
 import supplierIssueInspection from "./routes/SupplierIssue/supplierIssueInspectionRoutes.js";
 
 /* ------------------------------
+  Humidity Inspection Report
+------------------------------ */
+
+import FiberNameRoute from "./routes/YorksysOrders/FIberNameRoute.js";
+
+/* ------------------------------
   Yorksys Orders
 ------------------------------ */
 
@@ -543,6 +549,11 @@ app.use(digitalMeasurement);
 app.use(supplierIssuesAdmin);
 app.use(supplierIssueInspection);
 app.use(supplierIssueReport);
+
+/* ------------------------------
+  Humidity Inspection Report Routes
+------------------------------ */
+app.use(FiberNameRoute);
 
 /* ------------------------------
   Yorksys Orders routes
