@@ -205,7 +205,7 @@ function Login({ onLogin }) {
                 name="username"
                 type="text"
                 required
-                className={`appearance-none block w-full px-4 py-3 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                className={`appearance-none block w-full px-4 py-3 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
                   error ? "border-red-300" : "border-gray-300"
                 }`}
                 placeholder="Enter your User Name"
@@ -229,7 +229,7 @@ function Login({ onLogin }) {
                 name="password"
                 type="password"
                 required
-                className={`appearance-none block w-full px-4 py-3 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                className={`appearance-none block w-full px-4 py-3 border rounded-lg placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 ${
                   error ? "border-red-300" : "border-gray-300"
                 }`}
                 placeholder="Enter the Password"

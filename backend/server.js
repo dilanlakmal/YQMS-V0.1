@@ -279,6 +279,12 @@ import PackingList from "./routes/PackingList/packingListRoutes.js";
 import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 
 /* -----------------------------
+  CE System
+------------------------------ */
+import ceMasterRoutes from "./modules/CESystem/Routes/CEMasterRoutes.js";
+import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes.js";
+
+/* -----------------------------
   YDT Imports
 ------------------------------ */
 /* -----------Cover Page-----------------*/
@@ -559,6 +565,12 @@ app.use(PackingList);
   QC Output Routes
 ------------------------------ */
 app.use(QCOutputRoute);
+
+/* ------------------------------
+  CE System Routes
+------------------------------ */
+app.use(ceMasterRoutes);
+app.use(ceTargetMasterRoutes);
 
 /* -----------------------------
   YDT Imports

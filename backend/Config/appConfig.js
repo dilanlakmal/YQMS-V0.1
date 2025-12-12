@@ -5,7 +5,7 @@ import fs from "fs";
 import { Server as SocketIO } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
-import https from "https";
+import http from "http";
 import gracefulFs from "graceful-fs";
 gracefulFs.gracefulify(fs);
 import dotenv from "dotenv";
@@ -32,7 +32,7 @@ const options = {
   )
 };
 
-export const server = https.createServer(options, app);
+export const server = http.createServer(options, app);
 
 // Initialize Socket.io
 export const io = new SocketIO(server, {
