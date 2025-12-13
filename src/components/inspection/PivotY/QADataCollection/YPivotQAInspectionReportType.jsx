@@ -424,7 +424,8 @@ const YPivotQAInspectionReportType = ({
   orderData = null,
   orderType = "single",
   onReportDataChange,
-  savedState = {}
+  savedState = {},
+  shippingStages = []
 }) => {
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(
@@ -636,13 +637,15 @@ const YPivotQAInspectionReportType = ({
     }));
   }, [subConFactories]);
 
-  const shippingStageOptions = [
-    { value: "D1", label: "D1" },
-    { value: "D2", label: "D2" },
-    { value: "D3", label: "D3" },
-    { value: "D4", label: "D4" },
-    { value: "D5", label: "D5" }
-  ];
+  const shippingStageOptions = useMemo(() => {
+    // Sort by 'no' to ensure correct order
+    const sorted = [...shippingStages].sort((a, b) => a.no - b.no);
+
+    return sorted.map((stage) => ({
+      value: stage.ShippingStage, // Value to store
+      label: stage.ShippingStage // Label to display
+    }));
+  }, [shippingStages]);
 
   // Visibility Flags
   const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
@@ -879,12 +882,14 @@ const YPivotQAInspectionReportType = ({
                       className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none"
                     >
                       <option value="">Select stage...</option>
+                      {/* Map over the dynamic options */}
                       {shippingStageOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
                         </option>
                       ))}
                     </select>
+
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>

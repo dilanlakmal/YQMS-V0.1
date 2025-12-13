@@ -424,6 +424,7 @@ const YPivotQAInspectionOrderData = ({
   const [showSearchDropdown, setShowSearchDropdown] = useState(false);
   const [error, setError] = useState(null);
   const skipSearchRef = useRef(false);
+  const [shippingStages, setShippingStages] = useState([]);
 
   // State to control visibility of order details
   const [showOrderDetails, setShowOrderDetails] = useState(false);
@@ -572,6 +573,23 @@ const YPivotQAInspectionOrderData = ({
     }, 300);
     return () => clearTimeout(timer);
   }, [searchTerm, searchOrders]);
+
+  useEffect(() => {
+    const fetchShippingStages = async () => {
+      try {
+        const response = await axios.get(
+          `${API_BASE_URL}/api/qa-sections-shipping-stage`
+        );
+        if (response.data.success) {
+          setShippingStages(response.data.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch shipping stages:", err);
+      }
+    };
+
+    fetchShippingStages();
+  }, []);
 
   // Fetch single order details
   const fetchSingleOrderDetails = async (moNo) => {
@@ -1311,6 +1329,7 @@ const YPivotQAInspectionOrderData = ({
             orderType={orderType}
             onReportDataChange={onReportDataChange}
             savedState={savedReportState}
+            shippingStages={shippingStages}
           />
 
           {/* Quality Plan - Only shows if template has QualityPlan="Yes" */}
