@@ -255,6 +255,7 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 ------------------------------ */
 /* -----------Cover Page-----------------*/
 import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
+/* -----------Sketch Technical-----------------*/
 import sketchTechnical from "./routes/YDT/CoverPage/sketchTechnicalRoutes.js";
 /* -----------------------------
    SQL Query Import
@@ -535,6 +536,7 @@ app.use(afterIroning);
 ------------------------------ */
 /* -----------Cover Page-----------------*/
 app.use(CoverPage);
+/* -----------Sketch Technical-----------------*/
 app.use(sketchTechnical);
 
 // process.on("SIGINT", async () => {
