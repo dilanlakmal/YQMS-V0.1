@@ -222,7 +222,7 @@ function Home() {
       },
       {
         id: "sewing-qc",
-        title: "Sewing QC Inspection",
+        title: "Sewing QC",
         icon: <CheckSquare className="w-5 h-5 mr-2" />,
         bgColor: "bg-purple-50 dark:bg-purple-900/20",
         items: [
@@ -258,7 +258,7 @@ function Home() {
       },
       {
         id: "y-pivot",
-        title: "Fin Check System",
+        title: "Fin Check",
         icon: <Layers className="w-5 h-5 mr-2" />,
         bgColor: "bg-blue-50 dark:bg-blue-900/20",
         items: [
@@ -381,9 +381,9 @@ function Home() {
           {
             path: "/master-list",
             roles: ["CE"],
-            image: "assets/Home/masterlist.png",
-            title: "Master List",
-            description: "View and manage the Master List"
+            image: "assets/Home/CE-System.png",
+            title: "CE",
+            description: "Proudction Control & Monitoring"
           }
         ]
       },
@@ -469,7 +469,7 @@ function Home() {
             path: "/production-Sheet",
             roles: ["production"],
             image: "assets/Home/coverPage.png",
-            title: "Cover Page",
+            title: "Production Sheet",
             description: "Maintain the production sheet",
             version: "0"
           }
