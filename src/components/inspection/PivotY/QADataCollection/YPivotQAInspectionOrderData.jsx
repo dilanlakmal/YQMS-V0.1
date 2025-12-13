@@ -860,30 +860,6 @@ const YPivotQAInspectionOrderData = ({
             Order Selection
           </h2>
           <div className="flex items-center gap-2">
-            {/* Save Button */}
-            {selectedOrders.length > 0 && orderData && !isReportSaved && (
-              <button
-                onClick={() => setShowSaveModal(true)}
-                disabled={!canSave}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-                  canSave
-                    ? "bg-white text-indigo-600 hover:bg-indigo-50 shadow-md"
-                    : "bg-white/30 text-white/70 cursor-not-allowed"
-                }`}
-                title={
-                  canSave
-                    ? "Save Inspection Report"
-                    : "Complete all required fields to save"
-                }
-              >
-                {canSave ? (
-                  <Save className="w-3.5 h-3.5" />
-                ) : (
-                  <Lock className="w-3.5 h-3.5" />
-                )}
-                Save
-              </button>
-            )}
             {isReportSaved && (
               <div className="flex items-center gap-1.5 px-3 py-2 bg-green-500 rounded-lg text-xs font-bold text-white">
                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1326,16 +1302,8 @@ const YPivotQAInspectionOrderData = ({
 
       {/* ============================================================ */}
       {/* Report Type Section - Integrated from YPivotQAInspectionReportType */}
-      {/* Only show when orders are selected */}
       {/* ============================================================ */}
       {selectedOrders.length > 0 && orderData && !loading && (
-        // <YPivotQAInspectionReportType
-        //   selectedOrders={selectedOrders}
-        //   orderData={orderData}
-        //   orderType={orderType}
-        //   onReportDataChange={onReportDataChange}
-        //   savedState={savedReportState}
-        // />
         <>
           <YPivotQAInspectionReportType
             selectedOrders={selectedOrders}
@@ -1351,6 +1319,72 @@ const YPivotQAInspectionOrderData = ({
             qualityPlanData={qualityPlanData}
             onQualityPlanChange={onQualityPlanChange}
           />
+
+          {/* Save Button Section - Fixed at bottom of content */}
+          {!isReportSaved && (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3">
+                <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                  <Save className="w-4 h-4" />
+                  Save Inspection Report
+                </h3>
+              </div>
+              <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-center sm:text-left">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    {canSave
+                      ? "All required fields are complete. Ready to save!"
+                      : "Complete all required fields to save the report."}
+                  </p>
+                  {!canSave && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Make sure to select a Report Type and fill in all required
+                      configuration.
+                    </p>
+                  )}
+                </div>
+                <button
+                  onClick={() => setShowSaveModal(true)}
+                  disabled={!canSave}
+                  className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-lg ${
+                    canSave
+                      ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                      : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                  }`}
+                  title={
+                    canSave
+                      ? "Save Inspection Report"
+                      : "Complete all required fields to save"
+                  }
+                >
+                  {canSave ? (
+                    <Save className="w-5 h-5" />
+                  ) : (
+                    <Lock className="w-5 h-5" />
+                  )}
+                  Save Report
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Saved Confirmation */}
+          {isReportSaved && (
+            <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl border-2 border-green-200 dark:border-green-800 p-6 flex items-center gap-4">
+              <div className="p-3 bg-green-500 rounded-full">
+                <CheckCircle2 className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-green-700 dark:text-green-400">
+                  Report Saved Successfully!
+                </h3>
+                <p className="text-sm text-green-600 dark:text-green-500">
+                  You can now proceed to fill in the inspection details in other
+                  tabs.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Save Modal */}
           <YPivotQAInspectionOrderDataSaveModal

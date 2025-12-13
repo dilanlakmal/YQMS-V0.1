@@ -226,6 +226,29 @@ const YPivotQATemplatesPPSheet = ({
     return DEFAULT_FORM_STATE;
   });
 
+  // NEW: Sync with savedState when component remounts (tab switch)
+  useEffect(() => {
+    if (savedState && Object.keys(savedState).length > 0) {
+      setFormData({
+        ...DEFAULT_FORM_STATE,
+        ...savedState,
+        materials: { ...DEFAULT_FORM_STATE.materials, ...savedState.materials },
+        attendance: {
+          ...DEFAULT_FORM_STATE.attendance,
+          ...savedState.attendance
+        },
+        // IMPORTANT: Preserve arrays that might have been modified
+        riskAnalysis:
+          savedState.riskAnalysis || DEFAULT_FORM_STATE.riskAnalysis,
+        criticalOperations:
+          savedState.criticalOperations ||
+          DEFAULT_FORM_STATE.criticalOperations,
+        otherComments:
+          savedState.otherComments || DEFAULT_FORM_STATE.otherComments
+      });
+    }
+  }, []);
+
   // 2. AUTO-FILL LOGIC (Only updates Style/Qty/Date if valid and different)
   useEffect(() => {
     if (prefilledData) {

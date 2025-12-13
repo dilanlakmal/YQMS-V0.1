@@ -8,11 +8,17 @@
   font-weight: 400;
 }
 
+html {
+  /* This ensures the scrollbar only appears if content is actually taller than screen */
+  overflow-y: auto;
+}
+
 body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
   background-color: #f3f4f6;
+  overflow-x: hidden;
 }
 
 #root {
@@ -26,6 +32,10 @@ body {
 
 .react-datepicker-popper-z-50 {
   z-index: 50 !important;
+}
+
+.pt-16 > .min-h-screen {
+  min-height: calc(100vh - 4rem) !important;
 }
 
 /* --- ADD KEYFRAME ANIMATION FOR FOCUS INDICATOR --- */
