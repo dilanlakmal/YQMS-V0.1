@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import io from "socket.io-client";
 import { useAuth } from "../components/authentication/AuthContext";
+import { API_BASE_URL } from "../../config";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 const socket = io(API_BASE_URL, {
   withCredentials: true,
   extraHeaders: {
