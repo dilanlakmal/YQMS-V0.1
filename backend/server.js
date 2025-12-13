@@ -293,6 +293,12 @@ import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
 import sketchTechnical from "./routes/YDT/CoverPage/sketchTechnicalRoutes.js";
 
 /* -----------------------------
+  CE System
+------------------------------ */
+import ceMasterRoutes from "./modules/CESystem/Routes/CEMasterRoutes.js";
+import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes.js";
+
+/* -----------------------------
   User Routes
 ------------------------------ */
 app.use(auth);
@@ -570,6 +576,12 @@ app.use(PackingList);
   QC Output Routes
 ------------------------------ */
 app.use(QCOutputRoute);
+
+/* ------------------------------
+  CE System Routes
+------------------------------ */
+app.use(ceMasterRoutes);
+app.use(ceTargetMasterRoutes);
 
 /* -----------------------------
   YDT Imports
