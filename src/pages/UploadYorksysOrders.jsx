@@ -15,6 +15,7 @@ import YorksysOrderPreview from "../components/inspection/qa-pivot/YorksysOrderP
 import YorksysOrdersView from "../components/inspection/qa-pivot/YorksysOrdersView";
 import YorksysProductTypeView from "../components/inspection/qa-pivot/YorksysProductTypeView";
 import YorksysCuttingSyncView from "../components/inspection/qa-pivot/YorksysCuttingSyncView";
+import YorkSysOrdersRibContentSave from "../components/inspection/qa-pivot/YorkSysOrdersRibContentSave";
 
 const UploadYorksysOrders = ({ activeSubTab }) => {
   // --- State for Upload Logic ---
@@ -353,6 +354,13 @@ const UploadYorksysOrders = ({ activeSubTab }) => {
       {activeSubTab === "cuttingSync" && (
         <div className="max-w-8xl mx-auto">
           <YorksysCuttingSyncView />
+        </div>
+      )}
+
+      {/* SUB TAB FOR RIB CONTENT */}
+      {activeSubTab === "ribContent" && (
+        <div className="max-w-8xl mx-auto">
+          <YorkSysOrdersRibContentSave />
         </div>
       )}
     </div>

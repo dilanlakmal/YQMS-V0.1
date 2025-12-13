@@ -11,7 +11,8 @@ import {
   Layers, // Sub: Product Type
   GitMerge, // Sub: Sync,
   Ruler,
-  FileText
+  FileText,
+  Scissors
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 
@@ -105,6 +106,11 @@ const YPivotQAMeasurements = () => {
         id: "cuttingSync",
         label: "Sync from Cutting",
         icon: <GitMerge size={20} />
+      },
+      {
+        id: "ribContent",
+        label: "RIB Content",
+        icon: <Scissors size={20} />
       }
     ],
     []
