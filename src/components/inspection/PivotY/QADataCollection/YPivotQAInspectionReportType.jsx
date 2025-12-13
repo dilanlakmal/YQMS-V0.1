@@ -773,7 +773,7 @@ const YPivotQAInspectionReportType = ({
                 <div className="flex items-end pb-1">
                   <div className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl">
                     <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                      Sub-Con
+                      External
                     </span>
                     <button
                       onClick={() => setIsSubCon(!isSubCon)}
@@ -803,7 +803,7 @@ const YPivotQAInspectionReportType = ({
                 {isSubCon && (
                   <div className="sm:col-span-2">
                     <SearchableSingleSelect
-                      label="Sub-Con Factory"
+                      label="Factory"
                       icon={Factory}
                       options={subConFactoryOptions}
                       selectedValue={selectedSubConFactory}
