@@ -3,13 +3,16 @@ import axios from "axios";
 import io from "socket.io-client";
 import { useAuth } from "../components/authentication/AuthContext";
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+
+const API_BASE_URL = "https://192.167.12.85:5000";
+// const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 const socket = io(API_BASE_URL, {
   withCredentials: true,
   extraHeaders: {
     Authorization: `Bearer ${localStorage.getItem("accessToken")}`
   }
 });
+
 
 const YQMSChat = () => {
   const { user } = useAuth();

@@ -22,11 +22,11 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
-  resolve: {
-    alias: {
-      buffer: 'buffer',
-    },
-  },
+  // resolve: {
+  //   alias: {
+  //     buffer: 'buffer',
+  //   },
+  // },
   server: {
     host: '0.0.0.0',
     port: 3001,

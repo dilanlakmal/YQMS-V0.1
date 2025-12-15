@@ -95,8 +95,6 @@ import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
 import CoverPage from "./pages/coverPage.jsx";
 
-import CoverPage from "./pages/coverPage.jsx";
-
 export const BluetoothContext = createContext(null);
 
 function AppContent() {

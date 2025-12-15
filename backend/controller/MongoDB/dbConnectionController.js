@@ -107,10 +107,6 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 
-//YDT Models
-/*------------- Cover page ----------------*/
-import createCoverPageSchema from "../../models/YDT/coverPage.js";
-
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   // process.env.MongoDB_URI_ym_prod
