@@ -17,6 +17,7 @@ const SketchTechnicalSheet = () => {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchLoading, setSearchLoading] = useState(false);
   const [justSelected, setJustSelected] = useState(false);
+  const [originalImage, setOriginalImage] = useState(null);
   
   // ✅ NEW: Available sizes from selected order
   const [availableSizes, setAvailableSizes] = useState([]);
@@ -190,7 +191,9 @@ const SketchTechnicalSheet = () => {
     if (file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        setMainSketchImage(e.target.result);
+        const imageData = e.target.result;
+        setOriginalImage(imageData); 
+        setMainSketchImage(imageData);
         setShowDrawingCanvas(true);
       };
       reader.readAsDataURL(file);
@@ -206,7 +209,7 @@ const SketchTechnicalSheet = () => {
   const handleSave = async () => {
     try {
       setLoading(true);
-
+      
       // ✅ Get canvas data including all drawn objects
       const canvasRef = document.querySelector('canvas');
       let canvasImageData = null;
@@ -229,12 +232,13 @@ const SketchTechnicalSheet = () => {
 
       const dataToSave = {
         ...formData,
-        sizeRange: sizeRangeArray, // ✅ Save as array
-        mainSketchImage: canvasImageData || mainSketchImage, // ✅ Use canvas image with drawings
+        sizeRange: sizeRangeArray,
+        originalImage: originalImage, // ✅ Save original uploaded image
+        mainSketchImage: canvasImageData || mainSketchImage, // ✅ Canvas with drawings
         secondaryImage,
         canvasData: drawnObjectsData, // ✅ Save drawn objects for editing
         selectedOrderData: selectedOrder,
-        availableSizes, // ✅ Include available sizes array
+        availableSizes,
         createdBy: (() => {
           try {
             const userDataString = localStorage.getItem('user');
@@ -249,6 +253,13 @@ const SketchTechnicalSheet = () => {
         })()
       };
 
+      // ✅ Debug log to check what's being sent
+    console.log('Data being saved:', {
+      originalImage: originalImage ? 'Present' : 'NULL',
+      mainSketchImage: canvasImageData ? 'Present' : 'NULL',
+      canvasData: drawnObjectsData ? drawnObjectsData.length : 0
+    });
+
       const accessToken = localStorage.getItem("accessToken");
       const response = await fetch(`${API_BASE_URL}/api/coverPage/sketch-technical/save`, {
         method: 'POST',
@@ -258,7 +269,6 @@ const SketchTechnicalSheet = () => {
         },
         body: JSON.stringify(dataToSave)
       });
-
 
       const result = await response.json();
       if (result.success) {
@@ -288,104 +298,116 @@ const SketchTechnicalSheet = () => {
 
   // ✅ Function to load existing sketch technical data
   const loadSketchTechnical = async (orderNo, sketchTechnicalId) => {
-    try {
-      setLoading(true);
-      
-      const accessToken = localStorage.getItem("accessToken");
-      const response = await fetch(`${API_BASE_URL}/api/coverPage/sketch-technical/order/${orderNo}`, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+  try {
+    setLoading(true);
+    
+    const accessToken = localStorage.getItem("accessToken");
+    const response = await fetch(`${API_BASE_URL}/api/coverPage/sketch-technical/order/${orderNo}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
       }
+    });
 
-      const result = await response.json();
-      if (result.success && result.data.sketchTechnicals.length > 0) {
-        // Find the specific sketch technical record or use the latest one
-        const sketchData = sketchTechnicalId 
-          ? result.data.sketchTechnicals.find(st => st._id === sketchTechnicalId)
-          : result.data.sketchTechnicals[result.data.sketchTechnicals.length - 1];
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-        if (sketchData) {
-          // ✅ Load form data
-          setFormData({
-            styleId: sketchData.styleId || '',
-            shortDesc: sketchData.shortDesc || '',
-            department: sketchData.department || '',
-            initialDcDate: sketchData.initialDcDate ? new Date(sketchData.initialDcDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            commodity: sketchData.commodity || '',
-            season: sketchData.season || '',
-            vendor3d: sketchData.vendor3d || 'No',
-            styleStatus: sketchData.styleStatus || 'In Work',
-            longDescription: sketchData.longDescription || '',
-            finalFitApproval: sketchData.finalFitApproval || '',
-            sizeRange: sketchData.sizeRange || '',
-            targetCost: sketchData.targetCost || '',
-            targetUnits: sketchData.targetUnits || '',
-            plannedColors: sketchData.plannedColors || '',
-            deliveryCount: sketchData.deliveryCount || '',
-            fitType: sketchData.fitType || 'Regular',
-            coll1: sketchData.coll1 || '',
-            coll2: sketchData.coll2 || '',
-            retailPrice: sketchData.retailPrice || '',
-            floorSet: sketchData.floorSet ? new Date(sketchData.floorSet).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-            sizeCurve: sketchData.sizeCurve || '',
-            orderNo: orderNo,
-            buyerEngName: sketchData.buyerEngName || '',
-            custStyle: sketchData.custStyle || '',
-            orderQty: sketchData.orderQty || ''
-          });
+    const result = await response.json();
+    if (result.success && result.data.sketchTechnicals.length > 0) {
+      const sketchData = sketchTechnicalId 
+        ? result.data.sketchTechnicals.find(st => st._id === sketchTechnicalId)
+        : result.data.sketchTechnicals[result.data.sketchTechnicals.length - 1];
 
-          // ✅ Load available sizes if saved (handle both array and string)
-          if (sketchData.availableSizes) {
-            setAvailableSizes(Array.isArray(sketchData.availableSizes) 
-              ? sketchData.availableSizes 
-              : sketchData.availableSizes.split(',').map(s => s.trim()));
-          }
+      if (sketchData) {
+        // ✅ Load form data
+        setFormData({
+          styleId: sketchData.styleId || '',
+          shortDesc: sketchData.shortDesc || '',
+          department: sketchData.department || '',
+          initialDcDate: sketchData.initialDcDate ? new Date(sketchData.initialDcDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          commodity: sketchData.commodity || '',
+          season: sketchData.season || '',
+          vendor3d: sketchData.vendor3d || 'No',
+          styleStatus: sketchData.styleStatus || 'In Work',
+          longDescription: sketchData.longDescription || '',
+          finalFitApproval: sketchData.finalFitApproval || '',
+          sizeRange: Array.isArray(sketchData.sizeRange) 
+            ? sketchData.sizeRange.join(', ') 
+            : sketchData.sizeRange || '',
+          targetCost: sketchData.targetCost || '',
+          targetUnits: sketchData.targetUnits || '',
+          plannedColors: sketchData.plannedColors || '',
+          deliveryCount: sketchData.deliveryCount || '',
+          fitType: sketchData.fitType || 'Regular',
+          coll1: sketchData.coll1 || '',
+          coll2: sketchData.coll2 || '',
+          retailPrice: sketchData.retailPrice || '',
+          floorSet: sketchData.floorSet ? new Date(sketchData.floorSet).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+          sizeCurve: sketchData.sizeCurve || '',
+          orderNo: sketchData.orderNo || orderNo,
+          buyerEngName: sketchData.buyerEngName || '',
+          custStyle: sketchData.custStyle || '',
+          orderQty: sketchData.orderQty || ''
+        });
 
-          // ✅ Load images with API_BASE_URL handling
-          if (sketchData.mainSketchImage) {
-            // Handle both full URLs and relative paths
-            const imageUrl = sketchData.mainSketchImage.startsWith('http') 
-              ? sketchData.mainSketchImage 
-              : `${API_BASE_URL}${sketchData.mainSketchImage}`;
-            setMainSketchImage(imageUrl);
-            setShowDrawingCanvas(true);
-          }
-          if (sketchData.secondaryImage) {
-            const imageUrl = sketchData.secondaryImage.startsWith('http')
-              ? sketchData.secondaryImage
-              : `${API_BASE_URL}${sketchData.secondaryImage}`;
-            setSecondaryImage(imageUrl);
-          }
+        // ✅ Load available sizes
+        if (sketchData.availableSizes) {
+          setAvailableSizes(Array.isArray(sketchData.availableSizes) 
+            ? sketchData.availableSizes 
+            : sketchData.availableSizes.split(',').map(s => s.trim()));
+        }
 
-          // ✅ Load canvas drawn objects data
-          if (sketchData.canvasData && window.drawnObjects !== undefined) {
-            setTimeout(() => {
+        // ✅ Load original image FIRST
+        if (sketchData.originalImage) {
+          const originalImageUrl = sketchData.originalImage.startsWith('http') 
+            ? sketchData.originalImage 
+            : `${API_BASE_URL}${sketchData.originalImage}`;
+          setOriginalImage(originalImageUrl);
+        }
+
+        // ✅ Load main sketch image (canvas with drawings)
+        if (sketchData.mainSketchImage) {
+          const imageUrl = sketchData.mainSketchImage.startsWith('http') 
+            ? sketchData.mainSketchImage 
+            : `${API_BASE_URL}${sketchData.mainSketchImage}`;
+          setMainSketchImage(imageUrl);
+          setShowDrawingCanvas(true);
+        }
+
+        // ✅ Load secondary image
+        if (sketchData.secondaryImage) {
+          const imageUrl = sketchData.secondaryImage.startsWith('http')
+            ? sketchData.secondaryImage
+            : `${API_BASE_URL}${sketchData.secondaryImage}`;
+          setSecondaryImage(imageUrl);
+        }
+
+        // ✅ Load canvas drawn objects data
+        if (sketchData.canvasData && Array.isArray(sketchData.canvasData) && sketchData.canvasData.length > 0) {
+          setTimeout(() => {
+            if (window.drawnObjects !== undefined) {
               window.drawnObjects = sketchData.canvasData;
               // Trigger canvas redraw if available
               if (window.redrawCanvas) {
                 window.redrawCanvas();
               }
-            }, 100);
-          }
+            }
+          }, 100);
         }
       }
-    } catch (error) {
-      console.error('Error loading sketch technical data:', error);
-      await Swal.fire({
-        icon: 'error',
-        title: 'Load Failed',
-        text: `Failed to load: ${error.message}`,
-        confirmButtonColor: '#ef4444'
-      });
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Error loading sketch technical data:', error);
+    await Swal.fire({
+      icon: 'error',
+      title: 'Load Failed',
+      text: `Failed to load: ${error.message}`,
+      confirmButtonColor: '#ef4444'
+    });
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-screen bg-gray-50 p-4">

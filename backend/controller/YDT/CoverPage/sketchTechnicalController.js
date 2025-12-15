@@ -68,6 +68,7 @@ export const saveSketchTechnical = async (req, res) => {
       buyerEngName,
       custStyle,
       orderQty,
+      originalImage,
       mainSketchImage,
       secondaryImage,
       canvasData,
@@ -76,6 +77,15 @@ export const saveSketchTechnical = async (req, res) => {
       createdBy,
       userInfo
     } = req.body;
+
+    // ✅ Debug log to see what's received
+    console.log('Received data:', {
+      orderNo,
+      styleId,
+      hasOriginalImage: !!originalImage,
+      hasMainSketchImage: !!mainSketchImage,
+      hasSecondaryImage: !!secondaryImage
+    });
 
     // Validate required fields
     if (!orderNo) {
@@ -93,12 +103,40 @@ export const saveSketchTechnical = async (req, res) => {
         : 'http://localhost:5000';
 
     // ✅ Save images using the same pattern as coverpage
+    let savedOriginalImagePath = null;
     let savedMainImagePath = null;
     let savedSecondaryImagePath = null;
 
+    if (originalImage && originalImage.startsWith('data:image')) {
+      try {
+        savedOriginalImagePath = await saveSketchBase64Image(
+          originalImage, 
+          orderNo, 
+          styleId || 'sketch', 
+          baseUrl, 
+          'original'
+        );
+        console.log('Original image saved:', savedOriginalImagePath);
+      } catch (imageError) {
+        console.error('Error saving original image:', imageError);
+        // Don't fail the entire request, just log the error
+      }
+    } else if (originalImage) {
+      // Already a URL, keep it as is
+      savedOriginalImagePath = originalImage;
+    }
+
+    // ✅ Handle main sketch image saving
     if (mainSketchImage && mainSketchImage.startsWith('data:image')) {
       try {
-        savedMainImagePath = await saveSketchBase64Image(mainSketchImage, orderNo, styleId || 'sketch', baseUrl);
+        savedMainImagePath = await saveSketchBase64Image(
+          mainSketchImage, 
+          orderNo, 
+          styleId || 'sketch', 
+          baseUrl, 
+          'main'
+        );
+        console.log('Main sketch image saved:', savedMainImagePath);
       } catch (imageError) {
         console.error('Error saving main sketch image:', imageError);
         // Don't fail the entire request, just log the error
@@ -108,9 +146,17 @@ export const saveSketchTechnical = async (req, res) => {
       savedMainImagePath = mainSketchImage;
     }
 
+    // ✅ Handle secondary image saving
     if (secondaryImage && secondaryImage.startsWith('data:image')) {
       try {
-        savedSecondaryImagePath = await saveSketchBase64Image(secondaryImage, orderNo, styleId || 'sketch', baseUrl);
+        savedSecondaryImagePath = await saveSketchBase64Image(
+          secondaryImage, 
+          orderNo, 
+          styleId || 'sketch', 
+          baseUrl, 
+          'secondary'
+        );
+        console.log('Secondary image saved:', savedSecondaryImagePath);
       } catch (imageError) {
         console.error('Error saving secondary image:', imageError);
       }
@@ -151,18 +197,30 @@ export const saveSketchTechnical = async (req, res) => {
       retailPrice,
       floorSet: floorSet ? new Date(floorSet) : new Date(),
       sizeCurve,
+      orderNo, // ✅ ADD orderNo to the data
       buyerEngName,
       custStyle,
       orderQty,
+      originalImage: savedOriginalImagePath || originalImage, // ✅ ADD THIS
       mainSketchImage: savedMainImagePath || mainSketchImage,
       secondaryImage: savedSecondaryImagePath || secondaryImage,
       canvasData: canvasData || [],
+      selectedOrderData: selectedOrderData || null, // ✅ ADD THIS
       availableSizes: Array.isArray(availableSizes) ? availableSizes : [],
       createdBy: createdBy || 'system',
       userInfo: userInfo || {},
       createdAt: new Date(),
       updatedAt: new Date()
     };
+
+    // ✅ Debug log to see what's being saved
+    console.log('Saving sketch technical data:', {
+      orderNo: sketchTechnicalData.orderNo,
+      styleId: sketchTechnicalData.styleId,
+      hasOriginalImage: !!sketchTechnicalData.originalImage,
+      hasMainSketchImage: !!sketchTechnicalData.mainSketchImage,
+      hasCanvasData: Array.isArray(sketchTechnicalData.canvasData) && sketchTechnicalData.canvasData.length > 0
+    });
 
     if (existingOrder) {
       // ✅ Check if styleId already exists in sketchTechnical array
@@ -240,6 +298,7 @@ export const saveSketchTechnical = async (req, res) => {
     }
 
   } catch (error) {
+    console.error('Error in saveSketchTechnical:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
@@ -327,12 +386,16 @@ export const updateSketchTechnical = async (req, res) => {
           'sketchTechnical.$.retailPrice': updateData.retailPrice,
           'sketchTechnical.$.floorSet': updateData.floorSet ? new Date(updateData.floorSet) : undefined,
           'sketchTechnical.$.sizeCurve': updateData.sizeCurve,
+          'sketchTechnical.$.orderNo': updateData.orderNo, // ✅ ADD THIS
           'sketchTechnical.$.buyerEngName': updateData.buyerEngName,
           'sketchTechnical.$.custStyle': updateData.custStyle,
           'sketchTechnical.$.orderQty': updateData.orderQty,
+          'sketchTechnical.$.originalImage': updateData.originalImage, // ✅ ADD THIS
           'sketchTechnical.$.mainSketchImage': updateData.mainSketchImage,
           'sketchTechnical.$.secondaryImage': updateData.secondaryImage,
           'sketchTechnical.$.canvasData': updateData.canvasData,
+          'sketchTechnical.$.selectedOrderData': updateData.selectedOrderData, // ✅ ADD THIS
+          'sketchTechnical.$.availableSizes': updateData.availableSizes, // ✅ ADD THIS
           'sketchTechnical.$.updatedAt': new Date()
         }
       }

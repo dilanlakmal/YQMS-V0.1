@@ -33,14 +33,18 @@ const createCoverPageSchema = (connection) => {
     sizeCurve: { type: String, default: '' },
     
     // Order-related fields
+    orderNo: { type: String, default: '' },
     buyerEngName: { type: String, default: '' },
     custStyle: { type: String, default: '' },
     orderQty: { type: String, default: '' },
     
     // Canvas and image data
+    originalImage: { type: String, default: null },
     mainSketchImage: { type: String, default: null },
     secondaryImage: { type: String, default: null },
     canvasData: { type: Array, default: [] },
+
+    selectedOrderData: { type: mongoose.Schema.Types.Mixed, default: null },
     
     // Metadata
     createdAt: { type: Date, default: Date.now },
@@ -171,7 +175,7 @@ const createCoverPageSchema = (connection) => {
   });
 
   // Create indexes for better performance
-  CoverPageSchema.index({ createdAt: -1 });
+  CoverPageSchema.index({ createdAt: 1 });
 
   return connection.model('CoverPage', CoverPageSchema);
 };
