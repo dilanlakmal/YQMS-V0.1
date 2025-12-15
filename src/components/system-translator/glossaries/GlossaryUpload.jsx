@@ -1,4 +1,5 @@
 import React, { useState, useRef } from "react";
+import { ArrowRightLeft } from "lucide-react";
 import LanguageSelector from "../LanguageSelector";
 import { API_BASE_URL } from "../../../../config";
 
@@ -121,21 +122,40 @@ export default function GlossaryUpload({ onUploadSuccess }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <label className="text-sm font-semibold translator-text-foreground">Source Language</label>
+      <div className="flex flex-col md:flex-row bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+        {/* Source Language */}
+        <div className="flex-1 min-w-0">
           <LanguageSelector
             value={sourceLanguage}
             onChange={setSourceLanguage}
             includeAuto={false}
+            recentLanguages={['en', 'zh-Hans', 'km']}
+            variant="tabs"
           />
         </div>
-        <div className="space-y-2">
-          <label className="text-sm font-semibold translator-text-foreground">Target Language</label>
+
+        {/* Swap Button */}
+        <div className="hidden md:flex items-center justify-center px-2 border-l border-r border-gray-100 dark:border-gray-800 bg-gray-50/30 dark:bg-gray-900/30">
+          <button
+            onClick={() => {
+              setSourceLanguage(targetLanguage);
+              setTargetLanguage(sourceLanguage);
+            }}
+            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500"
+            title="Swap languages"
+          >
+            <ArrowRightLeft size={20} />
+          </button>
+        </div>
+
+        {/* Target Language */}
+        <div className="flex-1 min-w-0">
           <LanguageSelector
             value={targetLanguage}
             onChange={setTargetLanguage}
             includeAuto={false}
+            recentLanguages={['en', 'zh-Hans', 'km']}
+            variant="tabs"
           />
         </div>
       </div>
@@ -147,11 +167,10 @@ export default function GlossaryUpload({ onUploadSuccess }) {
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          className={`translator-rounded border-2 border-dashed p-8 text-center transition-all cursor-pointer ${
-            dragActive
-              ? "translator-primary translator-text-foreground shadow-md border-solid"
-              : "translator-card translator-border hover:translator-primary-text hover:border-primary"
-          } ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
+          className={`translator-rounded border-2 border-dashed p-8 text-center transition-all cursor-pointer ${dragActive
+            ? "translator-primary translator-text-foreground shadow-md border-solid"
+            : "translator-card translator-border hover:translator-primary-text hover:border-primary"
+            } ${isUploading ? "opacity-50 cursor-not-allowed" : ""}`}
           onClick={() => !isUploading && fileInputRef.current?.click()}
         >
           <svg
