@@ -78,15 +78,6 @@ export const saveSketchTechnical = async (req, res) => {
       userInfo
     } = req.body;
 
-    // ✅ Debug log to see what's received
-    console.log('Received data:', {
-      orderNo,
-      styleId,
-      hasOriginalImage: !!originalImage,
-      hasMainSketchImage: !!mainSketchImage,
-      hasSecondaryImage: !!secondaryImage
-    });
-
     // Validate required fields
     if (!orderNo) {
       return res.status(400).json({
@@ -116,7 +107,6 @@ export const saveSketchTechnical = async (req, res) => {
           baseUrl, 
           'original'
         );
-        console.log('Original image saved:', savedOriginalImagePath);
       } catch (imageError) {
         console.error('Error saving original image:', imageError);
         // Don't fail the entire request, just log the error
@@ -136,7 +126,6 @@ export const saveSketchTechnical = async (req, res) => {
           baseUrl, 
           'main'
         );
-        console.log('Main sketch image saved:', savedMainImagePath);
       } catch (imageError) {
         console.error('Error saving main sketch image:', imageError);
         // Don't fail the entire request, just log the error
@@ -156,7 +145,6 @@ export const saveSketchTechnical = async (req, res) => {
           baseUrl, 
           'secondary'
         );
-        console.log('Secondary image saved:', savedSecondaryImagePath);
       } catch (imageError) {
         console.error('Error saving secondary image:', imageError);
       }
@@ -213,14 +201,6 @@ export const saveSketchTechnical = async (req, res) => {
       updatedAt: new Date()
     };
 
-    // ✅ Debug log to see what's being saved
-    console.log('Saving sketch technical data:', {
-      orderNo: sketchTechnicalData.orderNo,
-      styleId: sketchTechnicalData.styleId,
-      hasOriginalImage: !!sketchTechnicalData.originalImage,
-      hasMainSketchImage: !!sketchTechnicalData.mainSketchImage,
-      hasCanvasData: Array.isArray(sketchTechnicalData.canvasData) && sketchTechnicalData.canvasData.length > 0
-    });
 
     if (existingOrder) {
       // ✅ Check if styleId already exists in sketchTechnical array

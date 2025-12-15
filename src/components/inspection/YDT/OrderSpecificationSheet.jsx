@@ -402,7 +402,6 @@ const handleOrderSelect = useCallback(async (orderNo) => {
   const handleSave = async () => {
   try {
     setLoading(true);
-
     let empId = 'unknown_user';
     try {
       const userDataString = localStorage.getItem('user');
@@ -414,12 +413,20 @@ const handleOrderSelect = useCallback(async (orderNo) => {
       console.error("Failed to parse user data from localStorage", error);
     }
 
-     const preparedSizeTable = sizeTable.map(item => ({
-      orderTotalQty: item.orderTotalQty || 0,
-      sizeDetails: item.sizeDetails || '',
-      sizes: item.sizes || (selectedOrder?.sizes || []),
-      colors: item.colors || styleTable.flatMap(styleRow => styleRow.colors)
-    }));
+    // ✅ UPDATED: Handle empty or null tables
+    const preparedSizeTable = sizeTable && sizeTable.length > 0 
+      ? sizeTable.map(item => ({
+          orderTotalQty: item.orderTotalQty || 0,
+          sizeDetails: item.sizeDetails || '',
+          sizes: item.sizes || (selectedOrder?.sizes || []),
+          colors: item.colors || styleTable.flatMap(styleRow => styleRow.colors)
+        }))
+      : []; // Return empty array if no size table data
+
+    // ✅ UPDATED: Handle empty or null style table
+    const preparedStyleTable = styleTable && styleTable.length > 0
+      ? styleTable.filter(row => row.orderNo || row.customerStyle) // Only include rows with some data
+      : []; // Return empty array if no style table data
 
     const dataToSave = {
       orderNo: formData.orderNo,
@@ -431,8 +438,8 @@ const handleOrderSelect = useCallback(async (orderNo) => {
       testInstructions: formData.testInstructions,
       testInstructionsHTML: formData.testInstructions,
       uploadedImage: uploadedImage,
-      styleTable: styleTable,
-     sizeTable: preparedSizeTable,
+      styleTable: preparedStyleTable, // Can be empty array
+      sizeTable: preparedSizeTable,   // Can be empty array
       stampData: stampData,
       createdBy: empId
     };
@@ -450,7 +457,6 @@ const handleOrderSelect = useCallback(async (orderNo) => {
     }
 
     const result = await response.json();
-
     if (result.success) {
       await Swal.fire({
         icon: 'success',

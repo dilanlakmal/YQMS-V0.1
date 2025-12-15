@@ -298,7 +298,7 @@ export const saveCoverPageData = async (req, res) => {
       createdBy
     } = req.body;
 
-    // Validation
+    // Validation - only require essential fields
     if (!orderNo || !customerStyle || !poNumber) {
       return res.status(400).json({
         error: 'Missing required fields',
@@ -310,10 +310,9 @@ export const saveCoverPageData = async (req, res) => {
       ? 'https://yqms.yaikh.com' 
       : `${req.protocol}://${req.get('host')}`;
 
-    // Handle image upload - support both file upload and base64
+    // Handle image upload (existing code)
     let savedImagePath = null;
     
-    // Check if there's a file uploaded via multer
     if (req.file) {
       try {
         const validation = validateImageBuffer(req.file.buffer, 5);
@@ -337,7 +336,6 @@ export const saveCoverPageData = async (req, res) => {
         });
       }
     }
-    // Check if there's base64 image data
     else if (uploadedImage) {
       try {
         savedImagePath = await saveBase64Image(uploadedImage, orderNo, poNumber, baseUrl);
@@ -349,39 +347,47 @@ export const saveCoverPageData = async (req, res) => {
       }
     }
 
-    // Process sizeTable and styleTable (keep your existing logic)
+    // ✅ UPDATED: Process sizeTable - handle null/undefined/empty
     let processedSizeTable = [];
     if (sizeTable && Array.isArray(sizeTable) && sizeTable.length > 0) {
-      processedSizeTable = sizeTable.map(item => {
-        const processedItem = {
-          orderTotalQty: item.orderTotalQty || 0,
-          sizeDetails: item.sizeDetails || '',
-          sizes: [],
-          colors: []
-        };
-        if (item.sizes && Array.isArray(item.sizes)) {
-          processedItem.sizes = item.sizes;
-        }
-        if (item.colors && Array.isArray(item.colors)) {
-          processedItem.colors = item.colors;
-        }
-        return processedItem;
-      });
+      processedSizeTable = sizeTable
+        .filter(item => item && (item.orderTotalQty || item.sizeDetails || (item.sizes && item.sizes.length > 0) || (item.colors && item.colors.length > 0)))
+        .map(item => {
+          const processedItem = {
+            orderTotalQty: item.orderTotalQty || 0,
+            sizeDetails: item.sizeDetails || '',
+            sizes: [],
+            colors: []
+          };
+
+          if (item.sizes && Array.isArray(item.sizes)) {
+            processedItem.sizes = item.sizes;
+          }
+
+          if (item.colors && Array.isArray(item.colors)) {
+            processedItem.colors = item.colors;
+          }
+
+          return processedItem;
+        });
     }
 
+    // ✅ UPDATED: Process styleTable - handle null/undefined/empty
     let processedStyleTable = [];
     if (styleTable && Array.isArray(styleTable) && styleTable.length > 0) {
-      processedStyleTable = styleTable.map(item => ({
-        orderNo: item.orderNo || orderNo,
-        customerStyle: item.customerStyle || customerStyle,
-        poNumber: item.poNumber || poNumber,
-        colors: Array.isArray(item.colors) ? item.colors : [],
-        quantity: item.quantity || 0,
-        remarks: item.remarks || ''
-      }));
+      processedStyleTable = styleTable
+        .filter(item => item && (item.orderNo || item.customerStyle || item.poNumber || (item.colors && item.colors.length > 0) || item.quantity))
+        .map(item => ({
+          orderNo: item.orderNo || orderNo,
+          customerStyle: item.customerStyle || customerStyle,
+          poNumber: item.poNumber || poNumber,
+          colors: Array.isArray(item.colors) ? item.colors : [],
+          quantity: item.quantity || 0,
+          remarks: item.remarks || ''
+        }));
     }
 
-    // ✅ UPDATED: Create the cover page item data with proper HTML handling
+    // ✅ UPDATED: Create the cover page item data with nullable tables
     const coverPageItem = {
       poNumber,
       customerStyle,
@@ -391,8 +397,8 @@ export const saveCoverPageData = async (req, res) => {
       testInstructions: testInstructions || '', 
       testInstructionsHtml: testInstructions || '', 
       uploadedImage: savedImagePath,
-      styleTable: processedStyleTable,
-      sizeTable: processedSizeTable,
+      styleTable: processedStyleTable, // Can be empty array
+      sizeTable: processedSizeTable,   // Can be empty array
       stampData: {
         name: stampData?.name || '',
         date: stampData?.date ? new Date(stampData.date) : new Date()
@@ -402,7 +408,7 @@ export const saveCoverPageData = async (req, res) => {
       updatedAt: new Date()
     };
 
-    // Find existing order record or create new one
+    // Rest of the save logic remains the same...
     let orderRecord = await CoverPage.findOne({ orderNo: orderNo });
     let oldImagePath = null;
 
@@ -422,6 +428,7 @@ export const saveCoverPageData = async (req, res) => {
       } else {
         orderRecord.coverPages.push(coverPageItem);
       }
+
       orderRecord.updatedAt = new Date();
       await orderRecord.save();
     } else {
@@ -462,6 +469,7 @@ export const saveCoverPageData = async (req, res) => {
     });
   }
 };
+
 
 
 export const getCoverPageData = async (req, res) => {

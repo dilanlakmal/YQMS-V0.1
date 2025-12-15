@@ -90,15 +90,15 @@ const createCoverPageSchema = (connection) => {
     styleTable: [{
       orderNo: {
         type: String,
-        required: true
+        default:''
       },
       customerStyle: {
         type: String,
-        required: true
+         default:''
       },
       poNumber: {
         type: String,
-        required: true
+         default:''
       },
       colors: [{
         type: String
