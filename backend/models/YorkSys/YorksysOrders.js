@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-// Sub-schema for Fabric Content
+// Sub-schema for Fabric Content (Reused for Rib Content)
 const fabricContentSchema = new mongoose.Schema(
   {
     fabricName: { type: String, required: true },
@@ -74,6 +74,9 @@ const yorksysOrdersSchema = new mongoose.Schema(
 
     // Fabric Content array
     FabricContent: [fabricContentSchema],
+
+    // Rib Content array
+    RibContent: [fabricContentSchema],
 
     // MO Summary array (typically one object)
     MOSummary: [moSummarySchema],

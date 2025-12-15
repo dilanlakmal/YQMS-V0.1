@@ -296,3 +296,47 @@ export const bulkUpdateProductTypeFromCutting = async (req, res) => {
     });
   }
 };
+
+// ============================================================
+// Updates ONLY the Rib Content for a specific Yorksys order
+// ============================================================
+export const updateYorksysOrderRibContent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ribContent } = req.body; // Expecting array: [{ fabricName, percentageValue }]
+
+    // Basic Validation
+    if (!Array.isArray(ribContent)) {
+      return res.status(400).json({
+        success: false,
+        message: "Rib Content must be an array."
+      });
+    }
+
+    const updatedOrder = await YorksysOrders.findByIdAndUpdate(
+      id,
+      { RibContent: ribContent },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({
+        success: false,
+        message: `Order with ID ${id} not found.`
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Rib Content for MO ${updatedOrder.moNo} updated successfully!`,
+      data: updatedOrder
+    });
+  } catch (error) {
+    console.error("Error updating Rib Content:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error while updating Rib Content.",
+      error: error.message
+    });
+  }
+};

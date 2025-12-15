@@ -52,3 +52,51 @@ export const deleteAQLValue = async (req, res) => {
     res.status(409).json({ message: error.message });
   }
 };
+
+// ---------------------------------------------------------
+// NEW: Bulk Update AQL Values
+// ---------------------------------------------------------
+export const bulkUpdateAQLValues = async (req, res) => {
+  try {
+    const { updates } = req.body;
+
+    if (!updates || !Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({
+        message: "Invalid request. 'updates' array is required."
+      });
+    }
+
+    // Validate that all entries have an _id
+    const invalidEntries = updates.filter((item) => !item._id);
+    if (invalidEntries.length > 0) {
+      return res.status(400).json({
+        message: "All update entries must have an '_id' field."
+      });
+    }
+
+    // Perform bulk update using bulkWrite
+    const bulkOps = updates.map((item) => ({
+      updateOne: {
+        filter: { _id: item._id },
+        update: {
+          $set: {
+            SampleLetter: item.SampleLetter,
+            SampleSize: item.SampleSize,
+            AQLData: item.AQLData
+          }
+        }
+      }
+    }));
+
+    const result = await QASectionsAqlValues.bulkWrite(bulkOps);
+
+    res.status(200).json({
+      message: "Bulk update successful",
+      modifiedCount: result.modifiedCount,
+      matchedCount: result.matchedCount
+    });
+  } catch (error) {
+    console.error("Bulk update error:", error);
+    res.status(500).json({ message: error.message });
+  }
+};

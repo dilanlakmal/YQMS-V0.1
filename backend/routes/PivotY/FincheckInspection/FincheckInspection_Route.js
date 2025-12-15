@@ -9,7 +9,10 @@ import {
   getSubConFactories,
   getOrderProductTypeInfo,
   getProductTypeOptions,
-  updateOrderProductType
+  updateOrderProductType,
+  createInspectionReport,
+  getInspectionReportById,
+  checkExistingReport
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -57,6 +60,21 @@ router.get(
 router.put(
   "/api/fincheck-inspection/update-product-type",
   updateOrderProductType
+);
+
+// NEW: Create Inspection Report
+router.post("/api/fincheck-inspection/create-report", createInspectionReport);
+
+// NEW: Get Inspection Report by ID
+router.get(
+  "/api/fincheck-inspection/report/:reportId",
+  getInspectionReportById
+);
+
+// NEW: Check Existing Report
+router.post(
+  "/api/fincheck-inspection/check-existing-report",
+  checkExistingReport
 );
 
 export default router;

@@ -11,10 +11,14 @@ import {
   MessageSquare,
   Trash2,
   Save,
-  AlertCircle
+  AlertCircle,
+  Images
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor";
+
+// Maximum images per section
+const MAX_IMAGES_PER_SECTION = 5;
 
 // ==============================================================================
 // INTERNAL COMPONENT: REMARK MODAL
@@ -137,7 +141,6 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
         setSections(response.data.data);
 
         // Initialize default selections ONLY if no saved data exists
-        // (i.e., this is the first load)
         if (
           !headerData ||
           Object.keys(headerData?.selectedOptions || {}).length === 0
@@ -149,8 +152,6 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
             }
           });
           setSelectedOptions(initialSelections);
-          // We don't call updateParent here immediately to avoid render loops,
-          // the state will sync on first user interaction or we can sync separately if needed.
           if (onUpdateHeaderData) {
             onUpdateHeaderData({ selectedOptions: initialSelections });
           }
@@ -162,7 +163,7 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
       }
     };
     fetchSections();
-  }, []); // Only run once on mount
+  }, []);
 
   // --- Remark Logic ---
   const openRemarkModal = (section) => {
@@ -217,19 +218,59 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
     return index;
   };
 
-  const openImageEditor = (
-    mode,
-    sectionId,
-    imageIndex,
-    existingData = null
-  ) => {
+  // Get current images count for a section
+  const getCurrentImagesCount = (sectionId) => {
+    return getImagesForSection(sectionId).length;
+  };
+
+  // Get available slots for adding new images
+  const getAvailableSlots = (sectionId) => {
+    const currentCount = getCurrentImagesCount(sectionId);
+    return Math.max(0, MAX_IMAGES_PER_SECTION - currentCount);
+  };
+
+  // Open image editor for NEW capture/upload (multi-image mode)
+  const openImageEditorForNew = (mode, sectionId) => {
+    const availableSlots = getAvailableSlots(sectionId);
+
+    if (availableSlots <= 0) {
+      alert(
+        `Maximum ${MAX_IMAGES_PER_SECTION} images reached for this section!`
+      );
+      return;
+    }
+
     setCurrentEditContext({
       mode,
       sectionId,
-      imageIndex,
-      existingData
+      isEditing: false,
+      maxImages: availableSlots, // Pass available slots as max
+      existingData: null
     });
     setShowImageEditor(true);
+  };
+
+  // Open image editor for EDITING existing image
+  const openImageEditorForEdit = (sectionId, imageIndex) => {
+    const key = `${sectionId}_${imageIndex}`;
+    const imageData = capturedImages[key];
+
+    if (imageData) {
+      setCurrentEditContext({
+        mode: "edit",
+        sectionId,
+        imageIndex,
+        isEditing: true,
+        maxImages: 1,
+        existingData: [
+          {
+            imgSrc: imageData.imgSrc || imageData.url,
+            history: imageData.history || []
+          }
+        ]
+      });
+      setShowImageEditor(true);
+    }
   };
 
   const handleImageEditorClose = () => {
@@ -237,45 +278,90 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
     setCurrentEditContext(null);
   };
 
-  const handleImageSave = (imageDataUrl, editHistory, originalImgSrc) => {
-    if (currentEditContext) {
-      const { sectionId, imageIndex } = currentEditContext;
-      const key = `${sectionId}_${imageIndex}`;
-
-      const newImages = {
-        ...capturedImages,
-        [key]: {
-          url: imageDataUrl,
-          history: editHistory,
-          imgSrc: originalImgSrc
-        }
-      };
-
-      setCapturedImages(newImages);
-      updateParent({ capturedImages: newImages });
+  // Handle multiple images save from editor
+  const handleImagesSave = (savedImages) => {
+    if (!currentEditContext || !savedImages || savedImages.length === 0) {
       handleImageEditorClose();
+      return;
     }
+
+    const { sectionId, isEditing, imageIndex } = currentEditContext;
+    let newImages = { ...capturedImages };
+
+    if (isEditing && imageIndex !== undefined) {
+      // Editing single existing image
+      const img = savedImages[0];
+      const key = `${sectionId}_${imageIndex}`;
+      newImages[key] = {
+        url: img.editedImgSrc,
+        imgSrc: img.imgSrc,
+        history: img.history || []
+      };
+    } else {
+      // Adding new images - fill consecutive slots
+      let nextIndex = getNextImageIndex(sectionId);
+      const availableSlots = getAvailableSlots(sectionId);
+      const imagesToAdd = savedImages.slice(0, availableSlots);
+
+      imagesToAdd.forEach((img) => {
+        const key = `${sectionId}_${nextIndex}`;
+        newImages[key] = {
+          url: img.editedImgSrc,
+          imgSrc: img.imgSrc,
+          history: img.history || []
+        };
+        nextIndex++;
+      });
+
+      if (savedImages.length > availableSlots) {
+        alert(
+          `Only ${availableSlots} image(s) were added. Maximum ${MAX_IMAGES_PER_SECTION} images per section.`
+        );
+      }
+    }
+
+    setCapturedImages(newImages);
+    updateParent({ capturedImages: newImages });
+    handleImageEditorClose();
   };
 
-  const removeImage = (sectionId, imageIndex) => {
-    const key = `${sectionId}_${imageIndex}`;
+  const removeImage = (sectionId, imageIndex, e) => {
+    if (e) e.stopPropagation();
+
+    if (!window.confirm("Remove this image?")) return;
+
     const newImages = { ...capturedImages };
-    delete newImages[key];
+
+    // Get all images for this section except the one being removed
+    const remainingImages = [];
+    let idx = 0;
+    while (idx < 20) {
+      const key = `${sectionId}_${idx}`;
+      if (idx !== imageIndex && capturedImages[key]) {
+        remainingImages.push(capturedImages[key]);
+      }
+      idx++;
+    }
+
+    // Clear all old keys for this section
+    Object.keys(newImages).forEach((key) => {
+      if (key.startsWith(`${sectionId}_`)) {
+        delete newImages[key];
+      }
+    });
+
+    // Re-add with sequential indices (no gaps)
+    remainingImages.forEach((img, i) => {
+      newImages[`${sectionId}_${i}`] = img;
+    });
+
     setCapturedImages(newImages);
     updateParent({ capturedImages: newImages });
   };
 
   const editExistingImage = (e, sectionId, imageIndex) => {
     e.stopPropagation();
-    const key = `${sectionId}_${imageIndex}`;
-    const imageData = capturedImages[key];
-
-    if (imageData) {
-      openImageEditor("edit", sectionId, imageIndex, {
-        imgSrc: imageData.imgSrc,
-        history: imageData.history
-      });
-    }
+    openImageEditorForEdit(sectionId, imageIndex);
   };
 
   // --- Option Handling ---
@@ -327,7 +413,8 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
 
       {sections.map((section) => {
         const sectionImages = getImagesForSection(section._id);
-        const canAddMore = sectionImages.length < 5;
+        const availableSlots = getAvailableSlots(section._id);
+        const canAddMore = availableSlots > 0;
         const currentRemark = remarks[section._id];
 
         return (
@@ -342,6 +429,12 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                 <h4 className="text-gray-800 dark:text-gray-100 font-bold text-sm">
                   {section.MainTitle}
                 </h4>
+                {sectionImages.length === 0 && (
+                  <p className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-1 mt-1">
+                    <Images className="w-3 h-3" />
+                    Up to {MAX_IMAGES_PER_SECTION} images
+                  </p>
+                )}
               </div>
 
               {/* 2. Middle: Actions (Camera + Upload + Remark) */}
@@ -349,12 +442,7 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                 {/* Camera */}
                 <button
                   onClick={() =>
-                    canAddMore &&
-                    openImageEditor(
-                      "camera",
-                      section._id,
-                      getNextImageIndex(section._id)
-                    )
+                    canAddMore && openImageEditorForNew("camera", section._id)
                   }
                   disabled={!canAddMore}
                   className={`p-2 rounded-lg transition-all flex items-center gap-2 border ${
@@ -362,7 +450,11 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                       ? "bg-white dark:bg-gray-800 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-gray-200 dark:border-gray-700 hover:border-indigo-500"
                       : "bg-gray-50 dark:bg-gray-800/50 text-gray-400 cursor-not-allowed border-gray-100 dark:border-gray-800"
                   }`}
-                  title="Take Photo"
+                  title={
+                    canAddMore
+                      ? `Take photos (${availableSlots} slots available)`
+                      : "Maximum images reached"
+                  }
                 >
                   <Camera className="w-4 h-4" />
                 </button>
@@ -370,12 +462,7 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                 {/* Upload */}
                 <button
                   onClick={() =>
-                    canAddMore &&
-                    openImageEditor(
-                      "upload",
-                      section._id,
-                      getNextImageIndex(section._id)
-                    )
+                    canAddMore && openImageEditorForNew("upload", section._id)
                   }
                   disabled={!canAddMore}
                   className={`p-2 rounded-lg transition-all flex items-center gap-2 border ${
@@ -383,15 +470,26 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                       ? "bg-white dark:bg-gray-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border-gray-200 dark:border-gray-700 hover:border-emerald-500"
                       : "bg-gray-50 dark:bg-gray-800/50 text-gray-400 cursor-not-allowed border-gray-100 dark:border-gray-800"
                   }`}
-                  title="Upload Image"
+                  title={
+                    canAddMore
+                      ? `Upload images (${availableSlots} slots available)`
+                      : "Maximum images reached"
+                  }
                 >
                   <Upload className="w-4 h-4" />
                 </button>
 
-                {/* Counter */}
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono mr-2">
-                  {sectionImages.length}/5
-                </span>
+                {/* Counter with available slots */}
+                <div className="flex items-center gap-1">
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 font-mono">
+                    {sectionImages.length}/{MAX_IMAGES_PER_SECTION}
+                  </span>
+                  {canAddMore && sectionImages.length > 0 && (
+                    <span className="text-[9px] text-indigo-500 dark:text-indigo-400">
+                      (+{availableSlots})
+                    </span>
+                  )}
+                </div>
 
                 <div className="h-6 w-px bg-gray-200 dark:bg-gray-700 hidden sm:block"></div>
 
@@ -478,10 +576,7 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                         <Edit3 className="w-4 h-4 text-white" />
                       </div>
                       <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeImage(section._id, index);
-                        }}
+                        onClick={(e) => removeImage(section._id, index, e)}
                         className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-10"
                       >
                         <X className="w-3 h-3" />
@@ -491,6 +586,39 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
                       </div>
                     </div>
                   ))}
+
+                  {/* Add More Button - shown inline when there are images but room for more */}
+                  {canAddMore && (
+                    <div className="flex-shrink-0 w-16 h-16 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md overflow-hidden hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors bg-white dark:bg-gray-800">
+                      <button
+                        onClick={() =>
+                          openImageEditorForNew("camera", section._id)
+                        }
+                        className="w-full h-1/2 flex items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-200 dark:border-gray-700"
+                        title={`Take photos (${availableSlots} slots)`}
+                      >
+                        <Camera className="w-3.5 h-3.5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                      </button>
+                      <button
+                        onClick={() =>
+                          openImageEditorForNew("upload", section._id)
+                        }
+                        className="w-full h-1/2 flex items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group"
+                        title={`Upload images (${availableSlots} slots)`}
+                      >
+                        <Upload className="w-3.5 h-3.5 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Slots indicator */}
+                  {canAddMore && availableSlots > 1 && (
+                    <div className="flex-shrink-0 flex items-center justify-center px-2">
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                        +{availableSlots} slots
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -503,9 +631,12 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
       {/* Image Editor */}
       {showImageEditor && currentEditContext && (
         <YPivotQATemplatesImageEditor
-          autoStartMode={currentEditContext.mode}
+          autoStartMode={
+            currentEditContext.mode === "edit" ? null : currentEditContext.mode
+          }
           existingData={currentEditContext.existingData}
-          onSave={handleImageSave}
+          maxImages={currentEditContext.maxImages}
+          onSave={handleImagesSave}
           onCancel={handleImageEditorClose}
         />
       )}

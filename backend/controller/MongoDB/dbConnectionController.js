@@ -98,7 +98,15 @@ import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMea
 
 import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
 
+import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
+
 import normalNotificationSchema from "../../models/NormalNotification.js";
+//YDT Models
+/*------------- Cover page ----------------*/
+import createCoverPageSchema from "../../models/YDT/coverPage.js";
+
+import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
+
 //YDT Models
 /*------------- Cover page ----------------*/
 import createCoverPageSchema from "../../models/YDT/coverPage.js";
@@ -241,7 +249,12 @@ export const QASectionsMeasurementSpecs =
 export const QASectionsTemplates =
   createQASectionsTemplatesModel(ymProdConnection);
 
+export const FincheckInspectionReports =
+  createFincheckInspectionReportsModel(ymProdConnection);
+
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
+
+export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
 
 //YDT Exported Models
 /*------------- Cover page ----------------*/

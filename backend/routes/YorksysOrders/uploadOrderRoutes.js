@@ -6,7 +6,8 @@ import {
   getYorksysOrder,
   updateYorksysOrderProductType,
   previewBulkUpdateProductType,
-  bulkUpdateProductTypeFromCutting
+  bulkUpdateProductTypeFromCutting,
+  updateYorksysOrderRibContent
 } from "../../controller//YorksysOrders/uploadOrderController.js";
 
 const router = express.Router();
@@ -31,5 +32,8 @@ router.put(
   "/api/yorksys-orders/bulk-update-product-type",
   bulkUpdateProductTypeFromCutting
 );
+
+// ROUTE: Update Rib Content specifically
+router.put("/api/yorksys-orders/:id/rib-content", updateYorksysOrderRibContent);
 
 export default router;

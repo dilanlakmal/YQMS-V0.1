@@ -11,6 +11,11 @@ const __dirname = path.dirname(__filename);
 export default defineConfig({
   plugins: [react()],
   assetsInclude: ["**/*.ttf"],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src")
+    }
+  },
   optimizeDeps: {
     include: ["jspdf", "jspdf-autotable"]
   },

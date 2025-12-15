@@ -47,7 +47,8 @@ import CuttingInline from "./pages/CuttingInline.jsx";
 import ManageBuyerSpecs from "./pages/ManageBuyerSpecs.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
 import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
-import CEMasterList from "./pages/CEMasterList.jsx";
+//import CEMasterList from "./pages/CEMasterList.jsx";
+import CESystem from "./pages/CESystem.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
 import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
@@ -92,6 +93,8 @@ import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
+import CoverPage from "./pages/coverPage.jsx";
+
 import CoverPage from "./pages/coverPage.jsx";
 
 export const BluetoothContext = createContext(null);
@@ -461,7 +464,7 @@ function AppContent() {
               <Route path="/qc-output" element={<QCOutput />} />
               <Route path="/qc-output/full-report" element={<QCFullReport />} />
               <Route path="/supplier-issues" element={<SupplierIssues />} />
-              <Route path="/master-list" element={<CEMasterList />} />
+              <Route path="/master-list" element={<CESystem />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
               <Route path="/training" element={<YQMSTrainingSchedule />} />
               <Route path="/exam" element={<YQMSExam />} />
@@ -494,6 +497,8 @@ function AppContent() {
                 path="/fincheck-inspection"
                 element={<YPivotQAInspection />}
               />
+
+              <Route path="/production-Sheet" element={<CoverPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

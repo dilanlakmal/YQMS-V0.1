@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import {
   Camera,
@@ -19,8 +19,12 @@ import {
   Save,
   Palette,
   Settings,
-  Loader
+  Loader,
+  Move,
+  Check
 } from "lucide-react";
+
+const MAX_IMAGES = 7;
 
 const YPivotQATemplatesImageEditor = ({
   autoStartMode = null,
@@ -47,11 +51,8 @@ const YPivotQATemplatesImageEditor = ({
 
   // --- Lock Body Scroll ---
   useEffect(() => {
-    // Prevent scrolling on the background page when this modal is open
     document.body.style.overflow = "hidden";
-    // Also prevent pull-to-refresh on mobile
     document.body.style.overscrollBehavior = "none";
-
     return () => {
       document.body.style.overflow = "unset";
       document.body.style.overscrollBehavior = "unset";
@@ -60,7 +61,13 @@ const YPivotQATemplatesImageEditor = ({
 
   // --- Modes & State ---
   const [mode, setMode] = useState("initial");
-  const [imgSrc, setImgSrc] = useState(null);
+
+  // MULTIPLE IMAGES STATE
+  const [images, setImages] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
+  const currentImage = images[currentImageIndex] || null;
+  const imgSrc = currentImage?.imgSrc || null;
 
   // --- Camera State ---
   const videoRef = useRef(null);
@@ -78,7 +85,7 @@ const YPivotQATemplatesImageEditor = ({
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
 
-  // History for Undo
+  // History for current image
   const [history, setHistory] = useState([]);
   const [currentAction, setCurrentAction] = useState(null);
 
@@ -95,8 +102,45 @@ const YPivotQATemplatesImageEditor = ({
   const [textValue, setTextValue] = useState("");
   const [textPos, setTextPos] = useState({ x: 0, y: 0 });
 
+  // TEXT SELECTION & MOVEMENT
+  const [selectedElementId, setSelectedElementId] = useState(null);
+  const [hoveredElementId, setHoveredElementId] = useState(null);
+  const [isDraggingElement, setIsDraggingElement] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const longPressTimerRef = useRef(null);
+  const [isLongPressing, setIsLongPressing] = useState(false);
+
   // Touch/pinch zoom
   const [lastTouchDistance, setLastTouchDistance] = useState(null);
+
+  // Generate unique ID
+  const generateId = () =>
+    `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+  // Sync history when image changes
+  useEffect(() => {
+    if (currentImage) {
+      setHistory(currentImage.history || []);
+      setSelectedElementId(null);
+      setHoveredElementId(null);
+    } else {
+      setHistory([]);
+    }
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, [currentImageIndex]);
+
+  // Update images array when history changes
+  const updateCurrentImageHistory = useCallback(
+    (newHistory) => {
+      setImages((prev) =>
+        prev.map((img, idx) =>
+          idx === currentImageIndex ? { ...img, history: newHistory } : img
+        )
+      );
+    },
+    [currentImageIndex]
+  );
 
   // ==========================================
   // INITIALIZE WITH PROPS
@@ -104,21 +148,35 @@ const YPivotQATemplatesImageEditor = ({
 
   useEffect(() => {
     const initializeEditor = async () => {
-      // Load existing data if editing
       if (existingData) {
-        setImgSrc(existingData.imgSrc);
-        setHistory(existingData.history || []);
+        if (Array.isArray(existingData)) {
+          setImages(
+            existingData.map((data, idx) => ({
+              id: generateId(),
+              imgSrc: data.imgSrc,
+              history: data.history || [],
+              editedImgSrc: null
+            }))
+          );
+        } else {
+          setImages([
+            {
+              id: generateId(),
+              imgSrc: existingData.imgSrc,
+              history: existingData.history || [],
+              editedImgSrc: null
+            }
+          ]);
+        }
         setMode("editor");
         return;
       }
 
-      // Auto-start camera or upload based on mode
       if (autoStartMode === "camera") {
         setIsInitializing(true);
         await startCamera();
         setIsInitializing(false);
       } else if (autoStartMode === "upload") {
-        // Trigger file input
         setIsInitializing(true);
         setTimeout(() => {
           fileInputRef.current?.click();
@@ -128,7 +186,7 @@ const YPivotQATemplatesImageEditor = ({
     };
 
     initializeEditor();
-  }, []); // Run only once on mount
+  }, []);
 
   // ==========================================
   // 1. CAMERA & UPLOAD LOGIC
@@ -136,7 +194,6 @@ const YPivotQATemplatesImageEditor = ({
 
   const startCamera = async () => {
     try {
-      // Ensure any previous stream is dead
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
       }
@@ -144,18 +201,15 @@ const YPivotQATemplatesImageEditor = ({
         videoRef.current.srcObject = null;
       }
 
-      // Determine starting mode based on screen width immediately
-      // (Don't wait for deviceType state)
       const isMobile = window.innerWidth < 1024;
       const initialMode = isMobile ? "environment" : "user";
-
-      setFacingMode(initialMode); // Sync state
+      setFacingMode(initialMode);
 
       const constraints = {
         audio: false,
         video: {
           facingMode: initialMode,
-          width: { ideal: 1920 }, // Try for high res
+          width: { ideal: 1920 },
           height: { ideal: 1080 }
         }
       };
@@ -168,7 +222,6 @@ const YPivotQATemplatesImageEditor = ({
       setMode("camera");
     } catch (err) {
       console.error("Camera Error:", err);
-      // Fallback: If environment fails (some laptops), try user
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
           video: true
@@ -184,49 +237,38 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   const switchCamera = async () => {
-    // 1. Calculate the NEW mode locally (don't rely on state updating yet)
     const nextMode = facingMode === "user" ? "environment" : "user";
 
-    // 2. STOP the current stream completely
     if (stream) {
       stream.getTracks().forEach((track) => {
         track.stop();
-        stream.removeTrack(track); // Explicitly remove
+        stream.removeTrack(track);
       });
-      setStream(null); // Clear state
+      setStream(null);
     }
 
-    // 3. Clear the video element
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
 
-    // 4. Update state for UI
     setFacingMode(nextMode);
-
-    // 5. SMALL DELAY - Critical for mobile devices to release hardware lock
     await new Promise((resolve) => setTimeout(resolve, 200));
 
     try {
-      // 6. Request new stream
       const constraints = {
         audio: false,
         video: {
-          // 'exact' is strict. If it fails, we fall back to loose.
           facingMode: { exact: nextMode }
         }
       };
 
       const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-
       setStream(newStream);
       if (videoRef.current) {
         videoRef.current.srcObject = newStream;
       }
     } catch (err) {
       console.warn("Exact switch failed, trying loose constraint...", err);
-
-      // FALLBACK: Try without 'exact' if the specific camera label wasn't found
       try {
         const looseStream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: nextMode }
@@ -238,15 +280,18 @@ const YPivotQATemplatesImageEditor = ({
       } catch (finalErr) {
         console.error("Camera switch error:", finalErr);
         alert("Could not switch camera. Your device might be busy.");
-
-        // Emergency: try to restart whatever worked before
         startCamera();
       }
     }
   };
 
+  // MODIFIED: Capture without stopping camera, add to images array
   const captureImage = () => {
     if (!videoRef.current) return;
+    if (images.length >= MAX_IMAGES) {
+      alert(`Maximum ${MAX_IMAGES} images allowed!`);
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = document.createElement("canvas");
@@ -255,9 +300,32 @@ const YPivotQATemplatesImageEditor = ({
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0);
 
-    setImgSrc(canvas.toDataURL("image/png"));
+    const newImage = {
+      id: generateId(),
+      imgSrc: canvas.toDataURL("image/png"),
+      history: [],
+      editedImgSrc: null
+    };
+
+    setImages((prev) => [...prev, newImage]);
+
+    // Visual feedback - flash effect
+    if (videoRef.current) {
+      videoRef.current.style.opacity = "0.5";
+      setTimeout(() => {
+        if (videoRef.current) videoRef.current.style.opacity = "1";
+      }, 100);
+    }
+  };
+
+  const finishCapturing = () => {
     stopCamera();
-    setMode("editor");
+    if (images.length > 0) {
+      setCurrentImageIndex(0);
+      setMode("editor");
+    } else {
+      setMode("initial");
+    }
   };
 
   const stopCamera = () => {
@@ -267,25 +335,54 @@ const YPivotQATemplatesImageEditor = ({
     }
   };
 
+  // MODIFIED: Handle multiple file upload
   const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        setImgSrc(event.target.result);
-        setMode("editor");
-      };
-      reader.readAsDataURL(file);
-    } else {
-      // User cancelled
-      if (autoStartMode) {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) {
+      if (autoStartMode && images.length === 0) {
         handleCancel();
       }
+      return;
     }
+
+    const remainingSlots = MAX_IMAGES - images.length;
+    const filesToProcess = files.slice(0, remainingSlots);
+
+    if (files.length > remainingSlots) {
+      alert(
+        `Only ${remainingSlots} more image(s) can be added. Maximum is ${MAX_IMAGES}.`
+      );
+    }
+
+    let loadedCount = 0;
+    const newImages = [];
+
+    filesToProcess.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        newImages.push({
+          id: generateId(),
+          imgSrc: event.target.result,
+          history: [],
+          editedImgSrc: null
+        });
+        loadedCount++;
+
+        if (loadedCount === filesToProcess.length) {
+          setImages((prev) => [...prev, ...newImages]);
+          setCurrentImageIndex(images.length);
+          setMode("editor");
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset file input
+    e.target.value = "";
   };
 
   // ==========================================
-  // 2. CANVAS RENDERING ENGINE (FULL SCREEN LOGIC)
+  // 2. CANVAS RENDERING ENGINE
   // ==========================================
 
   useEffect(() => {
@@ -295,26 +392,21 @@ const YPivotQATemplatesImageEditor = ({
       const img = new Image();
 
       img.onload = () => {
-        // --- VIEWPORT BASED CALCULATION ---
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
-
-        // Heights of UI elements (Header + Toolbar)
-        // Header approx 60px, Toolbar approx 100-140px depending on settings
         const headerHeight = 60;
-        const toolbarHeight = deviceType === "mobile" ? 140 : 100;
+        const toolbarHeight = deviceType === "mobile" ? 180 : 140;
+        const thumbnailHeight = images.length > 0 ? 80 : 0;
         const padding = 20;
 
-        // Calculate available space
         const maxAvailableWidth = screenW - padding;
         const maxAvailableHeight =
-          screenH - headerHeight - toolbarHeight - padding;
+          screenH - headerHeight - toolbarHeight - thumbnailHeight - padding;
 
-        // Calculate scale to fit perfectly
         const scale = Math.min(
           maxAvailableWidth / img.width,
           maxAvailableHeight / img.height,
-          1 // Don't upscale small images too much
+          1
         );
 
         const canvasWidth = img.width * scale;
@@ -329,7 +421,7 @@ const YPivotQATemplatesImageEditor = ({
       };
       img.src = imgSrc;
     }
-  }, [mode, imgSrc, deviceType]);
+  }, [mode, imgSrc, deviceType, images.length]);
 
   useEffect(() => {
     if (context && imgSrc && canvasSize.width > 0) {
@@ -339,21 +431,17 @@ const YPivotQATemplatesImageEditor = ({
       };
       img.src = imgSrc;
     }
-  }, [history, currentAction, zoom, pan]);
+  }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
 
   const redrawCanvas = (ctx, img, width, height) => {
     if (!ctx) return;
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
-
-    // Apply zoom and pan
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
-
     ctx.drawImage(img, 0, 0, width, height);
 
-    // Draw History Items
     [...history, currentAction].forEach((item) => {
       if (!item) return;
 
@@ -364,7 +452,7 @@ const YPivotQATemplatesImageEditor = ({
       ctx.fillStyle = item.color;
 
       if (item.type === "pen") {
-        if (item.points.length > 1) {
+        if (item.points && item.points.length > 1) {
           ctx.beginPath();
           ctx.moveTo(item.points[0].x, item.points[0].y);
           item.points.forEach((p) => ctx.lineTo(p.x, p.y));
@@ -388,10 +476,36 @@ const YPivotQATemplatesImageEditor = ({
         );
         ctx.stroke();
       } else if (item.type === "text") {
-        ctx.font = `bold ${
-          deviceType === "mobile" ? "20px" : "24px"
-        } sans-serif`;
+        const fontSize = deviceType === "mobile" ? 20 : 24;
+        ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textBaseline = "middle";
+
+        // Measure text for bounding box
+        const textMetrics = ctx.measureText(item.text);
+        const textWidth = textMetrics.width;
+        const textHeight = fontSize;
+        const padding = 8;
+
+        const isSelected = selectedElementId === item.id;
+        const isHovered = hoveredElementId === item.id;
+
+        // Draw selection/hover box
+        if (isSelected || isHovered) {
+          ctx.save();
+          ctx.strokeStyle = isSelected ? "#3b82f6" : "#6b7280";
+          ctx.lineWidth = 2;
+          ctx.setLineDash(isHovered && !isSelected ? [5, 5] : []);
+          ctx.strokeRect(
+            item.x - padding,
+            item.y - textHeight / 2 - padding,
+            textWidth + padding * 2,
+            textHeight + padding * 2
+          );
+          ctx.setLineDash([]);
+          ctx.restore();
+        }
+
+        ctx.fillStyle = item.color;
         ctx.fillText(item.text, item.x, item.y);
       }
     });
@@ -426,13 +540,8 @@ const YPivotQATemplatesImageEditor = ({
   // 3. ZOOM & PAN
   // ==========================================
 
-  const handleZoomIn = () => {
-    setZoom((prev) => Math.min(prev + 0.2, 3));
-  };
-
-  const handleZoomOut = () => {
-    setZoom((prev) => Math.max(prev - 0.2, 0.5));
-  };
+  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 0.2, 3));
+  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 0.2, 0.5));
 
   const handleWheel = (e) => {
     e.preventDefault();
@@ -441,9 +550,8 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && !isDrawing) {
+    if (e.touches.length === 2 && !isDrawing && !isDraggingElement) {
       e.preventDefault();
-      // Pinch to zoom
       const touch1 = e.touches[0];
       const touch2 = e.touches[1];
       const distance = Math.hypot(
@@ -459,12 +567,51 @@ const YPivotQATemplatesImageEditor = ({
     }
   };
 
-  const handleTouchEndZoom = () => {
-    setLastTouchDistance(null);
+  const handleTouchEndZoom = () => setLastTouchDistance(null);
+
+  // ==========================================
+  // 4. TEXT ELEMENT DETECTION
+  // ==========================================
+
+  const getTextElementAtPosition = (pos) => {
+    const fontSize = deviceType === "mobile" ? 20 : 24;
+    const padding = 8;
+
+    // Check in reverse order (top-most first)
+    for (let i = history.length - 1; i >= 0; i--) {
+      const item = history[i];
+      if (item.type === "text") {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext("2d");
+        if (ctx) {
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          const textMetrics = ctx.measureText(item.text);
+          const textWidth = textMetrics.width;
+          const textHeight = fontSize;
+
+          const bounds = {
+            left: item.x - padding,
+            right: item.x + textWidth + padding,
+            top: item.y - textHeight / 2 - padding,
+            bottom: item.y + textHeight / 2 + padding
+          };
+
+          if (
+            pos.x >= bounds.left &&
+            pos.x <= bounds.right &&
+            pos.y >= bounds.top &&
+            pos.y <= bounds.bottom
+          ) {
+            return { item, index: i };
+          }
+        }
+      }
+    }
+    return null;
   };
 
   // ==========================================
-  // 4. INTERACTION HANDLERS
+  // 5. INTERACTION HANDLERS
   // ==========================================
 
   const getCoords = (e) => {
@@ -473,29 +620,82 @@ const YPivotQATemplatesImageEditor = ({
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    // Adjust for zoom and pan
     const x = (clientX - rect.left - pan.x) / zoom;
     const y = (clientY - rect.top - pan.y) / zoom;
 
     return { x, y };
   };
 
+  const handleMouseMove = (e) => {
+    if (isDraggingElement && selectedElementId) {
+      const pos = getCoords(e);
+      setHistory((prev) =>
+        prev.map((item) =>
+          item.id === selectedElementId
+            ? { ...item, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }
+            : item
+        )
+      );
+      return;
+    }
+
+    if (isDrawing) {
+      handleMove(e);
+      return;
+    }
+
+    // Hover detection for desktop
+    if (deviceType === "desktop" && !isDrawing) {
+      const pos = getCoords(e);
+      const textElement = getTextElementAtPosition(pos);
+      setHoveredElementId(textElement?.item?.id || null);
+    }
+  };
+
   const handleStart = (e) => {
-    if (e.touches && e.touches.length > 1) return; // Ignore multi-touch for drawing
+    if (e.touches && e.touches.length > 1) return;
+
+    const pos = getCoords(e);
+
+    // Check if clicking on a text element
+    const textElement = getTextElementAtPosition(pos);
+
+    if (textElement) {
+      setSelectedElementId(textElement.item.id);
+      setDragOffset({
+        x: pos.x - textElement.item.x,
+        y: pos.y - textElement.item.y
+      });
+
+      // For touch devices, start long press timer
+      if (e.touches) {
+        setIsLongPressing(false);
+        longPressTimerRef.current = setTimeout(() => {
+          setIsLongPressing(true);
+          setIsDraggingElement(true);
+        }, 500);
+      } else {
+        // Desktop - immediate drag on click
+        setIsDraggingElement(true);
+      }
+      return;
+    }
+
+    // Clear selection if clicking elsewhere
+    setSelectedElementId(null);
 
     if (activeTool === "text") {
-      const pos = getCoords(e);
       setTextPos(pos);
       setShowTextInput(true);
       return;
     }
 
     setIsDrawing(true);
-    const pos = getCoords(e);
     setStartPos(pos);
 
     if (activeTool === "pen") {
       setCurrentAction({
+        id: generateId(),
         type: "pen",
         color: color,
         width: lineWidth,
@@ -503,6 +703,7 @@ const YPivotQATemplatesImageEditor = ({
       });
     } else {
       setCurrentAction({
+        id: generateId(),
         type: activeTool,
         color: color,
         width: lineWidth,
@@ -526,7 +727,7 @@ const YPivotQATemplatesImageEditor = ({
     if (activeTool === "pen") {
       setCurrentAction((prev) => ({
         ...prev,
-        points: [...prev.points, pos]
+        points: [...(prev?.points || []), pos]
       }));
     } else if (activeTool === "arrow") {
       setCurrentAction((prev) => ({ ...prev, endX: pos.x, endY: pos.y }));
@@ -540,61 +741,225 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   const handleEnd = () => {
+    // Clear long press timer
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+
+    if (isDraggingElement) {
+      setIsDraggingElement(false);
+      setIsLongPressing(false);
+      updateCurrentImageHistory(history);
+      return;
+    }
+
     if (!isDrawing) return;
     setIsDrawing(false);
     if (currentAction) {
-      setHistory((prev) => [...prev, currentAction]);
+      const newHistory = [...history, currentAction];
+      setHistory(newHistory);
+      updateCurrentImageHistory(newHistory);
       setCurrentAction(null);
     }
   };
 
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 1) {
+      handleStart(e);
+    }
+  };
+
+  const handleTouchMoveCanvas = (e) => {
+    handleTouchMove(e);
+    if (isDraggingElement) {
+      e.preventDefault();
+      const pos = getCoords(e);
+      setHistory((prev) =>
+        prev.map((item) =>
+          item.id === selectedElementId
+            ? { ...item, x: pos.x - dragOffset.x, y: pos.y - dragOffset.y }
+            : item
+        )
+      );
+    } else if (isDrawing) {
+      handleMove(e);
+    }
+  };
+
+  const handleTouchEndCanvas = () => {
+    handleEnd();
+    handleTouchEndZoom();
+  };
+
   const confirmText = () => {
     if (textValue.trim()) {
-      setHistory((prev) => [
-        ...prev,
-        {
-          type: "text",
-          text: textValue,
-          x: textPos.x,
-          y: textPos.y,
-          color: color,
-          width: lineWidth
-        }
-      ]);
+      const newTextItem = {
+        id: generateId(),
+        type: "text",
+        text: textValue,
+        x: textPos.x,
+        y: textPos.y,
+        color: color,
+        width: lineWidth
+      };
+      const newHistory = [...history, newTextItem];
+      setHistory(newHistory);
+      updateCurrentImageHistory(newHistory);
     }
     setTextValue("");
     setShowTextInput(false);
   };
 
+  const deleteSelectedElement = () => {
+    if (selectedElementId) {
+      const newHistory = history.filter(
+        (item) => item.id !== selectedElementId
+      );
+      setHistory(newHistory);
+      updateCurrentImageHistory(newHistory);
+      setSelectedElementId(null);
+    }
+  };
+
   const undoLast = () => {
-    setHistory((prev) => prev.slice(0, -1));
+    const newHistory = history.slice(0, -1);
+    setHistory(newHistory);
+    updateCurrentImageHistory(newHistory);
+    setSelectedElementId(null);
   };
 
   const clearAll = () => {
-    if (window.confirm("Clear all edits?")) {
+    if (window.confirm("Clear all edits on this image?")) {
       setHistory([]);
+      updateCurrentImageHistory([]);
+      setSelectedElementId(null);
+    }
+  };
+
+  // ==========================================
+  // 6. IMAGE MANAGEMENT
+  // ==========================================
+
+  const selectImage = (index) => {
+    // Save current canvas state before switching
+    if (canvasRef.current && currentImage) {
+      const editedImgSrc = canvasRef.current.toDataURL("image/png");
+      setImages((prev) =>
+        prev.map((img, idx) =>
+          idx === currentImageIndex ? { ...img, editedImgSrc, history } : img
+        )
+      );
+    }
+    setCurrentImageIndex(index);
+  };
+
+  const removeImage = (index, e) => {
+    e.stopPropagation();
+    if (window.confirm("Remove this image?")) {
+      setImages((prev) => prev.filter((_, idx) => idx !== index));
+      if (currentImageIndex >= index && currentImageIndex > 0) {
+        setCurrentImageIndex((prev) => prev - 1);
+      }
+      if (images.length === 1) {
+        setMode("initial");
+      }
     }
   };
 
   const handleSave = () => {
-    if (onSave && canvasRef.current) {
-      // Reset zoom and pan before saving
-      const originalZoom = zoom;
-      const originalPan = { ...pan };
+    if (!onSave) return;
 
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
+    // Generate final images with edits
+    const savePromises = images.map((img, idx) => {
+      return new Promise((resolve) => {
+        if (idx === currentImageIndex && canvasRef.current) {
+          // Current image - get from canvas
+          const originalZoom = zoom;
+          const originalPan = { ...pan };
+          setZoom(1);
+          setPan({ x: 0, y: 0 });
 
-      setTimeout(() => {
-        const canvas = canvasRef.current;
-        const imageDataUrl = canvas.toDataURL("image/png");
-        onSave(imageDataUrl, history, imgSrc);
+          setTimeout(() => {
+            const editedImgSrc = canvasRef.current.toDataURL("image/png");
+            setZoom(originalZoom);
+            setPan(originalPan);
+            resolve({
+              id: img.id,
+              imgSrc: img.imgSrc,
+              editedImgSrc,
+              history: img.history
+            });
+          }, 100);
+        } else {
+          // Generate edited image for other images
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+          const image = new Image();
 
-        // Restore zoom/pan
-        setZoom(originalZoom);
-        setPan(originalPan);
-      }, 100);
-    }
+          image.onload = () => {
+            canvas.width = image.width;
+            canvas.height = image.height;
+            ctx.drawImage(image, 0, 0);
+
+            // Redraw history
+            (img.history || []).forEach((item) => {
+              ctx.strokeStyle = item.color;
+              ctx.lineWidth = item.width;
+              ctx.lineCap = "round";
+              ctx.lineJoin = "round";
+              ctx.fillStyle = item.color;
+
+              if (item.type === "pen" && item.points?.length > 1) {
+                ctx.beginPath();
+                ctx.moveTo(item.points[0].x, item.points[0].y);
+                item.points.forEach((p) => ctx.lineTo(p.x, p.y));
+                ctx.stroke();
+              } else if (item.type === "arrow") {
+                drawArrow(
+                  ctx,
+                  item.x,
+                  item.y,
+                  item.endX,
+                  item.endY,
+                  item.width
+                );
+              } else if (item.type === "rect") {
+                ctx.strokeRect(item.x, item.y, item.w, item.h);
+              } else if (item.type === "circle") {
+                ctx.beginPath();
+                ctx.ellipse(
+                  item.x + item.w / 2,
+                  item.y + item.h / 2,
+                  Math.abs(item.w / 2),
+                  Math.abs(item.h / 2),
+                  0,
+                  0,
+                  2 * Math.PI
+                );
+                ctx.stroke();
+              } else if (item.type === "text") {
+                ctx.font = "bold 24px sans-serif";
+                ctx.textBaseline = "middle";
+                ctx.fillText(item.text, item.x, item.y);
+              }
+            });
+
+            resolve({
+              id: img.id,
+              imgSrc: img.imgSrc,
+              editedImgSrc: canvas.toDataURL("image/png"),
+              history: img.history
+            });
+          };
+          image.src = img.imgSrc;
+        }
+      });
+    });
+
+    Promise.all(savePromises).then((savedImages) => {
+      onSave(savedImages);
+    });
   };
 
   const handleCancel = () => {
@@ -604,14 +969,17 @@ const YPivotQATemplatesImageEditor = ({
     }
   };
 
+  const addMoreImages = () => {
+    fileInputRef.current?.click();
+  };
+
   // ==========================================
-  // 5. UI RENDERING (REACT PORTAL)
+  // 7. UI RENDERING
   // ==========================================
 
   return createPortal(
-    // 1. Removed 'touch-none' from here so buttons work
     <div className="fixed top-0 left-0 w-full h-[100dvh] bg-black/95 z-[9999] flex flex-col overflow-hidden overscroll-none">
-      {/* 2. Added 'relative z-50' here to ensure header sits on top */}
+      {/* HEADER */}
       <div className="relative z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-2 sm:p-3 flex justify-between items-center flex-shrink-0 border-b border-white/10 safe-area-top">
         <div className="flex items-center gap-2">
           <div className="p-1.5 bg-white/20 rounded-lg backdrop-blur-sm">
@@ -619,23 +987,24 @@ const YPivotQATemplatesImageEditor = ({
           </div>
           <div>
             <h2 className="text-xs sm:text-sm font-bold text-white">
-              Fin Check Image Editor Pro
+              Image Editor Pro
             </h2>
             <p className="text-[10px] text-indigo-100 hidden sm:block">
-              Professional QA Annotation Tool
+              {images.length > 0
+                ? `${images.length}/${MAX_IMAGES} images`
+                : "Professional QA Annotation Tool"}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Save Button */}
-          {mode === "editor" && (
+          {mode === "editor" && images.length > 0 && (
             <button
               onClick={handleSave}
               className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/90 hover:bg-white text-indigo-600 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-95"
             >
               <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>Save</span>
+              <span>Save All</span>
             </button>
           )}
 
@@ -671,7 +1040,7 @@ const YPivotQATemplatesImageEditor = ({
               >
                 <Camera className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 group-hover:text-white mb-2 sm:mb-3" />
                 <span className="text-xs sm:text-base text-gray-300 group-hover:text-white font-semibold">
-                  Take Photo
+                  Take Photos
                 </span>
               </button>
 
@@ -684,50 +1053,101 @@ const YPivotQATemplatesImageEditor = ({
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   className="hidden"
                   onChange={handleFileUpload}
                 />
               </label>
             </div>
+            <p className="text-gray-500 text-sm">Max {MAX_IMAGES} images</p>
           </div>
         )}
 
         {/* STATE: CAMERA */}
         {mode === "camera" && (
-          <div className="relative w-full h-full bg-black flex flex-col items-center justify-center">
+          <div className="relative w-full h-full bg-black flex flex-col">
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
-              className="w-full h-full object-contain"
+              className="w-full flex-1 object-contain transition-opacity duration-100"
             />
 
-            <div className="absolute bottom-8 flex items-center gap-4 sm:gap-8 bg-black/50 px-4 sm:px-8 py-4 rounded-full backdrop-blur-md border border-white/10 safe-area-bottom">
-              <button
-                onClick={() => {
-                  stopCamera();
-                  handleCancel();
-                }}
-                className="p-2 sm:p-3 bg-gray-700 rounded-full text-white hover:bg-gray-600 transition-colors"
-              >
-                <X className="w-5 h-5 sm:w-6 sm:h-6" />
-              </button>
+            {/* Captured Images Preview */}
+            {images.length > 0 && (
+              <div className="absolute top-4 left-4 right-4 flex gap-2 overflow-x-auto pb-2">
+                {images.map((img, idx) => (
+                  <div
+                    key={img.id}
+                    className="relative flex-shrink-0 w-12 h-12 sm:w-16 sm:h-16 rounded-lg overflow-hidden border-2 border-white/50"
+                  >
+                    <img
+                      src={img.imgSrc}
+                      alt={`Capture ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <span className="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-[10px] text-center py-0.5">
+                      {idx + 1}
+                    </span>
+                    <button
+                      onClick={(e) => removeImage(idx, e)}
+                      className="absolute top-0 right-0 bg-red-500 rounded-bl-lg p-0.5"
+                    >
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
-              <button
-                onClick={captureImage}
-                className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] hover:scale-105 transition-transform active:scale-95"
-              />
-
-              {deviceType !== "desktop" && (
+            <div className="absolute bottom-8 left-0 right-0 flex items-center justify-center gap-4 sm:gap-8 safe-area-bottom">
+              <div className="flex items-center gap-4 sm:gap-8 bg-black/50 px-4 sm:px-8 py-4 rounded-full backdrop-blur-md border border-white/10">
                 <button
-                  onClick={switchCamera}
+                  onClick={() => {
+                    stopCamera();
+                    if (images.length > 0) {
+                      setMode("editor");
+                    } else {
+                      handleCancel();
+                    }
+                  }}
                   className="p-2 sm:p-3 bg-gray-700 rounded-full text-white hover:bg-gray-600 transition-colors"
-                  title="Switch Camera"
                 >
-                  <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6" />
+                  <X className="w-5 h-5 sm:w-6 sm:h-6" />
                 </button>
-              )}
+
+                <div className="flex flex-col items-center">
+                  <button
+                    onClick={captureImage}
+                    disabled={images.length >= MAX_IMAGES}
+                    className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] hover:scale-105 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  <span className="text-white text-xs mt-1">
+                    {images.length}/{MAX_IMAGES}
+                  </span>
+                </div>
+
+                {images.length > 0 ? (
+                  <button
+                    onClick={finishCapturing}
+                    className="p-2 sm:p-3 bg-green-600 rounded-full text-white hover:bg-green-500 transition-colors"
+                    title="Done Capturing"
+                  >
+                    <Check className="w-5 h-5 sm:w-6 sm:h-6" />
+                  </button>
+                ) : (
+                  deviceType !== "desktop" && (
+                    <button
+                      onClick={switchCamera}
+                      className="p-2 sm:p-3 bg-gray-700 rounded-full text-white hover:bg-gray-600 transition-colors"
+                      title="Switch Camera"
+                    >
+                      <SwitchCamera className="w-5 h-5 sm:w-6 sm:h-6" />
+                    </button>
+                  )
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -739,20 +1159,20 @@ const YPivotQATemplatesImageEditor = ({
               id="image-editor-canvas"
               ref={canvasRef}
               onMouseDown={handleStart}
-              onMouseMove={handleMove}
+              onMouseMove={handleMouseMove}
               onMouseUp={handleEnd}
               onMouseLeave={handleEnd}
               onWheel={handleWheel}
-              onTouchStart={handleStart}
-              onTouchMove={(e) => {
-                handleTouchMove(e);
-                handleMove(e);
-              }}
-              onTouchEnd={() => {
-                handleEnd();
-                handleTouchEndZoom();
-              }}
-              className="object-contain cursor-crosshair touch-none shadow-2xl block"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMoveCanvas}
+              onTouchEnd={handleTouchEndCanvas}
+              className={`object-contain shadow-2xl block ${
+                isDraggingElement
+                  ? "cursor-move"
+                  : hoveredElementId
+                  ? "cursor-pointer"
+                  : "cursor-crosshair"
+              } ${isDraggingElement ? "" : "touch-none"}`}
               style={{
                 transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
                   pan.y / zoom
@@ -760,6 +1180,35 @@ const YPivotQATemplatesImageEditor = ({
                 transformOrigin: "center center"
               }}
             />
+
+            {/* Selected Element Controls */}
+            {selectedElementId && (
+              <div className="absolute top-4 right-4 bg-gray-800 rounded-lg p-2 flex gap-2 shadow-lg z-50">
+                <button
+                  onClick={() => setIsDraggingElement(true)}
+                  className="p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition-colors"
+                  title="Move"
+                >
+                  <Move className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={deleteSelectedElement}
+                  className="p-2 bg-red-600 rounded-lg text-white hover:bg-red-500 transition-colors"
+                  title="Delete"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            {/* Long press indicator */}
+            {isLongPressing && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
+                  Dragging enabled - Move your finger
+                </div>
+              </div>
+            )}
 
             {/* Text Input Modal */}
             {showTextInput && (
@@ -801,14 +1250,59 @@ const YPivotQATemplatesImageEditor = ({
         )}
       </div>
 
+      {/* IMAGE THUMBNAILS (Editor Only) */}
+      {mode === "editor" && images.length > 0 && (
+        <div className="bg-gray-900 border-t border-gray-700 p-2 flex-shrink-0 z-40">
+          <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-2">
+            {images.map((img, idx) => (
+              <div
+                key={img.id}
+                onClick={() => selectImage(idx)}
+                className={`relative flex-shrink-0 cursor-pointer transition-all ${
+                  idx === currentImageIndex
+                    ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-900"
+                    : "opacity-70 hover:opacity-100"
+                }`}
+              >
+                <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden bg-gray-800">
+                  <img
+                    src={img.imgSrc}
+                    alt={`Image ${idx + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <span className="absolute -top-2 -left-2 w-5 h-5 bg-indigo-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                  {idx + 1}
+                </span>
+                <button
+                  onClick={(e) => removeImage(idx, e)}
+                  className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-400 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+
+            {/* Add More Button */}
+            {images.length < MAX_IMAGES && (
+              <button
+                onClick={addMoreImages}
+                className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-lg border-2 border-dashed border-gray-600 hover:border-indigo-500 flex items-center justify-center text-gray-500 hover:text-indigo-400 transition-colors"
+              >
+                <Plus className="w-6 h-6" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* TOOLBAR (Editor Only) */}
       {mode === "editor" && (
         <div className="bg-gray-800 border-t border-gray-700 flex-shrink-0 safe-area-bottom z-50 relative">
-          {/* Settings Panel - Collapsible */}
+          {/* Settings Panel */}
           {showSettings && (
             <div className="p-3 border-b border-gray-700 bg-gray-900/50">
               <div className="flex flex-wrap items-center justify-center gap-4">
-                {/* Colors */}
                 <div className="flex gap-2 items-center">
                   <Palette className="w-4 h-4 text-gray-400" />
                   {[
@@ -832,7 +1326,6 @@ const YPivotQATemplatesImageEditor = ({
                   ))}
                 </div>
 
-                {/* Line Width */}
                 <div className="flex items-center gap-2 bg-gray-700 rounded-lg px-3 py-2">
                   <button
                     onClick={() => setLineWidth(Math.max(1, lineWidth - 1))}
@@ -868,7 +1361,6 @@ const YPivotQATemplatesImageEditor = ({
 
           {/* Main Toolbar */}
           <div className="p-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
-            {/* Drawing Tools */}
             <div className="flex gap-1">
               {[
                 { id: "pen", icon: PenTool },
@@ -879,7 +1371,10 @@ const YPivotQATemplatesImageEditor = ({
               ].map((tool) => (
                 <button
                   key={tool.id}
-                  onClick={() => setActiveTool(tool.id)}
+                  onClick={() => {
+                    setActiveTool(tool.id);
+                    setSelectedElementId(null);
+                  }}
                   className={`p-2 rounded-lg transition-all ${
                     activeTool === tool.id
                       ? "bg-indigo-600 text-white"
@@ -892,7 +1387,6 @@ const YPivotQATemplatesImageEditor = ({
               ))}
             </div>
 
-            {/* Zoom Controls */}
             <div className="flex gap-1 items-center bg-gray-700 rounded-lg px-2">
               <button
                 onClick={handleZoomOut}
@@ -913,7 +1407,6 @@ const YPivotQATemplatesImageEditor = ({
               </button>
             </div>
 
-            {/* Actions */}
             <div className="flex gap-1">
               <button
                 onClick={() => setShowSettings(!showSettings)}
@@ -946,6 +1439,16 @@ const YPivotQATemplatesImageEditor = ({
           </div>
         </div>
       )}
+
+      {/* Hidden file input for adding more images */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={handleFileUpload}
+      />
 
       <style jsx>{`
         .scrollbar-hide::-webkit-scrollbar {

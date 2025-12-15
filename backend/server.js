@@ -244,6 +244,11 @@ import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspe
 ------------------------------ */
 import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
 
+/* ------------------------------
+  Humidity Inspection Report
+------------------------------ */
+
+import FiberNameRoute from "./routes/YorksysOrders/FIberNameRoute.js";
 
 /* -----------------------------
   QC Output Imports
@@ -257,6 +262,12 @@ import QCOutputRoute from "./routes/QCOutput/QCOutputRoute.js";
 import CoverPage from "./routes/YDT/CoverPage/CoverPageRoutes.js";
 /* -----------Sketch Technical-----------------*/
 import sketchTechnical from "./routes/YDT/CoverPage/sketchTechnicalRoutes.js";
+
+/* -----------------------------
+  CE System
+------------------------------ */
+import ceMasterRoutes from "./modules/CESystem/Routes/CEMasterRoutes.js";
+import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -538,6 +549,13 @@ app.use(afterIroning);
 app.use(CoverPage);
 /* -----------Sketch Technical-----------------*/
 app.use(sketchTechnical);
+
+/* ------------------------------
+  CE System Routes
+------------------------------ */
+app.use(ceMasterRoutes);
+app.use(ceTargetMasterRoutes);
+
 
 // process.on("SIGINT", async () => {
 //   try {
