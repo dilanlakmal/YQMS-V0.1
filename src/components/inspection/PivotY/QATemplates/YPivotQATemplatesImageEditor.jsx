@@ -209,8 +209,9 @@ const YPivotQATemplatesImageEditor = ({
         audio: false,
         video: {
           facingMode: initialMode,
-          width: { ideal: 1920 },
-          height: { ideal: 1080 }
+          width: { ideal: 4096, min: 1280 },
+          height: { ideal: 2160, min: 720 },
+          frameRate: { ideal: 30 }
         }
       };
 
@@ -224,7 +225,10 @@ const YPivotQATemplatesImageEditor = ({
       console.error("Camera Error:", err);
       try {
         const fallbackStream = await navigator.mediaDevices.getUserMedia({
-          video: true
+          video: {
+            width: { ideal: 4096 },
+            height: { ideal: 2160 }
+          }
         });
         setStream(fallbackStream);
         if (videoRef.current) videoRef.current.srcObject = fallbackStream;
@@ -258,7 +262,9 @@ const YPivotQATemplatesImageEditor = ({
       const constraints = {
         audio: false,
         video: {
-          facingMode: { exact: nextMode }
+          facingMode: { exact: nextMode },
+          width: { ideal: 4096, min: 1280 },
+          height: { ideal: 2160, min: 720 }
         }
       };
 
@@ -271,7 +277,11 @@ const YPivotQATemplatesImageEditor = ({
       console.warn("Exact switch failed, trying loose constraint...", err);
       try {
         const looseStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: nextMode }
+          video: {
+            facingMode: nextMode,
+            width: { ideal: 4096 },
+            height: { ideal: 2160 }
+          }
         });
         setStream(looseStream);
         if (videoRef.current) {
@@ -294,15 +304,29 @@ const YPivotQATemplatesImageEditor = ({
     }
 
     const video = videoRef.current;
+    // ADD: Check if video is ready with valid dimensions
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.error("Video not ready");
+      return;
+    }
+
     const canvas = document.createElement("canvas");
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0);
+
+    // ADD: High quality rendering settings
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+    //ctx.drawImage(video, 0, 0);
 
     const newImage = {
       id: generateId(),
-      imgSrc: canvas.toDataURL("image/png"),
+      imgSrc: canvas.toDataURL("image/jpeg", 1.0),
+      //imgSrc: canvas.toDataURL("image/png"),
       history: [],
       editedImgSrc: null
     };
@@ -385,6 +409,45 @@ const YPivotQATemplatesImageEditor = ({
   // 2. CANVAS RENDERING ENGINE
   // ==========================================
 
+  // useEffect(() => {
+  //   if (mode === "editor" && imgSrc && canvasRef.current) {
+  //     const canvas = canvasRef.current;
+  //     const ctx = canvas.getContext("2d");
+  //     const img = new Image();
+
+  //     img.onload = () => {
+  //       const screenW = window.innerWidth;
+  //       const screenH = window.innerHeight;
+  //       const headerHeight = 60;
+  //       const toolbarHeight = deviceType === "mobile" ? 180 : 140;
+  //       const thumbnailHeight = images.length > 0 ? 80 : 0;
+  //       const padding = 20;
+
+  //       const maxAvailableWidth = screenW - padding;
+  //       const maxAvailableHeight =
+  //         screenH - headerHeight - toolbarHeight - thumbnailHeight - padding;
+
+  //       const scale = Math.min(
+  //         maxAvailableWidth / img.width,
+  //         maxAvailableHeight / img.height,
+  //         1
+  //       );
+
+  //       const canvasWidth = img.width * scale;
+  //       const canvasHeight = img.height * scale;
+
+  //       canvas.width = canvasWidth;
+  //       canvas.height = canvasHeight;
+
+  //       setCanvasSize({ width: canvasWidth, height: canvasHeight });
+  //       setContext(ctx);
+  //       redrawCanvas(ctx, img, canvasWidth, canvasHeight);
+  //     };
+  //     img.src = imgSrc;
+  //   }
+  // }, [mode, imgSrc, deviceType, images.length]);
+
+  // AFTER - Keep full resolution, use CSS for display
   useEffect(() => {
     if (mode === "editor" && imgSrc && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -409,35 +472,65 @@ const YPivotQATemplatesImageEditor = ({
           1
         );
 
-        const canvasWidth = img.width * scale;
-        const canvasHeight = img.height * scale;
+        // ✅ FIX: Keep canvas at FULL original resolution
+        canvas.width = img.width;
+        canvas.height = img.height;
 
-        canvas.width = canvasWidth;
-        canvas.height = canvasHeight;
+        // ✅ FIX: Use CSS to scale the DISPLAY size only
+        const displayWidth = img.width * scale;
+        const displayHeight = img.height * scale;
+        canvas.style.width = `${displayWidth}px`;
+        canvas.style.height = `${displayHeight}px`;
 
-        setCanvasSize({ width: canvasWidth, height: canvasHeight });
+        // ✅ Store both original and display sizes
+        setCanvasSize({
+          width: img.width, // Original resolution
+          height: img.height, // Original resolution
+          displayWidth: displayWidth, // CSS display size
+          displayHeight: displayHeight,
+          scale: scale // Scale factor for coordinate conversion
+        });
+
         setContext(ctx);
-        redrawCanvas(ctx, img, canvasWidth, canvasHeight);
+        redrawCanvas(ctx, img, img.width, img.height);
       };
       img.src = imgSrc;
     }
   }, [mode, imgSrc, deviceType, images.length]);
 
+  // AFTER - No change needed if you're storing full resolution in canvasSize
+  // Just make sure it uses the original dimensions
   useEffect(() => {
     if (context && imgSrc && canvasSize.width > 0) {
       const img = new Image();
       img.onload = () => {
+        // Uses full resolution width/height
         redrawCanvas(context, img, canvasSize.width, canvasSize.height);
       };
       img.src = imgSrc;
     }
   }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
 
+  // useEffect(() => {
+  //   if (context && imgSrc && canvasSize.width > 0) {
+  //     const img = new Image();
+  //     img.onload = () => {
+  //       redrawCanvas(context, img, canvasSize.width, canvasSize.height);
+  //     };
+  //     img.src = imgSrc;
+  //   }
+  // }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
+
   const redrawCanvas = (ctx, img, width, height) => {
     if (!ctx) return;
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
+
+    // ✅ High quality rendering
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
     ctx.translate(pan.x, pan.y);
     ctx.scale(zoom, zoom);
     ctx.drawImage(img, 0, 0, width, height);
@@ -614,14 +707,32 @@ const YPivotQATemplatesImageEditor = ({
   // 5. INTERACTION HANDLERS
   // ==========================================
 
+  // const getCoords = (e) => {
+  //   const canvas = canvasRef.current;
+  //   const rect = canvas.getBoundingClientRect();
+  //   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+  //   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+  //   const x = (clientX - rect.left - pan.x) / zoom;
+  //   const y = (clientY - rect.top - pan.y) / zoom;
+
+  //   return { x, y };
+  // };
+
+  // AFTER - Account for display scaling
   const getCoords = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    const x = (clientX - rect.left - pan.x) / zoom;
-    const y = (clientY - rect.top - pan.y) / zoom;
+    // ✅ Calculate the ratio between internal size and display size
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    // ✅ Convert screen coordinates to canvas coordinates
+    const x = ((clientX - rect.left) * scaleX - pan.x) / zoom;
+    const y = ((clientY - rect.top) * scaleY - pan.y) / zoom;
 
     return { x, y };
   };
