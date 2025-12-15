@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ArrowRightLeft } from "lucide-react";
+import { ArrowRightLeft, X, Loader2 } from "lucide-react";
 import LanguageSelector from "./LanguageSelector";
 import GlossarySelector from "./glossaries/GlossarySelector";
 import { API_BASE_URL } from "../../../config";
@@ -22,6 +22,7 @@ const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
 export default function FileTranslator() {
   const [uploadedFiles, setUploadedFiles] = useState([]) // Files uploaded via file input
   const [selectedBlobFiles, setSelectedBlobFiles] = useState([]) // Files selected from blob storage
+  const [translationResult, setTranslationResult] = useState(null) // New state for storing translation results
   const [targetLanguage, setTargetLanguage] = useState("km")
   const [sourceLanguage, setSourceLanguage] = useState("auto") // Change from "en" to "auto"
   const [isLoading, setIsLoading] = useState(false)
@@ -55,6 +56,81 @@ export default function FileTranslator() {
       setLoadingFiles(false)
     }
   }
+
+  // Helper to find the best matching translated file for a given source
+  const getMostRecentTranslation = (sourceFile, targetFiles) => {
+    if (!sourceFile || !targetFiles) return null;
+
+    const sourceName = sourceFile.name || sourceFile.cleanName || sourceFile.originalName;
+    // Handle files with no extension or weird names safely
+    const lastDotIndex = sourceName.lastIndexOf('.');
+    const sourceBase = lastDotIndex !== -1 ? sourceName.substring(0, lastDotIndex) : sourceName;
+    const sourceExt = lastDotIndex !== -1 ? sourceName.substring(lastDotIndex + 1).toLowerCase() : "";
+
+    // Normalize for comparison: remove all non-alphanumeric characters to handle spaces vs underscores
+    // This handles the case where backend sanitizes "File Name" to "File_Name"
+    const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, "");
+    const normalizedSourceBase = normalize(sourceBase);
+
+    // Find best candidate from target files
+    const candidates = targetFiles.filter(tf => {
+      const tfName = tf.cleanName;
+      const tfLastDotIndex = tfName.lastIndexOf('.');
+      const tfExt = tfLastDotIndex !== -1 ? tfName.substring(tfLastDotIndex + 1).toLowerCase() : "";
+
+      if (tfExt !== sourceExt) return false;
+
+      const { baseName } = parseTranslatedFileName(tfName);
+      // Compare normalized bases
+      return normalize(baseName) === normalizedSourceBase;
+    });
+
+    // Sort by date descending (newest first)
+    candidates.sort((a, b) => {
+      const dateA = new Date(a.lastModified).getTime();
+      const dateB = new Date(b.lastModified).getTime();
+      return dateB - dateA;
+    });
+
+    return candidates.length > 0 ? candidates[0] : null;
+  };
+
+  // Polling effect: When there is a translation result, keep checking for files until they appear
+  useEffect(() => {
+    if (!translationResult) return;
+
+    let attempts = 0;
+    const maxAttempts = 60; // 2 minutes approx
+    const intervalStr = 2000;
+
+    const checkAndReload = async () => {
+      // Check if we have matched all files yet
+      const allFound = translationResult.sourceFiles.every(source => {
+        return getMostRecentTranslation(source, blobFiles.target);
+      });
+
+      if (allFound) {
+        // Stop polling if done
+        return;
+      }
+
+      // Reload
+      await loadBlobFiles();
+      attempts++;
+    };
+
+    // Initial check is handled by the immediate loadBlobFiles call after translate
+    // We just set interval here
+    const timer = setInterval(() => {
+      if (attempts >= maxAttempts) {
+        clearInterval(timer);
+        return;
+      }
+      checkAndReload();
+    }, intervalStr);
+
+    return () => clearInterval(timer);
+  }, [translationResult]); // Dependency on translationResult ensures we start when a new job finishes
 
   useEffect(() => {
     if (activeTab === "upload") {
@@ -247,7 +323,10 @@ export default function FileTranslator() {
 
       // Extract clean name for download
       const file = blobFiles.source.find(f => f.originalName === fileName) ||
-        blobFiles.target.find(f => f.originalName === fileName)
+        blobFiles.target.find(f => f.originalName === fileName) ||
+        // If not found in current list, try to construct one
+        { cleanName: fileName }
+
       const downloadName = file?.cleanName || fileName
 
       link.download = downloadName
@@ -260,6 +339,28 @@ export default function FileTranslator() {
       setTimeout(() => setSuccess(""), 3000)
     } catch (err) {
       setError(`Failed to download: ${err.message}`)
+    }
+  }
+
+  const openBlobFile = async (container, fileName) => {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/translate-files/download?container=${container}&fileName=${encodeURIComponent(fileName)}`
+      )
+
+      if (!response.ok) {
+        throw new Error("Open failed")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      window.open(url, '_blank')
+
+      // Clean up URL object after a delay to allow new window to load
+      setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+
+    } catch (err) {
+      setError(`Failed to open: ${err.message}`)
     }
   }
 
@@ -428,13 +529,24 @@ export default function FileTranslator() {
 
       if (response.ok && data?.success) {
         setProgress("Translation completed!")
-        setSuccess(data.message || `Translation job submitted successfully! Check the "My Files" tab to download translated files.`)
+        // Store result for display instead of just success text
+        setTranslationResult({
+          sourceFiles: [...uploadedFiles, ...selectedBlobFiles],
+          timestamp: new Date()
+        })
+
+        // UPDATE: Set actual cost and character count from Azure response
+        if (data.cost) {
+          setCharacterCount(data.cost.totalCharactersCharged);
+          // Ensure it's a number
+          setEstimatedCost(parseFloat(data.cost.estimatedCost));
+        }
+
         setUploadedFiles([])
         setSelectedBlobFiles([])
 
-        setTimeout(() => {
-          loadBlobFiles()
-        }, 1000)
+        // Load files immediately to ensure we can match results
+        loadBlobFiles()
       } else {
         const errorMessage = data?.error || data?.details || "Translation failed. Please try again."
         setError(errorMessage)
@@ -454,6 +566,7 @@ export default function FileTranslator() {
     setError("")
     setSuccess("")
     setProgress("")
+    setTranslationResult(null)
     setSelectedGlossary(null)
   }
 
@@ -589,213 +702,189 @@ export default function FileTranslator() {
             />
           </div>
 
-          {/* Available Files from Blob Storage */}
-          {blobFiles.source.length > 0 && (
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold translator-text-foreground">
-                Available Files in Storage (Select to translate)
-              </h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto translator-rounded translator-border p-3">
-                {blobFiles.source.map((file, idx) => {
-                  const icon = getFileIcon(file.cleanName)
-                  const isSelected = isBlobFileSelected({ ...file, container: "inputdocuments" })
-                  return (
-                    <div
-                      key={idx}
-                      className={`flex items-center justify-between p-2 translator-rounded cursor-pointer transition-colors ${isSelected ? "translator-primary-bg-light ring-2 ring-primary" : "hover:translator-muted"
-                        }`}
-                      onClick={() => toggleBlobFileSelection({ ...file, container: "inputdocuments" })}
-                    >
-                      <div className="flex items-center gap-3 flex-1">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => { }}
-                          className="w-4 h-4"
-                        />
-                        <span className="inline-flex items-center justify-center w-8 h-8 translator-rounded font-bold text-xs" style={{ backgroundColor: icon.bg, color: icon.color }}>
-                          {icon.text}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm translator-text-foreground truncate font-medium">{file.cleanName}</p>
-                          <p className="text-xs translator-muted-foreground">{formatFileSize(file.size)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
+          {/* Main Content Area */}
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 min-h-[400px] flex flex-col items-center justify-center p-8">
 
-          {/* File Upload Area */}
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold translator-text-foreground">Or Upload New Files</h3>
-            <div
-              onDragEnter={handleDrag}
-              onDragLeave={handleDrag}
-              onDragOver={handleDrag}
-              onDrop={handleDrop}
-              className={`translator-rounded border-2 border-dashed p-12 text-center transition-all cursor-pointer ${dragActive
-                ? "translator-primary translator-text-foreground shadow-md border-solid"
-                : "translator-card translator-border hover:translator-primary-text hover:border-primary"
-                } ${isLoading ? "opacity-50 cursor-not-allowed" : ""}`}
-              onClick={!isLoading ? handleAttachmentClick : undefined}
-            >
-              <svg
-                className={`mx-auto mb-4 h-12 w-12 translator-primary-text opacity-80 ${dragActive ? "scale-110" : ""} transition-transform`}
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
+            {/* 1. Empty State: Upload Area (Split Columns) */}
+            {uploadedFiles.length === 0 && selectedBlobFiles.length === 0 && !translationResult && (
+              <div
+                className="flex w-full max-w-4xl gap-8"
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-              <p className="mb-2 translator-text-foreground font-medium">Drag and drop your files here</p>
-              <p className="mb-4 text-sm translator-muted-foreground">or click to browse files</p>
-              <p className="mb-4 text-xs translator-muted-foreground">
-                Supported: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, HTML, XML • Max 50MB per file
-              </p>
-            </div>
+                {/* Left Column: Drag & Drop */}
+                <div className="flex-1 flex flex-col items-center justify-center p-8 border-r border-gray-200 dark:border-gray-700">
+                  <div className="w-40 h-32 mb-6 bg-blue-50 dark:bg-blue-900/10 rounded-xl flex items-center justify-center">
+                    <svg className="w-20 h-20 text-blue-400 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-normal text-gray-700 dark:text-gray-200">Drag and drop</h3>
+                </div>
 
-            <button
-              onClick={handleAttachmentClick}
-              disabled={isLoading}
-              className="w-full translator-rounded translator-primary px-4 py-2.5 font-medium hover:opacity-90 transition-opacity flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-              </svg>
-              Attach Files
-            </button>
-          </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.html,.xml"
-            onChange={handleFileSelect}
-            className="hidden"
-            disabled={isLoading}
-          />
-
-          {/* Progress/Error/Success Messages */}
-          {progress && (
-            <div className="translator-rounded translator-border p-4 text-sm flex items-start gap-3" style={{ backgroundColor: "oklch(0.9 0.05 250 / 0.15)" }}>
-              <svg className="h-5 w-5 mt-0.5 flex-shrink-0 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              <div className="flex-1">
-                <p className="font-medium">{progress}</p>
+                {/* Right Column: Browse Files */}
+                <div className="flex-1 flex flex-col items-center justify-center p-8">
+                  <p className="text-gray-500 mb-6 text-lg">Or choose a file</p>
+                  <button
+                    onClick={handleAttachmentClick}
+                    disabled={isLoading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded text-sm font-medium transition-colors shadow-sm mb-4 w-full max-w-[200px]"
+                  >
+                    Browse your files
+                  </button>
+                  <p className="text-xs text-gray-400 text-center max-w-[200px]">
+                    Supported file types: .docx, .pdf, .pptx, .xlsx
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="translator-rounded translator-border translator-destructive-bg-light p-4 text-sm translator-destructive">
-              <p className="font-medium">Error</p>
-              <p className="text-xs mt-1">{error}</p>
-            </div>
-          )}
-
-          {success && (
-            <div className="translator-rounded translator-border p-4 text-sm" style={{ backgroundColor: "oklch(0.9 0.05 150 / 0.15)" }}>
-              <p className="font-medium">{success}</p>
-            </div>
-          )}
-
-          {/* Selected Files List */}
-          {(uploadedFiles.length > 0 || selectedBlobFiles.length > 0) && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold translator-text-foreground">
-                  Selected Files ({uploadedFiles.length + selectedBlobFiles.length}) • {totalFileSizeMB} MB
-                </h3>
-                <button
-                  onClick={handleClear}
-                  disabled={isLoading}
-                  className="text-xs font-medium translator-muted-foreground hover:translator-text-foreground"
-                >
-                  Clear All
-                </button>
-              </div>
-              <div className="space-y-2 max-h-64 overflow-y-auto">
-                {/* Uploaded files */}
-                {uploadedFiles.map((file, index) => {
-                  const icon = getFileIcon(file.name)
-                  return (
-                    <div key={`upload-${index}`} className="flex items-center justify-between translator-rounded translator-card translator-border p-3">
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs" style={{ backgroundColor: icon.bg, color: icon.color }}>
-                          {icon.text}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm translator-text-foreground truncate font-medium">{file.name}</p>
-                          <p className="text-xs translator-muted-foreground">{formatFileSize(file.size)}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => removeUploadedFile(index)}
-                        disabled={isLoading}
-                        className="text-xs font-medium translator-destructive translator-rounded px-3 py-1.5 hover:translator-destructive-bg-light"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )
-                })}
-                {/* Selected blob files */}
-                {selectedBlobFiles.map((file, index) => {
-                  const icon = getFileIcon(file.cleanName)
-                  return (
-                    <div key={`blob-${index}`} className="flex items-center justify-between translator-rounded translator-card translator-border p-3">
-                      <div className="flex items-center gap-3 flex-1">
-                        <span className="inline-flex items-center justify-center w-10 h-10 translator-rounded font-bold text-xs" style={{ backgroundColor: icon.bg, color: icon.color }}>
-                          {icon.text}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm translator-text-foreground truncate font-medium">{file.cleanName}</p>
-                          <p className="text-xs translator-muted-foreground">{formatFileSize(file.size)} • From Storage</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => toggleBlobFileSelection(file)}
-                        disabled={isLoading}
-                        className="text-xs font-medium translator-destructive translator-rounded px-3 py-1.5 hover:translator-destructive-bg-light"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Translate Button */}
-          <button
-            onClick={handleTranslate}
-            disabled={(uploadedFiles.length === 0 && selectedBlobFiles.length === 0) || isLoading}
-            className="w-full translator-rounded translator-primary px-6 py-3.5 font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
-          >
-            {isLoading ? (
-              <span className="flex items-center justify-center gap-3">
-                <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Translating...
-              </span>
-            ) : (
-              `Translate ${uploadedFiles.length + selectedBlobFiles.length} File${(uploadedFiles.length + selectedBlobFiles.length) !== 1 ? "s" : ""}`
             )}
-          </button>
+
+            {/* 2. Selected State (Pre-translation) */}
+            {(uploadedFiles.length > 0 || selectedBlobFiles.length > 0) && !translationResult && (
+              <div className="w-full max-w-2xl">
+                <div className="grid gap-4">
+                  {[...uploadedFiles, ...selectedBlobFiles].map((file, idx) => {
+                    const isBlob = !!file.container; // simplistic check
+                    const fileName = file.name || file.cleanName;
+                    const fileSize = file.size;
+                    const icon = getFileIcon(fileName);
+
+                    return (
+                      <div key={idx} className="flex items-center justify-between bg-gray-100 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center gap-4 overflow-hidden">
+                          <div className="w-12 h-12 flex items-center justify-center rounded bg-white dark:bg-gray-800 shadow-sm text-gray-500">
+                            {/* Simple File Icon */}
+                            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                          </div>
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate pr-4">{fileName}</h4>
+                            <p className="text-sm text-gray-500">{formatFileSize(fileSize)}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => isBlob ? toggleBlobFileSelection(file) : removeUploadedFile(idx)}
+                          className="p-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        >
+                          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Translate Action */}
+                <div className="mt-8 flex justify-end">
+                  <button
+                    onClick={handleTranslate}
+                    disabled={isLoading}
+                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded font-medium shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoading && <Loader2 className="animate-spin w-4 h-4" />}
+                    {isLoading ? "Translating..." : "Translate"}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* 3. Result State (Post-translation) */}
+            {translationResult && (
+              <div className="w-full max-w-2xl">
+                <div className="grid gap-4">
+                  {(() => {
+                    return translationResult.sourceFiles.map((sourceFile, idx) => {
+                      const sourceName = sourceFile.name || sourceFile.cleanName || sourceFile.originalName;
+                      const translatedFile = getMostRecentTranslation(sourceFile, blobFiles.target);
+
+                      return (
+                        <div key={idx} className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
+                          <div className="flex items-center gap-4 overflow-hidden">
+                            <div className="w-12 h-12 flex items-center justify-center rounded bg-white dark:bg-gray-800 shadow-sm text-blue-500">
+                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0">
+                              <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate pr-4">{translatedFile ? translatedFile.cleanName : sourceName}</h4>
+                              <div className="flex items-center gap-2">
+                                {translatedFile ? (
+                                  <span className="text-sm text-green-600 font-medium">Translated</span>
+                                ) : (
+                                  <span className="text-sm text-blue-600 flex items-center gap-1">
+                                    <Loader2 className="w-3 h-3 animate-spin" />
+                                    Finalizing...
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Open Action */}
+                            <button
+                              onClick={() => translatedFile && openBlobFile("documentstraslated", translatedFile.originalName)}
+                              disabled={!translatedFile}
+                              className="px-4 py-2 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 disabled:opacity-50 disabled:cursor-wait"
+                            >
+                              Open translation
+                            </button>
+
+                            {/* Download Action */}
+                            <button
+                              onClick={() => translatedFile && downloadBlobFile("documentstraslated", translatedFile.originalName)}
+                              disabled={!translatedFile}
+                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait"
+                            >
+                              Download result
+                            </button>
+
+                            <button
+                              onClick={handleClear}
+                              className="p-2 text-gray-400 hover:text-gray-600 ml-2"
+                              title="Close"
+                            >
+                              <X size={20} />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+            )}
+
+            {/* Hidden Input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              multiple
+              accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.html,.xml"
+              onChange={handleFileSelect}
+              className="hidden"
+              disabled={isLoading}
+            />
+
+            {/* Error/Progress Overlays */}
+            {progress && (
+              <div className="mt-6 text-sm text-gray-500 flex items-center gap-2">
+                <Loader2 className="animate-spin w-4 h-4 text-blue-500" />
+                {progress}
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-6 w-full max-w-2xl bg-red-50 text-red-600 p-3 rounded text-sm border border-red-100">
+                {error}
+              </div>
+            )}
+
+          </div>
         </>
       )}
 
