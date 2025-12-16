@@ -72,22 +72,22 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
             total: { $sum: 1 },
             passed: {
               $sum: {
-                $cond: [{ $eq: ['$inspectionResult', 'Pass'] }, 1, 0]
+                $cond: [{ $eq: ['$approvalStatus', 'Accepted'] }, 1, 0]
               }
             },
             failed: {
               $sum: {
-                $cond: [{ $eq: ['$inspectionResult', 'Fail'] }, 1, 0]
+                $cond: [{ $eq: ['$approvalStatus', 'Reworked'] }, 1, 0]
               }
             },
             pending: {
               $sum: {
-                $cond: [{ $eq: ['$inspectionResult', 'Pending'] }, 1, 0]
+                $cond: [{ $eq: ['$approvalStatus', 'Pending Approval'] }, 1, 0]
               }
             },
             hold: {
               $sum: {
-                $cond: [{ $eq: ['$inspectionResult', 'Hold'] }, 1, 0]
+                $cond: [{ $eq: ['$inspectionResult', 'Not Complete'] }, 1, 0]
               }
             }
           }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import InspectionReportModal from '../P88Legacy/inspectionreport.jsx';
 import FilterPanel from './FilterPanel.jsx';
+import SummaryCards from './SummaryCards.jsx';
 import ReactPaginate from 'react-paginate';
 
 const SummaryP88Data = () => {
@@ -33,26 +34,10 @@ const SummaryP88Data = () => {
     direction: 'desc'
   });
 
-  // Debounce filter changes to avoid excessive API calls
   useEffect(() => {
-    const handler = setTimeout(() => {
-      // Reset to first page on filter change
-      if (currentPage !== 0) {
-        setCurrentPage(0);
-      } else {
-        fetchInspectionData();
-      }
-    }, 500); // 500ms debounce delay
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [filters, sortConfig]);
-
-  useEffect(() => {
-    fetchInspectionData();
+    // Fetch options only on initial component mount
     fetchFilterOptions();
-  }, [currentPage]);
+  }, []);
 
   const fetchInspectionData = useCallback(async () => {
     try {
@@ -78,7 +63,21 @@ const SummaryP88Data = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, filters, sortConfig]);
+  }, [currentPage, filters, sortConfig]); // fetchInspectionData is dependent on these states
+
+  // This primary useEffect handles all data fetching logic
+  useEffect(() => {
+    // Debounce to prevent rapid API calls while typing in filters
+    const handler = setTimeout(() => {
+      fetchInspectionData();
+    }, 500); // 500ms delay
+
+    // Cleanup function to cancel the timeout if dependencies change again quickly
+    return () => {
+      clearTimeout(handler);
+    };
+    // This effect runs when the page, filters, or sort config change
+  }, [currentPage, filters, sortConfig, fetchInspectionData]);
 
   const fetchFilterOptions = async () => {
     try {
@@ -146,7 +145,16 @@ const SummaryP88Data = () => {
       ...prev,
       [key]: value
     }));
+    // When filters change, always go back to the first page
+    setCurrentPage(0);
   };
+
+  // const handleFilterChange = (key, value) => {
+  //   setFilters(prev => ({
+  //     ...prev,
+  //     [key]: value
+  //   }));
+  // };
 
   const handlePageClick = (event) => {
     setCurrentPage(event.selected);
@@ -182,34 +190,9 @@ const SummaryP88Data = () => {
 
   return (
     <div className="p-5 bg-gray-50 min-h-screen">
-      {/* Header Section */}
-      <div className="bg-white p-5 rounded-lg mb-5 shadow-sm">
-        <h2 className="text-2xl font-bold text-gray-800 mb-5">P88 Inspection Summary</h2>
-        <div className="flex gap-5 flex-wrap">
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-md min-w-[120px]">
-            <span className="text-2xl font-bold text-blue-500">{summary.total}</span>
-            <span className="text-xs text-gray-600 mt-1">Total Inspections</span>
-          </div>
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-md min-w-[120px]">
-            <span className="text-2xl font-bold text-green-500">
-              {summary.accepted}
-            </span>
-            <span className="text-xs text-gray-600 mt-1">Passed</span>
-          </div>
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-md min-w-[120px]">
-            <span className="text-2xl font-bold text-red-500">
-              {summary.failed}
-            </span>
-            <span className="text-xs text-gray-600 mt-1">Failed</span>
-          </div>
-          <div className="flex flex-col items-center p-4 bg-gray-50 rounded-md min-w-[120px]">
-            <span className="text-2xl font-bold text-yellow-500">
-              {summary.pending}
-            </span>
-            <span className="text-xs text-gray-600 mt-1">Pending</span>
-          </div>
-        </div>
-      </div>
+      
+      {/* Summary Cards Section */}
+      <SummaryCards summary={summary} />
 
       <FilterPanel filters={filters} onFilterChange={handleFilterChange} options={filterOptions} />
 
