@@ -51,9 +51,9 @@ const UploadP88Data = () => {
       return;
     }
 
-    if (selectedFile.size > 10 * 1024 * 1024) {
+    if (selectedFile.size > 50 * 1024 * 1024) {
       setUploadStatus('error');
-      setUploadMessage('File size must be less than 10MB.');
+      setUploadMessage('File size must be less than 50MB.');
       return;
     }
 
@@ -110,14 +110,11 @@ const UploadP88Data = () => {
           return;
         }
 
-        console.log('📄 Raw CSV first line:', lines[0]);
 
         // Parse headers
         const headers = parseCSVLine(lines[0]).map(header => 
           header.replace(/^["']|["']$/g, '').trim()
         );
-        
-        console.log('📋 Parsed headers:', headers);
         setCsvHeaders(headers);
 
         // Parse data rows
@@ -139,16 +136,6 @@ const UploadP88Data = () => {
           }
         }).filter(row => row !== null);
 
-        console.log('📊 Sample parsed data:', {
-          totalRows: data.length,
-          firstRow: data[0],
-          sampleValues: {
-            'Group #': data[0]?.['Group #'],
-            'Supplier': data[0]?.['Supplier'],
-            'Style': data[0]?.['Style']
-          }
-        });
-
         setCsvData(data);
         setUploadStatus('success');
         setUploadMessage(`Successfully parsed ${data.length} rows with ${headers.length} columns.`);
@@ -164,7 +151,6 @@ const UploadP88Data = () => {
 
   // Upload data to server
   const handleUpload = async () => {
-    console.log('🚀 Upload button clicked!');
 
     if (!file || csvData.length === 0) {
       setUploadMessage('No valid data to upload.');
@@ -284,7 +270,7 @@ const UploadP88Data = () => {
               </span>
             </p>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              Supports CSV files up to 10MB
+              Supports CSV files up to 50MB
             </p>
           </div>
         </div>

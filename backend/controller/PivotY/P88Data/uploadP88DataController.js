@@ -7,7 +7,7 @@ import { Readable } from 'stream';
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB limit
+    fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (req, file, cb) => {
     if (file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
@@ -18,23 +18,430 @@ const upload = multer({
   }
 });
 
+// Enhanced flexible header mapping system
+const createFlexibleMapping = () => {
+  return {
+    // Group variations
+    groupNumber: [
+      'Group #', 'Group Number', 'GroupNumber', 'Group ID', 'Group'
+    ],
+    
+    // Inspection variations
+    inspectionNumbers: [
+      'Inspection #', 'Inspection Number', 'InspectionNumber', 'Inspection ID'
+    ],
+    
+    // Supplier variations
+    supplier: [
+      'Supplier', 'Supplier Name', 'Supplier Code'
+    ],
+    
+    // PO variations
+    poNumbers: [
+      'PO #', 'PO Number', 'PONumber', 'Purchase Order', 'PO'
+    ],
+    
+    // SKU variations
+    skuNumbers: [
+      'SKU #', 'SKU Number', 'SKUNumber', 'SKU', 'SKU Code'
+    ],
+    
+    // Style variations
+    style: [
+      'Style', 'Style Number', 'Style Code', 'Style #'
+    ],
+    
+    // Color variations
+    colors: [
+      'Color', 'Colors', 'Colour', 'Colours'
+    ],
+    
+    // Size variations
+    sizes: [
+      'Size', 'Sizes', 'Size Code'
+    ],
+    
+    // Brand variations
+    brand: [
+      'Brand', 'Brand Name'
+    ],
+    
+    // Buyer variations
+    buyer: [
+      'Buyer', 'Buyer Name'
+    ],
+    
+    // Client variations
+    client: [
+      'Client', 'Client Name', 'Customer'
+    ],
+    
+    // Material variations
+    material: [
+      'Material', 'Materials', 'Fabric'
+    ],
+    
+    // Origin variations
+    origin: [
+      'Origin', 'Country of Origin', 'Manufacturing Origin'
+    ],
+    
+    // Port variations
+    portOfLoading: [
+      'Port of Loading', 'Loading Port', 'POL'
+    ],
+    
+    portOfArrival: [
+      'Port of Arrival', 'Arrival Port', 'POA', 'Destination Port'
+    ],
+    
+    // Destination variations
+    destination: [
+      'Destination', 'Final Destination'
+    ],
+    
+    // Description variations
+    description: [
+      'Description', 'Product Description', 'Item Description'
+    ],
+    
+    // SKU Name variations
+    skuName: [
+      'SKU Name', 'Product Name', 'Item Name'
+    ],
+    
+    // Packing variations
+    packingType: [
+      'Packing Type', 'Packaging Type', 'Pack Type'
+    ],
+    
+    // Quantity variations
+    masterCartonPackedQty: [
+      'Master Carton / Packed Qty', 'Master Carton Qty', 'Carton Qty'
+    ],
+    
+    innerPackQty: [
+      'Inner Pack Qty', 'Inner Pack Quantity', 'Pack Qty'
+    ],
+    
+    totalPoItemsQty: [
+      'Total PO Items Qty', 'Total PO Qty', 'PO Quantity'
+    ],
+    
+    qtyToInspect: [
+      'Qty to Inspect', 'Quantity to Inspect', 'Inspect Qty'
+    ],
+    
+    qtyInspected: [
+      'Qty Inspected', 'Quantity Inspected', 'Inspected Qty'
+    ],
+    
+    // Price variations
+    retailPrice: [
+      'Retail Price', 'Price', 'Unit Price'
+    ],
+    
+    // Date variations
+    orderDate: [
+      'Order Date', 'PO Date', 'Purchase Date'
+    ],
+    
+    etd: [
+      'ETD', 'Estimated Time of Departure', 'Departure Date'
+    ],
+    
+    eta: [
+      'ETA', 'Estimated Time of Arrival', 'Arrival Date'
+    ],
+    
+    scheduledInspectionDate: [
+      'Scheduled Inspection Date', 'Inspection Schedule', 'Planned Inspection Date'
+    ],
+    
+    submittedInspectionDate: [
+      'Submitted Inspection Date', 'Inspection Submitted Date'
+    ],
+    
+    decisionDate: [
+      'Decision Date', 'Final Decision Date'
+    ],
+    
+    lastModifiedDate: [
+      'Last Modified Date', 'Modified Date', 'Updated Date'
+    ],
+    
+    // Terms variations
+    terms: [
+      'Terms', 'Payment Terms', 'Trade Terms'
+    ],
+    
+    // Inspection result variations
+    inspectionResult: [
+      'Inspection Result', 'Result', 'Final Result'
+    ],
+    
+    // Approval variations
+    approvalStatus: [
+      'Approval Status', 'Status', 'Approval'
+    ],
+    
+    // Report variations
+    reportType: [
+      'Report Type', 'Type of Report'
+    ],
+    
+    // Inspector variations
+    inspector: [
+      'Inspector', 'Inspector Name', 'QC Inspector'
+    ],
+    
+    // Project variations
+    project: [
+      'Project', 'Project Name', 'Project Code'
+    ],
+    
+    // Sample variations
+    sampleSize: [
+      'Sample Size', 'Sample Qty', 'Sample Quantity'
+    ],
+    
+    sampleInspected: [
+      'Sample Inspected', 'Inspected Sample', 'Sample Checked'
+    ],
+    
+    // Inspector decision variations
+    inspectorDecision: [
+      'Inspector Decision', 'QC Decision', 'Final Decision'
+    ],
+    
+    // Location variations
+    inspectionLocation: [
+      'Inspection Location', 'Location', 'Facility'
+    ],
+    
+    // Defect rate variations
+    defectRate: [
+      'Defect Rate', 'Defect %', 'Defect Percentage'
+    ],
+    
+    // Defect count variations
+    totalNumberOfDefects: [
+      'Total Number of Defects', 'Total Defects', 'Defect Count'
+    ],
+    
+    totalDefectiveUnits: [
+      'Total Defective Units', 'Defective Units', 'Bad Units'
+    ],
+    
+    totalGoodUnits: [
+      'Total Good Units', 'Good Units', 'Acceptable Units'
+    ],
+    
+    // Comments variations
+    allComments: [
+      'All Comments', 'Comments', 'Notes', 'Remarks'
+    ],
+    
+    // PoLine variations
+    poLineCustomerPO: [
+      'PoLine:Customer PO#', 'PoLine Customer PO#', 'Customer PO#', 'PoLine\nPO#'
+    ],
+    
+    poLineMainPO: [
+      'PoLine:Main PO#', 'PoLine Main PO#', 'Main PO#', 'PoLine PO#'
+    ]
+  };
+};
+
+// Function to find matching headers in CSV
+const findMatchingHeader = (csvHeaders, fieldMappings) => {
+  const headerMap = {};
+  const usedHeaders = new Set();
+  
+  // First pass - exact matches
+  Object.keys(fieldMappings).forEach(schemaField => {
+    const possibleHeaders = fieldMappings[schemaField];
+    
+    for (const header of possibleHeaders) {
+      if (csvHeaders.includes(header) && !usedHeaders.has(header)) {
+        headerMap[header] = schemaField;
+        usedHeaders.add(header);
+        break; // Use first exact match found
+      }
+    }
+  });
+  
+  // Second pass - case insensitive matches for unmapped headers
+  Object.keys(fieldMappings).forEach(schemaField => {
+    if (Object.values(headerMap).includes(schemaField)) {
+      return; // Already mapped
+    }
+    
+    const possibleHeaders = fieldMappings[schemaField];
+    
+    for (const header of possibleHeaders) {
+      const matchingCsvHeader = csvHeaders.find(csvHeader => 
+        csvHeader.toLowerCase().trim() === header.toLowerCase().trim() && 
+        !usedHeaders.has(csvHeader)
+      );
+      
+      if (matchingCsvHeader) {
+        headerMap[matchingCsvHeader] = schemaField;
+        usedHeaders.add(matchingCsvHeader);
+        break;
+      }
+    }
+  });
+  
+  return headerMap;
+};
+
+// Enhanced defect column detection
+const isDefectColumn = (columnName, mappedHeaders) => {
+  // If already mapped as standard field, not a defect
+  if (Object.keys(mappedHeaders).includes(columnName)) {
+    return false;
+  }
+  
+  // Known defect summary columns (not individual defects)
+  const defectSummaryColumns = [
+    'Defect Category', 'Defect Code', 'Defect', 'Defect Description',
+    'Qty Critical Defects', 'Qty Major Defects', 'Qty Minor Defects',
+    'Critical Defects', 'Major Defects', 'Minor Defects'
+  ];
+  
+  if (defectSummaryColumns.some(col => 
+    columnName.toLowerCase().includes(col.toLowerCase())
+  )) {
+    return false;
+  }
+  
+  // Standard column patterns that should not be treated as defects
+  const standardPatterns = [
+    'group', 'inspection', 'supplier', 'po', 'sku', 'style', 'color', 'size',
+    'brand', 'buyer', 'client', 'material', 'origin', 'port', 'destination',
+    'description', 'packing', 'carton', 'pack', 'retail', 'price', 'order',
+    'date', 'terms', 'total', 'qty', 'quantity', 'etd', 'eta', 'scheduled', 
+    'submitted', 'decision', 'modified', 'result', 'approval', 'status', 
+    'report', 'type', 'inspector', 'project', 'sample', 'location', 'rate', 
+    'number', 'defective', 'good', 'units', 'critical', 'major', 'minor', 
+    'comments', 'poline', 'remarks', 'notes'
+  ];
+  
+  // Check if column name contains standard field patterns
+  const isStandardField = standardPatterns.some(pattern => 
+    columnName.toLowerCase().includes(pattern.toLowerCase())
+  );
+  
+  return !isStandardField;
+};
+
+// Helper functions for data processing
+const parseDate = (dateString) => {
+  if (!dateString || dateString.trim() === '') return null;
+  const date = new Date(dateString);
+  return isNaN(date.getTime()) ? null : date;
+};
+
+const parseDateArray = (dateString) => {
+  if (!dateString || dateString.trim() === '') return [];
+  const dates = dateString.split(',').map(d => parseDate(d.trim())).filter(d => d !== null);
+  return dates;
+};
+
+const parseNumber = (numberString) => {
+  if (!numberString || numberString.trim() === '') return 0;
+  const cleaned = numberString.toString().replace(/[,$%]/g, '');
+  const num = parseFloat(cleaned);
+  return isNaN(num) ? 0 : num;
+};
+
+const parseArray = (arrayString) => {
+  if (!arrayString || arrayString.trim() === '') return [];
+  return arrayString.split(',').map(item => item.trim()).filter(item => item !== '');
+};
+
+// Enhanced field value processing
+const processFieldValue = (schemaField, value) => {
+  if (!value && value !== 0) return getDefaultValue(schemaField);
+  
+  // Handle array fields
+  if (['poNumbers', 'skuNumbers', 'colors', 'sizes', 'inspectionNumbers', 'poLineCustomerPO', 'poLineMainPO'].includes(schemaField)) {
+    return parseArray(value);
+  }
+  // Handle date array fields (ETD, ETA)
+  else if (['etd', 'eta'].includes(schemaField)) {
+    return parseDateArray(value);
+  }
+  // Handle other date fields
+  else if (schemaField.includes('Date')) {
+    return parseDate(value);
+  }
+  // Handle number fields
+  else if (['masterCartonPackedQty', 'innerPackQty', 'retailPrice', 'totalPoItemsQty',
+            'qtyToInspect', 'qtyInspected', 'sampleSize', 'sampleInspected',
+            'defectRate', 'totalNumberOfDefects', 'totalDefectiveUnits', 'totalGoodUnits'].includes(schemaField)) {
+    return parseNumber(value);
+  }
+  // Handle enum fields
+  else if (schemaField === 'inspectionResult') {
+    const validResults = ['Pass', 'Fail', 'Pending', 'Hold'];
+    const normalizedValue = value ? value.trim() : '';
+    return validResults.includes(normalizedValue) ? normalizedValue : '';
+  }
+  // Handle string fields
+  else {
+    return value.toString().trim();
+  }
+};
+
+// Get default values for different field types
+const getDefaultValue = (schemaField) => {
+  if (['poNumbers', 'skuNumbers', 'colors', 'sizes', 'inspectionNumbers', 'poLineCustomerPO', 'poLineMainPO', 'etd', 'eta'].includes(schemaField)) {
+    return [];
+  }
+  else if (['masterCartonPackedQty', 'innerPackQty', 'retailPrice', 'totalPoItemsQty',
+            'qtyToInspect', 'qtyInspected', 'sampleSize', 'sampleInspected',
+            'defectRate', 'totalNumberOfDefects', 'totalDefectiveUnits', 'totalGoodUnits'].includes(schemaField)) {
+    return 0;
+  }
+  else if (schemaField.includes('Date')) {
+    return null;
+  }
+  else {
+    return '';
+  }
+};
+
 // Generate unique key from inspection numbers array
 const generateInspectionNumbersKey = (inspectionNumbers) => {
   if (!inspectionNumbers || inspectionNumbers.length === 0) {
-    return null; // Return null for empty arrays (sparse index will ignore)
+    return null;
   }
   
-  // Filter out empty values, sort for consistency, and join
   const cleanNumbers = inspectionNumbers
-    .filter(num => num && num.toString().trim() !== '') // Remove empty/null values
-    .map(num => num.toString().trim()) // Convert to string and trim
-    .sort(); // Sort for consistency regardless of order
+    .filter(num => num && num.toString().trim() !== '')
+    .map(num => num.toString().trim())
+    .sort();
   
   if (cleanNumbers.length === 0) {
     return null;
   }
   
-  return cleanNumbers.join('-'); // Use - as delimiter
+  return cleanNumbers.join('-');
+};
+
+// Generate unique key for records without inspection numbers
+const generateFallbackKey = (mappedData, rowIndex) => {
+  const keyParts = [
+    mappedData.groupNumber || '',
+    mappedData.supplier || '',
+    mappedData.style || '',
+    (mappedData.poNumbers || []).join(','),
+    rowIndex.toString()
+  ].filter(part => part !== '');
+  
+  return keyParts.length > 0 ? keyParts.join('|') : `row_${rowIndex}`;
 };
 
 // Generate upload batch ID
@@ -42,254 +449,123 @@ const generateUploadBatch = () => {
   return `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 };
 
-// Function to find the group number column
-const findGroupNumberColumn = (headers) => {
-  console.log('🔍 Looking for Group # column in headers:', headers);
+// Enhanced CSV to schema mapping function
+const mapCsvToSchema = (csvRow, uploadBatch, rowIndex) => {
+  const csvHeaders = Object.keys(csvRow);
+  const fieldMappings = createFlexibleMapping();
+  const headerMap = findMatchingHeader(csvHeaders, fieldMappings);
   
-  const possibleGroupColumns = [
-    'Group #', 'Group Number', 'GroupNumber', 'Group ID', 'Group',
-    'group #', 'group number', 'groupnumber', 'group id', 'group',
-    'GROUP #', 'GROUP NUMBER', 'GROUPNUMBER', 'GROUP ID', 'GROUP'
-  ];
+  console.log(`\n🔄 Processing row ${rowIndex + 1}:`);
+  console.log(`   Available columns: [${csvHeaders.join(', ')}]`);
+  console.log(`   Mapped headers:`, Object.keys(headerMap).length, 'of', csvHeaders.length);
   
-  for (const possibleName of possibleGroupColumns) {
-    if (headers.includes(possibleName)) {
-      console.log(`✅ Found exact group column match: "${possibleName}"`);
-      return possibleName;
-    }
-  }
-  
-  for (let i = 0; i < headers.length; i++) {
-    const header = headers[i];
-    const lowerHeader = header.toLowerCase().trim();
-    if (lowerHeader.includes('group') && lowerHeader.includes('#')) {
-      console.log(`✅ Found partial group column match: "${header}"`);
-      return header;
-    }
-  }
-  
-  console.log('❌ No group column found');
-  return null;
-};
-
-// Function to map CSV headers to schema fields
-const mapCsvToSchema = (csvRow, groupColumnName, uploadBatch) => {
-  const fixedHeaders = [
-    'Group #', 'Group Number', 'GroupNumber', 'Group ID', 'Group',
-    'Supplier', 'PO #', 'SKU #', 'Style', 'Color', 'Size', 
-    'Brand', 'Buyer', 'Client', 'Material', 'Origin', 
-    'Port of Loading', 'Port of Arrival', 'Destination', 
-    'Description', 'SKU Name', 'Packing Type', 
-    'Master Carton / Packed Qty', 'Inner Pack Qty', 'Retail Price', 
-    'Order Date', 'Terms', 'Total PO Items Qty', 'Qty to Inspect', 
-    'Qty Inspected', 'ETD', 'ETA', 'Scheduled Inspection Date', 
-    'Submitted Inspection Date', 'Decision Date', 'Last Modified Date', 
-    'Inspection Result', 'Approval Status', 'Report Type', 'Inspector', 
-    'Project', 'Sample Size', 'Sample Inspected', 'Inspector Decision', 
-    'Inspection Location', 'Defect Rate', 'Total Number of Defects', 
-    'Total Defective Units', 'Total Good Units', 'Qty Critical Defects', 
-    'Defect Category', 'Defect Code', 'Defect', 'Qty Major Defects', 
-    'Qty Minor Defects', 'All Comments', 'Inspection #',
-    'PoLine:Customer PO#', 'PoLine:Main PO#', 'PoLine PO#', 'PoLine\nPO#'
-  ];
-
-  const mainFields = {
-    'Supplier': 'supplier',
-    'PO #': 'poNumbers',
-    'SKU #': 'skuNumbers',
-    'Style': 'style',
-    'Color': 'colors',
-    'Size': 'sizes',
-    'Brand': 'brand',
-    'Buyer': 'buyer',
-    'Client': 'client',
-    'Material': 'material',
-    'Origin': 'origin',
-    'Port of Loading': 'portOfLoading',
-    'Port of Arrival': 'portOfArrival',
-    'Destination': 'destination',
-    'Description': 'description',
-    'SKU Name': 'skuName',
-    'Packing Type': 'packingType',
-    'Master Carton / Packed Qty': 'masterCartonPackedQty',
-    'Inner Pack Qty': 'innerPackQty',
-    'Retail Price': 'retailPrice',
-    'Order Date': 'orderDate',
-    'Terms': 'terms',
-    'Total PO Items Qty': 'totalPoItemsQty',
-    'Qty to Inspect': 'qtyToInspect',
-    'Qty Inspected': 'qtyInspected',
-    'ETD': 'etd',
-    'ETA': 'eta',
-    'Scheduled Inspection Date': 'scheduledInspectionDate',
-    'Submitted Inspection Date': 'submittedInspectionDate',
-    'Decision Date': 'decisionDate',
-    'Last Modified Date': 'lastModifiedDate',
-    'Inspection Result': 'inspectionResult',
-    'Approval Status': 'approvalStatus',
-    'Report Type': 'reportType',
-    'Inspector': 'inspector',
-    'Project': 'project',
-    'Sample Size': 'sampleSize',
-    'Sample Inspected': 'sampleInspected',
-    'Inspector Decision': 'inspectorDecision',
-    'Inspection Location': 'inspectionLocation',
-    'Defect Rate': 'defectRate',
-    'Total Number of Defects': 'totalNumberOfDefects',
-    'Total Defective Units': 'totalDefectiveUnits',
-    'Total Good Units': 'totalGoodUnits',
-    'All Comments': 'allComments',
-    'Inspection #': 'inspectionNumbers',
-    'PoLine:Customer PO#': 'poLineCustomerPO',
-    'PoLine:Main PO#': 'poLineMainPO'
-  };
-
   const mappedData = {};
   const defects = [];
   const defectCategories = [];
   const defectCodes = [];
-  const defectDescriptions = []; // ✅ This will ONLY contain "Defect" column data
+  const defectDescriptions = [];
   let qtyCriticalDefects = 0;
   let qtyMajorDefects = 0;
   let qtyMinorDefects = 0;
-
-  // Helper functions
-  const parseDate = (dateString) => {
-    if (!dateString || dateString.trim() === '') return null;
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? null : date;
-  };
-
-  const parseDateArray = (dateString) => {
-    if (!dateString || dateString.trim() === '') return [];
-    const dates = dateString.split(',').map(d => parseDate(d.trim())).filter(d => d !== null);
-    return dates;
-  };
-
-  const parseNumber = (numberString) => {
-    if (!numberString || numberString.trim() === '') return 0;
-    const cleaned = numberString.toString().replace(/[,$%]/g, '');
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : num;
-  };
-
-  const parseArray = (arrayString) => {
-    if (!arrayString || arrayString.trim() === '') return [];
-    return arrayString.split(',').map(item => item.trim()).filter(item => item !== '');
-  };
-
-  // Set group number
-  if (groupColumnName && csvRow[groupColumnName] !== undefined) {
-    const groupValue = csvRow[groupColumnName];
-    if (groupValue !== null && groupValue !== undefined) {
-      mappedData.groupNumber = groupValue.toString().trim();
-    } else {
-      mappedData.groupNumber = '';
-    }
-  } else {
-    mappedData.groupNumber = '';
-  }
-
+  
+  // Initialize all schema fields with default values
+  Object.keys(fieldMappings).forEach(schemaField => {
+    mappedData[schemaField] = getDefaultValue(schemaField);
+  });
+  
   // Process each CSV column
-  Object.keys(csvRow).forEach(csvHeader => {
+  csvHeaders.forEach(csvHeader => {
     const value = csvRow[csvHeader];
-   
-    if (mainFields[csvHeader]) {
-      const schemaField = mainFields[csvHeader];
-     
-      if (['poNumbers', 'skuNumbers', 'colors', 'sizes', 'inspectionNumbers', 'poLineCustomerPO', 'poLineMainPO'].includes(schemaField)) {
-        mappedData[schemaField] = parseArray(value);
-      }
-      else if (['etd', 'eta'].includes(schemaField)) {
-        mappedData[schemaField] = parseDateArray(value);
-      }
-      else if (schemaField.includes('Date')) {
-        mappedData[schemaField] = parseDate(value);
-      }
-      else if (['masterCartonPackedQty', 'innerPackQty', 'retailPrice', 'totalPoItemsQty',
-                'qtyToInspect', 'qtyInspected', 'sampleSize', 'sampleInspected',
-                'defectRate', 'totalNumberOfDefects', 'totalDefectiveUnits', 'totalGoodUnits'].includes(schemaField)) {
-        mappedData[schemaField] = parseNumber(value);
-      }
-      else if (schemaField === 'inspectionResult') {
-        const validResults = ['Pass', 'Fail', 'Pending', 'Hold'];
-        const normalizedValue = value ? value.trim() : '';
-        mappedData[schemaField] = validResults.includes(normalizedValue) ? normalizedValue : '';
-      }
-      else {
-        mappedData[schemaField] = value ? value.toString().trim() : '';
-      }
+    
+    if (headerMap[csvHeader]) {
+      // This is a standard field
+      const schemaField = headerMap[csvHeader];
+      mappedData[schemaField] = processFieldValue(schemaField, value);
+      console.log(`     ✅ MAPPED "${csvHeader}" → ${schemaField}`);
     }
-    // ✅ FIXED: Handle special defect summary fields for top-level arrays
+    // Handle special defect summary fields
     else if (csvHeader === 'Defect Category') {
       const category = value ? value.toString().trim() : '';
-      if (category) defectCategories.push(category);
+      if (category) {
+        defectCategories.push(category);
+        console.log(`     📊 Defect category: "${category}"`);
+      }
     }
     else if (csvHeader === 'Defect Code') {
       const code = value ? value.toString().trim() : '';
-      if (code) defectCodes.push(code);
+      if (code) {
+        defectCodes.push(code);
+        console.log(`     📊 Defect code: "${code}"`);
+      }
     }
-    else if (csvHeader === 'Defect') {
-      // ✅ ONLY add to defectDescriptions if it's from the "Defect" column
+    else if (csvHeader === 'Defect' || csvHeader === 'Defect Description') {
       const description = value ? value.toString().trim() : '';
-      if (description) defectDescriptions.push(description);
+      if (description) {
+        defectDescriptions.push(description);
+        console.log(`     📊 Defect description: "${description}"`);
+      }
     }
-    else if (csvHeader === 'Qty Critical Defects') {
+    else if (csvHeader === 'Qty Critical Defects' || csvHeader === 'Critical Defects') {
       qtyCriticalDefects += parseNumber(value);
+      console.log(`     🔴 Critical defects: ${parseNumber(value)}`);
     }
-    else if (csvHeader === 'Qty Major Defects') {
+    else if (csvHeader === 'Qty Major Defects' || csvHeader === 'Major Defects') {
       qtyMajorDefects += parseNumber(value);
+      console.log(`     🟡 Major defects: ${parseNumber(value)}`);
     }
-    else if (csvHeader === 'Qty Minor Defects') {
+    else if (csvHeader === 'Qty Minor Defects' || csvHeader === 'Minor Defects') {
       qtyMinorDefects += parseNumber(value);
+      console.log(`     🟢 Minor defects: ${parseNumber(value)}`);
     }
-    // ✅ FIXED: Handle dynamic defect columns - DON'T add to defectDescriptions
-    else if (!fixedHeaders.includes(csvHeader) && csvHeader !== groupColumnName) {
+    // Handle dynamic defect columns
+    else if (isDefectColumn(csvHeader, headerMap)) {
       const count = parseNumber(value);
       if (count > 0) {
         defects.push({
           defectName: csvHeader,
           count: count
         });
-        // ❌ REMOVED: defectDescriptions.push(csvHeader); 
-        // Dynamic defect names should NOT go into defectDescriptions
+        console.log(`     🔍 DEFECT "${csvHeader}": ${count}`);
       }
     }
+    else {
+      console.log(`     ⚠️ UNMAPPED: "${csvHeader}"`);
+    }
   });
-
-  // Initialize arrays if not set
-  if (!mappedData.poLineCustomerPO) mappedData.poLineCustomerPO = [];
-  if (!mappedData.poLineMainPO) mappedData.poLineMainPO = [];
-
-  // ✅ FIXED: Set top-level defect summary data
+  
+  // Set defect summary data
   mappedData.defects = defects;
   mappedData.defectCategories = [...new Set(defectCategories)];
   mappedData.defectCodes = [...new Set(defectCodes)];
-  mappedData.defectDescriptions = [...new Set(defectDescriptions)]; // Only "Defect" column data
+  mappedData.defectDescriptions = [...new Set(defectDescriptions)];
   mappedData.qtyCriticalDefects = qtyCriticalDefects;
   mappedData.qtyMajorDefects = qtyMajorDefects;
   mappedData.qtyMinorDefects = qtyMinorDefects;
-
+  
   // Add upload batch
   mappedData.uploadBatch = uploadBatch;
-
-  // Generate unique key from inspection numbers
+  
+  // Generate unique key
   mappedData.inspectionNumbersKey = generateInspectionNumbersKey(mappedData.inspectionNumbers);
-
-  console.log(`🔑 Generated key for inspection numbers [${(mappedData.inspectionNumbers || []).join(', ')}]: "${mappedData.inspectionNumbersKey}"`);
-  console.log(`📋 Defect Categories: [${defectCategories.join(', ')}]`);
-  console.log(`🔢 Defect Codes: [${defectCodes.join(', ')}]`);
-  console.log(`📝 Defect Descriptions (from "Defect" column only): [${defectDescriptions.join(', ')}]`);
-  console.log(`⚡ Dynamic Defects (not in defectDescriptions): [${defects.map(d => d.defectName).join(', ')}]`);
-
+  
+  // If no inspection numbers, create fallback unique key
+  if (!mappedData.inspectionNumbersKey) {
+    mappedData.inspectionNumbersKey = generateFallbackKey(mappedData, rowIndex);
+  }
+  
+  console.log(`   ✅ FINAL RESULTS:`);
+  console.log(`      Group Number: "${mappedData.groupNumber}"`);
+  console.log(`      Inspection Numbers: [${mappedData.inspectionNumbers.join(', ')}]`);
+  console.log(`      Inspection Key: "${mappedData.inspectionNumbersKey}"`);
+  console.log(`      Defects Count: ${mappedData.defects.length}`);
+  console.log(`      Upload Batch: "${mappedData.uploadBatch}"`);
+  
   return mappedData;
 };
 
-// Controller function to handle CSV upload
+// Enhanced controller function to handle CSV upload
 export const uploadP88Data = async (req, res) => {
   try {
-    console.log('🚀 Upload controller started');
-   
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -325,51 +601,36 @@ export const uploadP88Data = async (req, res) => {
 
     // Generate upload batch ID
     const uploadBatch = generateUploadBatch();
-    console.log(`🏷️ Upload batch ID: ${uploadBatch}`);
-
-    const headers = Object.keys(csvData[0]);
-    const groupColumnName = findGroupNumberColumn(headers);
+    console.log(`🏷️ Upload batch: ${uploadBatch}`);
     
-    if (!groupColumnName) {
-      console.log('⚠️ No group number column found, but continuing with processing...');
-    } else {
-      console.log(`🎯 Using group column: "${groupColumnName}"`);
-    }
+    // Analyze CSV headers
+    const headers = Object.keys(csvData[0]);
+    console.log(`📋 CSV Headers Analysis:`);
+    console.log(`   Total columns: ${headers.length}`);
+    console.log(`   Headers: [${headers.join(', ')}]`);
+    
+    // Test mapping on headers
+    const fieldMappings = createFlexibleMapping();
+    const testHeaderMap = findMatchingHeader(headers, fieldMappings);
+    console.log(`🔍 Header Mapping Test: ${Object.keys(testHeaderMap).length} mapped`);
+    
+    const unmappedHeaders = headers.filter(h => !Object.keys(testHeaderMap).includes(h));
+    console.log(`⚠️ Unmapped Headers (${unmappedHeaders.length}): [${unmappedHeaders.join(', ')}]`);
+    
+    // Identify potential defect columns
+    const potentialDefects = unmappedHeaders.filter(h => isDefectColumn(h, testHeaderMap));
+    console.log(`🔍 Potential Defect Columns (${potentialDefects.length}): [${potentialDefects.join(', ')}]`);
 
     const savedRecords = [];
     const updatedRecords = [];
     const errors = [];
-    let emptyGroupRecords = 0;
-    let emptyInspectionNumbers = 0;
 
     // Process each row individually
     for (let i = 0; i < csvData.length; i++) {
       try {
         const row = csvData[i];
+        const mappedData = mapCsvToSchema(row, uploadBatch, i);
         
-        const mappedData = mapCsvToSchema(row, groupColumnName, uploadBatch);
-        
-        // Track empty group numbers
-        if (!mappedData.groupNumber || mappedData.groupNumber.trim() === '') {
-          emptyGroupRecords++;
-          console.log(`📝 Processing row ${i + 1} with EMPTY group number`);
-        } else {
-          console.log(`💾 Processing row ${i + 1} with group: "${mappedData.groupNumber}"`);
-        }
-
-        // Track empty inspection numbers
-        if (!mappedData.inspectionNumbersKey) {
-          emptyInspectionNumbers++;
-          console.log(`⚠️ Row ${i + 1} has NO inspection numbers key`);
-        } else {
-          console.log(`🔑 Row ${i + 1} inspection key: "${mappedData.inspectionNumbersKey}"`);
-        }
-
-        console.log(`   Inspection Numbers: [${(mappedData.inspectionNumbers || []).join(', ')}]`);
-        console.log(`   PoLine Customer PO: ${mappedData.poLineCustomerPO.length} items`);
-        console.log(`   PoLine Main PO: ${mappedData.poLineMainPO.length} items`);
-        console.log(`   Defects: ${mappedData.defects.length} items`);
-
         try {
           // Try to create new record first
           const p88Record = new p88LegacyData(mappedData);
@@ -381,7 +642,7 @@ export const uploadP88Data = async (req, res) => {
         } catch (saveError) {
           // Handle duplicate key error for inspectionNumbersKey
           if (saveError.code === 11000 && saveError.keyPattern?.inspectionNumbersKey) {
-            console.log(`🔄 Duplicate inspection numbers key found for row ${i + 1}, updating existing record`);
+            console.log(`🔄 Duplicate key found for row ${i + 1}, updating...`);
             
             try {
               const updatedRecord = await p88LegacyData.findOneAndUpdate(
@@ -398,19 +659,18 @@ export const uploadP88Data = async (req, res) => {
               );
               
               if (updatedRecord) {
-                console.log(`✅ Successfully UPDATED existing record for row ${i + 1}`);
+                console.log(`✅ Successfully UPDATED record for row ${i + 1}`);
                 updatedRecords.push({
                   rowNumber: i + 1,
                   recordId: updatedRecord._id,
-                  inspectionNumbersKey: mappedData.inspectionNumbersKey,
-                  inspectionNumbers: mappedData.inspectionNumbers
+                  inspectionNumbersKey: mappedData.inspectionNumbersKey
                 });
               } else {
                 throw new Error('Failed to update existing record');
               }
               
             } catch (updateError) {
-              console.error(`❌ Error updating existing record for row ${i + 1}:`, updateError.message);
+              console.error(`❌ Update error for row ${i + 1}:`, updateError.message);
               errors.push({
                 rowNumber: i + 1,
                 error: `Update failed: ${updateError.message}`,
@@ -419,11 +679,9 @@ export const uploadP88Data = async (req, res) => {
             }
             
           } else {
-            // Other save errors
             throw saveError;
           }
         }
-
       } catch (error) {
         console.error(`❌ Error processing row ${i + 1}:`, error.message);
         errors.push({
@@ -435,13 +693,11 @@ export const uploadP88Data = async (req, res) => {
     }
 
     console.log(`🎉 Processing complete:`);
-    console.log(`   📊 New records saved: ${savedRecords.length}`);
-    console.log(`   🔄 Records updated: ${updatedRecords.length}`);
+    console.log(`   📊 New records: ${savedRecords.length}`);
+    console.log(`   🔄 Updated records: ${updatedRecords.length}`);
     console.log(`   ❌ Errors: ${errors.length}`);
-    console.log(`   📝 Empty group records: ${emptyGroupRecords}`);
-    console.log(`   🔍 Empty inspection numbers: ${emptyInspectionNumbers}`);
 
-    // Return response
+    // Return enhanced response
     res.status(200).json({
       success: true,
       message: `Successfully processed ${csvData.length} rows`,
@@ -449,13 +705,18 @@ export const uploadP88Data = async (req, res) => {
         totalRows: csvData.length,
         newRecords: savedRecords.length,
         updatedRecords: updatedRecords.length,
-        emptyGroupRecords: emptyGroupRecords,
-        emptyInspectionNumbers: emptyInspectionNumbers,
         errors: errors.length,
         errorDetails: errors,
         updateDetails: updatedRecords,
         uploadBatch: uploadBatch,
-        groupColumnUsed: groupColumnName || 'Not found'
+        headerAnalysis: {
+          totalHeaders: headers.length,
+          mappedHeaders: Object.keys(testHeaderMap).length,
+          unmappedHeaders: unmappedHeaders.length,
+          potentialDefectColumns: potentialDefects.length,
+          unmappedHeadersList: unmappedHeaders,
+          potentialDefectsList: potentialDefects
+        }
       }
     });
 
