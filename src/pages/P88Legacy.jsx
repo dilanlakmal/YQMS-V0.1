@@ -276,9 +276,9 @@ const P88Legacy = () => {
       {/* Main Content Area */}
       <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
-          <div className="transform transition-all duration-500 ease-out">
+          {/* <div className="transform transition-all duration-500 ease-out"> */}
             {activeComponent}
-          </div>
+          {/* </div> */}
         </div>
       </div>
 

@@ -66,21 +66,21 @@ const SummaryCards = ({ summary }) => {
   return (
     <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100 mb-8">
       {/* Header Section */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
+      {/* <div className="flex items-center justify-between mb-8"> */}
+        {/* <div>
           <h2 className="text-3xl font-bold text-gray-800 mb-2">
             P88 Inspection Summary
           </h2>
           <p className="text-gray-600">
             Overview of all inspection activities and their current status
           </p>
-        </div>
+        </div> */}
         {/* <div className="hidden md:block">
           <div className="bg-blue-100 p-3 rounded-full">
             <span className="text-2xl">🔍</span>
           </div>
         </div> */}
-      </div>
+      {/* </div> */}
 
       {/* Cards Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">

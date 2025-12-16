@@ -8,13 +8,14 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
   try {
       const {
         page = 1,
-        limit = 100,
+        limit = 200,
         inspector,
         approvalStatus,
         reportType,
         supplier,
         project,
         inspectionResult,
+        poNumbers,
         sortBy = 'scheduledInspectionDate',
         sortOrder = 'desc'
       } = req.query;
@@ -44,6 +45,9 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       
       if (inspectionResult) {
         filter.inspectionResult = inspectionResult;
+      }
+       if (poNumbers) {
+        filter.poNumbers = { $regex: poNumbers, $options: 'i' };
       }
 
       // Build sort object
@@ -332,11 +336,12 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 // Get distinct values for filter dropdowns
 export const getFilterOptions = async (req, res) => {
   try {
-    const [inspectors, suppliers, projects, reportTypes] = await Promise.all([
+    const [inspectors, suppliers, projects, reportTypes, poNumbers] = await Promise.all([
       p88LegacyData.distinct('inspector').exec(),
       p88LegacyData.distinct('supplier').exec(),
       p88LegacyData.distinct('project').exec(),
       p88LegacyData.distinct('reportType').exec(),
+      p88LegacyData.distinct('poNumbers').exec(),
     ]);
 
     // Helper to filter out null/empty values and sort alphabetically
@@ -349,6 +354,7 @@ export const getFilterOptions = async (req, res) => {
         supplier: cleanAndSort(suppliers),
         project: cleanAndSort(projects),
         reportType: cleanAndSort(reportTypes),
+        poNumbers: cleanAndSort(poNumbers),
       },
       message: 'Filter options retrieved successfully'
     });

@@ -125,6 +125,13 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
       placeholder: 'Search project...',
       icon: '🏗️',
       options: options.project || []
+    },
+    {
+      key: 'poNumbers',
+      label: 'PO #',
+      placeholder: 'Search PO #...',
+      icon: '🏷️',
+      options: options.poNumbers || []
     }
   ];
 
@@ -142,7 +149,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
               <p className="text-sm text-gray-600">
                 {hasActiveFilters 
                   ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} applied`
-                  : 'Use filters to narrow down your search'
+                  : ''
                 }
               </p>
             </div>
@@ -164,7 +171,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
 
       {/* Filter Fields */}
       <div className="p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
           {filterFields.map((field) => (
             <FilterField
               key={field.key}
