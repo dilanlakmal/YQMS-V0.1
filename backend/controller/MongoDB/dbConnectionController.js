@@ -107,6 +107,9 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 
+//P88Data
+import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   // process.env.MongoDB_URI_ym_prod
@@ -255,6 +258,8 @@ export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
 //YDT Exported Models
 /*------------- Cover page ----------------*/
 export const CoverPage = createCoverPageSchema(ymProdConnection);
+//P88Data
+export const p88LegacyData = createP88DataSchema(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {
