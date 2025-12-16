@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import UploadP88Data from "../components/inspection/PivotY/P88Legacy/uploadP88Data";
+import SummaryP88Data from "../components/inspection/PivotY/P88Legacy/summaryP88DataTable";
 
 const P88Legacy = () => {
   const { user } = useAuth();
@@ -29,7 +30,7 @@ const P88Legacy = () => {
         id: "summary_date",
         label: "Summary P88 Data",
         icon: <BarChart3 size={20} />,
-        component: <div>View the summary of the P88 Data</div>, 
+        component: <SummaryP88Data />,
         description: "View summary data"
       },
     ],

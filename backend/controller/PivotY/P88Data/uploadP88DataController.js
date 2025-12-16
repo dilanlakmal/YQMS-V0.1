@@ -454,11 +454,7 @@ const mapCsvToSchema = (csvRow, uploadBatch, rowIndex) => {
   const csvHeaders = Object.keys(csvRow);
   const fieldMappings = createFlexibleMapping();
   const headerMap = findMatchingHeader(csvHeaders, fieldMappings);
-  
-  console.log(`\n🔄 Processing row ${rowIndex + 1}:`);
-  console.log(`   Available columns: [${csvHeaders.join(', ')}]`);
-  console.log(`   Mapped headers:`, Object.keys(headerMap).length, 'of', csvHeaders.length);
-  
+
   const mappedData = {};
   const defects = [];
   const defectCategories = [];
@@ -481,41 +477,34 @@ const mapCsvToSchema = (csvRow, uploadBatch, rowIndex) => {
       // This is a standard field
       const schemaField = headerMap[csvHeader];
       mappedData[schemaField] = processFieldValue(schemaField, value);
-      console.log(`     ✅ MAPPED "${csvHeader}" → ${schemaField}`);
     }
     // Handle special defect summary fields
     else if (csvHeader === 'Defect Category') {
       const category = value ? value.toString().trim() : '';
       if (category) {
         defectCategories.push(category);
-        console.log(`     📊 Defect category: "${category}"`);
       }
     }
     else if (csvHeader === 'Defect Code') {
       const code = value ? value.toString().trim() : '';
       if (code) {
         defectCodes.push(code);
-        console.log(`     📊 Defect code: "${code}"`);
       }
     }
     else if (csvHeader === 'Defect' || csvHeader === 'Defect Description') {
       const description = value ? value.toString().trim() : '';
       if (description) {
         defectDescriptions.push(description);
-        console.log(`     📊 Defect description: "${description}"`);
       }
     }
     else if (csvHeader === 'Qty Critical Defects' || csvHeader === 'Critical Defects') {
       qtyCriticalDefects += parseNumber(value);
-      console.log(`     🔴 Critical defects: ${parseNumber(value)}`);
     }
     else if (csvHeader === 'Qty Major Defects' || csvHeader === 'Major Defects') {
       qtyMajorDefects += parseNumber(value);
-      console.log(`     🟡 Major defects: ${parseNumber(value)}`);
     }
     else if (csvHeader === 'Qty Minor Defects' || csvHeader === 'Minor Defects') {
       qtyMinorDefects += parseNumber(value);
-      console.log(`     🟢 Minor defects: ${parseNumber(value)}`);
     }
     // Handle dynamic defect columns
     else if (isDefectColumn(csvHeader, headerMap)) {
@@ -525,7 +514,6 @@ const mapCsvToSchema = (csvRow, uploadBatch, rowIndex) => {
           defectName: csvHeader,
           count: count
         });
-        console.log(`     🔍 DEFECT "${csvHeader}": ${count}`);
       }
     }
     else {
@@ -552,13 +540,6 @@ const mapCsvToSchema = (csvRow, uploadBatch, rowIndex) => {
   if (!mappedData.inspectionNumbersKey) {
     mappedData.inspectionNumbersKey = generateFallbackKey(mappedData, rowIndex);
   }
-  
-  console.log(`   ✅ FINAL RESULTS:`);
-  console.log(`      Group Number: "${mappedData.groupNumber}"`);
-  console.log(`      Inspection Numbers: [${mappedData.inspectionNumbers.join(', ')}]`);
-  console.log(`      Inspection Key: "${mappedData.inspectionNumbersKey}"`);
-  console.log(`      Defects Count: ${mappedData.defects.length}`);
-  console.log(`      Upload Batch: "${mappedData.uploadBatch}"`);
   
   return mappedData;
 };
@@ -597,29 +578,20 @@ export const uploadP88Data = async (req, res) => {
       });
     }
 
-    console.log(`📊 Parsed ${csvData.length} rows from CSV`);
 
     // Generate upload batch ID
     const uploadBatch = generateUploadBatch();
-    console.log(`🏷️ Upload batch: ${uploadBatch}`);
     
     // Analyze CSV headers
     const headers = Object.keys(csvData[0]);
-    console.log(`📋 CSV Headers Analysis:`);
-    console.log(`   Total columns: ${headers.length}`);
-    console.log(`   Headers: [${headers.join(', ')}]`);
-    
     // Test mapping on headers
     const fieldMappings = createFlexibleMapping();
     const testHeaderMap = findMatchingHeader(headers, fieldMappings);
-    console.log(`🔍 Header Mapping Test: ${Object.keys(testHeaderMap).length} mapped`);
     
     const unmappedHeaders = headers.filter(h => !Object.keys(testHeaderMap).includes(h));
-    console.log(`⚠️ Unmapped Headers (${unmappedHeaders.length}): [${unmappedHeaders.join(', ')}]`);
     
     // Identify potential defect columns
     const potentialDefects = unmappedHeaders.filter(h => isDefectColumn(h, testHeaderMap));
-    console.log(`🔍 Potential Defect Columns (${potentialDefects.length}): [${potentialDefects.join(', ')}]`);
 
     const savedRecords = [];
     const updatedRecords = [];
@@ -636,13 +608,11 @@ export const uploadP88Data = async (req, res) => {
           const p88Record = new p88LegacyData(mappedData);
           const savedRecord = await p88Record.save();
           
-          console.log(`✅ Successfully saved NEW record for row ${i + 1}`);
           savedRecords.push(savedRecord);
           
         } catch (saveError) {
           // Handle duplicate key error for inspectionNumbersKey
           if (saveError.code === 11000 && saveError.keyPattern?.inspectionNumbersKey) {
-            console.log(`🔄 Duplicate key found for row ${i + 1}, updating...`);
             
             try {
               const updatedRecord = await p88LegacyData.findOneAndUpdate(
@@ -659,7 +629,6 @@ export const uploadP88Data = async (req, res) => {
               );
               
               if (updatedRecord) {
-                console.log(`✅ Successfully UPDATED record for row ${i + 1}`);
                 updatedRecords.push({
                   rowNumber: i + 1,
                   recordId: updatedRecord._id,
@@ -691,11 +660,6 @@ export const uploadP88Data = async (req, res) => {
         });
       }
     }
-
-    console.log(`🎉 Processing complete:`);
-    console.log(`   📊 New records: ${savedRecords.length}`);
-    console.log(`   🔄 Updated records: ${updatedRecords.length}`);
-    console.log(`   ❌ Errors: ${errors.length}`);
 
     // Return enhanced response
     res.status(200).json({

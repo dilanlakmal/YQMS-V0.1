@@ -242,7 +242,9 @@ import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspe
 /* ------------------------------
  P88 Data Upoad Routes
 ------------------------------ */
-import p88Routes from './routes/PivotY/P88Data/uploadP88DataRoutes.js';
+import p88Upload from './routes/PivotY/P88Data/uploadP88DataRoutes.js';
+import p88Summarydata from './routes/PivotY/P88Data/summaryP88DataRoutes.js';
+
 
 /* -----------------------------
   After Ironing Import
@@ -539,7 +541,8 @@ app.use(FincheckInspection);
 /* ------------------------------
  P88 Data Upoad Routes
 ------------------------------ */
-app.use(p88Routes);
+app.use(p88Upload);
+app.use(p88Summarydata);
 /* -----------------------------
 AI Routes
 ------------------------------ */
