@@ -92,7 +92,7 @@ const YPivotQATemplatesImageEditor = ({
   // Tools
   const [activeTool, setActiveTool] = useState("pen");
   const [color, setColor] = useState("#ef4444");
-  const [lineWidth, setLineWidth] = useState(3);
+  const [lineWidth, setLineWidth] = useState(8);
   const [isDrawing, setIsDrawing] = useState(false);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [showSettings, setShowSettings] = useState(false);
@@ -117,6 +117,17 @@ const YPivotQATemplatesImageEditor = ({
   const generateId = () =>
     `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+  // ✅ ADD: Helper to scale dimensions for high-res canvas
+  const getScaledValue = useCallback(
+    (value) => {
+      if (!canvasSize.width || canvasSize.width <= 0) return value;
+      // Scale based on canvas resolution (reference: 1000px)
+      const scaleFactor = Math.max(1, canvasSize.width / 1000);
+      return value * scaleFactor;
+    },
+    [canvasSize.width]
+  );
+
   // Sync history when image changes
   useEffect(() => {
     if (currentImage) {
@@ -128,7 +139,7 @@ const YPivotQATemplatesImageEditor = ({
     }
     setZoom(1);
     setPan({ x: 0, y: 0 });
-  }, [currentImageIndex]);
+  }, [currentImageIndex, currentImage?.id, images.length]);
 
   // Update images array when history changes
   const updateCurrentImageHistory = useCallback(
@@ -409,45 +420,7 @@ const YPivotQATemplatesImageEditor = ({
   // 2. CANVAS RENDERING ENGINE
   // ==========================================
 
-  // useEffect(() => {
-  //   if (mode === "editor" && imgSrc && canvasRef.current) {
-  //     const canvas = canvasRef.current;
-  //     const ctx = canvas.getContext("2d");
-  //     const img = new Image();
-
-  //     img.onload = () => {
-  //       const screenW = window.innerWidth;
-  //       const screenH = window.innerHeight;
-  //       const headerHeight = 60;
-  //       const toolbarHeight = deviceType === "mobile" ? 180 : 140;
-  //       const thumbnailHeight = images.length > 0 ? 80 : 0;
-  //       const padding = 20;
-
-  //       const maxAvailableWidth = screenW - padding;
-  //       const maxAvailableHeight =
-  //         screenH - headerHeight - toolbarHeight - thumbnailHeight - padding;
-
-  //       const scale = Math.min(
-  //         maxAvailableWidth / img.width,
-  //         maxAvailableHeight / img.height,
-  //         1
-  //       );
-
-  //       const canvasWidth = img.width * scale;
-  //       const canvasHeight = img.height * scale;
-
-  //       canvas.width = canvasWidth;
-  //       canvas.height = canvasHeight;
-
-  //       setCanvasSize({ width: canvasWidth, height: canvasHeight });
-  //       setContext(ctx);
-  //       redrawCanvas(ctx, img, canvasWidth, canvasHeight);
-  //     };
-  //     img.src = imgSrc;
-  //   }
-  // }, [mode, imgSrc, deviceType, images.length]);
-
-  // AFTER - Keep full resolution, use CSS for display
+  // Keep full resolution, use CSS for display
   useEffect(() => {
     if (mode === "editor" && imgSrc && canvasRef.current) {
       const canvas = canvasRef.current;
@@ -472,11 +445,11 @@ const YPivotQATemplatesImageEditor = ({
           1
         );
 
-        // ✅ FIX: Keep canvas at FULL original resolution
+        // Keep canvas at FULL original resolution
         canvas.width = img.width;
         canvas.height = img.height;
 
-        // ✅ FIX: Use CSS to scale the DISPLAY size only
+        // Use CSS to scale the DISPLAY size only
         const displayWidth = img.width * scale;
         const displayHeight = img.height * scale;
         canvas.style.width = `${displayWidth}px`;
@@ -498,7 +471,6 @@ const YPivotQATemplatesImageEditor = ({
     }
   }, [mode, imgSrc, deviceType, images.length]);
 
-  // AFTER - No change needed if you're storing full resolution in canvasSize
   // Just make sure it uses the original dimensions
   useEffect(() => {
     if (context && imgSrc && canvasSize.width > 0) {
@@ -511,23 +483,15 @@ const YPivotQATemplatesImageEditor = ({
     }
   }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
 
-  // useEffect(() => {
-  //   if (context && imgSrc && canvasSize.width > 0) {
-  //     const img = new Image();
-  //     img.onload = () => {
-  //       redrawCanvas(context, img, canvasSize.width, canvasSize.height);
-  //     };
-  //     img.src = imgSrc;
-  //   }
-  // }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
-
   const redrawCanvas = (ctx, img, width, height) => {
     if (!ctx) return;
+
+    // ✅ ADD: Calculate scale factor for stroke widths
+    const scaleFactor = Math.max(1, width / 1000);
 
     ctx.save();
     ctx.clearRect(0, 0, width, height);
 
-    // ✅ High quality rendering
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = "high";
 
@@ -539,7 +503,8 @@ const YPivotQATemplatesImageEditor = ({
       if (!item) return;
 
       ctx.strokeStyle = item.color;
-      ctx.lineWidth = item.width;
+      //  Scale the line width
+      ctx.lineWidth = item.width * scaleFactor;
       ctx.lineCap = "round";
       ctx.lineJoin = "round";
       ctx.fillStyle = item.color;
@@ -552,7 +517,15 @@ const YPivotQATemplatesImageEditor = ({
           ctx.stroke();
         }
       } else if (item.type === "arrow") {
-        drawArrow(ctx, item.x, item.y, item.endX, item.endY, item.width);
+        //  Pass scaled width
+        drawArrow(
+          ctx,
+          item.x,
+          item.y,
+          item.endX,
+          item.endY,
+          item.width * scaleFactor
+        );
       } else if (item.type === "rect") {
         ctx.beginPath();
         ctx.strokeRect(item.x, item.y, item.w, item.h);
@@ -569,25 +542,29 @@ const YPivotQATemplatesImageEditor = ({
         );
         ctx.stroke();
       } else if (item.type === "text") {
-        const fontSize = deviceType === "mobile" ? 20 : 24;
+        //  Scale font size
+        const baseFontSize = deviceType === "mobile" ? 20 : 24;
+        const fontSize = Math.round(baseFontSize * scaleFactor);
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textBaseline = "middle";
 
-        // Measure text for bounding box
         const textMetrics = ctx.measureText(item.text);
         const textWidth = textMetrics.width;
         const textHeight = fontSize;
-        const padding = 8;
+        //  Scale padding
+        const padding = 8 * scaleFactor;
 
         const isSelected = selectedElementId === item.id;
         const isHovered = hoveredElementId === item.id;
 
-        // Draw selection/hover box
         if (isSelected || isHovered) {
           ctx.save();
           ctx.strokeStyle = isSelected ? "#3b82f6" : "#6b7280";
-          ctx.lineWidth = 2;
-          ctx.setLineDash(isHovered && !isSelected ? [5, 5] : []);
+          //  Scale selection box stroke
+          ctx.lineWidth = 2 * scaleFactor;
+          ctx.setLineDash(
+            isHovered && !isSelected ? [5 * scaleFactor, 5 * scaleFactor] : []
+          );
           ctx.strokeRect(
             item.x - padding,
             item.y - textHeight / 2 - padding,
@@ -606,8 +583,10 @@ const YPivotQATemplatesImageEditor = ({
     ctx.restore();
   };
 
+  // width is already scaled when passed
   const drawArrow = (ctx, fromX, fromY, toX, toY, width) => {
-    const headlen = Math.max(15, width * 3);
+    // ✅ Arrow head scales with the line width (which is already scaled)
+    const headlen = Math.max(width * 2, width * 4);
     const angle = Math.atan2(toY - fromY, toX - fromX);
 
     ctx.beginPath();
@@ -707,19 +686,7 @@ const YPivotQATemplatesImageEditor = ({
   // 5. INTERACTION HANDLERS
   // ==========================================
 
-  // const getCoords = (e) => {
-  //   const canvas = canvasRef.current;
-  //   const rect = canvas.getBoundingClientRect();
-  //   const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-  //   const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-  //   const x = (clientX - rect.left - pan.x) / zoom;
-  //   const y = (clientY - rect.top - pan.y) / zoom;
-
-  //   return { x, y };
-  // };
-
-  // AFTER - Account for display scaling
+  // Account for display scaling
   const getCoords = (e) => {
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
@@ -1013,10 +980,13 @@ const YPivotQATemplatesImageEditor = ({
             canvas.height = image.height;
             ctx.drawImage(image, 0, 0);
 
-            // Redraw history
+            // ✅ ADD: Calculate scale factor
+            const scaleFactor = Math.max(1, image.width / 1000);
+
             (img.history || []).forEach((item) => {
               ctx.strokeStyle = item.color;
-              ctx.lineWidth = item.width;
+              //  Scale line width
+              ctx.lineWidth = item.width * scaleFactor;
               ctx.lineCap = "round";
               ctx.lineJoin = "round";
               ctx.fillStyle = item.color;
@@ -1027,13 +997,14 @@ const YPivotQATemplatesImageEditor = ({
                 item.points.forEach((p) => ctx.lineTo(p.x, p.y));
                 ctx.stroke();
               } else if (item.type === "arrow") {
+                //  Pass scaled width
                 drawArrow(
                   ctx,
                   item.x,
                   item.y,
                   item.endX,
                   item.endY,
-                  item.width
+                  item.width * scaleFactor
                 );
               } else if (item.type === "rect") {
                 ctx.strokeRect(item.x, item.y, item.w, item.h);
@@ -1050,7 +1021,9 @@ const YPivotQATemplatesImageEditor = ({
                 );
                 ctx.stroke();
               } else if (item.type === "text") {
-                ctx.font = "bold 24px sans-serif";
+                //  Scale font size
+                const fontSize = Math.round(24 * scaleFactor);
+                ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.textBaseline = "middle";
                 ctx.fillText(item.text, item.x, item.y);
               }
@@ -1439,7 +1412,7 @@ const YPivotQATemplatesImageEditor = ({
 
                 <div className="flex items-center gap-2 bg-gray-700 rounded-lg px-3 py-2">
                   <button
-                    onClick={() => setLineWidth(Math.max(1, lineWidth - 1))}
+                    onClick={() => setLineWidth(Math.max(1, lineWidth - 2))}
                     className="p-1 hover:bg-gray-600 rounded transition-colors text-white"
                     disabled={lineWidth <= 1}
                   >
@@ -1459,7 +1432,7 @@ const YPivotQATemplatesImageEditor = ({
                     </span>
                   </div>
                   <button
-                    onClick={() => setLineWidth(Math.min(20, lineWidth + 1))}
+                    onClick={() => setLineWidth(Math.min(20, lineWidth + 2))}
                     className="p-1 hover:bg-gray-600 rounded transition-colors text-white"
                     disabled={lineWidth >= 20}
                   >
