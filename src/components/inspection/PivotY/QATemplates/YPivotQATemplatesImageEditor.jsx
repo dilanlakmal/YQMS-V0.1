@@ -60,7 +60,9 @@ const YPivotQATemplatesImageEditor = ({
   }, []);
 
   // --- Modes & State ---
-  const [mode, setMode] = useState("initial");
+  const [mode, setMode] = useState(
+    existingData ? "editor" : autoStartMode ? "initializing" : "initial"
+  );
 
   // MULTIPLE IMAGES STATE
   const [images, setImages] = useState([]);
@@ -75,9 +77,15 @@ const YPivotQATemplatesImageEditor = ({
   const [stream, setStream] = useState(null);
   const [facingMode, setFacingMode] = useState("environment");
 
+  // --- Uploading State ---
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
+
   // --- Editor State ---
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
+  const didInitRef = useRef(false);
   const [context, setContext] = useState(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
@@ -158,6 +166,8 @@ const YPivotQATemplatesImageEditor = ({
   // ==========================================
 
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
     const initializeEditor = async () => {
       if (existingData) {
         if (Array.isArray(existingData)) {
@@ -183,16 +193,29 @@ const YPivotQATemplatesImageEditor = ({
         return;
       }
 
+      // ✅ AUTO-START CAMERA
       if (autoStartMode === "camera") {
         setIsInitializing(true);
         await startCamera();
         setIsInitializing(false);
-      } else if (autoStartMode === "upload") {
+      }
+      // ✅ AUTO-START UPLOAD
+      else if (autoStartMode === "upload") {
         setIsInitializing(true);
-        setTimeout(() => {
-          fileInputRef.current?.click();
-          setIsInitializing(false);
-        }, 300);
+        // Longer delay to ensure file input is mounted
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+          // Keep initializing state until user interacts with file picker
+        } else {
+          console.error("File input not found");
+          setMode("initial");
+        }
+        setIsInitializing(false);
+      }
+      // ✅ NO AUTO-START - Show initial screen
+      else {
+        setMode("initial");
       }
     };
 
@@ -373,10 +396,19 @@ const YPivotQATemplatesImageEditor = ({
   // MODIFIED: Handle multiple file upload
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
+
     if (files.length === 0) {
-      if (autoStartMode && images.length === 0) {
+      // User cancelled file selection
+      if (autoStartMode === "upload" && images.length === 0) {
+        // Auto-upload was cancelled - close modal
         handleCancel();
+      } else if (images.length === 0) {
+        // Manual upload cancelled - go back to initial screen
+        setMode("initial");
+        setIsInitializing(false);
       }
+      // Reset initializing state
+      setIsInitializing(false);
       return;
     }
 
@@ -389,26 +421,48 @@ const YPivotQATemplatesImageEditor = ({
       );
     }
 
-    let loadedCount = 0;
-    const newImages = [];
+    // ✅ IMMEDIATELY show loading state and switch to editor
+    setIsUploading(true);
+    setUploadProgress(0);
+    setUploadTotal(filesToProcess.length);
+    setMode("editor");
 
-    filesToProcess.forEach((file) => {
+    let loadedCount = 0;
+    const startIndex = images.length;
+
+    // ✅ Process each file and add to images IMMEDIATELY as it loads
+    filesToProcess.forEach((file, index) => {
       const reader = new FileReader();
+
       reader.onload = (event) => {
-        newImages.push({
+        const newImage = {
           id: generateId(),
           imgSrc: event.target.result,
           history: [],
           editedImgSrc: null
-        });
-        loadedCount++;
+        };
 
+        // ✅ Add image IMMEDIATELY (don't wait for others)
+        setImages((prev) => [...prev, newImage]);
+
+        // ✅ Set as current if it's the first one
+        if (index === 0 && loadedCount === 0) {
+          setCurrentImageIndex(startIndex);
+        }
+
+        loadedCount++;
+        setUploadProgress(loadedCount);
+
+        // ✅ Hide loading when all done
         if (loadedCount === filesToProcess.length) {
-          setImages((prev) => [...prev, ...newImages]);
-          setCurrentImageIndex(images.length);
-          setMode("editor");
+          setTimeout(() => {
+            setIsUploading(false);
+            setUploadProgress(0);
+            setUploadTotal(0);
+          }, 300);
         }
       };
+
       reader.readAsDataURL(file);
     });
 
@@ -1115,35 +1169,66 @@ const YPivotQATemplatesImageEditor = ({
         )}
 
         {/* STATE: INITIAL */}
-        {mode === "initial" && !isInitializing && (
+        {(mode === "initial" || mode === "initializing") && (
           <div className="text-center space-y-6 p-4 sm:p-8">
-            <div className="flex flex-row justify-center gap-3 sm:gap-6">
-              <button
-                onClick={startCamera}
-                className="group flex flex-col items-center justify-center w-28 h-28 sm:w-40 sm:h-40 bg-gray-800 hover:bg-indigo-600 border-2 border-gray-700 hover:border-indigo-500 rounded-2xl transition-all duration-300 shadow-lg"
-              >
-                <Camera className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 group-hover:text-white mb-2 sm:mb-3" />
-                <span className="text-xs sm:text-base text-gray-300 group-hover:text-white font-semibold">
-                  Take Photos
-                </span>
-              </button>
+            {mode === "initializing" || isInitializing ? (
+              <div className="flex flex-col items-center gap-4">
+                <Loader className="w-12 h-12 text-indigo-500 animate-spin" />
+                <p className="text-white text-sm">
+                  {isUploading
+                    ? "Uploading in Progress..."
+                    : autoStartMode === "camera"
+                    ? "Starting camera..."
+                    : "Processing..."}
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="flex flex-row justify-center gap-3 sm:gap-6">
+                  <button
+                    onClick={startCamera}
+                    className="group flex flex-col items-center justify-center w-28 h-28 sm:w-40 sm:h-40 bg-gray-800 hover:bg-indigo-600 border-2 border-gray-700 hover:border-indigo-500 rounded-2xl transition-all duration-300 shadow-lg"
+                  >
+                    <Camera className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 group-hover:text-white mb-2 sm:mb-3" />
+                    <span className="text-xs sm:text-base text-gray-300 group-hover:text-white font-semibold">
+                      Take Photos
+                    </span>
+                  </button>
 
-              <label className="group flex flex-col items-center justify-center w-28 h-28 sm:w-40 sm:h-40 bg-gray-800 hover:bg-emerald-600 border-2 border-gray-700 hover:border-emerald-500 rounded-2xl cursor-pointer transition-all duration-300 shadow-lg">
-                <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 group-hover:text-white mb-2 sm:mb-3" />
-                <span className="text-xs sm:text-base text-gray-300 group-hover:text-white font-semibold">
-                  Upload
-                </span>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={handleFileUpload}
-                />
-              </label>
-            </div>
-            <p className="text-gray-500 text-sm">Max {MAX_IMAGES} images</p>
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className="group flex flex-col items-center justify-center w-28 h-28 sm:w-40 sm:h-40 bg-gray-800 hover:bg-emerald-600 border-2 border-gray-700 hover:border-emerald-500 rounded-2xl cursor-pointer transition-all duration-300 shadow-lg"
+                  >
+                    <Upload className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 group-hover:text-white mb-2 sm:mb-3" />
+                    <span className="text-xs sm:text-base text-gray-300 group-hover:text-white font-semibold">
+                      Upload
+                    </span>
+                  </button>
+                </div>
+
+                {/* ✅ ADD PROGRESS BAR HERE */}
+                {isUploading && (
+                  <div className="mt-4 space-y-2">
+                    <div className="flex items-center justify-center gap-2 text-sm text-indigo-400">
+                      <Loader className="w-4 h-4 animate-spin" />
+                      <span>
+                        Uploading {uploadProgress} of {uploadTotal} images...
+                      </span>
+                    </div>
+                    <div className="w-full max-w-md mx-auto bg-gray-700 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300 ease-out"
+                        style={{
+                          width: `${(uploadProgress / uploadTotal) * 100}%`
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-gray-500 text-sm">Max {MAX_IMAGES} images</p>
+              </>
+            )}
           </div>
         )}
 
@@ -1237,98 +1322,167 @@ const YPivotQATemplatesImageEditor = ({
         )}
 
         {/* STATE: EDITOR */}
-        {mode === "editor" && imgSrc && (
+        {mode === "editor" && (
           <>
-            <canvas
-              id="image-editor-canvas"
-              ref={canvasRef}
-              onMouseDown={handleStart}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleEnd}
-              onMouseLeave={handleEnd}
-              onWheel={handleWheel}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMoveCanvas}
-              onTouchEnd={handleTouchEndCanvas}
-              className={`object-contain shadow-2xl block ${
-                isDraggingElement
-                  ? "cursor-move"
-                  : hoveredElementId
-                  ? "cursor-pointer"
-                  : "cursor-crosshair"
-              } ${isDraggingElement ? "" : "touch-none"}`}
-              style={{
-                transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
-                  pan.y / zoom
-                }px)`,
-                transformOrigin: "center center"
-              }}
-            />
-
-            {/* Selected Element Controls */}
-            {selectedElementId && (
-              <div className="absolute top-4 right-4 bg-gray-800 rounded-lg p-2 flex gap-2 shadow-lg z-50">
-                <button
-                  onClick={() => setIsDraggingElement(true)}
-                  className="p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition-colors"
-                  title="Move"
-                >
-                  <Move className="w-4 h-4" />
-                </button>
-                <button
-                  onClick={deleteSelectedElement}
-                  className="p-2 bg-red-600 rounded-lg text-white hover:bg-red-500 transition-colors"
-                  title="Delete"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-
-            {/* Long press indicator */}
-            {isLongPressing && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
-                  Dragging enabled - Move your finger
-                </div>
-              </div>
-            )}
-
-            {/* Text Input Modal */}
-            {showTextInput && (
-              <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-md">
-                  <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">
-                    Enter Text
-                  </h3>
-                  <input
-                    type="text"
-                    value={textValue}
-                    onChange={(e) => setTextValue(e.target.value)}
-                    onKeyPress={(e) => e.key === "Enter" && confirmText()}
-                    autoFocus
-                    className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="Defect note..."
-                  />
-                  <div className="flex justify-end gap-2">
-                    <button
-                      onClick={() => {
-                        setShowTextInput(false);
-                        setTextValue("");
-                      }}
-                      className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      onClick={confirmText}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors"
-                    >
-                      Add Text
-                    </button>
+            {/* ✅ LOADING STATE - Show when uploading but NO image loaded yet */}
+            {isUploading && !imgSrc && (
+              <div className="absolute inset-0 bg-black/90 z-50 flex flex-col items-center justify-center gap-6 p-4">
+                <div className="relative">
+                  <Loader className="w-16 h-16 text-indigo-500 animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 bg-indigo-500/20 rounded-full animate-ping"></div>
                   </div>
                 </div>
+
+                <div className="text-white text-center space-y-3">
+                  <p className="text-xl font-bold">Processing Images...</p>
+                  <p className="text-sm text-gray-300">
+                    Please wait while we prepare your images
+                  </p>
+
+                  {/* Progress Counter */}
+                  <div className="flex items-center justify-center gap-2 text-indigo-400 font-mono text-sm mt-4">
+                    <span className="text-2xl font-bold">{uploadProgress}</span>
+                    <span className="text-gray-500">/</span>
+                    <span className="text-lg">{uploadTotal}</span>
+                  </div>
+                </div>
+
+                {/* Progress Bar */}
+                <div className="w-full max-w-sm space-y-2">
+                  <div className="bg-gray-800 rounded-full h-2 overflow-hidden shadow-inner">
+                    <div
+                      className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 transition-all duration-500 ease-out relative overflow-hidden"
+                      style={{
+                        width: `${(uploadProgress / uploadTotal) * 100}%`
+                      }}
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer"></div>
+                    </div>
+                  </div>
+                  <p className="text-xs text-center text-gray-400">
+                    {Math.round((uploadProgress / uploadTotal) * 100)}% Complete
+                  </p>
+                </div>
               </div>
+            )}
+
+            {/* ✅ CANVAS & CONTROLS - Only show when image exists */}
+            {imgSrc && (
+              <>
+                {/* Upload Progress Indicator (compact, when adding more images) */}
+                {isUploading && (
+                  <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 bg-black/80 backdrop-blur-sm px-6 py-3 rounded-full border border-indigo-500/50 shadow-lg">
+                    <div className="flex items-center gap-3 text-white">
+                      <Loader className="w-5 h-5 text-indigo-400 animate-spin" />
+                      <div className="text-sm font-medium">
+                        Loading {uploadProgress}/{uploadTotal}
+                      </div>
+                      <div className="w-24 bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 transition-all duration-300"
+                          style={{
+                            width: `${(uploadProgress / uploadTotal) * 100}%`
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Canvas */}
+                <canvas
+                  id="image-editor-canvas"
+                  ref={canvasRef}
+                  onMouseDown={handleStart}
+                  onMouseMove={handleMouseMove}
+                  onMouseUp={handleEnd}
+                  onMouseLeave={handleEnd}
+                  onWheel={handleWheel}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMoveCanvas}
+                  onTouchEnd={handleTouchEndCanvas}
+                  className={`object-contain shadow-2xl block ${
+                    isDraggingElement
+                      ? "cursor-move"
+                      : hoveredElementId
+                      ? "cursor-pointer"
+                      : "cursor-crosshair"
+                  } ${isDraggingElement ? "" : "touch-none"}`}
+                  style={{
+                    transform: `scale(${zoom}) translate(${pan.x / zoom}px, ${
+                      pan.y / zoom
+                    }px)`,
+                    transformOrigin: "center center"
+                  }}
+                />
+
+                {/* Selected Element Controls */}
+                {selectedElementId && (
+                  <div className="absolute top-4 right-4 bg-gray-800 rounded-lg p-2 flex gap-2 shadow-lg z-50">
+                    <button
+                      onClick={() => setIsDraggingElement(true)}
+                      className="p-2 bg-blue-600 rounded-lg text-white hover:bg-blue-500 transition-colors"
+                      title="Move"
+                    >
+                      <Move className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={deleteSelectedElement}
+                      className="p-2 bg-red-600 rounded-lg text-white hover:bg-red-500 transition-colors"
+                      title="Delete"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Long press indicator */}
+                {isLongPressing && (
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="bg-black/70 text-white px-4 py-2 rounded-lg text-sm">
+                      Dragging enabled - Move your finger
+                    </div>
+                  </div>
+                )}
+
+                {/* Text Input Modal */}
+                {showTextInput && (
+                  <div className="absolute inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-gray-800 p-6 rounded-xl shadow-2xl w-full max-w-md">
+                      <h3 className="text-lg font-bold mb-4 text-gray-800 dark:text-white">
+                        Enter Text
+                      </h3>
+                      <input
+                        type="text"
+                        value={textValue}
+                        onChange={(e) => setTextValue(e.target.value)}
+                        onKeyPress={(e) => e.key === "Enter" && confirmText()}
+                        autoFocus
+                        className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white mb-4 focus:ring-2 focus:ring-indigo-500 outline-none"
+                        placeholder="Defect note..."
+                      />
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            setShowTextInput(false);
+                            setTextValue("");
+                          }}
+                          className="px-4 py-2 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={confirmText}
+                          className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium transition-colors"
+                        >
+                          Add Text
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
