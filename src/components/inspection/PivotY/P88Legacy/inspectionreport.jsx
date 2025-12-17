@@ -127,8 +127,8 @@ const InspectionReportPage = ({ inspection, onClose }) => {
                   {inspection.reportType || 'Inline Inspection- Finishing'}
                 </h2>
                 <p className="text-gray-600 mt-2 text-lg">
-                  Inspection #: {inspection.inspectionNumbers?.join(', ') || 'N/A'} | 
-                  Group #: {inspection.groupNumber || 'N/A'}
+                  Inspection #: {inspection.inspectionNumbers?.join(', ') || 'N/A'}  
+                  {/* Group #: {inspection.groupNumber || 'N/A'} */}
                 </p>
               </div>
               <div className={`px-6 py-3 rounded-xl font-bold text-xl ${getStatusColor(inspection.inspectionResult)}`}>
@@ -158,23 +158,23 @@ const InspectionReportPage = ({ inspection, onClose }) => {
             </div>
 
             {/* Details Table */}
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="overflow-x-auto rounded-sm border border-gray-200">
               <table className="w-full text-sm">
                 <tbody>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700 w-1/4">Report Type</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700 w-1/4">Report Type</td>
                     <td className="py-4 text-gray-800 w-1/4">{inspection.reportType || 'N/A'}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700 w-1/4">Project</td>
                     <td className="py-4 text-gray-800 w-1/4">{inspection.project || 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Inspector</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Inspector</td>
                     <td className="py-4 text-gray-800">{inspection.inspector || 'N/A'}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Supplier</td>
                     <td className="py-4 text-gray-800">{inspection.supplier || 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Factory Name</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Factory Name</td>
                     <td className="py-4 text-gray-800">{inspection.supplier || 'N/A'}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Destination</td>
                     <td className="py-4 text-gray-800">{inspection.destination || 'N/A'}</td>
@@ -186,32 +186,32 @@ const InspectionReportPage = ({ inspection, onClose }) => {
                     <td className="py-4 text-gray-800">{inspection.skuNumbers?.join(', ') || 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Style</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Style</td>
                     <td className="py-4 text-gray-800">{inspection.style || 'N/A'}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Color</td>
                     <td className="py-4 text-gray-800">{inspection.colors?.join(', ') || 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Total PO Items Qty</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Total PO Items Qty</td>
                     <td className="py-4 text-gray-800">{inspection.totalPoItemsQty?.toLocaleString() || '0'}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Inspected Qty (Pcs)</td>
                     <td className="py-4 text-gray-800">{inspection.qtyInspected?.toLocaleString() || '0'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Sample Inspected</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Sample Inspected</td>
                     <td className="py-4 text-gray-800">{inspection.sampleInspected || '0'}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">ETD</td>
                     <td className="py-4 text-gray-800">{inspection.etd?.length > 0 ? inspection.etd.map(date => formatDate(date)).join(', ') : 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Created Date</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Created Date</td>
                     <td className="py-4 text-gray-800">{formatDate(inspection.createdAt)}</td>
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Last Modified Date</td>
                     <td className="py-4 text-gray-800">{formatDate(inspection.lastModifiedDate)}</td>
                   </tr>
                   <tr>
-                    <td className="pt-6 pr-6 font-bold bg-blue-50 text-gray-700 align-top">Description</td>
-                    <td colSpan="3" className="pt-6 text-gray-800">{inspection.description || 'N/A'}</td>
+                    <td className="pt-6 px-6 pb-4 font-bold bg-blue-50 text-gray-700 align-top">Description</td>
+                    <td colSpan="3" className="pt-6 pb-4 text-gray-800">{inspection.description || 'N/A'}</td>
                   </tr>
                 </tbody>
               </table>
