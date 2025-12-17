@@ -598,6 +598,79 @@ const YPivotQAInspectionReportType = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTemplate?._id]);
 
+  // --- NEW: Calculate Full AQL Configuration Object ---
+  const calculatedAqlConfig = useMemo(() => {
+    // Return null if not AQL or no configs loaded
+    if (!aqlConfigs || aqlConfigs.length === 0 || !inspectedQty) return null;
+
+    const qty = parseInt(inspectedQty);
+    if (isNaN(qty) || qty <= 0) return null;
+
+    // Helper to find sample row for a config
+    const getSampleRow = (config) => {
+      if (!config?.SampleData) return null;
+      return config.SampleData.find((s) => qty >= s.Min && qty <= s.Max);
+    };
+
+    const minorConfig = aqlConfigs.find((c) => c.Status === "Minor");
+    const majorConfig = aqlConfigs.find((c) => c.Status === "Major");
+    const criticalConfig = aqlConfigs.find((c) => c.Status === "Critical");
+
+    const minorSample = getSampleRow(minorConfig);
+    const majorSample = getSampleRow(majorConfig);
+    const criticalSample = getSampleRow(criticalConfig);
+
+    // If no matching batch found (e.g. qty too high or low), return null
+    if (!minorSample && !majorSample && !criticalSample) return null;
+
+    // Use one of the found samples for common data (Batch, Letter, Size)
+    const baseSample = minorSample || majorSample || criticalSample;
+    const baseConfig = minorConfig || majorConfig || criticalConfig;
+
+    const items = [];
+    if (minorConfig && minorSample) {
+      items.push({
+        status: "Minor",
+        ac: minorSample.Ac,
+        re: minorSample.Re,
+        aqlLevel: minorConfig.AQLLevel
+      });
+    }
+    if (majorConfig && majorSample) {
+      items.push({
+        status: "Major",
+        ac: majorSample.Ac,
+        re: majorSample.Re,
+        aqlLevel: majorConfig.AQLLevel
+      });
+    }
+    if (criticalConfig && criticalSample) {
+      items.push({
+        status: "Critical",
+        ac: criticalSample.Ac,
+        re: criticalSample.Re,
+        aqlLevel: criticalConfig.AQLLevel
+      });
+    }
+
+    return {
+      inspectionType: baseConfig?.InspectionType || "General",
+      level: baseConfig?.Level || "II",
+
+      // Top level Float values
+      minorAQL: minorConfig?.AQLLevel || 0,
+      majorAQL: majorConfig?.AQLLevel || 0,
+      criticalAQL: criticalConfig?.AQLLevel || 0,
+
+      inspectedQty: qty,
+      batch: baseSample?.BatchName || "",
+      sampleLetter: baseSample?.SampleLetter || "",
+      sampleSize: baseSample?.SampleSize || 0,
+
+      items: items
+    };
+  }, [aqlConfigs, inspectedQty]);
+
   // Pass data to parent including calculated AQL Sample Size
   useEffect(() => {
     if (onReportDataChange) {
@@ -605,7 +678,9 @@ const YPivotQAInspectionReportType = ({
         selectedTemplate,
         config: {
           inspectedQty, // This is user input Lot Size
-          aqlSampleSize, // This is the calculated Sample Size for AQL
+          aqlConfig: calculatedAqlConfig,
+          aqlSampleSize: calculatedAqlConfig?.sampleSize || 0,
+          //aqlSampleSize, // This is the calculated Sample Size for AQL
           cartonQty,
           isSubCon,
           selectedSubConFactory,
@@ -618,6 +693,7 @@ const YPivotQAInspectionReportType = ({
   }, [
     selectedTemplate,
     inspectedQty,
+    calculatedAqlConfig,
     aqlSampleSize,
     cartonQty,
     isSubCon,

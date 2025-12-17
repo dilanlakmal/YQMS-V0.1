@@ -111,6 +111,16 @@ app.use(
 );
 
 app.use(
+  "/storage/PivotY",
+  express.static(path.join(__backendDir, "storage/PivotY"), {
+    setHeaders: (res, path) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Cache-Control", "public, max-age=3600");
+    }
+  })
+);
+
+app.use(
   "/public",
   express.static(path.join(__backendDir, "public"), {
     setHeaders: (res, path) => {

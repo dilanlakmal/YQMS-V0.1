@@ -12,7 +12,8 @@ import {
   updateOrderProductType,
   createInspectionReport,
   getInspectionReportById,
-  checkExistingReport
+  checkExistingReport,
+  updateHeaderData
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -76,5 +77,8 @@ router.post(
   "/api/fincheck-inspection/check-existing-report",
   checkExistingReport
 );
+
+// NEW: Save Header Data
+router.post("/api/fincheck-inspection/update-header-data", updateHeaderData);
 
 export default router;
