@@ -356,9 +356,74 @@ const parseNumber = (numberString) => {
   return isNaN(num) ? 0 : num;
 };
 
+// FIXED: Enhanced array parsing with proper bracket handling
 const parseArray = (arrayString) => {
   if (!arrayString || arrayString.trim() === '') return [];
+  
+  // Handle special case for colors with quantities in brackets
+  if (arrayString.includes('[QTY')) {
+    return parseColorArray(arrayString);
+  }
+  
+  // Regular array parsing for other fields
   return arrayString.split(',').map(item => item.trim()).filter(item => item !== '');
+};
+
+// NEW: Special function to handle color arrays with quantities
+const parseColorArray = (colorString) => {
+  if (!colorString || colorString.trim() === '') return [];
+  
+  const colors = [];
+  let currentColor = '';
+  let bracketCount = 0;
+  let i = 0;
+  
+  while (i < colorString.length) {
+    const char = colorString[i];
+    
+    if (char === '[') {
+      bracketCount++;
+      currentColor += char;
+    } else if (char === ']') {
+      bracketCount--;
+      currentColor += char;
+      
+      // If we've closed all brackets, this color entry is complete
+      if (bracketCount === 0) {
+        const trimmedColor = currentColor.trim();
+        if (trimmedColor) {
+          colors.push(trimmedColor);
+        }
+        currentColor = '';
+        
+        // Skip any following comma and whitespace
+        i++;
+        while (i < colorString.length && (colorString[i] === ',' || colorString[i] === ' ')) {
+          i++;
+        }
+        continue;
+      }
+    } else if (char === ',' && bracketCount === 0) {
+      // Only split on comma if we're not inside brackets
+      const trimmedColor = currentColor.trim();
+      if (trimmedColor) {
+        colors.push(trimmedColor);
+      }
+      currentColor = '';
+    } else {
+      currentColor += char;
+    }
+    
+    i++;
+  }
+  
+  // Add any remaining color
+  const trimmedColor = currentColor.trim();
+  if (trimmedColor) {
+    colors.push(trimmedColor);
+  }
+  
+  return colors.filter(color => color !== '');
 };
 
 // Enhanced field value processing
@@ -366,8 +431,12 @@ const processFieldValue = (schemaField, value) => {
   if (!value && value !== 0) return getDefaultValue(schemaField);
   
   // Handle array fields
-  if (['poNumbers', 'skuNumbers', 'colors', 'sizes', 'inspectionNumbers', 'poLineCustomerPO', 'poLineMainPO'].includes(schemaField)) {
+  if (['poNumbers', 'skuNumbers', 'sizes', 'inspectionNumbers', 'poLineCustomerPO', 'poLineMainPO'].includes(schemaField)) {
     return parseArray(value);
+  }
+  // Handle colors specially
+  else if (schemaField === 'colors') {
+    return parseColorArray(value);
   }
   // Handle date array fields (ETD, ETA)
   else if (['etd', 'eta'].includes(schemaField)) {
@@ -454,7 +523,6 @@ const mapCsvToSchema = (csvRow, uploadBatch, rowIndex) => {
   const csvHeaders = Object.keys(csvRow);
   const fieldMappings = createFlexibleMapping();
   const headerMap = findMatchingHeader(csvHeaders, fieldMappings);
-
   const mappedData = {};
   const defects = [];
   const defectCategories = [];
@@ -578,12 +646,12 @@ export const uploadP88Data = async (req, res) => {
       });
     }
 
-
     // Generate upload batch ID
     const uploadBatch = generateUploadBatch();
     
     // Analyze CSV headers
     const headers = Object.keys(csvData[0]);
+
     // Test mapping on headers
     const fieldMappings = createFlexibleMapping();
     const testHeaderMap = findMatchingHeader(headers, fieldMappings);

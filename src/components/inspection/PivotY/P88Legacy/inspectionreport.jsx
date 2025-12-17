@@ -5,22 +5,24 @@ import html2canvas from 'html2canvas';
 const InspectionReportPage = ({ inspection, onClose }) => {
   const formatDate = (date) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'N/A';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const formatDateTime = (date) => {
     if (!date) return 'N/A';
-    return new Date(date).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return 'N/A';
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day} ${hours}:${minutes}`;
   };
 
   const downloadPDF = async () => {
@@ -56,7 +58,10 @@ const InspectionReportPage = ({ inspection, onClose }) => {
     switch (status) {
       case 'Pass': return 'bg-emerald-500 text-white';
       case 'Fail': return 'bg-red-500 text-white';
+      case 'Rejected': return 'bg-red-500 text-white';
       case 'Pending': return 'bg-amber-500 text-white';
+      case 'Reworked': return 'bg-amber-500 text-white';
+      case 'Accepted': return 'bg-emerald-500 text-white';
       default: return 'bg-gray-500 text-white';
     }
   };
@@ -65,7 +70,10 @@ const InspectionReportPage = ({ inspection, onClose }) => {
     switch (status) {
       case 'Pass': return 'bg-emerald-100 text-emerald-800';
       case 'Fail': return 'bg-red-100 text-red-800';
+      case 'Rejected': return 'bg-red-100 text-red-800';
       case 'Pending Approval': return 'bg-amber-100 text-amber-800';
+      case 'Reworked': return 'bg-amber-100 text-amber-800';
+      case 'Accepted': return 'bg-emerald-100 text-emerald-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -89,9 +97,6 @@ const InspectionReportPage = ({ inspection, onClose }) => {
               <h1 className="text-3xl font-bold flex items-center gap-3">
                 📋 Inspection Report
               </h1>
-              <p className="text-blue-100 text-lg mt-2">
-                {inspection.inspectionNumbers?.join(', ') || 'N/A'}
-              </p>
             </div>
             <div className="flex gap-3">
               <button 
@@ -118,18 +123,33 @@ const InspectionReportPage = ({ inspection, onClose }) => {
 
         {/* Report Content */}
         <div id="inspection-report-content" className="space-y-6">
+          <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-200">
+            <div className="flex justify-between items-center  border-gray-200 pb-4">
+              <div>
+                <h1 className="text-2xl font-bold text-gray-800">
+                  {inspection.poNumbers?.join(', ') || 'N/A'} - Inspection Summary
+                </h1>
+                <p className="text-gray-600 text-lg mt-1">
+                  Yorkmars (Cambodia) Garment MFG Co., LTD
+                </p>
+               <p className="text-gray-600 mt-2 text-l">
+                  Inspection #: {inspection.inspectionNumbers?.join(', ') || 'N/A'}  |
+                  Group #: {inspection.groupNumber || 'N/A'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-gray-800 font-medium">{new Date().toLocaleDateString()}</p>
+              </div>
+            </div>
+          </div>
           
           {/* Header Section */}
-          <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
-            <div className="flex items-center justify-between mb-6">
+          <div className="bg-white rounded-xl p-4 shadow-lg border border-gray-200">
+            <div className="flex items-center justify-between ">
               <div>
-                <h2 className="text-3xl font-bold text-gray-800">
+                <h2 className="text-xl font-bold text-gray-800">
                   {inspection.reportType || 'Inline Inspection- Finishing'}
                 </h2>
-                <p className="text-gray-600 mt-2 text-lg">
-                  Inspection #: {inspection.inspectionNumbers?.join(', ') || 'N/A'}  
-                  {/* Group #: {inspection.groupNumber || 'N/A'} */}
-                </p>
               </div>
               <div className={`px-6 py-3 rounded-xl font-bold text-xl ${getStatusColor(inspection.inspectionResult)}`}>
                 {inspection.inspectionResult || 'Pending'}
@@ -147,10 +167,10 @@ const InspectionReportPage = ({ inspection, onClose }) => {
                 <p className="text-sm font-medium text-purple-700 mb-2">Scheduled Inspection Date</p>
                 <p className="text-xl font-bold text-gray-800">{formatDateTime(inspection.scheduledInspectionDate)}</p>
               </div>
-              <div className="text-center p-6 bg-orange-100 rounded-xl border border-orange-200">
+              {/* <div className="text-center p-6 bg-orange-100 rounded-xl border border-orange-200">
                 <p className="text-sm font-medium text-orange-700 mb-2">Inspection Started Date</p>
                 <p className="text-xl font-bold text-gray-800">{formatDateTime(inspection.scheduledInspectionDate)}</p>
-              </div>
+              </div> */}
               <div className="text-center p-6 bg-green-100 rounded-xl border border-green-200">
                 <p className="text-sm font-medium text-green-700 mb-2">Submitted Inspection Date</p>
                 <p className="text-xl font-bold text-gray-800">{formatDateTime(inspection.submittedInspectionDate)}</p>
@@ -173,17 +193,43 @@ const InspectionReportPage = ({ inspection, onClose }) => {
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Supplier</td>
                     <td className="py-4 pl-2 text-gray-800">{inspection.supplier || 'N/A'}</td>
                   </tr>
+                   <tr className="border-b border-gray-200">
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Total PO Items Qty</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.totalPoItemsQty?.toLocaleString() || '0'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Sample Inspected</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.sampleInspected || '0'}</td>
+                  </tr>
                   <tr className="border-b border-gray-200">
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Factory Name</td>
                     <td className="py-4 pl-2 text-gray-800">{inspection.supplier || 'N/A'}</td>
-                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Destination</td>
-                    <td className="py-4 pl-2 text-gray-800">{inspection.destination || 'N/A'}</td>
+                    {/* <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Approved By</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.destination || 'N/A'}</td> */}
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Created Date</td>
+                    <td className="py-4 pl-2 text-gray-800">{formatDate(inspection.createdAt)}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Submitted Inspection Date</td>
+                    <td className="py-4 pl-2 text-gray-800">{formatDate(inspection.submittedInspectionDate)}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Last Modified Date</td>
+                    <td className="py-4 pl-2 text-gray-800">{formatDate(inspection.lastModifiedDate)}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">PO #</td>
                     <td className="py-4 pl-2 text-gray-800">{inspection.poNumbers?.join(', ') || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">ETD</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.etd?.length > 0 ? inspection.etd.map(date => formatDate(date)).join(', ') : 'N/A'}</td>
+                  </tr>
+                   <tr className="border-b border-gray-200">
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Destination</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.destination || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">SKU #</td>
                     <td className="py-4 pl-2 text-gray-800">{inspection.skuNumbers?.join(', ') || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Description</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.description || 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Style</td>
@@ -192,26 +238,12 @@ const InspectionReportPage = ({ inspection, onClose }) => {
                     <td className="py-4 pl-2 text-gray-800">{inspection.colors?.join(', ') || 'N/A'}</td>
                   </tr>
                   <tr className="border-b border-gray-200">
-                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Total PO Items Qty</td>
-                    <td className="py-4 pl-2 text-gray-800">{inspection.totalPoItemsQty?.toLocaleString() || '0'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Custom PO#</td>
+                    <td className="py-4 pl-2 text-gray-800">{inspection.poLineCustomerPO || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
                     <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Inspected Qty (Pcs)</td>
                     <td className="py-4 pl-2 text-gray-800">{inspection.qtyInspected?.toLocaleString() || '0'}</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Sample Inspected</td>
-                    <td className="py-4 pl-2 text-gray-800">{inspection.sampleInspected || '0'}</td>
-                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">ETD</td>
-                    <td className="py-4 pl-2 text-gray-800">{inspection.etd?.length > 0 ? inspection.etd.map(date => formatDate(date)).join(', ') : 'N/A'}</td>
-                  </tr>
-                  <tr className="border-b border-gray-200">
-                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Created Date</td>
-                    <td className="py-4 pl-2 text-gray-800">{formatDate(inspection.createdAt)}</td>
-                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Last Modified Date</td>
-                    <td className="py-4 pl-2 text-gray-800">{formatDate(inspection.lastModifiedDate)}</td>
-                  </tr>
-                  <tr>
-                    <td className="pt-6 px-6 pb-4 font-bold bg-blue-50 text-gray-700 align-top">Description</td>
-                    <td colSpan="3" className="pt-6 pb-4 pl-2 text-gray-800">{inspection.description || 'N/A'}</td>
                   </tr>
                 </tbody>
               </table>
@@ -314,13 +346,13 @@ const InspectionReportPage = ({ inspection, onClose }) => {
           )}
 
           {/* Footer */}
-          <div className="bg-white rounded-xl p-8 text-center border border-gray-200 shadow-lg">
+          {/* <div className="bg-white rounded-xl p-8 text-center border border-gray-200 shadow-lg">
             <div className="flex items-center justify-center gap-3 text-gray-600 mb-3">
               <span className="text-2xl">📄</span>
               <p className="text-lg font-medium">Report generated on: {new Date().toLocaleString()}</p>
             </div>
             <p className="text-gray-500">Upload Batch: {inspection.uploadBatch}</p>
-          </div>
+          </div> */}
 
         </div>
       </div>
