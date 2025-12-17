@@ -424,7 +424,8 @@ const YPivotQAInspectionReportType = ({
   orderData = null,
   orderType = "single",
   onReportDataChange,
-  savedState = {}
+  savedState = {},
+  shippingStages = []
 }) => {
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(
@@ -597,6 +598,79 @@ const YPivotQAInspectionReportType = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTemplate?._id]);
 
+  // --- NEW: Calculate Full AQL Configuration Object ---
+  const calculatedAqlConfig = useMemo(() => {
+    // Return null if not AQL or no configs loaded
+    if (!aqlConfigs || aqlConfigs.length === 0 || !inspectedQty) return null;
+
+    const qty = parseInt(inspectedQty);
+    if (isNaN(qty) || qty <= 0) return null;
+
+    // Helper to find sample row for a config
+    const getSampleRow = (config) => {
+      if (!config?.SampleData) return null;
+      return config.SampleData.find((s) => qty >= s.Min && qty <= s.Max);
+    };
+
+    const minorConfig = aqlConfigs.find((c) => c.Status === "Minor");
+    const majorConfig = aqlConfigs.find((c) => c.Status === "Major");
+    const criticalConfig = aqlConfigs.find((c) => c.Status === "Critical");
+
+    const minorSample = getSampleRow(minorConfig);
+    const majorSample = getSampleRow(majorConfig);
+    const criticalSample = getSampleRow(criticalConfig);
+
+    // If no matching batch found (e.g. qty too high or low), return null
+    if (!minorSample && !majorSample && !criticalSample) return null;
+
+    // Use one of the found samples for common data (Batch, Letter, Size)
+    const baseSample = minorSample || majorSample || criticalSample;
+    const baseConfig = minorConfig || majorConfig || criticalConfig;
+
+    const items = [];
+    if (minorConfig && minorSample) {
+      items.push({
+        status: "Minor",
+        ac: minorSample.Ac,
+        re: minorSample.Re,
+        aqlLevel: minorConfig.AQLLevel
+      });
+    }
+    if (majorConfig && majorSample) {
+      items.push({
+        status: "Major",
+        ac: majorSample.Ac,
+        re: majorSample.Re,
+        aqlLevel: majorConfig.AQLLevel
+      });
+    }
+    if (criticalConfig && criticalSample) {
+      items.push({
+        status: "Critical",
+        ac: criticalSample.Ac,
+        re: criticalSample.Re,
+        aqlLevel: criticalConfig.AQLLevel
+      });
+    }
+
+    return {
+      inspectionType: baseConfig?.InspectionType || "General",
+      level: baseConfig?.Level || "II",
+
+      // Top level Float values
+      minorAQL: minorConfig?.AQLLevel || 0,
+      majorAQL: majorConfig?.AQLLevel || 0,
+      criticalAQL: criticalConfig?.AQLLevel || 0,
+
+      inspectedQty: qty,
+      batch: baseSample?.BatchName || "",
+      sampleLetter: baseSample?.SampleLetter || "",
+      sampleSize: baseSample?.SampleSize || 0,
+
+      items: items
+    };
+  }, [aqlConfigs, inspectedQty]);
+
   // Pass data to parent including calculated AQL Sample Size
   useEffect(() => {
     if (onReportDataChange) {
@@ -604,7 +678,9 @@ const YPivotQAInspectionReportType = ({
         selectedTemplate,
         config: {
           inspectedQty, // This is user input Lot Size
-          aqlSampleSize, // This is the calculated Sample Size for AQL
+          aqlConfig: calculatedAqlConfig,
+          aqlSampleSize: calculatedAqlConfig?.sampleSize || 0,
+          //aqlSampleSize, // This is the calculated Sample Size for AQL
           cartonQty,
           isSubCon,
           selectedSubConFactory,
@@ -617,6 +693,7 @@ const YPivotQAInspectionReportType = ({
   }, [
     selectedTemplate,
     inspectedQty,
+    calculatedAqlConfig,
     aqlSampleSize,
     cartonQty,
     isSubCon,
@@ -636,13 +713,15 @@ const YPivotQAInspectionReportType = ({
     }));
   }, [subConFactories]);
 
-  const shippingStageOptions = [
-    { value: "D1", label: "D1" },
-    { value: "D2", label: "D2" },
-    { value: "D3", label: "D3" },
-    { value: "D4", label: "D4" },
-    { value: "D5", label: "D5" }
-  ];
+  const shippingStageOptions = useMemo(() => {
+    // Sort by 'no' to ensure correct order
+    const sorted = [...shippingStages].sort((a, b) => a.no - b.no);
+
+    return sorted.map((stage) => ({
+      value: stage.ShippingStage, // Value to store
+      label: stage.ShippingStage // Label to display
+    }));
+  }, [shippingStages]);
 
   // Visibility Flags
   const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
@@ -770,7 +849,7 @@ const YPivotQAInspectionReportType = ({
                 <div className="flex items-end pb-1">
                   <div className="flex items-center gap-3 px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl">
                     <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                      Sub-Con
+                      External
                     </span>
                     <button
                       onClick={() => setIsSubCon(!isSubCon)}
@@ -800,7 +879,7 @@ const YPivotQAInspectionReportType = ({
                 {isSubCon && (
                   <div className="sm:col-span-2">
                     <SearchableSingleSelect
-                      label="Sub-Con Factory"
+                      label="Factory"
                       icon={Factory}
                       options={subConFactoryOptions}
                       selectedValue={selectedSubConFactory}
@@ -879,12 +958,14 @@ const YPivotQAInspectionReportType = ({
                       className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-cyan-500 focus:border-transparent appearance-none"
                     >
                       <option value="">Select stage...</option>
+                      {/* Map over the dynamic options */}
                       {shippingStageOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
                         </option>
                       ))}
                     </select>
+
                     <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>

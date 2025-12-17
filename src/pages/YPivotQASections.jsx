@@ -15,7 +15,8 @@ import {
   BookOpen,
   Sliders,
   Factory,
-  Grid
+  Grid,
+  Ship
 } from "lucide-react";
 import React, { useMemo, useState } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -113,6 +114,11 @@ const YPivotQASections = () => {
         id: "tables",
         label: "Tables",
         icon: <Grid size={20} />
+      },
+      {
+        id: "shipping",
+        label: "Shipping",
+        icon: <Ship size={20} />
       },
       {
         id: "category",

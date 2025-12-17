@@ -128,6 +128,15 @@ app.use("/public", express.static(path.join(__backendDir, "public"), {
     res.header("Cache-Control", "public, max-age=3600");
   }
 }));
+app.use(
+  "/storage/PivotY",
+  express.static(path.join(__backendDir, "storage/PivotY"), {
+    setHeaders: (res, path) => {
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Cache-Control", "public, max-age=3600");
+    }
+  })
+);
 
 // Socket.io connection handler
 io.on("connection", (socket) => {

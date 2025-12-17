@@ -1,12 +1,13 @@
 import mongoose from "mongoose";
 
 const createFincheckInspectionReportsModel = (connection) => {
+  // 1. Sub-Schemas
   const AQLConfigItemSchema = new mongoose.Schema(
     {
       status: { type: String, enum: ["Minor", "Major", "Critical"] },
-      aqlLevel: { type: mongoose.Schema.Types.Mixed },
-      ac: { type: mongoose.Schema.Types.Mixed },
-      re: { type: mongoose.Schema.Types.Mixed }
+      // Ac/Re are whole numbers
+      ac: { type: Number, default: 0 },
+      re: { type: Number, default: 0 }
     },
     { _id: false }
   );
@@ -33,87 +34,116 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
+  // 2. Inspection Details Schema (Specifics)
   const InspectionDetailsSchema = new mongoose.Schema(
     {
-      buyer: { type: String },
-      buyerCode: { type: String },
-      productType: { type: String },
-      productTypeId: { type: mongoose.Schema.Types.ObjectId },
-      supplier: { type: String, default: "YM" },
+      supplier: { type: String, default: "" },
       isSubCon: { type: Boolean, default: false },
-      subConFactory: { type: String },
-      subConFactoryId: { type: mongoose.Schema.Types.ObjectId },
-      reportTypeName: { type: String },
-      reportTypeId: { type: mongoose.Schema.Types.ObjectId },
-      measurement: { type: String, enum: ["Before", "After", "N/A"] },
-      method: { type: String, enum: ["Fixed", "AQL", "N/A"] },
-      inspectedQty: { type: Number },
-      aqlSampleSize: { type: Number },
-      cartonQty: { type: Number },
-      shippingStage: { type: String },
-      remarks: { type: String },
-      totalOrderQty: { type: Number },
-      custStyle: { type: String },
-      customer: { type: String },
-      factory: { type: String },
+      subConFactory: { type: String, default: "" },
+      subConFactoryId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      factory: { type: String, default: "" },
 
-      // AQL Configuration - only populated if method is AQL
+      inspectedQty: { type: Number, default: null },
+      aqlSampleSize: { type: Number, default: 0 },
+      cartonQty: { type: Number, default: null },
+      shippingStage: { type: String, default: "" },
+      remarks: { type: String, default: "" },
+
+      totalOrderQty: { type: Number, default: 0 },
+      custStyle: { type: String, default: "" },
+      customer: { type: String, default: "" },
+
+      // --- MODIFIED AQL CONFIG STRUCTURE ---
       aqlConfig: {
-        inspectionType: { type: String },
-        level: { type: String },
-        batch: { type: String },
-        sampleLetter: { type: String },
-        sampleSize: { type: Number },
+        inspectionType: { type: String, default: "" }, // e.g., "General"
+        level: { type: String, default: "" }, // e.g., "II"
+
+        // Specific Float Fields for AQL Levels
+        minorAQL: { type: Number, default: 0 },
+        majorAQL: { type: Number, default: 0 },
+        criticalAQL: { type: Number, default: 0 },
+
+        inspectedQty: { type: Number, default: 0 }, // e.g., 500
+        batch: { type: String, default: "" }, // e.g., "501 ~ 1200"
+        sampleLetter: { type: String, default: "" }, // e.g., "J"
+        sampleSize: { type: Number, default: 0 }, // e.g., 80
+
+        // Array for Ac/Re values
         items: [AQLConfigItemSchema]
       },
 
-      // Production Status - only populated if QualityPlan is "Yes"
-      productionStatus: ProductionStatusSchema,
-      packingList: PackingListSchema,
+      productionStatus: { type: ProductionStatusSchema, default: () => ({}) },
+      packingList: { type: PackingListSchema, default: () => ({}) },
       qualityPlanEnabled: { type: Boolean, default: false }
     },
     { _id: false }
   );
 
+  // --- NEW: Header Data Schemas ---
+  const HeaderImageSchema = new mongoose.Schema(
+    {
+      imageId: { type: String, required: true }, // Frontend ID for tracking
+      imageURL: { type: String, required: true }, // Path: /storage/...
+      uploadedAt: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  const HeaderDataItemSchema = new mongoose.Schema(
+    {
+      headerId: { type: mongoose.Schema.Types.ObjectId, required: true }, // Ref to QASectionsHome
+      name: { type: String, required: true }, // Section Name
+      selectedOption: { type: String, default: "" },
+      remarks: { type: String, default: "" },
+      images: [HeaderImageSchema]
+    },
+    { _id: false }
+  );
+
+  // 3. Main Report Schema
   const FincheckInspectionReportsSchema = new mongoose.Schema(
     {
-      reportId: {
-        type: String,
-        required: true,
-        unique: true,
-        index: true
-      },
-      inspectionDate: {
-        type: Date,
-        required: true
-      },
-      inspectionType: {
-        type: String,
-        enum: ["first", "re"],
-        required: true
-      },
-      orderNos: {
-        type: [String],
-        required: true
-      },
+      inspectionDate: { type: Date, required: true },
+      inspectionType: { type: String, enum: ["first", "re"], required: true },
+      orderNos: { type: [String], required: true },
+      orderNosString: { type: String, required: true },
       orderType: {
         type: String,
         enum: ["single", "multi", "batch"],
         default: "single"
       },
-      empId: {
+      buyer: { type: String, required: true },
+      productType: { type: String, required: true },
+      productTypeId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      reportType: { type: String, required: true },
+      reportTypeId: { type: mongoose.Schema.Types.ObjectId, required: true },
+      empId: { type: String, required: true },
+      empName: { type: String },
+      measurementMethod: {
         type: String,
-        required: true
+        enum: ["Before", "After", "N/A"],
+        default: "N/A"
       },
-      empName: {
-        type: String
+      inspectionMethod: {
+        type: String,
+        enum: ["Fixed", "AQL", "N/A"],
+        default: "N/A"
+      },
+
+      // --- Report ID is a Number ---
+      reportId: {
+        type: Number,
+        unique: true,
+        index: true
       },
       status: {
         type: String,
         enum: ["draft", "in_progress", "completed", "cancelled"],
         default: "draft"
       },
-      inspectionDetails: InspectionDetailsSchema
+      inspectionDetails: InspectionDetailsSchema,
+      // --- NEW: Header Data Array ---
+      headerData: { type: [HeaderDataItemSchema], default: [] }
     },
     {
       timestamps: true,
@@ -121,11 +151,17 @@ const createFincheckInspectionReportsModel = (connection) => {
     }
   );
 
-  // Indexes
-  FincheckInspectionReportsSchema.index({ inspectionDate: -1 });
-  FincheckInspectionReportsSchema.index({ empId: 1 });
-  FincheckInspectionReportsSchema.index({ orderNos: 1 });
-  FincheckInspectionReportsSchema.index({ status: 1 });
+  FincheckInspectionReportsSchema.index(
+    {
+      inspectionDate: 1,
+      inspectionType: 1,
+      orderNos: 1,
+      productTypeId: 1,
+      reportTypeId: 1,
+      empId: 1
+    },
+    { unique: true }
+  );
 
   return connection.model(
     "FincheckInspectionReports",

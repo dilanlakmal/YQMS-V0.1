@@ -644,6 +644,7 @@ import YPivotQAInspectionMeasurementConfig from "../components/inspection/PivotY
 import YPivotQAInspectionDefectConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectConfig";
 import YPivotQAInspectionSummary from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionSummary";
 import YPivotQAInspectionPPSheetDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDetermination";
+import YPivotQAInspectionHeaderDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionHeaderDataSave";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -713,9 +714,26 @@ const YPivotQAInspection = () => {
   }, []);
 
   // NEW: Handler for save complete
-  const handleSaveComplete = useCallback((savedData) => {
-    setSavedReportData(savedData);
+  const handleSaveComplete = useCallback((result) => {
+    // Destructure the result passed from the Modal
+    const { reportData, isNew, message } = result;
+
+    setSavedReportData(reportData);
     setIsReportSaved(true);
+
+    // --- LOGIC TO SHOW MESSAGE IF EXISTING ---
+    if (isNew === false) {
+      // You can use a standard alert, or a custom Toast component if you have one
+      alert(
+        `⚠️ EXISTING REPORT FOUND\n\n${message}\n\nThe system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data.`
+      );
+    } else {
+      // Optional: Success message for new report
+      // alert("Success! New inspection report created.");
+    }
+
+    // Optional: Automatically move to next logical tab
+    // setActiveTab("header");
   }, []);
 
   // NEW: Handle tab change with validation
@@ -856,15 +874,32 @@ const YPivotQAInspection = () => {
         label: "Header",
         icon: <FileText size={18} />,
         component: (
-          <YPivotQATemplatesHeader
+          // MODIFIED: Use the Wrapper Component instead of YPivotQATemplatesHeader directly
+          <YPivotQAInspectionHeaderDataSave
             headerData={sharedReportState.headerData}
             onUpdateHeaderData={handleHeaderDataUpdate}
+            reportId={savedReportData?.reportId} // Pass the ID from saved order
+            isReportSaved={isReportSaved} // Pass status to enable button
           />
         ),
         gradient: "from-purple-500 to-pink-500",
         description: "Inspection header",
         requiresSave: true
       },
+      // {
+      //   id: "header",
+      //   label: "Header",
+      //   icon: <FileText size={18} />,
+      //   component: (
+      //     <YPivotQATemplatesHeader
+      //       headerData={sharedReportState.headerData}
+      //       onUpdateHeaderData={handleHeaderDataUpdate}
+      //     />
+      //   ),
+      //   gradient: "from-purple-500 to-pink-500",
+      //   description: "Inspection header",
+      //   requiresSave: true
+      // },
       {
         id: "photos",
         label: "Photos",

@@ -234,11 +234,36 @@ const YPivotQAInspectionOrderDataSaveModal = ({
       ? determineBuyer(orderNos[0])
       : { buyer: "Unknown", code: "--" };
 
-  // AQL Config computation
-  const aqlConfig = useMemo(() => {
+  const prepareAqlPayload = () => {
     if (selectedTemplate?.InspectedQtyMethod !== "AQL") return null;
-    return config.aqlConfig || null;
-  }, [selectedTemplate, config]);
+    const src = config.aqlConfig || {};
+
+    // We need to extract the float values from the items array if not present at top level
+    const minorItem = src.items?.find((i) => i.status === "Minor");
+    const majorItem = src.items?.find((i) => i.status === "Major");
+    const criticalItem = src.items?.find((i) => i.status === "Critical");
+
+    return {
+      inspectionType: src.inspectionType || "General",
+      level: src.level || "II",
+      // Extract floats
+      minorAQL: parseFloat(minorItem?.aqlLevel) || 0,
+      majorAQL: parseFloat(majorItem?.aqlLevel) || 0,
+      criticalAQL: parseFloat(criticalItem?.aqlLevel) || 0,
+
+      inspectedQty: parseInt(config.inspectedQty) || 0,
+      batch: src.batch || "",
+      sampleLetter: src.sampleLetter || "",
+      sampleSize: parseInt(src.sampleSize) || 0,
+
+      items:
+        src.items?.map((item) => ({
+          status: item.status,
+          ac: parseInt(item.ac) || 0,
+          re: parseInt(item.re) || 0
+        })) || []
+    };
+  };
 
   // Handle save
   const handleSave = async () => {
@@ -246,6 +271,9 @@ const YPivotQAInspectionOrderDataSaveModal = ({
     setError(null);
 
     try {
+      // Prepare specific AQL payload
+      const finalAqlConfig = prepareAqlPayload();
+
       const payload = {
         inspectionDate,
         inspectionType,
@@ -267,17 +295,22 @@ const YPivotQAInspectionOrderDataSaveModal = ({
           reportTypeId: selectedTemplate?._id,
           measurement: selectedTemplate?.Measurement || "N/A",
           method: selectedTemplate?.InspectedQtyMethod || "N/A",
-          inspectedQty:
-            config.inspectedQty || selectedTemplate?.InspectedQty || 0,
+
+          // Handle Empty Strings for Numbers
+          inspectedQty: config.inspectedQty !== "" ? config.inspectedQty : null,
           aqlSampleSize: config.aqlSampleSize || 0,
-          cartonQty: config.cartonQty || 0,
+          cartonQty: config.cartonQty !== "" ? config.cartonQty : null,
+
           shippingStage: config.shippingStage || "",
           remarks: config.remarks || "",
           totalOrderQty: orderData?.dtOrder?.totalQty || 0,
           custStyle: orderData?.dtOrder?.custStyle || "",
           customer: orderData?.dtOrder?.customer || "",
           factory: orderData?.dtOrder?.factory || "",
-          aqlConfig: aqlConfig,
+
+          // Use the transformed AQL config
+          aqlConfig: finalAqlConfig,
+
           productionStatus: qualityPlanData?.productionStatus || null,
           packingList: qualityPlanData?.packingList || null,
           qualityPlanEnabled: selectedTemplate?.QualityPlan === "Yes"
@@ -290,7 +323,11 @@ const YPivotQAInspectionOrderDataSaveModal = ({
       );
 
       if (response.data.success) {
-        onConfirm(response.data.data);
+        onConfirm({
+          reportData: response.data.data,
+          isNew: response.data.isNew,
+          message: response.data.message
+        });
       } else {
         setError(response.data.message || "Failed to save report");
       }
@@ -534,20 +571,21 @@ const YPivotQAInspectionOrderDataSaveModal = ({
           )}
 
           {/* AQL Config - Only show if method is AQL */}
-          {selectedTemplate?.InspectedQtyMethod === "AQL" && aqlConfig && (
-            <div className="p-4 sm:p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
-              <div className="flex items-center gap-2 mb-4">
-                <BarChart3 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-                <h3 className="text-base font-bold text-indigo-800 dark:text-indigo-200">
-                  AQL Configuration
-                </h3>
+          {selectedTemplate?.InspectedQtyMethod === "AQL" &&
+            config.aqlConfig && (
+              <div className="p-4 sm:p-6 bg-indigo-50 dark:bg-indigo-900/20 rounded-xl border border-indigo-200 dark:border-indigo-800">
+                <div className="flex items-center gap-2 mb-4">
+                  <BarChart3 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-base font-bold text-indigo-800 dark:text-indigo-200">
+                    AQL Configuration
+                  </h3>
+                </div>
+                <AQLConfigDisplay
+                  aqlConfig={config.aqlConfig}
+                  inspectedQty={config.inspectedQty}
+                />
               </div>
-              <AQLConfigDisplay
-                aqlConfig={aqlConfig}
-                inspectedQty={config.inspectedQty}
-              />
-            </div>
-          )}
+            )}
 
           {/* Error Message */}
           {error && (

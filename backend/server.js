@@ -222,6 +222,7 @@ import QASections_AQL_Values from "./routes/PivotY/QASections/QASections_AQL_Val
 import QASections_AQL_Config from "./routes/PivotY/QASections/QASections_AQL_Config_Routes.js";
 import QASections_Line from "./routes/PivotY/QASections/QASections_Line_Route.js";
 import QASections_Table from "./routes/PivotY/QASections/QASections_Table_Route.js";
+import QASections_Shipping_Stage from "./routes/PivotY/QASections/QASections_Shipping_Stage_Route.js";
 
 /* ------------------------------
   PivotY - QA Measurement Specs
@@ -522,6 +523,7 @@ app.use(QASections_AQL_Values);
 app.use(QASections_AQL_Config);
 app.use(QASections_Line);
 app.use(QASections_Table);
+app.use(QASections_Shipping_Stage);
 
 /* ------------------------------
   PivotY - QA Measurements routes

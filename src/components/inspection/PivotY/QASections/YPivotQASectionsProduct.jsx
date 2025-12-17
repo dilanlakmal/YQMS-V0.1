@@ -8,7 +8,8 @@ import {
   BookOpen,
   Sliders,
   Factory,
-  Grid
+  Grid,
+  Ship
 } from "lucide-react";
 import React, { useMemo } from "react";
 import YPivotQASectionsProductCategory from "./YPivotQASectionsProductCategory";
@@ -21,6 +22,7 @@ import YPivotQASectionsAQLTerminology from "./YPivotQASectionsAQLTerminology";
 import YPivotQASectionsAQLBuyerConfig from "./YPivotQASectionsAQLBuyerConfig";
 import YPivotQASectionsLineConfig from "./YPivotQASectionsLineConfig";
 import YPivotQASectionsTableConfig from "./YPivotQASectionsTableConfig";
+import YPivotQASectionsShippingStageConfig from "./YPivotQASectionsShippingStageConfig";
 
 // Placeholder components for other tabs
 const PlaceholderComponent = ({ title, icon: Icon }) => {
@@ -59,6 +61,12 @@ const YPivotQASectionsProduct = ({ activeSubTab, setActiveSubTab }) => {
         label: "Table Management",
         icon: <Grid size={16} />,
         component: <YPivotQASectionsTableConfig />
+      },
+      {
+        id: "shipping",
+        label: "Shipping Stage",
+        icon: <Ship size={16} />,
+        component: <YPivotQASectionsShippingStageConfig />
       },
       {
         id: "category",

@@ -6,6 +6,10 @@ import {
   QASectionsProductType,
   FincheckInspectionReports
 } from "../../MongoDB/dbConnectionController.js";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import crypto from "crypto";
 
 // ============================================================
 // Helper: Extract base order number (common part)
@@ -794,20 +798,24 @@ export const updateOrderProductType = async (req, res) => {
   }
 };
 
-// ============================================================
-// Generate Random 12-digit Report ID
-// ============================================================
-const generateReportId = () => {
-  let id = "";
-  for (let i = 0; i < 12; i++) {
-    id += Math.floor(Math.random() * 10).toString();
-  }
-  return id;
+// Helper to safely parse numbers
+const parseNullableInt = (value) => {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? null : parsed;
 };
 
-// ============================================================
-// Create Inspection Report
-// ============================================================
+const parseIntWithDefault = (value, defaultVal = 0) => {
+  if (value === undefined || value === null || value === "") return defaultVal;
+  const parsed = parseInt(value, 10);
+  return isNaN(parsed) ? defaultVal : parsed;
+};
+
+// MODIFIED: Returns a Number type
+const generateReportId = () => {
+  return Math.floor(1000000000 + Math.random() * 9000000000);
+};
+
 export const createInspectionReport = async (req, res) => {
   try {
     const {
@@ -820,192 +828,158 @@ export const createInspectionReport = async (req, res) => {
       inspectionDetails
     } = req.body;
 
-    // Validation
-    if (!inspectionDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Inspection date is required."
-      });
+    if (
+      !inspectionDate ||
+      !inspectionType ||
+      !orderNos ||
+      !empId ||
+      !inspectionDetails
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields." });
     }
 
-    if (!inspectionType || !["first", "re"].includes(inspectionType)) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid inspection type is required (first or re)."
-      });
-    }
+    const sortedOrderNos = [...orderNos].sort();
+    const orderNosString = sortedOrderNos.join(", ");
 
-    if (!orderNos || !Array.isArray(orderNos) || orderNos.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "At least one order number is required."
-      });
-    }
-
-    if (!empId) {
-      return res.status(400).json({
-        success: false,
-        message: "Employee ID is required."
-      });
-    }
-
-    if (!inspectionDetails) {
-      return res.status(400).json({
-        success: false,
-        message: "Inspection details are required."
-      });
-    }
-
-    // Validate required inspection details
-    const requiredFields = ["buyer", "productType", "reportTypeName"];
-    for (const field of requiredFields) {
-      if (!inspectionDetails[field]) {
-        return res.status(400).json({
-          success: false,
-          message: `${field} is required in inspection details.`
-        });
-      }
-    }
-
-    // Generate unique report ID
-    let reportId = generateReportId();
-    let attempts = 0;
-    const maxAttempts = 10;
-
-    // Ensure unique report ID
-    while (attempts < maxAttempts) {
-      const existing = await FincheckInspectionReports.findOne({ reportId });
-      if (!existing) break;
-      reportId = generateReportId();
-      attempts++;
-    }
-
-    if (attempts >= maxAttempts) {
-      return res.status(500).json({
-        success: false,
-        message: "Failed to generate unique report ID. Please try again."
-      });
-    }
-
-    // Process AQL config if method is AQL
-    let processedAqlConfig = null;
+    // --- MODIFIED: AQL Logic to match new Schema ---
+    let processedAqlConfig = {};
     if (inspectionDetails.method === "AQL" && inspectionDetails.aqlConfig) {
+      const src = inspectionDetails.aqlConfig;
       processedAqlConfig = {
-        inspectionType: inspectionDetails.aqlConfig.inspectionType || "",
-        level: inspectionDetails.aqlConfig.level || "",
-        batch: inspectionDetails.aqlConfig.batch || "",
-        sampleLetter: inspectionDetails.aqlConfig.sampleLetter || "",
-        sampleSize: inspectionDetails.aqlConfig.sampleSize || 0,
-        items: inspectionDetails.aqlConfig.items || []
+        inspectionType: src.inspectionType || "",
+        level: src.level || "",
+        // Save floats
+        minorAQL: parseFloat(src.minorAQL) || 0,
+        majorAQL: parseFloat(src.majorAQL) || 0,
+        criticalAQL: parseFloat(src.criticalAQL) || 0,
+
+        inspectedQty: parseIntWithDefault(src.inspectedQty, 0),
+        batch: src.batch || "",
+        sampleLetter: src.sampleLetter || "",
+        sampleSize: parseIntWithDefault(src.sampleSize, 0),
+
+        // Map Items
+        items: Array.isArray(src.items)
+          ? src.items.map((item) => ({
+              status: item.status,
+              ac: parseIntWithDefault(item.ac, 0),
+              re: parseIntWithDefault(item.re, 0)
+            }))
+          : []
       };
     }
+    const processedProductionStatus =
+      inspectionDetails.qualityPlanEnabled && inspectionDetails.productionStatus
+        ? inspectionDetails.productionStatus
+        : {};
 
-    // Process production status if quality plan is enabled
-    let processedProductionStatus = null;
-    let processedPackingList = null;
+    const processedPackingList =
+      inspectionDetails.qualityPlanEnabled && inspectionDetails.packingList
+        ? inspectionDetails.packingList
+        : {};
 
-    if (inspectionDetails.qualityPlanEnabled) {
-      processedProductionStatus = {
-        cutting: parseInt(inspectionDetails.productionStatus?.cutting) || 0,
-        sewing: parseInt(inspectionDetails.productionStatus?.sewing) || 0,
-        ironing: parseInt(inspectionDetails.productionStatus?.ironing) || 0,
-        qc2FinishedChecking:
-          parseInt(inspectionDetails.productionStatus?.qc2FinishedChecking) ||
-          0,
-        folding: parseInt(inspectionDetails.productionStatus?.folding) || 0,
-        packing: parseInt(inspectionDetails.productionStatus?.packing) || 0
-      };
-
-      processedPackingList = {
-        totalCartons:
-          parseInt(inspectionDetails.packingList?.totalCartons) || 0,
-        totalPcs: parseInt(inspectionDetails.packingList?.totalPcs) || 0,
-        finishedCartons:
-          parseInt(inspectionDetails.packingList?.finishedCartons) || 0,
-        finishedPcs: parseInt(inspectionDetails.packingList?.finishedPcs) || 0
-      };
-    }
-
-    // Create the report document
-    const newReport = new FincheckInspectionReports({
-      reportId,
+    const updateData = {
       inspectionDate: new Date(inspectionDate),
       inspectionType,
-      orderNos,
-      orderType: orderType || "single",
+      orderNos: sortedOrderNos,
+      orderNosString,
+      orderType,
+      buyer: inspectionDetails.buyer,
+      productType: inspectionDetails.productType,
+      productTypeId: inspectionDetails.productTypeId,
+      reportType: inspectionDetails.reportTypeName,
+      reportTypeId: inspectionDetails.reportTypeId,
       empId,
-      empName: empName || "",
-      status: "draft",
+      empName,
+      measurementMethod: inspectionDetails.measurement || "N/A",
+      inspectionMethod: inspectionDetails.method || "N/A",
+
       inspectionDetails: {
-        buyer: inspectionDetails.buyer,
-        buyerCode: inspectionDetails.buyerCode || "",
-        productType: inspectionDetails.productType,
-        productTypeId: inspectionDetails.productTypeId || null,
-        supplier: inspectionDetails.supplier || "YM",
+        supplier: inspectionDetails.supplier || "",
         isSubCon: inspectionDetails.isSubCon || false,
         subConFactory: inspectionDetails.subConFactory || "",
         subConFactoryId: inspectionDetails.subConFactoryId || null,
-        reportTypeName: inspectionDetails.reportTypeName,
-        reportTypeId: inspectionDetails.reportTypeId || null,
-        measurement: inspectionDetails.measurement || "N/A",
-        method: inspectionDetails.method || "N/A",
-        inspectedQty: parseInt(inspectionDetails.inspectedQty) || 0,
-        aqlSampleSize: parseInt(inspectionDetails.aqlSampleSize) || 0,
-        cartonQty: parseInt(inspectionDetails.cartonQty) || 0,
+        factory: inspectionDetails.factory || "",
         shippingStage: inspectionDetails.shippingStage || "",
         remarks: inspectionDetails.remarks || "",
-        totalOrderQty: parseInt(inspectionDetails.totalOrderQty) || 0,
         custStyle: inspectionDetails.custStyle || "",
         customer: inspectionDetails.customer || "",
-        factory: inspectionDetails.factory || "",
+        buyerCode: inspectionDetails.buyerCode || "",
+
+        inspectedQty: parseNullableInt(inspectionDetails.inspectedQty),
+        cartonQty: parseNullableInt(inspectionDetails.cartonQty),
+
+        aqlSampleSize: parseIntWithDefault(inspectionDetails.aqlSampleSize, 0),
+        totalOrderQty: parseIntWithDefault(inspectionDetails.totalOrderQty, 0),
+
         aqlConfig: processedAqlConfig,
         productionStatus: processedProductionStatus,
         packingList: processedPackingList,
         qualityPlanEnabled: inspectionDetails.qualityPlanEnabled || false
       }
-    });
+    };
 
-    await newReport.save();
+    const filter = {
+      inspectionDate: new Date(inspectionDate),
+      inspectionType: inspectionType,
+      orderNos: sortedOrderNos,
+      reportTypeId: inspectionDetails.reportTypeId,
+      productTypeId: inspectionDetails.productTypeId,
+      empId: empId
+    };
 
-    return res.status(201).json({
-      success: true,
-      message: "Inspection report created successfully.",
-      data: {
-        reportId: newReport.reportId,
-        _id: newReport._id,
-        createdAt: newReport.createdAt
+    const report = await FincheckInspectionReports.findOneAndUpdate(
+      filter,
+      {
+        $set: updateData,
+        $setOnInsert: {
+          reportId: generateReportId(), // Generates Number
+          status: "draft"
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
       }
+    );
+
+    const isNew = report.createdAt.getTime() === report.updatedAt.getTime();
+    const message = isNew
+      ? "Inspection report created successfully."
+      : "Existing report updated successfully.";
+
+    return res.status(200).json({
+      success: true,
+      message: message,
+      isNew: isNew,
+      data: report
     });
   } catch (error) {
-    console.error("Error creating inspection report:", error);
+    console.error("Error saving inspection report:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error while creating inspection report.",
+      message: "Internal server error while saving report.",
       error: error.message
     });
   }
 };
 
 // ============================================================
-// Get Inspection Report by Report ID
+// Get Inspection Report by ID
 // ============================================================
 export const getInspectionReportById = async (req, res) => {
   try {
     const { reportId } = req.params;
-
-    if (!reportId) {
-      return res.status(400).json({
-        success: false,
-        message: "Report ID is required."
-      });
-    }
 
     const report = await FincheckInspectionReports.findOne({ reportId }).lean();
 
     if (!report) {
       return res.status(404).json({
         success: false,
-        message: `Report with ID ${reportId} not found.`
+        message: "Report not found."
       });
     }
 
@@ -1014,54 +988,180 @@ export const getInspectionReportById = async (req, res) => {
       data: report
     });
   } catch (error) {
-    console.error("Error fetching inspection report:", error);
+    console.error("Error fetching report by ID:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error while fetching inspection report.",
+      message: "Internal server error.",
       error: error.message
     });
   }
 };
 
 // ============================================================
-// Check if Report Exists for Same Order, Date, Type, Employee
+// Check Existing Report (Matches Unique Index Logic)
 // ============================================================
 export const checkExistingReport = async (req, res) => {
   try {
-    const { inspectionDate, inspectionType, orderNos, empId } = req.body;
+    const {
+      inspectionDate,
+      inspectionType,
+      orderNos,
+      empId,
+      productTypeId,
+      reportTypeId
+    } = req.body;
 
-    if (!inspectionDate || !inspectionType || !orderNos || !empId) {
+    // Validate required fields for uniqueness check
+    if (
+      !inspectionDate ||
+      !inspectionType ||
+      !orderNos ||
+      !empId ||
+      !productTypeId ||
+      !reportTypeId
+    ) {
       return res.status(400).json({
         success: false,
-        message: "All parameters are required."
+        message: "Missing parameters for existence check."
       });
     }
 
-    // Check for existing report with same criteria
-    const existing = await FincheckInspectionReports.findOne({
+    const sortedOrderNos = [...orderNos].sort();
+
+    const existingReport = await FincheckInspectionReports.findOne({
       inspectionDate: new Date(inspectionDate),
-      inspectionType,
-      orderNos: { $all: orderNos, $size: orderNos.length },
-      empId
+      inspectionType: inspectionType,
+      orderNos: sortedOrderNos,
+      productTypeId: productTypeId,
+      reportTypeId: reportTypeId,
+      empId: empId
     }).lean();
 
     return res.status(200).json({
       success: true,
-      exists: !!existing,
-      data: existing
-        ? {
-            reportId: existing.reportId,
-            status: existing.status,
-            createdAt: existing.createdAt
-          }
-        : null
+      exists: !!existingReport,
+      data: existingReport || null
     });
   } catch (error) {
     console.error("Error checking existing report:", error);
     return res.status(500).json({
       success: false,
-      message: "Internal server error while checking existing report.",
+      message: "Internal server error.",
       error: error.message
     });
+  }
+};
+
+// Define Storage Path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const uploadDirHeader = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/HeaderData"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirHeader)) {
+  fs.mkdirSync(uploadDirHeader, { recursive: true });
+}
+
+// Helper: Save Base64 Image to Disk
+const saveBase64Image = (base64String, reportId, sectionId, index) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Create unique filename
+    const filename = `header_${reportId}_${sectionId}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirHeader, filename);
+
+    fs.writeFileSync(filepath, data);
+
+    // Return relative URL for frontend access
+    return `/storage/PivotY/Fincheck/HeaderData/${filename}`;
+  } catch (error) {
+    console.error("Error saving base64 image:", error);
+    return null;
+  }
+};
+
+// ============================================================
+// Update Header Data (Selections, Remarks, Images)
+// ============================================================
+export const updateHeaderData = async (req, res) => {
+  try {
+    const { reportId, headerData } = req.body;
+
+    if (!reportId || !headerData || !Array.isArray(headerData)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    const processedHeaderData = headerData.map((section) => {
+      const processedImages = (section.images || [])
+        .map((img, idx) => {
+          let finalUrl = img.imageURL;
+
+          if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+            const savedPath = saveBase64Image(
+              img.imgSrc,
+              reportId,
+              section.headerId,
+              idx
+            );
+            if (savedPath) finalUrl = savedPath;
+          }
+
+          return {
+            // FIX: Ensure imageId exists. Use provided ID or generate fallback.
+            imageId:
+              img.id ||
+              img.imageId ||
+              `${section.headerId}_${idx}_${Date.now()}`,
+            imageURL: finalUrl
+          };
+        })
+        .filter((img) => img.imageURL);
+
+      return {
+        headerId: section.headerId,
+        name: section.name,
+        selectedOption: section.selectedOption,
+        remarks: section.remarks,
+        images: processedImages
+      };
+    });
+
+    report.headerData = processedHeaderData;
+    await report.save(); // Mongoose validation will now pass because imageId is guaranteed
+
+    return res.status(200).json({
+      success: true,
+      message: "Header data saved successfully.",
+      data: report.headerData
+    });
+  } catch (error) {
+    console.error("Error updating header data:", error);
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal server error.",
+        error: error.message
+      });
   }
 };
