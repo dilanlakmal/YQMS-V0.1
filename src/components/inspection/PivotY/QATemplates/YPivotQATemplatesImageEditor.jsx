@@ -21,8 +21,16 @@ import {
   Settings,
   Loader,
   Move,
-  Check
+  Check,
+  Eraser, // for background removal button
+  ImageOff // alternative icon
 } from "lucide-react";
+
+import {
+  useBackgroundRemoval,
+  BackgroundRemovalModal,
+  BackgroundColorPicker
+} from "./YPivotQATemplatesImageRemoveBackground";
 
 const MAX_IMAGES = 7;
 
@@ -120,6 +128,20 @@ const YPivotQATemplatesImageEditor = ({
 
   // Touch/pinch zoom
   const [lastTouchDistance, setLastTouchDistance] = useState(null);
+
+  // --- Background Removal State ---
+  const [showBgColorPicker, setShowBgColorPicker] = useState(false);
+  const [bgRemovalColor, setBgRemovalColor] = useState("#FFFFFF");
+
+  // Use the background removal hook
+  const {
+    removeImageBackground,
+    isProcessing: isBgRemoving,
+    progress: bgRemovalProgress,
+    progressMessage: bgRemovalMessage,
+    error: bgRemovalError,
+    resetState: resetBgRemovalState
+  } = useBackgroundRemoval();
 
   // Generate unique ID
   const generateId = () =>
@@ -1112,6 +1134,55 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   // ==========================================
+  // BACKGROUND REMOVAL HANDLER
+  // ==========================================
+
+  const handleRemoveBackground = async (backgroundColor = "#FFFFFF") => {
+    if (!imgSrc) return;
+
+    setShowBgColorPicker(false);
+
+    try {
+      const result = await removeImageBackground(imgSrc, {
+        backgroundColor,
+        quality: 0.95,
+        outputFormat: "image/png"
+      });
+
+      if (result.success) {
+        // Update the current image with the new background-removed image
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  // Clear history since we have a new base image
+                  // Or you could keep it: history: img.history
+                  history: []
+                }
+              : img
+          )
+        );
+
+        // Clear current image history
+        setHistory([]);
+      }
+    } catch (error) {
+      console.error("Background removal failed:", error);
+    }
+  };
+
+  const handleBgRemovalCancel = () => {
+    resetBgRemovalState();
+  };
+
+  const handleBgRemovalRetry = () => {
+    resetBgRemovalState();
+    setShowBgColorPicker(true);
+  };
+
+  // ==========================================
   // 7. UI RENDERING
   // ==========================================
 
@@ -1482,6 +1553,26 @@ const YPivotQATemplatesImageEditor = ({
                     </div>
                   </div>
                 )}
+                {/* Background Removal Progress Modal */}
+                <BackgroundRemovalModal
+                  isOpen={isBgRemoving}
+                  progress={bgRemovalProgress}
+                  progressMessage={bgRemovalMessage}
+                  error={bgRemovalError}
+                  onCancel={handleBgRemovalCancel}
+                  onRetry={handleBgRemovalRetry}
+                />
+
+                {/* Background Color Picker Modal */}
+                <BackgroundColorPicker
+                  isOpen={showBgColorPicker}
+                  currentColor={bgRemovalColor}
+                  onSelect={(color) => {
+                    setBgRemovalColor(color);
+                    handleRemoveBackground(color);
+                  }}
+                  onCancel={() => setShowBgColorPicker(false)}
+                />
               </>
             )}
           </>
@@ -1623,6 +1714,25 @@ const YPivotQATemplatesImageEditor = ({
                   <tool.icon className="w-5 h-5" />
                 </button>
               ))}
+              {/* Divider */}
+              <div className="w-px h-6 bg-gray-600 mx-1" />
+              {/* Background Removal Button */}
+              <button
+                onClick={() => setShowBgColorPicker(true)}
+                disabled={!imgSrc || isBgRemoving}
+                className={`p-2 rounded-lg transition-all relative ${
+                  isBgRemoving
+                    ? "bg-emerald-600/20 text-emerald-400"
+                    : "text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300"
+                } disabled:opacity-30 disabled:cursor-not-allowed`}
+                title="Remove Background"
+              >
+                {isBgRemoving ? (
+                  <Loader className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Eraser className="w-5 h-5" />
+                )}
+              </button>
             </div>
 
             <div className="flex gap-1 items-center bg-gray-700 rounded-lg px-2">

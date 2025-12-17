@@ -100,6 +100,90 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
+  // --- Photo Data Schemas ---
+  const PhotoImageSchema = new mongoose.Schema(
+    {
+      imageId: { type: String, required: true }, // Frontend ID or generated
+      imageURL: { type: String, required: true }, // /storage/...
+      uploadedAt: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  const PhotoItemSchema = new mongoose.Schema(
+    {
+      itemNo: { type: Number, required: true },
+      itemName: { type: String, required: true },
+      remarks: { type: String, default: "" },
+      images: [PhotoImageSchema]
+    },
+    { _id: false }
+  );
+
+  const PhotoSectionDataSchema = new mongoose.Schema(
+    {
+      sectionId: { type: mongoose.Schema.Types.ObjectId, required: true },
+      sectionName: { type: String, required: true },
+      items: [PhotoItemSchema]
+    },
+    { _id: false }
+  );
+
+  // --- Inspection Config Schema ---
+  const InspectionConfigItemSchema = new mongoose.Schema(
+    {
+      reportName: { type: String, required: true },
+      inspectionMethod: { type: String, default: "Fixed" }, // "AQL" or "Fixed"
+      sampleSize: { type: Number, default: 0 }, // Total Calculated Qty
+      // Stores the array of groups (Line, Table, Color, Assignments) dynamically
+      configGroups: { type: mongoose.Schema.Types.Mixed, default: [] },
+      updatedAt: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  // --- Measurement Data Schema ---
+  const MeasurementDataItemSchema = new mongoose.Schema(
+    {
+      // Context / Config Link
+      groupId: { type: Number, required: true }, // Matches the ID from InspectionConfig
+
+      // Scopes
+      line: { type: String, default: "" },
+      table: { type: String, default: "" },
+      color: { type: String, default: "" },
+
+      // Visual Helpers (Snapshot names in case config changes)
+      lineName: { type: String, default: "" },
+      tableName: { type: String, default: "" },
+      colorName: { type: String, default: "" },
+      qcUser: { type: mongoose.Schema.Types.Mixed, default: null }, // Stores QC Object
+
+      // Measurement Context
+      size: { type: String, required: true },
+      kValue: { type: String, default: "" }, // For Before Wash
+      displayMode: { type: String, default: "all" }, // "all" or "selected"
+
+      // --- Heavy Data (Using Mixed for flexibility) ---
+      // Structure: { [specId]: { [pcsIndex]: { decimal: 0, fraction: "0" } } }
+      allMeasurements: { type: mongoose.Schema.Types.Mixed, default: {} },
+      criticalMeasurements: { type: mongoose.Schema.Types.Mixed, default: {} },
+
+      // Qty & Enabled Pieces (Stored as Arrays in DB, converted to Sets in Frontend)
+      allQty: { type: Number, default: 1 },
+      criticalQty: { type: Number, default: 2 },
+      allEnabledPcs: { type: [Number], default: [] },
+      criticalEnabledPcs: { type: [Number], default: [] },
+
+      // Decisions & Metadata
+      inspectorDecision: { type: String, default: "pass" },
+      systemDecision: { type: String, default: "pending" },
+      remark: { type: String, default: "" },
+      timestamp: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
   // 3. Main Report Schema
   const FincheckInspectionReportsSchema = new mongoose.Schema(
     {
@@ -142,8 +226,14 @@ const createFincheckInspectionReportsModel = (connection) => {
         default: "draft"
       },
       inspectionDetails: InspectionDetailsSchema,
-      // --- NEW: Header Data Array ---
-      headerData: { type: [HeaderDataItemSchema], default: [] }
+      // --- Header Data Array ---
+      headerData: { type: [HeaderDataItemSchema], default: [] },
+      // --- Photo Data Array ---
+      photoData: { type: [PhotoSectionDataSchema], default: [] },
+      // --- Inspection Configuration Data ---
+      inspectionConfig: { type: [InspectionConfigItemSchema], default: [] },
+      // --- Measurement Data Array ---
+      measurementData: { type: [MeasurementDataItemSchema], default: [] }
     },
     {
       timestamps: true,

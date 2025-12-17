@@ -13,7 +13,10 @@ import {
   createInspectionReport,
   getInspectionReportById,
   checkExistingReport,
-  updateHeaderData
+  updateHeaderData,
+  updatePhotoData,
+  updateInspectionConfig,
+  updateMeasurementData
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -45,40 +48,55 @@ router.get("/api/fincheck-inspection/aql-config", getAqlConfigByBuyer);
 // Get Sub-Con Factories
 router.get("/api/fincheck-inspection/subcon-factories", getSubConFactories);
 
-// NEW: Get Product Type Info for Orders
+// Get Product Type Info for Orders
 router.post(
   "/api/fincheck-inspection/order-product-type",
   getOrderProductTypeInfo
 );
 
-// NEW: Get All Product Type Options for Dropdown
+// Get All Product Type Options for Dropdown
 router.get(
   "/api/fincheck-inspection/product-type-options",
   getProductTypeOptions
 );
 
-// NEW: Update Product Type for Orders
+// Update Product Type for Orders
 router.put(
   "/api/fincheck-inspection/update-product-type",
   updateOrderProductType
 );
 
-// NEW: Create Inspection Report
+// Create Inspection Report
 router.post("/api/fincheck-inspection/create-report", createInspectionReport);
 
-// NEW: Get Inspection Report by ID
+// Get Inspection Report by ID
 router.get(
   "/api/fincheck-inspection/report/:reportId",
   getInspectionReportById
 );
 
-// NEW: Check Existing Report
+// Check Existing Report
 router.post(
   "/api/fincheck-inspection/check-existing-report",
   checkExistingReport
 );
 
-// NEW: Save Header Data
+// Save Header Data
 router.post("/api/fincheck-inspection/update-header-data", updateHeaderData);
+
+// Save Photo Data
+router.post("/api/fincheck-inspection/update-photo-data", updatePhotoData);
+
+// Save Inspection Config (Info Tab)
+router.post(
+  "/api/fincheck-inspection/update-inspection-config",
+  updateInspectionConfig
+);
+
+// Save Measurement Data (Measurement Tab)
+router.post(
+  "/api/fincheck-inspection/update-measurement-data",
+  updateMeasurementData
+);
 
 export default router;

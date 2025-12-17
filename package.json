@@ -24,6 +24,7 @@
     "@fortawesome/react-fontawesome": "^0.2.2",
     "@headlessui/react": "^1.7.19",
     "@heroicons/react": "^2.2.0",
+    "@imgly/background-removal": "^1.7.0",
     "@lucide/lab": "^0.1.2",
     "@mui/material": "^6.4.7",
     "@radix-ui/react-alert-dialog": "^1.1.15",
