@@ -217,11 +217,6 @@ const FilterField = ({
                     No matches found for "{inputValue}"
                   </div>
                 )}
-                
-                {/* Instruction text */}
-                <div className="px-4 py-2 text-xs text-blue-600 bg-blue-50 border-t border-gray-200 font-medium text-center">
-                  Click an option to apply filter or press Enter to select first match
-                </div>
               </div>
             )}
           </>
