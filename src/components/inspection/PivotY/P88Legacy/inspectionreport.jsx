@@ -2,7 +2,7 @@ import React from 'react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
-const InspectionReportModal = ({ inspection, onClose }) => {
+const InspectionReportPage = ({ inspection, onClose }) => {
   const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
@@ -70,332 +70,262 @@ const InspectionReportModal = ({ inspection, onClose }) => {
     }
   };
 
+  const handleClose = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      window.close(); // Close the tab if no onClose handler
+    }
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl w-full max-w-7xl max-h-[95vh] overflow-hidden flex flex-col shadow-2xl">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      <div className="max-w-7xl mx-auto p-6">
         
-        {/* Modal Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 px-6 py-4">
+        {/* Page Header */}
+        <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 rounded-2xl px-6 py-6 mb-6 shadow-xl">
           <div className="flex justify-between items-center">
             <div className="text-white">
-              <h2 className="text-xl font-bold flex items-center gap-2">
+              <h1 className="text-3xl font-bold flex items-center gap-3">
                 📋 Inspection Report
-              </h2>
-              <p className="text-blue-100 text-sm mt-1">
+              </h1>
+              <p className="text-blue-100 text-lg mt-2">
                 {inspection.inspectionNumbers?.join(', ') || 'N/A'}
               </p>
             </div>
             <div className="flex gap-3">
               <button 
                 onClick={downloadPDF} 
-                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg transition-all duration-200 font-medium shadow-lg hover:shadow-xl"
+                className="flex items-center gap-2 px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
                 Download PDF
               </button>
               <button 
-                onClick={onClose} 
-                className="flex items-center justify-center w-10 h-10 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-all duration-200 font-bold shadow-lg hover:shadow-xl"
+                onClick={handleClose} 
+                className="flex items-center gap-2 px-6 py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
+                Close
               </button>
             </div>
           </div>
         </div>
 
-        {/* Modal Content */}
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          <div id="inspection-report-content" className="p-6 space-y-6">
+        {/* Report Content */}
+        <div id="inspection-report-content" className="space-y-6">
+          
+          {/* Header Section */}
+          <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-3xl font-bold text-gray-800">
+                  {inspection.reportType || 'Inline Inspection- Finishing'}
+                </h2>
+                <p className="text-gray-600 mt-2 text-lg">
+                  Inspection #: {inspection.inspectionNumbers?.join(', ') || 'N/A'} | 
+                  Group #: {inspection.groupNumber || 'N/A'}
+                </p>
+              </div>
+              <div className={`px-6 py-3 rounded-xl font-bold text-xl ${getStatusColor(inspection.inspectionResult)}`}>
+                {inspection.inspectionResult || 'Pending'}
+              </div>
+            </div>
+          </div>
+
+          {/* Inspection Details */}
+          <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Inspection Details</h2>
             
-            {/* Header Section */}
-            <div className="bg-white rounded-lg p-6 shadow-sm border">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-800">
-                    {inspection.reportType || 'Inline Inspection- Finishing'}
-                  </h1>
-                  <p className="text-gray-600 mt-1">
-                    Inspection #: {inspection.inspectionNumbers?.join(', ') || 'N/A'} | 
-                    Group #: {inspection.groupNumber || 'N/A'}
-                  </p>
-                </div>
-                <div className={`px-4 py-2 rounded-lg font-bold text-lg ${getStatusColor(inspection.inspectionResult)}`}>
-                  {inspection.inspectionResult || 'Pending'}
-                </div>
+            {/* Date Information */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="text-center p-6 bg-purple-100 rounded-xl border border-purple-200">
+                <p className="text-sm font-medium text-purple-700 mb-2">Scheduled Inspection Date</p>
+                <p className="text-xl font-bold text-gray-800">{formatDateTime(inspection.scheduledInspectionDate)}</p>
+              </div>
+              <div className="text-center p-6 bg-orange-100 rounded-xl border border-orange-200">
+                <p className="text-sm font-medium text-orange-700 mb-2">Inspection Started Date</p>
+                <p className="text-xl font-bold text-gray-800">{formatDateTime(inspection.scheduledInspectionDate)}</p>
+              </div>
+              <div className="text-center p-6 bg-green-100 rounded-xl border border-green-200">
+                <p className="text-sm font-medium text-green-700 mb-2">Submitted Inspection Date</p>
+                <p className="text-xl font-bold text-gray-800">{formatDateTime(inspection.submittedInspectionDate)}</p>
               </div>
             </div>
 
-            {/* Inspection Details */}
-            <div className="bg-white rounded-lg p-6 shadow-sm border">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Inspection Details</h2>
-              
-              {/* Date Information */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="text-center p-4  bg-purple-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-600">Scheduled Inspection Date</p>
-                  <p className="text-lg font-bold text-gray-800">{formatDateTime(inspection.scheduledInspectionDate)}</p>
-                </div>
-                <div className="text-center p-4 bg-orange-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-600">Inspection Started Date</p>
-                  <p className="text-lg font-bold text-gray-800">{formatDateTime(inspection.scheduledInspectionDate)}</p>
-                </div>
-                <div className="text-center p-4 bg-green-200 rounded-lg">
-                  <p className="text-sm font-medium text-gray-600">Submitted Inspection Date</p>
-                  <p className="text-lg font-bold text-gray-800">{formatDateTime(inspection.submittedInspectionDate)}</p>
-                </div>
-              </div>
-
-              {/* Details Table */}
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <tbody>
-                    <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600 w-1/5">Report Type</td>
-                      <td className="py-2 text-gray-800 w-1/5">{inspection.reportType || 'N/A'}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600 w-1/5">Project</td>
-                      <td className="py-2 text-gray-800 w-1/5">{inspection.project || 'N/A'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">Inspector</td>
-                      <td className="py-2 text-gray-800">{inspection.inspector || 'N/A'}</td>
-                      <td className="py-2 px-4 ffont-bold bg-blue-50 text-gray-600">Supplier</td>
-                      <td className="py-2 text-gray-800">{inspection.supplier || 'N/A'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">Factory Name</td>
-                      <td className="py-2 text-gray-800">{inspection.supplier || 'N/A'}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600">Destination</td>
-                      <td className="py-2 text-gray-800">{inspection.destination || 'N/A'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">PO #</td>
-                      <td className="py-2 text-gray-800">{inspection.poNumbers?.join(', ') || 'N/A'}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600">SKU #</td>
-                      <td className="py-2 text-gray-800">{inspection.skuNumbers?.join(', ') || 'N/A'}</td>
-                    </tr>
-                     <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">Style</td>
-                      <td className="py-2 text-gray-800">{inspection.style || 'N/A'}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600">Color</td>
-                      <td className="py-2 text-gray-800">{inspection.colors?.join(', ') || 'N/A'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">Total PO Items Qty</td>
-                      <td className="py-2 text-gray-800">{inspection.totalPoItemsQty?.toLocaleString() || '0'}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600">Inspected Qty (Pcs)</td>
-                      <td className="py-2 text-gray-800">{inspection.qtyInspected?.toLocaleString() || '0'}</td>
-                    </tr>
-                    <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">Sample Inspected</td>
-                      <td className="py-2 text-gray-800">{inspection.sampleInspected || '0'}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600">ETD</td>
-                      <td className="py-2 text-gray-800">{inspection.etd?.length > 0 ? inspection.etd.map(date => formatDate(date)).join(', ') : 'N/A'}</td>
-                    </tr>
-                     <tr className="border-b">
-                      <td className="py-2 pr-4 font-bold bg-blue-50 text-gray-600">Created Date</td>
-                      <td className="py-2 text-gray-800">{formatDate(inspection.createdAt)}</td>
-                      <td className="py-2 px-4 font-bold bg-blue-50 text-gray-600">Last Modified Date</td>
-                      <td className="py-2 text-gray-800">{formatDate(inspection.lastModifiedDate)}</td>
-                    </tr>
-                    <tr>
-                      <td className="pt-4 pr-4 font-bold bg-blue-50 text-gray-600 align-top">Description</td>
-                      <td colSpan="3" className="pt-4 text-gray-800">{inspection.description || 'N/A'}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
+            {/* Details Table */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-sm">
+                <tbody>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700 w-1/4">Report Type</td>
+                    <td className="py-4 text-gray-800 w-1/4">{inspection.reportType || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700 w-1/4">Project</td>
+                    <td className="py-4 text-gray-800 w-1/4">{inspection.project || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Inspector</td>
+                    <td className="py-4 text-gray-800">{inspection.inspector || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Supplier</td>
+                    <td className="py-4 text-gray-800">{inspection.supplier || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Factory Name</td>
+                    <td className="py-4 text-gray-800">{inspection.supplier || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Destination</td>
+                    <td className="py-4 text-gray-800">{inspection.destination || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">PO #</td>
+                    <td className="py-4 text-gray-800">{inspection.poNumbers?.join(', ') || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">SKU #</td>
+                    <td className="py-4 text-gray-800">{inspection.skuNumbers?.join(', ') || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Style</td>
+                    <td className="py-4 text-gray-800">{inspection.style || 'N/A'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Color</td>
+                    <td className="py-4 text-gray-800">{inspection.colors?.join(', ') || 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Total PO Items Qty</td>
+                    <td className="py-4 text-gray-800">{inspection.totalPoItemsQty?.toLocaleString() || '0'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Inspected Qty (Pcs)</td>
+                    <td className="py-4 text-gray-800">{inspection.qtyInspected?.toLocaleString() || '0'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Sample Inspected</td>
+                    <td className="py-4 text-gray-800">{inspection.sampleInspected || '0'}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">ETD</td>
+                    <td className="py-4 text-gray-800">{inspection.etd?.length > 0 ? inspection.etd.map(date => formatDate(date)).join(', ') : 'N/A'}</td>
+                  </tr>
+                  <tr className="border-b border-gray-200">
+                    <td className="py-4 pr-6 font-bold bg-blue-50 text-gray-700">Created Date</td>
+                    <td className="py-4 text-gray-800">{formatDate(inspection.createdAt)}</td>
+                    <td className="py-4 px-6 font-bold bg-blue-50 text-gray-700">Last Modified Date</td>
+                    <td className="py-4 text-gray-800">{formatDate(inspection.lastModifiedDate)}</td>
+                  </tr>
+                  <tr>
+                    <td className="pt-6 pr-6 font-bold bg-blue-50 text-gray-700 align-top">Description</td>
+                    <td colSpan="3" className="pt-6 text-gray-800">{inspection.description || 'N/A'}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+          </div>
 
-            {/* Conclusion */}
-            <div className="bg-white rounded-lg p-6 shadow-sm border">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Conclusion</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-600">Inspection Result</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(inspection.inspectionResult)}`}>
-                    {inspection.inspectionResult || 'Pending'}
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-medium text-gray-600">Approval Status</p>
-                  <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusBadgeColor(inspection.approvalStatus)}`}>
-                    {inspection.approvalStatus || 'N/A'}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Checklists */}
-            {/* <div className="bg-white rounded-lg p-6 shadow-sm border">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Checklists</h2>
+          {/* Conclusion */}
+          <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Conclusion</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="space-y-2">
-                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
-                  <span className="font-medium text-gray-800">Packing, Packaging & Labelling</span>
-                  <span className="px-3 py-1 bg-emerald-500 text-white rounded-full text-sm font-medium">PASS</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
-                  <span className="font-medium text-gray-800">Workmanship</span>
-                  <span className="px-3 py-1 bg-emerald-500 text-white rounded-full text-sm font-medium">PASS</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
-                  <span className="font-medium text-gray-800">Quality Plan</span>
-                  <span className="px-3 py-1 bg-emerald-500 text-white rounded-full text-sm font-medium">PASS</span>
-                </div>
+                <p className="text-sm font-medium text-gray-600">Inspection Result</p>
+                <span className={`inline-block px-4 py-2 rounded-xl text-lg font-medium ${getStatusBadgeColor(inspection.inspectionResult)}`}>
+                  {inspection.inspectionResult || 'Pending'}
+                </span>
               </div>
-            </div> */}
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gray-600">Approval Status</p>
+                <span className={`inline-block px-4 py-2 rounded-xl text-lg font-medium ${getStatusBadgeColor(inspection.approvalStatus)}`}>
+                  {inspection.approvalStatus || 'N/A'}
+                </span>
+              </div>
+            </div>
+          </div>
 
-            {/* Defect Summary */}
-            <div className="bg-white rounded-lg p-6 shadow-sm border">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Defect Summary</h3>
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg border-l-4 border-red-500">
-                      <span className="font-medium text-gray-800">Critical</span>
-                      <span className="text-xl font-bold text-red-600">{inspection.qtyCriticalDefects || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-amber-50 rounded-lg border-l-4 border-amber-500">
-                      <span className="font-medium text-gray-800">Major</span>
-                      <span className="text-xl font-bold text-amber-600">{inspection.qtyMajorDefects || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-emerald-50 rounded-lg border-l-4 border-emerald-500">
-                      <span className="font-medium text-gray-800">Minor</span>
-                      <span className="text-xl font-bold text-emerald-600">{inspection.qtyMinorDefects || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500">
-                      <span className="font-medium text-gray-800">Total Product + Quality Plan Defects</span>
-                      <span className="text-xl font-bold text-blue-600">{inspection.totalNumberOfDefects || 0}</span>
-                    </div>
+          {/* Defect Summary */}
+          <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-6">Defect Summary</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-red-50 rounded-xl border-l-4 border-red-500">
+                    <span className="font-medium text-gray-800">Critical</span>
+                    <span className="text-2xl font-bold text-red-600">{inspection.qtyCriticalDefects || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-amber-50 rounded-xl border-l-4 border-amber-500">
+                    <span className="font-medium text-gray-800">Major</span>
+                    <span className="text-2xl font-bold text-amber-600">{inspection.qtyMajorDefects || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-emerald-50 rounded-xl border-l-4 border-emerald-500">
+                    <span className="font-medium text-gray-800">Minor</span>
+                    <span className="text-2xl font-bold text-emerald-600">{inspection.qtyMinorDefects || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-blue-50 rounded-xl border-l-4 border-blue-500">
+                    <span className="font-medium text-gray-800">Total Product + Quality Plan Defects</span>
+                    <span className="text-2xl font-bold text-blue-600">{inspection.totalNumberOfDefects || 0}</span>
                   </div>
                 </div>
+              </div>
 
-                <div>
-                  <h3 className="text-lg font-bold text-gray-800 mb-4">Quality Metrics</h3>
-                  <div className="space-y-3">
-                    {/* <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="font-medium text-gray-800">Accept/Reject Qty</span>
-                      <span className="font-bold text-gray-800">
-                        {(inspection.totalGoodUnits || 0)}/{(inspection.totalDefectiveUnits || 0)}/{(inspection.sampleInspected || 0)}
-                      </span>
-                    </div> */}
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="font-medium text-gray-800">Total Defective Units</span>
-                      <span className="font-bold text-gray-800">{inspection.totalDefectiveUnits || 0}</span>
-                    </div>
-                    <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <span className="font-medium text-gray-800">Defect Rate</span>
-                      <span className="font-bold text-gray-800">{inspection.defectRate || 0}%</span>
-                    </div>
+              <div>
+                <h3 className="text-xl font-bold text-gray-800 mb-6">Quality Metrics</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                    <span className="font-medium text-gray-800">Total Defective Units</span>
+                    <span className="text-xl font-bold text-gray-800">{inspection.totalDefectiveUnits || 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
+                    <span className="font-medium text-gray-800">Defect Rate</span>
+                    <span className="text-xl font-bold text-gray-800">{inspection.defectRate || 0}%</span>
                   </div>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Comments */}
-            {inspection.allComments && (
-              <div className="bg-white rounded-lg p-6 shadow-sm border">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Comments</h2>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <p className="text-gray-700">{inspection.allComments}</p>
-                </div>
+          {/* Comments */}
+          {inspection.allComments && (
+            <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Comments</h2>
+              <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                <p className="text-gray-700 text-lg leading-relaxed">{inspection.allComments}</p>
               </div>
-            )}
+            </div>
+          )}
 
-            {/* Detailed Defects */}
-            {inspection.defects && inspection.defects.length > 0 && (
-              <div className="bg-white rounded-lg p-6 shadow-sm border">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">Detailed Defects</h2>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse border border-gray-300">
-                    <thead>
-                      <tr className="bg-gray-100">
-                        {/* <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Defect Category</th> */}
-                        <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Defect Name</th>
-                        {/* <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Severity</th> */}
-                        <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Quantity</th>
-                        {/* <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Comment</th> */}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {inspection.defects.map((defect, index) => {
-                        const severity = defect.defectName.includes('Critical') ? 'Critical' :
-                                       defect.defectName.includes('Major') ? 'Major' : 'Minor';
-                        const category = defect.defectName.includes('Sewing') ? 'E-Sewing & Linking' :
-                                       defect.defectName.includes('Pressing') ? 'C-Finishing & Pressing' : 'General';
-                        
-                        return (
-                          <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            {/* <td className="border border-gray-300 px-4 py-2">{category}</td> */}
-                            <td className="border border-gray-300 px-4 py-2">{defect.defectName}</td>
-                            {/* <td className="border border-gray-300 px-4 py-2">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                severity === 'Critical' ? 'bg-red-100 text-red-800' :
-                                severity === 'Major' ? 'bg-amber-100 text-amber-800' : 
-                                'bg-emerald-100 text-emerald-800'
-                              }`}>
-                                {severity}
-                              </span>
-                            </td> */}
-                            <td className="border border-gray-300 px-4 py-2 font-semibold">{defect.count}</td>
-                            {/* <td className="border border-gray-300 px-4 py-2">-</td> */}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
-            {/* Sample Size & AQL */}
-            {/* <div className="bg-white rounded-lg p-6 shadow-sm border">
-              <h2 className="text-xl font-bold text-gray-800 mb-4">Sample Size & AQL</h2>
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-300">
+          {/* Detailed Defects */}
+          {inspection.defects && inspection.defects.length > 0 && (
+            <div className="bg-white rounded-xl p-8 shadow-lg border border-gray-200">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Detailed Defects</h2>
+              <div className="overflow-x-auto rounded-xl border border-gray-200">
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-gray-300 px-4 py-2 text-left">Inspection Method</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Inspection Level</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Critical</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Major</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Minor</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Qty Inspected</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left">Sample Inspected</th>
+                    <tr className="bg-gradient-to-r from-gray-100 to-gray-200">
+                      <th className="border border-gray-300 px-6 py-4 text-left font-semibold text-gray-700">Defect Name</th>
+                      <th className="border border-gray-300 px-6 py-4 text-left font-semibold text-gray-700">Quantity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td className="border border-gray-300 px-4 py-2">Normal</td>
-                      <td className="border border-gray-300 px-4 py-2">II</td>
-                      <td className="border border-gray-300 px-4 py-2">0.010</td>
-                      <td className="border border-gray-300 px-4 py-2">4.000</td>
-                      <td className="border border-gray-300 px-4 py-2">0.010</td>
-                      <td className="border border-gray-300 px-4 py-2">{inspection.qtyInspected || 0}</td>
-                      <td className="border border-gray-300 px-4 py-2">{inspection.sampleInspected || 0}</td>
-                    </tr>
+                    {inspection.defects.map((defect, index) => (
+                      <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="border border-gray-300 px-6 py-4 text-gray-800">{defect.defectName}</td>
+                        <td className="border border-gray-300 px-6 py-4 font-semibold text-gray-800">{defect.count}</td>
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
-            </div> */}
-
-            {/* Footer */}
-            <div className="bg-white rounded-lg p-6 text-center border shadow-sm">
-              <div className="flex items-center justify-center gap-2 text-gray-600 mb-2">
-                <span className="text-lg">📄</span>
-                <p className="font-medium">Report generated on: {new Date().toLocaleString()}</p>
-              </div>
-              <p className="text-sm text-gray-500">Upload Batch: {inspection.uploadBatch}</p>
             </div>
+          )}
 
+          {/* Footer */}
+          <div className="bg-white rounded-xl p-8 text-center border border-gray-200 shadow-lg">
+            <div className="flex items-center justify-center gap-3 text-gray-600 mb-3">
+              <span className="text-2xl">📄</span>
+              <p className="text-lg font-medium">Report generated on: {new Date().toLocaleString()}</p>
+            </div>
+            <p className="text-gray-500">Upload Batch: {inspection.uploadBatch}</p>
           </div>
+
         </div>
       </div>
     </div>
   );
 };
 
-export default InspectionReportModal;
+export default InspectionReportPage;
