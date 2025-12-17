@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 
 const FilterField = ({ 
   label, 
@@ -11,16 +11,124 @@ const FilterField = ({
   datalistId 
 }) => {
   const [isFocused, setIsFocused] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [filteredOptions, setFilteredOptions] = useState(options);
+  const [inputValue, setInputValue] = useState(value); // Separate input value from filter value
+  const inputRef = useRef(null);
+  const dropdownRef = useRef(null);
+
+  // Update input value when prop value changes
+  useEffect(() => {
+    setInputValue(value);
+  }, [value]);
+
+  // Filter options based on input value
+  useEffect(() => {
+    if (inputValue && type !== 'select') {
+      const filtered = options.filter(option =>
+        option.toLowerCase().includes(inputValue.toLowerCase())
+      );
+      setFilteredOptions(filtered);
+    } else {
+      setFilteredOptions(options);
+    }
+  }, [inputValue, options, type]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+        // Reset input to last selected value if no option was selected
+        if (inputValue !== value) {
+          setInputValue(value);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [inputValue, value]);
 
   const baseInputClasses = `
     w-full px-4 py-3 border rounded-lg text-sm transition-all duration-200
     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
     hover:border-gray-400 bg-white
     ${isFocused ? 'border-blue-500 shadow-md' : 'border-gray-300'}
+    ${type !== 'select' ? 'pr-10' : ''}
   `;
 
+  const handleInputFocus = () => {
+    setIsFocused(true);
+    if (type !== 'select' && options.length > 0) {
+      setIsDropdownOpen(true);
+    }
+  };
+
+  const handleInputBlur = () => {
+    setIsFocused(false);
+    // Delay closing dropdown to allow for option selection
+    setTimeout(() => {
+      setIsDropdownOpen(false);
+      // Reset input to last selected value if no option was selected
+      if (inputValue !== value) {
+        setInputValue(value);
+      }
+    }, 200);
+  };
+
+  const handleOptionSelect = (option) => {
+    setInputValue(option);
+    onChange(option); // Only call onChange when option is actually selected
+    setIsDropdownOpen(false);
+    inputRef.current?.blur();
+  };
+
+  const handleInputChange = (e) => {
+    const newValue = e.target.value;
+    setInputValue(newValue); // Update input display value
+    // Don't call onChange here - only update the visual input
+    
+    if (type !== 'select' && options.length > 0) {
+      setIsDropdownOpen(true);
+    }
+  };
+
+  const handleDropdownToggle = () => {
+    if (type === 'select') return;
+    
+    if (isDropdownOpen) {
+      setIsDropdownOpen(false);
+      // Reset input to last selected value
+      if (inputValue !== value) {
+        setInputValue(value);
+      }
+    } else {
+      inputRef.current?.focus();
+      setIsDropdownOpen(true);
+    }
+  };
+
+  const handleClear = () => {
+    setInputValue('');
+    onChange(''); // Clear the filter
+    setIsDropdownOpen(false);
+  };
+
+  // Handle Enter key to select first filtered option
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter' && filteredOptions.length > 0) {
+      e.preventDefault();
+      handleOptionSelect(filteredOptions[0]);
+    } else if (e.key === 'Escape') {
+      setIsDropdownOpen(false);
+      setInputValue(value); // Reset to last selected value
+      inputRef.current?.blur();
+    }
+  };
+
   return (
-    <div className="relative group">
+    <div className="relative group" ref={dropdownRef}>
       <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
         <span className="text-lg">{icon}</span>
         {label}
@@ -36,40 +144,96 @@ const FilterField = ({
             className={baseInputClasses}
           >
             <option value="">All {label}</option>
-            {type === 'select' && label === 'Approval Status' && (
-              <>
-                <option value="Pending Approval">Pending Approval</option>
-                <option value="Approved">Approved</option>
-                <option value="Rejected">Rejected</option>
-              </>
-            )}
+            {options.map(option => (
+              <option key={option} value={option}>{option}</option>
+            ))}
           </select>
         ) : (
           <>
             <input
-              list={datalistId}
+              ref={inputRef}
               type="text"
               placeholder={placeholder}
-              value={value}
-              onChange={(e) => onChange(e.target.value)}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
+              value={inputValue}
+              onChange={handleInputChange}
+              onFocus={handleInputFocus}
+              onBlur={handleInputBlur}
+              onKeyDown={handleKeyDown}
               className={baseInputClasses}
+              autoComplete="off"
             />
+            
+            {/* Dropdown Arrow - Only show if there are options */}
             {options.length > 0 && (
-              <datalist id={datalistId}>
-                {options.map(option => (
-                  <option key={option} value={option} />
+              <button
+                type="button"
+                onClick={handleDropdownToggle}
+                className="absolute inset-y-0 right-8 flex items-center px-2 text-gray-400 hover:text-gray-600 transition-colors"
+                tabIndex={-1}
+              >
+                <svg 
+                  className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            )}
+            
+            {/* Custom Dropdown with improved styling */}
+            {isDropdownOpen && filteredOptions.length > 0 && (
+              <div 
+                className="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto"
+                style={{
+                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                }}
+              >
+                {filteredOptions.slice(0, 10).map((option, index) => (
+                  <div
+                    key={`${option}-${index}`}
+                    className="px-4 py-3 hover:bg-blue-50 hover:text-blue-900 cursor-pointer text-sm border-b border-gray-100 last:border-b-0 transition-all duration-150 flex items-center justify-between"
+                    onMouseDown={(e) => e.preventDefault()} // Prevent input blur
+                    onClick={() => handleOptionSelect(option)}
+                  >
+                    <span className="text-gray-800 font-medium">{option}</span>
+                    {value === option && (
+                      <span className="text-xs text-green-600 bg-green-100 px-2 py-1 rounded-full font-semibold">
+                        Selected
+                      </span>
+                    )}
+                  </div>
                 ))}
-              </datalist>
+                
+                {filteredOptions.length > 10 && (
+                  <div className="px-4 py-2 text-xs text-gray-500 bg-gray-50 border-t border-gray-200 font-medium">
+                    Showing 10 of {filteredOptions.length} results. Keep typing to narrow down...
+                  </div>
+                )}
+                
+                {filteredOptions.length === 0 && inputValue && (
+                  <div className="px-4 py-3 text-sm text-gray-500 text-center italic">
+                    No matches found for "{inputValue}"
+                  </div>
+                )}
+                
+                {/* Instruction text */}
+                <div className="px-4 py-2 text-xs text-blue-600 bg-blue-50 border-t border-gray-200 font-medium text-center">
+                  Click an option to apply filter or press Enter to select first match
+                </div>
+              </div>
             )}
           </>
         )}
         
+        {/* Clear Button */}
         {value && (
           <button
-            onClick={() => onChange('')}
-            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600 transition-colors"
+            type="button"
+            onClick={handleClear}
+            className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-red-500 transition-colors"
+            tabIndex={-1}
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -95,48 +259,49 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
     {
       key: 'inspector',
       label: 'Inspector',
-      placeholder: 'Search inspector...',
+      placeholder: 'Type to search, then select an option...',
       icon: '👤',
-      options: options.inspector || []
+      options: [...(options.inspector || [])].sort()
     },
     {
       key: 'approvalStatus',
       label: 'Approval Status',
       type: 'select',
       icon: '✅',
+      options: ['Pending Approval', 'Approved', 'Rejected'],
     },
     {
       key: 'reportType',
       label: 'Report Type',
-      placeholder: 'Search report type...',
+      placeholder: 'Type to search, then select an option...',
       icon: '📋',
-      options: options.reportType || []
+      options: [...(options.reportType || [])].sort()
     },
     {
       key: 'supplier',
       label: 'Supplier',
-      placeholder: 'Search supplier...',
+      placeholder: 'Type to search, then select an option...',
       icon: '🏢',
-      options: options.supplier || []
+      options: [...(options.supplier || [])].sort()
     },
     {
       key: 'project',
       label: 'Project',
-      placeholder: 'Search project...',
+      placeholder: 'Type to search, then select an option...',
       icon: '🏗️',
-      options: options.project || []
+      options: [...(options.project || [])].sort()
     },
     {
       key: 'poNumbers',
       label: 'PO #',
-      placeholder: 'Search PO #...',
+      placeholder: 'Type to search, then select an option...',
       icon: '🏷️',
-      options: options.poNumbers || []
+      options: [...(options.poNumbers || [])].sort()
     }
   ];
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-lg border border-gray-100 mb-8 overflow-visible">
       {/* Header */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">
@@ -149,7 +314,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
               <p className="text-sm text-gray-600">
                 {hasActiveFilters 
                   ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} applied`
-                  : ''
+                  : 'Type to search, then click an option to apply filter'
                 }
               </p>
             </div>
@@ -157,6 +322,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
           
           {hasActiveFilters && (
             <button
+              type="button"
               onClick={clearAllFilters}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors duration-200"
             >
@@ -202,8 +368,9 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
                   >
                     <span className="text-xs">{field?.icon}</span>
                     <span className="font-medium">{field?.label}:</span>
-                    <span>{value}</span>
+                    <span className="max-w-32 truncate">{value}</span>
                     <button
+                      type="button"
                       onClick={() => onFilterChange(key, '')}
                       className="ml-1 text-blue-600 hover:text-blue-800 transition-colors"
                     >

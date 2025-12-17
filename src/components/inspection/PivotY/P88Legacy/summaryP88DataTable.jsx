@@ -1,15 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import InspectionReportModal from '../P88Legacy/inspectionreport.jsx';
 import FilterPanel from './FilterPanel.jsx';
 import SummaryCards from './SummaryCards.jsx';
 import ReactPaginate from 'react-paginate';
+
 
 const SummaryP88Data = () => {
   const [inspectionData, setInspectionData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedInspection, setSelectedInspection] = useState(null);
-  const [showReportModal, setShowReportModal] = useState(false);
   const [summary, setSummary] = useState({ total: 0, passed: 0, failed: 0, pending: 0, hold: 0 });
   const [filterOptions, setFilterOptions] = useState({
     inspector: [],
@@ -162,11 +160,6 @@ const SummaryP88Data = () => {
 
   const handlePageClick = (event) => {
     setCurrentPage(event.selected);
-  };
-
-  const handleViewReport = (inspection) => {
-    setSelectedInspection(inspection);
-    setShowReportModal(true);
   };
 
   // Loading State
@@ -387,14 +380,16 @@ const SummaryP88Data = () => {
                       </button>
                     </td> */}
                     <td className="px-4 py-4">
-                      <button 
+                      <a 
+                        href={`/inspection-report/${inspection._id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-lg text-sm font-medium hover:from-blue-600 hover:to-blue-700 transition-all duration-200 transform hover:scale-105 shadow-md hover:shadow-lg"
-                        onClick={() => handleViewReport(inspection)}
                         title="View Full Report"
                       >
                         <span>📊</span>
                         <span className="hidden sm:inline">View Report</span>
-                      </button>
+                      </a>
                     </td>
                   </tr>
                 ))}
@@ -454,17 +449,6 @@ const SummaryP88Data = () => {
               />
             </div>
           </div>
-        )}
-
-        {/* Report Modal */}
-        {showReportModal && selectedInspection && (
-          <InspectionReportModal
-            inspection={selectedInspection}
-            onClose={() => {
-              setShowReportModal(false);
-              setSelectedInspection(null);
-            }}
-          />
         )}
       </div>
     </div>

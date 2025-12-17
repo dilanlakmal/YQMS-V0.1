@@ -12,9 +12,16 @@ import SummaryP88Data from "../components/inspection/PivotY/P88Legacy/summaryP88
 
 const P88Legacy = () => {
   const { user } = useAuth();
-  
-  // State for Main Tabs
   const [activeTab, setActiveTab] = useState("upload_data");
+  // Remove or comment out the dataVersion state if it's causing refreshes
+  // const [dataVersion, setDataVersion] = useState(0);
+
+  // Modify the success handler to only switch tabs without incrementing version
+  const handleDataUploadSuccess = () => {
+    // Remove the version increment that might be causing refresh
+    // setDataVersion(prevVersion => prevVersion + 1);
+    setActiveTab("summary_date");
+  };
 
   // --- Configuration: Main Tabs ---
   const tabs = useMemo(
@@ -23,20 +30,20 @@ const P88Legacy = () => {
         id: "upload_data",
         label: "Upload P88 Data",
         icon: <Upload size={20} />,
-        component: <UploadP88Data />, 
+        component: <UploadP88Data onUploadSuccess={handleDataUploadSuccess} />, 
         description: "Upload the P88 Data"
       },
       {
         id: "summary_date",
         label: "Summary P88 Data",
         icon: <BarChart3 size={20} />,
+        // Remove dataVersion prop to prevent refresh triggers
         component: <SummaryP88Data />,
         description: "View summary data"
       },
     ],
+    [handleDataUploadSuccess] // Add dependency to prevent unnecessary re-renders
   );
-
-
 
   const activeComponent = useMemo(() => {
     return tabs.find((tab) => tab.id === activeTab)?.component || null;
@@ -45,7 +52,6 @@ const P88Legacy = () => {
   const activeTabData = useMemo(() => {
     return tabs.find((tab) => tab.id === activeTab);
   }, [activeTab, tabs]);
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
@@ -60,9 +66,8 @@ const P88Legacy = () => {
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
         <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
-          {/* ======================= */}
+          
           {/* MOBILE/TABLET LAYOUT (< lg) */}
-          {/* ======================= */}
           <div className="lg:hidden space-y-3">
             {/* Top Row: Title + User */}
             <div className="flex items-center justify-between gap-3">
@@ -87,6 +92,7 @@ const P88Legacy = () => {
                   </p>
                 </div>
               </div>
+
               {user && (
                 <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
                   <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
@@ -150,9 +156,7 @@ const P88Legacy = () => {
               </div>
               <div>
                 <p className="text-white font-bold text-xs leading-tight">
-                  {activeTab === "yorksys-orders"
-                    ? activeTabData?.label
-                    : activeTabData?.label}
+                  {activeTabData?.label}
                 </p>
                 <p className="text-indigo-200 text-[10px] font-medium leading-tight">
                   Active Module
@@ -161,9 +165,7 @@ const P88Legacy = () => {
             </div>
           </div>
 
-          {/* ======================= */}
-          {/* DESKTOP LAYOUT (>= lg)  */}
-          {/* ======================= */}
+          {/* DESKTOP LAYOUT (>= lg) */}
           <div className="hidden lg:flex lg:flex-col lg:gap-0">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-6 flex-1">
@@ -192,9 +194,8 @@ const P88Legacy = () => {
 
                 {/* Navigation Bar */}
                 <div className="flex items-center gap-3">
-                  {/* Main Tabs + Optional Sub Tabs */}
+                  {/* Main Tabs */}
                   <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
-                    {/* Render Main Tabs */}
                     {tabs.map((tab) => {
                       const isActive = activeTab === tab.id;
                       return (
@@ -229,7 +230,6 @@ const P88Legacy = () => {
                         </button>
                       );
                     })}
-                   
                   </div>
 
                   {/* Status Indicator */}
@@ -240,9 +240,7 @@ const P88Legacy = () => {
                     </div>
                     <div>
                       <p className="text-white font-bold text-sm leading-tight">
-                        {activeTab === "yorksys-orders" 
-                          ? activeTabData.label
-                          : activeTabData?.label}
+                        {activeTabData?.label}
                       </p>
                       <p className="text-indigo-200 text-xs font-medium leading-tight">
                         Active Module
@@ -276,9 +274,7 @@ const P88Legacy = () => {
       {/* Main Content Area */}
       <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
-          {/* <div className="transform transition-all duration-500 ease-out"> */}
-            {activeComponent}
-          {/* </div> */}
+          {activeComponent}
         </div>
       </div>
 
