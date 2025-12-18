@@ -44,7 +44,7 @@ const SummaryP88Data = () => {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
       const params = new URLSearchParams({
         page: currentPage + 1,
-        limit: 50,
+        limit: 100,
         sortBy: sortConfig.key,
         sortOrder: sortConfig.direction,
         ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
@@ -254,6 +254,14 @@ const SummaryP88Data = () => {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
+                  <th
+                    className="px-4 py-4 text-left font-semibold text-gray-700 select-none"
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">#️⃣</span>
+                      <span>No.</span>
+                    </div>
+                  </th>
                   {[
                     { key: 'scheduledInspectionDate', label: 'Scheduled Date', icon: '📅' },
                     { key: 'inspector', label: 'Inspector', icon: '👤' },
@@ -305,6 +313,9 @@ const SummaryP88Data = () => {
               <tbody className="divide-y divide-gray-100">
                 {inspectionData.map((inspection, index) => (
                   <tr key={inspection._id || index} className="hover:bg-blue-50 transition-colors duration-150 group">
+                    <td className="px-4 py-4 text-sm text-gray-700 font-medium text-center">
+                      {currentPage * 100 + index + 1}
+                    </td>
                     <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
                       {formatDateTime(inspection.scheduledInspectionDate)}
                     </td>

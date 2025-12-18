@@ -64,7 +64,7 @@ const SummaryCards = ({ summary }) => {
   ];
 
   return (
-    <div className="bg-white p-2 rounded-xl shadow-lg border border-gray-100 mb-8">
+    <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-100 mb-8">
       {/* Header Section */}
       {/* <div className="flex items-center justify-between mb-8"> */}
         {/* <div>
