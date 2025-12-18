@@ -90,6 +90,8 @@ import YPivotQASections from "./pages/YPivotQASections.jsx";
 import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
 import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
 import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
+import P88Legacy from "./pages/P88Legacy.jsx";
+import InspectionReportPage from "./components/inspection/PivotY/P88Legacy/InspectionReportPage.jsx";
 
 import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
@@ -490,6 +492,11 @@ function AppContent() {
               <Route
                 path="/fincheck-inspection"
                 element={<YPivotQAInspection />}
+              />
+              <Route path="/P88Legacy" element={<P88Legacy />} />
+              <Route
+                path="/inspection-report/:id"
+                element={<InspectionReportPage />}
               />
 
               <Route path="/production-Sheet" element={<CoverPage />} />

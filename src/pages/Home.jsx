@@ -291,6 +291,14 @@ function Home() {
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),
             description: "Pivot Y Inspections"
+          },
+          {
+            path: "/P88Legacy",
+            //pageId: "y-pivot-inspection",
+            image: "assets/Home/p88Legacy.png",
+            title: t("home.p88_Legacy"),
+            description: "P88 Legacy Data",
+            version: "0"
           }
         ]
       },

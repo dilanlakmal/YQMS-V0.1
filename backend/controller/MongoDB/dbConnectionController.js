@@ -115,6 +115,9 @@ import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.
 
 import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
 
+//P88Data
+import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
 import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
@@ -290,6 +293,8 @@ export const QASectionsTemplates =
 
 export const FincheckInspectionReports =
   createFincheckInspectionReportsModel(ymProdConnection);
+
+export const p88LegacyData = createP88DataSchema(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
