@@ -1393,3 +1393,212 @@ export const updateMeasurementData = async (req, res) => {
     });
   }
 };
+
+// Define Defect Storage Path
+const uploadDirDefect = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/DefectData"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirDefect)) {
+  fs.mkdirSync(uploadDirDefect, { recursive: true });
+}
+
+// Helper: Save Defect Base64 Image
+const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Create unique filename
+    const filename = `defect_${reportId}_${defectCode}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirDefect, filename);
+
+    fs.writeFileSync(filepath, data);
+
+    // Return relative URL
+    return `/storage/PivotY/Fincheck/DefectData/${filename}`;
+  } catch (error) {
+    console.error("Error saving defect base64 image:", error);
+    return null;
+  }
+};
+
+// ============================================================
+// Update Defect Data
+// ============================================================
+export const updateDefectData = async (req, res) => {
+  try {
+    const { reportId, defectData } = req.body;
+
+    if (!reportId || !defectData || !Array.isArray(defectData)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Process images in the defect data
+    const processedDefectData = defectData.map((defect) => {
+      const processedImages = (defect.images || [])
+        .map((img, idx) => {
+          let finalUrl = img.imageURL;
+
+          // If new Base64 image, save to disk
+          if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+            const savedPath = saveDefectBase64Image(
+              img.imgSrc,
+              reportId,
+              defect.defectCode,
+              idx
+            );
+            if (savedPath) finalUrl = savedPath;
+          }
+
+          return {
+            imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
+            imageURL: finalUrl
+          };
+        })
+        .filter((img) => img.imageURL); // Remove failed saves
+
+      return {
+        ...defect,
+        images: processedImages
+      };
+    });
+
+    // Replace existing data with the snapshot from frontend
+    report.defectData = processedDefectData;
+
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Defect data saved successfully.",
+      data: report.defectData
+    });
+  } catch (error) {
+    console.error("Error updating defect data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// Define PP Sheet Storage Path
+const uploadDirPPSheet = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/PPSheetData"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirPPSheet)) {
+  fs.mkdirSync(uploadDirPPSheet, { recursive: true });
+}
+
+// Helper: Save PP Sheet Base64 Image
+const savePPSheetBase64Image = (base64String, reportId, index) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Create unique filename
+    const filename = `ppsheet_${reportId}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirPPSheet, filename);
+
+    fs.writeFileSync(filepath, data);
+
+    // Return relative URL
+    return `/storage/PivotY/Fincheck/PPSheetData/${filename}`;
+  } catch (error) {
+    console.error("Error saving PP Sheet base64 image:", error);
+    return null;
+  }
+};
+
+// ============================================================
+// Update PP Sheet Data
+// ============================================================
+export const updatePPSheetData = async (req, res) => {
+  try {
+    const { reportId, ppSheetData } = req.body;
+
+    if (!reportId || !ppSheetData) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Process Images
+    const processedImages = (ppSheetData.images || [])
+      .map((img, idx) => {
+        let finalUrl = img.imageURL;
+
+        // If new Base64 image, save to disk
+        if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+          const savedPath = savePPSheetBase64Image(img.imgSrc, reportId, idx);
+          if (savedPath) finalUrl = savedPath;
+        }
+
+        return {
+          imageId: img.id || `pp_${idx}_${Date.now()}`,
+          imageURL: finalUrl
+        };
+      })
+      .filter((img) => img.imageURL); // Remove failed saves
+
+    // Construct the final object
+    const finalData = {
+      ...ppSheetData,
+      images: processedImages,
+      timestamp: new Date()
+    };
+
+    report.ppSheetData = finalData;
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "PP Sheet data saved successfully.",
+      data: report.ppSheetData
+    });
+  } catch (error) {
+    console.error("Error updating PP Sheet data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};

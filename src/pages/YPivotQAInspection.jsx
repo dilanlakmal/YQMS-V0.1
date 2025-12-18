@@ -19,16 +19,13 @@ import React, { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
-//import YPivotQAInspectionPhotosDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPhotosDetermination";
-//import YPivotQAInspectionLineTableColorConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionLineTableColorConfig";
-//import YPivotQAInspectionMeasurementConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementConfig";
-import YPivotQAInspectionDefectConfig from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectConfig";
 import YPivotQAInspectionSummary from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionSummary";
-import YPivotQAInspectionPPSheetDetermination from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDetermination";
 import YPivotQAInspectionHeaderDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionHeaderDataSave";
 import YPivotQAInspectionPhotoDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPhotoDataSave";
 import YPivotQAInspectionConfigSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionConfigSave";
 import YPivotQAInspectionMeasurementDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementDataSave";
+import YPivotQAInspectionDefectDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectDataSave";
+import YPivotQAInspectionPPSheetDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDataSave";
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -55,7 +52,7 @@ const YPivotQAInspection = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("order");
 
-  // NEW: Report saved state
+  //Report saved state
   const [savedReportData, setSavedReportData] = useState(null);
   const [isReportSaved, setIsReportSaved] = useState(false);
 
@@ -76,7 +73,8 @@ const YPivotQAInspection = () => {
     config: {},
     lineTableConfig: [],
     measurementData: {},
-    defectData: {}
+    defectData: {},
+    ppSheetData: null
   });
 
   // Add new state for quality plan (after sharedReportState):
@@ -89,12 +87,12 @@ const YPivotQAInspection = () => {
   // State for Active Inspection Context (Activated via Play button)
   const [activeGroup, setActiveGroup] = useState(null);
 
-  // State to persist PP Sheet data across tab switches
-  const [ppSheetData, setPPSheetData] = useState(null);
-
   // Handler to update PP Sheet data
   const handlePPSheetUpdate = useCallback((newData) => {
-    setPPSheetData(newData);
+    setSharedReportState((prev) => ({
+      ...prev,
+      ppSheetData: newData
+    }));
   }, []);
 
   // Handler for save complete
@@ -217,7 +215,7 @@ const YPivotQAInspection = () => {
             externalOrderType={sharedOrderState.orderType}
             externalInspectionDate={sharedOrderState.inspectionDate}
             externalInspectionType={sharedOrderState.inspectionType}
-            // NEW: Pass report-related props
+            //Pass report-related props
             onReportDataChange={handleReportDataChange}
             savedReportState={sharedReportState}
             onQualityPlanChange={handleQualityPlanChange}
@@ -239,12 +237,15 @@ const YPivotQAInspection = () => {
               label: "PP Sheet",
               icon: <FileSpreadsheet size={18} />,
               component: (
-                <YPivotQAInspectionPPSheetDetermination
+                // MODIFIED: Use the Wrapper Component
+                <YPivotQAInspectionPPSheetDataSave
                   orderData={sharedOrderState.orderData}
                   selectedOrders={sharedOrderState.selectedOrders}
                   inspectionDate={sharedOrderState.inspectionDate}
-                  savedState={ppSheetData}
-                  onUpdate={handlePPSheetUpdate}
+                  reportData={sharedReportState} // Access ppSheetData from here
+                  onUpdatePPSheetData={handlePPSheetUpdate}
+                  reportId={savedReportData?.reportId} // Pass ID
+                  isReportSaved={isReportSaved} // Pass Status
                 />
               ),
               gradient: "from-indigo-600 to-blue-600",
@@ -258,7 +259,7 @@ const YPivotQAInspection = () => {
         label: "Header",
         icon: <FileText size={18} />,
         component: (
-          // MODIFIED: Use the Wrapper Component instead of YPivotQATemplatesHeader directly
+          // Use the Wrapper Component instead of YPivotQATemplatesHeader directly
           <YPivotQAInspectionHeaderDataSave
             headerData={sharedReportState.headerData}
             onUpdateHeaderData={handleHeaderDataUpdate}
@@ -291,7 +292,7 @@ const YPivotQAInspection = () => {
         label: "Info",
         icon: <Info size={18} />,
         component: (
-          // MODIFIED: Use the Wrapper Component
+          // Use the Wrapper Component
           <YPivotQAInspectionConfigSave
             reportData={sharedReportState}
             orderData={sharedOrderState}
@@ -311,7 +312,7 @@ const YPivotQAInspection = () => {
         label: "Measurement",
         icon: <Ruler size={18} />,
         component: (
-          // MODIFIED: Use the Wrapper Component
+          // Use the Wrapper Component
           <YPivotQAInspectionMeasurementDataSave
             selectedOrders={sharedOrderState.selectedOrders}
             orderData={sharedOrderState.orderData}
@@ -326,65 +327,20 @@ const YPivotQAInspection = () => {
         description: "Measurement data",
         requiresSave: true
       },
-      // {
-      //   id: "photos",
-      //   label: "Photos",
-      //   icon: <Camera size={18} />,
-      //   component: (
-      //     <YPivotQAInspectionPhotosDetermination
-      //       reportData={sharedReportState}
-      //       onUpdatePhotoData={handlePhotoDataUpdate}
-      //     />
-      //   ),
-      //   gradient: "from-orange-500 to-red-500",
-      //   description: "Photo documentation",
-      //   requiresSave: true
-      // },
-      // {
-      //   id: "info",
-      //   label: "Info",
-      //   icon: <Info size={18} />,
-      //   component: (
-      //     <YPivotQAInspectionLineTableColorConfig
-      //       reportData={sharedReportState}
-      //       orderData={sharedOrderState}
-      //       onUpdate={handleReportDataChange}
-      //       onSetActiveGroup={handleSetActiveGroup}
-      //       activeGroup={activeGroup}
-      //     />
-      //   ),
-      //   gradient: "from-teal-500 to-cyan-500",
-      //   description: "Detailed Configuration",
-      //   requiresSave: true
-      // },
-      // {
-      //   id: "measurement",
-      //   label: "Measurement",
-      //   icon: <Ruler size={18} />,
-      //   component: (
-      //     <YPivotQAInspectionMeasurementConfig
-      //       selectedOrders={sharedOrderState.selectedOrders}
-      //       orderData={sharedOrderState.orderData}
-      //       reportData={sharedReportState}
-      //       onUpdateMeasurementData={handleMeasurementDataUpdate}
-      //       activeGroup={activeGroup}
-      //     />
-      //   ),
-      //   gradient: "from-green-500 to-emerald-500",
-      //   description: "Measurement data",
-      //   requiresSave: true
-      // },
       {
         id: "defects",
         label: "Defects",
         icon: <ClipboardCheck size={18} />,
         component: (
-          <YPivotQAInspectionDefectConfig
+          // Use the Wrapper Component
+          <YPivotQAInspectionDefectDataSave
             selectedOrders={sharedOrderState.selectedOrders}
             orderData={sharedOrderState.orderData}
             reportData={sharedReportState}
-            activeGroup={activeGroup}
             onUpdateDefectData={handleDefectDataUpdate}
+            activeGroup={activeGroup}
+            reportId={savedReportData?.reportId} // Pass ID
+            isReportSaved={isReportSaved} // Pass Status
           />
         ),
         gradient: "from-red-500 to-rose-500",
@@ -423,7 +379,6 @@ const YPivotQAInspection = () => {
       handleSaveComplete,
       savedReportData,
       isReportSaved,
-      ppSheetData,
       handlePPSheetUpdate
     ]
   );

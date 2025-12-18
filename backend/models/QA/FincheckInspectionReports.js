@@ -184,6 +184,143 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
+  // Image Sub-Schema
+  const DefectImageSchema = new mongoose.Schema(
+    {
+      imageId: { type: String, required: true }, // unique ID for frontend tracking
+      imageURL: { type: String, required: true }, // path: /storage/...
+      uploadedAt: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  // Location Sub-Schema
+  const DefectLocationSchema = new mongoose.Schema(
+    {
+      uniqueId: { type: String, required: true }, // e.g., Front_LocationID
+      locationId: { type: String, required: true }, // ID from ProductLocation collection
+      locationNo: { type: Number, required: true },
+      locationName: { type: String, required: true },
+      view: { type: String, required: true }, // "Front" or "Back"
+      position: { type: String, default: "Outside" }, // "Inside" or "Outside"
+      remark: { type: String, default: "" }
+    },
+    { _id: false }
+  );
+
+  // Individual Defect Item Schema
+  const DefectItemSchema = new mongoose.Schema(
+    {
+      // Context / Config Link
+      groupId: { type: Number, required: true }, // Matches ID from InspectionConfig
+
+      // Defect Details
+      defectId: { type: mongoose.Schema.Types.ObjectId, required: true }, // Ref to QASectionsDefectList
+      defectName: { type: String, required: true },
+      defectCode: { type: String, required: true },
+      categoryName: { type: String, default: "" },
+
+      // Status & Quantity
+      status: { type: String, required: true }, // "Minor", "Major", "Critical"
+      qty: { type: Number, required: true, default: 1 },
+
+      // Metadata
+      determinedBuyer: { type: String, default: "Unknown" },
+
+      // Location Data
+      isNoLocation: { type: Boolean, default: false },
+      locations: { type: [DefectLocationSchema], default: [] },
+
+      // Images
+      images: { type: [DefectImageSchema], default: [] },
+
+      // Context Snapshot (Visual Helpers)
+      line: { type: String, default: "" },
+      table: { type: String, default: "" },
+      color: { type: String, default: "" },
+      lineName: { type: String, default: "" },
+      tableName: { type: String, default: "" },
+      colorName: { type: String, default: "" },
+      qcUser: { type: mongoose.Schema.Types.Mixed, default: null }, // QC Object
+
+      timestamp: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  // --- PP Sheet Data Schemas ---
+
+  // Attendance User Schema
+  const PPSheetUserSchema = new mongoose.Schema(
+    {
+      emp_id: { type: String, required: true },
+      eng_name: { type: String, required: true },
+      face_photo: { type: String, default: null } // Optional display
+    },
+    { _id: false }
+  );
+
+  // Image Schema
+  const PPSheetImageSchema = new mongoose.Schema(
+    {
+      imageId: { type: String, required: true },
+      imageURL: { type: String, required: true },
+      uploadedAt: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  // Main PP Sheet Schema
+  const PPSheetDataSchema = new mongoose.Schema(
+    {
+      style: { type: String, default: "" },
+      qty: { type: String, default: "" },
+      date: { type: String, default: "" }, // Store as YYYY-MM-DD string
+
+      // Materials Checklist
+      materials: {
+        ppSizeSet: { type: String, default: "OK" },
+        approvalFullSizeSpec: { type: String, default: "OK" },
+        sampleComments: { type: String, default: "OK" },
+        handFeelStandard: { type: String, default: "OK" },
+        approvalWashingStandard: { type: String, default: "OK" },
+        approvalSwatches: { type: String, default: "OK" },
+        approvalTrimCard: { type: String, default: "OK" },
+        approvalPrintEmb: { type: String, default: "OK" },
+        fabricInspectionResult: { type: String, default: "Pass" },
+        other: { type: String, default: "" }
+      },
+
+      // Dynamic Lists
+      riskAnalysis: [
+        {
+          risk: { type: String, default: "" },
+          action: { type: String, default: "" }
+        }
+      ],
+      criticalOperations: [{ type: String }],
+      otherComments: [{ type: String }],
+
+      // Attendance
+      attendance: {
+        merchandiser: [PPSheetUserSchema],
+        technical: [PPSheetUserSchema],
+        cutting: [PPSheetUserSchema],
+        qaqc: [PPSheetUserSchema],
+        sewing: [PPSheetUserSchema],
+        mechanic: [PPSheetUserSchema],
+        ironing: [PPSheetUserSchema],
+        packing: [PPSheetUserSchema]
+      },
+
+      // Images
+      images: { type: [PPSheetImageSchema], default: [] },
+
+      timestamp: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
   // 3. Main Report Schema
   const FincheckInspectionReportsSchema = new mongoose.Schema(
     {
@@ -233,7 +370,11 @@ const createFincheckInspectionReportsModel = (connection) => {
       // --- Inspection Configuration Data ---
       inspectionConfig: { type: [InspectionConfigItemSchema], default: [] },
       // --- Measurement Data Array ---
-      measurementData: { type: [MeasurementDataItemSchema], default: [] }
+      measurementData: { type: [MeasurementDataItemSchema], default: [] },
+      // --- Defect Data Array ---
+      defectData: { type: [DefectItemSchema], default: [] },
+      // --- PP Sheet Data---
+      ppSheetData: { type: PPSheetDataSchema, default: null }
     },
     {
       timestamps: true,

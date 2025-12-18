@@ -10,18 +10,25 @@ import {
   CheckCircle,
   AlertTriangle,
   PenTool,
-  Printer,
-  Save,
   Check,
   X,
   Search,
   User,
-  Loader2
+  Loader2,
+  Images, // Added Icon
+  Camera, // Added Icon
+  Upload, // Added Icon
+  Edit3 // Added Icon
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
+import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor"; // Import Image Editor
+
+const MAX_IMAGES_PP_SHEET = 10; // Max limit
 
 // --- SUB-COMPONENT: USER SEARCH INPUT (MULTI-SELECT) ---
+// (No changes to UserSearchInput component...)
 const UserSearchInput = ({ label, selectedUsers, onChange }) => {
+  // ... same code as before ...
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -168,7 +175,7 @@ const UserSearchInput = ({ label, selectedUsers, onChange }) => {
   );
 };
 
-// Define default state outside to ensure consistency
+// Define default state
 const DEFAULT_FORM_STATE = {
   date: new Date().toISOString().split("T")[0],
   style: "",
@@ -197,7 +204,8 @@ const DEFAULT_FORM_STATE = {
     mechanic: [],
     ironing: [],
     packing: []
-  }
+  },
+  images: [] // New Images Array
 };
 
 // --- MAIN COMPONENT ---
@@ -206,27 +214,28 @@ const YPivotQATemplatesPPSheet = ({
   savedState,
   onDataChange
 }) => {
+  // State for Image Editor
+  const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageEditorContext, setImageEditorContext] = useState(null);
+
   // 1. ROBUST INITIALIZATION
-  // We merge savedState with DEFAULT_FORM_STATE.
-  // This ensures that if 'riskAnalysis' is somehow missing in savedState, it defaults to [{risk:"", action:""}]
-  // instead of crashing or being undefined.
   const [formData, setFormData] = useState(() => {
     if (savedState) {
       return {
         ...DEFAULT_FORM_STATE,
         ...savedState,
-        // Deep merge specific objects to be safe
         materials: { ...DEFAULT_FORM_STATE.materials, ...savedState.materials },
         attendance: {
           ...DEFAULT_FORM_STATE.attendance,
           ...savedState.attendance
-        }
+        },
+        images: savedState.images || [] // Load existing images
       };
     }
     return DEFAULT_FORM_STATE;
   });
 
-  // NEW: Sync with savedState when component remounts (tab switch)
+  // NEW: Sync with savedState when component remounts
   useEffect(() => {
     if (savedState && Object.keys(savedState).length > 0) {
       setFormData({
@@ -237,24 +246,22 @@ const YPivotQATemplatesPPSheet = ({
           ...DEFAULT_FORM_STATE.attendance,
           ...savedState.attendance
         },
-        // IMPORTANT: Preserve arrays that might have been modified
         riskAnalysis:
           savedState.riskAnalysis || DEFAULT_FORM_STATE.riskAnalysis,
         criticalOperations:
           savedState.criticalOperations ||
           DEFAULT_FORM_STATE.criticalOperations,
         otherComments:
-          savedState.otherComments || DEFAULT_FORM_STATE.otherComments
+          savedState.otherComments || DEFAULT_FORM_STATE.otherComments,
+        images: savedState.images || [] // Restore images
       });
     }
   }, []);
 
-  // 2. AUTO-FILL LOGIC (Only updates Style/Qty/Date if valid and different)
+  // 2. AUTO-FILL LOGIC
   useEffect(() => {
     if (prefilledData) {
       setFormData((prev) => {
-        // Only update if the field is currently empty OR if we want to force sync
-        // Here we prioritize prefilled data if it exists, but we preserve other fields
         return {
           ...prev,
           style: prefilledData.style || prev.style,
@@ -265,15 +272,14 @@ const YPivotQATemplatesPPSheet = ({
     }
   }, [prefilledData]);
 
-  // 3. PERSISTENCE LOGIC (Lift State Up)
-  // Whenever formData changes (user types), send it up to parent
+  // 3. PERSISTENCE LOGIC
   useEffect(() => {
     if (onDataChange) {
       onDataChange(formData);
     }
   }, [formData, onDataChange]);
 
-  // --- Handlers (Unchanged) ---
+  // --- Handlers ---
   const handleMaterialChange = (field, value) => {
     setFormData((prev) => ({
       ...prev,
@@ -328,6 +334,106 @@ const YPivotQATemplatesPPSheet = ({
     setFormData((prev) => ({ ...prev, [key]: newRows }));
   };
 
+  // --- Image Handlers ---
+  const getAvailableImageSlots = () => {
+    return MAX_IMAGES_PP_SHEET - formData.images.length;
+  };
+
+  const openImageEditorForNew = (mode) => {
+    const availableSlots = getAvailableImageSlots();
+    if (availableSlots <= 0) {
+      alert(`Maximum ${MAX_IMAGES_PP_SHEET} images allowed!`);
+      return;
+    }
+
+    setImageEditorContext({
+      mode,
+      isEditing: false,
+      maxImages: availableSlots,
+      existingData: null
+    });
+    setShowImageEditor(true);
+  };
+
+  const openImageEditorForEdit = (imageIndex) => {
+    const imageData = formData.images[imageIndex];
+    if (imageData) {
+      setImageEditorContext({
+        mode: "edit",
+        isEditing: true,
+        imageIndex,
+        maxImages: 1,
+        existingData: [
+          {
+            imgSrc: imageData.imgSrc || imageData.url,
+            history: imageData.history || []
+          }
+        ]
+      });
+      setShowImageEditor(true);
+    }
+  };
+
+  const handleImagesSave = (savedImages) => {
+    if (!savedImages || savedImages.length === 0) {
+      setShowImageEditor(false);
+      setImageEditorContext(null);
+      return;
+    }
+
+    setFormData((prev) => {
+      let newImages = [...prev.images];
+
+      if (
+        imageEditorContext?.isEditing &&
+        imageEditorContext?.imageIndex !== undefined
+      ) {
+        // Editing existing
+        const img = savedImages[0];
+        newImages[imageEditorContext.imageIndex] = {
+          url: img.editedImgSrc,
+          imgSrc: img.imgSrc,
+          history: img.history || []
+        };
+      } else {
+        // Adding new
+        const availableSlots = MAX_IMAGES_PP_SHEET - newImages.length;
+        const imagesToAdd = savedImages.slice(0, availableSlots);
+
+        imagesToAdd.forEach((img) => {
+          newImages.push({
+            url: img.editedImgSrc,
+            imgSrc: img.imgSrc,
+            history: img.history || []
+          });
+        });
+
+        if (savedImages.length > availableSlots) {
+          setTimeout(() => {
+            alert(
+              `Only ${availableSlots} image(s) were added. Maximum ${MAX_IMAGES_PP_SHEET} images allowed.`
+            );
+          }, 100);
+        }
+      }
+
+      return { ...prev, images: newImages };
+    });
+
+    setShowImageEditor(false);
+    setImageEditorContext(null);
+  };
+
+  const removeImage = (index, e) => {
+    if (e) e.stopPropagation();
+    if (window.confirm("Remove this image?")) {
+      setFormData((prev) => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index)
+      }));
+    }
+  };
+
   // --- Render Helpers ---
   const colorMap = {
     indigo: "from-indigo-500 to-indigo-600",
@@ -335,7 +441,8 @@ const YPivotQATemplatesPPSheet = ({
     orange: "from-orange-500 to-orange-600",
     purple: "from-purple-500 to-purple-600",
     teal: "from-teal-500 to-teal-600",
-    green: "from-green-500 to-green-600"
+    green: "from-green-500 to-green-600",
+    pink: "from-pink-500 to-pink-600" // Added for Images section
   };
 
   const renderSectionHeader = (title, Icon, color = "indigo") => (
@@ -477,6 +584,7 @@ const YPivotQATemplatesPPSheet = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+              {/* Material Rows (Same as before) */}
               {[
                 [
                   {
@@ -594,6 +702,7 @@ const YPivotQATemplatesPPSheet = ({
           "orange"
         )}
         <div className="p-4">
+          {/* ... Risk Analysis Content (Same as before) ... */}
           <div className="grid grid-cols-2 gap-4 mb-2 font-bold text-xs uppercase text-gray-500 px-2">
             <div>Risk Analysis 风险分析</div>
             <div>Risk Preventive Action 预防风险措施</div>
@@ -771,15 +880,88 @@ const YPivotQATemplatesPPSheet = ({
         </div>
       </div>
 
-      {/* Save Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 shadow-2xl flex justify-end gap-3 z-30">
-        <button className="px-6 py-2.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 font-bold rounded-xl hover:bg-gray-200 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
-          <Printer className="w-4 h-4" /> Print
-        </button>
-        <button className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-lg flex items-center gap-2 transition-colors">
-          <Save className="w-4 h-4" /> Save Report
-        </button>
+      {/* 7. Images Section */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {renderSectionHeader("Images / 图片", Images, "pink")}
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-gray-500 font-bold uppercase">
+              Captured Images ({formData.images.length}/{MAX_IMAGES_PP_SHEET})
+            </span>
+          </div>
+
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
+            {/* Existing Images */}
+            {formData.images.map((img, i) => (
+              <div
+                key={i}
+                className="relative w-24 h-24 flex-shrink-0 group cursor-pointer"
+                onClick={() => openImageEditorForEdit(i)}
+              >
+                <img
+                  src={img.url}
+                  className="w-full h-full object-cover rounded-lg border-2 border-gray-300 group-hover:border-indigo-500 transition-colors"
+                  alt={`PP Sheet ${i + 1}`}
+                />
+                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
+                  <Edit3 className="w-5 h-5 text-white" />
+                </div>
+                <button
+                  onClick={(e) => removeImage(i, e)}
+                  className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+                <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">
+                  #{i + 1}
+                </div>
+              </div>
+            ))}
+
+            {/* Add New Images Button */}
+            {formData.images.length < MAX_IMAGES_PP_SHEET && (
+              <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 flex flex-col overflow-hidden hover:border-indigo-400 transition-colors">
+                <button
+                  onClick={() => openImageEditorForNew("camera")}
+                  className="flex-1 w-full flex items-center justify-center hover:bg-indigo-50 border-b border-gray-200 transition-colors group"
+                  title={`Take photos (${getAvailableImageSlots()} slots available)`}
+                >
+                  <Camera className="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
+                </button>
+                <button
+                  onClick={() => openImageEditorForNew("upload")}
+                  className="flex-1 w-full flex items-center justify-center hover:bg-emerald-50 transition-colors group"
+                  title={`Upload images (${getAvailableImageSlots()} slots available)`}
+                >
+                  <Upload className="w-5 h-5 text-gray-400 group-hover:text-emerald-500 transition-colors" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {formData.images.length === 0 && (
+            <p className="text-center text-xs text-gray-400 mt-4 italic">
+              No images added yet. Click camera or upload icons to add.
+            </p>
+          )}
+        </div>
       </div>
+
+      {/* Image Editor Modal */}
+      {showImageEditor && (
+        <YPivotQATemplatesImageEditor
+          autoStartMode={
+            imageEditorContext?.isEditing ? null : imageEditorContext?.mode
+          }
+          existingData={imageEditorContext?.existingData}
+          maxImages={imageEditorContext?.maxImages || 1}
+          onSave={handleImagesSave}
+          onCancel={() => {
+            setShowImageEditor(false);
+            setImageEditorContext(null);
+          }}
+        />
+      )}
 
       <style jsx>{`
         @keyframes fadeIn {
@@ -794,6 +976,13 @@ const YPivotQATemplatesPPSheet = ({
         }
         .animate-fadeIn {
           animation: fadeIn 0.5s ease-out;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          height: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background-color: #cbd5e1;
+          border-radius: 10px;
         }
       `}</style>
     </div>

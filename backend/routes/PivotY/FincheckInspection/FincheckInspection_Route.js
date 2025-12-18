@@ -16,7 +16,9 @@ import {
   updateHeaderData,
   updatePhotoData,
   updateInspectionConfig,
-  updateMeasurementData
+  updateMeasurementData,
+  updateDefectData,
+  updatePPSheetData
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -98,5 +100,11 @@ router.post(
   "/api/fincheck-inspection/update-measurement-data",
   updateMeasurementData
 );
+
+// Save Defect Data
+router.post("/api/fincheck-inspection/update-defect-data", updateDefectData);
+
+// Save PP Sheet Data
+router.post("/api/fincheck-inspection/update-pp-sheet-data", updatePPSheetData);
 
 export default router;
