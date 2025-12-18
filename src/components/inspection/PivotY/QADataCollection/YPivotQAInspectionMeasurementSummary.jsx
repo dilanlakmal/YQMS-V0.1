@@ -62,7 +62,7 @@ const YPivotQAInspectionMeasurementSummary = ({
 
   // Build table structure for a group of measurements
   const buildTableData = (measurements) => {
-    // Sort measurements by size for consistent display
+    // Sort measurements by size
     const sortedMeasurements = [...measurements].sort((a, b) => {
       const sizeA = a.size || "";
       const sizeB = b.size || "";
@@ -72,8 +72,8 @@ const YPivotQAInspectionMeasurementSummary = ({
     const tableData = sortedMeasurements.map((m) => {
       const columns = [];
 
-      // Add All mode pcs first
-      const allEnabledPcs = m.allEnabledPcs || [];
+      //  Convert Set to Array before sorting
+      const allEnabledPcs = Array.from(m.allEnabledPcs || []);
       allEnabledPcs
         .sort((a, b) => a - b)
         .forEach((pcsIndex) => {
@@ -85,8 +85,8 @@ const YPivotQAInspectionMeasurementSummary = ({
           });
         });
 
-      // Add Critical mode pcs
-      const criticalEnabledPcs = m.criticalEnabledPcs || [];
+      //  Convert Set to Array before sorting
+      const criticalEnabledPcs = Array.from(m.criticalEnabledPcs || []);
       criticalEnabledPcs
         .sort((a, b) => a - b)
         .forEach((pcsIndex) => {
@@ -119,7 +119,8 @@ const YPivotQAInspectionMeasurementSummary = ({
 
     measurements.forEach((m) => {
       // All mode stats
-      const allEnabledPcs = m.allEnabledPcs || [];
+      // Convert to Array for forEach
+      const allEnabledPcs = Array.from(m.allEnabledPcs || []);
       allEnabledPcs.forEach((pcsIndex) => {
         totalPcs++;
         let pcsHasFail = false;
@@ -128,10 +129,6 @@ const YPivotQAInspectionMeasurementSummary = ({
         filteredAllSpecs.forEach((spec) => {
           totalPoints++;
           const val = m.allMeasurements?.[spec.id]?.[pcsIndex];
-
-          // specsData.forEach((spec) => {
-          //   totalPoints++;
-          //   const val = m.allMeasurements?.[spec.id]?.[pcsIndex];
           const value = val?.decimal || 0;
 
           if (value === 0) {
@@ -152,7 +149,8 @@ const YPivotQAInspectionMeasurementSummary = ({
       });
 
       // Critical mode stats
-      const criticalEnabledPcs = m.criticalEnabledPcs || [];
+      // Convert to Array for forEach
+      const criticalEnabledPcs = Array.from(m.criticalEnabledPcs || []);
       criticalEnabledPcs.forEach((pcsIndex) => {
         totalPcs++;
         let pcsHasFail = false;
@@ -162,7 +160,6 @@ const YPivotQAInspectionMeasurementSummary = ({
           m.kValue
         );
         filteredCriticalSpecs.forEach((spec) => {
-          // selectedSpecsList.forEach((spec) => {
           totalPoints++;
           const val = m.criticalMeasurements?.[spec.id]?.[pcsIndex];
           const value = val?.decimal || 0;

@@ -21,8 +21,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
     const fetchExistingMeasurementData = async () => {
       if (!reportId) return;
 
-      // If we already have data in client state (e.g. from nav), don't re-fetch
-      // unless you want to ensure sync. For now, check if empty.
+      // If we already have data in client state, don't re-fetch to avoid overwrite
       if (
         reportData.measurementData &&
         reportData.measurementData.savedMeasurements &&
@@ -47,11 +46,9 @@ const YPivotQAInspectionMeasurementDataSave = ({
             criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
           }));
 
-          // Update parent state so the UI component receives it
+          // Update parent state
           onUpdateMeasurementData({
             savedMeasurements: processedMeasurements,
-            // We set isConfigured to true if we have data,
-            // forcing the UI to unlock if needed
             isConfigured: processedMeasurements.length > 0
           });
         }
@@ -121,7 +118,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
     );
   }
 
-  // Warning if no template selected (Early return handled in child, but good to have context here)
+  // Warning if no template selected
   if (!reportData?.selectedTemplate) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -133,7 +130,6 @@ const YPivotQAInspectionMeasurementDataSave = ({
 
   return (
     <div className="relative pb-24">
-      {/* 1. The Main UI Component (Unmodified logic) */}
       <YPivotQAInspectionMeasurementConfig
         selectedOrders={selectedOrders}
         orderData={orderData}
@@ -142,7 +138,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
         activeGroup={activeGroup}
       />
 
-      {/* 2. Floating Save Button */}
+      {/* Floating Save Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
         <div className="max-w-8xl mx-auto flex justify-end px-4">
           <button
@@ -152,7 +148,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
               ${
                 isReportSaved
-                  ? "bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white"
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                   : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
               }
             `}

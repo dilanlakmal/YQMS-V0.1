@@ -289,9 +289,19 @@ const YPivotQAInspectionMeasurementConfig = ({
 
     contextMeasurements.forEach((m) => {
       const key = measConfig === "Before" ? `${m.size}_${m.kValue}` : m.size;
-      const hasAll = m.allEnabledPcs && m.allEnabledPcs.length > 0;
-      const hasCritical =
-        m.criticalEnabledPcs && m.criticalEnabledPcs.length > 0;
+
+      // FIX: Use .size for Sets, fallback to .length if Array (safety)
+      const allCount =
+        m.allEnabledPcs instanceof Set
+          ? m.allEnabledPcs.size
+          : m.allEnabledPcs?.length || 0;
+      const criticalCount =
+        m.criticalEnabledPcs instanceof Set
+          ? m.criticalEnabledPcs.size
+          : m.criticalEnabledPcs?.length || 0;
+
+      const hasAll = allCount > 0;
+      const hasCritical = criticalCount > 0;
 
       statusMap[key] = {
         hasAll,
