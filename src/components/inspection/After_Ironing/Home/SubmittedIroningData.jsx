@@ -471,9 +471,9 @@ const  SubmittedIroningDataPage = () => {
 
       try {
         const { pdf } = await import("@react-pdf/renderer");
-        const { QcWashingFullReportPDF } = await import("./qcIroningFullReportPDF");
+        const { QcIroningFullReportPDF } = await import("./qcIroningFullReportPDF");
 
-        const pdfElement = React.createElement(QcWashingFullReportPDF, {
+        const pdfElement = React.createElement(QcIroningFullReportPDF, {
           recordData: cleanRecordData,
           comparisonData: null,
           API_BASE_URL,

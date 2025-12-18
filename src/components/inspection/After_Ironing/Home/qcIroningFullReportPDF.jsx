@@ -922,7 +922,7 @@ const WashingComparisonSection = ({ washingData, afterIroningData }) => {
 };
 
 // --- MAIN PDF DOCUMENT COMPONENT ---
-const QcWashingFullReportPDF = ({ 
+const QcIroningFullReportPDF = ({ 
   recordData, 
   comparisonData = null, 
   API_BASE_URL, 
@@ -1150,8 +1150,8 @@ const QcWashingFullReportPDF = ({
 };
 
 // Export both components for different use cases
-export default QcWashingFullReportPDF;
-export { QcWashingFullReportPDF };
+export default QcIroningFullReportPDF;
+export { QcIroningFullReportPDF };
 
 
                 
