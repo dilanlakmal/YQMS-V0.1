@@ -111,9 +111,6 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
 import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 
-//P88Data
-import createP88DataSchema from "../../models/P88/p88LegacyData.js";
-
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   // process.env.MongoDB_URI_ym_prod
@@ -256,9 +253,6 @@ export const QASectionsTemplates =
 
 export const FincheckInspectionReports =
   createFincheckInspectionReportsModel(ymProdConnection);
-
-export const p88LegacyData = createP88DataSchema(ymProdConnection);
-
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
 export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
