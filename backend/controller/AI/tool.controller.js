@@ -7,9 +7,12 @@ export const properties = (type, description) => {
     }
 }
 
-export const func_params = (type, required, properties) => {
+export const func_params = (required, properties) => {
+    if (!required) {
+        return {}
+    }
     return {
-        type: type,
+        type: "object",
         required: required,
         properties: properties
     }

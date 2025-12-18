@@ -107,3 +107,19 @@ export const editConversationModel = async (conversationID, newModel) => {
 
   return response.data;
 };
+
+export const updateConversationStatus = async (conversationID) => {
+  const token = getToken();
+  if (!token) throw new Error("Token not found!");
+
+  const response = await axios.patch(
+    `${API_BASE_URL}/api/ai/conversation/${conversationID}/updateActiveStatus`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    }
+  );
+
+  return response.data;
+};

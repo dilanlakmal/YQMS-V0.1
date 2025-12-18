@@ -9,6 +9,7 @@ import {
   addMessages,
   createConversation,
   editConversationTitle,
+  updateConversationStatus
 } from "./lib/api/conversation";
 import { getOllamaResponse } from "./lib/api/chat";
 import { BsRobot } from "react-icons/bs";
@@ -45,10 +46,13 @@ export default function ChatInterface({
     const newConv = {
       title: "New conversation",
       userID: userData.emp_id,
+      model: model,
+      active_status: true,
       date: new Date(),
       messages: [...initialMessages],
     };
     const newConversationCreated = await createConversation(newConv);
+    await updateConversationStatus(newConversationCreated._id);
     setActiveConversationId(newConversationCreated._id);
     setConversations([newConversationCreated, ...conversations]);
   };
@@ -79,6 +83,7 @@ export default function ChatInterface({
         title: "New conversation",
         date: new Date(),
         model: model,
+        active_status: true,
         messages: [userMessage], // include the user message immediately
       };
       const created = await createConversation(newConversation);

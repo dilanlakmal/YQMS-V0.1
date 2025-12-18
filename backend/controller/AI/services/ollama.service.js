@@ -2,16 +2,11 @@ import { Ollama } from "ollama";
 import { getMoNumberTools, getMoNumber } from "../qc_assistance/QC.tools.js";
 
 const abortController = new AbortController();
-
+let toolIsCall = false;
 // Main handler for chat requests
 const handleChatWithOllama = async (req, res) => {
     const { model, messages, tool } = req.body;
-    let apiHost = process.env.OLLAMA_API_URL;
-
-    if (model === "llama3.2:latest") {
-        apiHost = process.env.LLAMA3_2_API_URL;
-        console.log("User selected model:", model);
-    }
+    let apiHost = process.env.OLLAMA_BASE_URL;
 
     try {
         const ollamaClient = new Ollama({
@@ -37,7 +32,7 @@ const handleChatWithOllama = async (req, res) => {
             model,
             messages: updatedMessages,
             stream: false,
-            tools: getMoNumberTools,
+            tools: toolIsCall ? getMoNumberTools: null,
         });
 
         res.status(200).json(result);
@@ -48,13 +43,40 @@ const handleChatWithOllama = async (req, res) => {
     }
 };
 
+const getModels = async (req, res) => {
+    const { model, messages, tool } = req.body;
+    let apiHost = process.env.OLLAMA_BASE_URL;
+
+    try {
+        const ollamaClient = new Ollama({
+            host: apiHost,
+            headers: {
+                Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`,
+            },
+            fetch: (url, options) =>
+                fetch(url, {
+                    ...options,
+                    signal: abortController.signal,
+                }),
+        });
+
+        const models = await ollamaClient.list();
+        return res.json(models);
+    } catch (error) {
+        console.error("Ollama Error:", error);
+        res.status(500).json({ error: error.message || error.toString() });
+    }
+}
+
 // Extract tool call information from LLM response
 const getToolCallFromLLM = (llmResponse) => {
     if (llmResponse?.message?.tool_calls) {
         const toolCall = llmResponse.message.tool_calls[0]; // Use first tool call
         console.log("Tool call detected:", toolCall);
+        toolIsCall = true;
         return toolCall?.function;
     }
+    toolIsCall = false;
     return null;
 };
 
@@ -64,7 +86,7 @@ const selectToolForMessages = async (messages, ollamaClient) => {
 
     try {
         const response = await ollamaClient.chat({
-            model: "qwen3-vl:latest",
+            model: "qwen3-vl:2b",
             messages,
             stream: false,
             tools: getMoNumberTools,
@@ -117,3 +139,4 @@ const selectToolForMessages = async (messages, ollamaClient) => {
 };
 
 export default handleChatWithOllama;
+export {getModels};

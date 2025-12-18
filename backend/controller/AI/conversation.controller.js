@@ -137,3 +137,27 @@ export const addMessage = async (req, res) => {
         res.status(500).json({error: error.message});
     }
 }
+
+export const updateActiveStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Convert status to boolean (optional, if coming from string)
+
+    // 1️⃣ Set all other conversations to false
+    await Conversation.updateMany(
+      { _id: { $ne: id } }, // all except the one being updated
+      { active_status: false }
+    );
+
+    // 2️⃣ Update the selected conversation
+    const updated = await Conversation.findByIdAndUpdate(
+      id,
+      { active_status: true },
+    );
+
+    res.json(updated);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};

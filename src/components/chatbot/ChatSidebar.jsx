@@ -22,7 +22,7 @@ import { MdKeyboardArrowRight, MdKeyboardArrowDown } from "react-icons/md";
 import { MdGTranslate } from "react-icons/md";
 import { IoSearch } from "react-icons/io5";
 import ChatGuide from "./ChatStepIntro";
-
+import { updateConversationStatus } from "./lib/api/conversation";
 // Reusable user profile component
 function UserProfile({ userData, center }) {
   return (
@@ -175,11 +175,12 @@ function ExpandedSidebar({
       console.error(error);
     }
   };
-  const handleConversationSelection = (_id) => {
+  const handleConversationSelection = async(_id) => {
     onSelectConversation(_id);
     const activeConversation = conversations.find((conv) => conv._id === _id);
     setModel(activeConversation.model);
     setCurrentService("");
+    await updateConversationStatus(_id);
   };
 
   const GuideSteps = [

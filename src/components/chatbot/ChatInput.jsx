@@ -6,6 +6,7 @@ import { Textarea } from "@/components/Chatbot/ui/textarea";
 import { editConversationModel } from "./lib/api/conversation";
 import { motion } from "framer-motion";
 import ChatGuide from "./ChatStepIntro";
+import { getModels } from "./lib/api/chat";
 
 export default function ChatInput({
   conversations,
@@ -22,18 +23,15 @@ export default function ChatInput({
 }) {
   const textareaRef = useRef(null);
   const [historyIndex, setHistoryIndex] = useState(-1);
+  const [models, setModels] = useState([{name: "Loading"}]);
 
-  const models = [
-    { name: "gpt-oss:120b-cloud", active: true },
-    { name: "llama3.2:latest", active: false },
-  ];
+
 
   const userMessages = conversations
     .find(conv => conv._id === activeConversationId)
     ?.messages
     ?.filter(msg => msg.role === "user") || [];
   
-  console.log("User conversation", userMessages)
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -45,13 +43,11 @@ export default function ChatInput({
   const handleKeyUp = (e) => {
     if (e.key === "ArrowUp") {
       let newIndex;
-      console.log("History index", historyIndex);
       if (historyIndex === 0){
         newIndex = userMessages.length -1;
       } else {
         newIndex = Math.max(historyIndex -1, 0);
       }
-      console.log("New history index", newIndex);
       setHistoryIndex(newIndex)
 
       if (newIndex < 0) {
@@ -83,6 +79,18 @@ export default function ChatInput({
       setModel(models[0].name);
     }
   }, [input]);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      const response = await getModels();
+      const fetchedModels = response.models;
+      console.log("model fetched", fetchedModels)
+      setModels(fetchedModels);
+    };
+
+    fetchModels();
+  }, []);
+
 
   const handleChangeModel = async (e) => {
     const newModel = e.target.value;
@@ -170,7 +178,7 @@ export default function ChatInput({
           "
           >
             {models.map((m) => (
-              <option key={m.name} value={m.name}>
+              <option key={m.name} value={m.model}>
                 {m.name}
               </option>
             ))}

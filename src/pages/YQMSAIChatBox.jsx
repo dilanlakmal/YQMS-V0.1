@@ -10,7 +10,7 @@ import {
   fetchUserProfile,
   createConversation,
 } from "../components/chatbot/lib/api/conversation";
-
+import { getModels } from "../components/chatbot/lib/api/chat";
 export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const [userData, setUserData] = useState({
     emp_id: "",
@@ -30,7 +30,7 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
 
   const [conversations, setConversations] = useState([]);
   const [activeConversationId, setActiveConversationId] = useState(null);
-  const [model, setModel] = useState("gpt-oss:120b-cloud");
+  const [model, setModel] = useState("");
   const [currentService, setCurrentService] = useState("");
 
   const initialMessages = [
@@ -41,7 +41,16 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
       timestamp: new Date(),
     },
   ];
+  useEffect(() => {
+    const fetchModels = async () => {
+      const response = await getModels();
+      const fetchedModels = response.models;
+      console.log("model fetched", fetchedModels)
+      setModel(fetchedModels[0].model);
+    };
 
+    fetchModels();
+  }, [!model]);
   // Fetch user data once on mount
   useEffect(() => {
     const loadUserData = async () => {
@@ -63,8 +72,8 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
       try {
         const data = await fetchUserConversation(userData.emp_id);
         if (data?.length) {
-          setConversations(data);
-          setActiveConversationId(data[0]._id);
+          setConversations([...data].reverse());
+          setActiveConversationId(data.find(d => d.active_status === true)._id);
           setModel(data[0].model ?? model);
         } else if (!conversationCreated.current) {
           conversationCreated.current = true;
@@ -73,6 +82,7 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
             title: "New conversation",
             date: new Date(),
             model: model,
+            active_status: true,
             messages: initialMessages,
           };
           const created = await createConversation(newConversation);

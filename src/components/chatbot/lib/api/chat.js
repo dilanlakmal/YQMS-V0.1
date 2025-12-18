@@ -20,3 +20,15 @@ export async function getOllamaResponse(model, messages, tool) {
     return response.data;
 
 }
+
+const getModels = async() => {
+    const token = getToken();
+    if (!token) throw new Error("Token not found!");
+    const response = await axios.get(`${API_BASE_URL}/api/ai/chat`, {
+        headers: { Authorization: `Bearer ${token}` },
+        });
+
+    return response.data;
+}
+
+export {getModels};

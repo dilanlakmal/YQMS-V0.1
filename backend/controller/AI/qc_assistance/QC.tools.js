@@ -19,5 +19,5 @@ export const getMoNumber = async () => {
 };
 
 
-const function_param = func_params(null, null, null)
+const function_param = func_params(null, null)
 export const getMoNumberTools = [tools("getMoNumber", "Get list of moNumber of QC accuracy report", function_param)]

@@ -13,7 +13,8 @@ const conversationSchema = new mongoose.Schema({
     required: true },
   title: { type: String, default: "New conversation" },
   date: { type: Date },
-  model: {type: String},  
+  model: {type: String}, 
+  active_status: {type: Boolean, default: false}, 
   messages: { type: [messageSchema], default: [] }
 });
 

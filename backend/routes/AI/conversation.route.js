@@ -7,7 +7,8 @@ import {
     deleteConversation,
     addMessage,
     updateConversationTitle,
-    updateConversationModel
+    updateConversationModel,
+    updateActiveStatus
 } from "../../controller/AI/conversation.controller.js";
 
 const router = express.Router();
@@ -19,5 +20,5 @@ router.delete("/:id", deleteConversation);
 router.post("/:id/addMessage", addMessage);
 router.patch("/:id/updateTitle", updateConversationTitle);
 router.patch("/:id/updateModel", updateConversationModel);
-
+router.patch("/:id/updateActiveStatus", updateActiveStatus)
 export default router;
