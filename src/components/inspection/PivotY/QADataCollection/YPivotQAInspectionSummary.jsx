@@ -728,7 +728,7 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
         />
       )}
 
-      {/* Building2 and other icons that were used but not imported in your original snippet need to be checked. 
+      {/* Building2 and other icons that were used but not imported in your original snippet need to be checked.
           I added Building2 to the Lucide import list at the top. */}
 
       <style jsx>{`
