@@ -322,7 +322,7 @@ function Home() {
           {
             path: "/P88Legacy",
             //pageId: "y-pivot-inspection",
-            image: "assets/Home/yPivotInspection.png",
+            image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
             description: "P88 Legacy Data",
             version: '0',

@@ -240,6 +240,16 @@ PivotY - Fincheck Inspection
 ------------------------------ */
 import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
 
+/* -----------------------------
+QA Random Inspection Imports
+------------------------------ */
+import qaDefect from "./routes/QARandomInspection/QAAdmin/QADefectRoutes.js";
+import qaDefectBuyerStatus from "./routes/QARandomInspection/QAAdmin/QADefectBuyerStatusRoutes.js";
+import qaStandardDefect from "./routes/QARandomInspection/QAAdmin/QAStandardDefectRoutes.js";
+import qaRandomInspectionSave from "./routes/QARandomInspection/QARandomInspectionData/QARandomInspectionSaveRoutes.js";
+import qaRandomInspection from "./routes/QARandomInspection/QARandomInspectionData/QARandomInspectionRoutes.js";
+import qaAccuracyDashboard from "./routes/QARandomInspection/QAaccuracyDashboard/QAAccuracyDashboardRoutes.js";
+
 /* ------------------------------
  P88 Data Upoad Routes
 ------------------------------ */
@@ -539,6 +549,16 @@ app.use(QASections_Templates);
 PivotY - Fincheck Inspection routes
 ------------------------------ */
 app.use(FincheckInspection);
+
+/* -----------------------------
+  QA Random Inspection Routes
+------------------------------ */
+app.use(qaDefect);
+app.use(qaDefectBuyerStatus);
+app.use(qaStandardDefect);
+app.use(qaRandomInspectionSave);
+app.use(qaRandomInspection);
+app.use(qaAccuracyDashboard);
 
 /* ------------------------------
  P88 Data Upoad Routes

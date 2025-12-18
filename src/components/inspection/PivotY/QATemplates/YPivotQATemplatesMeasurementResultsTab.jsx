@@ -564,20 +564,18 @@ const YPivotQATemplatesMeasurementResultsTab = ({
     return specs;
   };
 
-  // FIXED: Calculate stats with correct logic
+  // Calculate stats with correct logic
   // - Total Points = ALL specs count × enabled pcs (not just touched ones)
   // - If value is 0 (default/not touched) = Pass Point
   // - If value is touched and within tolerance = Pass Point
   // - If value is touched and out of tolerance = Fail Point
   // - Pass Pcs = Pcs where ALL points are pass
   // - Fail Pcs = Pcs where at least 1 point is fail
-  const calculateSubStats = (measurements, enabledPcs, specs, size) => {
-    if (
-      !measurements ||
-      !enabledPcs ||
-      enabledPcs.length === 0 ||
-      specs.length === 0
-    ) {
+  const calculateSubStats = (measurements, enabledPcsSet, specs, size) => {
+    // Convert Set to Array for safe iteration/length check
+    const enabledPcs = Array.from(enabledPcsSet || []);
+
+    if (!measurements || enabledPcs.length === 0 || specs.length === 0) {
       return {
         totalPoints: 0,
         passPoints: 0,
@@ -594,7 +592,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
     let passPcs = 0;
     let failPcs = 0;
 
-    // Total points = ALL specs × enabled pcs count
     const totalPoints = specs.length * totalPcs;
     let passPoints = 0;
     let failPoints = 0;
@@ -605,11 +602,9 @@ const YPivotQATemplatesMeasurementResultsTab = ({
       specs.forEach((spec) => {
         const val = measurements[spec.id]?.[pcsIndex];
 
-        // If value is 0 or undefined (default/not touched), consider as PASS
         if (!val || val.decimal === 0) {
           passPoints++;
         } else {
-          // Check tolerance using the helper function
           const toleranceResult = checkTolerance(spec, val.decimal, size);
           if (toleranceResult.isWithin || toleranceResult.isDefault) {
             passPoints++;
@@ -620,7 +615,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
         }
       });
 
-      // A Pcs is Pass only if ALL points in that Pcs are pass
       if (pcsHasFail) {
         failPcs++;
       } else {
@@ -628,7 +622,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
       }
     });
 
-    // Calculate pass rates with 2 decimal points
     const pointPassRate =
       totalPoints > 0 ? (passPoints / totalPoints) * 100 : 0;
     const pcsPassRate = totalPcs > 0 ? (passPcs / totalPcs) * 100 : 0;
@@ -785,9 +778,15 @@ const YPivotQATemplatesMeasurementResultsTab = ({
   };
 
   const renderSizeCard = (item, isEditable) => {
-    const hasAll = item.allData && item.allData.enabledPcs.length > 0;
+    // FIX: Check .size for Sets
+    const allSet = item.allData?.enabledPcs;
+    const critSet = item.criticalData?.enabledPcs;
+
+    const hasAll =
+      allSet && (allSet instanceof Set ? allSet.size > 0 : allSet.length > 0);
     const hasCritical =
-      item.criticalData && item.criticalData.enabledPcs.length > 0;
+      critSet &&
+      (critSet instanceof Set ? critSet.size > 0 : critSet.length > 0);
 
     const allStats = hasAll
       ? calculateSubStats(
@@ -806,24 +805,6 @@ const YPivotQATemplatesMeasurementResultsTab = ({
           item.size
         )
       : null;
-
-    // const allStats = hasAll
-    //   ? calculateSubStats(
-    //       item.allData.measurements,
-    //       item.allData.enabledPcs,
-    //       specsData,
-    //       item.size
-    //     )
-    //   : null;
-
-    // const criticalStats = hasCritical
-    //   ? calculateSubStats(
-    //       item.criticalData.measurements,
-    //       item.criticalData.enabledPcs,
-    //       selectedSpecsList,
-    //       item.size
-    //     )
-    //   : null;
 
     // Calculate overall stats for the card header
     const overallFailPcs =
@@ -864,6 +845,18 @@ const YPivotQATemplatesMeasurementResultsTab = ({
                     K: {item.kValue}
                   </span>
                 )}
+                {overallTotalPcs > 0 && (
+                  <span
+                    className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                      overallFailPcs > 0
+                        ? "bg-red-500/50 text-white"
+                        : "bg-green-500/50 text-white"
+                    }`}
+                  >
+                    {overallFailPcs} / {overallTotalPcs} Fail
+                  </span>
+                )}
+
                 <span
                   className={`text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1 ${
                     item.systemDecision === "pass"

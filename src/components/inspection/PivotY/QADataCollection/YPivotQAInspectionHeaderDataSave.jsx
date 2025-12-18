@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Save, Loader2 } from "lucide-react";
-import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
+import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesHeader from "../QATemplates/YPivotQATemplatesHeader";
 
 const YPivotQAInspectionHeaderDataSave = ({
@@ -13,7 +13,7 @@ const YPivotQAInspectionHeaderDataSave = ({
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
 
-  // --- NEW: FETCH EXISTING DATA ON MOUNT OR ID CHANGE ---
+  // --- FETCH EXISTING DATA ON MOUNT OR ID CHANGE ---
   useEffect(() => {
     const fetchExistingHeaderData = async () => {
       if (!reportId) return;
@@ -42,7 +42,6 @@ const YPivotQAInspectionHeaderDataSave = ({
               section.images.forEach((img, idx) => {
                 const key = `${secId}_${idx}`;
 
-                // --- FIX STARTS HERE ---
                 // If imageURL exists and is relative (starts with /), prepend API_BASE_URL
                 let displayUrl = img.imageURL;
                 if (
@@ -52,7 +51,6 @@ const YPivotQAInspectionHeaderDataSave = ({
                 ) {
                   displayUrl = `${API_BASE_URL}${displayUrl}`;
                 }
-                // --- FIX ENDS HERE ---
 
                 newCapturedImages[key] = {
                   id: img.imageId,
@@ -84,84 +82,7 @@ const YPivotQAInspectionHeaderDataSave = ({
     }
   }, [reportId]);
 
-  //   useEffect(() => {
-  //     const fetchExistingHeaderData = async () => {
-  //       if (!reportId) return;
-
-  //       setLoadingData(true);
-  //       try {
-  //         // Fetch specific report by ID
-  //         const res = await axios.get(
-  //           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
-  //         );
-
-  //         if (res.data.success && res.data.data.headerData) {
-  //           const backendHeaderData = res.data.data.headerData;
-
-  //           // TRANSFORM: Backend Array -> Frontend Object State
-  //           const newSelectedOptions = {};
-  //           const newRemarks = {};
-  //           const newCapturedImages = {};
-
-  //           backendHeaderData.forEach((section) => {
-  //             const secId = section.headerId;
-
-  //             // 1. Map Options
-  //             if (section.selectedOption) {
-  //               newSelectedOptions[secId] = section.selectedOption;
-  //             }
-
-  //             // 2. Map Remarks
-  //             if (section.remarks) {
-  //               newRemarks[secId] = section.remarks;
-  //             }
-
-  //             // 3. Map Images
-  //             if (section.images && section.images.length > 0) {
-  //               section.images.forEach((img, idx) => {
-  //                 // Key format used by YPivotQATemplatesHeader: "SECTIONID_INDEX"
-  //                 // Note: Index might not match perfectly if images were deleted,
-  //                 // so we generate sequential keys for the UI.
-  //                 const key = `${secId}_${idx}`;
-
-  //                 newCapturedImages[key] = {
-  //                   id: img.imageId,
-  //                   //url: `${PUBLIC_ASSET_URL}${img.imageURL}`, // Ensure full URL for display
-  //                   //imgSrc: `${PUBLIC_ASSET_URL}${img.imageURL}`, // For editor preview
-  //                   url: img.imageURL, // Ensure full URL for display
-  //                   imgSrc: img.imageURL, // For editor preview
-  //                   history: [] // History not saved in basic schema, default empty
-  //                 };
-  //               });
-  //             }
-  //           });
-
-  //           // UPDATE PARENT STATE
-  //           onUpdateHeaderData({
-  //             selectedOptions: newSelectedOptions,
-  //             remarks: newRemarks,
-  //             capturedImages: newCapturedImages
-  //           });
-  //         }
-  //       } catch (error) {
-  //         console.error("Error fetching existing header data:", error);
-  //       } finally {
-  //         setLoadingData(false);
-  //       }
-  //     };
-
-  //     // Only fetch if report is saved/exists and headerData is empty (initial load)
-  //     // OR if you want to force reload on tab switch, remove the empty check.
-  //     // Here we check if headerData is essentially empty to avoid overwriting unsaved edits
-  //     const hasData = Object.keys(headerData.selectedOptions || {}).length > 0;
-  //     if (reportId && !hasData) {
-  //       fetchExistingHeaderData();
-  //     }
-  //     // If you want to ALWAYS load fresh from DB when reportId changes:
-  //     // fetchExistingHeaderData();
-  //   }, [reportId]); // Dependency on reportId
-
-  // --- SAVE HANDLER (Unchanged logic, just ensure imports match) ---
+  // --- SAVE HANDLER---
   const handleSaveHeaderData = async () => {
     if (!isReportSaved || !reportId) {
       alert(
@@ -185,7 +106,6 @@ const YPivotQAInspectionHeaderDataSave = ({
           .map((k) => {
             const img = headerData.capturedImages[k];
 
-            // --- FIX STARTS HERE ---
             let payloadImageURL = null;
             let payloadImgSrc = null;
 
@@ -200,7 +120,6 @@ const YPivotQAInspectionHeaderDataSave = ({
               payloadImageURL = img.url.replace(API_BASE_URL, "");
               payloadImgSrc = null; // No need to re-upload
             }
-            // --- FIX ENDS HERE ---
 
             return {
               id: img.id || k,
@@ -237,71 +156,6 @@ const YPivotQAInspectionHeaderDataSave = ({
       setSaving(false);
     }
   };
-
-  //   const handleSaveHeaderData = async () => {
-  //     if (!isReportSaved || !reportId) {
-  //       alert(
-  //         "Please save the Order information first before saving Header data."
-  //       );
-  //       return;
-  //     }
-
-  //     setSaving(true);
-  //     try {
-  //       // Fetch Section Config for mapping
-  //       const sectionsRes = await axios.get(
-  //         `${API_BASE_URL}/api/qa-sections-home`
-  //       );
-  //       const sections = sectionsRes.data.data;
-
-  //       const payloadData = sections.map((section) => {
-  //         const secId = section._id;
-
-  //         // Filter images for this section
-  //         const sectionImages = Object.keys(headerData.capturedImages || {})
-  //           .filter((k) => k.startsWith(`${secId}_`))
-  //           .map((k) => {
-  //             const img = headerData.capturedImages[k];
-  //             return {
-  //               id: img.id || k,
-  //               // Check if URL is Base64 (New) or Path (Existing)
-  //               imageURL: img.url.startsWith("data:")
-  //                 ? null
-  //                 : img.url.replace(API_BASE_URL, ""), // Strip base URL for saving relative path
-  //               imgSrc: img.url.startsWith("data:") ? img.url : null
-  //             };
-  //           });
-
-  //         return {
-  //           headerId: secId,
-  //           name: section.MainTitle,
-  //           selectedOption: (headerData.selectedOptions || {})[secId] || "",
-  //           remarks: (headerData.remarks || {})[secId] || "",
-  //           images: sectionImages
-  //         };
-  //       });
-
-  //       const res = await axios.post(
-  //         `${API_BASE_URL}/api/fincheck-inspection/update-header-data`,
-  //         {
-  //           reportId: reportId,
-  //           headerData: payloadData
-  //         }
-  //       );
-
-  //       if (res.data.success) {
-  //         alert("Header data saved successfully!");
-  //       }
-  //     } catch (error) {
-  //       console.error("Error saving header data:", error);
-  //       alert(
-  //         "Failed to save header data. " +
-  //           (error.response?.data?.message || "Internal Error")
-  //       );
-  //     } finally {
-  //       setSaving(false);
-  //     }
-  //   };
 
   if (loadingData) {
     return (

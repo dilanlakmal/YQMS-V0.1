@@ -1156,12 +1156,449 @@ export const updateHeaderData = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating header data:", error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal server error.",
-        error: error.message
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// Define Photo Storage Path
+const uploadDirPhoto = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/PhotoData"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirPhoto)) {
+  fs.mkdirSync(uploadDirPhoto, { recursive: true });
+}
+
+// Helper: Save Photo Base64 Image to Disk
+const savePhotoBase64Image = (
+  base64String,
+  reportId,
+  sectionId,
+  itemNo,
+  index
+) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Create unique filename
+    const filename = `photo_${reportId}_${sectionId}_${itemNo}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirPhoto, filename);
+
+    fs.writeFileSync(filepath, data);
+
+    // Return relative URL
+    return `/storage/PivotY/Fincheck/PhotoData/${filename}`;
+  } catch (error) {
+    console.error("Error saving photo base64 image:", error);
+    return null;
+  }
+};
+
+// ============================================================
+// Update Photo Data (Images, Remarks)
+// ============================================================
+export const updatePhotoData = async (req, res) => {
+  try {
+    const { reportId, photoData } = req.body;
+
+    if (!reportId || !photoData || !Array.isArray(photoData)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Process nested structure: Sections -> Items -> Images
+    const processedPhotoData = photoData.map((section) => {
+      const processedItems = (section.items || []).map((item) => {
+        const processedImages = (item.images || [])
+          .map((img, idx) => {
+            let finalUrl = img.imageURL;
+
+            // If it's a new Base64 image, save it
+            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+              const savedPath = savePhotoBase64Image(
+                img.imgSrc,
+                reportId,
+                section.sectionId,
+                item.itemNo,
+                idx
+              );
+              if (savedPath) finalUrl = savedPath;
+            }
+
+            return {
+              imageId:
+                img.id ||
+                `${section.sectionId}_${item.itemNo}_${idx}_${Date.now()}`,
+              imageURL: finalUrl
+            };
+          })
+          .filter((img) => img.imageURL); // Remove invalid images
+
+        return {
+          itemNo: item.itemNo,
+          itemName: item.itemName,
+          remarks: item.remarks,
+          images: processedImages
+        };
       });
+
+      return {
+        sectionId: section.sectionId,
+        sectionName: section.sectionName,
+        items: processedItems
+      };
+    });
+
+    report.photoData = processedPhotoData;
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Photo data saved successfully.",
+      data: report.photoData
+    });
+  } catch (error) {
+    console.error("Error updating photo data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Update Inspection Configuration (Info Tab)
+// ============================================================
+export const updateInspectionConfig = async (req, res) => {
+  try {
+    const { reportId, configData } = req.body;
+
+    if (!reportId || !configData) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // We replace the config array or push to it?
+    // Usually, for the current inspection context, we want to update the entry
+    // corresponding to the current active report type.
+    // For simplicity in this structure, we will overwrite the list with the latest snapshot,
+    // or you can implement logic to find index by reportName and update.
+    // Here, we treat it as a single source of truth for the current session.
+
+    // Construct the object based on schema
+    const newConfigItem = {
+      reportName: configData.reportName,
+      inspectionMethod: configData.inspectionMethod,
+      sampleSize: configData.sampleSize,
+      configGroups: configData.configGroups,
+      updatedAt: new Date()
+    };
+
+    // Filter out old config for same report type if exists, then push new
+    // Or just set it if we only track one active config for the report
+    report.inspectionConfig = [newConfigItem];
+
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Inspection configuration saved successfully.",
+      data: report.inspectionConfig
+    });
+  } catch (error) {
+    console.error("Error updating inspection config:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Update Measurement Data
+// ============================================================
+export const updateMeasurementData = async (req, res) => {
+  try {
+    const { reportId, measurementData } = req.body;
+
+    if (!reportId || !measurementData || !Array.isArray(measurementData)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Replace the existing measurement data with the new snapshot
+    // Since the frontend sends the complete state of 'savedMeasurements',
+    // a full replacement ensures sync (deletions are handled automatically).
+    report.measurementData = measurementData;
+
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Measurement data saved successfully.",
+      data: report.measurementData
+    });
+  } catch (error) {
+    console.error("Error updating measurement data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// Define Defect Storage Path
+const uploadDirDefect = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/DefectData"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirDefect)) {
+  fs.mkdirSync(uploadDirDefect, { recursive: true });
+}
+
+// Helper: Save Defect Base64 Image
+const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Create unique filename
+    const filename = `defect_${reportId}_${defectCode}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirDefect, filename);
+
+    fs.writeFileSync(filepath, data);
+
+    // Return relative URL
+    return `/storage/PivotY/Fincheck/DefectData/${filename}`;
+  } catch (error) {
+    console.error("Error saving defect base64 image:", error);
+    return null;
+  }
+};
+
+// ============================================================
+// Update Defect Data
+// ============================================================
+export const updateDefectData = async (req, res) => {
+  try {
+    const { reportId, defectData } = req.body;
+
+    if (!reportId || !defectData || !Array.isArray(defectData)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Process images in the defect data
+    const processedDefectData = defectData.map((defect) => {
+      const processedImages = (defect.images || [])
+        .map((img, idx) => {
+          let finalUrl = img.imageURL;
+
+          // If new Base64 image, save to disk
+          if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+            const savedPath = saveDefectBase64Image(
+              img.imgSrc,
+              reportId,
+              defect.defectCode,
+              idx
+            );
+            if (savedPath) finalUrl = savedPath;
+          }
+
+          return {
+            imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
+            imageURL: finalUrl
+          };
+        })
+        .filter((img) => img.imageURL); // Remove failed saves
+
+      return {
+        ...defect,
+        images: processedImages
+      };
+    });
+
+    // Replace existing data with the snapshot from frontend
+    report.defectData = processedDefectData;
+
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Defect data saved successfully.",
+      data: report.defectData
+    });
+  } catch (error) {
+    console.error("Error updating defect data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// Define PP Sheet Storage Path
+const uploadDirPPSheet = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/PPSheetData"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirPPSheet)) {
+  fs.mkdirSync(uploadDirPPSheet, { recursive: true });
+}
+
+// Helper: Save PP Sheet Base64 Image
+const savePPSheetBase64Image = (base64String, reportId, index) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Create unique filename
+    const filename = `ppsheet_${reportId}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirPPSheet, filename);
+
+    fs.writeFileSync(filepath, data);
+
+    // Return relative URL
+    return `/storage/PivotY/Fincheck/PPSheetData/${filename}`;
+  } catch (error) {
+    console.error("Error saving PP Sheet base64 image:", error);
+    return null;
+  }
+};
+
+// ============================================================
+// Update PP Sheet Data
+// ============================================================
+export const updatePPSheetData = async (req, res) => {
+  try {
+    const { reportId, ppSheetData } = req.body;
+
+    if (!reportId || !ppSheetData) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid payload." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Process Images
+    const processedImages = (ppSheetData.images || [])
+      .map((img, idx) => {
+        let finalUrl = img.imageURL;
+
+        // If new Base64 image, save to disk
+        if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+          const savedPath = savePPSheetBase64Image(img.imgSrc, reportId, idx);
+          if (savedPath) finalUrl = savedPath;
+        }
+
+        return {
+          imageId: img.id || `pp_${idx}_${Date.now()}`,
+          imageURL: finalUrl
+        };
+      })
+      .filter((img) => img.imageURL); // Remove failed saves
+
+    // Construct the final object
+    const finalData = {
+      ...ppSheetData,
+      images: processedImages,
+      timestamp: new Date()
+    };
+
+    report.ppSheetData = finalData;
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "PP Sheet data saved successfully.",
+      data: report.ppSheetData
+    });
+  } catch (error) {
+    console.error("Error updating PP Sheet data:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
   }
 };
