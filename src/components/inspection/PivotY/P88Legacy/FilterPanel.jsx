@@ -143,7 +143,7 @@ const FilterField = ({
             onBlur={() => setIsFocused(false)}
             className={baseInputClasses}
           >
-            <option value="">All {label}</option>
+            <option value="">All Status</option>
             {options.map(option => (
               <option key={option} value={option}>{option}</option>
             ))}
@@ -254,7 +254,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
     {
       key: 'inspector',
       label: 'Inspector',
-      placeholder: 'Type to search, then select an option...',
+      placeholder: '',
       icon: '👤',
       options: [...(options.inspector || [])].sort()
     },
@@ -263,33 +263,33 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
       label: 'Approval Status',
       type: 'select',
       icon: '✅',
-      options: ['Pending Approval', 'Approved', 'Rejected'],
+      options: ['Pending Approval', 'Accepted', 'Reworked'],
     },
     {
       key: 'reportType',
       label: 'Report Type',
-      placeholder: 'Type to search, then select an option...',
+      placeholder: '',
       icon: '📋',
       options: [...(options.reportType || [])].sort()
     },
     {
       key: 'supplier',
       label: 'Supplier',
-      placeholder: 'Type to search, then select an option...',
+      placeholder: '',
       icon: '🏢',
       options: [...(options.supplier || [])].sort()
     },
     {
       key: 'project',
       label: 'Project',
-      placeholder: 'Type to search, then select an option...',
+      placeholder: '',
       icon: '🏗️',
       options: [...(options.project || [])].sort()
     },
     {
       key: 'poNumbers',
       label: 'PO #',
-      placeholder: 'Type to search, then select an option...',
+      placeholder: '',
       icon: '🏷️',
       options: [...(options.poNumbers || [])].sort()
     }
@@ -309,7 +309,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
               <p className="text-sm text-gray-600">
                 {hasActiveFilters 
                   ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} applied`
-                  : 'Type to search, then click an option to apply filter'
+                  : ''
                 }
               </p>
             </div>
@@ -332,7 +332,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
 
       {/* Filter Fields */}
       <div className="p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6 gap-6">
           {filterFields.map((field) => (
             <FilterField
               key={field.key}

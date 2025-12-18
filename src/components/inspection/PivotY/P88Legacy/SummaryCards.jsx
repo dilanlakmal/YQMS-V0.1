@@ -1,17 +1,17 @@
 import React from 'react';
 
 const SummaryCard = ({ title, value, colorClass, icon, bgClass }) => (
-  <div className={`relative overflow-hidden rounded-xl ${bgClass} p-6 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 min-w-[160px] flex-1`}>
+  <div className={`relative overflow-hidden rounded-xl ${bgClass} p-2 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 min-w-[160px] flex-1`}>
     <div className="flex items-center justify-between">
       <div className="flex flex-col">
-        <span className={`text-3xl font-bold ${colorClass} mb-2`}>
+        <span className={`text-2xl font-bold ${colorClass} mb-2`}>
           {value.toLocaleString()}
         </span>
         <span className="text-sm font-medium text-gray-600 uppercase tracking-wide">
           {title}
         </span>
       </div>
-      <div className={`text-4xl ${colorClass} opacity-20`}>
+      <div className={`text-xl ${colorClass} opacity-20`}>
         {icon}
       </div>
     </div>
@@ -64,7 +64,7 @@ const SummaryCards = ({ summary }) => {
   ];
 
   return (
-    <div className="bg-white p-8 rounded-xl shadow-lg border border-gray-100 mb-8">
+    <div className="bg-white p-2 rounded-xl shadow-lg border border-gray-100 mb-8">
       {/* Header Section */}
       {/* <div className="flex items-center justify-between mb-8"> */}
         {/* <div>
@@ -83,7 +83,7 @@ const SummaryCards = ({ summary }) => {
       {/* </div> */}
 
       {/* Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
         {cards.map((card, index) => (
           <SummaryCard
             key={index}

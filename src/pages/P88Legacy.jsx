@@ -87,12 +87,19 @@ const P88Legacy = () => {
                       </span>
                     </div>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    P88 Legacy Data
-                  </p>
+                 {/* Active Tab Indicator - Inline with title */}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                    </div>
+                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                      {activeTabData?.label} • Active
+                    </p>
+                  </div>
                 </div>
               </div>
-
+            
               {user && (
                 <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
                   <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
@@ -149,7 +156,7 @@ const P88Legacy = () => {
             </div>
 
             {/* Active Status Indicator */}
-            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+            {/* <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
               <div className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
@@ -162,7 +169,7 @@ const P88Legacy = () => {
                   Active Module
                 </p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* DESKTOP LAYOUT (>= lg) */}
