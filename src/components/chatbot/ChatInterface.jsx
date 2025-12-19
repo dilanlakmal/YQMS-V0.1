@@ -126,7 +126,7 @@ export default function ChatInterface({
           },
         ], false);
       } else {
-        topic = activeConversation.title;
+        topic = {message: {content: activeConversation.title}};
       }
 
 
