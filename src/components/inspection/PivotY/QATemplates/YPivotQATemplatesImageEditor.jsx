@@ -23,6 +23,7 @@ import {
   Move,
   Check,
   Eraser, // for background removal button
+  Crop,
   ImageOff // alternative icon
 } from "lucide-react";
 
@@ -33,6 +34,12 @@ import {
   ModelStatusIndicator,
   initializeCacheStatus
 } from "./YPivotQATemplatesImageRemoveBackground";
+
+import {
+  useImageCrop,
+  ImageCropModal,
+  CropButton
+} from "./YPivotQATemplatesImageCrop";
 
 const MAX_IMAGES = 7;
 
@@ -155,6 +162,16 @@ const YPivotQATemplatesImageEditor = ({
     isCached: isModelCached, // NEW - cache status
     isModelReady // NEW - model ready status
   } = useBackgroundRemoval();
+
+  // --- Crop State ---
+  const {
+    isOpen: isCropOpen,
+    imageSrc: cropImageSrc,
+    originalDimensions: cropOriginalDimensions,
+    openCropModal,
+    handleComplete: handleCropComplete,
+    handleCancel: handleCropCancel
+  } = useImageCrop();
 
   // Generate unique ID
   const generateId = () =>
@@ -1510,6 +1527,59 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   // ==========================================
+  // CROP HANDLER
+  // ==========================================
+
+  const handleCropClick = async () => {
+    if (!imgSrc) return;
+
+    try {
+      const result = await openCropModal(imgSrc);
+
+      if (result.success && result.imageSrc) {
+        // Update the current image with the cropped version
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  // Clear history since we have a new base image
+                  history: []
+                }
+              : img
+          )
+        );
+
+        // Clear current image history
+        setHistory([]);
+
+        console.log("✅ Image cropped successfully", result.cropData);
+      }
+    } catch (error) {
+      console.error("Crop failed:", error);
+    }
+  };
+
+  const handleCropDone = (croppedImageSrc, cropData) => {
+    // Update the current image with the cropped version
+    setImages((prev) =>
+      prev.map((img, idx) =>
+        idx === currentImageIndex
+          ? {
+              ...img,
+              imgSrc: croppedImageSrc,
+              history: [] // Clear history for new cropped image
+            }
+          : img
+      )
+    );
+
+    setHistory([]);
+    handleCropComplete(croppedImageSrc, cropData);
+  };
+
+  // ==========================================
   // 7. UI RENDERING
   // ==========================================
 
@@ -1916,6 +1986,17 @@ const YPivotQATemplatesImageEditor = ({
                   onCancel={() => setShowBgColorPicker(false)}
                   isCached={isModelCached}
                 />
+
+                {/* Crop Modal */}
+                <ImageCropModal
+                  isOpen={isCropOpen}
+                  imageSrc={cropImageSrc}
+                  originalDimensions={cropOriginalDimensions}
+                  onComplete={handleCropDone}
+                  onCancel={handleCropCancel}
+                  quality={1.0}
+                  outputFormat="image/png"
+                />
               </>
             )}
           </>
@@ -2057,6 +2138,16 @@ const YPivotQATemplatesImageEditor = ({
                   <tool.icon className="w-5 h-5" />
                 </button>
               ))}
+              {/* ✅ CROP BUTTON*/}
+              <button
+                onClick={handleCropClick}
+                disabled={!imgSrc}
+                className="p-2 rounded-lg transition-all text-amber-400 hover:bg-amber-900/30 hover:text-amber-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Crop Image"
+              >
+                <Crop className="w-5 h-5" />
+              </button>
+
               {/* Divider */}
               <div className="w-px h-6 bg-gray-600 mx-1" />
               {/* Background Removal Button */}
