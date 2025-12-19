@@ -24,6 +24,9 @@ import {
   Check,
   Eraser, // for background removal button
   Crop,
+  RotateCcw,
+  FlipHorizontal2,
+  SlidersHorizontal,
   ImageOff // alternative icon
 } from "lucide-react";
 
@@ -40,6 +43,19 @@ import {
   ImageCropModal,
   CropButton
 } from "./YPivotQATemplatesImageCrop";
+
+// Rotate
+import { useImageRotate, RotateButton } from "./YPivotQATemplatesImageRotate";
+
+// Flip
+import { useImageFlip, FlipButton } from "./YPivotQATemplatesImageFlip";
+
+// Adjust
+import {
+  useImageAdjust,
+  AdjustButton,
+  AdjustToolbarPanel
+} from "./YPivotQATemplatesImageAdjust";
 
 const MAX_IMAGES = 7;
 
@@ -172,6 +188,38 @@ const YPivotQATemplatesImageEditor = ({
     handleComplete: handleCropComplete,
     handleCancel: handleCropCancel
   } = useImageCrop();
+
+  // --- Rotate State ---
+  const { rotateImage } = useImageRotate();
+  const [isRotating, setIsRotating] = useState(false);
+
+  // --- Flip State ---
+  const { flipImageHorizontal } = useImageFlip();
+  const [isFlipping, setIsFlipping] = useState(false);
+
+  // --- Adjust State ---
+  const {
+    isOpen: isAdjustOpen,
+    values: adjustValues,
+    previewImageSrc: adjustPreviewSrc,
+    openAdjustPanel,
+    handleValueChange: handleAdjustValueChange,
+    resetAll: resetAdjustments,
+    handleApply: applyAdjustments,
+    handleCancel: cancelAdjustments
+  } = useImageAdjust();
+
+  // Toolbar adjust panel state (inline mode)
+  const [showAdjustPanel, setShowAdjustPanel] = useState(false);
+  const [activeAdjustment, setActiveAdjustment] = useState(null);
+  const [adjustmentValues, setAdjustmentValues] = useState({
+    exposure: 0,
+    brightness: 0,
+    contrast: 0,
+    highlights: 0,
+    saturation: 0,
+    vibrance: 0
+  });
 
   // Generate unique ID
   const generateId = () =>
@@ -1580,6 +1628,163 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   // ==========================================
+  // ROTATE HANDLER
+  // ==========================================
+
+  const handleRotateClick = async () => {
+    if (!imgSrc || isRotating) return;
+
+    setIsRotating(true);
+
+    try {
+      const result = await rotateImage(imgSrc);
+
+      if (result.success) {
+        // Update the current image with the rotated version
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  history: [] // Clear history for new rotated image
+                }
+              : img
+          )
+        );
+
+        setHistory([]);
+        console.log("✅ Image rotated successfully");
+      }
+    } catch (error) {
+      console.error("Rotate failed:", error);
+    } finally {
+      setIsRotating(false);
+    }
+  };
+
+  // ==========================================
+  // FLIP HANDLER
+  // ==========================================
+
+  const handleFlipClick = async () => {
+    if (!imgSrc || isFlipping) return;
+
+    setIsFlipping(true);
+
+    try {
+      const result = await flipImageHorizontal(imgSrc);
+
+      if (result.success) {
+        // Update the current image with the flipped version
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  history: [] // Clear history for new flipped image
+                }
+              : img
+          )
+        );
+
+        setHistory([]);
+        console.log("✅ Image flipped successfully");
+      }
+    } catch (error) {
+      console.error("Flip failed:", error);
+    } finally {
+      setIsFlipping(false);
+    }
+  };
+
+  // ==========================================
+  // ADJUST HANDLERS
+  // ==========================================
+
+  const handleAdjustClick = () => {
+    setShowAdjustPanel(!showAdjustPanel);
+    if (showAdjustPanel) {
+      setActiveAdjustment(null);
+    }
+  };
+
+  const handleAdjustmentChange = async (id, value) => {
+    const newValues = { ...adjustmentValues, [id]: value };
+    setAdjustmentValues(newValues);
+
+    // Apply adjustments to preview (debounced in real implementation)
+    // For now, we'll apply on confirm
+  };
+
+  const handleApplyAdjustments = async () => {
+    if (!imgSrc) return;
+
+    // Check if any adjustments were made
+    const hasChanges = Object.values(adjustmentValues).some((v) => v !== 0);
+    if (!hasChanges) {
+      setShowAdjustPanel(false);
+      setActiveAdjustment(null);
+      return;
+    }
+
+    try {
+      const result = await openAdjustPanel(imgSrc);
+
+      // Apply the current adjustment values
+      // This is handled by the adjust panel internally
+    } catch (error) {
+      console.error("Adjust failed:", error);
+    }
+  };
+
+  const handleAdjustDone = (result) => {
+    if (result.success && result.imageSrc) {
+      setImages((prev) =>
+        prev.map((img, idx) =>
+          idx === currentImageIndex
+            ? {
+                ...img,
+                imgSrc: result.imageSrc,
+                history: []
+              }
+            : img
+        )
+      );
+
+      setHistory([]);
+
+      // Reset adjustment values
+      setAdjustmentValues({
+        exposure: 0,
+        brightness: 0,
+        contrast: 0,
+        highlights: 0,
+        saturation: 0,
+        vibrance: 0
+      });
+    }
+
+    setShowAdjustPanel(false);
+    setActiveAdjustment(null);
+  };
+
+  // Close adjust panel when clicking outside or changing images
+  useEffect(() => {
+    setShowAdjustPanel(false);
+    setActiveAdjustment(null);
+    setAdjustmentValues({
+      exposure: 0,
+      brightness: 0,
+      contrast: 0,
+      highlights: 0,
+      saturation: 0,
+      vibrance: 0
+    });
+  }, [currentImageIndex]);
+
+  // ==========================================
   // 7. UI RENDERING
   // ==========================================
 
@@ -2112,6 +2317,19 @@ const YPivotQATemplatesImageEditor = ({
             </div>
           )}
 
+          {/* ✅ ADJUST PANEL */}
+          <AdjustToolbarPanel
+            isOpen={showAdjustPanel}
+            values={adjustmentValues}
+            onValueChange={handleAdjustmentChange}
+            onClose={() => {
+              setShowAdjustPanel(false);
+              setActiveAdjustment(null);
+            }}
+            activeAdjustment={activeAdjustment}
+            onSelectAdjustment={setActiveAdjustment}
+          />
+
           {/* Main Toolbar */}
           <div className="p-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
             <div className="flex gap-1">
@@ -2138,6 +2356,33 @@ const YPivotQATemplatesImageEditor = ({
                   <tool.icon className="w-5 h-5" />
                 </button>
               ))}
+              {/* Divider */}
+              <div className="w-px h-6 bg-gray-600 mx-1" />
+
+              {/* ✅ ROTATE BUTTON */}
+              <button
+                onClick={handleRotateClick}
+                disabled={!imgSrc || isRotating}
+                className={`p-2 rounded-lg transition-all text-blue-400 hover:bg-blue-900/30 hover:text-blue-300 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 ${
+                  isRotating ? "animate-spin" : ""
+                }`}
+                title="Rotate 90° Counter-clockwise"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+
+              {/* ✅ FLIP BUTTON */}
+              <button
+                onClick={handleFlipClick}
+                disabled={!imgSrc || isFlipping}
+                className={`p-2 rounded-lg transition-all text-purple-400 hover:bg-purple-900/30 hover:text-purple-300 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 ${
+                  isFlipping ? "animate-pulse" : ""
+                }`}
+                title="Flip Horizontal"
+              >
+                <FlipHorizontal2 className="w-5 h-5" />
+              </button>
+
               {/* ✅ CROP BUTTON*/}
               <button
                 onClick={handleCropClick}
@@ -2207,7 +2452,26 @@ const YPivotQATemplatesImageEditor = ({
               </button>
             </div>
 
-            <div className="flex gap-1">
+            <div className="flex gap-1 items-center">
+              {/* ✅ ADJUST BUTTON */}
+              <button
+                onClick={handleAdjustClick}
+                disabled={!imgSrc}
+                className={`p-2 rounded-lg transition-all relative ${
+                  showAdjustPanel
+                    ? "bg-cyan-600 text-white"
+                    : "text-cyan-400 hover:bg-cyan-900/30 hover:text-cyan-300"
+                } disabled:opacity-30 disabled:cursor-not-allowed`}
+                title="Adjust Image"
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+                {Object.values(adjustmentValues).some((v) => v !== 0) &&
+                  !showAdjustPanel && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-gray-800" />
+                  )}
+              </button>
+
+              {/* Settings Button */}
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className={`p-2 rounded-lg transition-all ${
@@ -2219,6 +2483,8 @@ const YPivotQATemplatesImageEditor = ({
               >
                 <Settings className="w-5 h-5" />
               </button>
+
+              {/* Undo Button */}
               <button
                 onClick={undoLast}
                 disabled={history.length === 0}
@@ -2227,6 +2493,8 @@ const YPivotQATemplatesImageEditor = ({
               >
                 <Undo2 className="w-5 h-5" />
               </button>
+
+              {/* Clear All Button */}
               <button
                 onClick={clearAll}
                 disabled={history.length === 0}
