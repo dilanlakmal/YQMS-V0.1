@@ -23,14 +23,39 @@ import {
   Move,
   Check,
   Eraser, // for background removal button
+  Crop,
+  RotateCcw,
+  FlipHorizontal2,
+  SlidersHorizontal,
   ImageOff // alternative icon
 } from "lucide-react";
 
 import {
   useBackgroundRemoval,
   BackgroundRemovalModal,
-  BackgroundColorPicker
+  BackgroundColorPicker,
+  ModelStatusIndicator,
+  initializeCacheStatus
 } from "./YPivotQATemplatesImageRemoveBackground";
+
+import {
+  useImageCrop,
+  ImageCropModal,
+  CropButton
+} from "./YPivotQATemplatesImageCrop";
+
+// Rotate
+import { useImageRotate, RotateButton } from "./YPivotQATemplatesImageRotate";
+
+// Flip
+import { useImageFlip, FlipButton } from "./YPivotQATemplatesImageFlip";
+
+// Adjust
+import {
+  useImageAdjust,
+  AdjustButton,
+  AdjustToolbarPanel
+} from "./YPivotQATemplatesImageAdjust";
 
 const MAX_IMAGES = 7;
 
@@ -84,6 +109,8 @@ const YPivotQATemplatesImageEditor = ({
   const fileInputRef = useRef(null);
   const [stream, setStream] = useState(null);
   const [facingMode, setFacingMode] = useState("environment");
+  const [pendingStream, setPendingStream] = useState(null); // ✅ ADD THIS LINE
+  const [isCameraLoading, setIsCameraLoading] = useState(false); // ✅ ADD THIS LINE
 
   // --- Uploading State ---
   const [isUploading, setIsUploading] = useState(false);
@@ -133,6 +160,12 @@ const YPivotQATemplatesImageEditor = ({
   const [showBgColorPicker, setShowBgColorPicker] = useState(false);
   const [bgRemovalColor, setBgRemovalColor] = useState("#FFFFFF");
 
+  // 2. ADD useEffect TO CHECK CACHE ON MOUNT (add after other useEffects)
+  useEffect(() => {
+    // Check cache status early so we know if models are ready
+    initializeCacheStatus();
+  }, []);
+
   // Use the background removal hook
   const {
     removeImageBackground,
@@ -140,8 +173,53 @@ const YPivotQATemplatesImageEditor = ({
     progress: bgRemovalProgress,
     progressMessage: bgRemovalMessage,
     error: bgRemovalError,
-    resetState: resetBgRemovalState
+    resetState: resetBgRemovalState,
+    cancelProcessing: cancelBgRemoval, // NEW
+    isCached: isModelCached, // NEW - cache status
+    isModelReady // NEW - model ready status
   } = useBackgroundRemoval();
+
+  // --- Crop State ---
+  const {
+    isOpen: isCropOpen,
+    imageSrc: cropImageSrc,
+    originalDimensions: cropOriginalDimensions,
+    openCropModal,
+    handleComplete: handleCropComplete,
+    handleCancel: handleCropCancel
+  } = useImageCrop();
+
+  // --- Rotate State ---
+  const { rotateImage } = useImageRotate();
+  const [isRotating, setIsRotating] = useState(false);
+
+  // --- Flip State ---
+  const { flipImageHorizontal } = useImageFlip();
+  const [isFlipping, setIsFlipping] = useState(false);
+
+  // --- Adjust State ---
+  const {
+    isOpen: isAdjustOpen,
+    values: adjustValues,
+    previewImageSrc: adjustPreviewSrc,
+    openAdjustPanel,
+    handleValueChange: handleAdjustValueChange,
+    resetAll: resetAdjustments,
+    handleApply: applyAdjustments,
+    handleCancel: cancelAdjustments
+  } = useImageAdjust();
+
+  // Toolbar adjust panel state (inline mode)
+  const [showAdjustPanel, setShowAdjustPanel] = useState(false);
+  const [activeAdjustment, setActiveAdjustment] = useState(null);
+  const [adjustmentValues, setAdjustmentValues] = useState({
+    exposure: 0,
+    brightness: 0,
+    contrast: 0,
+    highlights: 0,
+    saturation: 0,
+    vibrance: 0
+  });
 
   // Generate unique ID
   const generateId = () =>
@@ -182,6 +260,75 @@ const YPivotQATemplatesImageEditor = ({
     },
     [currentImageIndex]
   );
+
+  // ✅ ADD THIS NEW useEffect - Attach stream when video element becomes available
+  useEffect(() => {
+    const attachStreamToVideo = async () => {
+      if (mode === "camera" && pendingStream && videoRef.current) {
+        console.log("📹 Attaching stream to video element...");
+
+        try {
+          videoRef.current.srcObject = pendingStream;
+
+          // Wait for metadata to load
+          await new Promise((resolve, reject) => {
+            const video = videoRef.current;
+            if (!video) {
+              reject(new Error("Video element not found"));
+              return;
+            }
+
+            const onLoadedMetadata = () => {
+              video.removeEventListener("loadedmetadata", onLoadedMetadata);
+              video.removeEventListener("error", onError);
+              resolve();
+            };
+
+            const onError = (e) => {
+              video.removeEventListener("loadedmetadata", onLoadedMetadata);
+              video.removeEventListener("error", onError);
+              reject(e);
+            };
+
+            video.addEventListener("loadedmetadata", onLoadedMetadata);
+            video.addEventListener("error", onError);
+
+            // Timeout fallback
+            setTimeout(resolve, 2000);
+          });
+
+          // Explicitly call play() - important for some browsers
+          try {
+            await videoRef.current.play();
+            console.log("✅ Video playing successfully");
+          } catch (playError) {
+            console.warn(
+              "Auto-play failed, user interaction may be needed:",
+              playError
+            );
+          }
+
+          // Clear pending stream and loading state
+          setPendingStream(null);
+          setIsCameraLoading(false);
+
+          // Log actual resolution
+          const videoTrack = pendingStream.getVideoTracks()[0];
+          if (videoTrack) {
+            const settings = videoTrack.getSettings();
+            console.log(
+              `📷 Camera active: ${settings.width}x${settings.height}`
+            );
+          }
+        } catch (error) {
+          console.error("Error attaching stream:", error);
+          setIsCameraLoading(false);
+        }
+      }
+    };
+
+    attachStreamToVideo();
+  }, [mode, pendingStream]);
 
   // ==========================================
   // INITIALIZE WITH PROPS
@@ -250,47 +397,200 @@ const YPivotQATemplatesImageEditor = ({
 
   const startCamera = async () => {
     try {
+      setIsCameraLoading(true);
+
+      // ✅ Clean up existing stream
       if (stream) {
         stream.getTracks().forEach((track) => track.stop());
+        setStream(null);
+      }
+      if (pendingStream) {
+        pendingStream.getTracks().forEach((track) => track.stop());
+        setPendingStream(null);
       }
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
 
-      const isMobile = window.innerWidth < 1024;
-      const initialMode = isMobile ? "environment" : "user";
-      setFacingMode(initialMode);
+      // ✅ Better mobile/tablet detection
+      const isMobileOrTablet =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        ) ||
+        "ontouchstart" in window ||
+        (navigator.maxTouchPoints && navigator.maxTouchPoints > 1);
 
-      const constraints = {
-        audio: false,
-        video: {
-          facingMode: initialMode,
-          width: { ideal: 4096, min: 1280 },
-          height: { ideal: 2160, min: 720 },
-          frameRate: { ideal: 30 }
-        }
+      const preferRearCamera = isMobileOrTablet;
+      setFacingMode(preferRearCamera ? "environment" : "user");
+
+      let newStream = null;
+
+      // ✅ HIGH QUALITY settings - preserved from original
+      const highQualityConstraints = {
+        width: { ideal: 4096, min: 1280 },
+        height: { ideal: 2160, min: 720 },
+        frameRate: { ideal: 30 }
       };
 
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(newStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
+      // ✅ Strategy 1: Device enumeration (most reliable for rear camera)
+      if (preferRearCamera) {
+        try {
+          // Get temporary permission to enumerate devices
+          const tempStream = await navigator.mediaDevices.getUserMedia({
+            video: true
+          });
+          tempStream.getTracks().forEach((track) => track.stop());
+
+          // Small delay after stopping temp stream
+          await new Promise((resolve) => setTimeout(resolve, 100));
+
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoDevices = devices.filter(
+            (device) => device.kind === "videoinput"
+          );
+
+          console.log(
+            "Available cameras:",
+            videoDevices.map((d) => ({ label: d.label, id: d.deviceId }))
+          );
+
+          // Find back camera by label
+          let backCamera = videoDevices.find((device) =>
+            /back|rear|environment|後|背面|trasera|arrière|hinten|0/i.test(
+              device.label
+            )
+          );
+
+          // If not found and multiple cameras, try the last one (usually back camera on mobile)
+          if (!backCamera && videoDevices.length >= 2) {
+            backCamera = videoDevices[videoDevices.length - 1];
+          }
+
+          if (backCamera) {
+            try {
+              newStream = await navigator.mediaDevices.getUserMedia({
+                audio: false,
+                video: {
+                  deviceId: { exact: backCamera.deviceId },
+                  ...highQualityConstraints
+                }
+              });
+              console.log(
+                "✅ Using back camera by deviceId:",
+                backCamera.label
+              );
+            } catch (deviceIdError) {
+              console.log("deviceId approach failed:", deviceIdError.message);
+            }
+          }
+        } catch (enumError) {
+          console.log("Device enumeration failed:", enumError.message);
+        }
       }
-      setMode("camera");
+
+      // ✅ Strategy 2: exact facingMode
+      if (!newStream && preferRearCamera) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: { exact: "environment" },
+              ...highQualityConstraints
+            }
+          });
+          console.log("✅ Using exact facingMode: environment");
+        } catch (exactError) {
+          console.log("Exact facingMode failed:", exactError.message);
+        }
+      }
+
+      // ✅ Strategy 3: string facingMode (some devices prefer this)
+      if (!newStream && preferRearCamera) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: "environment",
+              ...highQualityConstraints
+            }
+          });
+          console.log("✅ Using string facingMode: environment");
+        } catch (stringError) {
+          console.log("String facingMode failed:", stringError.message);
+        }
+      }
+
+      // ✅ Strategy 4: ideal facingMode
+      if (!newStream) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              facingMode: { ideal: preferRearCamera ? "environment" : "user" },
+              ...highQualityConstraints
+            }
+          });
+          console.log("✅ Using ideal facingMode");
+        } catch (idealError) {
+          console.log("Ideal facingMode failed:", idealError.message);
+        }
+      }
+
+      // ✅ Strategy 5: No facingMode, just high quality
+      if (!newStream) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: highQualityConstraints
+          });
+          console.log("✅ Using fallback without facingMode");
+        } catch (fallbackError) {
+          console.log("High quality fallback failed:", fallbackError.message);
+        }
+      }
+
+      // ✅ Strategy 6: Minimal constraints (last resort)
+      if (!newStream) {
+        try {
+          newStream = await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+              width: { ideal: 4096 },
+              height: { ideal: 2160 }
+            }
+          });
+          console.log("✅ Using minimal high-quality constraints");
+        } catch (minimalError) {
+          console.log("Minimal failed:", minimalError.message);
+
+          // Absolute last resort
+          newStream = await navigator.mediaDevices.getUserMedia({
+            video: true
+          });
+          console.log("⚠️ Using basic video constraint");
+        }
+      }
+
+      if (newStream) {
+        // ✅ Store stream and set mode FIRST
+        // The video element will be rendered, THEN we attach the stream via useEffect
+        setStream(newStream);
+        setPendingStream(newStream);
+        setMode("camera"); // This renders the video element
+
+        // The useEffect above will handle attaching the stream to the video element
+      } else {
+        throw new Error("Could not access any camera");
+      }
     } catch (err) {
       console.error("Camera Error:", err);
-      try {
-        const fallbackStream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            width: { ideal: 4096 },
-            height: { ideal: 2160 }
-          }
-        });
-        setStream(fallbackStream);
-        if (videoRef.current) videoRef.current.srcObject = fallbackStream;
-        setMode("camera");
-      } catch (e) {
-        alert("Unable to access camera. Please check permissions.");
+      setIsCameraLoading(false);
+      alert(
+        "Unable to access camera. Please check:\n1. Camera permissions are allowed\n2. No other app is using the camera\n3. Try refreshing the page"
+      );
+      if (onCancel) {
+        onCancel();
+      } else {
         setMode("initial");
       }
     }
@@ -299,11 +599,11 @@ const YPivotQATemplatesImageEditor = ({
   const switchCamera = async () => {
     const nextMode = facingMode === "user" ? "environment" : "user";
 
+    setIsCameraLoading(true);
+
+    // Clean up current stream
     if (stream) {
-      stream.getTracks().forEach((track) => {
-        track.stop();
-        stream.removeTrack(track);
-      });
+      stream.getTracks().forEach((track) => track.stop());
       setStream(null);
     }
 
@@ -312,46 +612,106 @@ const YPivotQATemplatesImageEditor = ({
     }
 
     setFacingMode(nextMode);
-    await new Promise((resolve) => setTimeout(resolve, 200));
 
+    // Small delay before requesting new stream
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    const highQualityConstraints = {
+      width: { ideal: 4096, min: 1280 },
+      height: { ideal: 2160, min: 720 }
+    };
+
+    let newStream = null;
+
+    // ✅ Strategy 1: exact facingMode
     try {
-      const constraints = {
+      newStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: { exact: nextMode },
-          width: { ideal: 4096, min: 1280 },
-          height: { ideal: 2160, min: 720 }
+          ...highQualityConstraints
         }
-      };
-
-      const newStream = await navigator.mediaDevices.getUserMedia(constraints);
-      setStream(newStream);
-      if (videoRef.current) {
-        videoRef.current.srcObject = newStream;
-      }
+      });
+      console.log("✅ Switched with exact facingMode");
     } catch (err) {
-      console.warn("Exact switch failed, trying loose constraint...", err);
+      console.log("Exact switch failed:", err.message);
+    }
+
+    // ✅ Strategy 2: string facingMode
+    if (!newStream) {
       try {
-        const looseStream = await navigator.mediaDevices.getUserMedia({
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
           video: {
             facingMode: nextMode,
-            width: { ideal: 4096 },
-            height: { ideal: 2160 }
+            ...highQualityConstraints
           }
         });
-        setStream(looseStream);
-        if (videoRef.current) {
-          videoRef.current.srcObject = looseStream;
-        }
-      } catch (finalErr) {
-        console.error("Camera switch error:", finalErr);
-        alert("Could not switch camera. Your device might be busy.");
-        startCamera();
+        console.log("✅ Switched with string facingMode");
+      } catch (err) {
+        console.log("String facingMode switch failed:", err.message);
       }
     }
+
+    // ✅ Strategy 3: ideal facingMode
+    if (!newStream) {
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          audio: false,
+          video: {
+            facingMode: { ideal: nextMode },
+            ...highQualityConstraints
+          }
+        });
+        console.log("✅ Switched with ideal facingMode");
+      } catch (err) {
+        console.log("Ideal switch failed:", err.message);
+      }
+    }
+
+    // ✅ Strategy 4: Device enumeration
+    if (!newStream) {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter((d) => d.kind === "videoinput");
+
+        if (videoDevices.length >= 2) {
+          const currentSettings = stream?.getVideoTracks()[0]?.getSettings();
+          const currentDeviceId = currentSettings?.deviceId;
+
+          const otherCamera = videoDevices.find(
+            (d) => d.deviceId !== currentDeviceId
+          );
+
+          if (otherCamera) {
+            newStream = await navigator.mediaDevices.getUserMedia({
+              audio: false,
+              video: {
+                deviceId: { exact: otherCamera.deviceId },
+                ...highQualityConstraints
+              }
+            });
+            console.log("✅ Switched using deviceId");
+          }
+        }
+      } catch (err) {
+        console.log("Device enumeration switch failed:", err.message);
+      }
+    }
+
+    if (!newStream) {
+      console.log("All switch methods failed, restarting camera...");
+      setIsCameraLoading(false);
+      await startCamera();
+      return;
+    }
+
+    // ✅ Use the same pattern - set pending stream for useEffect to handle
+    setStream(newStream);
+    setPendingStream(newStream);
   };
 
-  // MODIFIED: Capture without stopping camera, add to images array
+  // Capture without stopping camera, add to images array
   const captureImage = () => {
     if (!videoRef.current) return;
     if (images.length >= MAX_IMAGES) {
@@ -413,9 +773,14 @@ const YPivotQATemplatesImageEditor = ({
       stream.getTracks().forEach((track) => track.stop());
       setStream(null);
     }
+    if (pendingStream) {
+      pendingStream.getTracks().forEach((track) => track.stop());
+      setPendingStream(null);
+    }
+    setIsCameraLoading(false);
   };
 
-  // MODIFIED: Handle multiple file upload
+  // Handle multiple file upload
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
 
@@ -549,15 +914,36 @@ const YPivotQATemplatesImageEditor = ({
 
   // Just make sure it uses the original dimensions
   useEffect(() => {
-    if (context && imgSrc && canvasSize.width > 0) {
+    if (context && imgSrc && canvasRef.current) {
       const img = new Image();
       img.onload = () => {
-        // Uses full resolution width/height
-        redrawCanvas(context, img, canvasSize.width, canvasSize.height);
+        // ✅ Check if canvas dimensions match the image dimensions
+        // If they don't match, it means the main initialization effect hasn't finished resizing yet.
+        // We abort to prevent the "tiled/glitched" render.
+        const canvas = canvasRef.current;
+        if (
+          Math.abs(canvas.width - img.width) > 1 ||
+          Math.abs(canvas.height - img.height) > 1
+        ) {
+          return;
+        }
+
+        // Uses full resolution width/height from the image itself
+        redrawCanvas(context, img, img.width, img.height);
       };
       img.src = imgSrc;
     }
-  }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
+    // ✅ Added imgSrc and canvasSize to dependency array to ensure freshness
+  }, [
+    history,
+    currentAction,
+    zoom,
+    pan,
+    selectedElementId,
+    hoveredElementId,
+    imgSrc,
+    canvasSize
+  ]);
 
   const redrawCanvas = (ctx, img, width, height) => {
     if (!ctx) return;
@@ -1173,9 +1559,15 @@ const YPivotQATemplatesImageEditor = ({
     }
   };
 
+  // 4. UPDATE handleBgRemovalCancel
   const handleBgRemovalCancel = () => {
+    cancelBgRemoval(); // Use the new cancel function
     resetBgRemovalState();
   };
+
+  // const handleBgRemovalCancel = () => {
+  //   resetBgRemovalState();
+  // };
 
   const handleBgRemovalRetry = () => {
     resetBgRemovalState();
@@ -1183,11 +1575,221 @@ const YPivotQATemplatesImageEditor = ({
   };
 
   // ==========================================
+  // CROP HANDLER
+  // ==========================================
+
+  const handleCropClick = async () => {
+    if (!imgSrc) return;
+
+    try {
+      const result = await openCropModal(imgSrc);
+
+      if (result.success && result.imageSrc) {
+        // Update the current image with the cropped version
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  // Clear history since we have a new base image
+                  history: []
+                }
+              : img
+          )
+        );
+
+        // Clear current image history
+        setHistory([]);
+
+        console.log("✅ Image cropped successfully", result.cropData);
+      }
+    } catch (error) {
+      console.error("Crop failed:", error);
+    }
+  };
+
+  const handleCropDone = (croppedImageSrc, cropData) => {
+    // Update the current image with the cropped version
+    setImages((prev) =>
+      prev.map((img, idx) =>
+        idx === currentImageIndex
+          ? {
+              ...img,
+              imgSrc: croppedImageSrc,
+              history: [] // Clear history for new cropped image
+            }
+          : img
+      )
+    );
+
+    setHistory([]);
+    handleCropComplete(croppedImageSrc, cropData);
+  };
+
+  // ==========================================
+  // ROTATE HANDLER
+  // ==========================================
+
+  const handleRotateClick = async () => {
+    if (!imgSrc || isRotating) return;
+
+    setIsRotating(true);
+
+    try {
+      const result = await rotateImage(imgSrc);
+
+      if (result.success) {
+        // Update the current image with the rotated version
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  history: [] // Clear history for new rotated image
+                }
+              : img
+          )
+        );
+
+        setHistory([]);
+        console.log("✅ Image rotated successfully");
+      }
+    } catch (error) {
+      console.error("Rotate failed:", error);
+    } finally {
+      setIsRotating(false);
+    }
+  };
+
+  // ==========================================
+  // FLIP HANDLER
+  // ==========================================
+
+  const handleFlipClick = async () => {
+    if (!imgSrc || isFlipping) return;
+
+    setIsFlipping(true);
+
+    try {
+      const result = await flipImageHorizontal(imgSrc);
+
+      if (result.success) {
+        // Update the current image with the flipped version
+        setImages((prev) =>
+          prev.map((img, idx) =>
+            idx === currentImageIndex
+              ? {
+                  ...img,
+                  imgSrc: result.imageSrc,
+                  history: [] // Clear history for new flipped image
+                }
+              : img
+          )
+        );
+
+        setHistory([]);
+        console.log("✅ Image flipped successfully");
+      }
+    } catch (error) {
+      console.error("Flip failed:", error);
+    } finally {
+      setIsFlipping(false);
+    }
+  };
+
+  // ==========================================
+  // ADJUST HANDLERS
+  // ==========================================
+
+  const handleAdjustClick = () => {
+    setShowAdjustPanel(!showAdjustPanel);
+    if (showAdjustPanel) {
+      setActiveAdjustment(null);
+    }
+  };
+
+  const handleAdjustmentChange = async (id, value) => {
+    const newValues = { ...adjustmentValues, [id]: value };
+    setAdjustmentValues(newValues);
+
+    // Apply adjustments to preview (debounced in real implementation)
+    // For now, we'll apply on confirm
+  };
+
+  const handleApplyAdjustments = async () => {
+    if (!imgSrc) return;
+
+    // Check if any adjustments were made
+    const hasChanges = Object.values(adjustmentValues).some((v) => v !== 0);
+    if (!hasChanges) {
+      setShowAdjustPanel(false);
+      setActiveAdjustment(null);
+      return;
+    }
+
+    try {
+      const result = await openAdjustPanel(imgSrc);
+
+      // Apply the current adjustment values
+      // This is handled by the adjust panel internally
+    } catch (error) {
+      console.error("Adjust failed:", error);
+    }
+  };
+
+  const handleAdjustDone = (result) => {
+    if (result.success && result.imageSrc) {
+      setImages((prev) =>
+        prev.map((img, idx) =>
+          idx === currentImageIndex
+            ? {
+                ...img,
+                imgSrc: result.imageSrc,
+                history: []
+              }
+            : img
+        )
+      );
+
+      setHistory([]);
+
+      // Reset adjustment values
+      setAdjustmentValues({
+        exposure: 0,
+        brightness: 0,
+        contrast: 0,
+        highlights: 0,
+        saturation: 0,
+        vibrance: 0
+      });
+    }
+
+    setShowAdjustPanel(false);
+    setActiveAdjustment(null);
+  };
+
+  // Close adjust panel when clicking outside or changing images
+  useEffect(() => {
+    setShowAdjustPanel(false);
+    setActiveAdjustment(null);
+    setAdjustmentValues({
+      exposure: 0,
+      brightness: 0,
+      contrast: 0,
+      highlights: 0,
+      saturation: 0,
+      vibrance: 0
+    });
+  }, [currentImageIndex]);
+
+  // ==========================================
   // 7. UI RENDERING
   // ==========================================
 
   return createPortal(
-    <div className="fixed top-0 left-0 w-full h-[100dvh] bg-black/95 z-[9999] flex flex-col overflow-hidden overscroll-none">
+    <div className="fixed inset-0 w-full h-full h-[100dvh] bg-black/95 z-[9999] flex flex-col overflow-hidden overscroll-none touch-none">
       {/* HEADER */}
       <div className="relative z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 p-2 sm:p-3 flex justify-between items-center flex-shrink-0 border-b border-white/10 safe-area-top">
         <div className="flex items-center gap-2">
@@ -1198,11 +1800,15 @@ const YPivotQATemplatesImageEditor = ({
             <h2 className="text-xs sm:text-sm font-bold text-white">
               Image Editor Pro
             </h2>
-            <p className="text-[10px] text-indigo-100 hidden sm:block">
-              {images.length > 0
-                ? `${images.length}/${MAX_IMAGES} images`
-                : "Professional QA Annotation Tool"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-indigo-100 hidden sm:block">
+                {images.length > 0
+                  ? `${images.length}/${MAX_IMAGES} images`
+                  : "Professional QA Annotation Tool"}
+              </p>
+              {/* NEW: Model status indicator */}
+              <ModelStatusIndicator className="hidden sm:flex" />
+            </div>
           </div>
         </div>
 
@@ -1306,12 +1912,21 @@ const YPivotQATemplatesImageEditor = ({
         {/* STATE: CAMERA */}
         {mode === "camera" && (
           <div className="relative w-full h-full bg-black flex flex-col">
+            {/* ✅ ADD: Camera Loading Overlay */}
+            {isCameraLoading && (
+              <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80">
+                <Loader className="w-12 h-12 text-indigo-500 animate-spin mb-4" />
+                <p className="text-white text-sm">Starting camera...</p>
+                <p className="text-gray-400 text-xs mt-2">Please wait</p>
+              </div>
+            )}
             <video
               ref={videoRef}
               autoPlay
               playsInline
               muted
               className="w-full flex-1 object-contain transition-opacity duration-100"
+              style={{ opacity: isCameraLoading ? 0.3 : 1 }} // ✅ Dim while loading
             />
 
             {/* Captured Images Preview */}
@@ -1360,7 +1975,7 @@ const YPivotQATemplatesImageEditor = ({
                 <div className="flex flex-col items-center">
                   <button
                     onClick={captureImage}
-                    disabled={images.length >= MAX_IMAGES}
+                    disabled={images.length >= MAX_IMAGES || isCameraLoading} // ✅ Disable while loading
                     className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] hover:scale-105 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <span className="text-white text-xs mt-1">
@@ -1380,6 +1995,7 @@ const YPivotQATemplatesImageEditor = ({
                   deviceType !== "desktop" && (
                     <button
                       onClick={switchCamera}
+                      disabled={isCameraLoading} // ✅ Disable while loading
                       className="p-2 sm:p-3 bg-gray-700 rounded-full text-white hover:bg-gray-600 transition-colors"
                       title="Switch Camera"
                     >
@@ -1561,6 +2177,7 @@ const YPivotQATemplatesImageEditor = ({
                   error={bgRemovalError}
                   onCancel={handleBgRemovalCancel}
                   onRetry={handleBgRemovalRetry}
+                  isCached={isModelCached}
                 />
 
                 {/* Background Color Picker Modal */}
@@ -1572,6 +2189,18 @@ const YPivotQATemplatesImageEditor = ({
                     handleRemoveBackground(color);
                   }}
                   onCancel={() => setShowBgColorPicker(false)}
+                  isCached={isModelCached}
+                />
+
+                {/* Crop Modal */}
+                <ImageCropModal
+                  isOpen={isCropOpen}
+                  imageSrc={cropImageSrc}
+                  originalDimensions={cropOriginalDimensions}
+                  onComplete={handleCropDone}
+                  onCancel={handleCropCancel}
+                  quality={1.0}
+                  outputFormat="image/png"
                 />
               </>
             )}
@@ -1688,6 +2317,19 @@ const YPivotQATemplatesImageEditor = ({
             </div>
           )}
 
+          {/* ✅ ADJUST PANEL */}
+          <AdjustToolbarPanel
+            isOpen={showAdjustPanel}
+            values={adjustmentValues}
+            onValueChange={handleAdjustmentChange}
+            onClose={() => {
+              setShowAdjustPanel(false);
+              setActiveAdjustment(null);
+            }}
+            activeAdjustment={activeAdjustment}
+            onSelectAdjustment={setActiveAdjustment}
+          />
+
           {/* Main Toolbar */}
           <div className="p-2 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
             <div className="flex gap-1">
@@ -1716,22 +2358,77 @@ const YPivotQATemplatesImageEditor = ({
               ))}
               {/* Divider */}
               <div className="w-px h-6 bg-gray-600 mx-1" />
+
+              {/* ✅ ROTATE BUTTON */}
+              <button
+                onClick={handleRotateClick}
+                disabled={!imgSrc || isRotating}
+                className={`p-2 rounded-lg transition-all text-blue-400 hover:bg-blue-900/30 hover:text-blue-300 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 ${
+                  isRotating ? "animate-spin" : ""
+                }`}
+                title="Rotate 90° Counter-clockwise"
+              >
+                <RotateCcw className="w-5 h-5" />
+              </button>
+
+              {/* ✅ FLIP BUTTON */}
+              <button
+                onClick={handleFlipClick}
+                disabled={!imgSrc || isFlipping}
+                className={`p-2 rounded-lg transition-all text-purple-400 hover:bg-purple-900/30 hover:text-purple-300 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95 ${
+                  isFlipping ? "animate-pulse" : ""
+                }`}
+                title="Flip Horizontal"
+              >
+                <FlipHorizontal2 className="w-5 h-5" />
+              </button>
+
+              {/* ✅ CROP BUTTON*/}
+              <button
+                onClick={handleCropClick}
+                disabled={!imgSrc}
+                className="p-2 rounded-lg transition-all text-amber-400 hover:bg-amber-900/30 hover:text-amber-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                title="Crop Image"
+              >
+                <Crop className="w-5 h-5" />
+              </button>
+
+              {/* Divider */}
+              <div className="w-px h-6 bg-gray-600 mx-1" />
               {/* Background Removal Button */}
               <button
                 onClick={() => setShowBgColorPicker(true)}
                 disabled={!imgSrc || isBgRemoving}
-                className={`p-2 rounded-lg transition-all relative ${
+                className={`p-2 rounded-lg transition-all relative group ${
                   isBgRemoving
                     ? "bg-emerald-600/20 text-emerald-400"
+                    : isModelCached
+                    ? "text-green-400 hover:bg-green-900/30 hover:text-green-300"
                     : "text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300"
                 } disabled:opacity-30 disabled:cursor-not-allowed`}
-                title="Remove Background"
+                title={
+                  isModelCached
+                    ? "Remove Background (AI Ready)"
+                    : "Remove Background (Will download AI model)"
+                }
               >
                 {isBgRemoving ? (
                   <Loader className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Eraser className="w-5 h-5" />
+                  <>
+                    <Eraser className="w-5 h-5" />
+                    {/* Green dot indicator when cached */}
+                    {isModelCached && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-gray-800"></span>
+                    )}
+                  </>
                 )}
+                {/* Tooltip on hover */}
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                  {isModelCached
+                    ? "AI Ready - Instant Processing"
+                    : "First use downloads AI model"}
+                </span>
               </button>
             </div>
 
@@ -1755,7 +2452,26 @@ const YPivotQATemplatesImageEditor = ({
               </button>
             </div>
 
-            <div className="flex gap-1">
+            <div className="flex gap-1 items-center">
+              {/* ✅ ADJUST BUTTON */}
+              <button
+                onClick={handleAdjustClick}
+                disabled={!imgSrc}
+                className={`p-2 rounded-lg transition-all relative ${
+                  showAdjustPanel
+                    ? "bg-cyan-600 text-white"
+                    : "text-cyan-400 hover:bg-cyan-900/30 hover:text-cyan-300"
+                } disabled:opacity-30 disabled:cursor-not-allowed`}
+                title="Adjust Image"
+              >
+                <SlidersHorizontal className="w-5 h-5" />
+                {Object.values(adjustmentValues).some((v) => v !== 0) &&
+                  !showAdjustPanel && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-gray-800" />
+                  )}
+              </button>
+
+              {/* Settings Button */}
               <button
                 onClick={() => setShowSettings(!showSettings)}
                 className={`p-2 rounded-lg transition-all ${
@@ -1767,6 +2483,8 @@ const YPivotQATemplatesImageEditor = ({
               >
                 <Settings className="w-5 h-5" />
               </button>
+
+              {/* Undo Button */}
               <button
                 onClick={undoLast}
                 disabled={history.length === 0}
@@ -1775,6 +2493,8 @@ const YPivotQATemplatesImageEditor = ({
               >
                 <Undo2 className="w-5 h-5" />
               </button>
+
+              {/* Clear All Button */}
               <button
                 onClick={clearAll}
                 disabled={history.length === 0}

@@ -3,7 +3,7 @@ import {
   Shield,
   Sparkles,
   User,
-  BarChart3, 
+  BarChart3,
   Upload,
   Printer,
 } from "lucide-react";
@@ -32,7 +32,7 @@ const P88Legacy = () => {
         id: "upload_data",
         label: "Upload P88 Data",
         icon: <Upload size={20} />,
-        component: <UploadP88Data onUploadSuccess={handleDataUploadSuccess} />, 
+        component: <UploadP88Data onUploadSuccess={handleDataUploadSuccess} />,
         description: "Upload the P88 Data"
       },
       {
@@ -75,7 +75,6 @@ const P88Legacy = () => {
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
         <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
-          
           {/* MOBILE/TABLET LAYOUT (< lg) */}
           <div className="lg:hidden space-y-3">
             {/* Top Row: Title + User */}
@@ -87,7 +86,7 @@ const P88Legacy = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
-                      P88 Legacy 
+                      P88 Legacy
                     </h1>
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
                       <Sparkles size={10} className="text-yellow-300" />
@@ -289,9 +288,7 @@ const P88Legacy = () => {
 
       {/* Main Content Area */}
       <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
-        <div className="animate-fadeIn">
-          {activeComponent}
-        </div>
+        <div className="animate-fadeIn">{activeComponent}</div>
       </div>
 
       {/* Global Styles */}
