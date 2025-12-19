@@ -191,22 +191,20 @@ function Home() {
             description: "After Ironing Report",
              version: '0.1',
           },
-           {
-            path: "/measurement",
-            roles: ["QC Washing", "QA"],
-            image: "assets/Home/measurement.png",
-            title: t("home.Measurement"),
-            description: "All Style measurements",
-             version: '0.1',
-          },
-          {
-            path: "/upload-beforewash-specs",
-            roles: ["Washing Clerk"],
-            image: "assets/Home/uploadspecs.png",
-            title: t("home.upload_beforewash_specs"),
-            description: "Upload Beforewash Specs",
-             version: '0.1',
-          },
+          // {
+          //   path: "/measurement",
+          //   roles: ["QC Washing", "QA"],
+          //   image: "assets/Home/measurement.png",
+          //   title: t("home.Measurement"),
+          //   description: "All Style measurements"
+          // },
+          // {
+          //   path: "/upload-beforewash-specs",
+          //   roles: ["Washing Clerk"],
+          //   image: "assets/Home/uploadspecs.png",
+          //   title: t("home.upload_beforewash_specs"),
+          //   description: "Upload Beforewash Specs"
+          // },
           {
             path: "/select-dt-specs",
             roles: ["Washing Clerk", "QA Clerk"],
@@ -223,14 +221,13 @@ function Home() {
             description: "QC After Wash Measurements",
              version: '0.1',
           },
-          {
-            path: "/anf-washing-ver2",
-            roles: ["ANF QA"],
-            image: "assets/Home/anf-washing-ver2.png",
-            title: t("home.anf_washing_version2"),
-            description: "QC AW Measurements - Version 2",
-             version: '0.1',
-          },
+          // {
+          //   path: "/anf-washing-ver2",
+          //   roles: ["ANF QA"],
+          //   image: "assets/Home/anf-washing-ver2.png",
+          //   title: t("home.anf_washing_version2"),
+          //   description: "QC AW Measurements - Version 2"
+          // },
           {
             path: "/supplier-issues",
             roles: ["Supplier QC"],
@@ -290,7 +287,7 @@ function Home() {
           {
             path: "/qa-sections",
             //pageId: "qa-sections",
-            roles: ["Admin", "QA"],
+            roles: ["Fincheck Config"],
             image: "assets/Home/FinCheck.png",
             title: t("home.qa_sections"),
             description: "Fin Check Configuration"
@@ -298,7 +295,7 @@ function Home() {
           {
             path: "/qa-measurements",
             //pageId: "qa-measurements",
-            roles: ["Admin", "QA", "QA Clerk", "Washing Clerk"],
+            roles: ["Fincheck Measurement"],
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
             description: "Fin Check Measurements"
@@ -306,6 +303,7 @@ function Home() {
           {
             path: "/qa-templates",
             //pageId: "qa-templates",
+            roles: ["Fincheck Templates"],
             image: "assets/Home/qatemplates.png",
             title: t("home.qa_templates"),
             description: "QA Inspection Templates",
@@ -314,6 +312,7 @@ function Home() {
           {
             path: "/fincheck-inspection",
             //pageId: "y-pivot-inspection",
+            roles: ["Fincheck Inspections"],
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),
             description: "Pivot Y Inspections",
@@ -322,6 +321,7 @@ function Home() {
           {
             path: "/P88Legacy",
             //pageId: "y-pivot-inspection",
+            roles: ["P88"],
             image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
             description: "P88 Legacy Data",
@@ -391,14 +391,13 @@ function Home() {
             description: "Create Exam & Preview",
              version: '0',
           },
-          {
-            path: "/qa-yorksys",
-            roles: ["QA Clerk"],
-            image: "assets/Home/upload-orders.png",
-            title: "Upload Orders",
-            description: "Order data from York-sys",
-             version: '0.1',
-          },
+          // {
+          //   path: "/qa-yorksys",
+          //   roles: ["QA Clerk"],
+          //   image: "assets/Home/upload-orders.png",
+          //   title: "Upload Orders",
+          //   description: "Order data from York-sys"
+          // },
           {
             path: "/packing-list",
             roles: ["QA Clerk"],
