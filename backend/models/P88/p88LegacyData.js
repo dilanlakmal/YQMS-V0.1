@@ -96,8 +96,17 @@ const InspectionSchema = new mongoose.Schema({
     defects: [DefectSchema],
 
     // --- Duplicate Prevention ---
-    uploadBatch: { type: String }, // Track which upload batch this belongs to
-
+    uploadBatch: { type: String }, 
+      // Add these new fields
+    downloadStatus: {
+        type: String,
+        enum: ['Pending', 'In Progress', 'Downloaded', 'Failed'],
+        default: 'Pending'
+    },
+    downloadedAt: {
+        type: Date,
+        default: null
+    },
 }, {
     timestamps: true,
     collection: 'p88LegacyData'

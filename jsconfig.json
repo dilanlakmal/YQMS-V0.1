@@ -5,6 +5,6 @@
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src"]
+  "include": ["src", "backend/routes/PivotY/P88Data/downloadP88ReportRoutes.js"]
 }
 

@@ -245,7 +245,7 @@ import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspe
 ------------------------------ */
 import p88Upload from './routes/PivotY/P88Data/uploadP88DataRoutes.js';
 import p88Summarydata from './routes/PivotY/P88Data/summaryP88DataRoutes.js';
-
+import printReport from './routes/PivotY/P88Data/downloadP88ReportRoutes.js';
 
 /* -----------------------------
   After Ironing Import
@@ -545,6 +545,7 @@ app.use(FincheckInspection);
 ------------------------------ */
 app.use(p88Upload);
 app.use(p88Summarydata);
+app.use(printReport);
 /* -----------------------------
 AI Routes
 ------------------------------ */
@@ -555,6 +556,11 @@ app.use(translator);
 After Ironing Routes
 ------------------------------ */
 app.use(afterIroning);
+
+/* ------------------------------
+  Humidity Inspection Report
+------------------------------ */
+app.use(FiberNameRoute);
 
 /* -----------------------------
   YDT Imports

@@ -5,10 +5,12 @@ import {
   User,
   BarChart3, 
   Upload,
+  Printer,
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import UploadP88Data from "../components/inspection/PivotY/P88Legacy/uploadP88Data";
 import SummaryP88Data from "../components/inspection/PivotY/P88Legacy/summaryP88DataTable";
+import PrintP88Report from "../components/inspection/PivotY/P88Legacy/printP88Report";
 
 const P88Legacy = () => {
   const { user } = useAuth();
@@ -37,9 +39,16 @@ const P88Legacy = () => {
         id: "summary_date",
         label: "Summary P88 Data",
         icon: <BarChart3 size={20} />,
-        // Remove dataVersion prop to prevent refresh triggers
         component: <SummaryP88Data />,
         description: "View summary data"
+      },
+      {
+        id: "print_original_report",
+        label: "Print Report",
+        icon: <Printer size={20} />,
+        // Remove dataVersion prop to prevent refresh triggers
+        component: <PrintP88Report/>,
+        description: "Print Report"
       },
     ],
     [handleDataUploadSuccess] // Add dependency to prevent unnecessary re-renders
