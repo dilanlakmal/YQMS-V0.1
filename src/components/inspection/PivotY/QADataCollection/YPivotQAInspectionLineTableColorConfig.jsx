@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
+import { createPortal } from "react-dom";
 import { API_BASE_URL } from "../../../../../config";
 import EmpQRCodeScanner from "../../qc_roving/EmpQRCodeScanner";
 
@@ -34,6 +35,7 @@ const SearchableSingleSelect = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 }); // Store position
   const wrapperRef = useRef(null);
 
   const filteredOptions = options.filter((opt) =>
@@ -41,25 +43,56 @@ const SearchableSingleSelect = ({
   );
   const selectedLabel = options.find((o) => o.value === selectedValue)?.label;
 
+  // Calculate position when opening
+  useEffect(() => {
+    if (isOpen && wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY + 4, // 4px gap
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [isOpen]);
+
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Logic to close if clicking outside wrapper
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
+        // We also need to check if the click was inside the PORTAL content.
+        // Since the portal is in document.body, we can just rely on state toggle logic usually,
         setIsOpen(false);
       }
     };
+
+    // Listeners to close dropdown on interaction
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    window.addEventListener("scroll", () => setIsOpen(false), true);
+    window.addEventListener("resize", () => setIsOpen(false));
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", () => setIsOpen(false), true);
+      window.removeEventListener("resize", () => setIsOpen(false));
+    };
   }, []);
 
   if (disabled)
     return (
-      <div className="opacity-50 pointer-events-none p-2 bg-gray-100 rounded text-sm">
-        N/A
+      <div>
+        {label && (
+          <label className="block text-xs font-bold text-gray-500 mb-1">
+            {label}
+          </label>
+        )}
+        <div className="opacity-50 pointer-events-none px-3 py-2 bg-gray-100 rounded text-sm border border-gray-200">
+          N/A
+        </div>
       </div>
     );
 
   return (
-    <div className="relative" ref={wrapperRef}>
+    <div className="relative w-full" ref={wrapperRef}>
       {label && (
         <label className="block text-xs font-bold text-gray-500 mb-1">
           {label}
@@ -70,58 +103,75 @@ const SearchableSingleSelect = ({
         onClick={() => setIsOpen(!isOpen)}
       >
         <span
-          className={
+          className={`truncate mr-2 ${
             selectedValue
               ? "text-gray-800 dark:text-gray-200 font-medium"
               : "text-gray-400"
-          }
+          }`}
         >
           {selectedLabel || placeholder}
         </span>
         <ChevronDown
-          className={`w-4 h-4 text-gray-400 transition-transform ${
+          className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
             isOpen ? "rotate-180" : ""
           }`}
         />
       </div>
 
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-          <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-            <input
-              type="text"
-              className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="Filter options..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-            />
-          </div>
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((opt) => (
-              <div
-                key={opt.value}
-                className={`px-3 py-2 text-sm cursor-pointer ${
-                  opt.value === selectedValue
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 font-bold"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-                onClick={() => {
-                  onSelectionChange(opt.value);
-                  setIsOpen(false);
-                  setSearchTerm("");
-                }}
-              >
-                {opt.label}
-              </div>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-xs text-gray-500 text-center">
-              No matches found
+      {/* PORTAL RENDERING */}
+      {isOpen &&
+        createPortal(
+          <div
+            className="fixed z-[9999] bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl flex flex-col"
+            style={{
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              maxHeight: "250px"
+            }}
+            // Stop propagation so clicking inside doesn't close immediately via window listener
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="p-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg sticky top-0 z-10">
+              <input
+                type="text"
+                className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
+                placeholder="Filter options..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                autoFocus
+                onMouseDown={(e) => e.stopPropagation()}
+              />
             </div>
-          )}
-        </div>
-      )}
+            <div className="overflow-y-auto flex-1 p-1">
+              {filteredOptions.length > 0 ? (
+                filteredOptions.map((opt) => (
+                  <div
+                    key={opt.value}
+                    className={`px-3 py-2 text-sm cursor-pointer rounded-md ${
+                      opt.value === selectedValue
+                        ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 font-bold"
+                        : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                    }`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectionChange(opt.value);
+                      setIsOpen(false);
+                      setSearchTerm("");
+                    }}
+                  >
+                    {opt.label}
+                  </div>
+                ))
+              ) : (
+                <div className="px-3 py-2 text-xs text-gray-500 text-center">
+                  No matches found
+                </div>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 };
@@ -134,6 +184,7 @@ const QCUserSearch = ({ onSelect }) => {
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 }); // NEW: Store position
   const wrapperRef = useRef(null);
 
   useEffect(() => {
@@ -160,14 +211,37 @@ const QCUserSearch = ({ onSelect }) => {
     return () => clearTimeout(delayDebounceFn);
   }, [term]);
 
+  // Calculate position when dropdown opens
+  useEffect(() => {
+    if (showDropdown && wrapperRef.current) {
+      const rect = wrapperRef.current.getBoundingClientRect();
+      setCoords({
+        top: rect.bottom + window.scrollY + 5, // Add a little gap
+        left: rect.left + window.scrollX,
+        width: rect.width
+      });
+    }
+  }, [showDropdown, results]); // Recalculate if results change
+
   useEffect(() => {
     const handleClickOutside = (event) => {
+      // Logic slightly updated to handle Portal clicks if necessary,
+      // but usually clicking outside the wrapper is enough
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
         setShowDropdown(false);
       }
     };
+    // Use 'mousedown' or 'click'
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    // Handle window resize/scroll to close dropdown to prevent detachment
+    window.addEventListener("scroll", () => setShowDropdown(false), true);
+    window.addEventListener("resize", () => setShowDropdown(false));
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      window.removeEventListener("scroll", () => setShowDropdown(false), true);
+      window.removeEventListener("resize", () => setShowDropdown(false));
+    };
   }, []);
 
   const handleSelection = (user) => {
@@ -192,37 +266,49 @@ const QCUserSearch = ({ onSelect }) => {
         )}
       </div>
 
-      {showDropdown && results.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
-          {results.map((user) => (
-            <div
-              key={user.emp_id}
-              className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
-              onClick={() => handleSelection(user)}
-            >
-              <div className="flex items-center gap-2">
-                {user.face_photo ? (
-                  <img
-                    src={user.face_photo}
-                    alt="face"
-                    className="w-6 h-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                    {user.eng_name ? user.eng_name.charAt(0) : "U"}
+      {/* Render Dropdown using Portal */}
+      {showDropdown &&
+        results.length > 0 &&
+        createPortal(
+          <div
+            className="fixed bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl overflow-y-auto z-[9999]"
+            style={{
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              maxHeight: "12rem" // max-h-48 equivalent
+            }}
+          >
+            {results.map((user) => (
+              <div
+                key={user.emp_id}
+                className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
+                onClick={() => handleSelection(user)}
+              >
+                <div className="flex items-center gap-2">
+                  {user.face_photo ? (
+                    <img
+                      src={user.face_photo}
+                      alt="face"
+                      className="w-6 h-6 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
+                      {user.eng_name ? user.eng_name.charAt(0) : "U"}
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
+                      {user.eng_name}
+                    </p>
+                    <p className="text-[10px] text-gray-500">{user.emp_id}</p>
                   </div>
-                )}
-                <div>
-                  <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
-                    {user.eng_name}
-                  </p>
-                  <p className="text-[10px] text-gray-500">{user.emp_id}</p>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>,
+          document.body // Target container
+        )}
     </div>
   );
 };
@@ -280,7 +366,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
           promises.push(Promise.resolve(null));
         }
 
-        // 3. Handle COLORS fetching logic... (Keep existing logic)
+        // 3. Handle COLORS fetching logic
         if (
           selectedTemplate?.Colors === "Yes" &&
           orderData?.selectedOrders?.length
@@ -412,7 +498,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     onUpdate({ lineTableConfig: updated });
   };
 
-  // --- NEW: Add All Colors Handler ---
+  // --- Add All Colors Handler ---
   // Only executed if button is clicked
   const handleAddAllColors = () => {
     if (orderColors.length === 0) {
