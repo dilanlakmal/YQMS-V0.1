@@ -29,7 +29,9 @@ import {
 import {
   useBackgroundRemoval,
   BackgroundRemovalModal,
-  BackgroundColorPicker
+  BackgroundColorPicker,
+  ModelStatusIndicator,
+  initializeCacheStatus
 } from "./YPivotQATemplatesImageRemoveBackground";
 
 const MAX_IMAGES = 7;
@@ -135,6 +137,12 @@ const YPivotQATemplatesImageEditor = ({
   const [showBgColorPicker, setShowBgColorPicker] = useState(false);
   const [bgRemovalColor, setBgRemovalColor] = useState("#FFFFFF");
 
+  // 2. ADD useEffect TO CHECK CACHE ON MOUNT (add after other useEffects)
+  useEffect(() => {
+    // Check cache status early so we know if models are ready
+    initializeCacheStatus();
+  }, []);
+
   // Use the background removal hook
   const {
     removeImageBackground,
@@ -142,7 +150,10 @@ const YPivotQATemplatesImageEditor = ({
     progress: bgRemovalProgress,
     progressMessage: bgRemovalMessage,
     error: bgRemovalError,
-    resetState: resetBgRemovalState
+    resetState: resetBgRemovalState,
+    cancelProcessing: cancelBgRemoval, // NEW
+    isCached: isModelCached, // NEW - cache status
+    isModelReady // NEW - model ready status
   } = useBackgroundRemoval();
 
   // Generate unique ID
@@ -1462,9 +1473,15 @@ const YPivotQATemplatesImageEditor = ({
     }
   };
 
+  // 4. UPDATE handleBgRemovalCancel
   const handleBgRemovalCancel = () => {
+    cancelBgRemoval(); // Use the new cancel function
     resetBgRemovalState();
   };
+
+  // const handleBgRemovalCancel = () => {
+  //   resetBgRemovalState();
+  // };
 
   const handleBgRemovalRetry = () => {
     resetBgRemovalState();
@@ -1487,11 +1504,15 @@ const YPivotQATemplatesImageEditor = ({
             <h2 className="text-xs sm:text-sm font-bold text-white">
               Image Editor Pro
             </h2>
-            <p className="text-[10px] text-indigo-100 hidden sm:block">
-              {images.length > 0
-                ? `${images.length}/${MAX_IMAGES} images`
-                : "Professional QA Annotation Tool"}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] text-indigo-100 hidden sm:block">
+                {images.length > 0
+                  ? `${images.length}/${MAX_IMAGES} images`
+                  : "Professional QA Annotation Tool"}
+              </p>
+              {/* NEW: Model status indicator */}
+              <ModelStatusIndicator className="hidden sm:flex" />
+            </div>
           </div>
         </div>
 
@@ -1860,6 +1881,7 @@ const YPivotQATemplatesImageEditor = ({
                   error={bgRemovalError}
                   onCancel={handleBgRemovalCancel}
                   onRetry={handleBgRemovalRetry}
+                  isCached={isModelCached}
                 />
 
                 {/* Background Color Picker Modal */}
@@ -1871,6 +1893,7 @@ const YPivotQATemplatesImageEditor = ({
                     handleRemoveBackground(color);
                   }}
                   onCancel={() => setShowBgColorPicker(false)}
+                  isCached={isModelCached}
                 />
               </>
             )}
@@ -2019,18 +2042,36 @@ const YPivotQATemplatesImageEditor = ({
               <button
                 onClick={() => setShowBgColorPicker(true)}
                 disabled={!imgSrc || isBgRemoving}
-                className={`p-2 rounded-lg transition-all relative ${
+                className={`p-2 rounded-lg transition-all relative group ${
                   isBgRemoving
                     ? "bg-emerald-600/20 text-emerald-400"
+                    : isModelCached
+                    ? "text-green-400 hover:bg-green-900/30 hover:text-green-300"
                     : "text-emerald-400 hover:bg-emerald-900/30 hover:text-emerald-300"
                 } disabled:opacity-30 disabled:cursor-not-allowed`}
-                title="Remove Background"
+                title={
+                  isModelCached
+                    ? "Remove Background (AI Ready)"
+                    : "Remove Background (Will download AI model)"
+                }
               >
                 {isBgRemoving ? (
                   <Loader className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Eraser className="w-5 h-5" />
+                  <>
+                    <Eraser className="w-5 h-5" />
+                    {/* Green dot indicator when cached */}
+                    {isModelCached && (
+                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-500 rounded-full border border-gray-800"></span>
+                    )}
+                  </>
                 )}
+                {/* Tooltip on hover */}
+                <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                  {isModelCached
+                    ? "AI Ready - Instant Processing"
+                    : "First use downloads AI model"}
+                </span>
               </button>
             </div>
 
