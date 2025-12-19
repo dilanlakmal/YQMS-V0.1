@@ -2,7 +2,7 @@ import { Ollama } from "ollama";
 import { getMoNumberTools, getMoNumber } from "../qc_assistance/QC.tools.js";
 
 const abortController = new AbortController();
-let toolIsCall = false;
+
 // Main handler for chat requests
 const handleChatWithOllama = async (req, res) => {
     const { model, messages, tool } = req.body;
@@ -21,18 +21,16 @@ const handleChatWithOllama = async (req, res) => {
                 }),
         });
 
-        let updatedMessages;
-        if (tool){
+        let updatedMessages = [...messages];
+        if (tool) {
             updatedMessages = await selectToolForMessages(messages, ollamaClient);
-        } else {
-            updatedMessages = [...messages];
         }
 
         const result = await ollamaClient.chat({
             model,
             messages: updatedMessages,
             stream: false,
-            tools: toolIsCall ? getMoNumberTools: null,
+            tools: tool ? getMoNumberTools : null,
         });
 
         res.status(200).json(result);
@@ -73,10 +71,8 @@ const getToolCallFromLLM = (llmResponse) => {
     if (llmResponse?.message?.tool_calls) {
         const toolCall = llmResponse.message.tool_calls[0]; // Use first tool call
         console.log("Tool call detected:", toolCall);
-        toolIsCall = true;
         return toolCall?.function;
     }
-    toolIsCall = false;
     return null;
 };
 
@@ -86,7 +82,7 @@ const selectToolForMessages = async (messages, ollamaClient) => {
 
     try {
         const response = await ollamaClient.chat({
-            model: "qwen3-vl:2b",
+            model: "qwen3-coder:30b",
             messages,
             stream: false,
             tools: getMoNumberTools,
