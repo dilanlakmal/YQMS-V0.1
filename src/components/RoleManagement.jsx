@@ -567,7 +567,11 @@ export default function RoleManagement() {
     "QC Washing",
     "QC1 Sub Con",
     "Measurement",
-    "Fin Check Measurements",
+    "Fincheck Config",
+    "Fincheck Measurement",
+    "Fincheck Templates",
+    "Fincheck Inspections",
+    "P88",
     "QC Ironing"
   ].sort();
 
