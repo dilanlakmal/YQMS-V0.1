@@ -256,26 +256,29 @@ const YPivotQAInspectionLineTableColorConfig = ({
       try {
         const promises = [];
 
+        // 1. Handle LINE fetching logic
         if (selectedTemplate?.Line === "Yes") {
           if (config?.isSubCon && config?.selectedSubConFactory) {
+            // Fetch from your specific sub-con management endpoint
             promises.push(
-              axios.get(
-                `${API_BASE_URL}/api/fincheck-inspection/subcon-factories`
-              )
+              axios.get(`${API_BASE_URL}/api/subcon-sewing-factories-manage`)
             );
           } else {
+            // Internal Lines
             promises.push(axios.get(`${API_BASE_URL}/api/qa-sections-lines`));
           }
         } else {
           promises.push(Promise.resolve(null));
         }
 
+        // 2. Handle TABLE fetching logic
         if (selectedTemplate?.Table === "Yes") {
           promises.push(axios.get(`${API_BASE_URL}/api/qa-sections-tables`));
         } else {
           promises.push(Promise.resolve(null));
         }
 
+        // 3. Handle COLORS fetching logic
         if (
           selectedTemplate?.Colors === "Yes" &&
           orderData?.selectedOrders?.length
@@ -291,17 +294,26 @@ const YPivotQAInspectionLineTableColorConfig = ({
 
         const [linesRes, tablesRes, colorsRes] = await Promise.all(promises);
 
+        // PROCESS LINE DATA
         if (linesRes) {
           if (config?.isSubCon) {
-            const factory = linesRes.data.data.find(
+            // LOGIC FOR SUBCON
+            const allFactories = linesRes.data || [];
+            const factory = allFactories.find(
               (f) => f._id === config.selectedSubConFactory
             );
-            setLines(
-              factory?.lineList?.map((l) => ({ value: l, label: l })) || []
-            );
+
+            if (factory && factory.lineList) {
+              // Map string array ["Line 1", "Line 2"] to Dropdown format
+              setLines(factory.lineList.map((l) => ({ value: l, label: l })));
+            } else {
+              setLines([]);
+            }
           } else {
+            // Internal Lines Logic
+            const internalData = linesRes.data.data || linesRes.data;
             setLines(
-              linesRes.data.data
+              internalData
                 .filter((l) => l.Active)
                 .map((l) => ({ value: l._id, label: l.LineNo }))
             );

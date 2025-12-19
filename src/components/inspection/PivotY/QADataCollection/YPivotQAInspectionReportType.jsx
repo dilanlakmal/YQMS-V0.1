@@ -527,14 +527,16 @@ const YPivotQAInspectionReportType = ({
     const fetchSubConFactories = async () => {
       setLoadingSubConFactories(true);
       try {
+        // Use the sub con sewing old management endpoint
         const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/subcon-factories`
+          `${API_BASE_URL}/api/subcon-sewing-factories-manage`
         );
-        if (res.data.success) {
-          setSubConFactories(res.data.data);
+
+        if (Array.isArray(res.data)) {
+          setSubConFactories(res.data);
         }
       } catch (err) {
-        console.error(err);
+        console.error("Error fetching subcon factories", err);
       } finally {
         setLoadingSubConFactories(false);
       }
@@ -706,7 +708,7 @@ const YPivotQAInspectionReportType = ({
 
   const subConFactoryOptions = useMemo(() => {
     return subConFactories.map((factory) => ({
-      value: factory._id,
+      value: factory._id, // This ID is what gets saved into config.selectedSubConFactory
       label: factory.factory_second_name
         ? `${factory.factory} (${factory.factory_second_name})`
         : factory.factory

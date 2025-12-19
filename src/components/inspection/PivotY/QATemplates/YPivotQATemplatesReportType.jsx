@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 import {
@@ -16,7 +16,8 @@ import {
   Camera,
   Box,
   ScanLine,
-  Ship
+  Ship,
+  GripVertical
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -32,6 +33,13 @@ const YPivotQATemplatesReportType = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Drag and Drop State
+  const [draggedItem, setDraggedItem] = useState(null);
+  const [dragOverItem, setDragOverItem] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [isReordering, setIsReordering] = useState(false);
+  const dragNode = useRef(null);
+
   // Form State
   const initialFormState = {
     _id: null,
@@ -42,7 +50,7 @@ const YPivotQATemplatesReportType = () => {
     Line: "Yes",
     Table: "Yes",
     Colors: "Yes",
-    ShippingStage: "Yes", // New Field
+    ShippingStage: "Yes",
     InspectedQtyMethod: "NA",
     isCarton: "No",
     isQCScan: "No",
@@ -78,6 +86,109 @@ const YPivotQATemplatesReportType = () => {
     fetchData();
   }, []);
 
+  // --- Drag and Drop Handlers ---
+  const handleDragStart = (e, index) => {
+    setDraggedItem(index);
+    setIsDragging(true);
+    dragNode.current = e.target;
+    dragNode.current.addEventListener("dragend", handleDragEnd);
+
+    // Make the drag image slightly transparent
+    setTimeout(() => {
+      if (dragNode.current) {
+        dragNode.current.style.opacity = "0.5";
+      }
+    }, 0);
+
+    // Set drag data
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/html", e.target.outerHTML);
+  };
+
+  const handleDragEnter = (e, index) => {
+    e.preventDefault();
+    if (index !== draggedItem) {
+      setDragOverItem(index);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+    setDraggedItem(null);
+    setDragOverItem(null);
+
+    if (dragNode.current) {
+      dragNode.current.style.opacity = "1";
+      dragNode.current.removeEventListener("dragend", handleDragEnd);
+      dragNode.current = null;
+    }
+  };
+
+  const handleDrop = async (e, dropIndex) => {
+    e.preventDefault();
+
+    if (draggedItem === null || draggedItem === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    // Create new array with reordered items
+    const newTemplates = [...templates];
+    const draggedItemContent = newTemplates[draggedItem];
+
+    // Remove dragged item
+    newTemplates.splice(draggedItem, 1);
+    // Insert at new position
+    newTemplates.splice(dropIndex, 0, draggedItemContent);
+
+    // Update local state immediately for smooth UX
+    const updatedTemplates = newTemplates.map((template, index) => ({
+      ...template,
+      no: index + 1
+    }));
+    setTemplates(updatedTemplates);
+
+    // Reset drag state
+    handleDragEnd();
+
+    // Save new order to database
+    await saveNewOrder(updatedTemplates);
+  };
+
+  const saveNewOrder = async (orderedTemplates) => {
+    setIsReordering(true);
+    try {
+      const orderedIds = orderedTemplates.map((t) => t._id);
+      await axios.put(`${API_BASE_URL}/api/qa-sections-templates-reorder`, {
+        orderedIds
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Reordered!",
+        text: "Template order updated successfully.",
+        timer: 1500,
+        showConfirmButton: false
+      });
+    } catch (error) {
+      console.error("Reorder error:", error);
+      Swal.fire("Error", "Failed to save new order. Refreshing data.", "error");
+      // Refresh data if save failed
+      fetchData();
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   // --- Handlers ---
   const handleAddNew = () => {
     setFormData(initialFormState);
@@ -95,7 +206,7 @@ const YPivotQATemplatesReportType = () => {
       Line: template.Line || "Yes",
       Table: template.Table || "Yes",
       Colors: template.Colors || "Yes",
-      ShippingStage: template.ShippingStage || "Yes", // Map new field
+      ShippingStage: template.ShippingStage || "Yes",
       InspectedQtyMethod: template.InspectedQtyMethod || "NA",
       isCarton: template.isCarton || "No",
       isQCScan: template.isQCScan || "No",
@@ -254,6 +365,24 @@ const YPivotQATemplatesReportType = () => {
   const headerClass =
     "px-2 py-3 text-center whitespace-normal break-words leading-tight";
 
+  // Get row class based on drag state
+  const getRowClass = (index) => {
+    let baseClass =
+      "bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-all duration-200";
+
+    if (isDragging) {
+      if (index === draggedItem) {
+        baseClass += " opacity-50 bg-indigo-50 dark:bg-indigo-900/20";
+      }
+      if (index === dragOverItem) {
+        baseClass +=
+          " border-t-2 border-indigo-500 dark:border-indigo-400 transform scale-[1.01]";
+      }
+    }
+
+    return baseClass;
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn pb-20">
       {/* Top Bar */}
@@ -263,15 +392,42 @@ const YPivotQATemplatesReportType = () => {
             Manage Report Templates
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Configure report structures and categories.
+            Configure report structures and categories.{" "}
+            <span className="text-indigo-600 dark:text-indigo-400">
+              Drag rows to reorder.
+            </span>
           </p>
         </div>
-        <button
-          onClick={handleAddNew}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-sm"
-        >
-          <Plus className="w-4 h-4" /> Add New Report
-        </button>
+        <div className="flex items-center gap-3">
+          {isReordering && (
+            <div className="flex items-center gap-2 text-sm text-indigo-600 dark:text-indigo-400">
+              <Loader className="w-4 h-4 animate-spin" />
+              Saving order...
+            </div>
+          )}
+          <button
+            onClick={handleAddNew}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-lg transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> Add New Report
+          </button>
+        </div>
+      </div>
+
+      {/* Drag Instruction Banner */}
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-900/20 dark:to-purple-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg p-3 flex items-center gap-3">
+        <div className="bg-indigo-100 dark:bg-indigo-900/40 p-2 rounded-lg">
+          <GripVertical className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+        </div>
+        <div>
+          <p className="text-sm font-medium text-indigo-800 dark:text-indigo-200">
+            Drag and Drop to Reorder
+          </p>
+          <p className="text-xs text-indigo-600 dark:text-indigo-400">
+            Use the grip handle or drag any row to change the template order.
+            Changes are saved automatically.
+          </p>
+        </div>
       </div>
 
       {/* Table */}
@@ -280,6 +436,9 @@ const YPivotQATemplatesReportType = () => {
           <table className="w-full text-sm text-left">
             <thead className="text-xs text-gray-500 uppercase bg-gray-50 dark:bg-gray-700/50 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700">
               <tr>
+                <th className="px-2 py-3 w-10 text-center">
+                  <GripVertical className="w-4 h-4 mx-auto text-gray-400" />
+                </th>
                 <th className={`${headerClass} w-10`}>No</th>
                 <th className="px-4 py-3 min-w-[150px] whitespace-normal break-words leading-tight">
                   Report Type
@@ -296,7 +455,6 @@ const YPivotQATemplatesReportType = () => {
                 <th className={headerClass}>Line</th>
                 <th className={headerClass}>Tab</th>
                 <th className={headerClass}>Col</th>
-                {/* New Stage Column */}
                 <th className={headerClass}>Stage</th>
                 <th className={headerClass}>Meth</th>
                 <th className={headerClass}>Qty</th>
@@ -310,24 +468,40 @@ const YPivotQATemplatesReportType = () => {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan="18" className="text-center py-10">
+                  <td colSpan="19" className="text-center py-10">
                     <Loader className="w-6 h-6 animate-spin mx-auto text-indigo-500" />
                   </td>
                 </tr>
               ) : templates.length === 0 ? (
                 <tr>
-                  <td colSpan="18" className="text-center py-10 text-gray-500">
+                  <td colSpan="19" className="text-center py-10 text-gray-500">
                     No templates found.
                   </td>
                 </tr>
               ) : (
-                templates.map((t) => (
+                templates.map((t, index) => (
                   <tr
                     key={t._id}
-                    className="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, index)}
+                    onDragEnter={(e) => handleDragEnter(e, index)}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={(e) => handleDrop(e, index)}
+                    className={`${getRowClass(
+                      index
+                    )} cursor-grab active:cursor-grabbing`}
                   >
-                    <td className="px-4 py-4 text-center font-mono text-gray-500 dark:text-gray-400">
-                      {t.no}
+                    {/* Drag Handle */}
+                    <td className="px-2 py-4 text-center">
+                      <div className="flex justify-center">
+                        <GripVertical className="w-5 h-5 text-gray-400 hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors cursor-grab active:cursor-grabbing" />
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 font-bold text-sm">
+                        {t.no}
+                      </span>
                     </td>
                     <td className="px-4 py-4 font-bold text-gray-800 dark:text-gray-100">
                       {t.ReportType}
@@ -354,7 +528,7 @@ const YPivotQATemplatesReportType = () => {
                         ))}
                       </div>
                     </td>
-                    {/* Photo Sections (Max 2 cards logic) */}
+                    {/* Photo Sections */}
                     <td className="px-4 py-4">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-1">
                         {t.SelectedPhotoSectionList &&
@@ -385,7 +559,6 @@ const YPivotQATemplatesReportType = () => {
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Colors || "Yes"} />
                     </td>
-                    {/* New Stage Column */}
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.ShippingStage || "Yes"} />
                     </td>
@@ -410,13 +583,19 @@ const YPivotQATemplatesReportType = () => {
                     <td className="px-4 py-4 text-right">
                       <div className="flex justify-end gap-2">
                         <button
-                          onClick={() => handleEdit(t)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEdit(t);
+                          }}
                           className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md dark:hover:bg-blue-900/30 transition-colors"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => handleDelete(t._id)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDelete(t._id);
+                          }}
                           className="p-1.5 text-red-600 hover:bg-red-50 rounded-md dark:hover:bg-red-900/30 transition-colors"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -481,13 +660,12 @@ const YPivotQATemplatesReportType = () => {
                     "Line",
                     "Table",
                     "Colors",
-                    "ShippingStage", // Added here for the loop
+                    "ShippingStage",
                     "QualityPlan",
                     "Conclusion"
                   ].map((field) => (
                     <div key={field}>
                       <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase flex items-center gap-1">
-                        {/* Add icon for ShippingStage specifically */}
                         {field === "ShippingStage" && (
                           <Ship className="w-3 h-3" />
                         )}
@@ -722,6 +900,36 @@ const YPivotQATemplatesReportType = () => {
           </div>
         </div>
       )}
+
+      {/* Custom Styles for Drag */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.3s ease-out;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background-color: rgba(156, 163, 175, 0.5);
+          border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background-color: rgba(156, 163, 175, 0.8);
+        }
+      `}</style>
     </div>
   );
 };
