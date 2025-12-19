@@ -534,6 +534,9 @@ const YPivotQAInspectionReportType = ({
 
         if (Array.isArray(res.data)) {
           setSubConFactories(res.data);
+        } else if (res.data && Array.isArray(res.data.data)) {
+          // Fallback if wrapped
+          setSubConFactories(res.data.data);
         }
       } catch (err) {
         console.error("Error fetching subcon factories", err);
@@ -543,6 +546,11 @@ const YPivotQAInspectionReportType = ({
     };
     fetchSubConFactories();
   }, []);
+
+  // --- MODIFICATION 2: RESET FACTORY IF TOGGLED OFF ---
+  useEffect(() => {
+    if (!isSubCon) setSelectedSubConFactory(null);
+  }, [isSubCon]);
 
   // Fetch AQL Config
   useEffect(() => {
@@ -785,7 +793,7 @@ const YPivotQAInspectionReportType = ({
         selectedOrders={selectedOrders}
         orderData={orderData}
         orderType={orderType}
-        onProductTypeUpdate={handleProductTypeUpdate} // <--- FIX 6: Pass callback
+        onProductTypeUpdate={handleProductTypeUpdate}
       />
 
       {/* Report Type Selection */}

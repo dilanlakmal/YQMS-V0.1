@@ -246,6 +246,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const [lines, setLines] = useState([]);
   const [tables, setTables] = useState([]);
   const [orderColors, setOrderColors] = useState([]);
+  const [subConQCs, setSubConQCs] = useState([]);
 
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [activeGroupIndex, setActiveGroupIndex] = useState(null);
@@ -256,18 +257,19 @@ const YPivotQAInspectionLineTableColorConfig = ({
       try {
         const promises = [];
 
-        // 1. Handle LINE fetching logic
-        if (selectedTemplate?.Line === "Yes") {
-          if (config?.isSubCon && config?.selectedSubConFactory) {
-            // Fetch from your specific sub-con management endpoint
-            promises.push(
-              axios.get(`${API_BASE_URL}/api/subcon-sewing-factories-manage`)
-            );
-          } else {
-            // Internal Lines
-            promises.push(axios.get(`${API_BASE_URL}/api/qa-sections-lines`));
-          }
+        // 1. Determine if we need to fetch SubCon Factories OR Internal Lines
+        // We fetch SubCon factories if isSubCon is true, regardless of Template.Line setting
+
+        if (config?.isSubCon) {
+          // Fetch Sub-Con Factories (Contains Lines AND QCs)
+          promises.push(
+            axios.get(`${API_BASE_URL}/api/subcon-sewing-factories-manage`)
+          );
+        } else if (selectedTemplate?.Line === "Yes") {
+          // Fetch Internal Lines only if not SubCon and Template requires Line
+          promises.push(axios.get(`${API_BASE_URL}/api/qa-sections-lines`));
         } else {
+          // No Lines needed
           promises.push(Promise.resolve(null));
         }
 
@@ -278,7 +280,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
           promises.push(Promise.resolve(null));
         }
 
-        // 3. Handle COLORS fetching logic
+        // 3. Handle COLORS fetching logic... (Keep existing logic)
         if (
           selectedTemplate?.Colors === "Yes" &&
           orderData?.selectedOrders?.length
@@ -294,29 +296,51 @@ const YPivotQAInspectionLineTableColorConfig = ({
 
         const [linesRes, tablesRes, colorsRes] = await Promise.all(promises);
 
-        // PROCESS LINE DATA
+        // PROCESS LINE / QC DATA
         if (linesRes) {
           if (config?.isSubCon) {
-            // LOGIC FOR SUBCON
-            const allFactories = linesRes.data || [];
+            // Extract Lines AND QCs from the selected factory
+            const allFactories = Array.isArray(linesRes.data)
+              ? linesRes.data
+              : linesRes.data.data || [];
+
             const factory = allFactories.find(
               (f) => f._id === config.selectedSubConFactory
             );
 
-            if (factory && factory.lineList) {
-              // Map string array ["Line 1", "Line 2"] to Dropdown format
-              setLines(factory.lineList.map((l) => ({ value: l, label: l })));
+            if (factory) {
+              // 1. SET LINES
+              setLines(
+                (factory.lineList || []).map((l) => ({ value: l, label: l }))
+              );
+
+              // 2. SET QCS
+              // Ensure we handle potential missing qcList property safely
+              setSubConQCs(
+                (factory.qcList || []).map((qc) => ({
+                  value: qc.qcID,
+                  label: `${qc.qcID} - ${qc.qcName}`,
+                  originalData: {
+                    emp_id: qc.qcID,
+                    eng_name: qc.qcName
+                  }
+                }))
+              );
             } else {
               setLines([]);
+              setSubConQCs([]);
             }
           } else {
-            // Internal Lines Logic
+            // HANDLE INTERNAL RESPONSE
             const internalData = linesRes.data.data || linesRes.data;
-            setLines(
-              internalData
-                .filter((l) => l.Active)
-                .map((l) => ({ value: l._id, label: l.LineNo }))
-            );
+            if (Array.isArray(internalData)) {
+              setLines(
+                internalData
+                  .filter((l) => l.Active)
+                  .map((l) => ({ value: l._id, label: l.LineNo }))
+              );
+            }
+            setSubConQCs([]);
           }
         }
 
@@ -606,8 +630,21 @@ const YPivotQAInspectionLineTableColorConfig = ({
     setIsScannerOpen(true);
   };
 
+  // --- SCANNER LOGIC ---
   const handleScanSuccess = (userData) => {
-    if (activeGroupIndex !== null) handleQCSelect(userData, activeGroupIndex);
+    if (activeGroupIndex !== null) {
+      if (config?.isSubCon) {
+        const scannedId = userData.emp_id || userData;
+        const foundQC = subConQCs.find((q) => q.value === scannedId);
+        if (foundQC) {
+          handleQCSelect(foundQC.originalData, activeGroupIndex);
+        } else {
+          Swal.fire("Error", "QC ID not found in this factory list", "error");
+        }
+      } else {
+        handleQCSelect(userData, activeGroupIndex);
+      }
+    }
     setIsScannerOpen(false);
     setActiveGroupIndex(null);
   };
@@ -615,16 +652,24 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const handleActivateGroup = (group, assignment = null) => {
     if (selectedTemplate.Line === "Yes" && !group.line)
       return Swal.fire("Missing Info", "Please select a Line.", "warning");
-    if (selectedTemplate.Table === "Yes" && !group.table)
+
+    // --- Update Validation ---
+    // Only require Table if template says Yes AND it is NOT SubCon
+    if (selectedTemplate.Table === "Yes" && !config?.isSubCon && !group.table)
       return Swal.fire("Missing Info", "Please select a Table.", "warning");
+
     if (selectedTemplate.Colors === "Yes" && !group.color)
       return Swal.fire("Missing Info", "Please select a Color.", "warning");
 
     // Resolve human readable names
     const lineName =
       lines.find((l) => l.value === group.line)?.label || group.line || "";
-    const tableName =
-      tables.find((t) => t.value === group.table)?.label || group.table || "";
+
+    // ---Force "N/A" for Table Name if SubCon ---
+    const tableName = config?.isSubCon
+      ? "N/A"
+      : tables.find((t) => t.value === group.table)?.label || group.table || "";
+
     const colorName =
       orderColors.find((c) => c.value === group.color)?.label ||
       group.color ||
@@ -633,7 +678,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     const context = {
       ...group,
       lineName,
-      tableName,
+      tableName, // This will now be "N/A" for SubCon
       colorName,
       activeAssignmentId: assignment?.id,
       activeQC: assignment?.qcUser
@@ -755,17 +800,30 @@ const YPivotQAInspectionLineTableColorConfig = ({
                   )}
                   {showTable && (
                     <div className="w-full sm:w-32">
-                      <SearchableSingleSelect
-                        label="Table No"
-                        options={tables}
-                        selectedValue={group.table}
-                        onSelectionChange={(val) =>
-                          handleUpdateGroup(gIdx, "table", val)
-                        }
-                        placeholder="Select Table"
-                      />
+                      {/* --- MODIFICATION 3: Show "N/A" Box for SubCon --- */}
+                      {config?.isSubCon ? (
+                        <div className="opacity-75 cursor-not-allowed">
+                          <label className="block text-xs font-bold text-gray-500 mb-1">
+                            Table No
+                          </label>
+                          <div className="w-full px-3 py-2 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-500 dark:text-gray-400 font-bold text-center">
+                            N/A
+                          </div>
+                        </div>
+                      ) : (
+                        <SearchableSingleSelect
+                          label="Table No"
+                          options={tables}
+                          selectedValue={group.table}
+                          onSelectionChange={(val) =>
+                            handleUpdateGroup(gIdx, "table", val)
+                          }
+                          placeholder="Select Table"
+                        />
+                      )}
                     </div>
                   )}
+
                   {showColors && (
                     <div className="w-full sm:w-48">
                       <SearchableSingleSelect
@@ -836,19 +894,6 @@ const YPivotQAInspectionLineTableColorConfig = ({
                                     {assign.qcUser.emp_id}
                                   </p>
                                 </div>
-                                <button
-                                  onClick={() =>
-                                    handleUpdateAssignment(
-                                      gIdx,
-                                      aIdx,
-                                      "qcUser",
-                                      null
-                                    )
-                                  }
-                                  className="ml-auto text-gray-300 hover:text-red-500"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
                               </div>
                             ) : (
                               <div className="flex gap-2 items-center">
@@ -862,11 +907,37 @@ const YPivotQAInspectionLineTableColorConfig = ({
                                   </span>
                                 </button>
                                 <div className="flex-1">
-                                  <QCUserSearch
-                                    onSelect={(user) =>
-                                      handleQCSelect(user, gIdx)
-                                    }
-                                  />
+                                  {/* --- MODIFIED INPUT SECTION --- */}
+                                  {config?.isSubCon ? (
+                                    subConQCs.length > 0 ? (
+                                      <SearchableSingleSelect
+                                        placeholder="Select Factory QC"
+                                        options={subConQCs}
+                                        selectedValue={null}
+                                        onSelectionChange={(val) => {
+                                          const selected = subConQCs.find(
+                                            (q) => q.value === val
+                                          );
+                                          if (selected)
+                                            handleQCSelect(
+                                              selected.originalData,
+                                              gIdx
+                                            );
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="px-3 py-2 bg-gray-100 text-gray-400 text-xs rounded border border-gray-200">
+                                        N/A (No QC List)
+                                      </div>
+                                    )
+                                  ) : (
+                                    // INTERNAL: Use Search API
+                                    <QCUserSearch
+                                      onSelect={(user) =>
+                                        handleQCSelect(user, gIdx)
+                                      }
+                                    />
+                                  )}
                                 </div>
                               </div>
                             )}
