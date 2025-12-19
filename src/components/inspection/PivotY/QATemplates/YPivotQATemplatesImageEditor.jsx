@@ -849,15 +849,36 @@ const YPivotQATemplatesImageEditor = ({
 
   // Just make sure it uses the original dimensions
   useEffect(() => {
-    if (context && imgSrc && canvasSize.width > 0) {
+    if (context && imgSrc && canvasRef.current) {
       const img = new Image();
       img.onload = () => {
-        // Uses full resolution width/height
-        redrawCanvas(context, img, canvasSize.width, canvasSize.height);
+        // ✅ Check if canvas dimensions match the image dimensions
+        // If they don't match, it means the main initialization effect hasn't finished resizing yet.
+        // We abort to prevent the "tiled/glitched" render.
+        const canvas = canvasRef.current;
+        if (
+          Math.abs(canvas.width - img.width) > 1 ||
+          Math.abs(canvas.height - img.height) > 1
+        ) {
+          return;
+        }
+
+        // Uses full resolution width/height from the image itself
+        redrawCanvas(context, img, img.width, img.height);
       };
       img.src = imgSrc;
     }
-  }, [history, currentAction, zoom, pan, selectedElementId, hoveredElementId]);
+    // ✅ Added imgSrc and canvasSize to dependency array to ensure freshness
+  }, [
+    history,
+    currentAction,
+    zoom,
+    pan,
+    selectedElementId,
+    hoveredElementId,
+    imgSrc,
+    canvasSize
+  ]);
 
   const redrawCanvas = (ctx, img, width, height) => {
     if (!ctx) return;
