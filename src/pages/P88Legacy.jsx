@@ -3,12 +3,14 @@ import {
   Shield,
   Sparkles,
   User,
-  BarChart3, 
+  BarChart3,
   Upload,
+  Printer
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 import UploadP88Data from "../components/inspection/PivotY/P88Legacy/uploadP88Data";
 import SummaryP88Data from "../components/inspection/PivotY/P88Legacy/summaryP88DataTable";
+import PrintP88Report from "../components/inspection/PivotY/P88Legacy/printP88Report";
 
 const P88Legacy = () => {
   const { user } = useAuth();
@@ -30,17 +32,24 @@ const P88Legacy = () => {
         id: "upload_data",
         label: "Upload P88 Data",
         icon: <Upload size={20} />,
-        component: <UploadP88Data onUploadSuccess={handleDataUploadSuccess} />, 
+        component: <UploadP88Data onUploadSuccess={handleDataUploadSuccess} />,
         description: "Upload the P88 Data"
       },
       {
         id: "summary_date",
         label: "Summary P88 Data",
         icon: <BarChart3 size={20} />,
-        // Remove dataVersion prop to prevent refresh triggers
         component: <SummaryP88Data />,
         description: "View summary data"
       },
+      {
+        id: "print_original_report",
+        label: "Print Report",
+        icon: <Printer size={20} />,
+        // Remove dataVersion prop to prevent refresh triggers
+        component: <PrintP88Report />,
+        description: "Print Report"
+      }
     ],
     [handleDataUploadSuccess] // Add dependency to prevent unnecessary re-renders
   );
@@ -66,7 +75,6 @@ const P88Legacy = () => {
         <div className="absolute inset-0 bg-black/10"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
         <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
-          
           {/* MOBILE/TABLET LAYOUT (< lg) */}
           <div className="lg:hidden space-y-3">
             {/* Top Row: Title + User */}
@@ -78,7 +86,7 @@ const P88Legacy = () => {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
-                      P88 Legacy 
+                      P88 Legacy
                     </h1>
                     <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
                       <Sparkles size={10} className="text-yellow-300" />
@@ -87,9 +95,16 @@ const P88Legacy = () => {
                       </span>
                     </div>
                   </div>
-                  <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
-                    P88 Legacy Data
-                  </p>
+                  {/* Active Tab Indicator - Inline with title */}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                    </div>
+                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                      {activeTabData?.label} • Active
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -149,7 +164,7 @@ const P88Legacy = () => {
             </div>
 
             {/* Active Status Indicator */}
-            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+            {/* <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
               <div className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
@@ -162,7 +177,7 @@ const P88Legacy = () => {
                   Active Module
                 </p>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* DESKTOP LAYOUT (>= lg) */}
@@ -273,9 +288,7 @@ const P88Legacy = () => {
 
       {/* Main Content Area */}
       <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
-        <div className="animate-fadeIn">
-          {activeComponent}
-        </div>
+        <div className="animate-fadeIn">{activeComponent}</div>
       </div>
 
       {/* Global Styles */}

@@ -1,22 +1,23 @@
 import mongoose from "mongoose";
 
 const DefectSchema = new mongoose.Schema({
-    defectName: { type: String, trim: true },  
-    count: { type: Number, default: 0 }        
+  defectName: { type: String, trim: true },
+  count: { type: Number, default: 0 }
 });
 
-const InspectionSchema = new mongoose.Schema({
+const InspectionSchema = new mongoose.Schema(
+  {
     // --- Identification ---
     groupNumber: {
-        type: String,
-        required: false
+      type: String,
+      required: false
     },
-    inspectionNumbers: [{ type: String }],  
-    inspectionNumbersKey: { 
-        type: String, 
-        unique: true, 
-        sparse: true,
-        index: true 
+    inspectionNumbers: [{ type: String }],
+    inspectionNumbersKey: {
+      type: String,
+      unique: true,
+      sparse: true,
+      index: true
     },
     project: { type: String },
 
@@ -28,15 +29,15 @@ const InspectionSchema = new mongoose.Schema({
     inspector: { type: String },
 
     // --- Product Details ---
-    poNumbers: [{ type: String }],          
-    skuNumbers: [{ type: String }],        
+    poNumbers: [{ type: String }],
+    skuNumbers: [{ type: String }],
     skuName: { type: String },
     style: { type: String },
-    colors: [{ type: String }],            
-    sizes: [{ type: String }],          
+    colors: [{ type: String }],
+    sizes: [{ type: String }],
     material: { type: String },
     description: { type: String },
-   
+
     // --- Logistics & Location ---
     origin: { type: String },
     portOfLoading: { type: String },
@@ -58,25 +59,28 @@ const InspectionSchema = new mongoose.Schema({
 
     // --- Dates ---
     orderDate: { type: Date },
-    etd: [{ type: Date }],  
-    eta: [{ type: Date }], 
+    etd: [{ type: Date }],
+    eta: [{ type: Date }],
     scheduledInspectionDate: { type: Date },
     submittedInspectionDate: { type: Date },
     decisionDate: { type: Date },
     lastModifiedDate: { type: Date },
 
     // --- Inspection Results ---
-    inspectionResult: { type: String, enum: ['Pass', 'Fail', 'Pending', 'Hold'] },
+    inspectionResult: {
+      type: String,
+      enum: ["Pass", "Fail", "Pending", "Hold"]
+    },
     approvalStatus: { type: String },
     reportType: { type: String },
     inspectorDecision: { type: String },
     defectRate: { type: Number },
-   
+
     // Top level summary counts
     totalNumberOfDefects: { type: Number },
     totalDefectiveUnits: { type: Number },
     totalGoodUnits: { type: Number },
-    
+
     // Top level defect summary arrays
     defectCategories: [{ type: String }],
     defectCodes: [{ type: String }],
@@ -87,21 +91,32 @@ const InspectionSchema = new mongoose.Schema({
 
     // --- Comments & Extra Info ---
     allComments: { type: String },
-    
+
     // --- PoLine Arrays (Top Level) ---
-    poLineCustomerPO: [{ type: String }],  
-    poLineMainPO: [{ type: String }],      
+    poLineCustomerPO: [{ type: String }],
+    poLineMainPO: [{ type: String }],
 
     // --- Simplified Defect Array ---
     defects: [DefectSchema],
 
     // --- Duplicate Prevention ---
-    uploadBatch: { type: String }, // Track which upload batch this belongs to
-
-}, {
+    uploadBatch: { type: String },
+    // Add these new fields
+    downloadStatus: {
+      type: String,
+      enum: ["Pending", "In Progress", "Downloaded", "Failed"],
+      default: "Pending"
+    },
+    downloadedAt: {
+      type: Date,
+      default: null
+    }
+  },
+  {
     timestamps: true,
-    collection: 'p88LegacyData'
-});
+    collection: "p88LegacyData"
+  }
+);
 
-
-export default (connection) => connection.model("p88LegacyData", InspectionSchema);
+export default (connection) =>
+  connection.model("p88LegacyData", InspectionSchema);
