@@ -24,7 +24,8 @@ import {
   Layers,
   MessageSquare,
   Images,
-  BarChart3
+  BarChart3,
+  User
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -242,7 +243,8 @@ const YPivotQAInspectionDefectConfig = ({
         qty: existing.qty,
         locations: existing.locations || [],
         images: existing.images || [],
-        isNoLocation: existing.isNoLocation || false
+        isNoLocation: existing.isNoLocation || false,
+        selectedQC: existing.qcUser || activeGroup?.activeQC || null // <--- ADD THIS
       });
       setEditingIndex(index);
     } else {
@@ -253,7 +255,8 @@ const YPivotQAInspectionDefectConfig = ({
         qty: 1,
         locations: [],
         images: [],
-        isNoLocation: false
+        isNoLocation: false,
+        selectedQC: activeGroup?.activeQC || null // <--- ADD THIS (Default to active, but allow change)
       });
       setEditingIndex(null);
     }
@@ -266,6 +269,16 @@ const YPivotQAInspectionDefectConfig = ({
       return alert("Select defect locations or check 'No Location Required'");
     }
 
+    // --- MODIFICATION: QC Validation ---
+    const isQCRequired = reportData?.selectedTemplate?.isQCScan === "Yes";
+    // Check if we have assignments available to pick from
+    const hasQCAssignments = activeGroup?.assignments?.some((a) => a.qcUser);
+
+    if (isQCRequired && hasQCAssignments && !configForm.selectedQC) {
+      return alert("Please select a QC / Inspector for this defect.");
+    }
+    // -----------------------------------
+
     const defectEntry = {
       ...configForm,
       defectId: currentDefectTemplate._id,
@@ -276,11 +289,15 @@ const YPivotQAInspectionDefectConfig = ({
       line: activeGroup?.line,
       table: activeGroup?.table,
       color: activeGroup?.color,
-      qcUser: activeGroup?.activeQC,
+
+      // --- MODIFICATION: Save Selected QC ---
+      qcUser: configForm.selectedQC,
+      // -------------------------------------
+
       lineName: activeGroup?.lineName,
       tableName: activeGroup?.tableName,
       colorName: activeGroup?.colorName,
-      determinedBuyer: determinedBuyer, // Store the determined buyer
+      determinedBuyer: determinedBuyer,
       timestamp: new Date().toISOString()
     };
 
@@ -907,35 +924,126 @@ const YPivotQAInspectionDefectConfig = ({
             </section>
 
             {/* Quantity Section */}
-            <section>
+            <section className="col-span-1 md:col-span-1">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-                Quantity
+                Quantity & Inspector
               </h3>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() =>
-                    setConfigForm((p) => ({
-                      ...p,
-                      qty: Math.max(1, p.qty - 1)
-                    }))
-                  }
-                  className="w-12 h-12 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                >
-                  <Minus className="w-6 h-6" />
-                </button>
-                <div className="flex-1 h-12 flex items-center justify-center bg-white border-2 border-indigo-100 rounded-xl">
-                  <span className="text-2xl font-bold text-indigo-600">
-                    {configForm.qty}
-                  </span>
+
+              {/* Flex Container: Mobile (Col), Desktop (Row) */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                {/* 1. Quantity Stepper */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() =>
+                      setConfigForm((p) => ({
+                        ...p,
+                        qty: Math.max(1, p.qty - 1)
+                      }))
+                    }
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                  >
+                    <Minus className="w-5 h-5" />
+                  </button>
+                  <div className="w-16 h-10 flex items-center justify-center bg-white border-2 border-indigo-100 rounded-xl">
+                    <span className="text-xl font-bold text-indigo-600">
+                      {configForm.qty}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() =>
+                      setConfigForm((p) => ({ ...p, qty: p.qty + 1 }))
+                    }
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
                 </div>
-                <button
-                  onClick={() =>
-                    setConfigForm((p) => ({ ...p, qty: p.qty + 1 }))
-                  }
-                  className="w-12 h-12 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                >
-                  <Plus className="w-6 h-6" />
-                </button>
+
+                {/* 2. QC Selection Cards (Only if QC Required & Available) */}
+                {reportData?.selectedTemplate?.isQCScan === "Yes" &&
+                  activeGroup?.assignments?.some((a) => a.qcUser) && (
+                    <div className="flex-1 w-full sm:w-auto overflow-x-auto pb-1">
+                      <div className="flex items-center gap-2">
+                        {/* Divider for Desktop */}
+                        <div className="hidden sm:block w-px h-10 bg-gray-200 mx-2"></div>
+
+                        <div className="flex gap-2">
+                          {activeGroup.assignments
+                            .filter((a) => a.qcUser) // Only show slots with users
+                            .map((assign) => {
+                              const qc = assign.qcUser;
+                              const isSelected =
+                                configForm.selectedQC?.emp_id === qc.emp_id;
+
+                              return (
+                                <div
+                                  key={qc.emp_id}
+                                  onClick={() =>
+                                    setConfigForm((p) => ({
+                                      ...p,
+                                      selectedQC: qc
+                                    }))
+                                  }
+                                  className={`relative flex flex-col items-center justify-center p-1.5 rounded-lg border-2 transition-all cursor-pointer w-20 h-20 flex-shrink-0 ${
+                                    isSelected
+                                      ? "border-indigo-500 bg-indigo-50 shadow-sm"
+                                      : "border-gray-200 bg-white hover:border-gray-300"
+                                  }`}
+                                >
+                                  {/* Top: Emp ID */}
+                                  <span
+                                    className={`text-[9px] font-bold mb-1 ${
+                                      isSelected
+                                        ? "text-indigo-700"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
+                                    {qc.emp_id}
+                                  </span>
+
+                                  {/* Middle: Photo or Icon */}
+                                  {qc.face_photo ? (
+                                    <img
+                                      src={qc.face_photo}
+                                      alt="qc"
+                                      className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                        isSelected
+                                          ? "bg-indigo-200 text-indigo-700"
+                                          : "bg-gray-100 text-gray-400"
+                                      }`}
+                                    >
+                                      <User className="w-4 h-4" />
+                                    </div>
+                                  )}
+
+                                  {/* Bottom: Name */}
+                                  <span
+                                    className={`text-[8px] font-medium mt-1 truncate w-full text-center ${
+                                      isSelected
+                                        ? "text-indigo-800"
+                                        : "text-gray-600"
+                                    }`}
+                                  >
+                                    {qc.eng_name}
+                                  </span>
+
+                                  {/* Checkmark Badge */}
+                                  {isSelected && (
+                                    <div className="absolute -top-1 -right-1 bg-indigo-600 text-white rounded-full p-0.5">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
               </div>
             </section>
           </div>
@@ -1070,7 +1178,19 @@ const YPivotQAInspectionDefectConfig = ({
         <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white dark:bg-gray-800 safe-area-bottom">
           <button
             onClick={handleSaveDefect}
-            className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+            // --- MODIFICATION: Disable button logic ---
+            disabled={
+              reportData?.selectedTemplate?.isQCScan === "Yes" &&
+              activeGroup?.assignments?.some((a) => a.qcUser) &&
+              !configForm.selectedQC
+            }
+            className={`w-full py-3.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all active:scale-95 ${
+              reportData?.selectedTemplate?.isQCScan === "Yes" &&
+              activeGroup?.assignments?.some((a) => a.qcUser) &&
+              !configForm.selectedQC
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed" // Disabled Style
+                : "bg-indigo-600 text-white hover:bg-indigo-700" // Active Style
+            }`}
           >
             <Save className="w-5 h-5" />{" "}
             {editingIndex !== null ? "Update Defect" : "Add Defect"}

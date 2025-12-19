@@ -278,6 +278,7 @@ const QCUserSearch = ({ onSelect }) => {
               width: coords.width,
               maxHeight: "12rem" // max-h-48 equivalent
             }}
+            onMouseDown={(e) => e.stopPropagation()}
           >
             {results.map((user) => (
               <div
