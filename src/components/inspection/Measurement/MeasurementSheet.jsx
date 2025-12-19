@@ -6,56 +6,76 @@ const MeasurementSheet = ({ data, filterCriteria, anfPoints }) => {
   
   // Sanitize function for measurement point names
   const sanitizeMeasurementPoint = (point, forPDF = false) => {
-    // 1. Guard clause for invalid input
-    if (!point || typeof point !== "string") {
-      return "N/A";
-    }
+  // 1. Guard clause for invalid input
+  if (!point || typeof point !== "string") {
+    return "N/A";
+  }
 
-    let sanitized = String(point);
+  let sanitized = String(point);
 
-    // 2. If sanitizing for PDF, replace Unicode special characters with ASCII equivalents
-    if (forPDF) {
-      sanitized = sanitized
-        .replace(/≤/g, "<=") // Less than or equal to
-        .replace(/≥/g, ">=") // Greater than or equal to
-        .replace(/≠/g, "!=") // Not equal to
-        .replace(/±/g, "+/-") // Plus-minus
-        .replace(/×/g, "x") // Multiplication sign
-        .replace(/÷/g, "/") // Division sign
-        .replace(/°/g, "deg") // Degree symbol
-        .replace(/″/g, '"') // Double prime (inches)
-        .replace(/′/g, "'") // Prime (feet)
-        .replace(/…/g, "...") // Ellipsis
-        .replace(/–/g, "-") // En dash
-        .replace(/—/g, "-") // Em dash
-        .replace(/'/g, "'") // Left single quote
-        .replace(/'/g, "'") // Right single quote
-        .replace(/"/g, '"') // Left double quote
-        .replace(/"/g, '"'); // Right double quote
-    }
+  // 2. If sanitizing for PDF, replace Unicode special characters with ASCII equivalents
+  if (forPDF) {
+    sanitized = sanitized
+      .replace(/（/g, "(")
+      .replace(/）/g, ")")
+      .replace(/［/g, "[")
+      .replace(/］/g, "]")
+      .replace(/｛/g, "{")
+      .replace(/｝/g, "}")
+      .replace(/≤/g, "<=") // Less than or equal to
+      .replace(/≥/g, ">=") // Greater than or equal to
+      .replace(/≠/g, "!=") // Not equal to
+      .replace(/±/g, "+/-") // Plus-minus
+      .replace(/×/g, "x") // Multiplication sign
+      .replace(/÷/g, "/") // Division sign
+      .replace(/°/g, "deg") // Degree symbol
+      .replace(/″/g, '"') // Double prime (inches)
+      .replace(/′/g, "'") // Prime (feet)
+      .replace(/…/g, "...") // Ellipsis
+      .replace(/–/g, "-") // En dash
+      .replace(/—/g, "-") // Em dash
+      .replace(/'/g, "'") // Left single quote
+      .replace(/'/g, "'") // Right single quote
+      .replace(/"/g, '"') // Left double quote
+      .replace(/"/g, '"'); // Right double quote
+  }
 
-    // 3. NEW: Intelligently find and fix only the spaced-out words.
-    sanitized = sanitized.replace(
-      /\b([a-zA-Z0-9])(?:\s\1)+\b|\b[a-zA-Z0-9](?:\s[a-zA-Z0-9])+\b/g,
-      (match) => {
+  // 3. FIXED: More intelligent handling of spaced-out words
+  // Only fix obvious cases where single characters are spaced out
+  // This pattern looks for sequences like "a b c d" where each character is separated by exactly one space
+  sanitized = sanitized.replace(
+    /\b([a-zA-Z0-9])\s+([a-zA-Z0-9])\s+([a-zA-Z0-9])\s+([a-zA-Z0-9])\b/g,
+    (match) => {
+      // Only remove spaces if it looks like artificially spaced characters
+      // Check if it's a sequence of single characters with spaces
+      const parts = match.split(/\s+/);
+      if (parts.every(part => part.length === 1)) {
         return match.replace(/\s/g, "");
       }
-    );
-
-    // 4. Remove only specific unwanted characters, like double quotes (if not for PDF).
-    if (!forPDF) {
-      sanitized = sanitized.replace(/"/g, "");
+      return match; // Leave it as is if it doesn't match the pattern
     }
+  );
 
-    // 5. Collapse multiple spaces (2 or more) into a single space.
-    sanitized = sanitized.replace(/ {2,}/g, " ");
+  // 4. Handle specific cases of double-spaced single characters (like "H S P" -> "HSP")
+  sanitized = sanitized.replace(
+    /\b([A-Z])\s+([A-Z])\s+([A-Z])\b/g,
+    "$1$2$3"
+  );
 
-    // 6. Trim whitespace from the beginning and end of the string.
-    sanitized = sanitized.trim();
+  // 5. Remove only specific unwanted characters, like double quotes (if not for PDF).
+  if (!forPDF) {
+    sanitized = sanitized.replace(/"/g, "");
+  }
 
-    // 7. Limit length to prevent overflow
-    return sanitized.substring(0, 100);
-  };
+  // 6. Collapse multiple spaces (3 or more) into a single space, but preserve normal spacing
+  sanitized = sanitized.replace(/ {3,}/g, " ");
+
+  // 7. Trim whitespace from the beginning and end of the string.
+  sanitized = sanitized.trim();
+
+  // 8. Limit length to prevent overflow
+  return sanitized.substring(0, 100);
+};
 
 
   const decimalToFraction = (decimal) => {
