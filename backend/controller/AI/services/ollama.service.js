@@ -2,10 +2,11 @@ import { Ollama } from "ollama";
 import { getMoNumberTools, getMoNumber } from "../qc_assistance/QC.tools.js";
 
 const abortController = new AbortController();
-
+let BotResponse;
 // Main handler for chat requests
 const handleChatWithOllama = async (req, res) => {
     const { model, messages, tool } = req.body;
+    console.error("Model", model)
     let apiHost = process.env.OLLAMA_BASE_URL;
 
     try {
@@ -20,21 +21,28 @@ const handleChatWithOllama = async (req, res) => {
                     signal: abortController.signal,
                 }),
         });
+        const enableTool = await ollamaClient.show({model: model});
+        const modelCapacities = enableTool.capabilities;
 
         let updatedMessages = [...messages];
-        if (tool) {
-            updatedMessages = await selectToolForMessages(messages, ollamaClient);
+        if (tool && modelCapacities.includes("tools")) {
+            updatedMessages = await selectToolForMessages(messages, ollamaClient, model);
+        }
+        if (BotResponse) {
+            res.status(200).json(BotResponse);
+            console.log("Request successful:", BotResponse);
+        } else {
+            const result = await ollamaClient.chat({
+                model,
+                messages: updatedMessages,
+                stream: false,
+                tools: tool && modelCapacities.includes("tools") ? getMoNumberTools : null,
+            });
+
+            res.status(200).json(result);
+            console.log("Request successful:", result);            
         }
 
-        const result = await ollamaClient.chat({
-            model,
-            messages: updatedMessages,
-            stream: false,
-            tools: tool ? getMoNumberTools : null,
-        });
-
-        res.status(200).json(result);
-        console.log("Request successful:", result);
     } catch (error) {
         console.error("Ollama Error:", error);
         res.status(500).json({ error: error.message || error.toString() });
@@ -77,12 +85,12 @@ const getToolCallFromLLM = (llmResponse) => {
 };
 
 // Select and execute tools as needed
-const selectToolForMessages = async (messages, ollamaClient) => {
+const selectToolForMessages = async (messages, ollamaClient, model) => {
     const executedTools = new Set();
 
     try {
         const response = await ollamaClient.chat({
-            model: "qwen3-coder:30b",
+            model: model,
             messages,
             stream: false,
             tools: getMoNumberTools,
@@ -92,6 +100,10 @@ const selectToolForMessages = async (messages, ollamaClient) => {
 
         // Keep the assistant message for context
         if (response?.message) {
+            if (response.message?.content){
+                BotResponse = response;
+                return 
+            }
             messages.push({
                 role: 'assistant',
                 content: response.message.content, // just the textual content

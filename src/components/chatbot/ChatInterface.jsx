@@ -15,6 +15,17 @@ import { getOllamaResponse } from "./lib/api/chat";
 import { BsRobot } from "react-icons/bs";
 import AzureTranslator from "./services/azureTranslation";
 
+
+function strictThreeWords(text) {
+  return text
+    .trim()
+    .replace(/[^\w\s]/g, "")   // remove punctuation
+    .split(/\s+/)
+    .slice(0, 3)
+    .join(" ");
+}
+
+
 export default function ChatInterface({
   currentService,
   setCurrentService,
@@ -121,8 +132,16 @@ export default function ChatInterface({
           topic = await getOllamaResponse(model, [
           {
             role: "user",
-            content: `Generate a short topic (exactly three words) for the following text. 
-          Return ONLY the topic, nothing else: ${input}`,
+            content: `
+            You must output EXACTLY three words.
+            No punctuation.
+            No explanations.
+            No line breaks.
+            If unsure, still output exactly three words.
+
+            Text:
+            ${input}
+            `,
           },
         ], false);
       } else {
@@ -130,7 +149,7 @@ export default function ChatInterface({
       }
 
 
-      const topicText = topic.message.content.trim();
+      const topicText = strictThreeWords(topic.message.content.trim());
 
       if (data?.message?.thinking) {
         setThinking(data.message.thinking);

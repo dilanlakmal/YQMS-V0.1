@@ -453,7 +453,7 @@ function Home() {
           {
             title: "Production Instruction Translation",
             description: "Translate your final report",
-            path: "/ai/production-instruction-translation",
+            path: "/ai/instruction-translation",
             image: "assets/Home/icon-instruction.png",
 
           }

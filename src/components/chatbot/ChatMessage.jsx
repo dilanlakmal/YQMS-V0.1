@@ -1,5 +1,5 @@
 import { cn } from "@/components/chatbot/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { marked } from "marked";
 import { LuBot } from "react-icons/lu";
 import DOMPurify from "dompurify";
@@ -23,8 +23,10 @@ export function ChatMessage({
 }) {
   const isUser = message.role === "user";
 
+ 
+
   return (
-    <div className={cn("flex gap-4 py-2 px-3", isUser && "flex-row-reverse")}>
+    <div className={cn("flex gap-4 py-2 px-3 overflow-hidden", isUser && "flex-row-reverse")}>
       {/* Avatar */}
       <div
         className={cn(
@@ -60,7 +62,7 @@ export function ChatMessage({
               <ChatMessageTyping
                 key="thinking"
                 message={thinking}
-                speed={60}
+                speed={10}
                 onFinish={() => setThinking("")}
               />
             ) : (
@@ -101,10 +103,14 @@ export function ChatMessage({
 
 export function ChatMessageTyping({ message, speed = 10, onFinish }) {
   const [displayed, setDisplayed] = useState("");
+  const bottomRef = useRef(null);
+  // Scroll whenever displayed text changes
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [displayed]);
 
   useEffect(() => {
     if (!message) return;
-
     let index = 0;
 
     const interval = setInterval(() => {
@@ -120,7 +126,14 @@ export function ChatMessageTyping({ message, speed = 10, onFinish }) {
     return () => clearInterval(interval);
   }, [message, speed, onFinish]);
 
-  return <MarkdownViewer text={displayed} />;
+  return (
+    <>
+      <MarkdownViewer text={displayed} />
+      <div ref={bottomRef} />
+    </>
+  )
+  
+  ;
 }
 
 export function MarkdownViewer({ text = "" }) {
@@ -128,18 +141,34 @@ export function MarkdownViewer({ text = "" }) {
   const safeHtml = DOMPurify.sanitize(rawHtml);
 
   return (
-    <div
-      className="
-        prose
-        prose-neutral 
-        max-w-none 
-        dark:prose-inert 
-        [&>*]:mb-6
-        [&>table td]: p-1
-        [&>table th]: p-1
-        [&>table tr]: border-none
+    <div className="w-full overflow-x-hidden">
+      {/* Inner wrapper allows scrolling for code but prevents overall overflow */}
+      <div
+        className="
+          prose
+          prose-neutral
+          max-w-1/2
+          dark:prose-invert
+          break-words
+          [&>*]:mb-6
+          [&>table]:block
+          [&>table]:w-full
+          [&>table]:overflow-x-auto
+          [&>pre]:overflow-hidden
+          [&>pre]:bg-gray-100
+          [&>pre]:p-2
+          [&>pre]:rounded
+          [&>code]:break-words
+          [&>code]:bg-gray-100
+          [&>code]:px-1
+          [&>code]:py-0.5
+          [&>code]:rounded
+          [&>code]:overflow-hidden
         "
-      dangerouslySetInnerHTML={{ __html: safeHtml }}
-    />
+        dangerouslySetInnerHTML={{ __html: safeHtml }}
+      />
+    </div>
   );
 }
+
+
