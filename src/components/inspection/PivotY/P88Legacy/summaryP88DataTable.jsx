@@ -112,16 +112,16 @@ const SummaryP88Data = () => {
 
   const getStatusBadge = (status) => {
     const statusConfig = {
-      'Pass': { bg: 'bg-emerald-100', text: 'text-emerald-800', icon: '✅' },
-      'Fail': { bg: 'bg-red-100', text: 'text-red-800', icon: '❌' },
-      'Pending Approval': { bg: 'bg-amber-100', text: 'text-amber-800', icon: '⏳' },
-      'Not Completed': { bg: 'bg-blue-100', text: 'text-blue-800', icon: '🔄' },
-      'Reworked': { bg: 'bg-purple-100', text: 'text-purple-800', icon: '🔧' },
-      'Accepted': { bg: 'bg-emerald-500', text: 'text-white', icon: '✅' },
-      'Rejected': { bg: 'bg-red-500', text: 'text-white', icon: '❌' }
+      'Pass': { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-800 dark:text-emerald-300', icon: '✅' },
+      'Fail': { bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-800 dark:text-red-300', icon: '❌' },
+      'Pending Approval': { bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-800 dark:text-amber-300', icon: '⏳' },
+      'Not Completed': { bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-800 dark:text-blue-300', icon: '🔄' },
+      'Reworked': { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-800 dark:text-purple-300', icon: '🔧' },
+      'Accepted': { bg: 'bg-emerald-500 dark:bg-emerald-600', text: 'text-white', icon: '✅' },
+      'Rejected': { bg: 'bg-red-500 dark:bg-red-600', text: 'text-white', icon: '❌' }
     };
 
-    const config = statusConfig[status] || { bg: 'bg-gray-100', text: 'text-gray-800', icon: '❓' };
+    const config = statusConfig[status] || { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-300', icon: '❓' };
     
     return (
       <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
@@ -165,17 +165,17 @@ const SummaryP88Data = () => {
   // Loading State
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center justify-center h-96 bg-white rounded-xl shadow-lg">
+          <div className="flex flex-col items-center justify-center h-96 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700">
             <div className="relative">
               <div className="w-16 h-16 border-4 border-gray-200 border-t-blue-500 rounded-full animate-spin"></div>
               <div className="absolute inset-0 flex items-center justify-center">
                 <span className="text-2xl">📊</span>
               </div>
             </div>
-            <p className="text-xl font-semibold text-gray-700 mt-6">Loading inspection data...</p>
-            <p className="text-sm text-gray-500 mt-2">Please wait while we fetch the latest information</p>
+            <p className="text-xl font-semibold text-gray-700 dark:text-gray-200 mt-6">Loading inspection data...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Please wait while we fetch the latest information</p>
           </div>
         </div>
       </div>
@@ -185,12 +185,12 @@ const SummaryP88Data = () => {
   // Error State
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 p-6">
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800 p-6">
         <div className="max-w-7xl mx-auto">
-          <div className="flex flex-col items-center justify-center h-96 bg-white rounded-xl shadow-lg border border-red-200">
+          <div className="flex flex-col items-center justify-center h-96 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-red-200 dark:border-red-900">
             <div className="text-6xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-bold text-red-600 mb-2">Oops! Something went wrong</h2>
-            <p className="text-gray-600 mb-6 text-center max-w-md">
+            <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-2">Oops! Something went wrong</h2>
+            <p className="text-gray-600 dark:text-gray-300 mb-6 text-center max-w-md">
               We encountered an error while loading the inspection data: <span className="font-medium">{error}</span>
             </p>
             <button 
@@ -207,7 +207,7 @@ const SummaryP88Data = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
       <div className="max-w-8xl mx-auto p-6">
         {/* Header */}
         {/* <div className="mb-8">
@@ -231,18 +231,18 @@ const SummaryP88Data = () => {
         
 
         {/* Data Table */}
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
           {/* Table Header */}
-          <div className="bg-gradient-to-r from-gray-50 to-gray-100 px-6 py-4 border-b border-gray-200">
+          <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-800">Inspection Records</h3>
-                <p className="text-sm text-gray-600">
+                <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Inspection Records</h3>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {inspectionData.length} records found
                   {Object.values(filters).some(v => v) && ' (filtered)'}
                 </p>
               </div>
-              <div className="flex items-center gap-2 text-sm text-gray-500">
+              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <span>📊</span>
                 <span>Page {currentPage + 1} of {pageCount}</span>
               </div>
@@ -252,10 +252,10 @@ const SummaryP88Data = () => {
           {/* Table Content */}
           <div className="overflow-x-auto">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
+              <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                 <tr>
                   <th
-                    className="px-4 py-4 text-left font-semibold text-gray-700 select-none"
+                    className="px-4 py-4 text-left font-semibold text-gray-700 dark:text-gray-200 select-none"
                   >
                     <div className="flex items-center gap-2">
                       <span className="text-sm">#️⃣</span>
@@ -281,7 +281,7 @@ const SummaryP88Data = () => {
                     <th 
                       key={column.key}
                       onClick={() => handleSort(column.key)}
-                      className="px-4 py-4 text-left font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors duration-150 select-none group"
+                      className="px-4 py-4 text-left font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150 select-none group"
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-sm">{column.icon}</span>
@@ -290,7 +290,7 @@ const SummaryP88Data = () => {
                       </div>
                     </th>
                   ))}
-                  <th className="px-4 py-4 text-left font-semibold text-gray-700">
+                  <th className="px-4 py-4 text-left font-semibold text-gray-700 dark:text-gray-200">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">🏭</span>
                       <span>Factory Name</span>
@@ -302,7 +302,7 @@ const SummaryP88Data = () => {
                       <span>Docs</span>
                     </div>
                   </th> */}
-                  <th className="px-4 py-4 text-left font-semibold text-gray-700">
+                  <th className="px-4 py-4 text-left font-semibold text-gray-700 dark:text-gray-200">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">⚡</span>
                       <span>Actions</span>
@@ -310,16 +310,16 @@ const SummaryP88Data = () => {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
                 {inspectionData.map((inspection, index) => (
-                  <tr key={inspection._id || index} className="hover:bg-blue-50 transition-colors duration-150 group">
-                    <td className="px-4 py-4 text-sm text-gray-700 font-medium text-center">
+                  <tr key={inspection._id || index} className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors duration-150 group">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 font-medium text-center">
                       {currentPage * 100 + index + 1}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {formatDateTime(inspection.scheduledInspectionDate)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
                         {inspection.inspector || '-'}
@@ -328,57 +328,57 @@ const SummaryP88Data = () => {
                     <td className="px-4 py-4">
                       {getStatusBadge(inspection.approvalStatus)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.reportType || '-'}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.etd && inspection.etd.length > 0 
                         ? formatDate(inspection.etd[0]) 
                         : '-'
                       }
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.eta && inspection.eta.length > 0 
                         ? formatDate(inspection.eta[0]) 
                         : '-'
                       }
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.poNumbers?.join(', ') || '-'}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {formatDateTime(inspection.submittedInspectionDate)}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 text-center font-medium">
-                      <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 text-center font-medium">
+                      <span className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 px-2 py-1 rounded-full text-xs">
                         {inspection.qtyToInspect || 0}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 text-center font-medium">
-                      <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 text-center font-medium">
+                      <span className="bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full text-xs">
                         {inspection.qtyInspected || 0}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 text-center font-medium">
-                      <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 text-center font-medium">
+                      <span className="bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-300 px-2 py-1 rounded-full text-xs">
                         {inspection.totalPoItemsQty || 0}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.allComments || '-'}
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
                         {inspection.project || '-'}
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 text-center font-medium">
-                      <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full text-xs">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 text-center font-medium">
+                      <span className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 px-2 py-1 rounded-full text-xs">
                         {inspection.sampleInspected || 0}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-sm text-gray-700 max-w-[150px] break-words">
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.supplier || '-'}
                     </td>
                     {/* <td className="px-4 py-4 text-center">
@@ -412,17 +412,17 @@ const SummaryP88Data = () => {
           {inspectionData.length === 0 && (
             <div className="text-center py-12">
               <div className="text-6xl mb-4">📋</div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">No inspections found</h3>
-              <p className="text-gray-500">Try adjusting your filters or check back later for new data.</p>
+              <h3 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-2">No inspections found</h3>
+              <p className="text-gray-500 dark:text-gray-400">Try adjusting your filters or check back later for new data.</p>
             </div>
           )}
         </div>
 
         {/* Enhanced Pagination */}
         {pageCount > 1 && (
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="text-sm text-gray-600">
+              <div className="text-sm text-gray-600 dark:text-gray-400">
                 Showing page <span className="font-semibold">{currentPage + 1}</span> of{' '}
                 <span className="font-semibold">{pageCount}</span>
               </div>
@@ -448,13 +448,13 @@ const SummaryP88Data = () => {
                 forcePage={currentPage}
                 containerClassName={'flex items-center space-x-1'}
                 pageClassName={''}
-                pageLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150'}
+                pageLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-150'}
                 previousClassName={''}
-                previousLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150'}
+                previousLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-150'}
                 nextClassName={''}
-                nextLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium text-gray-700 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150'}
+                nextLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-900/30 hover:text-blue-600 dark:hover:text-blue-400 transition-colors duration-150'}
                 breakClassName={''}
-                breakLinkClassName={'px-4 py-2 text-sm font-medium text-gray-500'}
+                breakLinkClassName={'px-4 py-2 text-sm font-medium text-gray-500 dark:text-gray-400'}
                 activeClassName={''}
                 activeLinkClassName={'px-4 py-2 rounded-lg text-sm font-medium bg-blue-500 text-white shadow-md'}
               />
