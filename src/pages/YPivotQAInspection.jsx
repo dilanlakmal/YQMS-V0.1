@@ -13,7 +13,8 @@ import {
   Lock,
   FileSpreadsheet,
   Home,
-  ArrowLeft
+  ArrowLeft,
+  CheckCircle2
 } from "lucide-react";
 import React, { useMemo, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
@@ -43,6 +44,73 @@ const PlaceholderComponent = ({ title, icon: Icon }) => {
       <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
         This section is under development.
       </p>
+    </div>
+  );
+};
+
+const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
+  if (!isOpen) return null;
+
+  const isSuccess = type === "success";
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all scale-100 border border-gray-100 dark:border-gray-700">
+        {/* Header Color Bar */}
+        <div
+          className={`h-2 w-full ${
+            isSuccess ? "bg-green-500" : "bg-amber-500"
+          }`}
+        />
+
+        <div className="p-6">
+          <div className="flex items-start gap-4">
+            {/* Icon */}
+            <div
+              className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                isSuccess
+                  ? "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400"
+                  : "bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400"
+              }`}
+            >
+              {isSuccess ? <CheckCircle2 size={24} /> : <Info size={24} />}
+            </div>
+
+            {/* Content */}
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-1">
+                {title}
+              </h3>
+              <p
+                className={`font-medium text-sm mb-2 ${
+                  isSuccess
+                    ? "text-green-700 dark:text-green-400"
+                    : "text-amber-700 dark:text-amber-400"
+                }`}
+              >
+                {message}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed">
+                {subMessage}
+              </p>
+            </div>
+          </div>
+
+          {/* Actions */}
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={onClose}
+              className={`px-5 py-2.5 rounded-xl text-sm font-bold text-white shadow-lg transition-transform active:scale-95 ${
+                isSuccess
+                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700"
+                  : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
+              }`}
+            >
+              Acknowledge
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -87,6 +155,15 @@ const YPivotQAInspection = () => {
   // State for Active Inspection Context (Activated via Play button)
   const [activeGroup, setActiveGroup] = useState(null);
 
+  // NEW: State for the Status Modal
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    type: "success", // 'success' or 'info'
+    title: "",
+    message: "",
+    subMessage: ""
+  });
+
   // Handler to update PP Sheet data
   const handlePPSheetUpdate = useCallback((newData) => {
     setSharedReportState((prev) => ({
@@ -103,20 +180,52 @@ const YPivotQAInspection = () => {
     setSavedReportData(reportData);
     setIsReportSaved(true);
 
-    // --- LOGIC TO SHOW MESSAGE IF EXISTING ---
+    // --- LOGIC TO SHOW NICE MODAL ---
     if (isNew === false) {
-      // can use a standard alert, or a custom Toast component
-      alert(
-        `⚠️ EXISTING REPORT FOUND\n\n${message}\n\nThe system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data.`
-      );
+      // EXISTING REPORT (Update Scenario)
+      setStatusModal({
+        isOpen: true,
+        type: "info",
+        title: "Existing Report Updated",
+        message: message || "Report updated successfully.",
+        subMessage:
+          "The system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data."
+      });
     } else {
-      // Optional: Success message for new report
-      // alert("Success! New inspection report created.");
+      // NEW REPORT (Create Scenario)
+      setStatusModal({
+        isOpen: true,
+        type: "success",
+        title: "Report Created",
+        message: "New inspection report created successfully.",
+        subMessage:
+          "You can now proceed to fill in the Header, Photos, and Measurement details."
+      });
     }
-
-    // Optional: Automatically move to next logical tab
-    // setActiveTab("header");
   }, []);
+
+  // // Handler for save complete
+  // const handleSaveComplete = useCallback((result) => {
+  //   // Destructure the result passed from the Modal
+  //   const { reportData, isNew, message } = result;
+
+  //   setSavedReportData(reportData);
+  //   setIsReportSaved(true);
+
+  //   // --- LOGIC TO SHOW MESSAGE IF EXISTING ---
+  //   if (isNew === false) {
+  //     // can use a standard alert, or a custom Toast component
+  //     alert(
+  //       `⚠️ EXISTING REPORT FOUND\n\n${message}\n\nThe system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data.`
+  //     );
+  //   } else {
+  //     // Optional: Success message for new report
+  //     // alert("Success! New inspection report created.");
+  //   }
+
+  //   // Optional: Automatically move to next logical tab
+  //   // setActiveTab("header");
+  // }, []);
 
   // Handle tab change with validation
   const handleTabChange = useCallback(
@@ -646,6 +755,15 @@ const YPivotQAInspection = () => {
           </div>
         </div>
       </div>
+
+      <StatusModal
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        type={statusModal.type}
+        title={statusModal.title}
+        message={statusModal.message}
+        subMessage={statusModal.subMessage}
+      />
 
       {/* Styles */}
       <style jsx>{`
