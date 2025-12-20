@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { Save, Loader2, Info } from "lucide-react";
+import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionLineTableColorConfig from "./YPivotQAInspectionLineTableColorConfig";
 
@@ -21,8 +22,6 @@ const YPivotQAInspectionConfigSave = ({
     const fetchExistingConfig = async () => {
       if (!reportId) return;
 
-      // Avoid re-fetching if we already have data in state (client-side navigation)
-      // Check if lineTableConfig has items
       if (reportData.lineTableConfig && reportData.lineTableConfig.length > 0) {
         return;
       }
@@ -34,17 +33,9 @@ const YPivotQAInspectionConfigSave = ({
         );
 
         if (res.data.success && res.data.data.inspectionConfig) {
-          const configArr = res.data.data.inspectionConfig;
-
-          // Assuming we want the latest config or the one matching current template
-          // For now, we take the first one as established in the controller
-          if (configArr.length > 0) {
-            const savedConfig = configArr[0];
-
-            // Restore the UI state
-            if (savedConfig.configGroups) {
-              onUpdate({ lineTableConfig: savedConfig.configGroups });
-            }
+          const savedConfig = res.data.data.inspectionConfig;
+          if (savedConfig && savedConfig.configGroups) {
+            onUpdate({ lineTableConfig: savedConfig.configGroups });
           }
         }
       } catch (error) {
@@ -59,30 +50,20 @@ const YPivotQAInspectionConfigSave = ({
     }
   }, [reportId]);
 
-  // --- SAVE HANDLER ---
-  const handleSaveConfig = async () => {
-    if (!isReportSaved || !reportId) {
-      alert("Please save the Order information first.");
-      return;
-    }
+  // --- REUSABLE SAVE FUNCTION ---
+  const saveToBackend = async (groupsToSave, isSilent = false) => {
+    if (!isReportSaved || !reportId) return; // Validation handled in UI trigger usually
 
-    const currentGroups = reportData.lineTableConfig || [];
     const selectedTemplate = reportData.selectedTemplate;
     const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
     const aqlSampleSize = reportData.config?.aqlSampleSize || 0;
 
-    if (currentGroups.length === 0) {
-      alert("Please add at least one configuration group before saving.");
-      return;
-    }
-
-    // Calculate Total Sample Size based on Logic
+    // Calculate Total
     let calculatedTotal = 0;
     if (isAQL) {
       calculatedTotal = aqlSampleSize;
     } else {
-      // Sum all assignments
-      calculatedTotal = currentGroups.reduce((total, group) => {
+      calculatedTotal = groupsToSave.reduce((total, group) => {
         const groupTotal = group.assignments.reduce(
           (sum, assign) => sum + (parseInt(assign.qty) || 0),
           0
@@ -97,7 +78,7 @@ const YPivotQAInspectionConfigSave = ({
         reportName: selectedTemplate.ReportType,
         inspectionMethod: selectedTemplate.InspectedQtyMethod || "Fixed",
         sampleSize: calculatedTotal,
-        configGroups: currentGroups // Saving the dynamic array directly
+        configGroups: groupsToSave
       };
 
       const res = await axios.post(
@@ -109,14 +90,65 @@ const YPivotQAInspectionConfigSave = ({
       );
 
       if (res.data.success) {
-        alert("Configuration saved successfully!");
+        if (!isSilent) {
+          Swal.fire({
+            icon: "success",
+            title: "Saved Successfully",
+            text: "Configuration data has been updated.",
+            toast: true,
+            position: "top-end",
+            showConfirmButton: false,
+            timer: 1500,
+            timerProgressBar: true
+          });
+        }
       }
     } catch (error) {
       console.error("Error saving configuration:", error);
-      alert("Failed to save configuration.");
+      if (!isSilent) {
+        Swal.fire({
+          icon: "error",
+          title: "Save Failed",
+          text: "Failed to save configuration."
+        });
+      }
     } finally {
       setSaving(false);
     }
+  };
+
+  // --- UI BUTTON SAVE HANDLER ---
+  const handleSaveClick = () => {
+    if (!isReportSaved || !reportId) {
+      Swal.fire({
+        icon: "warning",
+        title: "Order Not Saved",
+        text: "Please save the Order information first.",
+        timer: 2000,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    const currentGroups = reportData.lineTableConfig || [];
+    if (currentGroups.length === 0) {
+      Swal.fire({
+        icon: "warning",
+        title: "Empty Configuration",
+        text: "Please add at least one configuration group before saving.",
+        timer: 2000,
+        showConfirmButton: false
+      });
+      return;
+    }
+
+    saveToBackend(currentGroups);
+  };
+
+  // --- IMMEDIATE SAVE HANDLER (Passed to Child) ---
+  const handleImmediateSave = (updatedGroups) => {
+    // We save silently or with toast, up to preference. Here we show toast.
+    saveToBackend(updatedGroups, false);
   };
 
   if (loadingData) {
@@ -132,7 +164,6 @@ const YPivotQAInspectionConfigSave = ({
 
   return (
     <div className="relative pb-24">
-      {/* 1. Context Banner (Optional visual cue) */}
       {!activeGroup && (
         <div className="mb-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 p-3 rounded-xl flex items-start gap-3">
           <Info className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
@@ -141,28 +172,26 @@ const YPivotQAInspectionConfigSave = ({
               Configuration Required
             </p>
             <p className="text-xs text-blue-600 dark:text-blue-400">
-              Please configure the inspection scope (Line, Table, Colors) and
-              assign QCs or quantities below. Click "Start" on a card to begin
-              inspecting defects or measurements for that specific group.
+              Please configure the inspection scope...
             </p>
           </div>
         </div>
       )}
 
-      {/* 2. The Original UI Component */}
       <YPivotQAInspectionLineTableColorConfig
         reportData={reportData}
         orderData={orderData}
         onUpdate={onUpdate}
         onSetActiveGroup={onSetActiveGroup}
         activeGroup={activeGroup}
+        // --- PASS THE SAVE FUNCTION ---
+        onSaveWithData={handleImmediateSave}
       />
 
-      {/* 3. Floating Save Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
         <div className="max-w-8xl mx-auto flex justify-end px-4">
           <button
-            onClick={handleSaveConfig}
+            onClick={handleSaveClick}
             disabled={!isReportSaved || saving}
             className={`
               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
@@ -172,9 +201,6 @@ const YPivotQAInspectionConfigSave = ({
                   : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
               }
             `}
-            title={
-              !isReportSaved ? "Save Order Data first" : "Save Configuration"
-            }
           >
             {saving ? (
               <>

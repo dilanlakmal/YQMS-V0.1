@@ -368,7 +368,7 @@ const createFincheckInspectionReportsModel = (connection) => {
       // --- Photo Data Array ---
       photoData: { type: [PhotoSectionDataSchema], default: [] },
       // --- Inspection Configuration Data ---
-      inspectionConfig: { type: [InspectionConfigItemSchema], default: [] },
+      inspectionConfig: { type: InspectionConfigItemSchema, default: null },
       // --- Measurement Data Array ---
       measurementData: { type: [MeasurementDataItemSchema], default: [] },
       // --- Defect Data Array ---

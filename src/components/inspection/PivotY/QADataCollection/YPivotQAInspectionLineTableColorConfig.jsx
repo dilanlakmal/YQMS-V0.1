@@ -14,7 +14,9 @@ import {
   Search,
   Hash,
   PauseCircle,
-  CopyPlus // Imported for the Add All Colors button
+  CopyPlus,
+  Edit,
+  Save
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -41,6 +43,8 @@ const SearchableSingleSelect = ({
   const filteredOptions = options.filter((opt) =>
     String(opt.label).toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Find the label for the selected value
   const selectedLabel = options.find((o) => o.value === selectedValue)?.label;
 
   // Calculate position when opening
@@ -57,19 +61,13 @@ const SearchableSingleSelect = ({
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Logic to close if clicking outside wrapper
       if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        // We also need to check if the click was inside the PORTAL content.
-        // Since the portal is in document.body, we can just rely on state toggle logic usually,
         setIsOpen(false);
       }
     };
-
-    // Listeners to close dropdown on interaction
     document.addEventListener("mousedown", handleClickOutside);
     window.addEventListener("scroll", () => setIsOpen(false), true);
     window.addEventListener("resize", () => setIsOpen(false));
-
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
       window.removeEventListener("scroll", () => setIsOpen(false), true);
@@ -77,6 +75,7 @@ const SearchableSingleSelect = ({
     };
   }, []);
 
+  // --- FIX START: Display Selected Value when Disabled ---
   if (disabled)
     return (
       <div>
@@ -85,11 +84,13 @@ const SearchableSingleSelect = ({
             {label}
           </label>
         )}
-        <div className="opacity-50 pointer-events-none px-3 py-2 bg-gray-100 rounded text-sm border border-gray-200">
-          N/A
+        <div className="opacity-75 pointer-events-none px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg text-sm border border-gray-200 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-300">
+          {/* Display the selected label, or "N/A" only if nothing is selected */}
+          {selectedLabel || "N/A"}
         </div>
       </div>
     );
+  // --- FIX END ---
 
   return (
     <div className="relative w-full" ref={wrapperRef}>
@@ -118,7 +119,6 @@ const SearchableSingleSelect = ({
         />
       </div>
 
-      {/* PORTAL RENDERING */}
       {isOpen &&
         createPortal(
           <div
@@ -129,7 +129,6 @@ const SearchableSingleSelect = ({
               width: coords.width,
               maxHeight: "250px"
             }}
-            // Stop propagation so clicking inside doesn't close immediately via window listener
             onMouseDown={(e) => e.stopPropagation()}
           >
             <div className="p-2 border-b dark:border-gray-700 bg-white dark:bg-gray-800 rounded-t-lg sticky top-0 z-10">
@@ -322,7 +321,8 @@ const YPivotQAInspectionLineTableColorConfig = ({
   orderData,
   onUpdate,
   onSetActiveGroup,
-  activeGroup
+  activeGroup,
+  onSaveWithData
 }) => {
   const { selectedTemplate, config } = reportData;
   const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
@@ -335,6 +335,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const [orderColors, setOrderColors] = useState([]);
   const [subConQCs, setSubConQCs] = useState([]);
 
+  const [editingGroupId, setEditingGroupId] = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [activeGroupIndex, setActiveGroupIndex] = useState(null);
 
@@ -496,6 +497,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
     };
     const updated = [...groups, newGroup];
     setGroups(updated);
+    setEditingGroupId(newGroup.id); // Automatically enter edit mode for new card
     onUpdate({ lineTableConfig: updated });
   };
 
@@ -534,10 +536,13 @@ const YPivotQAInspectionLineTableColorConfig = ({
     }
 
     const newGroups = colorsToAdd.map((colorObj, index) => ({
-      id: Date.now() + index, // Ensure unique ID base
-      line: "", // No line based on requirements
-      table: "", // No table based on requirements
+      id: Date.now() + index,
+      line: "",
+      lineName: "", // Initialize empty name
+      table: "",
+      tableName: config?.isSubCon ? "N/A" : "", // Handle SubCon N/A default
       color: colorObj.value,
+      colorName: colorObj.label, // <--- ADD THIS: Store the readable name
       assignments: [
         { id: Date.now() + index + 1000, qcUser: null, qty: defaultRowQty }
       ]
@@ -556,15 +561,53 @@ const YPivotQAInspectionLineTableColorConfig = ({
     });
   };
 
-  const handleRemoveGroup = (index) => {
-    if (window.confirm("Remove this configuration group?")) {
+  const handleRemoveGroup = async (index) => {
+    // 1. Show the nice dialog box
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "Do you want to remove this configuration group?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444", // Red color
+      cancelButtonColor: "#6b7280", // Gray color
+      confirmButtonText: "Yes, remove it!",
+      cancelButtonText: "Cancel"
+    });
+
+    // 2. Only proceed if user clicked "Yes"
+    if (result.isConfirmed) {
       const updated = [...groups];
+
+      // If deleting the currently active group, stop the session
       if (activeGroup?.id === updated[index].id) {
         onSetActiveGroup(null);
       }
+
+      // Remove item
       updated.splice(index, 1);
       setGroups(updated);
+
+      // If we were editing this specific group, stop editing
+      // (You might need this if you delete a card while editing it)
+      if (editingGroupId === groups[index].id) {
+        setEditingGroupId(null);
+      }
+
       onUpdate({ lineTableConfig: updated });
+
+      // --- 3. TRIGGER IMMEDIATE SAVE TO DB ---
+      if (onSaveWithData) {
+        onSaveWithData(updated);
+      }
+
+      // Optional: Show a quick success toast
+      Swal.fire({
+        icon: "success",
+        title: "Removed",
+        text: "Configuration group removed.",
+        timer: 1000,
+        showConfirmButton: false
+      });
     }
   };
 
@@ -584,8 +627,11 @@ const YPivotQAInspectionLineTableColorConfig = ({
     return exists;
   };
 
-  const handleUpdateGroup = (index, field, value) => {
+  // ---Accepts optionsList to resolve ID to Name ---
+  const handleUpdateGroup = (index, field, value, optionsList = []) => {
     const updated = [...groups];
+
+    // Create temp object for validation
     const groupToUpdate = { ...updated[index], [field]: value };
 
     if (checkForDuplicateScope(groupToUpdate, index)) {
@@ -599,30 +645,32 @@ const YPivotQAInspectionLineTableColorConfig = ({
       return;
     }
 
+    // 1. Update the Value (ID)
     updated[index][field] = value;
+
+    // 2. Resolve and Update the Name (Label)
+    if (optionsList && optionsList.length > 0) {
+      const selectedOption = optionsList.find((opt) => opt.value === value);
+      // Dynamic key: line -> lineName, table -> tableName, color -> colorName
+      const nameField = `${field}Name`;
+      updated[index][nameField] = selectedOption ? selectedOption.label : value;
+    }
+    // Fallback for color if optionsList wasn't passed or found
+    else if (field === "color") {
+      updated[index]["colorName"] = value;
+    }
+
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
 
+    // Update Active Group Context if needed
     if (activeGroup?.id === updated[index].id) {
-      // Re-resolve names if active group modified
-      const newLineName =
-        lines.find((l) => l.value === updated[index].line)?.label ||
-        updated[index].line ||
-        "";
-      const newTableName =
-        tables.find((t) => t.value === updated[index].table)?.label ||
-        updated[index].table ||
-        "";
-      const newColorName =
-        orderColors.find((c) => c.value === updated[index].color)?.label ||
-        updated[index].color ||
-        "";
-
       onSetActiveGroup({
         ...updated[index],
-        lineName: newLineName,
-        tableName: newTableName,
-        colorName: newColorName,
+        // Ensure we pass the updated names to the active context immediately
+        lineName: updated[index].lineName || updated[index].line,
+        tableName: updated[index].tableName || updated[index].table,
+        colorName: updated[index].colorName || updated[index].color,
         activeAssignmentId: activeGroup.activeAssignmentId,
         activeQC: activeGroup.activeQC
       });
@@ -781,6 +829,59 @@ const YPivotQAInspectionLineTableColorConfig = ({
     });
   };
 
+  // --- Validation Handler for Edit Switching ---
+  const handleToggleEdit = (targetGroupId) => {
+    // If we are currently editing a group, validate it before allowing switch/save
+    if (editingGroupId !== null) {
+      const currentGroup = groups.find((g) => g.id === editingGroupId);
+
+      if (currentGroup) {
+        const missingFields = [];
+
+        // Validate Line
+        if (showLine && !currentGroup.line) {
+          missingFields.push("Line");
+        }
+
+        // Validate Table (Skip if SubCon)
+        if (showTable && !config?.isSubCon && !currentGroup.table) {
+          missingFields.push("Table");
+        }
+
+        // Validate Color
+        if (showColors && !currentGroup.color) {
+          missingFields.push("Color");
+        }
+
+        // Validate QC (Check if ANY assignment row is missing a user)
+        if (showQC && currentGroup.assignments.some((a) => !a.qcUser)) {
+          missingFields.push("QC Inspector");
+        }
+
+        if (missingFields.length > 0) {
+          Swal.fire({
+            icon: "warning",
+            title: "Incomplete Configuration",
+            text: `Please fill the following required fields before saving or switching: ${missingFields.join(
+              ", "
+            )}`,
+            confirmButtonColor: "#f59e0b"
+          });
+          return; // STOP: Do not allow switching
+        }
+      }
+    }
+
+    // If validation passes (or no group was being edited), proceed to toggle
+    if (editingGroupId === targetGroupId) {
+      // We are clicking the Save icon on the CURRENT card -> Just close edit mode
+      setEditingGroupId(null);
+    } else {
+      // We are clicking Edit on a DIFFERENT card -> Switch to that card
+      setEditingGroupId(targetGroupId);
+    }
+  };
+
   if (!selectedTemplate) return null;
 
   const showLine = selectedTemplate.Line === "Yes";
@@ -791,6 +892,25 @@ const YPivotQAInspectionLineTableColorConfig = ({
   // Check conditions for "Add All Colors" button
   const canAddAllColors =
     showColors && !showLine && !showTable && orderColors.length > 0;
+
+  // --- Check if the currently editing group is valid ---
+  const isCurrentEditingGroupComplete = useMemo(() => {
+    // If nothing is being edited, it's considered "complete" (safe to add new)
+    if (editingGroupId === null) return true;
+
+    const group = groups.find((g) => g.id === editingGroupId);
+    if (!group) return true;
+
+    // Check specific requirements based on template
+    if (showLine && !group.line) return false;
+    // Table is required if shown AND not SubCon
+    if (showTable && !config?.isSubCon && !group.table) return false;
+    if (showColors && !group.color) return false;
+    // Check if any assignment in the group is missing a user
+    if (showQC && group.assignments.some((a) => !a.qcUser)) return false;
+
+    return true;
+  }, [groups, editingGroupId, showLine, showTable, showColors, showQC, config]);
 
   return (
     <div className="space-y-6 pb-20">
@@ -861,6 +981,11 @@ const YPivotQAInspectionLineTableColorConfig = ({
       <div className="space-y-4">
         {groups.map((group, gIdx) => {
           const isActive = activeGroup?.id === group.id;
+          // --- Determine if fields should be locked ---
+          const isEditing = editingGroupId === group.id;
+          const isLocked = !isEditing;
+          //const isLocked = isActive && !isEditing;
+
           return (
             <div
               key={group.id}
@@ -879,15 +1004,16 @@ const YPivotQAInspectionLineTableColorConfig = ({
                         options={lines}
                         selectedValue={group.line}
                         onSelectionChange={(val) =>
-                          handleUpdateGroup(gIdx, "line", val)
+                          handleUpdateGroup(gIdx, "line", val, lines)
                         }
                         placeholder="Select Line"
+                        disabled={isLocked}
                       />
                     </div>
                   )}
                   {showTable && (
                     <div className="w-full sm:w-32">
-                      {/* --- MODIFICATION 3: Show "N/A" Box for SubCon --- */}
+                      {/* ---Show "N/A" Box for SubCon --- */}
                       {config?.isSubCon ? (
                         <div className="opacity-75 cursor-not-allowed">
                           <label className="block text-xs font-bold text-gray-500 mb-1">
@@ -903,9 +1029,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
                           options={tables}
                           selectedValue={group.table}
                           onSelectionChange={(val) =>
-                            handleUpdateGroup(gIdx, "table", val)
+                            handleUpdateGroup(gIdx, "table", val, tables)
                           }
                           placeholder="Select Table"
+                          disabled={isLocked}
                         />
                       )}
                     </div>
@@ -918,9 +1045,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
                         options={orderColors}
                         selectedValue={group.color}
                         onSelectionChange={(val) =>
-                          handleUpdateGroup(gIdx, "color", val)
+                          handleUpdateGroup(gIdx, "color", val, orderColors)
                         }
                         placeholder="Select Color"
+                        disabled={isLocked}
                       />
                     </div>
                   )}
@@ -931,9 +1059,28 @@ const YPivotQAInspectionLineTableColorConfig = ({
                         <CheckCircle2 className="w-3 h-3" /> Active
                       </span>
                     )}
+                    {/* --- EDIT BUTTON --- */}
+                    <button
+                      onClick={() => handleToggleEdit(group.id)} // <--- USE NEW HANDLER
+                      className={`p-1.5 rounded-lg border transition-colors ${
+                        isEditing
+                          ? "bg-indigo-50 border-indigo-200 text-indigo-600 hover:bg-indigo-100"
+                          : "bg-white border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-300"
+                      }`}
+                      title={
+                        isEditing ? "Save / Done Editing" : "Edit Configuration"
+                      }
+                    >
+                      {isEditing ? (
+                        <Save className="w-4 h-4" />
+                      ) : (
+                        <Edit className="w-4 h-4" />
+                      )}
+                    </button>
                     <button
                       onClick={() => handleRemoveGroup(gIdx)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg disabled:opacity-30 disabled:hover:bg-transparent"
+                      disabled={isLocked}
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -969,24 +1116,50 @@ const YPivotQAInspectionLineTableColorConfig = ({
                         {showQC && (
                           <td className="px-4 py-3 align-top">
                             {assign.qcUser ? (
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
-                                  {assign.qcUser.eng_name?.charAt(0) || "U"}
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
+                                    {assign.qcUser.eng_name?.charAt(0) || "U"}
+                                  </div>
+                                  <div>
+                                    <p className="font-bold text-gray-800 dark:text-gray-200">
+                                      {assign.qcUser.eng_name}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {assign.qcUser.emp_id}
+                                    </p>
+                                  </div>
                                 </div>
-                                <div>
-                                  <p className="font-bold text-gray-800 dark:text-gray-200">
-                                    {assign.qcUser.eng_name}
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    {assign.qcUser.emp_id}
-                                  </p>
-                                </div>
+                                {/* Allow removing QC user if not locked */}
+                                {!isLocked && (
+                                  <button
+                                    onClick={() =>
+                                      handleUpdateAssignment(
+                                        gIdx,
+                                        aIdx,
+                                        "qcUser",
+                                        null
+                                      )
+                                    }
+                                    className="text-gray-400 hover:text-red-500"
+                                    title="Change QC"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                )}
                               </div>
                             ) : (
-                              <div className="flex gap-2 items-center">
+                              <div
+                                className={`flex gap-2 items-center ${
+                                  isLocked
+                                    ? "opacity-50 pointer-events-none"
+                                    : ""
+                                }`}
+                              >
                                 <button
                                   onClick={() => handleOpenScanner(gIdx)}
                                   className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg"
+                                  disabled={isLocked}
                                 >
                                   <Scan className="w-4 h-4" />{" "}
                                   <span className="hidden sm:inline text-xs font-bold">
@@ -1011,6 +1184,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
                                               gIdx
                                             );
                                         }}
+                                        disabled={isLocked}
                                       />
                                     ) : (
                                       <div className="px-3 py-2 bg-gray-100 text-gray-400 text-xs rounded border border-gray-200">
@@ -1018,12 +1192,20 @@ const YPivotQAInspectionLineTableColorConfig = ({
                                       </div>
                                     )
                                   ) : (
-                                    // INTERNAL: Use Search API
-                                    <QCUserSearch
-                                      onSelect={(user) =>
-                                        handleQCSelect(user, gIdx)
+                                    // Wrap internal search to disable pointer events if locked
+                                    <div
+                                      className={
+                                        isLocked
+                                          ? "pointer-events-none opacity-50"
+                                          : ""
                                       }
-                                    />
+                                    >
+                                      <QCUserSearch
+                                        onSelect={(user) =>
+                                          handleQCSelect(user, gIdx)
+                                        }
+                                      />
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -1044,7 +1226,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
                                     e.target.value
                                   )
                                 }
-                                className="w-24 px-3 py-2 border rounded-lg text-sm font-bold text-center focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                disabled={isLocked}
+                                className={`w-24 px-3 py-2 border rounded-lg text-sm font-bold text-center focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white ${
+                                  isLocked ? "bg-gray-50 text-gray-500" : ""
+                                }`}
                                 placeholder="0"
                               />
                               <span className="text-xs text-gray-400 font-medium">
@@ -1055,7 +1240,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
                         )}
                         <td className="px-4 py-3 text-right align-middle">
                           <div className="flex justify-end gap-2">
-                            {group.assignments.length > 1 && (
+                            {group.assignments.length > 1 && !isLocked && (
                               <button
                                 onClick={() =>
                                   handleRemoveAssignment(gIdx, aIdx)
@@ -1089,7 +1274,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
                     ))}
                   </tbody>
                 </table>
-                {showQC && !isAQL && (
+                {showQC && !isAQL && !isLocked && (
                   <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700">
                     <button
                       onClick={() => handleAddAssignment(gIdx)}
@@ -1119,7 +1304,12 @@ const YPivotQAInspectionLineTableColorConfig = ({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleAddGroup}
-            className="flex-1 py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 transition-colors"
+            disabled={!isCurrentEditingGroupComplete}
+            className={`flex-1 py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 font-bold transition-colors ${
+              !isCurrentEditingGroupComplete
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed border-gray-300" // Disabled Style
+                : "text-indigo-600 hover:bg-indigo-50 cursor-pointer" // Active Style
+            }`}
           >
             <Plus className="w-5 h-5" /> Add New Configuration Group
           </button>

@@ -1312,25 +1312,21 @@ export const updateInspectionConfig = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // We replace the config array or push to it?
-    // Usually, for the current inspection context, we want to update the entry
-    // corresponding to the current active report type.
-    // For simplicity in this structure, we will overwrite the list with the latest snapshot,
-    // or you can implement logic to find index by reportName and update.
-    // Here, we treat it as a single source of truth for the current session.
-
     // Construct the object based on schema
     const newConfigItem = {
       reportName: configData.reportName,
       inspectionMethod: configData.inspectionMethod,
       sampleSize: configData.sampleSize,
-      configGroups: configData.configGroups,
+      configGroups: configData.configGroups, // The updated list
       updatedAt: new Date()
     };
 
-    // Filter out old config for same report type if exists, then push new
-    // Or just set it if we only track one active config for the report
-    report.inspectionConfig = [newConfigItem];
+    // 1. Assign the new object
+    report.inspectionConfig = newConfigItem;
+
+    // 2. Force Mongoose to acknowledge the change
+    // This ensures deletions in the Mixed array are persisted
+    report.markModified("inspectionConfig");
 
     await report.save();
 
