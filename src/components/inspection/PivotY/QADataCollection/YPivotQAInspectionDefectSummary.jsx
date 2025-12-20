@@ -13,8 +13,8 @@ import {
   ThumbsUp,
   ThumbsDown,
   Loader2,
-  Target,
-  Percent
+  MapPin,
+  User
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
@@ -100,7 +100,7 @@ const YPivotQAInspectionDefectSummary = ({
     };
   }, [aqlConfigs, inspectedQty]);
 
-  // Process data for summary table
+  // --- Process data for summary table ---
   const summaryData = useMemo(() => {
     if (!savedDefects || savedDefects.length === 0) {
       return {
@@ -111,10 +111,14 @@ const YPivotQAInspectionDefectSummary = ({
       };
     }
 
-    // Group defects by config (groupId)
-    const groupedByConfig = savedDefects.reduce((acc, defect) => {
-      const configKey = defect.groupId || "legacy";
+    const groupsMap = {};
+    const allDefectsMap = {}; // For AQL table
+    const grandTotals = { minor: 0, major: 0, critical: 0, total: 0 };
+    const uniqueDefectsSet = new Set();
 
+    savedDefects.forEach((defect) => {
+      // 1. Identify Config Group
+      const configKey = defect.groupId || "legacy";
       let configLabel = "";
       if (defect.lineName) configLabel += `Line ${defect.lineName}`;
       if (defect.tableName)
@@ -123,21 +127,80 @@ const YPivotQAInspectionDefectSummary = ({
         configLabel += (configLabel ? " • " : "") + defect.colorName;
       if (!configLabel) configLabel = "Unknown";
 
-      if (!acc[configKey]) {
-        acc[configKey] = {
+      if (!groupsMap[configKey]) {
+        groupsMap[configKey] = {
           configKey,
           configLabel,
           lineName: defect.lineName,
           tableName: defect.tableName,
           colorName: defect.colorName,
           isActive: activeGroup && activeGroup.id === configKey,
-          defects: {}
+          defects: {}, // Store defects keyed by ID
+          totalRowsInConfig: 0 // To calculate Config RowSpan
         };
       }
 
       const defectKey = defect.defectId || defect.defectName;
-      if (!acc[configKey].defects[defectKey]) {
-        acc[configKey].defects[defectKey] = {
+      const status = defect.status?.toLowerCase();
+      const qcId = defect.qcUser?.emp_id || null;
+
+      uniqueDefectsSet.add(defectKey);
+
+      // 2. Initialize Defect Entry in this Config Group if not exists
+      if (!groupsMap[configKey].defects[defectKey]) {
+        groupsMap[configKey].defects[defectKey] = {
+          defectId: defect.defectId,
+          defectName: defect.defectName,
+          defectCode: defect.defectCode,
+          locations: [], // List of specific location rows for this defect
+          minorTotal: 0,
+          majorTotal: 0,
+          criticalTotal: 0,
+          grandTotal: 0
+        };
+      }
+
+      const defectEntry = groupsMap[configKey].defects[defectKey];
+      const qty = defect.qty || 1; // Total qty for this defect entry
+
+      // 3. Update Defect Totals (Aggregate)
+      if (status === "minor") defectEntry.minorTotal += qty;
+      else if (status === "major") defectEntry.majorTotal += qty;
+      else if (status === "critical") defectEntry.criticalTotal += qty;
+      defectEntry.grandTotal += qty;
+
+      // 4. Update Global Totals
+      if (status === "minor") grandTotals.minor += qty;
+      else if (status === "major") grandTotals.major += qty;
+      else if (status === "critical") grandTotals.critical += qty;
+      grandTotals.total += qty;
+
+      // 5. Build Location Rows
+      // If No Location, push a single entry
+      if (
+        defect.isNoLocation ||
+        !defect.locations ||
+        defect.locations.length === 0
+      ) {
+        defectEntry.locations.push({
+          display: "No Location",
+          qcId: qcId,
+          qty: qty
+        });
+      } else {
+        // If has locations, push each one
+        defect.locations.forEach((loc) => {
+          defectEntry.locations.push({
+            display: `${loc.locationName} (${loc.view})`,
+            qcId: qcId,
+            qty: loc.qty || 1
+          });
+        });
+      }
+
+      // 6. Update AQL Map
+      if (!allDefectsMap[defectKey]) {
+        allDefectsMap[defectKey] = {
           defectId: defect.defectId,
           defectName: defect.defectName,
           defectCode: defect.defectCode,
@@ -147,64 +210,28 @@ const YPivotQAInspectionDefectSummary = ({
           total: 0
         };
       }
+      if (status === "minor") allDefectsMap[defectKey].minor += qty;
+      else if (status === "major") allDefectsMap[defectKey].major += qty;
+      else if (status === "critical") allDefectsMap[defectKey].critical += qty;
+      allDefectsMap[defectKey].total += qty;
+    });
 
-      const qty = defect.qty || 1;
-      const status = defect.status?.toLowerCase();
-
-      if (status === "minor") {
-        acc[configKey].defects[defectKey].minor += qty;
-      } else if (status === "major") {
-        acc[configKey].defects[defectKey].major += qty;
-      } else if (status === "critical") {
-        acc[configKey].defects[defectKey].critical += qty;
-      }
-      acc[configKey].defects[defectKey].total += qty;
-
-      return acc;
-    }, {});
-
-    const groups = Object.values(groupedByConfig).map((group) => ({
-      ...group,
-      defects: Object.values(group.defects).sort((a, b) => {
+    // 7. Structure Final Data for Rendering
+    const groups = Object.values(groupsMap).map((group) => {
+      // Sort Defects by Code
+      const sortedDefects = Object.values(group.defects).sort((a, b) => {
         const codeA = parseFloat(a.defectCode) || 0;
         const codeB = parseFloat(b.defectCode) || 0;
         return codeA - codeB;
-      })
-    }));
-
-    // Calculate grand totals
-    const totals = { minor: 0, major: 0, critical: 0, total: 0 };
-    let uniqueDefectsSet = new Set();
-
-    // Aggregate defects for AQL table (combine same defects across all configs)
-    const allDefectsMap = {};
-
-    groups.forEach((group) => {
-      group.defects.forEach((defect) => {
-        totals.minor += defect.minor;
-        totals.major += defect.major;
-        totals.critical += defect.critical;
-        totals.total += defect.total;
-        uniqueDefectsSet.add(defect.defectId || defect.defectName);
-
-        // Aggregate for AQL table
-        const defectKey = defect.defectId || defect.defectName;
-        if (!allDefectsMap[defectKey]) {
-          allDefectsMap[defectKey] = {
-            defectId: defect.defectId,
-            defectName: defect.defectName,
-            defectCode: defect.defectCode,
-            minor: 0,
-            major: 0,
-            critical: 0,
-            total: 0
-          };
-        }
-        allDefectsMap[defectKey].minor += defect.minor;
-        allDefectsMap[defectKey].major += defect.major;
-        allDefectsMap[defectKey].critical += defect.critical;
-        allDefectsMap[defectKey].total += defect.total;
       });
+
+      // Calculate total rows needed for the Config column rowspan
+      let totalRows = 0;
+      sortedDefects.forEach((d) => {
+        totalRows += d.locations.length;
+      });
+
+      return { ...group, defects: sortedDefects, totalRowsInConfig: totalRows };
     });
 
     const defectsList = Object.values(allDefectsMap).sort((a, b) => {
@@ -215,7 +242,7 @@ const YPivotQAInspectionDefectSummary = ({
 
     return {
       groups,
-      totals,
+      totals: grandTotals,
       uniqueDefects: uniqueDefectsSet.size,
       defectsList
     };
@@ -238,9 +265,6 @@ const YPivotQAInspectionDefectSummary = ({
       critical: criticalCount
     } = summaryData.totals;
 
-    // Determine pass/fail for each status
-    // Pass if actual count <= Accept value (Ac)
-    // Fail if actual count >= Reject value (Re)
     const getStatus = (count, sample) => {
       if (!sample || sample.Ac === null || sample.Ac === undefined) {
         return { status: "N/A", reason: "No AQL config" };
@@ -260,22 +284,10 @@ const YPivotQAInspectionDefectSummary = ({
     const majorResult = getStatus(majorCount, majorSample);
     const criticalResult = getStatus(criticalCount, criticalSample);
 
-    // Final result: PASS only if ALL pass
-    const allPass =
-      minorResult.status === "PASS" &&
-      majorResult.status === "PASS" &&
-      criticalResult.status === "PASS";
-
-    // If any is N/A, check only the ones that have config
     const hasAnyFail =
       minorResult.status === "FAIL" ||
       majorResult.status === "FAIL" ||
       criticalResult.status === "FAIL";
-
-    let finalStatus = "PASS";
-    if (hasAnyFail) {
-      finalStatus = "FAIL";
-    }
 
     return {
       minor: {
@@ -296,26 +308,13 @@ const YPivotQAInspectionDefectSummary = ({
         ac: criticalSample?.Ac,
         re: criticalSample?.Re
       },
-      final: finalStatus,
+      final: hasAnyFail ? "FAIL" : "PASS",
       sampleSize: minorSample?.SampleSize || majorSample?.SampleSize || 0,
       batch: minorSample?.BatchName || majorSample?.BatchName || "N/A",
       sampleLetter:
         minorSample?.SampleLetter || majorSample?.SampleLetter || "N/A"
     };
   }, [isAQLMethod, aqlSampleData, summaryData.totals]);
-
-  // Calculate group subtotals
-  const getGroupSubtotals = (defects) => {
-    return defects.reduce(
-      (acc, defect) => ({
-        minor: acc.minor + defect.minor,
-        major: acc.major + defect.major,
-        critical: acc.critical + defect.critical,
-        total: acc.total + defect.total
-      }),
-      { minor: 0, major: 0, critical: 0, total: 0 }
-    );
-  };
 
   if (!savedDefects || savedDefects.length === 0) {
     return (
@@ -371,10 +370,10 @@ const YPivotQAInspectionDefectSummary = ({
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse min-w-[700px]">
+          <table className="w-full text-sm border-collapse min-w-[900px]">
             <thead>
               <tr className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800">
-                <th className="px-4 py-3 text-left font-bold text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 min-w-[160px]">
+                <th className="px-4 py-3 text-left font-bold text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 min-w-[150px]">
                   <div className="flex items-center gap-2">
                     <Layers className="w-4 h-4" />
                     Config
@@ -383,6 +382,13 @@ const YPivotQAInspectionDefectSummary = ({
                 <th className="px-4 py-3 text-left font-bold text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 min-w-[180px]">
                   Defect Name
                 </th>
+                <th className="px-4 py-3 text-left font-bold text-xs text-gray-600 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 min-w-[200px]">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    Location
+                  </div>
+                </th>
+                {/* Status Columns with Full Names */}
                 <th className="px-3 py-3 text-center font-bold text-xs uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 w-[80px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
                   Minor
                 </th>
@@ -399,127 +405,189 @@ const YPivotQAInspectionDefectSummary = ({
             </thead>
             <tbody>
               {summaryData.groups.map((group, groupIndex) => {
-                const totalRows = group.defects.length;
+                // Tracking current location row index within the group for rendering
+                let groupRenderIndex = 0;
 
-                return group.defects.map((defect, defectIndex) => (
-                  <tr
-                    key={`${group.configKey}-${defect.defectId}-${defectIndex}`}
-                    className={`border-b border-gray-100 dark:border-gray-700/50 ${
-                      group.isActive
-                        ? "bg-green-50/50 dark:bg-green-900/10"
-                        : groupIndex % 2 === 0
-                        ? "bg-white dark:bg-gray-800"
-                        : "bg-gray-50/50 dark:bg-gray-800/50"
-                    } hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors`}
-                  >
-                    {defectIndex === 0 && (
-                      <td
-                        rowSpan={totalRows}
-                        className={`px-4 py-3 align-top border-r border-gray-200 dark:border-gray-700 ${
+                return group.defects.map((defect, defectIndex) => {
+                  const defectLocationRows = defect.locations.length;
+
+                  return defect.locations.map((loc, locIndex) => {
+                    const isFirstGroupRow = groupRenderIndex === 0;
+                    const isFirstDefectRow = locIndex === 0;
+
+                    // Increment counter for next iteration
+                    groupRenderIndex++;
+
+                    return (
+                      <tr
+                        key={`${group.configKey}-${defect.defectId}-${locIndex}`}
+                        className={`border-b border-gray-100 dark:border-gray-700/50 ${
                           group.isActive
-                            ? "bg-green-100/50 dark:bg-green-900/20"
-                            : "bg-gray-50 dark:bg-gray-900/30"
-                        }`}
+                            ? "bg-green-50/50 dark:bg-green-900/10"
+                            : groupIndex % 2 === 0
+                            ? "bg-white dark:bg-gray-800"
+                            : "bg-gray-50/50 dark:bg-gray-800/50"
+                        } hover:bg-indigo-50/50 dark:hover:bg-indigo-900/10 transition-colors`}
                       >
-                        <div className="space-y-2">
-                          <div className="flex items-start gap-2">
-                            <Layers
-                              className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
-                                group.isActive
-                                  ? "text-green-500"
-                                  : "text-gray-400"
-                              }`}
-                            />
-                            <div className="min-w-0">
-                              {group.lineName && (
-                                <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                                  Line {group.lineName}
-                                </p>
-                              )}
-                              {group.tableName && (
-                                <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                                  Table {group.tableName}
-                                </p>
-                              )}
-                              {group.colorName && (
-                                <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
-                                  {group.colorName}
-                                </p>
+                        {/* Config Column: Render only on the very first row of the entire group */}
+                        {isFirstGroupRow && (
+                          <td
+                            rowSpan={group.totalRowsInConfig}
+                            className={`px-4 py-3 align-top border-r border-gray-200 dark:border-gray-700 ${
+                              group.isActive
+                                ? "bg-green-100/50 dark:bg-green-900/20"
+                                : "bg-gray-50 dark:bg-gray-900/30"
+                            }`}
+                          >
+                            <div className="space-y-2 sticky top-2">
+                              <div className="flex items-start gap-2">
+                                <Layers
+                                  className={`w-4 h-4 flex-shrink-0 mt-0.5 ${
+                                    group.isActive
+                                      ? "text-green-500"
+                                      : "text-gray-400"
+                                  }`}
+                                />
+                                <div className="min-w-0">
+                                  {group.lineName && (
+                                    <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                                      Line {group.lineName}
+                                    </p>
+                                  )}
+                                  {group.tableName && (
+                                    <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                                      Table {group.tableName}
+                                    </p>
+                                  )}
+                                  {group.colorName && (
+                                    <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-300">
+                                      {group.colorName}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                              {group.isActive && (
+                                <span className="inline-flex px-2 py-0.5 bg-green-500 text-white text-[8px] font-bold rounded-full uppercase tracking-wider">
+                                  Active
+                                </span>
                               )}
                             </div>
+                          </td>
+                        )}
+
+                        {/* Defect Name: Render only on the first row of this defect, span all location rows */}
+                        {isFirstDefectRow && (
+                          <td
+                            rowSpan={defectLocationRows}
+                            className="px-4 py-2.5 align-top border-r border-gray-100 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="flex-shrink-0 font-mono text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 min-w-[36px] text-center">
+                                {defect.defectCode}
+                              </span>
+                              <span className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                                {defect.defectName}
+                              </span>
+                            </div>
+                          </td>
+                        )}
+
+                        {/* Location Column: Render on EVERY row */}
+                        <td className="px-4 py-2.5 border-r border-gray-100 dark:border-gray-700/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+                              <span
+                                className={
+                                  loc.display === "No Location"
+                                    ? "text-gray-400 italic"
+                                    : "font-medium"
+                                }
+                              >
+                                {loc.display}
+                              </span>
+                              {loc.qcId && (
+                                <span className="inline-flex items-center gap-1 text-[9px] font-mono bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded border border-blue-100 dark:border-blue-800 ml-1">
+                                  <User className="w-3 h-3" />
+                                  {loc.qcId}
+                                </span>
+                              )}
+                            </div>
+                            {loc.qty > 0 && (
+                              <span className="text-[10px] bg-gray-100 dark:bg-gray-700 px-1.5 rounded text-gray-500 font-mono">
+                                Qty: {loc.qty}
+                              </span>
+                            )}
                           </div>
-                          {group.isActive && (
-                            <span className="inline-flex px-2 py-0.5 bg-green-500 text-white text-[8px] font-bold rounded-full uppercase tracking-wider">
-                              Active
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    )}
+                        </td>
 
-                    <td className="px-4 py-2.5 border-r border-gray-100 dark:border-gray-700/50">
-                      <div className="flex items-center gap-2">
-                        <span className="flex-shrink-0 font-mono text-[10px] bg-gray-200 dark:bg-gray-700 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-400 min-w-[36px] text-center">
-                          {defect.defectCode}
-                        </span>
-                        <span
-                          className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate"
-                          title={defect.defectName}
-                        >
-                          {defect.defectName}
-                        </span>
-                      </div>
-                    </td>
+                        {/* Status Columns: Render only on first row of defect, show AGGREGATE totals */}
+                        {isFirstDefectRow && (
+                          <>
+                            <td
+                              rowSpan={defectLocationRows}
+                              className="px-3 py-2.5 text-center align-top border-r border-gray-100 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50"
+                            >
+                              {defect.minorTotal > 0 ? (
+                                <span className="font-bold text-xs text-green-700 dark:text-green-400">
+                                  {defect.minorTotal}
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 dark:text-gray-600">
+                                  -
+                                </span>
+                              )}
+                            </td>
 
-                    <td className="px-3 py-2.5 text-center border-r border-gray-100 dark:border-gray-700/50">
-                      {defect.minor > 0 ? (
-                        <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 font-bold text-xs rounded-lg">
-                          {defect.minor}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-600">
-                          -
-                        </span>
-                      )}
-                    </td>
+                            <td
+                              rowSpan={defectLocationRows}
+                              className="px-3 py-2.5 text-center align-top border-r border-gray-100 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50"
+                            >
+                              {defect.majorTotal > 0 ? (
+                                <span className="font-bold text-xs text-orange-700 dark:text-orange-400">
+                                  {defect.majorTotal}
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 dark:text-gray-600">
+                                  -
+                                </span>
+                              )}
+                            </td>
 
-                    <td className="px-3 py-2.5 text-center border-r border-gray-100 dark:border-gray-700/50">
-                      {defect.major > 0 ? (
-                        <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-400 font-bold text-xs rounded-lg">
-                          {defect.major}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-600">
-                          -
-                        </span>
-                      )}
-                    </td>
+                            <td
+                              rowSpan={defectLocationRows}
+                              className="px-3 py-2.5 text-center align-top border-r border-gray-100 dark:border-gray-700/50 bg-white/50 dark:bg-gray-800/50"
+                            >
+                              {defect.criticalTotal > 0 ? (
+                                <span className="font-bold text-xs text-red-700 dark:text-red-400">
+                                  {defect.criticalTotal}
+                                </span>
+                              ) : (
+                                <span className="text-gray-300 dark:text-gray-600">
+                                  -
+                                </span>
+                              )}
+                            </td>
 
-                    <td className="px-3 py-2.5 text-center border-r border-gray-100 dark:border-gray-700/50">
-                      {defect.critical > 0 ? (
-                        <span className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 font-bold text-xs rounded-lg">
-                          {defect.critical}
-                        </span>
-                      ) : (
-                        <span className="text-gray-300 dark:text-gray-600">
-                          -
-                        </span>
-                      )}
-                    </td>
-
-                    <td className="px-3 py-2.5 text-center">
-                      <span className="inline-flex items-center justify-center min-w-[32px] h-7 px-2 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 font-bold text-sm rounded-lg">
-                        {defect.total}
-                      </span>
-                    </td>
-                  </tr>
-                ));
+                            <td
+                              rowSpan={defectLocationRows}
+                              className="px-3 py-2.5 text-center align-top bg-white/50 dark:bg-gray-800/50"
+                            >
+                              <span className="font-bold text-xs text-indigo-700 dark:text-indigo-400">
+                                {defect.grandTotal}
+                              </span>
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  });
+                });
               })}
 
               {/* Grand Totals Row */}
               <tr className="bg-gradient-to-r from-gray-800 via-gray-900 to-gray-800 text-white">
                 <td
-                  colSpan={2}
+                  colSpan={3}
                   className="px-4 py-4 text-right font-bold text-xs uppercase tracking-wider border-r border-gray-600"
                 >
                   <div className="flex items-center justify-end gap-2">
