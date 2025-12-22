@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef
+} from "react";
 import {
   FileText,
   Loader2,
@@ -21,7 +27,10 @@ import YPivotQAInspectionBuyerDetermination, {
   determineBuyerFromOrderNo
 } from "./YPivotQAInspectionBuyerDetermination";
 
-// ReportTypeCard (Unchanged)
+// ============================================================
+// Sub-Components
+// ============================================================
+
 const ReportTypeCard = ({ template, isSelected, onSelect }) => {
   const getMeasurementLabel = (measurement) => {
     switch (measurement) {
@@ -88,7 +97,6 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
   );
 };
 
-// SearchableSingleSelect (Unchanged)
 const SearchableSingleSelect = ({
   label,
   icon: Icon,
@@ -255,7 +263,6 @@ const SearchableSingleSelect = ({
   );
 };
 
-// AQLConfigTable (Unchanged)
 const AQLConfigTable = ({ aqlConfigs, inspectedQty, buyer }) => {
   if (!aqlConfigs || aqlConfigs.length === 0) {
     return (
@@ -425,7 +432,8 @@ const YPivotQAInspectionReportType = ({
   orderType = "single",
   onReportDataChange,
   savedState = {},
-  shippingStages = []
+  shippingStages = [],
+  loadedReportData = null
 }) => {
   const [reportTemplates, setReportTemplates] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(
@@ -467,6 +475,9 @@ const YPivotQAInspectionReportType = ({
   const [loadingSubConFactories, setLoadingSubConFactories] = useState(false);
   const [error, setError] = useState(null);
 
+  // Ref to track if we are currently hydrating from QR to block reset logic
+  const isHydratingRef = useRef(false);
+
   // Determine buyer
   const buyer = useMemo(() => {
     if (!selectedOrders?.length) return null;
@@ -478,145 +489,35 @@ const YPivotQAInspectionReportType = ({
     return orderData?.dtOrder?.totalQty || 0;
   }, [orderData]);
 
+  // --- Calculate Options EARLY (Before use in Effects or Render) ---
+  const subConFactoryOptions = useMemo(() => {
+    return subConFactories.map((factory) => ({
+      value: factory._id, // This ID is what gets saved into config.selectedSubConFactory
+      label: factory.factory_second_name
+        ? `${factory.factory} (${factory.factory_second_name})`
+        : factory.factory
+    }));
+  }, [subConFactories]);
+
+  const shippingStageOptions = useMemo(() => {
+    // Sort by 'no' to ensure correct order
+    const sorted = [...shippingStages].sort((a, b) => a.no - b.no);
+
+    return sorted.map((stage) => ({
+      value: stage.ShippingStage, // Value to store
+      label: stage.ShippingStage // Label to display
+    }));
+  }, [shippingStages]);
+
   // --- Calculations ---
 
   // Calculate the actual AQL Sample Size based on the Inspected Qty (Lot Size)
-  const aqlSampleSize = useMemo(() => {
-    if (!aqlConfigs || aqlConfigs.length === 0 || !inspectedQty) return 0;
-
-    // Usually standardizing on one config (e.g., Major) to get sample size from the table
-    // Adjust logic if your AQL config structure differs
-    const majorConfig =
-      aqlConfigs.find((c) => c.Status === "Major") ||
-      aqlConfigs.find((c) => c.Status === "Minor");
-    if (!majorConfig?.SampleData) return 0;
-
-    const qty = parseInt(inspectedQty);
-    const sample = majorConfig.SampleData.find(
-      (s) => qty >= s.Min && qty <= s.Max
-    );
-
-    return sample ? sample.SampleSize : 0;
-  }, [aqlConfigs, inspectedQty]);
-
-  // --- Effects ---
-
-  // Fetch Report Templates
-  useEffect(() => {
-    const fetchTemplates = async () => {
-      setLoadingTemplates(true);
-      try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/qa-sections-templates`
-        );
-        if (res.data.success) {
-          setReportTemplates(res.data.data);
-        }
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load report templates");
-      } finally {
-        setLoadingTemplates(false);
-      }
-    };
-    fetchTemplates();
-  }, []);
-
-  // Fetch Sub-Con Factories
-  useEffect(() => {
-    const fetchSubConFactories = async () => {
-      setLoadingSubConFactories(true);
-      try {
-        // Use the sub con sewing old management endpoint
-        const res = await axios.get(
-          `${API_BASE_URL}/api/subcon-sewing-factories-manage`
-        );
-
-        if (Array.isArray(res.data)) {
-          setSubConFactories(res.data);
-        } else if (res.data && Array.isArray(res.data.data)) {
-          // Fallback if wrapped
-          setSubConFactories(res.data.data);
-        }
-      } catch (err) {
-        console.error("Error fetching subcon factories", err);
-      } finally {
-        setLoadingSubConFactories(false);
-      }
-    };
-    fetchSubConFactories();
-  }, []);
-
-  // --- MODIFICATION 2: RESET FACTORY IF TOGGLED OFF ---
-  useEffect(() => {
-    if (!isSubCon) setSelectedSubConFactory(null);
-  }, [isSubCon]);
-
-  // Fetch AQL Config
-  useEffect(() => {
-    if (!buyer || buyer === "Unknown") {
-      setAqlConfigs([]);
-      return;
-    }
-    const fetchAqlConfig = async () => {
-      setLoadingAql(true);
-      try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${buyer}`
-        );
-        if (res.data.success) {
-          setAqlConfigs(res.data.data);
-        }
-      } catch (err) {
-        console.error(err);
-        setAqlConfigs([]);
-      } finally {
-        setLoadingAql(false);
-      }
-    };
-    fetchAqlConfig();
-  }, [buyer]);
-
-  // Reset factory if not subcon
-  useEffect(() => {
-    if (!isSubCon) setSelectedSubConFactory(null);
-  }, [isSubCon]);
-
-  // Logic: Reset and Auto-fill Inputs based on Template
-  useEffect(() => {
-    if (!selectedTemplate) return;
-
-    const savedId = savedState?.selectedTemplate?._id;
-    const currentId = selectedTemplate._id;
-    const isRestoring = savedId === currentId;
-
-    if (selectedTemplate.InspectedQtyMethod === "AQL") {
-      // If switching TO an AQL template (not restoring), clear the input.
-      if (!isRestoring) {
-        setInspectedQty("");
-      }
-    } else {
-      // Fixed / NA Method
-      if (!isRestoring) {
-        setInspectedQty(selectedTemplate.InspectedQty?.toString() || "");
-      } else {
-        if (inspectedQty === "" && selectedTemplate.InspectedQty) {
-          setInspectedQty(selectedTemplate.InspectedQty.toString());
-        }
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTemplate?._id]);
-
-  // --- NEW: Calculate Full AQL Configuration Object ---
   const calculatedAqlConfig = useMemo(() => {
-    // Return null if not AQL or no configs loaded
     if (!aqlConfigs || aqlConfigs.length === 0 || !inspectedQty) return null;
 
     const qty = parseInt(inspectedQty);
     if (isNaN(qty) || qty <= 0) return null;
 
-    // Helper to find sample row for a config
     const getSampleRow = (config) => {
       if (!config?.SampleData) return null;
       return config.SampleData.find((s) => qty >= s.Min && qty <= s.Max);
@@ -630,10 +531,8 @@ const YPivotQAInspectionReportType = ({
     const majorSample = getSampleRow(majorConfig);
     const criticalSample = getSampleRow(criticalConfig);
 
-    // If no matching batch found (e.g. qty too high or low), return null
     if (!minorSample && !majorSample && !criticalSample) return null;
 
-    // Use one of the found samples for common data (Batch, Letter, Size)
     const baseSample = minorSample || majorSample || criticalSample;
     const baseConfig = minorConfig || majorConfig || criticalConfig;
 
@@ -666,37 +565,207 @@ const YPivotQAInspectionReportType = ({
     return {
       inspectionType: baseConfig?.InspectionType || "General",
       level: baseConfig?.Level || "II",
-
-      // Top level Float values
       minorAQL: minorConfig?.AQLLevel || 0,
       majorAQL: majorConfig?.AQLLevel || 0,
       criticalAQL: criticalConfig?.AQLLevel || 0,
-
       inspectedQty: qty,
       batch: baseSample?.BatchName || "",
       sampleLetter: baseSample?.SampleLetter || "",
       sampleSize: baseSample?.SampleSize || 0,
-
       items: items
     };
   }, [aqlConfigs, inspectedQty]);
 
-  // Pass data to parent including calculated AQL Sample Size
+  const aqlSampleSize = useMemo(() => {
+    return calculatedAqlConfig?.sampleSize || 0;
+  }, [calculatedAqlConfig]);
+
+  // --- Effects ---
+
+  // Fetch Report Templates
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      setLoadingTemplates(true);
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/qa-sections-templates`
+        );
+        if (res.data.success) {
+          setReportTemplates(res.data.data);
+        }
+      } catch (err) {
+        console.error(err);
+        setError("Failed to load report templates");
+      } finally {
+        setLoadingTemplates(false);
+      }
+    };
+    fetchTemplates();
+  }, []);
+
+  // Fetch Sub-Con Factories
+  useEffect(() => {
+    const fetchSubConFactories = async () => {
+      setLoadingSubConFactories(true);
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/subcon-sewing-factories-manage`
+        );
+        if (Array.isArray(res.data)) {
+          setSubConFactories(res.data);
+        } else if (res.data && Array.isArray(res.data.data)) {
+          setSubConFactories(res.data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching subcon factories", err);
+      } finally {
+        setLoadingSubConFactories(false);
+      }
+    };
+    fetchSubConFactories();
+  }, []);
+
+  // Fetch AQL Config
+  useEffect(() => {
+    if (!buyer || buyer === "Unknown") {
+      setAqlConfigs([]);
+      return;
+    }
+    const fetchAqlConfig = async () => {
+      setLoadingAql(true);
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/aql-config?buyer=${buyer}`
+        );
+        if (res.data.success) {
+          setAqlConfigs(res.data.data);
+        }
+      } catch (err) {
+        console.error(err);
+        setAqlConfigs([]);
+      } finally {
+        setLoadingAql(false);
+      }
+    };
+    fetchAqlConfig();
+  }, [buyer]);
+
+  // --- HYDRATION LOGIC (Restore State from QR/Backend Data) ---
+  useEffect(() => {
+    // 1. Get the ID from the ROOT level of the loaded data
+    const backendReportTypeId = loadedReportData?.reportTypeId;
+
+    if (reportTemplates.length > 0 && backendReportTypeId) {
+      // 2. Compare with currently selected template
+      if (selectedTemplate?._id !== backendReportTypeId) {
+        // 3. Find the matching template object from your API list
+        const matchingTemplate = reportTemplates.find(
+          (t) => t._id === backendReportTypeId
+        );
+
+        if (matchingTemplate) {
+          // Block Reset Logic
+          isHydratingRef.current = true;
+
+          console.log("Hydrating Report Configuration...", loadedReportData);
+
+          // Get config details (these ARE inside inspectionDetails)
+          const details = loadedReportData.inspectionDetails || {};
+
+          // Set State
+          setSelectedTemplate(matchingTemplate);
+
+          // Hydrate the configuration values
+          setInspectedQty(
+            details.inspectedQty ? details.inspectedQty.toString() : ""
+          );
+          setCartonQty(details.cartonQty ? details.cartonQty.toString() : "");
+          setShippingStage(details.shippingStage || null);
+          setRemarks(details.remarks || "");
+          setIsSubCon(details.isSubCon || false);
+          setSelectedSubConFactory(details.subConFactoryId || null);
+          setSelectedProductTypeId(
+            loadedReportData.productTypeId || details.productTypeId || null
+          ); // Check root or details for productType
+
+          // Force Immediate Parent Update
+          if (onReportDataChange) {
+            onReportDataChange({
+              selectedTemplate: matchingTemplate,
+              config: {
+                inspectedQty: details.inspectedQty
+                  ? details.inspectedQty.toString()
+                  : "",
+                cartonQty: details.cartonQty
+                  ? details.cartonQty.toString()
+                  : "",
+                shippingStage: details.shippingStage || null,
+                remarks: details.remarks || "",
+                isSubCon: details.isSubCon || false,
+                selectedSubConFactory: details.subConFactoryId || null,
+                productTypeId:
+                  loadedReportData.productTypeId ||
+                  details.productTypeId ||
+                  null
+              }
+            });
+          }
+
+          // Release Block
+          setTimeout(() => {
+            isHydratingRef.current = false;
+          }, 200);
+        }
+      }
+    }
+  }, [reportTemplates, loadedReportData, selectedTemplate]);
+
+  // --- RESET LOGIC (Blocks when hydrating) ---
+  useEffect(() => {
+    if (isHydratingRef.current) return; // SKIP IF HYDRATING
+
+    if (!selectedTemplate) return;
+
+    const savedId = savedState?.selectedTemplate?._id;
+    const currentId = selectedTemplate._id;
+    const isRestoring = savedId === currentId;
+
+    if (selectedTemplate.InspectedQtyMethod === "AQL") {
+      if (!isRestoring) {
+        setInspectedQty("");
+      }
+    } else {
+      if (!isRestoring) {
+        setInspectedQty(selectedTemplate.InspectedQty?.toString() || "");
+      } else {
+        if (inspectedQty === "" && selectedTemplate.InspectedQty) {
+          setInspectedQty(selectedTemplate.InspectedQty.toString());
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTemplate?._id]);
+
+  // Reset factory if not subcon
+  useEffect(() => {
+    if (!isSubCon) setSelectedSubConFactory(null);
+  }, [isSubCon]);
+
+  // Pass data to parent
   useEffect(() => {
     if (onReportDataChange) {
       onReportDataChange({
         selectedTemplate,
         config: {
-          inspectedQty, // This is user input Lot Size
+          inspectedQty,
           aqlConfig: calculatedAqlConfig,
-          aqlSampleSize: calculatedAqlConfig?.sampleSize || 0,
-          //aqlSampleSize, // This is the calculated Sample Size for AQL
+          aqlSampleSize,
           cartonQty,
           isSubCon,
           selectedSubConFactory,
           shippingStage,
           remarks,
-          productTypeId: selectedProductTypeId // <--- FIX 4: Pass ID to parent config
+          productTypeId: selectedProductTypeId
         }
       });
     }
@@ -710,42 +779,14 @@ const YPivotQAInspectionReportType = ({
     selectedSubConFactory,
     shippingStage,
     remarks,
-    selectedProductTypeId, // Dependency
+    selectedProductTypeId,
     onReportDataChange
   ]);
 
-  const subConFactoryOptions = useMemo(() => {
-    return subConFactories.map((factory) => ({
-      value: factory._id, // This ID is what gets saved into config.selectedSubConFactory
-      label: factory.factory_second_name
-        ? `${factory.factory} (${factory.factory_second_name})`
-        : factory.factory
-    }));
-  }, [subConFactories]);
-
-  const shippingStageOptions = useMemo(() => {
-    // Sort by 'no' to ensure correct order
-    const sorted = [...shippingStages].sort((a, b) => a.no - b.no);
-
-    return sorted.map((stage) => ({
-      value: stage.ShippingStage, // Value to store
-      label: stage.ShippingStage // Label to display
-    }));
-  }, [shippingStages]);
-
-  // Visibility Flags
-  const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
-  const showShippingStage = selectedTemplate?.ShippingStage === "Yes";
-  const showCarton = selectedTemplate?.isCarton === "Yes";
-  const showConfigurationSection = selectedTemplate !== null;
-
-  // Handle input changes with VALIDATION
   const handleInspectedQtyChange = (e) => {
     const rawVal = e.target.value.replace(/[^0-9]/g, "");
     const val = parseInt(rawVal) || 0;
-
     if (maxOrderQty > 0 && val > maxOrderQty) {
-      // Cap at max qty
       setInspectedQty(maxOrderQty.toString());
     } else {
       setInspectedQty(rawVal);
@@ -762,10 +803,14 @@ const YPivotQAInspectionReportType = ({
     setRemarks(value);
   };
 
-  // <--- FIX 5: Callback to update local state from child
   const handleProductTypeUpdate = useCallback((id) => {
     setSelectedProductTypeId(id);
   }, []);
+
+  const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
+  const showShippingStage = selectedTemplate?.ShippingStage === "Yes";
+  const showCarton = selectedTemplate?.isCarton === "Yes";
+  const showConfigurationSection = selectedTemplate !== null;
 
   if (!selectedOrders?.length) {
     return (

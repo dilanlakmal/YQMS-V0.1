@@ -429,6 +429,21 @@ const YPivotQAInspection = () => {
     navigate("/home");
   }, [navigate]);
 
+  // --- Prepare QR Data Object ---
+  // This object aggregates the necessary info for the QR code.
+  // It prefers saved data (from DB), falling back to current state (for drafts).
+  const qrData = useMemo(() => {
+    return {
+      reportId: savedReportData?.reportId, // Only exists if saved
+      inspectionDate: sharedOrderState.inspectionDate,
+      orderNos: sharedOrderState.selectedOrders,
+      reportType: sharedReportState.selectedTemplate?.ReportType || "N/A",
+      inspectionType: sharedOrderState.inspectionType,
+      // If report is saved, use the empId from it. If new/draft, use current user's emp_id.
+      empId: savedReportData?.empId || user?.emp_id || "Unknown"
+    };
+  }, [savedReportData, sharedOrderState, sharedReportState, user]);
+
   const tabs = useMemo(
     () => [
       {
@@ -452,6 +467,7 @@ const YPivotQAInspection = () => {
             onSaveComplete={handleSaveComplete}
             savedReportId={savedReportData?.reportId}
             isReportSaved={isReportSaved}
+            savedReportData={savedReportData}
           />
         ),
         gradient: "from-blue-500 to-cyan-500",
@@ -583,6 +599,7 @@ const YPivotQAInspection = () => {
           <YPivotQAInspectionSummary
             orderData={sharedOrderState}
             reportData={sharedReportState}
+            qrData={qrData}
           />
         ),
         gradient: "from-indigo-500 to-violet-500",
@@ -607,7 +624,8 @@ const YPivotQAInspection = () => {
       handleSaveComplete,
       savedReportData,
       isReportSaved,
-      handlePPSheetUpdate
+      handlePPSheetUpdate,
+      qrData
     ]
   );
 
