@@ -67,13 +67,15 @@ const InspectionDataSection = ({
   setActualValues,
   machineStatus,
   setMachineStatus,
-  checkpointInspectionData, // This is the transactional data
+  checkpointInspectionData, 
   setCheckpointInspectionData,
-  timeCoolEnabled, // Prop from parent
-  setTimeCoolEnabled, // Prop from parent
-  timeHotEnabled, // Prop from parent
-  setTimeHotEnabled, // Prop from parent
-  checkpointDefinitions // This is the master list of checkpoints
+  timeCoolEnabled, 
+  setTimeCoolEnabled,
+  timeHotEnabled, 
+  setTimeHotEnabled, 
+  checkpointDefinitions,
+  formData,
+  setFormData, 
 }) => {
   const uploadRefs = useRef([]);
   const captureRefs = useRef([]);
@@ -194,40 +196,105 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
 
   // Existing useEffects remain the same...
   useEffect(() => {
-    const fetchStandardValues = async () => {
-      if (!washType) return; // Exit if no washType is selected
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards`);
-        const data = await response.json();
-        if (data.success) {
-          const standardRecord = data.data.find(record => record.washType === washType);
-          if (standardRecord) {
-            const washingMachineValues = { ...standardRecord.washingMachine };
-            const tumbleDryValues = { ...standardRecord.tumbleDry };
-
-            // Always set the standard values for display
-            setStandardValues({
-              "Washing Machine": washingMachineValues,
-              "Tumble Dry": tumbleDryValues
+  const fetchStandardValues = async () => {
+    if (!washType || !formData?.factoryName) return;
+    
+    console.log('=== FETCHING STANDARDS DEBUG ===');
+    console.log('washType:', washType);
+    console.log('factoryName:', formData.factoryName);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=${formData.factoryName}`);
+      const data = await response.json();
+      
+      console.log('API Response:', data);
+      
+      if (data.success && data.data.length > 0) {
+        console.log('Standards data:', data.data);
+        
+        const standardRecord = data.data.find(record => record.washType === washType);
+        console.log('Found standard record:', standardRecord);
+        
+        if (standardRecord) {
+          const washingMachineValues = { ...standardRecord.washingMachine };
+          const tumbleDryValues = { ...standardRecord.tumbleDry };
+          
+          console.log('Washing Machine Values:', washingMachineValues);
+          console.log('Tumble Dry Values:', tumbleDryValues);
+          
+          // Always set the standard values for display
+          setStandardValues({
+            "Washing Machine": washingMachineValues,
+            "Tumble Dry": tumbleDryValues
+          });
+          
+          // Only set actual values to standard if it's a new record (no recordId)
+          if (!recordId) {
+            setActualValues({
+              "Washing Machine": { ...washingMachineValues },
+              "Tumble Dry": { ...tumbleDryValues }
             });
-            
-            // Only set actual values to standard if it's a new record (no recordId)
-            // This prevents overwriting loaded data for existing records.
-            if (!recordId) {
-              setActualValues({
-                "Washing Machine": { ...washingMachineValues },
-                "Tumble Dry": { ...tumbleDryValues }
-              });
-            }
           }
+        } else {
+          console.log('No standard record found for washType:', washType);
+          await fetchFallbackStandards();
         }
-      } catch (error) {
-        console.error("Error fetching standard values:", error);
+      } else {
+        console.log('No standards found, trying fallback');
+        await fetchFallbackStandards();
       }
-    };
-    fetchStandardValues();
-  }, [washType, recordId, setStandardValues, setActualValues]);
+    } catch (error) {
+      console.error("Error fetching standard values:", error);
+      await fetchFallbackStandards();
+    }
+  };
 
+  const fetchFallbackStandards = async () => {
+    console.log('=== FETCHING FALLBACK STANDARDS (YM) ===');
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=YM`);
+      const data = await response.json();
+      
+      console.log('Fallback API Response:', data);
+      
+      if (data.success && data.data.length > 0) {
+        const standardRecord = data.data.find(record => record.washType === washType);
+        console.log('Fallback standard record:', standardRecord);
+        
+        if (standardRecord) {
+          const washingMachineValues = { ...standardRecord.washingMachine };
+          const tumbleDryValues = { ...standardRecord.tumbleDry };
+          
+          console.log('Fallback Washing Machine Values:', washingMachineValues);
+          console.log('Fallback Tumble Dry Values:', tumbleDryValues);
+          
+          setStandardValues({
+            "Washing Machine": washingMachineValues,
+            "Tumble Dry": tumbleDryValues
+          });
+          
+          if (!recordId) {
+            setActualValues({
+              "Washing Machine": { ...washingMachineValues },
+              "Tumble Dry": { ...tumbleDryValues }
+            });
+          }
+          
+          console.log(`Using YM factory standards as fallback for ${washType}`);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching fallback YM standards:", error);
+    }
+  };
+
+  fetchStandardValues();
+}, [washType, formData?.factoryName, recordId, setStandardValues, setActualValues]);
+
+useEffect(() => {
+  console.log('=== STANDARD VALUES STATE UPDATE ===');
+  console.log('standardValues:', standardValues);
+}, [standardValues]);
   // Rest of existing useEffects...
   useEffect(() => {
     const qty = Number(washQty);
@@ -2045,6 +2112,9 @@ InspectionDataSection.propTypes = {
   timeHotEnabled: PropTypes.bool.isRequired,
   setTimeHotEnabled: PropTypes.func.isRequired,
   checkpointDefinitions: PropTypes.array.isRequired,
+  formData: PropTypes.object.isRequired, 
+   setFormData: PropTypes.func 
+
 };
 
 export default InspectionDataSection;

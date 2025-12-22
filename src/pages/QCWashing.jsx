@@ -2738,6 +2738,8 @@ if (saved.inspectionDetails?.referenceSampleApproveDate) {
                       checkpointDefinitions={checkpointDefinitions}
                       referenceSampleApproveDate={referenceSampleApproveDate}
                       setReferenceSampleApproveDate={setReferenceSampleApproveDate}
+                      formData={formData}
+                      setFormData={setFormData} 
                     />
                   )}
 

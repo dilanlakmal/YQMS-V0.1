@@ -383,7 +383,6 @@ export const getQCWashingCheckListSummary = async (req, res) => {
       .limit(5)
       .select('name createdAt addedBy')
       .lean();
-
     res.json({
       totalCheckpoints,
       checkpointsWithSubPoints,
@@ -446,13 +445,11 @@ export const getQCWashingNextDefectCode = async (req, res) => {
   const lastDefect = await QCWashingDefects.findOne()
       .sort({ code: -1 })
       .lean();
-
     let nextCode = 1; // Default to 1 if no defects exist
     if (lastDefect && lastDefect.code) {
       // Increment the last code
       nextCode = parseInt(lastDefect.code, 10) + 1;
     }
-
     res.json({ success: true, nextCode });
   } catch (error) {
     console.error("Error fetching next defect code:", error);
@@ -678,39 +675,439 @@ export const deleteFirstOutputRecord = async (req, res) => {
   }
 };
 
-// POST /api/qc-washing/standards
+// POST /api/qc-washing/standards - Updated to save standards under factory
 export const addQCWashingStandards = async (req, res) => {
   try {
-      const { washType, washingMachine, tumbleDry } = req.body;
-      if (!washType)
-        return res
-          .status(400)
-          .json({ success: false, message: "washType is required" });
-  
-      let record = await QCWashingMachineStandard.findOne({ washType });
-      if (record) {
-        record.washingMachine = washingMachine;
-        record.tumbleDry = tumbleDry;
-        await record.save();
-      } else {
-        record = await QCWashingMachineStandard.create({
+    const { washType, factoryName, washingMachine, tumbleDry } = req.body;
+    
+    // Validation
+    if (!washType) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "washType is required" 
+      });
+    }
+    
+    if (!factoryName) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "factoryName is required" 
+      });
+    }
+
+    // Find or create factory record
+    let factoryRecord = await QCWashingMachineStandard.findOne({ factoryName });
+    
+    if (factoryRecord) {
+      // Update existing factory record
+      const existingStandardIndex = factoryRecord.standards.findIndex(
+        standard => standard.washType === washType
+      );
+      
+      if (existingStandardIndex !== -1) {
+        // Update existing wash type standard
+        factoryRecord.standards[existingStandardIndex] = {
           washType,
-          washingMachine,
-          tumbleDry
+          washingMachine: washingMachine || {},
+          tumbleDry: tumbleDry || {},
+          updatedAt: new Date()
+        };
+      } else {
+        // Add new wash type standard
+        factoryRecord.standards.push({
+          washType,
+          washingMachine: washingMachine || {},
+          tumbleDry: tumbleDry || {},
+          createdAt: new Date(),
+          updatedAt: new Date()
         });
       }
-      res.json({ success: true, data: record });
-    } catch (err) {
-      res.status(500).json({ success: false, message: err.message });
+      
+      factoryRecord.updatedAt = new Date();
+      await factoryRecord.save();
+    } else {
+      // Create new factory record with first standard
+      factoryRecord = await QCWashingMachineStandard.create({
+        factoryName,
+        standards: [{
+          washType,
+          washingMachine: washingMachine || {},
+          tumbleDry: tumbleDry || {},
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
     }
-};
 
-// GET /api/qc-washing/standards
-export const getQCWashingStandards = async (req, res) => {
-  try {
-    const records = await QCWashingMachineStandard.find({});
-    res.json({ success: true, data: records });
+    // Return the specific standard that was saved/updated
+    const savedStandard = factoryRecord.standards.find(
+      standard => standard.washType === washType
+    );
+
+    res.json({ 
+      success: true, 
+      data: {
+        ...savedStandard.toObject(),
+        factoryName: factoryRecord.factoryName
+      },
+      message: `${washType} standard saved successfully for ${factoryName} factory`
+    });
+
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
+    console.error("Error saving QC Washing standards:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to save standards"
+    });
   }
 };
+
+// GET /api/qc-washing/standards - Updated to get standards by factory
+export const getQCWashingStandards = async (req, res) => {
+  try {
+    const { factoryName } = req.query;
+    
+    console.log('=== CONTROLLER DEBUG ===');
+    console.log('Requested factoryName:', factoryName);
+    
+    if (!factoryName) {
+      return res.status(400).json({ 
+        success: false, 
+        message: "factoryName query parameter is required" 
+      });
+    }
+
+    // Use case-insensitive regex for factory name matching
+    const factoryRecord = await QCWashingMachineStandard.findOne({ 
+      factoryName: { $regex: new RegExp(`^${factoryName}$`, 'i') } 
+    });
+    
+    console.log('Found factory record:', factoryRecord);
+    
+    if (!factoryRecord) {
+      console.log('Factory not found, trying YM fallback');
+      // If requested factory not found, try YM as fallback
+      const fallbackRecord = await QCWashingMachineStandard.findOne({ 
+        factoryName: { $regex: new RegExp('^YM$', 'i') } 
+      });
+      console.log('Fallback record:', fallbackRecord);
+      
+      if (!fallbackRecord) {
+        return res.json({ 
+          success: true, 
+          data: [],
+          message: `No standards found for ${factoryName} factory or YM fallback`
+        });
+      }
+      
+      // Return YM standards as fallback
+      const transformedStandards = fallbackRecord.standards.map(standard => ({
+        washType: standard.washType,
+        washingMachine: standard.washingMachine,
+        tumbleDry: standard.tumbleDry,
+        factoryName: "YM",
+        createdAt: standard.createdAt,
+        updatedAt: standard.updatedAt
+      }));
+
+      console.log('Returning fallback standards:', transformedStandards);
+
+      return res.json({ 
+        success: true, 
+        data: transformedStandards,
+        factoryInfo: {
+          factoryName: "YM",
+          totalStandards: fallbackRecord.standards.length,
+          lastUpdated: fallbackRecord.updatedAt,
+          isFallback: true,
+          requestedFactory: factoryName
+        },
+        message: `Using YM standards as fallback for ${factoryName}`
+      });
+    }
+
+    // Transform standards to match expected format
+    const transformedStandards = factoryRecord.standards.map(standard => {
+      console.log('Processing standard:', standard);
+      return {
+        washType: standard.washType,
+        washingMachine: standard.washingMachine,
+        tumbleDry: standard.tumbleDry,
+        factoryName: factoryRecord.factoryName,
+        createdAt: standard.createdAt,
+        updatedAt: standard.updatedAt
+      };
+    });
+
+    console.log('Returning transformed standards:', transformedStandards);
+
+    res.json({ 
+      success: true, 
+      data: transformedStandards,
+      factoryInfo: {
+        factoryName: factoryRecord.factoryName,
+        totalStandards: factoryRecord.standards.length,
+        lastUpdated: factoryRecord.updatedAt,
+        isFallback: false
+      }
+    });
+
+  } catch (err) {
+    console.error("Error fetching QC Washing standards:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to fetch standards"
+    });
+  }
+};
+
+// GET /api/qc-washing/standards/all-factories - Get all factories with their standards
+export const getAllFactoryStandards = async (req, res) => {
+  try {
+    const allFactoryRecords = await QCWashingMachineStandard.find({})
+          .sort({ factoryName: 1 });
+
+    const factorySummary = allFactoryRecords.map(factory => ({
+      factoryName: factory.factoryName,
+      totalStandards: factory.standards.length,
+      washTypes: factory.standards.map(s => s.washType),
+      createdAt: factory.createdAt,
+      updatedAt: factory.updatedAt
+    }));
+
+    res.json({ 
+      success: true, 
+      data: factorySummary,
+      totalFactories: allFactoryRecords.length
+    });
+
+  } catch (err) {
+    console.error("Error fetching all factory standards:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to fetch factory standards"
+    });
+  }
+};
+
+// GET /api/qc-washing/standards/factory/:factoryName - Get specific factory's all standards
+export const getFactoryStandards = async (req, res) => {
+  try {
+    const { factoryName } = req.params;
+    
+    const factoryRecord = await QCWashingMachineStandard.findOne({ factoryName });
+    
+    if (!factoryRecord) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Factory '${factoryName}' not found`
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      data: {
+        factoryName: factoryRecord.factoryName,
+        standards: factoryRecord.standards,
+        totalStandards: factoryRecord.standards.length,
+        createdAt: factoryRecord.createdAt,
+        updatedAt: factoryRecord.updatedAt
+      }
+    });
+
+  } catch (err) {
+    console.error("Error fetching factory standards:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to fetch factory standards"
+    });
+  }
+};
+
+// DELETE /api/qc-washing/standards/factory/:factoryName/washtype/:washType - Delete specific wash type standard
+export const deleteFactoryWashTypeStandard = async (req, res) => {
+  try {
+    const { factoryName, washType } = req.params;
+    
+    const factoryRecord = await QCWashingMachineStandard.findOne({ factoryName });
+    
+    if (!factoryRecord) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Factory '${factoryName}' not found`
+      });
+    }
+
+    // Find and remove the specific wash type standard
+    const standardIndex = factoryRecord.standards.findIndex(
+      standard => standard.washType === washType
+    );
+
+    if (standardIndex === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Wash type '${washType}' not found for factory '${factoryName}'`
+      });
+    }
+
+    // Remove the standard
+    factoryRecord.standards.splice(standardIndex, 1);
+    factoryRecord.updatedAt = new Date();
+
+    // If no standards left, delete the entire factory record
+    if (factoryRecord.standards.length === 0) {
+      await QCWashingMachineStandard.findByIdAndDelete(factoryRecord._id);
+      return res.json({ 
+        success: true, 
+        message: `Factory '${factoryName}' and all its standards deleted successfully`
+      });
+    }
+
+    await factoryRecord.save();
+
+    res.json({ 
+      success: true, 
+      message: `${washType} standard deleted successfully from ${factoryName} factory`,
+      remainingStandards: factoryRecord.standards.length
+    });
+
+  } catch (err) {
+    console.error("Error deleting wash type standard:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to delete wash type standard"
+    });
+  }
+};
+
+// DELETE /api/qc-washing/standards/factory/:factoryName - Delete entire factory and all its standards
+export const deleteFactoryStandards = async (req, res) => {
+  try {
+    const { factoryName } = req.params;
+    
+    const deletedFactory = await QCWashingMachineStandard.findOneAndDelete({ factoryName });
+    
+    if (!deletedFactory) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Factory '${factoryName}' not found`
+      });
+    }
+
+    res.json({ 
+      success: true, 
+      message: `Factory '${factoryName}' and all its standards (${deletedFactory.standards.length} standards) deleted successfully`
+    });
+
+  } catch (err) {
+    console.error("Error deleting factory standards:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to delete factory standards"
+    });
+  }
+};
+
+// PUT /api/qc-washing/standards/factory/:factoryName/washtype/:washType - Update specific wash type standard
+export const updateFactoryWashTypeStandard = async (req, res) => {
+  try {
+    const { factoryName, washType } = req.params;
+    const { washingMachine, tumbleDry } = req.body;
+    
+    const factoryRecord = await QCWashingMachineStandard.findOne({ factoryName });
+    
+    if (!factoryRecord) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Factory '${factoryName}' not found`
+      });
+    }
+
+    // Find the specific wash type standard
+    const standardIndex = factoryRecord.standards.findIndex(
+      standard => standard.washType === washType
+    );
+
+    if (standardIndex === -1) {
+      return res.status(404).json({ 
+        success: false, 
+        message: `Wash type '${washType}' not found for factory '${factoryName}'`
+      });
+    }
+
+    // Update the standard
+    factoryRecord.standards[standardIndex] = {
+      ...factoryRecord.standards[standardIndex].toObject(),
+      washingMachine: washingMachine || factoryRecord.standards[standardIndex].washingMachine,
+      tumbleDry: tumbleDry || factoryRecord.standards[standardIndex].tumbleDry,
+      updatedAt: new Date()
+    };
+
+    factoryRecord.updatedAt = new Date();
+    await factoryRecord.save();
+
+    const updatedStandard = factoryRecord.standards[standardIndex];
+
+    res.json({ 
+      success: true, 
+      data: {
+        ...updatedStandard.toObject(),
+        factoryName: factoryRecord.factoryName
+      },
+      message: `${washType} standard updated successfully for ${factoryName} factory`
+    });
+
+  } catch (err) {
+    console.error("Error updating wash type standard:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to update wash type standard"
+    });
+  }
+};
+
+// GET /api/qc-washing/standards/summary - Get summary of all standards across all factories
+export const getStandardsSummary = async (req, res) => {
+  try {
+    const allFactories = await QCWashingMachineStandard.find({});
+    
+    let totalStandards = 0;
+    const washTypeCounts = {};
+    const factoryDetails = [];
+
+    allFactories.forEach(factory => {
+      totalStandards += factory.standards.length;
+      
+      factoryDetails.push({
+        factoryName: factory.factoryName,
+        standardsCount: factory.standards.length,
+        washTypes: factory.standards.map(s => s.washType),
+        lastUpdated: factory.updatedAt
+      });
+
+      factory.standards.forEach(standard => {
+        washTypeCounts[standard.washType] = (washTypeCounts[standard.washType] || 0) + 1;
+      });
+    });
+
+    res.json({
+      success: true,
+      summary: {
+        totalFactories: allFactories.length,
+        totalStandards,
+        washTypeCounts,
+        factoryDetails
+      }
+    });
+
+  } catch (err) {
+    console.error("Error fetching standards summary:", err);
+    res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to fetch standards summary"
+    });
+  }
+};
+

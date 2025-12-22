@@ -4,7 +4,25 @@ import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 import { useAuth } from "../../../authentication/AuthContext";
-import { Plus, Loader2, Trash2, Edit3, MessageSquare, X, Check } from "lucide-react";
+import { 
+  Plus, 
+  Loader2, 
+  Trash2, 
+  Edit3, 
+  MessageSquare, 
+  X, 
+  Check,
+  Settings,
+  CheckCircle,
+  AlertTriangle,
+  Info,
+  Target,
+  Layers,
+  Globe,
+  Languages,
+  Eye,
+  Save
+} from "lucide-react";
 
 const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
   const { t } = useTranslation();
@@ -280,7 +298,12 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
       Swal.fire({
         icon: "warning",
         title: "Validation Error",
-        text: "English remark is required"
+        text: "English remark is required",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
       });
       return;
     }
@@ -317,7 +340,6 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
       }
       return checkpoint;
     }));
-
     closeRemarkModal();
   };
 
@@ -351,133 +373,77 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
   };
 
   const prepareCheckpointData = (checkpoint) => {
-  console.log('=== PREPARE CHECKPOINT DATA START ===');
-  console.log('Input checkpoint:', JSON.stringify(checkpoint, null, 2));
-  
-  const filterValidOptions = (options, optionType) => {
-    if (!options || !Array.isArray(options)) {
-      console.log('No options or not array:', options);
-      return [];
-    }
-    
-    const filtered = options.filter(opt => {
-      const isValid = opt && opt.name && String(opt.name).trim().length > 0;
-      console.log(`Option "${opt?.name}" is valid: ${isValid}`);
-      return isValid;
-    });
-    
-    console.log('Filtered options:', filtered);
-    return filtered.map(opt => ({
-      id: opt.id ? String(opt.id) : String(Date.now() + Math.random()), // Ensure string
-      name: String(opt.name).trim(),
-      isDefault: Boolean(opt.isDefault),
-      isFail: Boolean(opt.isFail),
-      hasRemark: Boolean(opt.hasRemark),
-      remark: opt.hasRemark && opt.remark ? {
-        english: String(opt.remark.english || '').trim(),
-        khmer: String(opt.remark.khmer || '').trim(),
-        chinese: String(opt.remark.chinese || '').trim()
-      } : null
-    }));
-  };
+    const filterValidOptions = (options, optionType) => {
+      if (!options || !Array.isArray(options)) {
+        return [];
+      }
+      
+      const filtered = options.filter(opt => {
+        return opt && opt.name && String(opt.name).trim().length > 0;
+      });
+      
+      return filtered.map(opt => ({
+        id: opt.id ? String(opt.id) : String(Date.now() + Math.random()),
+        name: String(opt.name).trim(),
+        isDefault: Boolean(opt.isDefault),
+        isFail: Boolean(opt.isFail),
+        hasRemark: Boolean(opt.hasRemark),
+        remark: opt.hasRemark && opt.remark ? {
+          english: String(opt.remark.english || '').trim(),
+          khmer: String(opt.remark.khmer || '').trim(),
+          chinese: String(opt.remark.chinese || '').trim()
+        } : null
+      }));
+    };
 
-  // Process subPoints with detailed logging
-  let processedSubPoints = [];
-  
-  console.log('Raw subPoints:', checkpoint.subPoints);
-  console.log('SubPoints is array:', Array.isArray(checkpoint.subPoints));
-  console.log('SubPoints length:', checkpoint.subPoints?.length || 0);
-  
-  if (checkpoint.subPoints && Array.isArray(checkpoint.subPoints) && checkpoint.subPoints.length > 0) {
-    console.log('Processing subPoints...');
+    let processedSubPoints = [];
     
-    processedSubPoints = checkpoint.subPoints
-      .filter(sub => {
-        console.log('=== FILTERING SUB POINT ===');
-        console.log('Raw sub point:', JSON.stringify(sub, null, 2));
-        
-        if (!sub) {
-          console.log('Sub point is null/undefined');
-          return false;
-        }
-        
-        if (!sub.name) {
-          console.log('Sub point has no name');
-          return false;
-        }
-        
-        const name = String(sub.name).trim();
-        if (name.length === 0) {
-          console.log('Sub point name is empty after trim');
-          return false;
-        }
-        
-        if (!sub.options || !Array.isArray(sub.options)) {
-          console.log('Sub point has no options or options is not array');
-          return false;
-        }
-        
-        const hasValidOptions = sub.options.some(opt => 
-          opt && opt.name && String(opt.name).trim().length > 0
-        );
-        
-        console.log(`Sub point "${name}" has valid options: ${hasValidOptions}`);
-        console.log('Sub point options:', JSON.stringify(sub.options, null, 2));
-        
-        const isValid = hasValidOptions;
-        console.log(`Sub point "${name}" is valid: ${isValid}`);
-        
-        return isValid;
-      })
-      .map(sub => {
-        console.log('=== MAPPING SUB POINT ===');
-        console.log('Mapping sub point:', JSON.stringify(sub, null, 2));
-        
-        const subPointData = {
-          id: sub.id ? String(sub.id) : String(Date.now() + Math.random()), // Ensure string
+    if (checkpoint.subPoints && Array.isArray(checkpoint.subPoints) && checkpoint.subPoints.length > 0) {
+      processedSubPoints = checkpoint.subPoints
+        .filter(sub => {
+          if (!sub || !sub.name) return false;
+          const name = String(sub.name).trim();
+          if (name.length === 0) return false;
+          if (!sub.options || !Array.isArray(sub.options)) return false;
+          const hasValidOptions = sub.options.some(opt => 
+            opt && opt.name && String(opt.name).trim().length > 0
+          );
+          return hasValidOptions;
+        })
+        .map(sub => ({
+          id: sub.id ? String(sub.id) : String(Date.now() + Math.random()),
           name: String(sub.name).trim(),
           optionType: sub.optionType || 'passfail',
           options: filterValidOptions(sub.options, sub.optionType || 'passfail')
-        };
-        console.log('Mapped sub point data:', JSON.stringify(subPointData, null, 2));
-        return subPointData;
-      });
-  } else {
-    console.log('No subPoints to process');
-  }
+        }));
+    }
 
-  const result = {
-    name: String(checkpoint.name).trim(),
-    optionType: checkpoint.optionType || 'passfail',
-    options: filterValidOptions(checkpoint.options, checkpoint.optionType),
-    subPoints: processedSubPoints,
-    failureImpact: checkpoint.failureImpact || 'customize'
+    return {
+      name: String(checkpoint.name).trim(),
+      optionType: checkpoint.optionType || 'passfail',
+      options: filterValidOptions(checkpoint.options, checkpoint.optionType),
+      subPoints: processedSubPoints,
+      failureImpact: checkpoint.failureImpact || 'customize'
+    };
   };
-
-  console.log('=== PREPARE CHECKPOINT DATA END ===');
-  console.log('Final prepared data:', JSON.stringify(result, null, 2));
-  console.log('Final subPoints count:', result.subPoints.length);
-  
-  return result;
-};
-
 
   const handleSubmit = async () => {
     if (checkpoints.length === 0) return;
-
     setIsSubmitting(true);
+    
     try {
       const validCheckpoints = checkpoints.filter(cp => cp.name && cp.name.trim());
-      
-      console.log('=== SUBMIT DEBUG START ===');
-      console.log('Original checkpoints:', JSON.stringify(checkpoints, null, 2));
-      console.log('Valid checkpoints:', JSON.stringify(validCheckpoints, null, 2));
       
       if (validCheckpoints.length === 0) {
         Swal.fire({
           icon: "warning",
           title: "No Valid Checkpoints",
-          text: "Please add at least one checkpoint with a name"
+          text: "Please add at least one checkpoint with a name",
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+          position: 'top-end',
+          toast: true
         });
         setIsSubmitting(false);
         return;
@@ -485,27 +451,35 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
 
       // Validate remarks
       for (const checkpoint of validCheckpoints) {
-        // Check main options
         for (const option of checkpoint.options) {
           if (option.hasRemark && (!option.remark?.english || !option.remark.english.trim())) {
             Swal.fire({
               icon: "warning",
               title: "Invalid Remark",
-              text: `Option "${option.name}" in checkpoint "${checkpoint.name}" has remark enabled but English remark is missing`
+              text: `Option "${option.name}" in checkpoint "${checkpoint.name}" has remark enabled but English remark is missing`,
+              showConfirmButton: false,
+              timer: 3000,
+              timerProgressBar: true,
+              position: 'top-end',
+              toast: true
             });
             setIsSubmitting(false);
             return;
           }
         }
 
-        // Check sub point options
         for (const subPoint of checkpoint.subPoints) {
           for (const option of subPoint.options) {
             if (option.hasRemark && (!option.remark?.english || !option.remark.english.trim())) {
               Swal.fire({
                 icon: "warning",
                 title: "Invalid Remark",
-                text: `Option "${option.name}" in sub point "${subPoint.name}" has remark enabled but English remark is missing`
+                text: `Option "${option.name}" in sub point "${subPoint.name}" has remark enabled but English remark is missing`,
+                showConfirmButton: false,
+                timer: 3000,
+                timerProgressBar: true,
+                position: 'top-end',
+                toast: true
               });
               setIsSubmitting(false);
               return;
@@ -515,33 +489,34 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
       }
 
       for (const checkpoint of validCheckpoints) {
-        console.log('=== PROCESSING CHECKPOINT ===');
-        console.log('Raw checkpoint:', JSON.stringify(checkpoint, null, 2));
-        
         const preparedData = prepareCheckpointData(checkpoint);
-        
-        console.log('=== PREPARED DATA ===');
-        console.log('Prepared checkpoint data:', JSON.stringify(preparedData, null, 2));
-        console.log('Sub points count:', preparedData.subPoints?.length || 0);
         
         if (!preparedData.options || preparedData.options.length === 0) {
           Swal.fire({
             icon: "warning",
             title: "Invalid Checkpoint",
-            text: `Checkpoint "${checkpoint.name}" must have at least one valid option`
+            text: `Checkpoint "${checkpoint.name}" must have at least one valid option`,
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true,
+            position: 'top-end',
+            toast: true
           });
           setIsSubmitting(false);
           return;
         }
 
-        // Check each sub point
         for (const subPoint of preparedData.subPoints || []) {
-          console.log('Validating sub point:', JSON.stringify(subPoint, null, 2));
           if (!subPoint.options || subPoint.options.length === 0) {
             Swal.fire({
               icon: "warning",
               title: "Invalid Sub Point",
-              text: `Sub point "${subPoint.name}" must have at least one valid option`
+              text: `Sub point "${subPoint.name}" must have at least one valid option`,
+              showConfirmButton: false,
+              timer: 2000,
+              timerProgressBar: true,
+              position: 'top-end',
+              toast: true
             });
             setIsSubmitting(false);
             return;
@@ -560,28 +535,32 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
           }
         };
         
-        console.log('=== SENDING TO API ===');
-        console.log('Final data to send:', JSON.stringify(dataToSend, null, 2));
-        
-        const response = await axios.post(`${API_BASE_URL}/api/qc-washing-checklist`, dataToSend);
-        console.log('API Response:', response.data);
+        await axios.post(`${API_BASE_URL}/api/qc-washing-checklist`, dataToSend);
       }
       
       Swal.fire({
         icon: "success",
-        title: t("common.success"),
-        text: "Checkpoints added successfully"
+        title: "Success!",
+        text: "Checkpoints added successfully",
+        showConfirmButton: false,
+        timer: 2000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
       });
       
       setCheckpoints([]);
       onCheckpointAdded();
     } catch (error) {
-      console.error('=== SUBMIT ERROR ===');
-      console.error('Submit error:', error.response?.data || error.message);
       Swal.fire({
         icon: "error",
-        title: t("common.error"),
-        text: error.response?.data?.message || "Failed to add checkpoints"
+        title: "Error!",
+        text: error.response?.data?.message || "Failed to add checkpoints",
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
       });
     } finally {
       setIsSubmitting(false);
@@ -590,371 +569,567 @@ const QCWashingCheckpointForm = ({ onCheckpointAdded }) => {
 
   const renderOptionsGrid = (options, mainId, subId = null) => {
     return (
-      <div className="grid grid-cols-1 gap-2 p-2 border rounded bg-gray-50 dark:bg-gray-700">
+      <div className="space-y-3">
         {options.map((option, index) => (
-          <div key={option.id} className="flex items-center space-x-2 p-2 border rounded bg-white dark:bg-gray-800">
-            <span className="text-xs text-gray-600 dark:text-gray-300 min-w-[20px]">
-              {index + 1}.
-            </span>
-            <input
-              type="text"
-              value={option.name}
-              onChange={(e) => updateOption(mainId, subId, option.id, 'name', e.target.value)}
-              className="flex-1 px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded"
-              placeholder="Option name"
-            />
-            <div className="flex items-center space-x-1">
+          <div key={option.id} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0 w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center">
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  {index + 1}
+                </span>
+              </div>
+              
               <input
-                type="checkbox"
-                checked={option.isDefault}
-                onChange={(e) => updateOption(mainId, subId, option.id, 'isDefault', e.target.checked)}
-                className="w-3 h-3 text-green-600"
-                title="Default"
+                type="text"
+                value={option.name}
+                onChange={(e) => updateOption(mainId, subId, option.id, 'name', e.target.value)}
+                className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                placeholder="Enter option name"
               />
-              <span className="text-xs text-green-600 dark:text-green-400">Def</span>
-            </div>
-            <div className="flex items-center space-x-1">
-              <input
-                type="checkbox"
-                checked={option.isFail}
-                onChange={(e) => updateOption(mainId, subId, option.id, 'isFail', e.target.checked)}
-                className="w-3 h-3 text-red-600"
-                title="Fail"
-              />
-              <span className="text-xs text-red-600 dark:text-red-400">Fail</span>
-            </div>
-            
-            {/* Remark Section */}
-            <div className="flex items-center space-x-1">
-              {option.hasRemark ? (
+              
+              <div className="flex items-center space-x-4">
+                {/* Default Checkbox */}
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={option.isDefault}
+                    onChange={(e) => updateOption(mainId, subId, option.id, 'isDefault', e.target.checked)}
+                    className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-xs font-medium text-green-600 dark:text-green-400">Default</span>
+                </label>
+                
+                {/* Fail Checkbox */}
+                <label className="flex items-center space-x-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={option.isFail}
+                    onChange={(e) => updateOption(mainId, subId, option.id, 'isFail', e.target.checked)}
+                    className="w-4 h-4 text-red-600 bg-gray-100 border-gray-300 rounded focus:ring-red-500 dark:focus:ring-red-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                  />
+                  <span className="text-xs font-medium text-red-600 dark:text-red-400">Fail</span>
+                </label>
+                
+                {/* Remark Button */}
                 <div className="flex items-center space-x-1">
-                  <button
-                    onClick={() => openRemarkModal(mainId, subId, option.id)}
-                    className="p-1 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded"
-                    title="Edit Remark"
-                  >
-                    <MessageSquare className="h-3 w-3" />
-                  </button>
-                  <button
-                    onClick={() => removeRemark(mainId, subId, option.id)}
-                    className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded"
-                    title="Remove Remark"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                  <span className="text-xs text-blue-600 dark:text-blue-400">
-                    <Check className="h-3 w-3" />
-                  </span>
+                  {option.hasRemark ? (
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => openRemarkModal(mainId, subId, option.id)}
+                        className="p-2 text-blue-500 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
+                        title="Edit Remark"
+                      >
+                        <MessageSquare className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => removeRemark(mainId, subId, option.id)}
+                        className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                        title="Remove Remark"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <div className="p-1 bg-green-100 dark:bg-green-900/30 rounded-full">
+                        <Check className="h-3 w-3 text-green-600 dark:text-green-400" />
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => openRemarkModal(mainId, subId, option.id)}
+                      className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                      title="Add Remark"
+                    >
+                      <MessageSquare className="h-4 w-4" />
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <button
-                  onClick={() => openRemarkModal(mainId, subId, option.id)}
-                  className="p-1 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-                  title="Add Remark"
-                >
-                  <MessageSquare className="h-3 w-3" />
-                </button>
-              )}
+                
+                {/* Delete Button */}
+                {options.length > 1 && (
+                  <button
+                    onClick={() => deleteOption(mainId, subId, option.id)}
+                    className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                    title="Delete Option"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
-
-            {options.length > 1 && (
-              <button
-                onClick={() => deleteOption(mainId, subId, option.id)}
-                className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900 rounded"
-                title="Delete Option"
-              >
-                <Trash2 className="h-3 w-3" />
-              </button>
-            )}
           </div>
         ))}
       </div>
     );
   };
 
-  const renderCheckpointCard = (checkpoint) => {
+  const renderCheckpointCard = (checkpoint, index) => {
     return (
-      <div key={checkpoint.id} className="border border-gray-300 dark:border-gray-600 rounded-lg p-4 bg-white dark:bg-gray-800 shadow-sm">
-        {/* Main Checkpoint Header */}
-        <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200 dark:border-gray-600">
-          <div className="flex items-center space-x-2 flex-1">
-            <Edit3 className="h-4 w-4 text-blue-500" />
-            <input
-              type="text"
-              value={checkpoint.name}
-              onChange={(e) => updateCheckpointName(checkpoint.id, null, e.target.value)}
-              className="flex-1 px-3 py-2 text-lg font-medium border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded"
-              placeholder="Main checkpoint name"
-            />
-          </div>
-          <button
-            onClick={() => deleteCheckpoint(checkpoint.id)}
-            className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900 rounded"
-            title="Delete Main Checkpoint"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Main Checkpoint Options */}
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Main Options:</h4>
-            <div className="flex items-center space-x-2">
-              <select
-                value={checkpoint.optionType}
-                onChange={(e) => changeOptionType(checkpoint.id, null, e.target.value)}
-                className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded"
-              >
-                <option value="passfail">Pass/Fail</option>
-                <option value="custom">Custom</option>
-              </select>
-              {checkpoint.optionType === "custom" && (
-                <button
-                  onClick={() => addOption(checkpoint.id, null)}
-                  className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs"
-                >
-                  + Option
-                </button>
-              )}
-            </div>
-          </div>
-          {renderOptionsGrid(checkpoint.options, checkpoint.id)}
-        </div>
-
-        {/* Failure Impact */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            Failure Impact:
-          </label>
-          <select
-            value={checkpoint.failureImpact}
-            onChange={(e) => updateFailureImpact(checkpoint.id, e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded"
-          >
-            <option value="customize">Customize</option>
-            <option value="any">Any Sub Fail = Main Fail</option>
-            <option value="all">All Sub Fail = Main Fail</option>
-            <option value="majority">Majority Fail = Main Fail</option>
-          </select>
-        </div>
-
-        {/* Sub Points */}
-        <div className="space-y-4">
+      <div key={checkpoint.id} className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+        {/* Checkpoint Header */}
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Sub Points:</h4>
+            <div className="flex items-center space-x-3 flex-1">
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                <Target className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-1">
+                  <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                    Checkpoint #{index + 1}
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={checkpoint.name}
+                  onChange={(e) => updateCheckpointName(checkpoint.id, null, e.target.value)}
+                  className="w-full text-lg font-semibold bg-transparent border-none focus:outline-none focus:ring-0 text-gray-900 dark:text-white placeholder-gray-400"
+                  placeholder="Enter main checkpoint name"
+                />
+              </div>
+            </div>
             <button
-              onClick={() => addSubPoint(checkpoint.id)}
-              className="flex items-center space-x-1 px-3 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-xs"
+              onClick={() => deleteCheckpoint(checkpoint.id)}
+              className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+              title="Delete Main Checkpoint"
             >
-              <Plus className="h-3 w-3" />
-              <span>Add Sub Point</span>
+              <Trash2 className="h-5 w-5" />
             </button>
           </div>
+        </div>
 
-          {checkpoint.subPoints.length === 0 ? (
-            <div className="text-center py-4 text-gray-500 dark:text-gray-400 text-sm border-2 border-dashed border-gray-300 dark:border-gray-600 rounded">
-              No sub points added yet. Click "Add Sub Point" to add one.
+        <div className="p-6 space-y-6">
+          {/* Main Options Section */}
+          <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
+                Main Options
+              </h4>
+              <div className="flex items-center space-x-3">
+                <select
+                  value={checkpoint.optionType}
+                  onChange={(e) => changeOptionType(checkpoint.id, null, e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="passfail">Pass/Fail</option>
+                  <option value="custom">Custom</option>
+                </select>
+                {checkpoint.optionType === "custom" && (
+                  <button
+                    onClick={() => addOption(checkpoint.id, null)}
+                    className="flex items-center space-x-1 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Option</span>
+                  </button>
+                )}
+              </div>
             </div>
-          ) : (
-            <div className="space-y-3">
-              {checkpoint.subPoints.map((subPoint, subIndex) => (
-                <div key={subPoint.id} className="border border-gray-200 dark:border-gray-600 rounded p-3 bg-gray-50 dark:bg-gray-700">
-                  {/* Sub Point Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center space-x-2 flex-1">
-                                           <span className="text-sm text-gray-600 dark:text-gray-400 min-w-[20px]">
-                        {subIndex + 1}.
-                      </span>
-                      <input
-                        type="text"
-                        value={subPoint.name}
-                        onChange={(e) => updateCheckpointName(checkpoint.id, subPoint.id, e.target.value)}
-                        className="flex-1 px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded"
-                        placeholder="Sub point name"
-                      />
-                    </div>
-                    <button
-                      onClick={() => deleteCheckpoint(checkpoint.id, subPoint.id)}
-                      className="p-1 text-red-500 hover:bg-red-100 dark:hover:bg-red-900 rounded"
-                      title="Delete Sub Point"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
+            {renderOptionsGrid(checkpoint.options, checkpoint.id)}
+          </div>
 
-                  {/* Sub Point Options */}
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs text-gray-600 dark:text-gray-400">Options:</span>
-                      <div className="flex items-center space-x-2">
-                        <select
-                          value={subPoint.optionType}
-                          onChange={(e) => changeOptionType(checkpoint.id, subPoint.id, e.target.value)}
-                          className="text-xs px-2 py-1 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded"
-                        >
-                          <option value="passfail">Pass/Fail</option>
-                          <option value="custom">Custom</option>
-                        </select>
-                        {subPoint.optionType === "custom" && (
-                          <button
-                            onClick={() => addOption(checkpoint.id, subPoint.id)}
-                            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 text-xs"
-                          >
-                            + Option
-                          </button>
-                        )}
+          {/* Failure Impact Section */}
+          <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-4 border border-yellow-200 dark:border-yellow-800">
+            <div className="flex items-center space-x-2 mb-3">
+              <AlertTriangle className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white">
+                Failure Impact Strategy
+              </h4>
+            </div>
+            <select
+              value={checkpoint.failureImpact}
+              onChange={(e) => updateFailureImpact(checkpoint.id, e.target.value)}
+              className="w-full px-4 py-3 border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+            >
+              <option value="customize">Customize (Manual Control)</option>
+              <option value="any">Any Sub Fail = Main Fail</option>
+              <option value="all">All Sub Fail = Main Fail</option>
+              <option value="majority">Majority Fail = Main Fail</option>
+            </select>
+            <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-2">
+              This determines how sub-point failures affect the main checkpoint result.
+            </p>
+          </div>
+
+          {/* Sub Points Section */}
+          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-4 border border-purple-200 dark:border-purple-800">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <Layers className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
+                Sub Points ({checkpoint.subPoints.length})
+              </h4>
+              <button
+                onClick={() => addSubPoint(checkpoint.id)}
+                className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add Sub Point</span>
+              </button>
+            </div>
+
+            {checkpoint.subPoints.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-purple-300 dark:border-purple-600 rounded-lg">
+                <Layers className="h-8 w-8 mx-auto mb-2 text-purple-400" />
+                <p className="font-medium">No sub points added yet</p>
+                <p className="text-sm">Click "Add Sub Point" to create detailed inspection criteria</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {checkpoint.subPoints.map((subPoint, subIndex) => (
+                  <div key={subPoint.id} className="bg-white dark:bg-gray-800 border border-purple-200 dark:border-purple-700 rounded-xl p-4 shadow-sm">
+                    {/* Sub Point Header */}
+                                        <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center space-x-3 flex-1">
+                        <div className="bg-purple-100 dark:bg-purple-900/30 p-2 rounded-lg">
+                          <span className="text-sm font-bold text-purple-600 dark:text-purple-400">
+                            {subIndex + 1}
+                          </span>
+                        </div>
+                        <input
+                          type="text"
+                          value={subPoint.name}
+                          onChange={(e) => updateCheckpointName(checkpoint.id, subPoint.id, e.target.value)}
+                          className="flex-1 px-3 py-2 text-sm font-medium border border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          placeholder="Enter sub point name"
+                        />
                       </div>
+                      <button
+                        onClick={() => deleteCheckpoint(checkpoint.id, subPoint.id)}
+                        className="p-2 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                        title="Delete Sub Point"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
-                    {renderOptionsGrid(subPoint.options, checkpoint.id, subPoint.id)}
+
+                    {/* Sub Point Options */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Options:</span>
+                        <div className="flex items-center space-x-2">
+                          <select
+                            value={subPoint.optionType}
+                            onChange={(e) => changeOptionType(checkpoint.id, subPoint.id, e.target.value)}
+                            className="px-3 py-1 text-sm border border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                          >
+                            <option value="passfail">Pass/Fail</option>
+                            <option value="custom">Custom</option>
+                          </select>
+                          {subPoint.optionType === "custom" && (
+                            <button
+                              onClick={() => addOption(checkpoint.id, subPoint.id)}
+                              className="flex items-center space-x-1 px-2 py-1 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors text-sm"
+                            >
+                              <Plus className="h-3 w-3" />
+                              <span>Add</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {renderOptionsGrid(subPoint.options, checkpoint.id, subPoint.id)}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg dark:shadow-gray-900/20">
-      <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-2">
-        QC Washing Checkpoints Configuration
-      </h2>
-      <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-        Configure checkpoints with multiple sub-points and options. Each checkpoint can have multiple sub-points, and each can have custom options with optional remarks.
-      </p>
-      
-      {/* Legend */}
-      <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg mb-4">
-        <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Configuration Guide:</h3>
-        <div className="text-xs text-gray-600 dark:text-gray-400 space-y-1">
-          <div>• <strong>Main Point:</strong> Primary checkpoint (e.g., "Hand Feel")</div>
-          <div>• <strong>Sub Points:</strong> Secondary checkpoints under main point (e.g., "Soft", "Smooth")</div>
-          <div>• <strong>Options:</strong> Available choices for each point (e.g., "Pass", "Fail", "Dry", "Rough")</div>
-          <div>• <strong>Checkboxes:</strong> Def = Default option, Fail = Fail option</div>
-          <div>• <strong>Remark:</strong> Optional multilingual remarks (English required, Khmer & Chinese optional)</div>
-          <div>• <strong>Failure Impact:</strong> How sub-point failures affect main point result</div>
+    <div className="max-w-7xl mx-auto">
+      {/* Header Section */}
+      <div className="text-center mb-8">
+        <div className="flex items-center justify-center mb-4">
+          <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-full shadow-lg">
+            <Settings className="h-8 w-8 text-white" />
+          </div>
+        </div>
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          QC Washing Checkpoints Configuration
+        </h1>
+        <p className="text-lg text-gray-600 dark:text-gray-300">
+          Create comprehensive inspection checkpoints with sub-points and multilingual remarks
+        </p>
+      </div>
+
+      {/* Main Configuration Card */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+        {/* Card Header */}
+        <div className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+              <Settings className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                Checkpoint Configuration
+              </h2>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Build detailed inspection criteria with hierarchical structure
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Configuration Guide */}
+        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
+          <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-4">
+            <div className="flex items-start space-x-3">
+              <Info className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  Configuration Guide
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-700 dark:text-blue-300">
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Target className="h-4 w-4" />
+                      <span><strong>Main Point:</strong> Primary checkpoint (e.g., "Hand Feel")</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Layers className="h-4 w-4" />
+                      <span><strong>Sub Points:</strong> Detailed criteria under main point</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <CheckCircle className="h-4 w-4" />
+                      <span><strong>Options:</strong> Available choices (Pass/Fail/Custom)</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center space-x-2">
+                      <Eye className="h-4 w-4" />
+                      <span><strong>Default:</strong> Pre-selected option</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <AlertTriangle className="h-4 w-4" />
+                      <span><strong>Fail:</strong> Marks option as failure condition</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <MessageSquare className="h-4 w-4" />
+                      <span><strong>Remarks:</strong> Multilingual explanations</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Add Checkpoint Button */}
+        <div className="p-6">
+          <button
+            onClick={addMainCheckpoint}
+            className="flex items-center space-x-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Main Checkpoint</span>
+          </button>
         </div>
       </div>
-      
-      <div className="space-y-6">
-        <button
-          onClick={addMainCheckpoint}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Main Checkpoint
-        </button>
-        
-        {checkpoints.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 dark:text-gray-400 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-            No checkpoints configured yet. Click "Add Main Checkpoint" to start.
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {checkpoints.map(checkpoint => renderCheckpointCard(checkpoint))}
-          </div>
-        )}
-        
-        {checkpoints.length > 0 && (
-          <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-600">
+
+      {/* Checkpoints List */}
+      {checkpoints.length === 0 ? (
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <div className="max-w-md mx-auto">
+            <div className="bg-gray-100 dark:bg-gray-700 rounded-full p-6 w-24 h-24 mx-auto mb-6 flex items-center justify-center">
+              <Target className="h-12 w-12 text-gray-400" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              No Checkpoints Configured
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 mb-6">
+              Start building your inspection criteria by adding your first main checkpoint.
+            </p>
             <button
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-6 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg hover:bg-green-700 dark:hover:bg-green-600 disabled:opacity-50 transition-colors"
+              onClick={addMainCheckpoint}
+              className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors mx-auto"
             >
-              {isSubmitting ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Plus className="h-4 w-4" />
-              )}
-              {isSubmitting ? "Saving..." : "Save All Checkpoints"}
+              <Plus className="h-5 w-5" />
+              <span>Create First Checkpoint</span>
             </button>
           </div>
-        )}
-      </div>
-
-      {/* Remark Modal */}
-      {remarkModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">
-                Add/Edit Remark
-              </h3>
-              <button
-                onClick={closeRemarkModal}
-                className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              {/* English Remark - Required */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  English Remark <span className="text-red-500">*</span>
-                </label>
-                <textarea
-                  value={remarkData.english}
-                  onChange={(e) => setRemarkData(prev => ({ ...prev, english: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Enter English remark (required)"
-                />
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {checkpoints.map((checkpoint, index) => renderCheckpointCard(checkpoint, index))}
+          
+          {/* Save All Button */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-green-100 dark:bg-green-900/30 p-2 rounded-lg">
+                  <Save className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Ready to Save
+                  </h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    {checkpoints.length} checkpoint{checkpoints.length !== 1 ? 's' : ''} configured
+                  </p>
+                </div>
               </div>
-
-              {/* Khmer Remark - Optional */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Khmer Remark <span className="text-gray-400">(Optional)</span>
-                </label>
-                <textarea
-                  value={remarkData.khmer}
-                  onChange={(e) => setRemarkData(prev => ({ ...prev, khmer: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Enter Khmer remark (optional)"
-                  style={{ fontFamily: 'Khmer OS, Arial, sans-serif' }}
-                />
-              </div>
-
-              {/* Chinese Remark - Optional */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Chinese Remark <span className="text-gray-400">(Optional)</span>
-                </label>
-                <textarea
-                  value={remarkData.chinese}
-                  onChange={(e) => setRemarkData(prev => ({ ...prev, chinese: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Enter Chinese remark (optional)"
-                  style={{ fontFamily: 'SimSun, Arial, sans-serif' }}
-                />
-              </div>
-            </div>
-
-            <div className="flex items-center justify-end space-x-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-600">
+              
               <button
-                onClick={closeRemarkModal}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                onClick={handleSubmit}
+                disabled={isSubmitting}
+                className="flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
               >
-                Cancel
-              </button>
-              <button
-                onClick={saveRemark}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Save Remark
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Saving Checkpoints...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-5 w-5" />
+                    <span>Save All Checkpoints</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Remark Modal */}
+      {remarkModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                    <Languages className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      Multilingual Remark
+                    </h3>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Add explanatory text in multiple languages
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={closeRemarkModal}
+                  className="p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-6 max-h-[calc(90vh-120px)] overflow-y-auto">
+              {/* English Remark - Required */}
+              <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-4 border border-red-200 dark:border-red-800">
+                <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  <Globe className="h-4 w-4 mr-2 text-red-600 dark:text-red-400" />
+                  English Remark
+                  <span className="ml-2 text-red-500 dark:text-red-400">*</span>
+                  <span className="ml-2 text-xs text-red-600 dark:text-red-400">(Required)</span>
+                </label>
+                <textarea
+                  value={remarkData.english}
+                  onChange={(e) => setRemarkData(prev => ({ ...prev, english: e.target.value }))}
+                  className="w-full px-4 py-3 border border-red-300 dark:border-red-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
+                  rows="3"
+                  placeholder="Enter English remark (required for all users)"
+                />
+              </div>
+
+              {/* Khmer Remark - Optional */}
+              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 border border-blue-200 dark:border-blue-800">
+                <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  <span className="mr-2">🇰🇭</span>
+                  Khmer Remark
+                  <span className="ml-2 text-xs text-blue-600 dark:text-blue-400">(Optional)</span>
+                </label>
+                <textarea
+                  value={remarkData.khmer}
+                  onChange={(e) => setRemarkData(prev => ({ ...prev, khmer: e.target.value }))}
+                  className="w-full px-4 py-3 border border-blue-300 dark:border-blue-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  rows="3"
+                  placeholder="បញ្ចូលការពិពណ៌នាជាភាសាខ្មែរ (ស្រេចចិត្ត)"
+                  style={{ fontFamily: 'Khmer OS, Arial, sans-serif' }}
+                />
+              </div>
+
+              {/* Chinese Remark - Optional */}
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">
+                  <span className="mr-2">🇨🇳</span>
+                  Chinese Remark
+                  <span className="ml-2 text-xs text-green-600 dark:text-green-400">(Optional)</span>
+                </label>
+                <textarea
+                  value={remarkData.chinese}
+                  onChange={(e) => setRemarkData(prev => ({ ...prev, chinese: e.target.value }))}
+                  className="w-full px-4 py-3 border border-green-300 dark:border-green-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                  rows="3"
+                  placeholder="输入中文备注 (可选)"
+                  style={{ fontFamily: 'SimSun, Arial, sans-serif' }}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                  <Info className="h-4 w-4" />
+                  <span>English remark is required for saving</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <button
+                    onClick={closeRemarkModal}
+                    className="px-6 py-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-xl transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={saveRemark}
+                    disabled={!remarkData.english.trim()}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                  >
+                    Save Remark
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Best Practices Card */}
+      <div className="mt-8 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-xl p-6">
+        <div className="flex items-start space-x-3">
+          <AlertTriangle className="h-6 w-6 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <h3 className="text-lg font-medium text-yellow-800 dark:text-yellow-200 mb-3">
+              Best Practices for Checkpoint Configuration
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-yellow-700 dark:text-yellow-300">
+              <ul className="space-y-2">
+                <li>• Use clear, descriptive names for checkpoints and sub-points</li>
+                <li>• Set appropriate default options for common scenarios</li>
+                <li>• Configure failure impact based on quality requirements</li>
+                <li>• Add remarks for options that need explanation</li>
+              </ul>
+              <ul className="space-y-2">
+                <li>• Test checkpoint logic before deploying to production</li>
+                <li>• Ensure English remarks are always provided</li>
+                <li>• Group related sub-points under logical main points</li>
+                <li>• Review and update checkpoints based on feedback</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

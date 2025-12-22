@@ -18,6 +18,8 @@ import {
   deleteFirstOutputRecord,
   addQCWashingStandards,
   getQCWashingStandards,
+  getAllFactoryStandards,
+  getFactoryStandards
 } from '../../../controller/QCWashing/QCWashing Admin/qcWashingAdminController.js';
 import { uploadQC2_washing_image} from "../../../helpers/helperFunctions.js";
 
@@ -57,5 +59,7 @@ router.delete('/api/qc-washing-first-outputs/:id', deleteFirstOutputRecord);
 ------------------------------ */
 router.post('/api/qc-washing/standards', addQCWashingStandards);
 router.get('/api/qc-washing/standards', getQCWashingStandards);
+router.get('/api/qc-washing/standards/all-factories', getAllFactoryStandards);
+router.get('/api/qc-washing/standards/factory/:factoryName', getFactoryStandards);
 
 export default router;
