@@ -1348,6 +1348,38 @@ export const updateInspectionConfig = async (req, res) => {
 // ============================================================
 // Update Measurement Data
 // ============================================================
+
+// Define Path
+const uploadDirMeasManual = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/MeasurementManual"
+);
+
+if (!fs.existsSync(uploadDirMeasManual)) {
+  fs.mkdirSync(uploadDirMeasManual, { recursive: true });
+}
+
+// Helper Function
+const saveMeasManualBase64Image = (base64String, reportId, groupId, index) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    const filename = `meas_man_${reportId}_${groupId}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirMeasManual, filename);
+
+    fs.writeFileSync(filepath, data);
+    return `/storage/PivotY/Fincheck/MeasurementManual/${filename}`;
+  } catch (error) {
+    console.error("Error saving Measurement Manual image:", error);
+    return null;
+  }
+};
+
 export const updateMeasurementData = async (req, res) => {
   try {
     const { reportId, measurementData } = req.body;
@@ -1368,10 +1400,53 @@ export const updateMeasurementData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // Replace the existing measurement data with the new snapshot
-    // Since the frontend sends the complete state of 'savedMeasurements',
-    // a full replacement ensures sync (deletions are handled automatically).
-    report.measurementData = measurementData;
+    // Process the incoming array. If an item has manualData with images, process them.
+    const processedMeasurementData = measurementData.map((item) => {
+      let processedManualData = null;
+
+      if (item.manualData) {
+        // Handle Images in Manual Data
+        const processedImages = (item.manualData.images || [])
+          .map((img, idx) => {
+            let finalUrl = img.imageURL;
+
+            // Check if Base64 (New Image)
+            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+              const savedPath = saveMeasManualBase64Image(
+                img.imgSrc,
+                reportId,
+                item.groupId, // Use Group ID for uniqueness scope
+                idx
+              );
+              if (savedPath) finalUrl = savedPath;
+            }
+
+            return {
+              imageId:
+                img.id ||
+                img.imageId ||
+                `mm_${item.groupId}_${idx}_${Date.now()}`,
+              imageURL: finalUrl,
+              remark: img.remark || "" // Persist the image remark
+            };
+          })
+          .filter((img) => img.imageURL); // Remove failed saves
+
+        processedManualData = {
+          remarks: item.manualData.remarks || "",
+          status: item.manualData.status || "Pass",
+          images: processedImages
+        };
+      }
+
+      return {
+        ...item,
+        manualData: processedManualData
+      };
+    });
+
+    // Replace existing data
+    report.measurementData = processedMeasurementData;
 
     await report.save();
 
@@ -1390,16 +1465,29 @@ export const updateMeasurementData = async (req, res) => {
   }
 };
 
+// ============================================================
+// Update Defect Data
+// ============================================================
+
 // Define Defect Storage Path
 const uploadDirDefect = path.join(
   __dirname,
   "../../../storage/PivotY/Fincheck/DefectData"
 );
 
+// Define Manual Defect Storage Path
+const uploadDirDefectManual = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/DefectManualData"
+);
+
 // Ensure directory exists
 if (!fs.existsSync(uploadDirDefect)) {
   fs.mkdirSync(uploadDirDefect, { recursive: true });
 }
+
+if (!fs.existsSync(uploadDirDefectManual))
+  fs.mkdirSync(uploadDirDefectManual, { recursive: true });
 
 // Helper: Save Defect Base64 Image
 const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
@@ -1425,78 +1513,204 @@ const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
   }
 };
 
-// ============================================================
-// Update Defect Data
-// ============================================================
+// Helper: Save Defect LOCATION Image
+const saveDefectLocationBase64Image = (
+  base64String,
+  reportId,
+  defectCode,
+  locationId,
+  index
+) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    // Naming: def_loc_{reportId}_{defectCode}_{locationId}_{index}_{timestamp}
+    const filename = `def_loc_${reportId}_${defectCode}_${locationId}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirDefect, filename);
+    fs.writeFileSync(filepath, data);
+    return `/storage/PivotY/Fincheck/DefectData/${filename}`;
+  } catch (error) {
+    console.error("Error saving defect location image:", error);
+    return null;
+  }
+};
+
+// Helper: Save Defect MANUAL Image
+const saveDefectManualBase64Image = (
+  base64String,
+  reportId,
+  groupId,
+  index
+) => {
+  try {
+    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) return null;
+    const type = matches[1];
+    const data = Buffer.from(matches[2], "base64");
+    const ext = type.split("/")[1] || "jpg";
+
+    const filename = `def_man_${reportId}_${groupId}_${index}_${Date.now()}.${ext}`;
+    const filepath = path.join(uploadDirDefectManual, filename);
+    fs.writeFileSync(filepath, data);
+    return `/storage/PivotY/Fincheck/DefectManualData/${filename}`;
+  } catch (error) {
+    console.error("Error saving defect manual image:", error);
+    return null;
+  }
+};
+
 export const updateDefectData = async (req, res) => {
   try {
-    const { reportId, defectData } = req.body;
+    const { reportId, defectData, defectManualData } = req.body;
 
-    if (!reportId || !defectData || !Array.isArray(defectData)) {
+    if (!reportId)
       return res
         .status(400)
-        .json({ success: false, message: "Invalid payload." });
-    }
+        .json({ success: false, message: "Report ID required." });
 
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
     });
-
-    if (!report) {
+    if (!report)
       return res
         .status(404)
         .json({ success: false, message: "Report not found." });
-    }
 
-    // Process images in the defect data
-    const processedDefectData = defectData.map((defect) => {
-      const processedImages = (defect.images || [])
-        .map((img, idx) => {
-          let finalUrl = img.imageURL;
+    // A. Process Standard Defects
+    if (Array.isArray(defectData)) {
+      const processedDefectData = defectData.map((defect) => {
+        // 1. Process Locations (and their images)
+        const processedLocations = (defect.locations || []).map((loc) => {
+          const processedLocImages = (loc.images || [])
+            .map((img, idx) => {
+              let finalUrl = img.imageURL;
+              if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+                const savedPath = saveDefectLocationBase64Image(
+                  img.imgSrc,
+                  reportId,
+                  defect.defectCode,
+                  loc.locationId,
+                  idx
+                );
+                if (savedPath) finalUrl = savedPath;
+              }
+              // Determine name (Pcs1, Pcs2, Extra...)
+              // Logic: if index < qty, it is Pcs{index+1}, else Extra
+              const name = idx < loc.qty ? `Pcs${idx + 1}` : "Extra";
 
-          // If new Base64 image, save to disk
-          if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-            const savedPath = saveDefectBase64Image(
-              img.imgSrc,
-              reportId,
-              defect.defectCode,
-              idx
-            );
-            if (savedPath) finalUrl = savedPath;
-          }
+              return {
+                imageId: img.id || `${loc.locationId}_${idx}_${Date.now()}`,
+                imageURL: finalUrl,
+                name: name
+              };
+            })
+            .filter((img) => img.imageURL);
 
           return {
-            imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
-            imageURL: finalUrl
+            ...loc,
+            images: processedLocImages
           };
-        })
-        .filter((img) => img.imageURL); // Remove failed saves
+        });
 
-      return {
-        ...defect,
-        images: processedImages
-      };
-    });
+        // 2. Process General Defect Images (Legacy or top-level)
+        const processedGeneralImages = (defect.images || [])
+          .map((img, idx) => {
+            let finalUrl = img.imageURL;
+            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+              const savedPath = saveDefectBase64Image(
+                img.imgSrc,
+                reportId,
+                defect.defectCode,
+                idx
+              );
+              if (savedPath) finalUrl = savedPath;
+            }
+            return {
+              imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
+              imageURL: finalUrl
+            };
+          })
+          .filter((img) => img.imageURL);
 
-    // Replace existing data with the snapshot from frontend
-    report.defectData = processedDefectData;
+        return {
+          ...defect,
+          locations: processedLocations,
+          images: processedGeneralImages,
+          additionalRemark: defect.additionalRemark || ""
+        };
+      });
+      report.defectData = processedDefectData;
+    }
+
+    // B. Process Manual Defect Data
+    if (Array.isArray(defectManualData)) {
+      const processedManualData = defectManualData.map((manualItem) => {
+        const processedImages = (manualItem.images || [])
+          .map((img, idx) => {
+            let finalUrl = img.imageURL;
+            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+              const savedPath = saveDefectManualBase64Image(
+                img.imgSrc,
+                reportId,
+                manualItem.groupId,
+                idx
+              );
+              if (savedPath) finalUrl = savedPath;
+            }
+            return {
+              imageId:
+                img.id ||
+                img.imageId ||
+                `dm_${manualItem.groupId}_${idx}_${Date.now()}`,
+              imageURL: finalUrl,
+              remark: img.remark || ""
+            };
+          })
+          .filter((img) => img.imageURL);
+
+        return {
+          groupId: manualItem.groupId,
+          remarks: manualItem.remarks || "",
+          images: processedImages,
+          // Add context fields if provided by frontend
+          line: manualItem.line || "",
+          table: manualItem.table || "",
+          color: manualItem.color || "",
+          qcUser: manualItem.qcUser || null
+        };
+      });
+      report.defectManualData = processedManualData;
+    }
 
     await report.save();
 
     return res.status(200).json({
       success: true,
       message: "Defect data saved successfully.",
-      data: report.defectData
+      data: {
+        defectData: report.defectData,
+        defectManualData: report.defectManualData
+      }
     });
   } catch (error) {
     console.error("Error updating defect data:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error.",
-      error: error.message
-    });
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Error",
+        error: error.message
+      });
   }
 };
+
+// ============================================================
+// Update PP Sheet Data
+// ============================================================
 
 // Define PP Sheet Storage Path
 const uploadDirPPSheet = path.join(
@@ -1533,9 +1747,6 @@ const savePPSheetBase64Image = (base64String, reportId, index) => {
   }
 };
 
-// ============================================================
-// Update PP Sheet Data
-// ============================================================
 export const updatePPSheetData = async (req, res) => {
   try {
     const { reportId, ppSheetData } = req.body;

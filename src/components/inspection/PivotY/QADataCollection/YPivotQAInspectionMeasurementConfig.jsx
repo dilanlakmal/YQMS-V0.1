@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   Play,
   CheckCircle,
-  XCircle
+  XCircle,
+  FilePenLine
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -22,6 +23,7 @@ import YPivotQATemplatesSpecsConfigModal from "../QATemplates/YPivotQATemplatesS
 import YPivotQATemplatesMeasurementGridModal from "../QATemplates/YPivotQATemplatesMeasurementGridModal";
 import YPivotQATemplatesMeasurementResultsTab from "../QATemplates/YPivotQATemplatesMeasurementResultsTab";
 import YPivotQAInspectionMeasurementSummary from "./YPivotQAInspectionMeasurementSummary";
+import YPivotQAInspectionMeasurementManual from "./YPivotQAInspectionMeasurementManual";
 
 const YPivotQAInspectionMeasurementConfig = ({
   selectedOrders,
@@ -65,6 +67,35 @@ const YPivotQAInspectionMeasurementConfig = ({
   const [editingMeasurementIndex, setEditingMeasurementIndex] = useState(null);
   const [editingMeasurementData, setEditingMeasurementData] = useState(null);
 
+  // --- SCOPED MANUAL DATA LOGIC ---
+  const currentManualData = useMemo(() => {
+    const allManualData = reportData?.measurementData?.manualDataByGroup || {};
+    const groupId = activeGroup?.id || "general";
+    return (
+      allManualData[groupId] || { remarks: "", status: "Pass", images: [] }
+    );
+  }, [reportData?.measurementData?.manualDataByGroup, activeGroup]);
+
+  // --- MANUAL DATA UPDATE HANDLER ---
+  const handleManualDataUpdate = (newManualData) => {
+    if (onUpdateMeasurementData) {
+      const groupId = activeGroup?.id || "general";
+      const existingManualDataMap =
+        reportData?.measurementData?.manualDataByGroup || {};
+
+      const updatedMap = {
+        ...existingManualDataMap,
+        [groupId]: newManualData
+      };
+
+      // We use spread on existing state to not lose other measurement data
+      onUpdateMeasurementData({
+        ...reportData?.measurementData, // Keep existing standard measurements
+        manualDataByGroup: updatedMap
+      });
+    }
+  };
+
   const updateParent = (updates) => {
     if (onUpdateMeasurementData) {
       onUpdateMeasurementData({
@@ -75,6 +106,7 @@ const YPivotQAInspectionMeasurementConfig = ({
         savedMeasurements,
         orderSizes,
         kValuesList,
+        manualDataByGroup: reportData?.measurementData?.manualDataByGroup || {},
         ...updates
       });
     }
@@ -378,6 +410,17 @@ const YPivotQAInspectionMeasurementConfig = ({
 
         <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
           <button
+            onClick={() => setInternalTab("manual")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+              internalTab === "manual"
+                ? "bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-300"
+                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+            }`}
+          >
+            <FilePenLine className="w-3.5 h-3.5" />
+            Manual
+          </button>
+          <button
             onClick={() => setInternalTab("specs")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
               internalTab === "specs"
@@ -458,6 +501,13 @@ const YPivotQAInspectionMeasurementConfig = ({
             </p>
           </div>
         </div>
+      )}
+
+      {internalTab === "manual" && (
+        <YPivotQAInspectionMeasurementManual
+          data={currentManualData}
+          onUpdate={handleManualDataUpdate}
+        />
       )}
 
       {internalTab === "specs" && (

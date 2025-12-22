@@ -14,9 +14,16 @@ import {
   FileSpreadsheet,
   Home,
   ArrowLeft,
-  CheckCircle2
+  CheckCircle2,
+  Loader2 // Imported for the loading screen
 } from "lucide-react";
-import React, { useMemo, useState, useCallback } from "react";
+import React, {
+  useMemo,
+  useState,
+  useCallback,
+  useEffect,
+  useRef
+} from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
@@ -27,6 +34,70 @@ import YPivotQAInspectionConfigSave from "../components/inspection/PivotY/QAData
 import YPivotQAInspectionMeasurementDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementDataSave";
 import YPivotQAInspectionDefectDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectDataSave";
 import YPivotQAInspectionPPSheetDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDataSave";
+
+// ==================================================================================
+// 1. INDEXED DB UTILITY (Handles Large Data & Images preventing QuotaExceededError)
+// ==================================================================================
+const DB_NAME = "YQMS_INSPECTION_DB";
+const STORE_NAME = "drafts";
+const DRAFT_KEY = "current_inspection_draft";
+
+const initDB = () => {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onerror = (event) => reject(event.target.error);
+  });
+};
+
+const saveToDB = async (data) => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readwrite");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.put(data, DRAFT_KEY);
+      request.onsuccess = () => resolve(true);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error("IndexedDB Save Error:", err);
+  }
+};
+
+const loadFromDB = async () => {
+  try {
+    const db = await initDB();
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction([STORE_NAME], "readonly");
+      const store = transaction.objectStore(STORE_NAME);
+      const request = store.get(DRAFT_KEY);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+  } catch (err) {
+    console.error("IndexedDB Load Error:", err);
+    return null;
+  }
+};
+
+const clearDB = async () => {
+  try {
+    const db = await initDB();
+    const transaction = db.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    store.delete(DRAFT_KEY);
+  } catch (err) {
+    console.error("IndexedDB Clear Error:", err);
+  }
+};
+// ==================================================================================
 
 const PlaceholderComponent = ({ title, icon: Icon }) => {
   return (
@@ -118,6 +189,11 @@ const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
 const YPivotQAInspection = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  // --- STATE FOR DB LOADING ---
+  const [isRestoring, setIsRestoring] = useState(true);
+
+  // --- APPLICATION STATE (Initialized with defaults) ---
   const [activeTab, setActiveTab] = useState("order");
 
   //Report saved state
@@ -164,6 +240,71 @@ const YPivotQAInspection = () => {
     subMessage: ""
   });
 
+  // ======================================================================
+  // 1. RESTORE STATE FROM INDEXED DB ON MOUNT
+  // ======================================================================
+  useEffect(() => {
+    const restoreData = async () => {
+      setIsRestoring(true);
+      const draft = await loadFromDB();
+
+      if (draft) {
+        // Bulk update state from DB
+        if (draft.activeTab) setActiveTab(draft.activeTab);
+        if (draft.savedReportData) setSavedReportData(draft.savedReportData);
+        if (draft.isReportSaved !== undefined)
+          setIsReportSaved(draft.isReportSaved);
+        if (draft.sharedOrderState) setSharedOrderState(draft.sharedOrderState);
+        if (draft.sharedReportState)
+          setSharedReportState(draft.sharedReportState);
+        if (draft.qualityPlanData) setQualityPlanData(draft.qualityPlanData);
+        if (draft.activeGroup) setActiveGroup(draft.activeGroup);
+      }
+      setIsRestoring(false);
+    };
+
+    restoreData();
+  }, []);
+
+  // ======================================================================
+  // 2. SAVE STATE TO INDEXED DB ON CHANGE (Debounced)
+  // ======================================================================
+  const saveTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    // Only start saving AFTER we have attempted to restore
+    if (isRestoring) return;
+
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+
+    // Debounce save by 1 second to prevent freezing UI on every keystroke
+    saveTimeoutRef.current = setTimeout(() => {
+      const stateToSave = {
+        activeTab,
+        savedReportData,
+        isReportSaved,
+        sharedOrderState,
+        sharedReportState,
+        qualityPlanData,
+        activeGroup
+      };
+
+      // Async save to IndexedDB
+      saveToDB(stateToSave);
+    }, 1000);
+
+    return () => clearTimeout(saveTimeoutRef.current);
+  }, [
+    isRestoring,
+    activeTab,
+    savedReportData,
+    isReportSaved,
+    sharedOrderState,
+    sharedReportState,
+    qualityPlanData,
+    activeGroup
+  ]);
+
   // Handler to update PP Sheet data
   const handlePPSheetUpdate = useCallback((newData) => {
     setSharedReportState((prev) => ({
@@ -203,29 +344,6 @@ const YPivotQAInspection = () => {
       });
     }
   }, []);
-
-  // // Handler for save complete
-  // const handleSaveComplete = useCallback((result) => {
-  //   // Destructure the result passed from the Modal
-  //   const { reportData, isNew, message } = result;
-
-  //   setSavedReportData(reportData);
-  //   setIsReportSaved(true);
-
-  //   // --- LOGIC TO SHOW MESSAGE IF EXISTING ---
-  //   if (isNew === false) {
-  //     // can use a standard alert, or a custom Toast component
-  //     alert(
-  //       `⚠️ EXISTING REPORT FOUND\n\n${message}\n\nThe system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data.`
-  //     );
-  //   } else {
-  //     // Optional: Success message for new report
-  //     // alert("Success! New inspection report created.");
-  //   }
-
-  //   // Optional: Automatically move to next logical tab
-  //   // setActiveTab("header");
-  // }, []);
 
   // Handle tab change with validation
   const handleTabChange = useCallback(
@@ -305,8 +423,9 @@ const YPivotQAInspection = () => {
     setActiveGroup(group);
   }, []);
 
-  // Navigate to Home
-  const handleGoHome = useCallback(() => {
+  // Navigate to Home - MODIFIED TO CLEAR DB
+  const handleGoHome = useCallback(async () => {
+    await clearDB(); // Clear draft data when leaving
     navigate("/home");
   }, [navigate]);
 
@@ -499,6 +618,23 @@ const YPivotQAInspection = () => {
   const activeTabData = useMemo(() => {
     return tabs.find((tab) => tab.id === activeTab);
   }, [activeTab, tabs]);
+
+  // --- RENDER LOADING SCREEN ---
+  if (isRestoring) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-700 dark:text-white">
+            Restoring Session...
+          </h2>
+          <p className="text-gray-500 dark:text-gray-400 mt-2">
+            Retrieving your data and photos
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">

@@ -24,7 +24,8 @@ import {
   BarChart3,
   User,
   AlertTriangle,
-  FileText
+  FileText,
+  FilePenLine
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -34,6 +35,7 @@ import YPivotQATemplatesImageEditor from "../QATemplates/YPivotQATemplatesImageE
 // Import buyer determination function
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
 import YPivotQAInspectionDefectSummary from "./YPivotQAInspectionDefectSummary";
+import YPivotQAInspectionManualDefect from "./YPivotQAInspectionManualDefect";
 
 const YPivotQAInspectionDefectConfig = ({
   selectedOrders,
@@ -57,6 +59,18 @@ const YPivotQAInspectionDefectConfig = ({
   const [savedDefects, setSavedDefects] = useState(
     reportData?.defectData?.savedDefects || []
   );
+  // Retrieve saved manual data from parent state or initialize empty
+  const currentManualData = useMemo(() => {
+    // Get the dictionary of all manual data
+    const allManualData = reportData?.defectData?.manualDataByGroup || {};
+
+    // Determine current key (fallback to 'general' if no group selected)
+    const groupId = activeGroup?.id || "general";
+
+    // Return specific data for this group, or empty defaults
+    return allManualData[groupId] || { remarks: "", images: [] };
+  }, [reportData?.defectData?.manualDataByGroup, activeGroup]);
+
   const [allDefects, setAllDefects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -204,7 +218,41 @@ const YPivotQAInspectionDefectConfig = ({
   // --- Sync to Parent ---
   const updateParent = (newDefects) => {
     if (onUpdateDefectData) {
-      onUpdateDefectData({ savedDefects: newDefects });
+      // Pass back the existing DICTIONARY
+      const existingManualDataMap =
+        reportData?.defectData?.manualDataByGroup || {};
+
+      onUpdateDefectData({
+        savedDefects: newDefects,
+        manualDataByGroup: existingManualDataMap // Save the whole map
+      });
+    }
+  };
+
+  // // --- Sync to Parent ---
+  // const updateParent = (newDefects) => {
+  //   if (onUpdateDefectData) {
+  //     onUpdateDefectData({ savedDefects: newDefects });
+  //   }
+  // };
+
+  // --- New Handler for Manual Data ---
+  const handleManualDataUpdate = (newManualDataForActiveGroup) => {
+    if (onUpdateDefectData) {
+      const groupId = activeGroup?.id || "general";
+      const existingManualDataMap =
+        reportData?.defectData?.manualDataByGroup || {};
+
+      // Create a new map: Keep other groups' data + Update current group
+      const updatedMap = {
+        ...existingManualDataMap,
+        [groupId]: newManualDataForActiveGroup
+      };
+
+      onUpdateDefectData({
+        savedDefects: savedDefects,
+        manualDataByGroup: updatedMap // Send updated map to parent
+      });
     }
   };
 
@@ -1254,6 +1302,17 @@ const YPivotQAInspectionDefectConfig = ({
         </div>
         <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
           <button
+            onClick={() => setActiveTab("manual")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+              activeTab === "manual"
+                ? "bg-white dark:bg-gray-600 shadow text-indigo-600"
+                : "text-gray-500"
+            }`}
+          >
+            <FilePenLine className="w-3.5 h-3.5" />
+            Manual
+          </button>
+          <button
             onClick={() => setActiveTab("list")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
               activeTab === "list"
@@ -1278,6 +1337,7 @@ const YPivotQAInspectionDefectConfig = ({
               </span>
             )}
           </button>
+
           <button
             onClick={() => setActiveTab("summary")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
@@ -1294,8 +1354,15 @@ const YPivotQAInspectionDefectConfig = ({
 
       {renderActiveBanner()}
 
+      {activeTab === "manual" && (
+        <YPivotQAInspectionManualDefect
+          data={currentManualData}
+          onUpdate={handleManualDataUpdate}
+        />
+      )}
       {activeTab === "list" && renderListTab()}
       {activeTab === "results" && renderResultsTab()}
+
       {activeTab === "summary" && (
         <YPivotQAInspectionDefectSummary
           savedDefects={savedDefects}
