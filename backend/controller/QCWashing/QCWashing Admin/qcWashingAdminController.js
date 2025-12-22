@@ -767,10 +767,7 @@ export const addQCWashingStandards = async (req, res) => {
 // GET /api/qc-washing/standards - Updated to get standards by factory
 export const getQCWashingStandards = async (req, res) => {
   try {
-    const { factoryName } = req.query;
-    
-    console.log('=== CONTROLLER DEBUG ===');
-    console.log('Requested factoryName:', factoryName);
+    const { factoryName } = req.query;;
     
     if (!factoryName) {
       return res.status(400).json({ 
@@ -784,16 +781,11 @@ export const getQCWashingStandards = async (req, res) => {
       factoryName: { $regex: new RegExp(`^${factoryName}$`, 'i') } 
     });
     
-    console.log('Found factory record:', factoryRecord);
     
     if (!factoryRecord) {
-      console.log('Factory not found, trying YM fallback');
-      // If requested factory not found, try YM as fallback
       const fallbackRecord = await QCWashingMachineStandard.findOne({ 
         factoryName: { $regex: new RegExp('^YM$', 'i') } 
       });
-      console.log('Fallback record:', fallbackRecord);
-      
       if (!fallbackRecord) {
         return res.json({ 
           success: true, 
@@ -812,8 +804,6 @@ export const getQCWashingStandards = async (req, res) => {
         updatedAt: standard.updatedAt
       }));
 
-      console.log('Returning fallback standards:', transformedStandards);
-
       return res.json({ 
         success: true, 
         data: transformedStandards,
@@ -830,7 +820,6 @@ export const getQCWashingStandards = async (req, res) => {
 
     // Transform standards to match expected format
     const transformedStandards = factoryRecord.standards.map(standard => {
-      console.log('Processing standard:', standard);
       return {
         washType: standard.washType,
         washingMachine: standard.washingMachine,
@@ -840,8 +829,6 @@ export const getQCWashingStandards = async (req, res) => {
         updatedAt: standard.updatedAt
       };
     });
-
-    console.log('Returning transformed standards:', transformedStandards);
 
     res.json({ 
       success: true, 

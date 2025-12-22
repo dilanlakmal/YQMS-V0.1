@@ -64,7 +64,7 @@ const FactoryMachineStandardSchema = new mongoose.Schema({
 });
 
 // Indexes for better performance
-FactoryMachineStandardSchema.index({ factoryName: 1 });
+// FactoryMachineStandardSchema.index({ factoryName: 1 });
 FactoryMachineStandardSchema.index({ 'standards.washType': 1 });
 FactoryMachineStandardSchema.index({ factoryName: 1, 'standards.washType': 1 });
 

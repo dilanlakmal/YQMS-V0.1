@@ -199,28 +199,18 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
   const fetchStandardValues = async () => {
     if (!washType || !formData?.factoryName) return;
     
-    console.log('=== FETCHING STANDARDS DEBUG ===');
-    console.log('washType:', washType);
-    console.log('factoryName:', formData.factoryName);
-    
     try {
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=${formData.factoryName}`);
       const data = await response.json();
       
-      console.log('API Response:', data);
-      
       if (data.success && data.data.length > 0) {
-        console.log('Standards data:', data.data);
         
         const standardRecord = data.data.find(record => record.washType === washType);
-        console.log('Found standard record:', standardRecord);
         
         if (standardRecord) {
           const washingMachineValues = { ...standardRecord.washingMachine };
           const tumbleDryValues = { ...standardRecord.tumbleDry };
           
-          console.log('Washing Machine Values:', washingMachineValues);
-          console.log('Tumble Dry Values:', tumbleDryValues);
           
           // Always set the standard values for display
           setStandardValues({
@@ -236,11 +226,9 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
             });
           }
         } else {
-          console.log('No standard record found for washType:', washType);
           await fetchFallbackStandards();
         }
       } else {
-        console.log('No standards found, trying fallback');
         await fetchFallbackStandards();
       }
     } catch (error) {
@@ -250,23 +238,17 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
   };
 
   const fetchFallbackStandards = async () => {
-    console.log('=== FETCHING FALLBACK STANDARDS (YM) ===');
     try {
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=YM`);
       const data = await response.json();
       
-      console.log('Fallback API Response:', data);
       
       if (data.success && data.data.length > 0) {
         const standardRecord = data.data.find(record => record.washType === washType);
-        console.log('Fallback standard record:', standardRecord);
         
         if (standardRecord) {
           const washingMachineValues = { ...standardRecord.washingMachine };
           const tumbleDryValues = { ...standardRecord.tumbleDry };
-          
-          console.log('Fallback Washing Machine Values:', washingMachineValues);
-          console.log('Fallback Tumble Dry Values:', tumbleDryValues);
           
           setStandardValues({
             "Washing Machine": washingMachineValues,
@@ -279,8 +261,6 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
               "Tumble Dry": { ...tumbleDryValues }
             });
           }
-          
-          console.log(`Using YM factory standards as fallback for ${washType}`);
         }
       }
     } catch (error) {
@@ -291,10 +271,6 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
   fetchStandardValues();
 }, [washType, formData?.factoryName, recordId, setStandardValues, setActualValues]);
 
-useEffect(() => {
-  console.log('=== STANDARD VALUES STATE UPDATE ===');
-  console.log('standardValues:', standardValues);
-}, [standardValues]);
   // Rest of existing useEffects...
   useEffect(() => {
     const qty = Number(washQty);

@@ -677,7 +677,6 @@ const QCWashingPage = () => {
         );
         
         if (!response.ok) {
-          console.warn(`Failed to fetch color order qty: ${response.status} ${response.statusText}`);
           setColorOrderQty(null);
           return;
         }
