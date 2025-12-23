@@ -15,7 +15,9 @@ import {
   Home,
   ArrowLeft,
   CheckCircle2,
-  Loader2 // Imported for the loading screen
+  Loader2,
+  Plus,
+  AlertTriangle
 } from "lucide-react";
 import React, {
   useMemo,
@@ -115,6 +117,44 @@ const PlaceholderComponent = ({ title, icon: Icon }) => {
       <p className="text-gray-500 dark:text-gray-400 text-center text-sm">
         This section is under development.
       </p>
+    </div>
+  );
+};
+
+// Create a Simple Confirmation Modal Sub-Component
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, message }) => {
+  if (!isOpen) return null;
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700 transform scale-100 transition-all">
+        <div className="flex flex-col items-center text-center gap-4">
+          <div className="p-3 bg-amber-100 dark:bg-amber-900/30 rounded-full text-amber-600 dark:text-amber-400">
+            <AlertTriangle size={32} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              {title}
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              {message}
+            </p>
+          </div>
+          <div className="flex gap-3 w-full mt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 py-2.5 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-700 transition-colors shadow-lg"
+            >
+              Yes, Start New
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
@@ -239,6 +279,9 @@ const YPivotQAInspection = () => {
     message: "",
     subMessage: ""
   });
+
+  // NEW: State for confirmation modal
+  const [showNewConfirm, setShowNewConfirm] = useState(false);
 
   // ======================================================================
   // 1. RESTORE STATE FROM INDEXED DB ON MOUNT
@@ -637,6 +680,51 @@ const YPivotQAInspection = () => {
     return tabs.find((tab) => tab.id === activeTab);
   }, [activeTab, tabs]);
 
+  // NEW: Function to reset everything
+  const handleStartNewInspection = async () => {
+    // 1. Clear IndexedDB
+    await clearDB();
+
+    // 2. Reset Order State
+    setSharedOrderState({
+      inspectionDate: new Date().toISOString().split("T")[0],
+      orderType: "single",
+      selectedOrders: [],
+      orderData: null,
+      inspectionType: "first"
+    });
+
+    // 3. Reset Report State
+    setSharedReportState({
+      selectedTemplate: null,
+      headerData: {},
+      photoData: {},
+      config: {},
+      lineTableConfig: [],
+      measurementData: {},
+      defectData: {},
+      ppSheetData: null
+    });
+
+    // 4. Reset Quality Plan
+    setQualityPlanData({
+      productionStatus: {},
+      packingList: {},
+      accountedPercentage: "0.00"
+    });
+
+    // 5. Reset System State
+    setSavedReportData(null);
+    setIsReportSaved(false);
+    setActiveGroup(null);
+
+    // 6. Navigate to Order Tab
+    setActiveTab("order");
+
+    // 7. Close Modal
+    setShowNewConfirm(false);
+  };
+
   // --- RENDER LOADING SCREEN ---
   if (isRestoring) {
     return (
@@ -697,6 +785,15 @@ const YPivotQAInspection = () => {
                         PRO
                       </span>
                     </div>
+                    <button
+                      onClick={() => setShowNewConfirm(true)}
+                      className="ml-10 flex items-center justify-center gap-1.5 h-7 px-3 bg-white text-indigo-600 rounded-lg shadow-md active:scale-95 transition-transform"
+                    >
+                      <Plus size={24} strokeWidth={3} />
+                      <span className="text-[12px] font-bold uppercase">
+                        New
+                      </span>
+                    </button>
                   </div>
                   {/* Active Tab Indicator - Inline with title */}
                   <div className="flex items-center gap-1.5 mt-0.5">
@@ -880,6 +977,20 @@ const YPivotQAInspection = () => {
                   </p>
                 </div>
               </div>
+              <button
+                onClick={() => setShowNewConfirm(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group"
+                title="Start a new inspection report"
+              >
+                <div className="p-1 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                  <Plus size={16} strokeWidth={3} className="text-indigo-600" />
+                </div>
+                <div className="text-left">
+                  <p className="text-xs font-bold uppercase tracking-wider leading-none">
+                    New Inspection
+                  </p>
+                </div>
+              </button>
             </div>
             {/* Right Side - User Info */}
             {user && (
@@ -917,6 +1028,14 @@ const YPivotQAInspection = () => {
         title={statusModal.title}
         message={statusModal.message}
         subMessage={statusModal.subMessage}
+      />
+
+      <ConfirmationModal
+        isOpen={showNewConfirm}
+        onClose={() => setShowNewConfirm(false)}
+        onConfirm={handleStartNewInspection}
+        title="Start New Inspection?"
+        message="Are you sure you want to start a new report? Any unsaved changes in the current session will be lost. Please ensure you have saved your work."
       />
 
       {/* Styles */}

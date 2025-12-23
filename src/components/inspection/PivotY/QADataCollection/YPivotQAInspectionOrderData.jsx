@@ -34,7 +34,8 @@ import {
   ClipboardList,
   Save,
   Lock,
-  QrCode
+  QrCode,
+  Edit3
 } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../../config";
@@ -288,10 +289,16 @@ const OrderTypeToggle = ({
   isSingleData
 }) => {
   const types = [
-    { id: "qr", label: "Scan QR", icon: QrCode, color: "blue" },
-    { id: "single", label: "Single", icon: Package, color: "indigo" },
-    { id: "multi", label: "Multi", icon: Link2, color: "purple" },
-    { id: "batch", label: "Batch", icon: Boxes, color: "emerald" }
+    { id: "qr", label: "Scan QR", short: "QR", icon: QrCode, color: "blue" },
+    {
+      id: "single",
+      label: "Single",
+      short: "S",
+      icon: Package,
+      color: "indigo"
+    },
+    { id: "multi", label: "Multi", short: "M", icon: Link2, color: "purple" },
+    { id: "batch", label: "Batch", short: "B", icon: Boxes, color: "emerald" }
   ];
 
   return (
@@ -319,16 +326,19 @@ const OrderTypeToggle = ({
             key={type.id}
             onClick={() => !isDisabled && setOrderType(type.id)}
             disabled={isDisabled}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap flex-1 sm:flex-none ${
               isActive
                 ? `bg-white dark:bg-gray-700 shadow-md text-${type.color}-600 dark:text-${type.color}-400`
                 : isDisabled
-                ? "text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-60" // Grayed out style
+                ? "text-gray-300 dark:text-gray-600 cursor-not-allowed opacity-60"
                 : "text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50"
             }`}
           >
-            <Icon className="w-3.5 h-3.5" />
-            {type.label}
+            <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+            {/* Show Full Label on Desktop (sm and up) */}
+            <span className="hidden sm:inline">{type.label}</span>
+            {/* Show Short Label on Mobile */}
+            <span className="inline sm:hidden">{type.short}</span>
           </button>
         );
       })}
@@ -336,40 +346,8 @@ const OrderTypeToggle = ({
   );
 };
 
-// const OrderTypeToggle = ({ orderType, setOrderType }) => {
-//   const types = [
-//     { id: "qr", label: "Scan QR", icon: QrCode, color: "blue" },
-//     { id: "single", label: "Single", icon: Package, color: "indigo" },
-//     { id: "multi", label: "Multi", icon: Link2, color: "purple" },
-//     { id: "batch", label: "Batch", icon: Boxes, color: "emerald" }
-//   ];
-
-//   return (
-//     <div className="flex items-center gap-1 p-1 bg-gray-100 dark:bg-gray-800 rounded-xl">
-//       {types.map((type) => {
-//         const isActive = orderType === type.id;
-//         const Icon = type.icon;
-//         return (
-//           <button
-//             key={type.id}
-//             onClick={() => setOrderType(type.id)}
-//             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition-all ${
-//               isActive
-//                 ? `bg-white dark:bg-gray-700 shadow-md text-${type.color}-600 dark:text-${type.color}-400`
-//                 : "text-gray-500 dark:text-gray-400 hover:bg-white/50 dark:hover:bg-gray-700/50"
-//             }`}
-//           >
-//             <Icon className="w-3.5 h-3.5" />
-//             {type.label}
-//           </button>
-//         );
-//       })}
-//     </div>
-//   );
-// };
-
 // Selected Orders Chips
-const SelectedOrdersChips = ({ orders, onRemove }) => {
+const SelectedOrdersChips = ({ orders, onRemove, isLocked }) => {
   if (!orders || orders.length === 0) return null;
 
   return (
@@ -491,6 +469,9 @@ const YPivotQAInspectionOrderData = ({
   // NEW: Modal state
   const [showSaveModal, setShowSaveModal] = useState(false);
 
+  // NEW: State for checking existence
+  const [checkingExistence, setCheckingExistence] = useState(false);
+
   // Track previous orderType to detect actual changes
   const prevOrderTypeRef = useRef(orderType);
 
@@ -557,19 +538,6 @@ const YPivotQAInspectionOrderData = ({
     },
     [updateState]
   );
-
-  // const setOrderType = useCallback(
-  //   (value) => {
-  //     updateState({
-  //       orderType: value,
-  //       selectedOrders: [],
-  //       orderData: null
-  //     });
-  //     // Reset show order details when order type changes
-  //     setShowOrderDetails(false);
-  //   },
-  //   [updateState]
-  // );
 
   const setSelectedOrders = useCallback(
     (value) => {
@@ -889,6 +857,84 @@ const YPivotQAInspectionOrderData = ({
     );
   };
 
+  // ============================================================
+  // NEW: REAL-TIME CHECK FOR EXISTING REPORT
+  // ============================================================
+  useEffect(() => {
+    // Extract Index Fields from state
+    const reportTypeId = savedReportState?.selectedTemplate?._id;
+    // Product Type usually comes from the Template Config or Order Data
+    const productTypeId = savedReportState?.config?.productTypeId;
+
+    // Check if we have all necessary data AND we haven't already saved/loaded
+    if (
+      !isReportSaved &&
+      inspectionDate &&
+      inspectionType &&
+      selectedOrders.length > 0 &&
+      reportTypeId &&
+      productTypeId &&
+      user?.emp_id
+    ) {
+      const checkReport = async () => {
+        setCheckingExistence(true);
+        try {
+          const res = await axios.post(
+            `${API_BASE_URL}/api/fincheck-inspection/check-existing-report`,
+            {
+              inspectionDate,
+              inspectionType,
+              orderNos: selectedOrders,
+              empId: user.emp_id,
+              productTypeId,
+              reportTypeId
+            }
+          );
+
+          if (res.data.success && res.data.exists) {
+            console.log("Existing report found!", res.data.data);
+
+            // Hydrate Quality Plan / Production Status
+            if (onQualityPlanChange && foundReport.inspectionDetails) {
+              onQualityPlanChange({
+                productionStatus:
+                  foundReport.inspectionDetails.productionStatus || {},
+                packingList: foundReport.inspectionDetails.packingList || {},
+                accountedPercentage: "0.00" // Component will recalculate this automatically
+              });
+            }
+
+            // AUTOMATICALLY LOAD THE DATA (Switch to Update Mode)
+            if (onSaveComplete) {
+              onSaveComplete({
+                reportData: res.data.data,
+                isNew: false,
+                message: "Existing report loaded automatically."
+              });
+            }
+          }
+        } catch (err) {
+          console.error("Auto-check failed", err);
+        } finally {
+          setCheckingExistence(false);
+        }
+      };
+
+      // 500ms delay to prevent API spam while typing/selecting
+      const timer = setTimeout(checkReport, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [
+    inspectionDate,
+    inspectionType,
+    selectedOrders,
+    savedReportState?.selectedTemplate,
+    savedReportState?.config?.productTypeId,
+    user?.emp_id,
+    isReportSaved, // Stop checking if we are already in saved mode
+    onSaveComplete
+  ]);
+
   // Validation for save
   const canSave = useMemo(() => {
     // Required: Date, Inspection Type, Order(s), Order Data, Report Type
@@ -1014,6 +1060,16 @@ const YPivotQAInspectionOrderData = ({
         }
 
         if (orderFetchSuccess) {
+          // Hydrate Quality Plan / Production Status from QR Load
+          if (onQualityPlanChange && reportData.inspectionDetails) {
+            onQualityPlanChange({
+              productionStatus:
+                reportData.inspectionDetails.productionStatus || {},
+              packingList: reportData.inspectionDetails.packingList || {},
+              accountedPercentage: "0.00"
+            });
+          }
+
           // 3. Hydrate Parent State via onSaveComplete
           if (onSaveComplete) {
             onSaveComplete({
@@ -1054,7 +1110,7 @@ const YPivotQAInspectionOrderData = ({
         <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-3 flex items-center justify-between">
           <h2 className="text-white font-bold text-sm flex items-center gap-2">
             <Package className="w-4 h-4" />
-            Order Selection
+            Order
           </h2>
           <div className="flex items-center gap-2">
             {isReportSaved && (
@@ -1098,24 +1154,33 @@ const YPivotQAInspectionOrderData = ({
             <>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Inspection Date */}
-                <div>
+                <div className={`min-w-0 ${isReportSaved ? "opacity-75" : ""}`}>
                   <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <Calendar className="w-3.5 h-3.5 text-indigo-500" />
-                    Inspection Date
+                    {isReportSaved && (
+                      <Lock className="w-3 h-3 text-gray-400" />
+                    )}
                   </label>
                   <input
                     type="date"
                     value={inspectionDate}
                     onChange={(e) => setInspectionDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    disabled={isReportSaved}
+                    className="w-11/12 md:w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-base sm:text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:cursor-not-allowed"
                   />
                 </div>
 
                 {/* Inspection Type */}
-                <div>
+                <div
+                  className={
+                    isReportSaved ? "opacity-75 pointer-events-none" : ""
+                  }
+                >
                   <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <ClipboardList className="w-3.5 h-3.5 text-emerald-500" />
-                    Inspection
+                    {isReportSaved && (
+                      <Lock className="w-3 h-3 text-gray-400" />
+                    )}
                   </label>
                   <InspectionTypeToggle
                     inspectionType={inspectionType}
@@ -1124,10 +1189,19 @@ const YPivotQAInspectionOrderData = ({
                 </div>
 
                 {/* Order Search */}
-                <div className="relative" style={{ zIndex: 60 }}>
+                <div
+                  className={`relative ${
+                    isReportSaved ? "opacity-75 pointer-events-none" : ""
+                  }`}
+                  style={{ zIndex: 60 }}
+                >
                   <label className="block text-xs font-bold text-gray-700 dark:text-gray-300 mb-1.5 flex items-center gap-1.5">
                     <Search className="w-3.5 h-3.5 text-indigo-500" />
                     {orderType === "batch" ? "Add Order No" : "Order No"}
+                    {/* SHOW LOCK ICON IF SAVED */}
+                    {isReportSaved && (
+                      <Lock className="w-3 h-3 text-gray-400" />
+                    )}
                   </label>
                   <div className="relative">
                     <input
@@ -1138,18 +1212,20 @@ const YPivotQAInspectionOrderData = ({
                         searchResults.length > 0 && setShowSearchDropdown(true)
                       }
                       placeholder={
-                        orderType === "batch"
+                        isReportSaved
+                          ? "Order locked"
+                          : orderType === "batch"
                           ? "Search to add more orders..."
                           : "Search MO Number..."
                       }
-                      className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      className="w-full pl-10 pr-10 py-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-base sm:text-sm font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all disabled:bg-gray-100 disabled:cursor-not-allowed"
                     />
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     {searchLoading && (
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 animate-spin" />
                     )}
                   </div>
-                  {renderSearchDropdown()}
+                  {!isReportSaved && renderSearchDropdown()}
                 </div>
               </div>
 
@@ -1161,13 +1237,35 @@ const YPivotQAInspectionOrderData = ({
                       <label className="text-xs font-bold text-gray-700 dark:text-gray-300">
                         Selected Orders ({selectedOrders.length})
                       </label>
-                      <button
-                        onClick={handleClearAll}
-                        className="text-xs text-red-500 hover:text-red-600 font-medium"
-                      >
-                        Clear All
-                      </button>
+                      {!isReportSaved && (
+                        <button
+                          onClick={handleClearAll}
+                          className="text-xs text-red-500 hover:text-red-600 font-medium"
+                        >
+                          Clear All
+                        </button>
+                      )}
                     </div>
+
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedOrders.map((orderNo) => (
+                        <div
+                          key={orderNo}
+                          className="flex items-center gap-1 px-2 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 rounded-lg text-xs font-medium"
+                        >
+                          <span>{orderNo}</span>
+                          {!isReportSaved && (
+                            <button
+                              onClick={() => handleRemoveOrder(orderNo)}
+                              className="p-0.5 hover:bg-indigo-200 dark:hover:bg-indigo-800 rounded-full transition-colors"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
                     <SelectedOrdersChips
                       orders={selectedOrders}
                       onRemove={handleRemoveOrder}
@@ -1535,70 +1633,74 @@ const YPivotQAInspectionOrderData = ({
           />
 
           {/* Save Button Section - Fixed at bottom of content */}
-          {!isReportSaved && (
-            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-4 py-3">
-                <h3 className="text-white font-bold text-sm flex items-center gap-2">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+            <div
+              className={`px-4 py-3 ${
+                isReportSaved
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600"
+                  : "bg-gradient-to-r from-green-500 to-emerald-600"
+              }`}
+            >
+              <h3 className="text-white font-bold text-sm flex items-center gap-2">
+                {isReportSaved ? (
+                  <Edit3 className="w-4 h-4" />
+                ) : (
                   <Save className="w-4 h-4" />
-                  Save Inspection Report
-                </h3>
-              </div>
-              <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="text-center sm:text-left">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                    {canSave
-                      ? "All required fields are complete. Ready to save!"
-                      : "Complete all required fields to save the report."}
-                  </p>
-                  {!canSave && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Make sure to select a Report Type and fill in all required
-                      configuration.
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={() => setShowSaveModal(true)}
-                  disabled={!canSave}
-                  className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-lg ${
-                    canSave
-                      ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-                      : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-                  }`}
-                  title={
-                    canSave
-                      ? "Save Inspection Report"
-                      : "Complete all required fields to save"
-                  }
-                >
-                  {canSave ? (
-                    <Save className="w-5 h-5" />
-                  ) : (
-                    <Lock className="w-5 h-5" />
-                  )}
-                  Save Report
-                </button>
-              </div>
+                )}
+                {isReportSaved
+                  ? "Update Inspection Report"
+                  : "Save Inspection Report"}
+              </h3>
             </div>
-          )}
 
-          {/* Saved Confirmation */}
-          {isReportSaved && (
-            <div className="bg-green-50 dark:bg-green-900/20 rounded-2xl border-2 border-green-200 dark:border-green-800 p-6 flex items-center gap-4">
-              <div className="p-3 bg-green-500 rounded-full">
-                <CheckCircle2 className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-green-700 dark:text-green-400">
-                  Report Saved Successfully!
-                </h3>
-                <p className="text-sm text-green-600 dark:text-green-500">
-                  You can now proceed to fill in the inspection details in other
-                  tabs.
+            <div className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="text-center sm:text-left">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {canSave
+                    ? isReportSaved
+                      ? "You can update the configuration details below."
+                      : "All required fields are complete. Ready to save!"
+                    : "Complete all required fields to save/update the report."}
                 </p>
+                {isReportSaved && (
+                  <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-semibold flex items-center gap-1">
+                    <Lock className="w-3 h-3" /> Identity fields (Order, Date,
+                    Type) are locked.
+                  </p>
+                )}
+                {!canSave && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Make sure to select a Report Type and fill in all required
+                    configuration.
+                  </p>
+                )}
               </div>
+
+              <button
+                onClick={() => setShowSaveModal(true)}
+                disabled={!canSave}
+                className={`flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold transition-all shadow-lg ${
+                  canSave
+                    ? isReportSaved
+                      ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                      : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                    : "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                }`}
+              >
+                {isReportSaved ? (
+                  <>
+                    <RefreshCw className="w-5 h-5" />
+                    Update Report
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    Save Report
+                  </>
+                )}
+              </button>
             </div>
-          )}
+          </div>
 
           {/* Save Modal */}
           <YPivotQAInspectionOrderDataSaveModal

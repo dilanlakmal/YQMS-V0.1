@@ -169,29 +169,25 @@ const YPivotQAInspectionQRCodeReading = ({ onReportFound, isLoading }) => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-6 sm:p-8 animate-fadeIn">
-      {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-4 shadow-sm border border-blue-100 dark:border-blue-800">
-          <QrCode className="w-8 h-8" />
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-8 animate-fadeIn">
+      {/* Header - Compact on Mobile */}
+      <div className="text-center mb-4 sm:mb-8">
+        <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 mb-2 sm:mb-4 shadow-sm border border-blue-100 dark:border-blue-800">
+          <QrCode className="w-6 h-6 sm:w-8 sm:h-8" />
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200">
-          Load Inspection Report
+        <h2 className="text-lg sm:text-2xl font-bold text-gray-800 dark:text-gray-200">
+          Previous Inspection Report
         </h2>
-        <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-md mx-auto">
-          Scan a QR code or enter the Report ID to retrieve existing inspection
-          data.
-        </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8 max-w-4xl mx-auto">
         {/* Left Side: Manual Input */}
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-2 sm:space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <div className="p-1.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
               <FileText className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-gray-700 dark:text-gray-300">
+            <h3 className="font-bold text-sm sm:text-base text-gray-700 dark:text-gray-300">
               Manual Entry
             </h3>
           </div>
@@ -201,8 +197,9 @@ const YPivotQAInspectionQRCodeReading = ({ onReportFound, isLoading }) => {
               type="text"
               value={reportIdInput}
               onChange={(e) => setReportIdInput(e.target.value)}
-              placeholder="Enter Report ID (e.g., RPT-2023-001)"
-              className="w-full pl-4 pr-12 py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl font-medium text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              placeholder="Enter Report ID"
+              // Input text-base prevents iOS zoom
+              className="w-full pl-4 pr-12 py-2.5 sm:py-3 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl font-medium text-base sm:text-sm text-gray-800 dark:text-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               disabled={isLoading}
             />
             <button
@@ -217,18 +214,18 @@ const YPivotQAInspectionQRCodeReading = ({ onReportFound, isLoading }) => {
               )}
             </button>
           </form>
-          <p className="text-xs text-gray-500 dark:text-gray-400 pl-1">
+          <p className="text-xs text-gray-500 dark:text-gray-400 pl-1 hidden sm:block">
             Type the unique ID found on the top of the report.
           </p>
         </div>
 
         {/* Right Side: Scan Options */}
-        <div className="flex flex-col space-y-4">
+        <div className="flex flex-col space-y-2 sm:space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <div className="p-1.5 bg-purple-100 dark:bg-purple-900/30 rounded-lg text-purple-600 dark:text-purple-400">
               <Camera className="w-4 h-4" />
             </div>
-            <h3 className="font-bold text-gray-700 dark:text-gray-300">
+            <h3 className="font-bold text-sm sm:text-base text-gray-700 dark:text-gray-300">
               Scan QR Code
             </h3>
           </div>
@@ -238,10 +235,10 @@ const YPivotQAInspectionQRCodeReading = ({ onReportFound, isLoading }) => {
               {/* Camera Button */}
               <button
                 onClick={startScanning}
-                className="flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-purple-500 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all group"
+                className="flex flex-col items-center justify-center gap-2 p-3 sm:p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-purple-500 dark:hover:border-purple-500 hover:bg-purple-50 dark:hover:bg-purple-900/10 transition-all group"
               >
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                  <Camera className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-2 sm:p-3 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                  <Camera className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <span className="text-xs font-bold text-gray-600 dark:text-gray-300 group-hover:text-purple-600 dark:group-hover:text-purple-400">
                   Use Camera
@@ -251,10 +248,10 @@ const YPivotQAInspectionQRCodeReading = ({ onReportFound, isLoading }) => {
               {/* Upload Button */}
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all group"
+                className="flex flex-col items-center justify-center gap-2 p-3 sm:p-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-all group"
               >
-                <div className="p-3 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:scale-110 transition-transform">
-                  <Upload className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 sm:p-3 bg-white dark:bg-gray-800 rounded-full shadow-sm group-hover:scale-110 transition-transform">
+                  <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <span className="text-xs font-bold text-gray-600 dark:text-gray-300 group-hover:text-blue-600 dark:group-hover:text-blue-400">
                   Upload Image
@@ -324,7 +321,7 @@ const YPivotQAInspectionQRCodeReading = ({ onReportFound, isLoading }) => {
 
       {/* Error Message */}
       {error && (
-        <div className="mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center justify-center gap-2 text-red-600 dark:text-red-400 animate-fadeIn">
+        <div className="mt-4 sm:mt-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center justify-center gap-2 text-red-600 dark:text-red-400 animate-fadeIn">
           <AlertCircle className="w-5 h-5" />
           <span className="font-medium text-sm">{error}</span>
           <button
