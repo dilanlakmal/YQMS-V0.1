@@ -163,7 +163,7 @@ export default function LanguageSelector({
                   relative px-4 py-3 text-sm font-medium transition-colors
                   hover:bg-gray-50 dark:hover:bg-gray-800
                   ${value === code
-                  ? 'text-blue-600 dark:text-blue-400 after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-blue-600 dark:after:bg-blue-400'
+                  ? 'translator-primary-text after:absolute after:bottom-0 after:left-0 after:h-0.5 after:w-full after:bg-[image:var(--translator-primary)]'
                   : 'text-gray-600 dark:text-gray-300'}
                 `}
             >

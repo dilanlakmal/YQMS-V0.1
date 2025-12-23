@@ -413,7 +413,7 @@ export default function FileTranslator() {
 
     const updatedFiles = [...uploadedFiles, ...newFiles];
     setUploadedFiles(updatedFiles);
-    countCharacters(updatedFiles); // Count characters
+    // countCharacters(updatedFiles); // Removed pre-translation estimate
   }
 
   const handleFileSelect = (e) => {
@@ -429,7 +429,7 @@ export default function FileTranslator() {
 
       const updatedFiles = [...uploadedFiles, ...newFiles];
       setUploadedFiles(updatedFiles);
-      countCharacters(updatedFiles); // Count characters
+      // countCharacters(updatedFiles); // Removed pre-translation estimate
     }
     e.target.value = ""
   }
@@ -437,7 +437,7 @@ export default function FileTranslator() {
   const removeUploadedFile = (index) => {
     const updatedFiles = uploadedFiles.filter((_, i) => i !== index);
     setUploadedFiles(updatedFiles);
-    countCharacters(updatedFiles); // Re-count after removal
+    // countCharacters(updatedFiles); // Removed pre-translation estimate
   }
 
   const countCharacters = async (files) => {
@@ -645,7 +645,7 @@ export default function FileTranslator() {
       {activeTab === "upload" && (
         <>
           {/* Language Selection Header */}
-          <div className="flex flex-col md:flex-row bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 mb-6">
+          <div className="flex flex-col md:flex-row translator-card translator-rounded mb-6">
             {/* Source Language */}
             <div className="flex-1 min-w-0">
               <LanguageSelector
@@ -703,7 +703,7 @@ export default function FileTranslator() {
           </div>
 
           {/* Main Content Area */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 min-h-[400px] flex flex-col items-center justify-center p-8">
+          <div className="translator-card translator-rounded min-h-[400px] flex flex-col items-center justify-center p-8">
 
             {/* 1. Empty State: Upload Area (Split Columns) */}
             {uploadedFiles.length === 0 && selectedBlobFiles.length === 0 && !translationResult && (
@@ -752,9 +752,9 @@ export default function FileTranslator() {
                     const icon = getFileIcon(fileName);
 
                     return (
-                      <div key={idx} className="flex items-center justify-between bg-gray-100 dark:bg-gray-700/50 p-4 rounded-lg border border-gray-200 dark:border-gray-600">
+                      <div key={idx} className="flex items-center justify-between translator-muted p-4 rounded-lg translator-border border">
                         <div className="flex items-center gap-4 overflow-hidden">
-                          <div className="w-12 h-12 flex items-center justify-center rounded bg-white dark:bg-gray-800 shadow-sm text-gray-500">
+                          <div className="w-12 h-12 flex items-center justify-center rounded translator-card shadow-sm text-gray-500">
                             {/* Simple File Icon */}
                             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1065,21 +1065,21 @@ export default function FileTranslator() {
         </div>
       )}
       {characterCount !== null && (
-        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mb-4 p-4 translator-card translator-border border rounded-lg shadow-sm">
           <div className="flex justify-between items-center">
             <div>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm translator-text-foreground">
                 Total Characters: <span className="font-semibold">{characterCount.toLocaleString()}</span>
               </p>
-              <p className="text-sm text-gray-600 mt-1">
-                Estimated Cost: <span className="font-semibold text-blue-600">${estimatedCost} USD</span>
+              <p className="text-sm translator-primary-text mt-1">
+                Estimated Cost: <span className="font-semibold">${estimatedCost} USD</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs translator-muted-foreground mt-1">
                 (Document Translation: $15 per million characters)
               </p>
             </div>
             {countingCharacters && (
-              <div className="text-sm text-gray-500">Counting...</div>
+              <div className="text-sm translator-muted-foreground">Counting...</div>
             )}
           </div>
         </div>

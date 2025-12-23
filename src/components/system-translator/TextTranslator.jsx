@@ -106,7 +106,7 @@ export default function TextTranslator() {
   return (
     <div className="w-full max-w-[1200px] mx-auto space-y-6">
       {/* Glossaries Note */}
-      <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 flex items-center gap-2">
+      {/* <div className="bg-blue-50 border border-blue-100 rounded-lg p-3 text-sm text-blue-800 flex items-center gap-2">
         <div className="bg-blue-100 p-1 rounded-full">
           <span className="sr-only">Info</span>
           <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -114,15 +114,15 @@ export default function TextTranslator() {
           </svg>
         </div>
         <p>
-          <strong>Note:</strong> Glossaries are only available for file translation. Use "File Translation" mode for glossary support.
+          <strong>Note:</strong> Glossaries are only available for file translation.
         </p>
-      </div>
+      </div> */}
 
       {/* Main Translator Card */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden min-h-[500px] flex flex-col">
+      <div className="translator-card translator-rounded shadow-sm overflow-hidden min-h-[500px] flex flex-col">
 
         {/* Language Header Bar */}
-        <div className="flex flex-col md:flex-row border-b border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50">
+        <div className="flex flex-col md:flex-row translator-header bg-gray-50/50 dark:bg-gray-900/50">
           {/* Source Language Tabs */}
           <div className="flex-1 min-w-0">
             <LanguageSelector
@@ -160,7 +160,7 @@ export default function TextTranslator() {
         {/* Translation Area */}
         <div className="flex-1 flex flex-col md:flex-row relative">
           {/* Swap Button (Mobile) */}
-          <div className="md:hidden absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 z-10 bg-white dark:bg-gray-800 rounded-full shadow border p-1">
+          <div className="md:hidden absolute left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 z-10 translator-card rounded-full shadow border p-1">
             <button
               onClick={handleSwapLanguages}
               className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -170,13 +170,13 @@ export default function TextTranslator() {
           </div>
 
           {/* Source Panel */}
-          <div className="flex-1 relative flex flex-col border-b md:border-b-0 md:border-r border-gray-200 dark:border-gray-700 group">
+          <div className="flex-1 relative flex flex-col translator-border border-b md:border-b-0 md:border-r group">
             <div className="flex-1 relative">
               <textarea
                 value={sourceText}
                 onChange={(e) => setSourceText(e.target.value)}
                 placeholder="Enter text to translate or paste here..."
-                className="w-full h-full p-6 text-xl md:text-2xl bg-transparent border-none resize-none focus:ring-0 font-sans text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
+                className="w-full h-full p-6 text-xl md:text-2xl bg-transparent border-none resize-none focus:ring-0 font-sans translator-text-foreground placeholder:text-gray-400"
                 spellCheck="false"
               />
               {sourceText && (
@@ -207,7 +207,7 @@ export default function TextTranslator() {
                 value={translatedText}
                 readOnly
                 placeholder="Translation"
-                className="w-full h-full p-6 text-xl md:text-2xl bg-transparent border-none resize-none focus:ring-0 font-sans text-gray-800 dark:text-gray-100 placeholder:text-gray-400"
+                className="w-full h-full p-6 text-xl md:text-2xl bg-transparent border-none resize-none focus:ring-0 font-sans translator-text-foreground placeholder:text-gray-400"
               />
             </div>
             <div className="px-4 py-3 pb-6 flex justify-end items-center gap-2">
