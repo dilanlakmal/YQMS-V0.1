@@ -1,5 +1,28 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, Save, Download, FileText, Calendar, User, Building, Search, Loader } from 'lucide-react';
+import { 
+  Upload, 
+  Save, 
+  Download, 
+  FileText, 
+  Calendar, 
+  User, 
+  Building, 
+  Search, 
+  Loader,
+  Palette,
+  Settings,
+  Image as ImageIcon,
+  Edit3,
+  CheckCircle,
+  AlertTriangle,
+  Info,
+  Eye,
+  EyeOff,
+  Package,
+  Target,
+  DollarSign,
+  Layers
+} from 'lucide-react';
 import DrawingCanvas from '../../../components/inspection/YDT/drowingCanvas.jsx';
 import { useAuth } from '../../../components/authentication/AuthContext';
 import { API_BASE_URL } from '../../../../config.js';
@@ -10,7 +33,7 @@ const SketchTechnicalSheet = () => {
   const fileInputRef = useRef(null);
   const [loading, setLoading] = useState(false);
   
-  // ✅ NEW: Order search states
+  // Order search states
   const [orderSearchTerm, setOrderSearchTerm] = useState("");
   const [orderSuggestions, setOrderSuggestions] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -18,13 +41,10 @@ const SketchTechnicalSheet = () => {
   const [searchLoading, setSearchLoading] = useState(false);
   const [justSelected, setJustSelected] = useState(false);
   const [originalImage, setOriginalImage] = useState(null);
-  
-  // ✅ NEW: Available sizes from selected order
   const [availableSizes, setAvailableSizes] = useState([]);
 
   // Form data state
   const [formData, setFormData] = useState({
-    // Header information
     styleId: '',
     shortDesc: '',
     department: '',
@@ -32,27 +52,20 @@ const SketchTechnicalSheet = () => {
     commodity: '',
     season: '',
     vendor3d: 'No',
-    
-    // Style details
     styleStatus: 'In Work',
     longDescription: '',
-    
-    // Approval and sizing
     finalFitApproval: '',
     sizeRange: '',
     targetCost: '',
     targetUnits: '',
     plannedColors: '',
     deliveryCount: '',
-    
     fitType: 'Regular',
     coll1: '',
     coll2: '',
     retailPrice: '',
     floorSet: new Date().toISOString().split('T')[0],
     sizeCurve: '',
-    
-    // ✅ NEW: Order-related fields
     orderNo: '',
     buyerEngName: '',
     custStyle: '',
@@ -64,7 +77,7 @@ const SketchTechnicalSheet = () => {
   const [secondaryImage, setSecondaryImage] = useState(null);
   const [showDrawingCanvas, setShowDrawingCanvas] = useState(false);
 
-  // ✅ NEW: Debounce function for search
+  // Keep all existing functions (debounce, fetchOrderSuggestions, etc.)
   const debounce = useCallback((func, wait) => {
     let timeout;
     return (...args) => {
@@ -73,14 +86,12 @@ const SketchTechnicalSheet = () => {
     };
   }, []);
 
-  // ✅ NEW: Fetch order suggestions using your existing backend
   const fetchOrderSuggestions = async (searchTerm) => {
     if (!searchTerm || searchTerm.length < 2) {
       setOrderSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-
     try {
       setSearchLoading(true);
       
@@ -107,13 +118,11 @@ const SketchTechnicalSheet = () => {
     }
   };
 
-  // ✅ NEW: Debounced search function
   const debouncedSearch = useCallback(
     debounce(fetchOrderSuggestions, 300),
     [debounce]
   );
 
-  // ✅ NEW: Fetch order details using your existing backend
   const fetchOrderDetails = async (orderNo) => {
     try {
       setSearchLoading(true);
@@ -139,7 +148,6 @@ const SketchTechnicalSheet = () => {
     }
   };
 
-  // ✅ NEW: Handle order search with debouncing
   React.useEffect(() => {
     if (orderSearchTerm && !justSelected) { 
       debouncedSearch(orderSearchTerm);
@@ -149,7 +157,6 @@ const SketchTechnicalSheet = () => {
     }
   }, [orderSearchTerm, debouncedSearch, justSelected]);
 
-  // ✅ UPDATED: Handle order selection and auto-populate fields including size range
   const handleOrderSelect = useCallback(async (orderNo) => {
     setJustSelected(true);
     setShowSuggestions(false);
@@ -159,25 +166,22 @@ const SketchTechnicalSheet = () => {
       setSelectedOrder(orderData);
       setOrderSearchTerm(orderNo);
       
-      // ✅ Set available sizes
       const sizes = orderData.sizes || [];
       setAvailableSizes(sizes);
       
-      // ✅ Auto-populate form fields based on order data
       setFormData(prev => ({
         ...prev,
         orderNo: orderData.orderNo || orderNo,
-        styleId: orderData.customerStyle || orderData.custStyle || '', // CustStyle goes to Style ID
-        buyerEngName: orderData.engName || '', // EngName goes to buyer section
-        targetUnits: orderData.quantity || orderData.totalQty || '', // Order quantity goes to target units
+        styleId: orderData.customerStyle || orderData.custStyle || '',
+        buyerEngName: orderData.engName || '',
+        targetUnits: orderData.quantity || orderData.totalQty || '',
         custStyle: orderData.customerStyle || orderData.custStyle || '',
         orderQty: orderData.quantity || orderData.totalQty || '',
-        sizeRange: sizes.join(', ') || '' // ✅ Display as comma-separated string in UI
+        sizeRange: sizes.join(', ') || ''
       }));
     }
   }, []);
 
-  // Handle form input changes
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
       ...prev,
@@ -185,7 +189,6 @@ const SketchTechnicalSheet = () => {
     }));
   };
 
-  // Handle main image upload
   const handleMainImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -200,32 +203,26 @@ const SketchTechnicalSheet = () => {
     }
   };
 
-  // Handle canvas save
   const handleCanvasSave = (imageData) => {
     setMainSketchImage(imageData);
   };
 
-  // ✅ Updated save function with canvas data and proper image handling
   const handleSave = async () => {
     try {
       setLoading(true);
       
-      // ✅ Get canvas data including all drawn objects
       const canvasRef = document.querySelector('canvas');
       let canvasImageData = null;
       let drawnObjectsData = null;
       
       if (showDrawingCanvas && canvasRef) {
-        // Capture the complete canvas as image (including all drawings)
         canvasImageData = canvasRef.toDataURL('image/png');
         
-        // Also save the drawn objects data for editing later
         if (window.drawnObjects) {
           drawnObjectsData = window.drawnObjects;
         }
       }
 
-      // ✅ Convert size range string to array
       const sizeRangeArray = formData.sizeRange 
         ? formData.sizeRange.split(',').map(s => s.trim()).filter(s => s)
         : availableSizes;
@@ -233,10 +230,10 @@ const SketchTechnicalSheet = () => {
       const dataToSave = {
         ...formData,
         sizeRange: sizeRangeArray,
-        originalImage: originalImage, // ✅ Save original uploaded image
-        mainSketchImage: canvasImageData || mainSketchImage, // ✅ Canvas with drawings
+        originalImage: originalImage,
+        mainSketchImage: canvasImageData || mainSketchImage,
         secondaryImage,
-        canvasData: drawnObjectsData, // ✅ Save drawn objects for editing
+        canvasData: drawnObjectsData,
         selectedOrderData: selectedOrder,
         availableSizes,
         createdBy: (() => {
@@ -253,13 +250,6 @@ const SketchTechnicalSheet = () => {
         })()
       };
 
-      // ✅ Debug log to check what's being sent
-    console.log('Data being saved:', {
-      originalImage: originalImage ? 'Present' : 'NULL',
-      mainSketchImage: canvasImageData ? 'Present' : 'NULL',
-      canvasData: drawnObjectsData ? drawnObjectsData.length : 0
-    });
-
       const accessToken = localStorage.getItem("accessToken");
       const response = await fetch(`${API_BASE_URL}/api/coverPage/sketch-technical/save`, {
         method: 'POST',
@@ -271,14 +261,17 @@ const SketchTechnicalSheet = () => {
       });
 
       const result = await response.json();
+
       if (result.success) {
         await Swal.fire({
           icon: 'success',
           title: 'Success!',
           text: 'Technical sheet saved successfully!',
-          confirmButtonColor: '#10b981',
+          showConfirmButton: false,
           timer: 2000,
-          timerProgressBar: true
+          timerProgressBar: true,
+          position: 'top-end',
+          toast: true
         });
       } else {
         throw new Error(result.message || 'Failed to save technical sheet');
@@ -287,550 +280,640 @@ const SketchTechnicalSheet = () => {
       console.error('Error saving technical sheet:', error);
       await Swal.fire({
         icon: 'error',
-        title: 'Oops...',
+        title: 'Error!',
         text: `Failed to save: ${error.message}`,
-        confirmButtonColor: '#ef4444'
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
       });
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Function to load existing sketch technical data
-  const loadSketchTechnical = async (orderNo, sketchTechnicalId) => {
-  try {
-    setLoading(true);
-    
-    const accessToken = localStorage.getItem("accessToken");
-    const response = await fetch(`${API_BASE_URL}/api/coverPage/sketch-technical/order/${orderNo}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (result.success && result.data.sketchTechnicals.length > 0) {
-      const sketchData = sketchTechnicalId 
-        ? result.data.sketchTechnicals.find(st => st._id === sketchTechnicalId)
-        : result.data.sketchTechnicals[result.data.sketchTechnicals.length - 1];
-
-      if (sketchData) {
-        // ✅ Load form data
-        setFormData({
-          styleId: sketchData.styleId || '',
-          shortDesc: sketchData.shortDesc || '',
-          department: sketchData.department || '',
-          initialDcDate: sketchData.initialDcDate ? new Date(sketchData.initialDcDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          commodity: sketchData.commodity || '',
-          season: sketchData.season || '',
-          vendor3d: sketchData.vendor3d || 'No',
-          styleStatus: sketchData.styleStatus || 'In Work',
-          longDescription: sketchData.longDescription || '',
-          finalFitApproval: sketchData.finalFitApproval || '',
-          sizeRange: Array.isArray(sketchData.sizeRange) 
-            ? sketchData.sizeRange.join(', ') 
-            : sketchData.sizeRange || '',
-          targetCost: sketchData.targetCost || '',
-          targetUnits: sketchData.targetUnits || '',
-          plannedColors: sketchData.plannedColors || '',
-          deliveryCount: sketchData.deliveryCount || '',
-          fitType: sketchData.fitType || 'Regular',
-          coll1: sketchData.coll1 || '',
-          coll2: sketchData.coll2 || '',
-          retailPrice: sketchData.retailPrice || '',
-          floorSet: sketchData.floorSet ? new Date(sketchData.floorSet).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
-          sizeCurve: sketchData.sizeCurve || '',
-          orderNo: sketchData.orderNo || orderNo,
-          buyerEngName: sketchData.buyerEngName || '',
-          custStyle: sketchData.custStyle || '',
-          orderQty: sketchData.orderQty || ''
-        });
-
-        // ✅ Load available sizes
-        if (sketchData.availableSizes) {
-          setAvailableSizes(Array.isArray(sketchData.availableSizes) 
-            ? sketchData.availableSizes 
-            : sketchData.availableSizes.split(',').map(s => s.trim()));
-        }
-
-        // ✅ Load original image FIRST
-        if (sketchData.originalImage) {
-          const originalImageUrl = sketchData.originalImage.startsWith('http') 
-            ? sketchData.originalImage 
-            : `${API_BASE_URL}${sketchData.originalImage}`;
-          setOriginalImage(originalImageUrl);
-        }
-
-        // ✅ Load main sketch image (canvas with drawings)
-        if (sketchData.mainSketchImage) {
-          const imageUrl = sketchData.mainSketchImage.startsWith('http') 
-            ? sketchData.mainSketchImage 
-            : `${API_BASE_URL}${sketchData.mainSketchImage}`;
-          setMainSketchImage(imageUrl);
-          setShowDrawingCanvas(true);
-        }
-
-        // ✅ Load secondary image
-        if (sketchData.secondaryImage) {
-          const imageUrl = sketchData.secondaryImage.startsWith('http')
-            ? sketchData.secondaryImage
-            : `${API_BASE_URL}${sketchData.secondaryImage}`;
-          setSecondaryImage(imageUrl);
-        }
-
-        // ✅ Load canvas drawn objects data
-        if (sketchData.canvasData && Array.isArray(sketchData.canvasData) && sketchData.canvasData.length > 0) {
-          setTimeout(() => {
-            if (window.drawnObjects !== undefined) {
-              window.drawnObjects = sketchData.canvasData;
-              // Trigger canvas redraw if available
-              if (window.redrawCanvas) {
-                window.redrawCanvas();
-              }
-            }
-          }, 100);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error loading sketch technical data:', error);
-    await Swal.fire({
-      icon: 'error',
-      title: 'Load Failed',
-      text: `Failed to load: ${error.message}`,
-      confirmButtonColor: '#ef4444'
-    });
-  } finally {
-    setLoading(false);
-  }
-};
-
   return (
-    <div className="min-h-screen bg-gray-50 p-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Main Container */}
-        <div className="bg-white border-2 border-black">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/10 dark:bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
+      {/* Loading Overlay */}
+      {loading && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl flex items-center gap-3">
+            <Loader className="animate-spin h-6 w-6 text-blue-600" />
+            <span className="text-gray-900 dark:text-white font-medium">Saving technical sheet...</span>
+          </div>
+        </div>
+      )}
+
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-full shadow-lg">
+              <Edit3 className="h-8 w-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            Sketch Technical Sheet
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            Create detailed technical specifications with visual sketches
+          </p>
+        </div>
+
+        {/* Main Content Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           
-          {/* Top Row - Updated with Order Search */}
-          <div className="grid grid-cols-12 border-b border-black">
-            {/* ✅ UPDATED: Brand Logo Area with Order Search */}
-            <div className="col-span-2 border-r border-black p-3 bg-gray-50 relative">
-              
-              {/* ✅ NEW: Order Search Section */}
-              <div className="mt-2">
-                <div className="text-xs font-semibold mb-1">Search Order:</div>
-                <div className="relative">
-                  <div className="flex items-center">
-                    <input
-                      type="text"
-                      value={orderSearchTerm}
-                      onChange={(e) => {
-                        setOrderSearchTerm(e.target.value);
-                        if (justSelected) {
-                          setJustSelected(false);
-                        }
-                      }}
-                      placeholder="Enter Order No"
-                      className="w-full text-xs border border-gray-300 rounded p-1 pr-6"
-                    />
-                    {searchLoading && (
-                      <Loader className="absolute right-1 animate-spin" size={12} />
-                    )}
-                  </div>
-                  
-                  {/* Order Suggestions Dropdown */}
-                  {showSuggestions && orderSuggestions.length > 0 && !justSelected && (
-                    <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 shadow-lg z-50 max-h-32 overflow-y-auto mt-1">
-                      {orderSuggestions.map((order, index) => (
-                        <div
-                          key={index}
-                          onClick={() => handleOrderSelect(order.orderNo)}
-                          className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200 text-xs"
-                        >
-                          <div className="font-semibold">{order.orderNo}</div>
-                          <div className="text-gray-600">{order.customerStyle}</div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+          {/* Order Search Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                <Search className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Information</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Search and select manufacturing order</p>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Order Search */}
+              <div className="relative">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Search Order Number
+                </label>
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="text"
+                    value={orderSearchTerm}
+                    onChange={(e) => {
+                      setOrderSearchTerm(e.target.value);
+                      if (justSelected) {
+                        setJustSelected(false);
+                      }
+                    }}
+                    placeholder="Enter Order Number..."
+                    className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  />
+                  {searchLoading && <Loader className="animate-spin h-5 w-5 text-blue-600" />}
                 </div>
                 
-                {/* ✅ NEW: Display Buyer Eng Name when order is selected */}
-                {selectedOrder && (
-                  <div className="mt-2 p-2 bg-blue-50 rounded text-xs">
-                    <div className="font-semibold">Buyer:</div>
-                    <div className="font-bold">{formData.buyerEngName || 'N/A'}</div>
+                {/* Order Suggestions Dropdown */}
+                {showSuggestions && orderSuggestions.length > 0 && !justSelected && (
+                  <div className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto mt-2">
+                    {orderSuggestions.map((order, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleOrderSelect(order.orderNo)}
+                        className="p-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors duration-200"
+                      >
+                        <div className="font-semibold text-gray-900 dark:text-white">{order.orderNo}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">{order.customerStyle}</div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          Qty: {order.quantity} | Sizes: {order.sizes?.length || 0}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
 
-            {/* Style ID - Auto-populated from CustStyle */}
-            <div className="col-span-2 border-r border-black">
-              <div className="grid grid-rows-2">
-                <div className="border-b border-black p-1 grid grid-cols-2 text-xs">
-                  <span className="font-semibold">Style ID:</span>
+              {/* Selected Order Info */}
+              {selectedOrder && (
+                <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-4 border border-green-200 dark:border-green-800">
+                  <h4 className="text-sm font-semibold text-green-800 dark:text-green-200 mb-3 flex items-center">
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Selected Order Details
+                  </h4>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Order No:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{formData.orderNo}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Buyer:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{formData.buyerEngName || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600 dark:text-gray-400">Quantity:</span>
+                      <span className="font-medium text-gray-900 dark:text-white">{formData.orderQty}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Form Sections */}
+          <div className="p-6">
+            {/* Basic Information */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <FileText className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+                Basic Information
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Style ID
+                  </label>
                   <input
                     type="text"
                     value={formData.styleId}
                     onChange={(e) => handleInputChange('styleId', e.target.value)}
-                    className="border-0 outline-none bg-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="W02-490014"
                   />
                 </div>
-                <div className="p-1 grid grid-cols-2 text-xs">
-                  <span className="font-semibold">Initial DC Date:</span>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Initial DC Date
+                  </label>
                   <input
                     type="date"
                     value={formData.initialDcDate}
                     onChange={(e) => handleInputChange('initialDcDate', e.target.value)}
-                    className="border-0 outline-none bg-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* Short Description */}
-            <div className="col-span-4 border-r border-black">
-              <div className="grid grid-rows-2">
-                <div className="border-b border-black p-1 grid grid-cols-3 text-xs">
-                  <span className="font-semibold">Short Desc:</span>
-                  <input
-                    type="text"
-                    value={formData.shortDesc}
-                    onChange={(e) => handleInputChange('shortDesc', e.target.value)}
-                    className="col-span-2 border-0 outline-none bg-transparent"
-                    placeholder="F- DRY VISCOSE CREW NECK KNIT T-SHIRT"
-                  />
-                </div>
-                <div className="p-1 grid grid-cols-3 text-xs">
-                  <span className="font-semibold">Commodity:</span>
-                  <input
-                    type="text"
-                    value={formData.commodity}
-                    onChange={(e) => handleInputChange('commodity', e.target.value)}
-                    className="col-span-2 border-0 outline-none bg-transparent"
-                    placeholder="T-shirt / Cami"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Department */}
-            <div className="col-span-2 border-r border-black">
-              <div className="grid grid-rows-2">
-                <div className="border-b border-black p-1 grid grid-cols-2 text-xs">
-                  <span className="font-semibold">Department:</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Department
+                  </label>
                   <input
                     type="text"
                     value={formData.department}
                     onChange={(e) => handleInputChange('department', e.target.value)}
-                    className="border-0 outline-none bg-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="310 Womens Promo T-Shirt"
                   />
                 </div>
-                <div className="p-1 grid grid-cols-2 text-xs">
-                  <span className="font-semibold">Season:</span>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Short Description
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.shortDesc}
+                    onChange={(e) => handleInputChange('shortDesc', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="F- DRY VISCOSE CREW NECK KNIT T-SHIRT"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Commodity
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.commodity}
+                    onChange={(e) => handleInputChange('commodity', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="T-shirt / Cami"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Season
+                  </label>
                   <input
                     type="text"
                     value={formData.season}
                     onChange={(e) => handleInputChange('season', e.target.value)}
-                    className="border-0 outline-none bg-transparent"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="Fall 2025 Apparel Womens RW & CO"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 3D Vendor */}
-            <div className="col-span-2">
-              <div className="grid grid-rows-2">
-                <div className="border-b border-black p-1 text-xs">
-                  <div className="grid grid-cols-2">
-                    <span className="font-semibold">3D Vendor:</span>
-                    <select
-                      value={formData.vendor3d}
-                      onChange={(e) => handleInputChange('vendor3d', e.target.value)}
-                      className="border-0 outline-none bg-transparent"
-                    >
-                      <option value="No">No</option>
-                      <option value="Yes">Yes</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="p-1">
-                  {/* Empty space */}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Second Row */}
-          <div className="grid grid-cols-12 border-b border-black">
-            {/* Style Status & Long Description */}
-            <div className="col-span-2 border-r border-b border-black p-2">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold">Style Status:</span>
+            {/* Style Details */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Settings className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
+                Style Details
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Style Status
+                  </label>
                   <select
                     value={formData.styleStatus}
                     onChange={(e) => handleInputChange('styleStatus', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   >
                     <option value="In Work">In Work</option>
                     <option value="Approved">Approved</option>
                     <option value="On Hold">On Hold</option>
                   </select>
                 </div>
-                <div>
-                  <span className="font-semibold">Long Description:</span>
-                  <textarea
-                    value={formData.longDescription}
-                    onChange={(e) => handleInputChange('longDescription', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
-                    rows={2}
-                    placeholder="F- DRY VISCOSE CREW NECK KNIT T-SHIRT"
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* Final Fit Approval & Fit Type */}
-            <div className="col-span-2 border-r border-b border-black p-2">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold">Final Fit Approval:</span>
-                  <input
-                    type="text"
-                    value={formData.finalFitApproval}
-                    onChange={(e) => handleInputChange('finalFitApproval', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
-                  />
-                </div>
                 <div>
-                  <span className="font-semibold">Fit Type:</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Fit Type
+                  </label>
                   <select
                     value={formData.fitType}
                     onChange={(e) => handleInputChange('fitType', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                   >
                     <option value="Regular">Regular</option>
                     <option value="Slim">Slim</option>
                     <option value="Loose">Loose</option>
                   </select>
                 </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    3D Vendor
+                  </label>
+                  <select
+                    value={formData.vendor3d}
+                    onChange={(e) => handleInputChange('vendor3d', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  >
+                    <option value="No">No</option>
+                    <option value="Yes">Yes</option>
+                  </select>
+                </div>
+
+                <div className="md:col-span-2 lg:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Long Description
+                  </label>
+                  <textarea
+                    value={formData.longDescription}
+                    onChange={(e) => handleInputChange('longDescription', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 resize-none"
+                    rows={3}
+                    placeholder="F- DRY VISCOSE CREW NECK KNIT T-SHIRT"
+                  />
+                </div>
               </div>
             </div>
 
-            {/* ✅ UPDATED: Size Range & Coll 1 - Now auto-populated with available sizes */}
-            <div className="col-span-2 border-r border-b border-black p-2">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold">Size Range:</span>
+            {/* Sizing & Pricing */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Target className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
+                Sizing & Pricing
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Size Range
+                    {availableSizes.length > 0 && (
+                      <span className="text-xs text-green-600 dark:text-green-400 ml-2">(Auto-filled)</span>
+                    )}
+                  </label>
                   <input
                     type="text"
                     value={formData.sizeRange}
                     onChange={(e) => handleInputChange('sizeRange', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="XXS,XS,S,M,L,XL,XXL"
-                    readOnly={availableSizes.length > 0} // Make read-only when auto-populated
+                    readOnly={availableSizes.length > 0}
                   />
                 </div>
-                <div>
-                  <span className="font-semibold">Coll 1:</span>
-                  <input
-                    type="text"
-                    value={formData.coll1}
-                    onChange={(e) => handleInputChange('coll1', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
-                    placeholder="SEASONAL SHOP"
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* Target Cost & Coll 2 */}
-            <div className="col-span-2 border-r border-b border-black p-2">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold">Target Cost:</span>
-                  <input
-                    type="text"
-                    value={formData.targetCost}
-                    onChange={(e) => handleInputChange('targetCost', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
-                    placeholder="0 USD"
-                  />
-                </div>
                 <div>
-                  <span className="font-semibold">Coll 2:</span>
-                  <input
-                    type="text"
-                    value={formData.coll2}
-                    onChange={(e) => handleInputChange('coll2', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* ✅ UPDATED: Target Units - Auto-populated from Order Qty */}
-            <div className="col-span-2 border-r border-b border-black p-2">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold">Target Units:</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Target Units
+                    {selectedOrder && (
+                      <span className="text-xs text-green-600 dark:text-green-400 ml-2">(From Order)</span>
+                    )}
+                  </label>
                   <input
                     type="number"
                     value={formData.targetUnits}
                     onChange={(e) => handleInputChange('targetUnits', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="3200"
                   />
-                  {/* Show order quantity reference */}
-                  {selectedOrder && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      Order Qty: {formData.orderQty}
-                    </div>
-                  )}
                 </div>
+
                 <div>
-                  <span className="font-semibold">Retail Price:</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Target Cost
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.targetCost}
+                    onChange={(e) => handleInputChange('targetCost', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="0 USD"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Retail Price
+                  </label>
                   <input
                     type="text"
                     value={formData.retailPrice}
                     onChange={(e) => handleInputChange('retailPrice', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="35.9 USD"
                   />
                 </div>
-              </div>
-            </div>
 
-            {/* # Planned Colors & Floor Set */}
-            <div className="col-span-2 border-r border-b border-black p-2">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold"># Planned Colors:</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Planned Colors
+                  </label>
                   <input
                     type="number"
                     value={formData.plannedColors}
-                    onChange={(e) => handleInputChange('plannedColors', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                                       onChange={(e) => handleInputChange('plannedColors', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="0"
                   />
                 </div>
-                <div>
-                  <span className="font-semibold">Floor Set:</span>
-                  <input
-                    type="date"
-                    value={formData.floorSet}
-                    onChange={(e) => handleInputChange('floorSet', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
-                  />
-                </div>
-              </div>
-            </div>
 
-            {/* # of Deliv & Size Curve */}
-            <div className="col-span-2 p-2 border-r ">
-              <div className="text-xs">
-                <div className="mb-2">
-                  <span className="font-semibold"># of Deliv:</span>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Delivery Count
+                  </label>
                   <input
                     type="number"
                     value={formData.deliveryCount}
                     onChange={(e) => handleInputChange('deliveryCount', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                     placeholder="0"
                   />
                 </div>
+
                 <div>
-                  <span className="font-semibold">Size Curve:</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Floor Set
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.floorSet}
+                    onChange={(e) => handleInputChange('floorSet', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Size Curve
+                  </label>
                   <input
                     type="text"
                     value={formData.sizeCurve}
                     onChange={(e) => handleInputChange('sizeCurve', e.target.value)}
-                    className="w-full text-xs border border-gray-300 rounded p-1 mt-1"
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Size curve details"
                   />
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Main Sketch Area */}
-          <div className="min-h-[600px] relative">
-            <div className="p-4 bg-gray-50">
-              {showDrawingCanvas ? (
-                <DrawingCanvas
-                  backgroundImage={mainSketchImage}
-                  onSave={handleCanvasSave}
-                  width={900}
-                  height={550}
-                  className="w-full h-full"
-                />
-              ) : (
-                <div className="w-full h-[550px] border-2 border-dashed border-gray-400 flex flex-col items-center justify-center">
-                  <Upload className="h-16 w-16 text-gray-400 mb-4" />
-                  <p className="text-gray-500 mb-4">Upload an image to start sketching</p>
-                                   <button
-                    onClick={() => fileInputRef.current?.click()}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-                  >
-                    Upload Image
-                  </button>
+            {/* Additional Details */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Layers className="h-5 w-5 mr-2 text-orange-600 dark:text-orange-400" />
+                Additional Details
+              </h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Final Fit Approval
+                  </label>
                   <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleMainImageUpload}
-                    className="hidden"
+                    type="text"
+                    value={formData.finalFitApproval}
+                    onChange={(e) => handleInputChange('finalFitApproval', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Approval details"
                   />
                 </div>
-              )}
-            </div>
-          </div>
 
-          {/* Footer Actions */}
-          <div className="border-t-2 border-black p-4 bg-gray-50">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-4 text-xs text-gray-600">
-                <div className="flex items-center gap-1">
-                  <User size={14} />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Collection 1
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.coll1}
+                    onChange={(e) => handleInputChange('coll1', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="SEASONAL SHOP"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Collection 2
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.coll2}
+                    onChange={(e) => handleInputChange('coll2', e.target.value)}
+                    className="w-full px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                    placeholder="Collection 2"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Sketch Canvas Section */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <ImageIcon className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
+                Technical Sketch
+              </h3>
+              
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
+                {showDrawingCanvas ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                        <Edit3 className="h-4 w-4" />
+                        <span>Use the tools below to annotate and sketch on your image</span>
+                      </div>
+                      <button
+                        onClick={() => setShowDrawingCanvas(false)}
+                        className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200"
+                      >
+                        Reset Canvas
+                      </button>
+                    </div>
+                    
+                    <div className="bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-300 dark:border-gray-600 overflow-hidden">
+                      <DrawingCanvas
+                        backgroundImage={mainSketchImage}
+                        onSave={handleCanvasSave}
+                        width={900}
+                        height={550}
+                        className="w-full h-full"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="w-full h-64 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl flex flex-col items-center justify-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors duration-200">
+                      <Upload className="h-16 w-16 text-gray-400 mb-4" />
+                      <p className="text-lg font-medium text-gray-600 dark:text-gray-400 mb-2">Upload Technical Image</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+                        Upload an image to start creating your technical sketch
+                      </p>
+                      <button
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors duration-200 font-medium"
+                      >
+                        <Upload className="h-5 w-5" />
+                        <span>Choose Image</span>
+                      </button>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleMainImageUpload}
+                        className="hidden"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center space-x-2">
+                  <User className="h-4 w-4" />
                   <span>Created by: {user?.name || user?.engName || 'Unknown'}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Calendar size={14} />
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4" />
                   <span>Date: {new Date().toLocaleDateString()}</span>
                 </div>
-                {/* ✅ NEW: Show selected order info */}
                 {selectedOrder && (
-                  <div className="flex items-center gap-1">
-                    <FileText size={14} />
+                  <div className="flex items-center space-x-2">
+                    <Package className="h-4 w-4" />
                     <span>Order: {formData.orderNo}</span>
                   </div>
                 )}
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex items-center space-x-3">
                 <button
                   onClick={() => window.print()}
-                  className="flex items-center gap-1 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                  className="flex items-center space-x-2 px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-all duration-200 font-medium"
                 >
-                  <FileText size={16} />
-                  Print
+                  <FileText className="h-5 w-5" />
+                  <span>Print</span>
                 </button>
+                
                 <button
                   onClick={handleSave}
                   disabled={loading}
-                  className="flex items-center gap-1 px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 disabled:opacity-50"
+                  className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
                 >
-                  <Save size={16} />
-                  {loading ? 'Saving...' : 'Save Technical Sheet'}
+                  {loading ? (
+                    <>
+                      <Loader className="h-5 w-5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-5 w-5" />
+                      <span>Save Technical Sheet</span>
+                    </>
+                  )}
                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Indicators */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            formData.orderNo 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${formData.orderNo ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Selected</span>
+            </div>
+          </div>
+          
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            formData.styleId 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${formData.styleId ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Style ID</span>
+            </div>
+          </div>
+          
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            mainSketchImage 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${mainSketchImage ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Sketch Added</span>
+            </div>
+          </div>
+          
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            formData.longDescription 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${formData.longDescription ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Description</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Tips */}
+        <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+          <div className="flex items-start space-x-3">
+            <Info className="h-6 w-6 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-lg font-medium text-blue-800 dark:text-blue-200 mb-3">
+                Quick Tips for Technical Sheets
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-blue-700 dark:text-blue-300">
+                <ul className="space-y-2">
+                  <li>• Search for existing orders to auto-populate fields</li>
+                  <li>• Upload clear, high-resolution technical images</li>
+                  <li>• Use the drawing tools to add measurements and annotations</li>
+                  <li>• Fill in all required fields for complete documentation</li>
+                </ul>
+                <ul className="space-y-2">
+                  <li>• Size ranges are automatically filled from order data</li>
+                  <li>• Target units sync with order quantities</li>
+                  <li>• Save frequently to prevent data loss</li>
+                  <li>• Print function creates a clean technical document</li>
+                </ul>
               </div>
             </div>
           </div>

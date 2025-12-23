@@ -8,13 +8,25 @@ import {
   Search,
   Loader,
   Plus,
-  Trash2
+  Trash2,
+  FileText,
+  Package,
+  Palette,
+  Hash,
+  Calendar,
+  CheckCircle,
+  AlertTriangle,
+  Info,
+  Eye,
+  Settings,
+  Image as ImageIcon,
+  X
 } from "lucide-react";
 import {API_BASE_URL} from "../../../../config.js";
 import RichTextEditor from '../YDT/RichTextEditor.jsx';
 import Swal from 'sweetalert2';
 
-// Move ColorDropdown OUTSIDE of CoverPage component
+// Enhanced ColorDropdown with better styling
 const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrderColors }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [availableColors, setAvailableColors] = useState([]);
@@ -40,7 +52,6 @@ const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrd
     loadColors();
   }, [orderNo, fetchOrderColors]);
 
-  // Filter out already selected colors
   const unselectedColors = availableColors.filter(color => !selectedColors.includes(color));
 
   return (
@@ -51,7 +62,7 @@ const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrd
           e.target.value = "";
         }
       }}
-      className="w-full border border-gray-300 text-xs p-1 rounded"
+      className="w-full px-3 py-2 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-sm"
       disabled={isLoading || !orderNo}
     >
       <option value="">
@@ -70,9 +81,8 @@ const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrd
   );
 };
 
-// Now define the main CoverPage component
 const OrderSpecificationSheet = () => {
-  // State management
+  // State management (keeping existing state logic)
   const [orderSearchTerm, setOrderSearchTerm] = useState("");
   const [orderSuggestions, setOrderSuggestions] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -82,7 +92,6 @@ const OrderSpecificationSheet = () => {
   const [justSelected, setJustSelected] = useState(false);
   const [orderColors, setOrderColors] = useState({});
   
-  // Form data
   const [formData, setFormData] = useState({
     customerStyle: "",
     orderNo: "",
@@ -93,7 +102,6 @@ const OrderSpecificationSheet = () => {
     testInstructions: ""
   });
 
-  // Updated table data structure for the new format
   const [styleTable, setStyleTable] = useState([
     { 
       orderNo: "", 
@@ -106,32 +114,25 @@ const OrderSpecificationSheet = () => {
   ]);
   
   const [sizeTable, setSizeTable] = useState([]);
-  
-  // Available colors from selected order
   const [availableColors, setAvailableColors] = useState([]);
   
-  // Stamp data
   const [stampData, setStampData] = useState({
     name: "",
     date: new Date().toISOString().split('T')[0]
   });
 
-  // FIXED: Remove orderColors dependency to prevent infinite loop
+  // Keep all existing functions (fetchOrderColors, fetchOrderSuggestions, etc.)
   const fetchOrderColors = useCallback(async (orderNo) => {
     if (!orderNo) {
       return [];
     }
-
-    // Use functional update to access current orderColors without dependency
     return new Promise((resolve) => {
       setOrderColors(currentOrderColors => {
-        // Check if colors are already cached
         if (currentOrderColors[orderNo]) {
           resolve(currentOrderColors[orderNo]);
           return currentOrderColors;
         }
 
-        // If not cached, fetch from API
         (async () => {
           try {
             const response = await fetch(`${API_BASE_URL}/api/coverPage/orders/${encodeURIComponent(orderNo)}`);
@@ -143,7 +144,6 @@ const OrderSpecificationSheet = () => {
             const orderData = await response.json();
             const colors = orderData.colors || [];
             
-            // Store colors for this order
             setOrderColors(prev => ({
               ...prev,
               [orderNo]: colors
@@ -153,7 +153,6 @@ const OrderSpecificationSheet = () => {
           } catch (error) {
             console.error('Error fetching order colors:', error);
             
-            // Fallback to mock data
             const mockColors = ["BLACK", "DARK HEATHER BLACK", "NAVY", "WHITE"];
             
             setOrderColors(prev => ({
@@ -164,20 +163,17 @@ const OrderSpecificationSheet = () => {
             resolve(mockColors);
           }
         })();
-
         return currentOrderColors;
       });
     });
-  }, []); // Empty dependency array
+  }, []);
 
-  // Backend function to fetch orders with better error handling
   const fetchOrderSuggestions = async (searchTerm) => {
     if (!searchTerm || searchTerm.length < 2) {
       setOrderSuggestions([]);
       setShowSuggestions(false);
       return;
     }
-
     try {
       setLoading(true);
       
@@ -199,7 +195,6 @@ const OrderSpecificationSheet = () => {
     } catch (error) {
       console.error('Error fetching order suggestions:', error);
       
-      // Fallback to mock data for development
       const mockSuggestions = [
         {
           orderNo: "GPRT00077C",
@@ -220,7 +215,6 @@ const OrderSpecificationSheet = () => {
     }
   };
 
-  // Debounce function
   const debounce = useCallback((func, wait) => {
     let timeout;
     return (...args) => {
@@ -229,13 +223,11 @@ const OrderSpecificationSheet = () => {
     };
   }, []);
 
-  // Create debounced search function
   const debouncedSearch = useCallback(
     debounce(fetchOrderSuggestions, 300),
     [debounce]
   );
 
-  // Backend function to fetch order details
   const fetchOrderDetails = async (orderNo) => {
     try {
       setLoading(true);
@@ -257,7 +249,6 @@ const OrderSpecificationSheet = () => {
     } catch (error) {
       console.error('Error fetching order details:', error);
       
-      // Fallback to mock data for development
       return {
         orderNo: "GPRT00077C",
         customerStyle: "W02-490014",
@@ -271,7 +262,6 @@ const OrderSpecificationSheet = () => {
     }
   };
 
-  // Handle order search with debouncing
   useEffect(() => {
     if (orderSearchTerm && !justSelected) { 
       debouncedSearch(orderSearchTerm);
@@ -281,67 +271,54 @@ const OrderSpecificationSheet = () => {
     }
   }, [orderSearchTerm, debouncedSearch, justSelected]);
 
-const handleOrderSelect = useCallback(async (orderNo) => {
-  setJustSelected(true); 
-  setShowSuggestions(false); // Hide suggestions immediately
-  
-  const orderData = await fetchOrderDetails(orderNo);
-  setSelectedOrder(orderData);
-  setOrderSearchTerm(orderNo);
-  
-  // Update form data
-  setFormData(prev => ({
-    ...prev,
-    customerStyle: orderData.customerStyle || orderData.customer_style || "",
-    orderNo: orderData.orderNo || orderNo,
-    quantity: orderData.quantity || ""
-  }));
+  const handleOrderSelect = useCallback(async (orderNo) => {
+    setJustSelected(true); 
+    setShowSuggestions(false);
+    
+    const orderData = await fetchOrderDetails(orderNo);
+    setSelectedOrder(orderData);
+    setOrderSearchTerm(orderNo);
+    
+    setFormData(prev => ({
+      ...prev,
+      customerStyle: orderData.customerStyle || orderData.customer_style || "",
+      orderNo: orderData.orderNo || orderNo,
+      quantity: orderData.quantity || ""
+    }));
 
-  // Set available colors
-  setAvailableColors(orderData.colors || []);
-  
-  // Store colors for this order
-  setOrderColors(prev => ({
-    ...prev,
-    [orderNo]: orderData.colors || []
-  }));
+    setAvailableColors(orderData.colors || []);
+    
+    setOrderColors(prev => ({
+      ...prev,
+      [orderNo]: orderData.colors || []
+    }));
 
-  // Update style table with order data and current PO number
-  setStyleTable([{
-    orderNo: orderData.orderNo || orderNo,
-    customerStyle: orderData.customerStyle || orderData.customer_style || "",
-    poNumber: formData.poNumber,
-    colors: [], // Start with empty colors array
-    quantity: 5,
-    remarks: ""
-  }]);
+    setStyleTable([{
+      orderNo: orderData.orderNo || orderNo,
+      customerStyle: orderData.customerStyle || orderData.customer_style || "",
+      poNumber: formData.poNumber,
+      colors: [],
+      quantity: 5,
+      remarks: ""
+    }]);
 
-  // Initialize size table with updated structure
-  if (orderData.sizes) {
-    const sizeTableData = [{
-      orderTotalQty: orderData.quantity || 0,
-      sizeDetails: '',
-      sizes: orderData.sizes || [],        
-      colors: orderData.colors || [] 
-    }];
-    setSizeTable(sizeTableData);
-  }
+    if (orderData.sizes) {
+      const sizeTableData = [{
+        orderTotalQty: orderData.quantity || 0,
+        sizeDetails: '',
+        sizes: orderData.sizes || [],        
+        colors: orderData.colors || [] 
+      }];
+      setSizeTable(sizeTableData);
+    }
+  }, [formData.poNumber]);
 
-  // // Reset the justSelected flag after a longer delay to ensure it works
-  // setTimeout(() => {
-  //   setJustSelected(false);
-  // }, 500); // Increased from 100ms to 500ms
-}, [formData.poNumber]);
-
-  // Add this new function to handle PO number changes
   const handlePONumberChange = (newPONumber) => {
-    // Update form data
     setFormData(prev => ({
       ...prev,
       poNumber: newPONumber
     }));
 
-    // Update all rows in style table with the new PO number
     setStyleTable(prevTable => 
       prevTable.map(row => ({
         ...row,
@@ -350,7 +327,6 @@ const handleOrderSelect = useCallback(async (orderNo) => {
     );
   };
 
-  // Handle image upload
   const handleImageUpload = (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -360,19 +336,17 @@ const handleOrderSelect = useCallback(async (orderNo) => {
     }
   };
 
-  // Add new row to style table
   const addStyleRow = () => {
     setStyleTable([...styleTable, {
       orderNo: formData.orderNo,
       customerStyle: formData.customerStyle,
-      poNumber: formData.poNumber, // Use current PO number
+      poNumber: formData.poNumber,
       colors: [],
       quantity: 0,
       remarks: ""
     }]);
   };
 
-  // Remove row from style table
   const removeStyleRow = (index) => {
     if (styleTable.length > 1) {
       const newData = styleTable.filter((_, i) => i !== index);
@@ -380,7 +354,6 @@ const handleOrderSelect = useCallback(async (orderNo) => {
     }
   };
 
-  // Add color to a style row
   const addColorToRow = (rowIndex, color) => {
     const newData = [...styleTable];
     if (!newData[rowIndex].colors.includes(color)) {
@@ -389,122 +362,154 @@ const handleOrderSelect = useCallback(async (orderNo) => {
     }
   };
 
-  // Remove color from a style row
   const removeColorFromRow = (rowIndex, colorIndex) => {
     const newData = [...styleTable];
     newData[rowIndex].colors.splice(colorIndex, 1);
     setStyleTable(newData);
   };
 
-  // Calculate totals
   const styleTableTotal = styleTable.reduce((sum, row) => sum + (parseInt(row.quantity) || 0), 0);
 
   const handleSave = async () => {
-  try {
-    setLoading(true);
-    let empId = 'unknown_user';
     try {
-      const userDataString = localStorage.getItem('user');
-      if (userDataString) {
-        const userData = JSON.parse(userDataString);
-        empId = userData?.emp_id || 'unknown_user';
+      setLoading(true);
+      let empId = 'unknown_user';
+      try {
+        const userDataString = localStorage.getItem('user');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          empId = userData?.emp_id || 'unknown_user';
+        }
+      } catch (error) {
+        console.error("Failed to parse user data from localStorage", error);
+      }
+
+      const preparedSizeTable = sizeTable && sizeTable.length > 0 
+        ? sizeTable.map(item => ({
+            orderTotalQty: item.orderTotalQty || 0,
+            sizeDetails: item.sizeDetails || '',
+            sizes: item.sizes || (selectedOrder?.sizes || []),
+            colors: item.colors || styleTable.flatMap(styleRow => styleRow.colors)
+          }))
+        : [];
+
+      const preparedStyleTable = styleTable && styleTable.length > 0
+        ? styleTable.filter(row => row.orderNo || row.customerStyle)
+        : [];
+
+      const dataToSave = {
+        orderNo: formData.orderNo,
+        customerStyle: formData.customerStyle,
+        poNumber: formData.poNumber,
+        quantity: formData.quantity,
+        retailSingle: formData.retailSingle,
+        majorPoints: formData.majorPoints,
+        testInstructions: formData.testInstructions,
+        testInstructionsHTML: formData.testInstructions,
+        uploadedImage: uploadedImage,
+        styleTable: preparedStyleTable,
+        sizeTable: preparedSizeTable,
+        stampData: stampData,
+        createdBy: empId
+      };
+
+      const response = await fetch(`${API_BASE_URL}/api/coverPage/save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(dataToSave)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success) {
+        await Swal.fire({
+          icon: 'success',
+          title: 'Success!',
+          text: 'Order specification sheet saved successfully!',
+          showConfirmButton: false,
+          timer: 2000,
+          timerProgressBar: true,
+          position: 'top-end',
+          toast: true
+        });
+        console.log('Saved cover page:', result.data);
+      } else {
+        throw new Error(result.message || 'Failed to save cover page');
       }
     } catch (error) {
-      console.error("Failed to parse user data from localStorage", error);
-    }
-
-    // ✅ UPDATED: Handle empty or null tables
-    const preparedSizeTable = sizeTable && sizeTable.length > 0 
-      ? sizeTable.map(item => ({
-          orderTotalQty: item.orderTotalQty || 0,
-          sizeDetails: item.sizeDetails || '',
-          sizes: item.sizes || (selectedOrder?.sizes || []),
-          colors: item.colors || styleTable.flatMap(styleRow => styleRow.colors)
-        }))
-      : []; // Return empty array if no size table data
-
-    // ✅ UPDATED: Handle empty or null style table
-    const preparedStyleTable = styleTable && styleTable.length > 0
-      ? styleTable.filter(row => row.orderNo || row.customerStyle) // Only include rows with some data
-      : []; // Return empty array if no style table data
-
-    const dataToSave = {
-      orderNo: formData.orderNo,
-      customerStyle: formData.customerStyle,
-      poNumber: formData.poNumber,
-      quantity: formData.quantity,
-      retailSingle: formData.retailSingle,
-      majorPoints: formData.majorPoints,
-      testInstructions: formData.testInstructions,
-      testInstructionsHTML: formData.testInstructions,
-      uploadedImage: uploadedImage,
-      styleTable: preparedStyleTable, // Can be empty array
-      sizeTable: preparedSizeTable,   // Can be empty array
-      stampData: stampData,
-      createdBy: empId
-    };
-
-    const response = await fetch(`${API_BASE_URL}/api/coverPage/save`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(dataToSave)
-    });
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const result = await response.json();
-    if (result.success) {
+      console.error('Error saving cover page:', error);
       await Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: 'Cover page saved successfully!',
-        confirmButtonColor: '#10b981',
-        timer: 2000,
-        timerProgressBar: true
+        icon: 'error',
+        title: 'Error!',
+        text: `Failed to save: ${error.message}`,
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true,
+        position: 'top-end',
+        toast: true
       });
-      console.log('Saved cover page:', result.data);
-    } else {
-      throw new Error(result.message || 'Failed to save cover page');
+    } finally {
+      setLoading(false);
     }
-
-  } catch (error) {
-    console.error('Error saving cover page:', error);
-    await Swal.fire({
-      icon: 'error',
-      title: 'Oops...',
-      text: `Failed to save: ${error.message}`,
-      confirmButtonColor: '#ef4444'
-    });
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-blue-400/10 dark:bg-blue-600/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
       {/* Loading Overlay */}
       {loading && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-4 rounded-lg flex items-center gap-2">
-            <Loader className="animate-spin" size={20} />
-            <span>Loading...</span>
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-2xl flex items-center gap-3">
+            <Loader className="animate-spin h-6 w-6 text-blue-600" />
+            <span className="text-gray-900 dark:text-white font-medium">Loading...</span>
           </div>
         </div>
       )}
 
-      {/* Main Content */}
-      <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
-        <div className="bg-white border-2 border-black p-0">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-3 rounded-full shadow-lg">
+              <FileText className="h-8 w-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            Order Specification Sheet
+          </h1>
+          <p className="text-lg text-gray-600 dark:text-gray-300">
+            Create comprehensive product specifications and quality requirements
+          </p>
+        </div>
+
+        {/* Main Content Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           
-          {/* Top Header Row */}
-          <div className="grid grid-cols-2 border-b-2 border-black">
-            {/* Order Number Section */}
-            <div className="border-r-2 border-black p-2 relative">
-              <div className="flex items-center gap-2">
+          {/* Order Search Section */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                <Search className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Information</h3>
+                <p className="text-sm text-gray-500 dark:text-gray-400">Search and select manufacturing order</p>
+              </div>
+            </div>
+            
+            <div className="mt-4 relative">
+              <div className="flex items-center space-x-3">
                 <input
                   type="text"
                   value={orderSearchTerm}
@@ -514,407 +519,571 @@ const handleOrderSelect = useCallback(async (orderNo) => {
                       setJustSelected(false);
                     }
                   }}
-                  placeholder="Enter Order No"
-                  className="flex-1 text-lg font-bold border-0 outline-none bg-transparent"
+                  placeholder="Enter Order Number to search..."
+                  className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
                 />
-                {loading && <Loader className="animate-spin" size={16} />}
+                {loading && <Loader className="animate-spin h-5 w-5 text-blue-600" />}
               </div>
               
               {/* Order Suggestions Dropdown */}
-              {showSuggestions && orderSuggestions.length > 0 && !justSelected && ( 
-                <div className="absolute top-full left-0 right-0 bg-white border border-gray-300 shadow-lg z-10 max-h-40 overflow-y-auto">
+              {showSuggestions && orderSuggestions.length > 0 && !justSelected && (
+                <div className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto mt-2">
                   {orderSuggestions.map((order, index) => (
                     <div
                       key={index}
                       onClick={() => handleOrderSelect(order.orderNo)}
-                      className="p-2 hover:bg-gray-100 cursor-pointer border-b border-gray-200"
+                      className="p-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors duration-200"
                     >
-                      <div className="font-semibold">{order.orderNo}</div>
-                      <div className="text-sm text-gray-600">
+                      <div className="font-semibold text-gray-900 dark:text-white">{order.orderNo}</div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
                         {order.customerStyle || order.customer_style}
+                      </div>
+                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                        Qty: {order.quantity} | Colors: {order.colors?.length || 0}
                       </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
-            
-            {/* Attention Major Points */}
-            <div className="p-2">
-              <div className="text-lg font-bold text-center">Attention Major Points</div>
-            </div>
           </div>
 
-          {/* Rest of your JSX remains the same... */}
-          {/* Main Content Grid */}
-          <div className="grid grid-cols-2">
-            
-            {/* Left Column - Image */}
-            <div className="border-r-2 border-b-2 border-black p-4 flex flex-col items-center justify-center min-h-[200px]">
-              {uploadedImage ? (
-                <img src={uploadedImage} alt="Product" className="max-w-full max-h-40 object-contain" />
-              ) : (
-                <div className="border-2 border-dashed border-gray-400 w-full h-32 flex items-center justify-center">
-                  <div className="text-center">
-                    <Upload className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-                    <p className="text-xs text-gray-500">Upload Image</p>
-                  </div>
-                </div>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageUpload}
-                className="mt-2 text-xs"
-              />
-            </div>
-
-            {/* Right Column - Order Details */}
-            <div className="border-b-2 border-black">
-              <div className="grid grid-rows-4">
-                <div className="border-b border-black p-2 grid grid-cols-2">
-                  <span className="font-semibold">Customer Style:</span>
-                  <span>{formData.customerStyle}</span>
-                </div>
-                <div className="border-b border-black p-2 grid grid-cols-2">
-                  <span className="font-semibold">Order No:</span>
-                  <span>{formData.orderNo}</span>
-                </div>
-                <div className="border-b border-black p-2 grid grid-cols-2">
-                  <span className="font-semibold">PO#:</span>
+          {/* Product Information Grid */}
+          <div className="p-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              
+              {/* Left Column - Image Upload */}
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <ImageIcon className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
+                  Product Image
+                </h3>
+                
+                <div className="space-y-4">
+                  {uploadedImage ? (
+                    <div className="relative group">
+                      <img 
+                        src={uploadedImage} 
+                        alt="Product" 
+                        className="w-full h-64 object-contain bg-white rounded-lg border-2 border-gray-200 dark:border-gray-600" 
+                      />
+                      <button
+                        onClick={() => setUploadedImage(null)}
+                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors duration-200">
+                      <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400 mb-2">Upload Product Image</p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500">PNG, JPG up to 10MB</p>
+                    </div>
+                  )}
+                  
                   <input
-                    type="text"
-                    value={formData.poNumber}
-                    onChange={(e) => handlePONumberChange(e.target.value)}
-                    className="border-2 outline-none bg-transparent border-black "
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   />
                 </div>
-                <div className="p-2 grid grid-cols-2">
-                  <span className="font-semibold">Quantity:</span>
-                  <span>{formData.quantity}pcs</span>
+              </div>
+
+              {/* Right Column - Order Details */}
+              <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-6 border border-green-200 dark:border-green-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <Package className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
+                  Order Details
+                </h3>
+                
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Customer Style
+                      </label>
+                      <div className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
+                        {formData.customerStyle || 'Not selected'}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Order Number
+                      </label>
+                      <div className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
+                        {formData.orderNo || 'Not selected'}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        PO Number
+                      </label>
+                      <input
+                        type="text"
+                        value={formData.poNumber}
+                        onChange={(e) => handlePONumberChange(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="Enter PO Number"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        Quantity
+                      </label>
+                      <div className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
+                        {formData.quantity ? `${formData.quantity} pcs` : 'Not selected'}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 border-b-2">
-            {/* Major Points Section */}
-            <div className="border-r border-black bg-yellow-200 p-2">
-              <div className="font-semibold mb-1">Major Points:</div>
-              <textarea
-                value={formData.majorPoints}
-                onChange={(e) => setFormData(prev => ({...prev, majorPoints: e.target.value}))}
-                className="border-2 w-full outline-none bg-transparent resize-none"
-                rows={2}
-                placeholder="Enter major points here..."
-              />
-            </div>
+            {/* Major Points and Retail Single */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 rounded-xl p-6 border border-yellow-200 dark:border-yellow-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <AlertTriangle className="h-5 w-5 mr-2 text-yellow-600 dark:text-yellow-400" />
+                  Major Points
+                </h3>
+                <textarea
+                  value={formData.majorPoints}
+                  onChange={(e) => setFormData(prev => ({...prev, majorPoints: e.target.value}))}
+                  className="w-full px-4 py-3 border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
+                  rows={4}
+                  placeholder="Enter critical quality points and requirements..."
+                />
+              </div>
 
-            {/* Right Column - Additional Info */}
-            <div>
-              <div className="border-black p-2">
-                <span className="font-semibold">Retail Single:</span>
+              <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <Settings className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
+                  Retail Single
+                </h3>
                 <textarea
                   value={formData.retailSingle}
                   onChange={(e) => setFormData(prev => ({...prev, retailSingle: e.target.value}))}
-                  className="w-full border-2 outline-none bg-transparent mt-1"
-                  rows={2}
+                  className="w-full px-4 py-3 border border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                  rows={4}
+                  placeholder="Enter retail specifications..."
                 />
               </div>
             </div>
-          </div>
 
-          {/* Test Instructions */}
-          <div className="border-t border-black p-2">
-            <div className="font-semibold mb-2 text-sm">Test Instructions:</div>
-            <RichTextEditor
-              value={formData.testInstructions}
-              onChange={(content) => setFormData(prev => ({...prev, testInstructions: content}))}
-              placeholder="Enter detailed test instructions..."
-              height="300px"
-              className="w-full"
-            />
-          </div>
+            {/* Test Instructions */}
+            <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-6 border border-blue-200 dark:border-blue-800 mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <FileText className="h-5 w-5 mr-2 text-blue-600 dark:text-blue-400" />
+                Test Instructions
+              </h3>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-blue-300 dark:border-blue-600">
+                <RichTextEditor
+                  value={formData.testInstructions}
+                  onChange={(content) => setFormData(prev => ({...prev, testInstructions: content}))}
+                  placeholder="Enter detailed test instructions and procedures..."
+                  height="300px"
+                  className="w-full"
+                />
+              </div>
+            </div>
 
-          {/* Updated Style Table with new structure */}
-          <div className="border-t-2 border-black mb-4 p-2">
-            <table className="w-full">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border border-black p-2 text-xs">STYLE</th>
-                  <th className="border border-black p-2 text-xs">COLOR</th>
-                  <th className="border border-black p-2 text-xs">QTY</th>
-                  <th className="border border-black p-2 text-xs">REMARKS</th>
-                </tr>
-              </thead>
-              <tbody>
-                {styleTable.map((row, index) => (
-                  <tr key={index}>
-                    <td className="border border-black p-1">
-                      {/* Combined Order Info in first column */}
-                      <div className="space-y-1">
-                        <div className="text-xs">
-                          <span className="font-semibold">Order No:</span>
-                          <input
-                            type="text"
-                            value={row.orderNo}
-                            onChange={(e) => {
-                              const newData = [...styleTable];
-                              newData[index].orderNo = e.target.value;
-                              setStyleTable(newData);
-                            }}
-                            className="w-full border-0 outline-none bg-transparent text-xs mt-1"
-                            placeholder="Order Number"
-                          />
-                        </div>
-                        <div className="text-xs">
-                          <span className="font-semibold">Customer Style:</span>
-                          <input
-                            type="text"
-                            value={row.customerStyle}
-                            onChange={(e) => {
-                              const newData = [...styleTable];
-                              newData[index].customerStyle = e.target.value;
-                              setStyleTable(newData);
-                            }}
-                            className="w-full border-0 outline-none bg-transparent text-xs mt-1"
-                            placeholder="Customer Style"
-                          />
-                        </div>
-                        <div className="text-xs">
-                          <span className="font-semibold">PO#:</span>
-                          <input
-                            type="text"
-                            value={row.poNumber}
-                            readOnly
-                            className="w-full border-0 outline-none bg-transparent text-xs mt-1"
-                            placeholder="PO Number"
-                          />
-                        </div>
-                      </div>
-                    </td>
+            {/* Style Table */}
+            <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600 mb-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                  <Palette className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
+                  Style Configuration
+                </h3>
+                <button
+                  onClick={addStyleRow}
+                  className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+                >
+                  <Plus className="h-4 w-4" />
+                  <span>Add Row</span>
+                </button>
+              </div>
 
-                   <td className="border border-black p-1">
-                      {/* Color management in second column */}
-                      <div className="space-y-2">
-                        {/* Display selected colors */}
-                        <div className="flex flex-wrap gap-1">
-                          {row.colors.map((color, colorIndex) => (
-                            <span
-                              key={colorIndex}
-                              className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                            >
-                              {color}
-                              <button
-                                onClick={() => removeColorFromRow(index, colorIndex)}
-                                className="text-red-500 hover:text-red-700 ml-1"
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                        
-                        {/* Add color dropdown - UPDATED */}
-                        <ColorDropdown 
-                          rowIndex={index}
-                          orderNo={row.orderNo}
-                          selectedColors={row.colors}
-                          onColorAdd={(color) => addColorToRow(index, color)}
-                          fetchOrderColors={fetchOrderColors}
-                        />
-                      </div>
-                    </td>
-
-                    <td className="border border-black p-1 text-center">
-                      <input
-                        type="number"
-                        value={row.quantity}
-                        onChange={(e) => {
-                          const newData = [...styleTable];
-                          newData[index].quantity = parseInt(e.target.value) || 0;
-                          setStyleTable(newData);
-                        }}
-                        className="w-full border-0 outline-none bg-transparent text-s text-center"
-                      />
-                      pcs
-                    </td>
-
-                    <td className="border border-black p-1">
-                      <div className="flex items-center gap-2">
-                        <textarea
-                          value={row.remarks}
-                          onChange={(e) => {
-                            const newData = [...styleTable];
-                            newData[index].remarks = e.target.value;
-                            setStyleTable(newData);
-                          }}
-                          className="flex-1 border-2 outline-none bg-transparent text-xs"
-                          rows={7}
-                        />
-                        {styleTable.length > 1 && (
-                          <button
-                            onClick={() => removeStyleRow(index)}
-                            className="text-red-500 hover:text-red-700"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-                
-                {/* Add Row Button */}
-                <tr>
-                  <td colSpan={4} className="border border-black p-2 text-center">
-                    <button
-                      onClick={addStyleRow}
-                      className="flex items-center gap-1 mx-auto text-blue-600 hover:text-blue-800 text-sm"
-                    >
-                      <Plus size={16} />
-                      Add Row
-                    </button>
-                  </td>
-                </tr>
-                
-                <tr className="bg-gray-100">
-                  <td colSpan={2} className="border border-black p-2 text-center font-semibold text-xs">
-                    Total Qty
-                  </td>
-                  <td className="border border-black p-2 text-center font-semibold text-xs">
-                    {styleTableTotal} pc
-                  </td>
-                  <td className="border border-black p-2"></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-
-          {/* Size Breakdown Table - Updated Structure */}
-            {selectedOrder && selectedOrder.sizes && (
-              <div className="border-t-2 border-black p-2">
-                <table className="w-full">
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
                   <thead>
-                    <tr className="bg-gray-100">
-                      <th className="border border-black p-2 text-xs">STYLE</th>
-                      <th className="border border-black p-2 text-xs">COLOR</th>
-                      <th className="border border-black p-2 text-xs">TOTAL</th>
-                      <th className="border border-black p-1 text-xs">
-                        <div className={`grid gap-0 grid-cols-${selectedOrder.sizes.length}`}>
-                          {selectedOrder.sizes.map(size => (
-                            <div key={size} className="border-r border-black last:border-r-0 p-1 text-center">
-                              {size}
-                            </div>
-                          ))}
-                        </div>
+                                        <tr className="bg-gray-100 dark:bg-gray-700">
+                      <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                        Style Information
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                        Colors
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 p-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                        Quantity
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                        Remarks
+                      </th>
+                      <th className="border border-gray-300 dark:border-gray-600 p-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                        Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {sizeTable.map((row, rowIndex) => (
-                      <tr key={rowIndex}>
-                        {/* STYLE Column - Display Order No, Customer Style, and PO# */}
-                        <td className="border border-black p-2 text-xs">
-                          <div className="space-y-1">
+                    {styleTable.map((row, index) => (
+                      <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
+                        <td className="border border-gray-300 dark:border-gray-600 p-3">
+                          <div className="space-y-3">
                             <div>
-                              <span className="font-semibold">Order No:</span>
-                              <div>{formData.orderNo}</div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Order Number
+                              </label>
+                              <input
+                                type="text"
+                                value={row.orderNo}
+                                onChange={(e) => {
+                                  const newData = [...styleTable];
+                                  newData[index].orderNo = e.target.value;
+                                  setStyleTable(newData);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                placeholder="Order Number"
+                              />
                             </div>
                             <div>
-                              <span className="font-semibold">Customer Style:</span>
-                              <div>{formData.customerStyle}</div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                Customer Style
+                              </label>
+                              <input
+                                type="text"
+                                value={row.customerStyle}
+                                onChange={(e) => {
+                                  const newData = [...styleTable];
+                                  newData[index].customerStyle = e.target.value;
+                                  setStyleTable(newData);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                placeholder="Customer Style"
+                              />
                             </div>
                             <div>
-                              <span className="font-semibold">PO#:</span>
-                              <div>{formData.poNumber}</div>
+                              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+                                PO Number
+                              </label>
+                              <input
+                                type="text"
+                                value={row.poNumber}
+                                readOnly
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm cursor-not-allowed"
+                                placeholder="PO Number"
+                              />
                             </div>
                           </div>
                         </td>
                         
-                        {/* COLOR Column */}
-                        <td className="border border-black p-2 text-xs">
-                          <div className="flex flex-wrap gap-1">
-                            {styleTable.flatMap(styleRow => styleRow.colors).map((color, idx) => (
-                              <span 
-                                key={idx} 
-                                className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded"
-                              >
-                                {color}
-                              </span>
-                            ))}
+                        <td className="border border-gray-300 dark:border-gray-600 p-3">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              {row.colors.map((color, colorIndex) => (
+                                <span
+                                  key={colorIndex}
+                                  className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-sm rounded-full border border-blue-200 dark:border-blue-700"
+                                >
+                                  {color}
+                                  <button
+                                    onClick={() => removeColorFromRow(index, colorIndex)}
+                                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            
+                            <ColorDropdown 
+                              rowIndex={index}
+                              orderNo={row.orderNo}
+                              selectedColors={row.colors}
+                              onColorAdd={(color) => addColorToRow(index, color)}
+                              fetchOrderColors={fetchOrderColors}
+                            />
                           </div>
                         </td>
                         
-                        {/* TOTAL Column - Editable quantity */}
-                        <td className="border border-black p-2 text-xs text-center">
-                          <div className="font-semibold text-lg">
-                            {row.orderTotalQty || formData.quantity || 0}
+                        <td className="border border-gray-300 dark:border-gray-600 p-3 text-center">
+                          <div className="flex items-center justify-center space-x-2">
+                            <input
+                              type="number"
+                              value={row.quantity}
+                              onChange={(e) => {
+                                const newData = [...styleTable];
+                                newData[index].quantity = parseInt(e.target.value) || 0;
+                                setStyleTable(newData);
+                              }}
+                              className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                            />
+                            <span className="text-sm text-gray-600 dark:text-gray-400">pcs</span>
                           </div>
-                          <div className="text-xs text-gray-500 mt-1">pcs</div>
                         </td>
                         
-                        {/* Size Details Column - Merged single textarea */}
-                        <td className="border border-black p-1">
+                        <td className="border border-gray-300 dark:border-gray-600 p-3">
                           <textarea
-                            value={row.sizeDetails || ''}
+                            value={row.remarks}
                             onChange={(e) => {
-                              const newData = [...sizeTable];
-                              newData[rowIndex].sizeDetails = e.target.value;
-                              setSizeTable(newData);
+                              const newData = [...styleTable];
+                              newData[index].remarks = e.target.value;
+                              setStyleTable(newData);
                             }}
-                            className="w-full border-2 outline-none bg-transparent text-xs resize-none"
-                            rows={10}
-                            placeholder="Enter size details, measurements, or notes..."
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                            rows={4}
+                            placeholder="Enter remarks..."
                           />
+                        </td>
+                        
+                        <td className="border border-gray-300 dark:border-gray-600 p-3 text-center">
+                          {styleTable.length > 1 && (
+                            <button
+                              onClick={() => removeStyleRow(index)}
+                              className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                              title="Remove Row"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     ))}
+                    
+                    {/* Total Row */}
+                    <tr className="bg-blue-50 dark:bg-blue-900/20 font-semibold">
+                      <td colSpan={2} className="border border-gray-300 dark:border-gray-600 p-3 text-center text-gray-900 dark:text-white">
+                        Total Quantity
+                      </td>
+                      <td className="border border-gray-300 dark:border-gray-600 p-3 text-center text-blue-600 dark:text-blue-400 font-bold">
+                        {styleTableTotal} pcs
+                      </td>
+                      <td colSpan={2} className="border border-gray-300 dark:border-gray-600 p-3"></td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
+            </div>
+
+            {/* Size Breakdown Table */}
+            {selectedOrder && selectedOrder.sizes && (
+              <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600 mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                  <Hash className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
+                  Size Breakdown & Details
+                </h3>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse">
+                    <thead>
+                      <tr className="bg-gray-100 dark:bg-gray-700">
+                        <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                          Style Information
+                        </th>
+                        <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                          Colors
+                        </th>
+                        <th className="border border-gray-300 dark:border-gray-600 p-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                          Total Quantity
+                        </th>
+                        <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
+                          Size Details & Notes
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sizeTable.map((row, rowIndex) => (
+                        <tr key={rowIndex} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200">
+                          <td className="border border-gray-300 dark:border-gray-600 p-3">
+                            <div className="space-y-2">
+                              <div className="flex items-center space-x-2">
+                                <Package className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                                  {formData.orderNo}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                  {formData.customerStyle}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <Hash className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                                <span className="text-sm text-gray-700 dark:text-gray-300">
+                                  PO: {formData.poNumber}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          
+                          <td className="border border-gray-300 dark:border-gray-600 p-3">
+                            <div className="flex flex-wrap gap-2">
+                              {styleTable.flatMap(styleRow => styleRow.colors).map((color, idx) => (
+                                <span 
+                                  key={idx} 
+                                  className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-sm rounded-full border border-blue-200 dark:border-blue-700"
+                                >
+                                  {color}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          
+                          <td className="border border-gray-300 dark:border-gray-600 p-3 text-center">
+                            <div className="bg-green-100 dark:bg-green-900/30 rounded-lg p-3 border border-green-200 dark:border-green-700">
+                              <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                {row.orderTotalQty || formData.quantity || 0}
+                              </div>
+                              <div className="text-sm text-green-700 dark:text-green-300">pieces</div>
+                            </div>
+                          </td>
+                          
+                          <td className="border border-gray-300 dark:border-gray-600 p-3">
+                            <div className="space-y-2">
+                              <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Available Sizes: {selectedOrder.sizes.join(', ')}
+                              </div>
+                              <textarea
+                                value={row.sizeDetails || ''}
+                                onChange={(e) => {
+                                  const newData = [...sizeTable];
+                                  newData[rowIndex].sizeDetails = e.target.value;
+                                  setSizeTable(newData);
+                                }}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                                rows={6}
+                                placeholder="Enter size breakdown, measurements, or special notes..."
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
 
-          {/* Stamp Section */}
-          <div className="border-t-2 border-black p-4 flex justify-end">
-            <div className="border-2 border-red-400 p-3 bg-red-50">
-              <div className="text-center">
-                <div className="text-red-600 font-bold mb-2">Quality Control</div>
-                <div className="space-y-1">
-                  <div className="text-xs">
-                    <span>Name: </span>
-                    <input
-                      type="text"
-                      value={stampData.name}
-                      onChange={(e) => setStampData(prev => ({...prev, name: e.target.value}))}
-                      className="border-b border-red-400 bg-transparent text-xs w-20"
-                    />
-                  </div>
-                  <div className="text-xs">
-                    <span>Date: </span>
-                    <input
-                      type="date"
-                      value={stampData.date}
-                      onChange={(e) => setStampData(prev => ({...prev, date: e.target.value}))}
-                      className="border-b border-red-400 bg-transparent text-xs w-24"
-                    />
+            {/* Quality Control Stamp */}
+            <div className="bg-red-50 dark:bg-red-900/20 rounded-xl p-6 border border-red-200 dark:border-red-800 mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
+                <Shield className="h-5 w-5 mr-2 text-red-600 dark:text-red-400" />
+                Quality Control Approval
+              </h3>
+              
+              <div className="flex justify-end">
+                <div className="bg-white dark:bg-gray-800 border-2 border-red-400 dark:border-red-600 rounded-xl p-6 shadow-lg">
+                  <div className="text-center">
+                    <div className="text-red-600 dark:text-red-400 font-bold text-lg mb-4 flex items-center justify-center">
+                      <Shield className="h-6 w-6 mr-2" />
+                      Quality Control
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <User className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Name:</span>
+                        <input
+                          type="text"
+                          value={stampData.name}
+                          onChange={(e) => setStampData(prev => ({...prev, name: e.target.value}))}
+                          className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-24 focus:outline-none focus:border-red-600 dark:focus:border-red-400 text-gray-900 dark:text-white"
+                          placeholder="Inspector"
+                        />
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Calendar className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Date:</span>
+                        <input
+                          type="date"
+                          value={stampData.date}
+                          onChange={(e) => setStampData(prev => ({...prev, date: e.target.value}))}
+                          className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-32 focus:outline-none focus:border-red-600 dark:focus:border-red-400 text-gray-900 dark:text-white"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                <Info className="h-4 w-4" />
+                <span>All information will be saved to the specification sheet</span>
+              </div>
+              
+              <button 
+                onClick={handleSave}
+                disabled={loading}
+                className="flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
+              >
+                {loading ? (
+                  <>
+                    <Loader className="h-5 w-5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-5 w-5" />
+                    <span>Save Specification Sheet</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Save Button */}
-        <div className="mt-4 flex justify-center">
-          <button 
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center gap-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold disabled:opacity-50"
-          >
-            <Save size={20} />
-            {loading ? 'Saving...' : 'Save Specification Sheet'}
-          </button>
+        {/* Status Indicators */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            formData.orderNo 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${formData.orderNo ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Selected</span>
+            </div>
+          </div>
+          
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            formData.poNumber 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${formData.poNumber ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">PO Number</span>
+            </div>
+          </div>
+          
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            styleTable.some(row => row.colors.length > 0) 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${styleTable.some(row => row.colors.length > 0) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Colors Added</span>
+            </div>
+          </div>
+          
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            stampData.name 
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${stampData.name ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">QC Approval</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -922,3 +1091,4 @@ const handleOrderSelect = useCallback(async (orderNo) => {
 };
 
 export default OrderSpecificationSheet;
+
