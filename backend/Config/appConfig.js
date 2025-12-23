@@ -5,7 +5,7 @@ import fs from "fs";
 import { Server as SocketIO } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
-import https from "https";
+import http from "http";
 import gracefulFs from "graceful-fs";
 gracefulFs.gracefulify(fs);
 import dotenv from "dotenv";
@@ -21,7 +21,7 @@ export const __dirname = path.dirname(__filename);
 export const __backendDir = path.resolve(__dirname, "..");
 
 export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://192.167.6.207:5001";
+  process.env.API_BASE_URL || "http://localhost:5001";
 
 const options = {
   key: fs.readFileSync(
@@ -32,12 +32,12 @@ const options = {
   )
 };
 
-export const server = https.createServer(options, app);
+export const server = http.createServer(options, app);
 
 // Initialize Socket.io
 export const io = new SocketIO(server, {
   cors: {
-    origin: "https://192.167.6.207:3001",
+    origin: "http://localhost:3001",
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true
@@ -50,7 +50,7 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.6.207:3001"
+  "http://localhost:3001"
 ];
 
 // CORS configuration

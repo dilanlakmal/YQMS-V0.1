@@ -261,6 +261,7 @@ import supplierIssueInspection from "./routes/SupplierIssue/supplierIssueInspect
 ------------------------------ */
 
 import YourksysOrders from "./routes/YorksysOrders/uploadOrderRoutes.js";
+import huminityRoutes from "./huminity/routes/huminityRoutes.js";
 
 /* ------------------------------
   Packing List
@@ -531,6 +532,7 @@ app.use(supplierIssueReport);
 ------------------------------ */
 
 app.use(YourksysOrders);
+app.use(huminityRoutes);
 
 /* ------------------------------
   Packing List

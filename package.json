@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "server": "node backend/server.js",
+    "server": "nodemon backend/server.js",
     "dev:all": "concurrently \"npm run dev\" \"npm run server\"",
     "electron": "wait-port http://localhost:5173 && electron electron.js",
     "electron:serve": "concurrently -k \"npm run dev\" \"npm run electron\"",
@@ -65,6 +65,7 @@
     "mssql": "^11.0.1",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
+    "nodemon": "^3.1.11",
     "papaparse": "^5.5.3",
     "postcss": "^8.4.35",
     "prop-types": "^15.8.1",

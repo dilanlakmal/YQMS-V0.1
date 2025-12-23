@@ -91,6 +91,7 @@ import CuttingInlineOrdersModel from "../../models/CuttingInlineOrders.js";
 import createPlanPackingListModel from "../../models/PlanPackingList.js";
 
 import createYorksysOrdersModel from "../../models/YorksysOrders.js";
+import createHumidityModel from "../../huminity/models/HumidityReport.js";
 
 import createQASectionsProductType from "../../models/QA/QASectionsProductType.js";
 import createQASectionsHomeModel from "../../models/QA/QASectionsHome.js";
@@ -114,14 +115,17 @@ import normalNotificationSchema from "../../models/NormalNotification.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_prod?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?authSource=admin"
+  // "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?retryWrites=true&w=majority"
+  // "mongodb://localhost:27017/ym_prod"
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  "mongodb://admin:Yai%40Ym2024@192.167.1.10:29000/ym_eco_board?authSource=admin"
-  //"mongodb://localhost:27017/ym_prod"
+  "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/eco_development?authSource=admin"
+  // "mongodb://yaidev:Yai%40Dev2025@192.167.4.7:28425/ym_prod?retryWrites=true&w=majority"
+  // "mongodb://localhost:27017/ym_prod"
 );
+
 
 //Connection status
 ymProdConnection.on("connected", () =>
@@ -247,6 +251,7 @@ export const SubconSewingQc1Report =
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
+export const HumidityReport = createHumidityModel(ymProdConnection);
 
 export const QASectionsProductType =
   createQASectionsProductType(ymProdConnection);

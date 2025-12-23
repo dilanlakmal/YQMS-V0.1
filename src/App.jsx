@@ -54,6 +54,9 @@ import QCWashingPage from "./pages/QCWashing.jsx";
 import PackingList from "./pages/PackingList.jsx";
 import Measurement from "./pages/Measurement.jsx";
 
+// Humidity Report 
+import HumidityReportPage from "./pages/HumidityReport.jsx";
+
 //Languages
 import "../src/lang/i18n";
 
@@ -484,6 +487,7 @@ function AppContent() {
                 path="/fincheck-inspection"
                 element={<YPivotQAInspection />}
               />
+              <Route path="/humidity-report" element={<HumidityReportPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
