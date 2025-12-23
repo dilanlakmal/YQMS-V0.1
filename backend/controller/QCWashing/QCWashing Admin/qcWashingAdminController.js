@@ -767,7 +767,9 @@ export const addQCWashingStandards = async (req, res) => {
 // GET /api/qc-washing/standards - Updated to get standards by factory
 export const getQCWashingStandards = async (req, res) => {
   try {
-    const { factoryName } = req.query;;
+    const { factoryName } = req.query;
+    
+    console.log(`[Standards] Requested factory: ${factoryName}`);
     
     if (!factoryName) {
       return res.status(400).json({ 
@@ -781,16 +783,30 @@ export const getQCWashingStandards = async (req, res) => {
       factoryName: { $regex: new RegExp(`^${factoryName}$`, 'i') } 
     });
     
+    console.log(`[Standards] Factory record found: ${!!factoryRecord}`);
     
     if (!factoryRecord) {
+      console.log(`[Standards] Factory '${factoryName}' not found, trying YM fallback`);
+      
       const fallbackRecord = await QCWashingMachineStandard.findOne({ 
         factoryName: { $regex: new RegExp('^YM$', 'i') } 
       });
+      
+      console.log(`[Standards] YM fallback record found: ${!!fallbackRecord}`);
+      
       if (!fallbackRecord) {
+        console.log(`[Standards] No YM fallback available`);
         return res.json({ 
           success: true, 
           data: [],
-          message: `No standards found for ${factoryName} factory or YM fallback`
+          message: `No standards found for ${factoryName} factory or YM fallback`,
+          factoryInfo: {
+            factoryName: factoryName,
+            totalStandards: 0,
+            lastUpdated: null,
+            isFallback: false,
+            requestedFactory: factoryName
+          }
         });
       }
       
@@ -803,6 +819,8 @@ export const getQCWashingStandards = async (req, res) => {
         createdAt: standard.createdAt,
         updatedAt: standard.updatedAt
       }));
+
+      console.log(`[Standards] Returning ${transformedStandards.length} YM fallback standards`);
 
       return res.json({ 
         success: true, 
@@ -819,16 +837,16 @@ export const getQCWashingStandards = async (req, res) => {
     }
 
     // Transform standards to match expected format
-    const transformedStandards = factoryRecord.standards.map(standard => {
-      return {
-        washType: standard.washType,
-        washingMachine: standard.washingMachine,
-        tumbleDry: standard.tumbleDry,
-        factoryName: factoryRecord.factoryName,
-        createdAt: standard.createdAt,
-        updatedAt: standard.updatedAt
-      };
-    });
+    const transformedStandards = factoryRecord.standards.map(standard => ({
+      washType: standard.washType,
+      washingMachine: standard.washingMachine,
+      tumbleDry: standard.tumbleDry,
+      factoryName: factoryRecord.factoryName,
+      createdAt: standard.createdAt,
+      updatedAt: standard.updatedAt
+    }));
+
+    console.log(`[Standards] Returning ${transformedStandards.length} standards for ${factoryRecord.factoryName}`);
 
     res.json({ 
       success: true, 

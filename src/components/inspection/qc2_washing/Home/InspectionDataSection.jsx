@@ -200,17 +200,18 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
     if (!washType || !formData?.factoryName) return;
     
     try {
-      const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=${formData.factoryName}`);
+      // Normalize factory name to match database format (uppercase)
+      const normalizedFactoryName = formData.factoryName.trim().toUpperCase();
+      
+      const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=${normalizedFactoryName}`);
       const data = await response.json();
       
       if (data.success && data.data.length > 0) {
-        
         const standardRecord = data.data.find(record => record.washType === washType);
         
         if (standardRecord) {
           const washingMachineValues = { ...standardRecord.washingMachine };
           const tumbleDryValues = { ...standardRecord.tumbleDry };
-          
           
           // Always set the standard values for display
           setStandardValues({
@@ -225,10 +226,28 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
               "Tumble Dry": { ...tumbleDryValues }
             });
           }
+          
+          // Show notification if using fallback standards
+          if (data.factoryInfo?.isFallback) {
+            console.log(`Using YM factory standards as fallback for ${formData.factoryName}`);
+            // Optional: Show user notification
+            // Swal.fire({
+            //   icon: "info",
+            //   title: "Using Default Standards",
+            //   text: `No standards found for ${formData.factoryName}. Using YM factory standards as default.`,
+            //   showConfirmButton: false,
+            //   timer: 3000,
+            //   timerProgressBar: true,
+            //   position: "top-end",
+            //   toast: true
+            // });
+          }
         } else {
+          // If no standard found for current wash type, try YM fallback explicitly
           await fetchFallbackStandards();
         }
       } else {
+        // If no standards found for current factory, try YM fallback
         await fetchFallbackStandards();
       }
     } catch (error) {
@@ -241,7 +260,6 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards?factoryName=YM`);
       const data = await response.json();
-      
       
       if (data.success && data.data.length > 0) {
         const standardRecord = data.data.find(record => record.washType === washType);
@@ -261,10 +279,66 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
               "Tumble Dry": { ...tumbleDryValues }
             });
           }
+          
+          console.log(`Using YM factory standards as fallback for ${washType}`);
+          
+          // Optional: Show user notification about fallback
+          // Swal.fire({
+          //   icon: "warning",
+          //   title: "Using Default Standards",
+          //   text: `No standards found for ${formData.factoryName} factory. Using YM factory standards as default.`,
+          //   showConfirmButton: false,
+          //   timer: 3000,
+          //   timerProgressBar: true,
+          //   position: "top-end",
+          //   toast: true
+          // });
+        } else {
+          // No standards found even in YM, set empty values
+          setStandardValues({
+            "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+            "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+          });
+          
+          if (!recordId) {
+            setActualValues({
+              "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+              "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+            });
+          }
+          
+          console.warn(`No standards found for wash type: ${washType} in any factory`);
         }
+      } else {
+        // YM factory has no standards, set empty values
+        setStandardValues({
+          "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+        });
+        
+        if (!recordId) {
+          setActualValues({
+            "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+            "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+          });
+        }
+        
+        console.warn("No fallback standards available");
       }
     } catch (error) {
       console.error("Error fetching fallback YM standards:", error);
+      // Set empty values on error
+      setStandardValues({
+        "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+        "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+      });
+      
+      if (!recordId) {
+        setActualValues({
+          "Washing Machine": { temperature: "", time: "", silicon: "", softener: "" },
+          "Tumble Dry": { temperature: "", timeCool: "", timeHot: "" }
+        });
+      }
     }
   };
 
@@ -1595,9 +1669,9 @@ const handleSaveInspection = async () => {
                       const isOk = machineStatus[type.value]?.[param.key]?.ok;
                       const isNo = machineStatus[type.value]?.[param.key]?.no;
                       const actualValue =
-                        actualValues[type.value]?.[param.key] || "";
+                        actualValues[type.value]?.[param.key] ?? "";
                       const standardValue =
-                        standardValues[type.value]?.[param.key] || "";
+                        standardValues[type.value]?.[param.key] ?? "";
 
                       return (
                         <div
