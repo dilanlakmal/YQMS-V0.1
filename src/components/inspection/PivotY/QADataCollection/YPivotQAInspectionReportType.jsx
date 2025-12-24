@@ -67,7 +67,7 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
       }`}
     >
       <p
-        className={`text-sm font-bold mb-2 truncate ${
+        className={`font-bold mb-1.5 sm:mb-2 text-xs sm:text-sm line-clamp-3 sm:truncate leading-tight sm:leading-normal ${
           isSelected
             ? "text-indigo-700 dark:text-indigo-300"
             : "text-gray-800 dark:text-gray-200"
@@ -76,6 +76,7 @@ const ReportTypeCard = ({ template, isSelected, onSelect }) => {
       >
         {template.ReportType}
       </p>
+
       <div className="flex flex-wrap gap-1">
         <span
           className={`px-1.5 py-0.5 rounded text-[9px] font-bold text-white ${measurement.color}`}
