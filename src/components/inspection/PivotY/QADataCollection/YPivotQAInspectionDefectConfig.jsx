@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
@@ -6,8 +6,6 @@ import {
   Search,
   Plus,
   X,
-  Camera,
-  Upload,
   ChevronDown,
   ChevronUp,
   AlertCircle,
@@ -20,11 +18,14 @@ import {
   MapPinOff,
   MapPin,
   Lock,
-  RefreshCw,
   Layers,
   MessageSquare,
   Images,
-  BarChart3
+  BarChart3,
+  User,
+  AlertTriangle,
+  FileText,
+  FilePenLine
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 
@@ -34,8 +35,7 @@ import YPivotQATemplatesImageEditor from "../QATemplates/YPivotQATemplatesImageE
 // Import buyer determination function
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
 import YPivotQAInspectionDefectSummary from "./YPivotQAInspectionDefectSummary";
-
-const MAX_IMAGES_PER_DEFECT = 5;
+import YPivotQAInspectionManualDefect from "./YPivotQAInspectionManualDefect";
 
 const YPivotQAInspectionDefectConfig = ({
   selectedOrders,
@@ -51,7 +51,7 @@ const YPivotQAInspectionDefectConfig = ({
   const determinedBuyer = useMemo(() => {
     if (!selectedOrders || selectedOrders.length === 0) return "Unknown";
     const result = determineBuyerFromOrderNo(selectedOrders[0]);
-    return result.buyer; // Returns: "Costco", "Aritzia", "Reitmans", "ANF", "MWW", "STORI", or "Unknown"
+    return result.buyer;
   }, [selectedOrders]);
 
   // --- State ---
@@ -59,6 +59,18 @@ const YPivotQAInspectionDefectConfig = ({
   const [savedDefects, setSavedDefects] = useState(
     reportData?.defectData?.savedDefects || []
   );
+  // Retrieve saved manual data from parent state or initialize empty
+  const currentManualData = useMemo(() => {
+    // Get the dictionary of all manual data
+    const allManualData = reportData?.defectData?.manualDataByGroup || {};
+
+    // Determine current key (fallback to 'general' if no group selected)
+    const groupId = activeGroup?.id || "general";
+
+    // Return specific data for this group, or empty defaults
+    return allManualData[groupId] || { remarks: "", images: [] };
+  }, [reportData?.defectData?.manualDataByGroup, activeGroup]);
+
   const [allDefects, setAllDefects] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -75,8 +87,9 @@ const YPivotQAInspectionDefectConfig = ({
     status: "",
     qty: 1,
     locations: [],
-    images: [],
-    isNoLocation: false
+    isNoLocation: false,
+    additionalRemark: "",
+    selectedQC: null
   });
 
   // UI State
@@ -85,10 +98,161 @@ const YPivotQAInspectionDefectConfig = ({
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [imageEditorContext, setImageEditorContext] = useState(null);
 
+  // --- Calculated Qty based on locations ---
+  const calculatedQty = useMemo(() => {
+    if (configForm.isNoLocation) {
+      return configForm.qty; // User controlled when no location required
+    }
+    if (configForm.locations.length === 0) {
+      return 0;
+    }
+    // Sum up qty from all selected locations
+    return configForm.locations.reduce((sum, loc) => sum + (loc.qty || 1), 0);
+  }, [configForm.locations, configForm.isNoLocation, configForm.qty]);
+
+  // --- Validation for images per location ---
+  const locationImageValidation = useMemo(() => {
+    if (configForm.isNoLocation) {
+      return { isValid: true, errors: [] };
+    }
+
+    if (configForm.locations.length === 0) {
+      return { isValid: false, errors: [], noLocations: true };
+    }
+
+    const errors = [];
+    configForm.locations.forEach((loc) => {
+      const requiredImages = loc.qty || 1;
+      const currentImages = loc.images?.length || 0;
+      if (currentImages < requiredImages) {
+        errors.push({
+          uniqueId: loc.uniqueId,
+          locationName: loc.locationName,
+          locationNo: loc.locationNo,
+          view: loc.view,
+          required: requiredImages,
+          current: currentImages,
+          missing: requiredImages - currentImages
+        });
+      }
+    });
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      noLocations: false
+    };
+  }, [configForm.locations, configForm.isNoLocation]);
+
+  // --- Check if form is valid for submission ---
+  const isFormValid = useMemo(() => {
+    // Must have status
+    if (!configForm.status) return false;
+
+    // Must have location or no-location checked
+    if (!configForm.isNoLocation && configForm.locations.length === 0) {
+      return false;
+    }
+
+    // If locations are selected, all must have required images
+    if (!configForm.isNoLocation && !locationImageValidation.isValid) {
+      return false;
+    }
+
+    // QC validation if required
+    const isQCRequired = reportData?.selectedTemplate?.isQCScan === "Yes";
+    const hasQCAssignments = activeGroup?.assignments?.some((a) => a.qcUser);
+    if (isQCRequired && hasQCAssignments && !configForm.selectedQC) {
+      return false;
+    }
+
+    return true;
+  }, [
+    configForm.status,
+    configForm.isNoLocation,
+    configForm.locations,
+    configForm.selectedQC,
+    locationImageValidation.isValid,
+    reportData?.selectedTemplate?.isQCScan,
+    activeGroup?.assignments
+  ]);
+
+  // --- Get validation messages for display ---
+  const getValidationMessages = () => {
+    const messages = [];
+
+    if (!configForm.status) {
+      messages.push({ type: "error", text: "Please select a status" });
+    }
+
+    if (!configForm.isNoLocation && configForm.locations.length === 0) {
+      messages.push({
+        type: "error",
+        text: "Select defect locations or check 'No Location Required'"
+      });
+    }
+
+    if (!configForm.isNoLocation && locationImageValidation.errors.length > 0) {
+      locationImageValidation.errors.forEach((err) => {
+        messages.push({
+          type: "warning",
+          text: `Location #${err.locationNo} (${err.locationName}): ${
+            err.missing
+          } image${err.missing > 1 ? "s" : ""} required`
+        });
+      });
+    }
+
+    const isQCRequired = reportData?.selectedTemplate?.isQCScan === "Yes";
+    const hasQCAssignments = activeGroup?.assignments?.some((a) => a.qcUser);
+    if (isQCRequired && hasQCAssignments && !configForm.selectedQC) {
+      messages.push({
+        type: "error",
+        text: "Please select a QC / Inspector for this defect"
+      });
+    }
+
+    return messages;
+  };
+
   // --- Sync to Parent ---
   const updateParent = (newDefects) => {
     if (onUpdateDefectData) {
-      onUpdateDefectData({ savedDefects: newDefects });
+      // Pass back the existing DICTIONARY
+      const existingManualDataMap =
+        reportData?.defectData?.manualDataByGroup || {};
+
+      onUpdateDefectData({
+        savedDefects: newDefects,
+        manualDataByGroup: existingManualDataMap // Save the whole map
+      });
+    }
+  };
+
+  // // --- Sync to Parent ---
+  // const updateParent = (newDefects) => {
+  //   if (onUpdateDefectData) {
+  //     onUpdateDefectData({ savedDefects: newDefects });
+  //   }
+  // };
+
+  // --- New Handler for Manual Data ---
+  const handleManualDataUpdate = (newManualDataForActiveGroup) => {
+    if (onUpdateDefectData) {
+      const groupId = activeGroup?.id || "general";
+      const existingManualDataMap =
+        reportData?.defectData?.manualDataByGroup || {};
+
+      // Create a new map: Keep other groups' data + Update current group
+      const updatedMap = {
+        ...existingManualDataMap,
+        [groupId]: newManualDataForActiveGroup
+      };
+
+      onUpdateDefectData({
+        savedDefects: savedDefects,
+        manualDataByGroup: updatedMap // Send updated map to parent
+      });
     }
   };
 
@@ -175,14 +339,12 @@ const YPivotQAInspectionDefectConfig = ({
       !determinedBuyer ||
       determinedBuyer === "Unknown"
     ) {
-      // Default fallback when no buyer or no statusByBuyer data
       return {
         statuses: ["Minor", "Major", "Critical"],
         defaultStatus: "Major"
       };
     }
 
-    // Find matching buyer rule using the DETERMINED buyer name (case-insensitive)
     const buyerRule = defectTemplate.statusByBuyer.find(
       (r) =>
         r.buyerName?.toLowerCase().trim() ===
@@ -200,7 +362,6 @@ const YPivotQAInspectionDefectConfig = ({
       };
     }
 
-    // Fallback if no matching buyer found - check for "Default" or "All" buyer
     const defaultRule = defectTemplate.statusByBuyer.find(
       (r) =>
         r.buyerName?.toLowerCase() === "default" ||
@@ -219,7 +380,6 @@ const YPivotQAInspectionDefectConfig = ({
       };
     }
 
-    // Ultimate fallback
     return {
       statuses: ["Minor", "Major", "Critical"],
       defaultStatus: "Major"
@@ -229,7 +389,6 @@ const YPivotQAInspectionDefectConfig = ({
   // --- Handlers ---
 
   const handleOpenModal = (defectTemplate, index = null) => {
-    // Get available statuses based on DETERMINED buyer
     const { statuses, defaultStatus } = getStatusesForDefect(defectTemplate);
     setAvailableStatuses(statuses);
 
@@ -241,8 +400,9 @@ const YPivotQAInspectionDefectConfig = ({
         status: existing.status,
         qty: existing.qty,
         locations: existing.locations || [],
-        images: existing.images || [],
-        isNoLocation: existing.isNoLocation || false
+        isNoLocation: existing.isNoLocation || false,
+        additionalRemark: existing.additionalRemark || "",
+        selectedQC: existing.qcUser || activeGroup?.activeQC || null
       });
       setEditingIndex(index);
     } else {
@@ -252,8 +412,9 @@ const YPivotQAInspectionDefectConfig = ({
         status: defaultStatus,
         qty: 1,
         locations: [],
-        images: [],
-        isNoLocation: false
+        isNoLocation: false,
+        additionalRemark: "",
+        selectedQC: activeGroup?.activeQC || null
       });
       setEditingIndex(null);
     }
@@ -261,13 +422,12 @@ const YPivotQAInspectionDefectConfig = ({
   };
 
   const handleSaveDefect = () => {
-    if (!configForm.status) return alert("Select a status");
-    if (!configForm.isNoLocation && configForm.locations.length === 0) {
-      return alert("Select defect locations or check 'No Location Required'");
-    }
+    // Form validation is already checked via isFormValid
+    if (!isFormValid) return;
 
     const defectEntry = {
       ...configForm,
+      qty: calculatedQty, // Use calculated qty
       defectId: currentDefectTemplate._id,
       defectName: currentDefectTemplate.english,
       defectCode: currentDefectTemplate.code,
@@ -276,11 +436,11 @@ const YPivotQAInspectionDefectConfig = ({
       line: activeGroup?.line,
       table: activeGroup?.table,
       color: activeGroup?.color,
-      qcUser: activeGroup?.activeQC,
+      qcUser: configForm.selectedQC,
       lineName: activeGroup?.lineName,
       tableName: activeGroup?.tableName,
       colorName: activeGroup?.colorName,
-      determinedBuyer: determinedBuyer, // Store the determined buyer
+      determinedBuyer: determinedBuyer,
       timestamp: new Date().toISOString()
     };
 
@@ -306,115 +466,38 @@ const YPivotQAInspectionDefectConfig = ({
     }
   };
 
-  // --- Image Handlers (Updated for multi-image) ---
-
-  const getAvailableImageSlots = () => {
-    return MAX_IMAGES_PER_DEFECT - configForm.images.length;
-  };
-
-  const openImageEditorForNew = (mode) => {
-    const availableSlots = getAvailableImageSlots();
-    if (availableSlots <= 0) {
-      alert(`Maximum ${MAX_IMAGES_PER_DEFECT} images allowed!`);
-      return;
-    }
-
-    setImageEditorContext({
-      mode,
-      isEditing: false,
-      maxImages: availableSlots,
-      existingData: null
-    });
-    setShowImageEditor(true);
-  };
-
-  const openImageEditorForEdit = (imageIndex) => {
-    const imageData = configForm.images[imageIndex];
-    if (imageData) {
-      setImageEditorContext({
-        mode: "edit",
-        isEditing: true,
-        imageIndex,
-        maxImages: 1,
-        existingData: [
-          {
-            imgSrc: imageData.imgSrc || imageData.url,
-            history: imageData.history || []
-          }
-        ]
-      });
-      setShowImageEditor(true);
-    }
-  };
-
-  const handleImagesSave = (savedImages) => {
-    if (!savedImages || savedImages.length === 0) {
-      setShowImageEditor(false);
-      setImageEditorContext(null);
-      return;
-    }
-
-    setConfigForm((prev) => {
-      let newImages = [...prev.images];
-
-      if (
-        imageEditorContext?.isEditing &&
-        imageEditorContext?.imageIndex !== undefined
-      ) {
-        const img = savedImages[0];
-        newImages[imageEditorContext.imageIndex] = {
-          url: img.editedImgSrc,
-          imgSrc: img.imgSrc,
-          history: img.history || []
-        };
-      } else {
-        const availableSlots = MAX_IMAGES_PER_DEFECT - newImages.length;
-        const imagesToAdd = savedImages.slice(0, availableSlots);
-
-        imagesToAdd.forEach((img) => {
-          newImages.push({
-            url: img.editedImgSrc,
-            imgSrc: img.imgSrc,
-            history: img.history || []
-          });
-        });
-
-        if (savedImages.length > availableSlots) {
-          setTimeout(() => {
-            alert(
-              `Only ${availableSlots} image(s) were added. Maximum ${MAX_IMAGES_PER_DEFECT} images per defect.`
-            );
-          }, 100);
-        }
-      }
-
-      return { ...prev, images: newImages };
-    });
-
-    setShowImageEditor(false);
-    setImageEditorContext(null);
-  };
-
-  const removeImage = (index, e) => {
-    if (e) e.stopPropagation();
-    setConfigForm((prev) => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
-  };
+  // Memoized handler to prevent recreation on every render
+  const handleLocationSelectionChange = useCallback((locs) => {
+    setConfigForm((prev) => ({ ...prev, locations: locs }));
+  }, []);
 
   const toggleCategory = (cat) => {
     setExpandedCategories((p) => ({ ...p, [cat]: !p[cat] }));
   };
 
-  // --- Helper: Get remarks as comma-separated string for display ---
-  const getRemarksDisplay = (locations) => {
+  // --- Helper: Get all comments from positions as comma-separated string ---
+  const getCommentsDisplay = (locations) => {
     if (!locations || locations.length === 0) return null;
-    const remarks = locations
-      .filter((loc) => loc.remark && loc.remark.trim())
-      .map((loc) => loc.remark.trim());
-    if (remarks.length === 0) return null;
-    return remarks.join(", ");
+    const comments = [];
+    locations.forEach((loc) => {
+      if (loc.positions) {
+        loc.positions.forEach((pos) => {
+          if (pos.comment && pos.comment.trim()) {
+            comments.push(
+              `#${loc.locationNo} Pcs${pos.pcsNo}: ${pos.comment.trim()}`
+            );
+          }
+        });
+      }
+    });
+    if (comments.length === 0) return null;
+    return comments.join(" | ");
+  };
+
+  // --- Helper: Get total images count from locations ---
+  const getTotalImagesCount = (locations) => {
+    if (!locations || locations.length === 0) return 0;
+    return locations.reduce((sum, loc) => sum + (loc.images?.length || 0), 0);
   };
 
   // ================= RENDER =================
@@ -653,7 +736,8 @@ const YPivotQAInspectionDefectConfig = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {group.items.map((item) => {
                   const masterIndex = savedDefects.indexOf(item);
-                  const remarksDisplay = getRemarksDisplay(item.locations);
+                  const commentsDisplay = getCommentsDisplay(item.locations);
+                  const totalImages = getTotalImagesCount(item.locations);
 
                   return (
                     <div
@@ -724,20 +808,30 @@ const YPivotQAInspectionDefectConfig = ({
                                     <span className="text-[9px] text-gray-700 font-medium">
                                       #{loc.locationNo} - {loc.locationName}
                                     </span>
-                                    <span className="text-[8px] text-gray-400 bg-white px-1 rounded">
-                                      {loc.position}
+                                    <span className="text-[8px] text-gray-500 bg-white px-1 rounded">
+                                      Qty: {loc.qty || 1}
                                     </span>
                                   </div>
                                 </div>
                               ))}
                             </div>
 
-                            {/* Remarks section - comma separated display */}
-                            {remarksDisplay && (
+                            {/* Comments section */}
+                            {commentsDisplay && (
                               <div className="flex items-start gap-1.5 bg-amber-50 dark:bg-amber-900/20 rounded px-2 py-1.5 border border-amber-200 dark:border-amber-800">
                                 <MessageSquare className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
                                 <p className="text-[9px] text-amber-700 dark:text-amber-400 break-words leading-relaxed">
-                                  {remarksDisplay}
+                                  {commentsDisplay}
+                                </p>
+                              </div>
+                            )}
+
+                            {/* Additional Remark */}
+                            {item.additionalRemark && (
+                              <div className="flex items-start gap-1.5 bg-indigo-50 dark:bg-indigo-900/20 rounded px-2 py-1.5 border border-indigo-200 dark:border-indigo-800">
+                                <FileText className="w-3 h-3 text-indigo-500 mt-0.5 flex-shrink-0" />
+                                <p className="text-[9px] text-indigo-700 dark:text-indigo-400 break-words leading-relaxed">
+                                  {item.additionalRemark}
                                 </p>
                               </div>
                             )}
@@ -748,22 +842,11 @@ const YPivotQAInspectionDefectConfig = ({
                       {/* Footer with images and actions */}
                       <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900/50 flex justify-between items-center">
                         <div className="flex items-center gap-1">
-                          {item.images.length > 0 ? (
-                            <div className="flex gap-1.5">
-                              {item.images.slice(0, 4).map((img, i) => (
-                                <img
-                                  key={i}
-                                  src={img.url}
-                                  className="w-7 h-7 rounded-md border-2 border-white object-cover shadow-sm"
-                                  alt="thumb"
-                                />
-                              ))}
-                              {item.images.length > 4 && (
-                                <span className="text-[9px] text-gray-500 flex items-center">
-                                  +{item.images.length - 4}
-                                </span>
-                              )}
-                            </div>
+                          {totalImages > 0 ? (
+                            <span className="text-[9px] text-gray-500 flex items-center gap-1 bg-white dark:bg-gray-800 px-2 py-1 rounded border border-gray-200 dark:border-gray-700">
+                              <Images className="w-3 h-3" />
+                              {totalImages} image{totalImages > 1 ? "s" : ""}
+                            </span>
                           ) : (
                             <span className="text-[9px] text-gray-400 flex items-center gap-1">
                               <Images className="w-3 h-3" />
@@ -835,8 +918,10 @@ const YPivotQAInspectionDefectConfig = ({
   };
 
   // --- 4. MODAL ---
-  const renderConfigModal = () =>
-    createPortal(
+  const renderConfigModal = () => {
+    const validationMessages = getValidationMessages();
+
+    return createPortal(
       <div className="fixed inset-0 z-[100] h-[100dvh] bg-white dark:bg-gray-900 overflow-y-auto animate-fadeIn flex flex-col">
         {/* Header */}
         <div className="flex-shrink-0 px-4 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 flex justify-between items-center shadow-lg safe-area-top">
@@ -864,9 +949,9 @@ const YPivotQAInspectionDefectConfig = ({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-8 pb-24">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 pb-24">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Status Section - Dynamic based on DETERMINED buyer */}
+            {/* Status Section */}
             <section>
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
                 Status
@@ -899,48 +984,150 @@ const YPivotQAInspectionDefectConfig = ({
                   </span>
                 </p>
               )}
-              {(!determinedBuyer || determinedBuyer === "Unknown") && (
-                <p className="text-[10px] text-amber-500 mt-2">
-                  No buyer detected - showing default statuses
-                </p>
-              )}
             </section>
 
-            {/* Quantity Section */}
-            <section>
+            {/* Quantity & Inspector Section */}
+            <section className="col-span-1 md:col-span-1">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3">
-                Quantity
+                Quantity & Inspector
               </h3>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() =>
-                    setConfigForm((p) => ({
-                      ...p,
-                      qty: Math.max(1, p.qty - 1)
-                    }))
-                  }
-                  className="w-12 h-12 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                >
-                  <Minus className="w-6 h-6" />
-                </button>
-                <div className="flex-1 h-12 flex items-center justify-center bg-white border-2 border-indigo-100 rounded-xl">
-                  <span className="text-2xl font-bold text-indigo-600">
-                    {configForm.qty}
-                  </span>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                {/* Quantity Display/Stepper */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {configForm.isNoLocation ? (
+                    // Editable Qty when No Location Required
+                    <>
+                      <button
+                        onClick={() =>
+                          setConfigForm((p) => ({
+                            ...p,
+                            qty: Math.max(1, p.qty - 1)
+                          }))
+                        }
+                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                      >
+                        <Minus className="w-5 h-5" />
+                      </button>
+                      <div className="w-16 h-10 flex items-center justify-center bg-white border-2 border-indigo-100 rounded-xl">
+                        <span className="text-xl font-bold text-indigo-600">
+                          {configForm.qty}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() =>
+                          setConfigForm((p) => ({ ...p, qty: p.qty + 1 }))
+                        }
+                        className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
+                      >
+                        <Plus className="w-5 h-5" />
+                      </button>
+                    </>
+                  ) : (
+                    // Auto-calculated Qty when Locations are selected
+                    <div className="flex items-center gap-2">
+                      <div className="w-16 h-10 flex items-center justify-center bg-gray-100 border-2 border-gray-200 rounded-xl">
+                        <span className="text-xl font-bold text-gray-600">
+                          {calculatedQty}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-gray-400 uppercase">
+                          Auto
+                        </span>
+                        <span className="text-[9px] text-gray-500">
+                          From locations
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() =>
-                    setConfigForm((p) => ({ ...p, qty: p.qty + 1 }))
-                  }
-                  className="w-12 h-12 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors"
-                >
-                  <Plus className="w-6 h-6" />
-                </button>
+
+                {/* QC Selection Cards */}
+                {reportData?.selectedTemplate?.isQCScan === "Yes" &&
+                  activeGroup?.assignments?.some((a) => a.qcUser) && (
+                    <div className="flex-1 w-full sm:w-auto overflow-x-auto pb-1">
+                      <div className="flex items-center gap-2">
+                        <div className="hidden sm:block w-px h-10 bg-gray-200 mx-2"></div>
+
+                        <div className="flex gap-2">
+                          {activeGroup.assignments
+                            .filter((a) => a.qcUser)
+                            .map((assign) => {
+                              const qc = assign.qcUser;
+                              const isSelected =
+                                configForm.selectedQC?.emp_id === qc.emp_id;
+
+                              return (
+                                <div
+                                  key={qc.emp_id}
+                                  onClick={() =>
+                                    setConfigForm((p) => ({
+                                      ...p,
+                                      selectedQC: qc
+                                    }))
+                                  }
+                                  className={`relative flex flex-col items-center justify-center p-1.5 rounded-lg border-2 transition-all cursor-pointer w-20 h-20 flex-shrink-0 ${
+                                    isSelected
+                                      ? "border-indigo-500 bg-indigo-50 shadow-sm"
+                                      : "border-gray-200 bg-white hover:border-gray-300"
+                                  }`}
+                                >
+                                  <span
+                                    className={`text-[9px] font-bold mb-1 ${
+                                      isSelected
+                                        ? "text-indigo-700"
+                                        : "text-gray-400"
+                                    }`}
+                                  >
+                                    {qc.emp_id}
+                                  </span>
+
+                                  {qc.face_photo ? (
+                                    <img
+                                      src={qc.face_photo}
+                                      alt="qc"
+                                      className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
+                                    />
+                                  ) : (
+                                    <div
+                                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                                        isSelected
+                                          ? "bg-indigo-200 text-indigo-700"
+                                          : "bg-gray-100 text-gray-400"
+                                      }`}
+                                    >
+                                      <User className="w-4 h-4" />
+                                    </div>
+                                  )}
+
+                                  <span
+                                    className={`text-[8px] font-medium mt-1 truncate w-full text-center ${
+                                      isSelected
+                                        ? "text-indigo-800"
+                                        : "text-gray-600"
+                                    }`}
+                                  >
+                                    {qc.eng_name}
+                                  </span>
+
+                                  {isSelected && (
+                                    <div className="absolute -top-1 -right-1 bg-indigo-600 text-white rounded-full p-0.5">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                        </div>
+                      </div>
+                    </div>
+                  )}
               </div>
             </section>
           </div>
 
-          {/* Locations */}
+          {/* Locations Section */}
           <section className="bg-gray-50 dark:bg-gray-800/50 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex justify-between items-center mb-3">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
@@ -954,7 +1141,8 @@ const YPivotQAInspectionDefectConfig = ({
                     setConfigForm((p) => ({
                       ...p,
                       isNoLocation: e.target.checked,
-                      locations: []
+                      locations: [],
+                      qty: 1 // Reset qty to 1 when switching to no location
                     }))
                   }
                   className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500"
@@ -978,106 +1166,99 @@ const YPivotQAInspectionDefectConfig = ({
               <YPivotQATemplatesDefectLocationSelection
                 forcedProductTypeId={activeProductTypeId}
                 initialSelections={configForm.locations}
-                onSelectionChange={(locs) =>
-                  setConfigForm((prev) => ({ ...prev, locations: locs }))
-                }
+                onSelectionChange={handleLocationSelectionChange}
               />
             )}
           </section>
 
-          {/* Images - Updated for multi-image support */}
-          <section>
+          {/* Additional Remark Section */}
+          <section className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                <Images className="w-4 h-4" />
-                Images
+                <FileText className="w-4 h-4" />
+                Additional Remark
               </h3>
-              <span className="text-xs text-gray-400">
-                {configForm.images.length}/{MAX_IMAGES_PER_DEFECT}
+              <span
+                className={`text-[10px] ${
+                  (configForm.additionalRemark?.length || 0) >= 250
+                    ? "text-red-500"
+                    : "text-gray-400"
+                }`}
+              >
+                {configForm.additionalRemark?.length || 0}/250
               </span>
             </div>
+            <textarea
+              value={configForm.additionalRemark || ""}
+              onChange={(e) =>
+                setConfigForm((prev) => ({
+                  ...prev,
+                  additionalRemark: e.target.value.slice(0, 250)
+                }))
+              }
+              placeholder="Add any additional remarks for this defect entry..."
+              maxLength={250}
+              rows={3}
+              className="w-full px-3 py-2.5 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-700 dark:text-gray-300 placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none resize-none transition-all"
+            />
+          </section>
 
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-              {/* Existing Images */}
-              {configForm.images.map((img, i) => (
+          {/* Validation Messages */}
+          {validationMessages.length > 0 && (
+            <section className="space-y-2">
+              {validationMessages.map((msg, idx) => (
                 <div
-                  key={i}
-                  className="relative w-24 h-24 flex-shrink-0 group cursor-pointer"
-                  onClick={() => openImageEditorForEdit(i)}
+                  key={idx}
+                  className={`flex items-start gap-2.5 p-3 rounded-lg border ${
+                    msg.type === "error"
+                      ? "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800"
+                      : "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                  }`}
                 >
-                  <img
-                    src={img.url}
-                    className="w-full h-full object-cover rounded-lg border-2 border-gray-300 group-hover:border-indigo-500 transition-colors"
-                    alt={`Defect ${i + 1}`}
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center">
-                    <Edit className="w-5 h-5 text-white" />
-                  </div>
-                  <button
-                    onClick={(e) => removeImage(i, e)}
-                    className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg z-10"
+                  {msg.type === "error" ? (
+                    <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
+                  )}
+                  <p
+                    className={`text-sm font-medium ${
+                      msg.type === "error"
+                        ? "text-red-700 dark:text-red-400"
+                        : "text-amber-700 dark:text-amber-400"
+                    }`}
                   >
-                    <X className="w-3 h-3" />
-                  </button>
-                  <div className="absolute bottom-1 right-1 bg-black/60 text-white text-[9px] px-1.5 py-0.5 rounded font-bold">
-                    #{i + 1}
-                  </div>
+                    {msg.text}
+                  </p>
                 </div>
               ))}
-
-              {/* Add New Images Button */}
-              {configForm.images.length < MAX_IMAGES_PER_DEFECT && (
-                <div className="flex-shrink-0 w-24 h-24 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 flex flex-col overflow-hidden hover:border-indigo-400 transition-colors">
-                  <button
-                    onClick={() => openImageEditorForNew("camera")}
-                    className="flex-1 w-full flex items-center justify-center hover:bg-indigo-50 border-b border-gray-200 transition-colors group"
-                    title={`Take photos (${getAvailableImageSlots()} slots available)`}
-                  >
-                    <Camera className="w-5 h-5 text-gray-400 group-hover:text-indigo-500 transition-colors" />
-                  </button>
-                  <button
-                    onClick={() => openImageEditorForNew("upload")}
-                    className="flex-1 w-full flex items-center justify-center hover:bg-emerald-50 transition-colors group"
-                    title={`Upload images (${getAvailableImageSlots()} slots available)`}
-                  >
-                    <Upload className="w-5 h-5 text-gray-400 group-hover:text-emerald-500 transition-colors" />
-                  </button>
-                </div>
-              )}
-
-              {/* Slots indicator */}
-              {configForm.images.length > 0 &&
-                configForm.images.length < MAX_IMAGES_PER_DEFECT && (
-                  <div className="flex-shrink-0 flex items-center justify-center px-2">
-                    <span className="text-[10px] text-gray-400 whitespace-nowrap">
-                      +{getAvailableImageSlots()} slots
-                    </span>
-                  </div>
-                )}
-            </div>
-
-            {/* Empty state hint */}
-            {configForm.images.length === 0 && (
-              <p className="text-[10px] text-gray-400 mt-2 text-center flex items-center justify-center gap-1">
-                <Images className="w-3 h-3" />
-                You can add up to {MAX_IMAGES_PER_DEFECT} images
-              </p>
-            )}
-          </section>
+            </section>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex-shrink-0 p-4 border-t border-gray-200 bg-white dark:bg-gray-800 safe-area-bottom">
           <button
             onClick={handleSaveDefect}
-            className="w-full py-3.5 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 flex items-center justify-center gap-2 transition-all active:scale-95"
+            disabled={!isFormValid}
+            className={`w-full py-3.5 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2 transition-all ${
+              isFormValid
+                ? "bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
+                : "bg-gray-300 text-gray-500 cursor-not-allowed"
+            }`}
           >
             <Save className="w-5 h-5" />{" "}
             {editingIndex !== null ? "Update Defect" : "Add Defect"}
           </button>
+
+          {/* Helpful hint when button is disabled */}
+          {!isFormValid && (
+            <p className="text-center text-xs text-gray-400 mt-2">
+              Please fix the issues above to continue
+            </p>
+          )}
         </div>
 
-        {/* Image Editor */}
+        {/* Image Editor - Kept for potential direct usage */}
         {showImageEditor && (
           <YPivotQATemplatesImageEditor
             autoStartMode={
@@ -1085,7 +1266,10 @@ const YPivotQAInspectionDefectConfig = ({
             }
             existingData={imageEditorContext?.existingData}
             maxImages={imageEditorContext?.maxImages || 1}
-            onSave={handleImagesSave}
+            onSave={(savedImages) => {
+              setShowImageEditor(false);
+              setImageEditorContext(null);
+            }}
             onCancel={() => {
               setShowImageEditor(false);
               setImageEditorContext(null);
@@ -1095,6 +1279,7 @@ const YPivotQAInspectionDefectConfig = ({
       </div>,
       document.body
     );
+  };
 
   // ================= MAIN RETURN =================
 
@@ -1116,6 +1301,17 @@ const YPivotQAInspectionDefectConfig = ({
           </p>
         </div>
         <div className="flex bg-gray-100 dark:bg-gray-700 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab("manual")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
+              activeTab === "manual"
+                ? "bg-white dark:bg-gray-600 shadow text-indigo-600"
+                : "text-gray-500"
+            }`}
+          >
+            <FilePenLine className="w-3.5 h-3.5" />
+            Manual
+          </button>
           <button
             onClick={() => setActiveTab("list")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
@@ -1141,6 +1337,7 @@ const YPivotQAInspectionDefectConfig = ({
               </span>
             )}
           </button>
+
           <button
             onClick={() => setActiveTab("summary")}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
@@ -1157,8 +1354,15 @@ const YPivotQAInspectionDefectConfig = ({
 
       {renderActiveBanner()}
 
+      {activeTab === "manual" && (
+        <YPivotQAInspectionManualDefect
+          data={currentManualData}
+          onUpdate={handleManualDataUpdate}
+        />
+      )}
       {activeTab === "list" && renderListTab()}
       {activeTab === "results" && renderResultsTab()}
+
       {activeTab === "summary" && (
         <YPivotQAInspectionDefectSummary
           savedDefects={savedDefects}

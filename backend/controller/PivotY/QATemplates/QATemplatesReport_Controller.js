@@ -116,7 +116,7 @@ export const UpdateTemplate = async (req, res) => {
 };
 
 /**
- * DELETE Template
+ * DELETE Template and Re-sequence remaining templates
  */
 export const DeleteTemplate = async (req, res) => {
   try {
@@ -129,6 +129,13 @@ export const DeleteTemplate = async (req, res) => {
         .json({ success: false, message: "Template not found." });
     }
 
+    // Re-sequence remaining templates after deletion
+    const remainingTemplates = await QASectionsTemplates.find().sort({ no: 1 });
+    const updatePromises = remainingTemplates.map((template, index) =>
+      QASectionsTemplates.findByIdAndUpdate(template._id, { no: index + 1 })
+    );
+    await Promise.all(updatePromises);
+
     res
       .status(200)
       .json({ success: true, message: "Template deleted successfully." });
@@ -138,11 +145,44 @@ export const DeleteTemplate = async (req, res) => {
 };
 
 /**
+ * REORDER Templates - Updates 'no' field for all templates based on new order
+ */
+export const ReorderTemplates = async (req, res) => {
+  try {
+    const { orderedIds } = req.body;
+
+    if (!orderedIds || !Array.isArray(orderedIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "orderedIds array is required."
+      });
+    }
+
+    // Use bulkWrite for efficient batch update
+    const bulkOps = orderedIds.map((id, index) => ({
+      updateOne: {
+        filter: { _id: id },
+        update: { $set: { no: index + 1 } }
+      }
+    }));
+
+    await QASectionsTemplates.bulkWrite(bulkOps);
+
+    res.status(200).json({
+      success: true,
+      message: "Templates reordered successfully."
+    });
+  } catch (error) {
+    console.error("Error reordering templates:", error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+/**
  * HELPER: Get All Defect Categories (For the Modal Checkboxes)
  */
 export const GetCategoriesForSelection = async (req, res) => {
   try {
-    // We reuse the existing collection but this is a specific helper for this UI
     const categories = await QASectionsDefectCategory.find().sort({ no: 1 });
     res.status(200).json({ success: true, data: categories });
   } catch (error) {
@@ -155,7 +195,6 @@ export const GetCategoriesForSelection = async (req, res) => {
  */
 export const GetPhotoSectionsForSelection = async (req, res) => {
   try {
-    // Select only what we need for the UI
     const photoSections = await QASectionsPhotos.find()
       .select("sectionName itemList")
       .sort({ sectionName: 1 });

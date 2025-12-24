@@ -21,12 +21,12 @@ const YPivotQAInspectionDefectDataSave = ({
     const fetchExistingDefectData = async () => {
       if (!reportId) return;
 
-      // Avoid re-fetching if data is already in state (client nav)
-      if (
-        reportData.defectData &&
-        reportData.defectData.savedDefects &&
-        reportData.defectData.savedDefects.length > 0
-      ) {
+      // Check if data already exists in client state
+      const hasDefects = reportData.defectData?.savedDefects?.length > 0;
+      const hasManual =
+        Object.keys(reportData.defectData?.manualDataByGroup || {}).length > 0;
+
+      if (hasDefects || hasManual) {
         return;
       }
 
@@ -36,11 +36,36 @@ const YPivotQAInspectionDefectDataSave = ({
           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
         );
 
-        if (res.data.success && res.data.data.defectData) {
-          const backendDefects = res.data.data.defectData;
+        if (res.data.success) {
+          const backendData = res.data.data;
 
-          // Restore Image URLs (Prepend API_BASE_URL if relative)
+          // 1. Process Standard Defects (Deep Restore)
+          const backendDefects = backendData.defectData || [];
           const processedDefects = backendDefects.map((defect) => {
+            // Restore Location Images & Logic
+            const restoredLocations = (defect.locations || []).map((loc) => {
+              const restoredLocImages = (loc.images || []).map((img) => {
+                let displayUrl = img.imageURL;
+                if (
+                  displayUrl &&
+                  !displayUrl.startsWith("http") &&
+                  !displayUrl.startsWith("data:")
+                ) {
+                  displayUrl = `${API_BASE_URL}${displayUrl}`;
+                }
+                return {
+                  id: img.imageId,
+                  url: displayUrl,
+                  imgSrc: displayUrl,
+                  editedImgSrc: displayUrl,
+                  history: []
+                };
+              });
+
+              return { ...loc, images: restoredLocImages };
+            });
+
+            // Restore General Images
             const restoredImages = (defect.images || []).map((img) => {
               let displayUrl = img.imageURL;
               if (
@@ -50,24 +75,56 @@ const YPivotQAInspectionDefectDataSave = ({
               ) {
                 displayUrl = `${API_BASE_URL}${displayUrl}`;
               }
-
               return {
                 id: img.imageId,
                 url: displayUrl,
-                imgSrc: displayUrl, // For editor preview
+                imgSrc: displayUrl,
                 history: []
               };
             });
 
             return {
               ...defect,
+              locations: restoredLocations,
               images: restoredImages
+            };
+          });
+
+          // 2. Process Manual Defect Data (Array -> Object Map)
+          const backendManualData = backendData.defectManualData || [];
+          const processedManualDataByGroup = {};
+
+          backendManualData.forEach((item) => {
+            const groupId = item.groupId;
+            const processedImages = (item.images || []).map((img) => {
+              let displayUrl = img.imageURL;
+              if (
+                displayUrl &&
+                !displayUrl.startsWith("http") &&
+                !displayUrl.startsWith("data:")
+              ) {
+                displayUrl = `${API_BASE_URL}${displayUrl}`;
+              }
+              return {
+                id: img.imageId,
+                url: displayUrl,
+                imgSrc: displayUrl,
+                editedImgSrc: displayUrl,
+                remark: img.remark || "",
+                history: []
+              };
+            });
+
+            processedManualDataByGroup[groupId] = {
+              remarks: item.remarks || "",
+              images: processedImages
             };
           });
 
           // Update parent state
           onUpdateDefectData({
-            savedDefects: processedDefects
+            savedDefects: processedDefects,
+            manualDataByGroup: processedManualDataByGroup
           });
         }
       } catch (error) {
@@ -90,28 +147,52 @@ const YPivotQAInspectionDefectDataSave = ({
     }
 
     const currentDefects = reportData.defectData?.savedDefects || [];
+    const manualDataByGroup = reportData.defectData?.manualDataByGroup || {};
 
-    if (currentDefects.length === 0) {
-      alert("No defects recorded to save.");
+    if (
+      currentDefects.length === 0 &&
+      Object.keys(manualDataByGroup).length === 0
+    ) {
+      alert("No defect data recorded to save.");
       return;
     }
 
     setSaving(true);
     try {
-      // Prepare payload - Handle Images
-      const payloadData = currentDefects.map((defect) => {
+      // 1. Prepare Standard Defects Payload
+      const payloadDefects = currentDefects.map((defect) => {
+        // Process Location Images
+        const processedLocations = (defect.locations || []).map((loc) => {
+          const locImages = (loc.images || []).map((img) => {
+            let payloadImageURL = null;
+            let payloadImgSrc = null;
+            const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+            if (imageData && imageData.startsWith("data:")) {
+              payloadImgSrc = imageData;
+            } else if (imageData) {
+              payloadImageURL = imageData.replace(API_BASE_URL, "");
+            }
+
+            return {
+              id: img.id,
+              imageURL: payloadImageURL,
+              imgSrc: payloadImgSrc
+            };
+          });
+          return { ...loc, images: locImages };
+        });
+
+        // Process General Images
         const processedImages = (defect.images || []).map((img) => {
           let payloadImageURL = null;
           let payloadImgSrc = null;
+          const imageData = img.url || img.imgSrc;
 
-          if (img.url.startsWith("data:")) {
-            // New Image -> Send Base64 in imgSrc for backend to save
-            payloadImgSrc = img.url;
-            payloadImageURL = null;
-          } else {
-            // Existing Image -> Send Relative Path in imageURL
-            payloadImageURL = img.url.replace(API_BASE_URL, "");
-            payloadImgSrc = null;
+          if (imageData && imageData.startsWith("data:")) {
+            payloadImgSrc = imageData;
+          } else if (imageData) {
+            payloadImageURL = imageData.replace(API_BASE_URL, "");
           }
 
           return {
@@ -121,39 +202,56 @@ const YPivotQAInspectionDefectDataSave = ({
           };
         });
 
-        // Ensure we send only necessary fields and match schema
         return {
-          groupId: defect.groupId,
-          defectId: defect.defectId,
-          defectName: defect.defectName,
-          defectCode: defect.defectCode,
-          categoryName: defect.categoryName,
-          status: defect.status,
-          qty: defect.qty,
-          determinedBuyer: defect.determinedBuyer,
-
-          isNoLocation: defect.isNoLocation,
-          locations: defect.locations, // Array of location objects
-
-          images: processedImages,
-
-          line: defect.line,
-          table: defect.table,
-          color: defect.color,
-          lineName: defect.lineName,
-          tableName: defect.tableName,
-          colorName: defect.colorName,
-          qcUser: defect.qcUser,
-
-          timestamp: defect.timestamp || new Date()
+          ...defect,
+          additionalRemark: defect.additionalRemark || "",
+          locations: processedLocations,
+          images: processedImages
         };
       });
+
+      // 2. Prepare Manual Defects Payload
+      const payloadManualData = Object.entries(manualDataByGroup).map(
+        ([groupIdStr, data]) => {
+          const groupId = isNaN(Number(groupIdStr))
+            ? groupIdStr
+            : Number(groupIdStr);
+
+          const processedImages = (data.images || []).map((img) => {
+            let payloadImageURL = null;
+            let payloadImgSrc = null;
+            const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+            if (imageData && imageData.startsWith("data:")) {
+              payloadImgSrc = imageData;
+            } else if (imageData) {
+              payloadImageURL = imageData.replace(API_BASE_URL, "");
+            }
+
+            return {
+              id: img.id,
+              imageId: img.id,
+              imageURL: payloadImageURL,
+              imgSrc: payloadImgSrc,
+              remark: img.remark
+            };
+          });
+
+          return {
+            groupId: groupId,
+            remarks: data.remarks,
+            images: processedImages
+            // We can attach minimal context if needed, otherwise backend relies on groupId
+          };
+        }
+      );
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-defect-data`,
         {
           reportId: reportId,
-          defectData: payloadData
+          defectData: payloadDefects,
+          defectManualData: payloadManualData
         }
       );
 
@@ -179,7 +277,6 @@ const YPivotQAInspectionDefectDataSave = ({
     );
   }
 
-  // Warning if no template selected
   if (!reportData?.selectedTemplate) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -191,7 +288,6 @@ const YPivotQAInspectionDefectDataSave = ({
 
   return (
     <div className="relative pb-24">
-      {/* 1. Main UI Component */}
       <YPivotQAInspectionDefectConfig
         selectedOrders={selectedOrders}
         orderData={orderData}
@@ -200,7 +296,6 @@ const YPivotQAInspectionDefectDataSave = ({
         activeGroup={activeGroup}
       />
 
-      {/* 2. Floating Save Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
         <div className="max-w-8xl mx-auto flex justify-end px-4">
           <button

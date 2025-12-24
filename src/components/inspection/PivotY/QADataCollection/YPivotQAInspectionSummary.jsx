@@ -4,8 +4,6 @@ import {
   FileText,
   Package,
   Layers,
-  CheckCircle2,
-  AlertCircle,
   Hash,
   Users,
   MapPin,
@@ -20,10 +18,13 @@ import {
   XCircle,
   ChevronDown,
   ChevronUp,
-  Image as ImageIcon,
-  Loader
+  Loader,
+  Building2,
+  ClipboardCheck,
+  AlertCircle
 } from "lucide-react";
-import { PUBLIC_ASSET_URL, API_BASE_URL } from "../../../../../config";
+import { API_BASE_URL } from "../../../../../config";
+import YPivotQAInspectionQRCode from "./YPivotQAInspectionQRCode";
 
 // --- Helper: Modal for Image Preview ---
 const ImagePreviewModal = ({ src, alt, onClose }) => {
@@ -95,7 +96,7 @@ const SectionHeader = ({ title, icon: Icon, color = "text-gray-800" }) => (
   </div>
 );
 
-// --- Helper: Status Badge for Header Options ---
+// --- Helper: Status Badge ---
 const StatusBadge = ({ value }) => {
   let style = "bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300";
   if (["Conform", "Yes", "New Order"].includes(value)) {
@@ -118,7 +119,8 @@ const StatusBadge = ({ value }) => {
   );
 };
 
-const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
+// --- MAIN COMPONENT ---
+const YPivotQAInspectionSummary = ({ orderData, reportData, qrData }) => {
   const { selectedOrders, orderData: details } = orderData;
   const { selectedTemplate, config, lineTableConfig, headerData, photoData } =
     reportData;
@@ -133,7 +135,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
     photos: true
   });
 
-  // Fetch Definitions to map IDs to Names
   useEffect(() => {
     const fetchDefinitions = async () => {
       try {
@@ -154,7 +155,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
     fetchDefinitions();
   }, []);
 
-  // --- Data Processing ---
   const dtOrder = details?.dtOrder || {};
   const yorksys = details?.yorksysOrder || {};
   const skuData = yorksys.skuData || [];
@@ -180,7 +180,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // --- Filtering Photo Sections based on Report Type ---
   const relevantPhotoSections = useMemo(() => {
     if (
       !selectedTemplate?.SelectedPhotoSectionList ||
@@ -212,9 +211,17 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
 
   return (
     <div className="space-y-8 pb-24 animate-fadeIn">
-      {/* ==================================================================================== */}
-      {/* 1. ORDER SUMMARY HEADER */}
-      {/* ==================================================================================== */}
+      {/* 1. QR CODE SECTION */}
+      <YPivotQAInspectionQRCode
+        reportId={qrData?.reportId}
+        inspectionDate={qrData?.inspectionDate}
+        orderNos={qrData?.orderNos}
+        reportType={qrData?.reportType}
+        inspectionType={qrData?.inspectionType}
+        empId={qrData?.empId}
+      />
+
+      {/* 2. ORDER SUMMARY HEADER */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
         <div
           className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex justify-between items-center cursor-pointer"
@@ -247,7 +254,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
 
         {expandedSections.order && (
           <div className="p-6">
-            {/* Primary Order Data */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-6">
               <InfoRow
                 label="Order No(s)"
@@ -281,7 +287,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
               />
             </div>
 
-            {/* Detailed Info (Yorksys) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-gray-100 dark:border-gray-700 pt-6">
               <div className="md:col-span-3 lg:col-span-1">
                 <InfoRow
@@ -309,9 +314,7 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
               </div>
             </div>
 
-            {/* Tables Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-              {/* Color Size Breakdown */}
               {colorSizeBreakdown && (
                 <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                   <div className="bg-purple-600 px-3 py-1.5 text-white text-xs font-bold flex items-center gap-2">
@@ -339,7 +342,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                   </div>
                 </div>
               )}
-              {/* SKU Data (Limited view) */}
               {skuData.length > 0 && (
                 <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
                   <div className="bg-emerald-600 px-3 py-1.5 text-white text-xs font-bold flex items-center gap-2">
@@ -374,12 +376,9 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
         )}
       </div>
 
-      {/* ==================================================================================== */}
-      {/* 2. REPORT CONFIGURATION (Existing + Refined) */}
-      {/* ==================================================================================== */}
+      {/* 3. REPORT CONFIGURATION */}
       {selectedTemplate && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Config Details */}
           <div className="lg:col-span-1 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-5">
             <SectionHeader title="Inspection Setup" icon={Settings} />
             <div className="space-y-4">
@@ -420,7 +419,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
             </div>
           </div>
 
-          {/* Scope Table */}
           <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 flex flex-col">
             <div className="p-5 border-b border-gray-100 dark:border-gray-700">
               <SectionHeader
@@ -502,9 +500,7 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
         </div>
       )}
 
-      {/* ==================================================================================== */}
-      {/* 3. HEADER INSPECTION DATA (NEW SECTION) */}
-      {/* ==================================================================================== */}
+      {/* 4. HEADER INSPECTION DATA */}
       {definitions.headers.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div
@@ -527,7 +523,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                 const selectedVal = headerData?.selectedOptions?.[section._id];
                 const remark = headerData?.remarks?.[section._id];
 
-                // Filter images for this section
                 const images = Object.keys(headerData?.capturedImages || {})
                   .filter((k) => k.startsWith(`${section._id}_`))
                   .map((k) => ({ ...headerData.capturedImages[k], key: k }))
@@ -555,7 +550,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                       )}
                     </div>
 
-                    {/* Remarks */}
                     {remark && (
                       <div className="bg-amber-50 dark:bg-amber-900/20 p-2 rounded-lg border border-amber-100 dark:border-amber-800/50 flex gap-2">
                         <MessageSquare className="w-3 h-3 text-amber-500 mt-0.5 flex-shrink-0" />
@@ -565,7 +559,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                       </div>
                     )}
 
-                    {/* Images */}
                     {images.length > 0 && (
                       <div className="flex gap-2 mt-auto pt-2 overflow-x-auto scrollbar-thin">
                         {images.map((img) => (
@@ -597,9 +590,7 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
         </div>
       )}
 
-      {/* ==================================================================================== */}
-      {/* 4. PHOTO DOCUMENTATION (NEW SECTION) */}
-      {/* ==================================================================================== */}
+      {/* 5. PHOTO DOCUMENTATION */}
       {relevantPhotoSections.length > 0 &&
         selectedTemplate?.Photos !== "No" && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -631,11 +622,9 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                       {section.itemList.map((item) => {
-                        // Get images for this item
                         const images = [];
                         let idx = 0;
                         while (idx < 20) {
-                          // arbitrary safety limit
                           const key = `${section._id}_${item.no}_${idx}`;
                           if (photoData?.capturedImages?.[key]) {
                             images.push({
@@ -651,7 +640,7 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                         const remarkKey = `${section._id}_${item.no}`;
                         const remark = photoData?.remarks?.[remarkKey];
 
-                        if (images.length === 0 && !remark) return null; // Hide empty items
+                        if (images.length === 0 && !remark) return null;
 
                         return (
                           <div
@@ -670,7 +659,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                               </span>
                             </div>
 
-                            {/* Images Grid */}
                             <div className="grid grid-cols-3 gap-2 mt-2">
                               {images.map((img) => (
                                 <div
@@ -692,7 +680,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                               ))}
                             </div>
 
-                            {/* Remark */}
                             {remark && (
                               <div className="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700 text-[10px] text-gray-500 dark:text-gray-400 italic">
                                 <MessageSquare className="w-3 h-3 inline mr-1" />
@@ -703,7 +690,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
                         );
                       })}
                     </div>
-                    {/* Empty state for section if no photos taken */}
                     {(!photoData?.capturedImages ||
                       Object.keys(photoData.capturedImages).filter((k) =>
                         k.startsWith(`${section._id}_`)
@@ -728,9 +714,6 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
         />
       )}
 
-      {/* Building2 and other icons that were used but not imported in your original snippet need to be checked.
-          I added Building2 to the Lucide import list at the top. */}
-
       <style jsx>{`
         .animate-fadeIn {
           animation: fadeIn 0.3s ease-out;
@@ -747,8 +730,5 @@ const YPivotQAInspectionSummary = ({ orderData, reportData }) => {
     </div>
   );
 };
-
-// Simple icon import fix (Building2 was missing in original imports list but used in JSX)
-import { Building2, ClipboardCheck } from "lucide-react";
 
 export default YPivotQAInspectionSummary;

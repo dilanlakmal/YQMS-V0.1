@@ -35,6 +35,8 @@ dist-ssr
 # all image upload folders (cutting, scc, etc.)
 /backend/public/storage/
 
+# Fincheck image upload folders in frontend
+/backend/storage/PivotY/Fincheck
 
 # --- USER UPLOADED CONTENT ---
 # Ignore all content within the public storage directory.

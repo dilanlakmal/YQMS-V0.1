@@ -21,12 +21,14 @@ const YPivotQAInspectionMeasurementDataSave = ({
     const fetchExistingMeasurementData = async () => {
       if (!reportId) return;
 
-      // If we already have data in client state, don't re-fetch to avoid overwrite
-      if (
-        reportData.measurementData &&
-        reportData.measurementData.savedMeasurements &&
-        reportData.measurementData.savedMeasurements.length > 0
-      ) {
+      // Check if data already exists in client state to avoid overwrite
+      const hasSavedMeasurements =
+        reportData.measurementData?.savedMeasurements?.length > 0;
+      const hasManualData =
+        Object.keys(reportData.measurementData?.manualDataByGroup || {})
+          .length > 0;
+
+      if (hasSavedMeasurements || hasManualData) {
         return;
       }
 
@@ -39,16 +41,57 @@ const YPivotQAInspectionMeasurementDataSave = ({
         if (res.data.success && res.data.data.measurementData) {
           const backendData = res.data.data.measurementData;
 
-          // CRITICAL: Transform Arrays back to Sets for UI Logic
-          const processedMeasurements = backendData.map((m) => ({
-            ...m,
-            allEnabledPcs: new Set(m.allEnabledPcs || []),
-            criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
-          }));
+          // 1. Process Standard Measurements
+          const processedMeasurements = backendData
+            .filter((m) => m.size !== "Manual_Entry")
+            .map((m) => ({
+              ...m,
+              allEnabledPcs: new Set(m.allEnabledPcs || []),
+              criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+            }));
 
-          // Update parent state
+          // 2. Process Manual Data
+          const processedManualDataByGroup = {};
+
+          backendData.forEach((item) => {
+            if (item.manualData) {
+              const groupId = item.groupId;
+
+              // Process Images
+              const processedImages = (item.manualData.images || []).map(
+                (img) => {
+                  let displayUrl = img.imageURL;
+                  // Prepend API_BASE_URL for display if it's a relative path
+                  if (
+                    displayUrl &&
+                    !displayUrl.startsWith("http") &&
+                    !displayUrl.startsWith("data:")
+                  ) {
+                    displayUrl = `${API_BASE_URL}${displayUrl}`;
+                  }
+
+                  return {
+                    id: img.imageId,
+                    url: displayUrl, // Used for display logic in Editor
+                    imgSrc: displayUrl, // Used for display logic in Manual Component
+                    editedImgSrc: displayUrl, // Ensure preview works
+                    remark: img.remark || "",
+                    history: []
+                  };
+                }
+              );
+
+              processedManualDataByGroup[groupId] = {
+                remarks: item.manualData.remarks || "",
+                status: item.manualData.status || "Pass",
+                images: processedImages
+              };
+            }
+          });
+
           onUpdateMeasurementData({
             savedMeasurements: processedMeasurements,
+            manualDataByGroup: processedManualDataByGroup,
             isConfigured: processedMeasurements.length > 0
           });
         }
@@ -73,31 +116,126 @@ const YPivotQAInspectionMeasurementDataSave = ({
 
     const currentMeasurements =
       reportData.measurementData?.savedMeasurements || [];
-
-    if (currentMeasurements.length === 0) {
-      alert("No measurements recorded to save.");
-      return;
-    }
+    const manualDataByGroup =
+      reportData.measurementData?.manualDataByGroup || {};
 
     setSaving(true);
     try {
-      // CRITICAL: Transform Sets back to Arrays for MongoDB
-      const payloadData = currentMeasurements.map((m) => ({
-        ...m,
-        allEnabledPcs: Array.from(m.allEnabledPcs || []),
-        criticalEnabledPcs: Array.from(m.criticalEnabledPcs || [])
-      }));
+      const payload = [];
+
+      // Helper to process Manual Data Images for Upload
+      const processManualImagesForSave = (images) => {
+        return (images || []).map((img) => {
+          let payloadImageURL = null;
+          let payloadImgSrc = null;
+
+          // Check for Base64 in editedImgSrc (preferred) or imgSrc
+          const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+          if (imageData && imageData.startsWith("data:")) {
+            // New Image (Base64) -> Send in imgSrc for backend to save
+            payloadImgSrc = imageData;
+            payloadImageURL = null;
+          } else if (imageData && imageData.includes(API_BASE_URL)) {
+            // Existing Image with Full URL -> Strip API_BASE_URL to save relative path
+            payloadImageURL = imageData.replace(API_BASE_URL, "");
+            payloadImgSrc = null;
+          } else {
+            // Already relative or other URL
+            payloadImageURL = imageData;
+            payloadImgSrc = null;
+          }
+
+          return {
+            id: img.id,
+            imageId: img.id,
+            imageURL: payloadImageURL,
+            imgSrc: payloadImgSrc,
+            remark: img.remark
+          };
+        });
+      };
+
+      const measurementsByGroup = {};
+      currentMeasurements.forEach((m) => {
+        if (!measurementsByGroup[m.groupId])
+          measurementsByGroup[m.groupId] = [];
+        measurementsByGroup[m.groupId].push(m);
+      });
+
+      const allGroupIds = new Set([
+        ...Object.keys(measurementsByGroup).map(Number),
+        ...Object.keys(manualDataByGroup).map(Number)
+      ]);
+
+      allGroupIds.forEach((groupId) => {
+        const groupMeasurements = measurementsByGroup[groupId] || [];
+        const groupManualData = manualDataByGroup[groupId];
+
+        if (groupMeasurements.length > 0) {
+          groupMeasurements.forEach((m, index) => {
+            const isFirst = index === 0;
+            const cleanMeasurement = {
+              ...m,
+              allEnabledPcs: Array.from(m.allEnabledPcs || []),
+              criticalEnabledPcs: Array.from(m.criticalEnabledPcs || [])
+            };
+
+            if (isFirst && groupManualData) {
+              cleanMeasurement.manualData = {
+                remarks: groupManualData.remarks,
+                status: groupManualData.status,
+                images: processManualImagesForSave(groupManualData.images)
+              };
+            } else {
+              cleanMeasurement.manualData = null;
+            }
+            payload.push(cleanMeasurement);
+          });
+        } else if (groupManualData) {
+          // Placeholder for Manual-Only Entry
+          payload.push({
+            groupId: groupId,
+            size: "Manual_Entry",
+            line: "",
+            table: "",
+            color: "",
+            qcUser: null,
+            allMeasurements: {},
+            criticalMeasurements: {},
+            allEnabledPcs: [],
+            criticalEnabledPcs: [],
+            inspectorDecision:
+              groupManualData.status === "Pass" ? "pass" : "fail",
+            manualData: {
+              remarks: groupManualData.remarks,
+              status: groupManualData.status,
+              images: processManualImagesForSave(groupManualData.images)
+            }
+          });
+        }
+      });
+
+      if (payload.length === 0) {
+        setSaving(false);
+        alert("No data to save.");
+        return;
+      }
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-measurement-data`,
         {
           reportId: reportId,
-          measurementData: payloadData
+          measurementData: payload
         }
       );
 
       if (res.data.success) {
         alert("Measurement results saved successfully!");
+
+        // OPTIONAL: Reload data to ensure image URLs are synced back from server
+        // This fixes the "broken image" issue immediately after save if frontend kept base64
+        // You might want to update the state here with the response data if returned
       }
     } catch (error) {
       console.error("Error saving measurement results:", error);
@@ -118,7 +256,6 @@ const YPivotQAInspectionMeasurementDataSave = ({
     );
   }
 
-  // Warning if no template selected
   if (!reportData?.selectedTemplate) {
     return (
       <div className="flex flex-col items-center justify-center py-16">
@@ -138,7 +275,6 @@ const YPivotQAInspectionMeasurementDataSave = ({
         activeGroup={activeGroup}
       />
 
-      {/* Floating Save Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
         <div className="max-w-8xl mx-auto flex justify-end px-4">
           <button

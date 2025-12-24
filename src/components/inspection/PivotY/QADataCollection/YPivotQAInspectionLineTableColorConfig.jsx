@@ -4,17 +4,17 @@ import {
   Plus,
   Trash2,
   Scan,
-  User,
   CheckCircle2,
   Play,
   X,
-  ChevronDown,
   Calculator,
   Loader2,
-  Search,
   Hash,
   PauseCircle,
-  CopyPlus // Imported for the Add All Colors button
+  CopyPlus,
+  Edit,
+  Save,
+  ChevronDown
 } from "lucide-react";
 import axios from "axios";
 import Swal from "sweetalert2";
@@ -22,104 +22,47 @@ import { API_BASE_URL } from "../../../../../config";
 import EmpQRCodeScanner from "../../qc_roving/EmpQRCodeScanner";
 
 // ============================================================
-// Helper: Searchable Dropdown
+// Helper: Simple Native Dropdown Component
 // ============================================================
-const SearchableSingleSelect = ({
+const SimpleSelect = ({
   label,
   options,
-  selectedValue,
-  onSelectionChange,
+  value,
+  onChange,
   placeholder,
   disabled = false
 }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const wrapperRef = useRef(null);
-
-  const filteredOptions = options.filter((opt) =>
-    String(opt.label).toLowerCase().includes(searchTerm.toLowerCase())
-  );
-  const selectedLabel = options.find((o) => o.value === selectedValue)?.label;
-
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  if (disabled)
-    return (
-      <div className="opacity-50 pointer-events-none p-2 bg-gray-100 rounded text-sm">
-        N/A
-      </div>
-    );
+  const selectedLabel = options.find((o) => o.value === value)?.label || "";
 
   return (
-    <div className="relative" ref={wrapperRef}>
+    <div className="w-full">
       {label && (
-        <label className="block text-xs font-bold text-gray-500 mb-1">
+        <label className="block text-[10px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 mb-1">
           {label}
         </label>
       )}
-      <div
-        className="w-full px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-sm flex justify-between items-center cursor-pointer hover:border-indigo-400 transition-colors"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span
-          className={
-            selectedValue
-              ? "text-gray-800 dark:text-gray-200 font-medium"
-              : "text-gray-400"
-          }
-        >
-          {selectedLabel || placeholder}
-        </span>
-        <ChevronDown
-          className={`w-4 h-4 text-gray-400 transition-transform ${
-            isOpen ? "rotate-180" : ""
-          }`}
-        />
-      </div>
-
-      {isOpen && (
-        <div className="absolute z-50 mt-1 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-          <div className="p-2 sticky top-0 bg-white dark:bg-gray-800 border-b dark:border-gray-700">
-            <input
-              type="text"
-              className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs focus:ring-2 focus:ring-indigo-500 outline-none"
-              placeholder="Filter options..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              autoFocus
-            />
-          </div>
-          {filteredOptions.length > 0 ? (
-            filteredOptions.map((opt) => (
-              <div
-                key={opt.value}
-                className={`px-3 py-2 text-sm cursor-pointer ${
-                  opt.value === selectedValue
-                    ? "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 font-bold"
-                    : "hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                }`}
-                onClick={() => {
-                  onSelectionChange(opt.value);
-                  setIsOpen(false);
-                  setSearchTerm("");
-                }}
-              >
+      {disabled ? (
+        <div className="px-2 sm:px-3 py-2 bg-gray-50 dark:bg-gray-900/50 rounded-lg text-xs sm:text-sm border border-gray-200 dark:border-gray-700 font-medium text-gray-700 dark:text-gray-300 min-h-[36px] sm:min-h-[40px] flex items-center">
+          {selectedLabel || "N/A"}
+        </div>
+      ) : (
+        <div className="relative">
+          <select
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            disabled={disabled}
+            className="w-full px-2 sm:px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-xs sm:text-sm font-medium text-gray-800 dark:text-gray-200 appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none min-h-[36px] sm:min-h-[40px] pr-8"
+          >
+            <option value="" disabled>
+              {placeholder}
+            </option>
+            {options.map((opt) => (
+              <option key={opt.value} value={opt.value}>
                 {opt.label}
-              </div>
-            ))
-          ) : (
-            <div className="px-3 py-2 text-xs text-gray-500 text-center">
-              No matches found
-            </div>
-          )}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
         </div>
       )}
     </div>
@@ -127,17 +70,43 @@ const SearchableSingleSelect = ({
 };
 
 // ============================================================
-// Helper: QC User Search Component
+// Helper: QC User Inline Select (For SubCon)
 // ============================================================
-const QCUserSearch = ({ onSelect }) => {
+const QCInlineSelect = ({ options, onSelect, disabled }) => {
+  return (
+    <div className="relative w-full">
+      <select
+        value=""
+        onChange={(e) => {
+          const selected = options.find((q) => q.value === e.target.value);
+          if (selected) onSelect(selected.originalData);
+        }}
+        disabled={disabled}
+        className="w-full px-2 sm:px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-xs sm:text-sm font-medium appearance-none cursor-pointer focus:ring-2 focus:ring-indigo-500 outline-none min-h-[36px] sm:min-h-[40px] pr-8"
+      >
+        <option value="">Select QC...</option>
+        {options.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+    </div>
+  );
+};
+
+// ============================================================
+// Helper: Simple QC Search Input
+// ============================================================
+const SimpleQCSearch = ({ onSelect, disabled }) => {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const wrapperRef = useRef(null);
+  const [showResults, setShowResults] = useState(false);
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(async () => {
+    const delay = setTimeout(async () => {
       if (term.length >= 2) {
         setLoading(true);
         try {
@@ -145,80 +114,64 @@ const QCUserSearch = ({ onSelect }) => {
             `${API_BASE_URL}/api/users/search?term=${term}`
           );
           setResults(res.data);
-          setShowDropdown(true);
-        } catch (error) {
-          console.error("Search failed", error);
+          setShowResults(true);
+        } catch (err) {
+          console.error(err);
         } finally {
           setLoading(false);
         }
       } else {
         setResults([]);
-        setShowDropdown(false);
+        setShowResults(false);
       }
     }, 400);
-
-    return () => clearTimeout(delayDebounceFn);
+    return () => clearTimeout(delay);
   }, [term]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target)) {
-        setShowDropdown(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const handleSelection = (user) => {
+  const handleSelect = (user) => {
     onSelect(user);
     setTerm("");
-    setShowDropdown(false);
+    setResults([]);
+    setShowResults(false);
   };
 
+  if (disabled) {
+    return (
+      <div className="px-2 py-2 bg-gray-100 dark:bg-gray-700 text-gray-400 text-xs rounded-lg border min-h-[36px] flex items-center">
+        Search disabled
+      </div>
+    );
+  }
+
   return (
-    <div className="relative w-full" ref={wrapperRef}>
-      <div className="flex items-center bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
-        <Search className="w-4 h-4 text-gray-400 ml-2" />
+    <div className="relative w-full">
+      <div className="flex items-center bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-indigo-500">
         <input
           type="text"
-          className="w-full px-2 py-1.5 text-xs outline-none bg-transparent dark:text-white"
-          placeholder="Type Name or ID..."
+          className="w-full px-2 py-2 text-xs sm:text-sm outline-none bg-transparent dark:text-white min-h-[36px] sm:min-h-[40px]"
+          placeholder="Type ID or Name..."
           value={term}
           onChange={(e) => setTerm(e.target.value)}
+          onFocus={() => results.length > 0 && setShowResults(true)}
+          onBlur={() => setTimeout(() => setShowResults(false), 200)}
         />
         {loading && (
-          <Loader2 className="w-3 h-3 animate-spin text-indigo-500 mr-2" />
+          <Loader2 className="w-4 h-4 animate-spin text-indigo-500 mr-2" />
         )}
       </div>
 
-      {showDropdown && results.length > 0 && (
-        <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-48 overflow-y-auto">
+      {showResults && results.length > 0 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl z-50 max-h-40 overflow-y-auto">
           {results.map((user) => (
             <div
               key={user.emp_id}
-              className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-0"
-              onClick={() => handleSelection(user)}
+              className="px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 cursor-pointer border-b last:border-0 dark:border-gray-700"
+              onMouseDown={() => handleSelect(user)}
             >
-              <div className="flex items-center gap-2">
-                {user.face_photo ? (
-                  <img
-                    src={user.face_photo}
-                    alt="face"
-                    className="w-6 h-6 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-[10px] font-bold text-gray-600">
-                    {user.eng_name ? user.eng_name.charAt(0) : "U"}
-                  </div>
-                )}
-                <div>
-                  <p className="text-xs font-bold text-gray-700 dark:text-gray-200">
-                    {user.eng_name}
-                  </p>
-                  <p className="text-[10px] text-gray-500">{user.emp_id}</p>
-                </div>
-              </div>
+              <p className="text-xs font-bold text-gray-800 dark:text-white">
+                {user.eng_name}
+              </p>
+              <p className="text-[10px] text-gray-500">{user.emp_id}</p>
             </div>
           ))}
         </div>
@@ -235,37 +188,58 @@ const YPivotQAInspectionLineTableColorConfig = ({
   orderData,
   onUpdate,
   onSetActiveGroup,
-  activeGroup
+  activeGroup,
+  onSaveWithData,
+  lockTrigger
 }) => {
   const { selectedTemplate, config } = reportData;
   const isAQL = selectedTemplate?.InspectedQtyMethod === "AQL";
   const aqlSampleSize = config?.aqlSampleSize || 0;
 
-  // -- State --
   const [groups, setGroups] = useState(reportData.lineTableConfig || []);
   const [lines, setLines] = useState([]);
   const [tables, setTables] = useState([]);
   const [orderColors, setOrderColors] = useState([]);
-
+  const [subConQCs, setSubConQCs] = useState([]);
+  const [editingGroupId, setEditingGroupId] = useState(null);
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [activeGroupIndex, setActiveGroupIndex] = useState(null);
 
-  // Loading Resources
+  // FIXED: Only sync from parent on initial load, not on every update
+  const isInitialMount = useRef(true);
+
+  // Lock all cards when save is triggered from parent
+  useEffect(() => {
+    if (lockTrigger > 0) {
+      setEditingGroupId(null);
+    }
+  }, [lockTrigger]);
+
+  useEffect(() => {
+    if (reportData.lineTableConfig) {
+      setGroups(reportData.lineTableConfig);
+
+      // Only reset editingGroupId on initial load (from backend)
+      // NOT when we're updating locally (adding new groups, etc.)
+      if (isInitialMount.current) {
+        setEditingGroupId(null);
+        isInitialMount.current = false;
+      }
+    }
+  }, [reportData.lineTableConfig]);
+
+  // Load resources
   useEffect(() => {
     const fetchResources = async () => {
       try {
         const promises = [];
 
-        if (selectedTemplate?.Line === "Yes") {
-          if (config?.isSubCon && config?.selectedSubConFactory) {
-            promises.push(
-              axios.get(
-                `${API_BASE_URL}/api/fincheck-inspection/subcon-factories`
-              )
-            );
-          } else {
-            promises.push(axios.get(`${API_BASE_URL}/api/qa-sections-lines`));
-          }
+        if (config?.isSubCon) {
+          promises.push(
+            axios.get(`${API_BASE_URL}/api/subcon-sewing-factories-manage`)
+          );
+        } else if (selectedTemplate?.Line === "Yes") {
+          promises.push(axios.get(`${API_BASE_URL}/api/qa-sections-lines`));
         } else {
           promises.push(Promise.resolve(null));
         }
@@ -293,18 +267,33 @@ const YPivotQAInspectionLineTableColorConfig = ({
 
         if (linesRes) {
           if (config?.isSubCon) {
-            const factory = linesRes.data.data.find(
+            const allFactories = Array.isArray(linesRes.data)
+              ? linesRes.data
+              : linesRes.data.data || [];
+            const factory = allFactories.find(
               (f) => f._id === config.selectedSubConFactory
             );
-            setLines(
-              factory?.lineList?.map((l) => ({ value: l, label: l })) || []
-            );
+            if (factory) {
+              setLines(
+                (factory.lineList || []).map((l) => ({ value: l, label: l }))
+              );
+              setSubConQCs(
+                (factory.qcList || []).map((qc) => ({
+                  value: qc.qcID,
+                  label: `${qc.qcID} - ${qc.qcName}`,
+                  originalData: { emp_id: qc.qcID, eng_name: qc.qcName }
+                }))
+              );
+            }
           } else {
-            setLines(
-              linesRes.data.data
-                .filter((l) => l.Active)
-                .map((l) => ({ value: l._id, label: l.LineNo }))
-            );
+            const data = linesRes.data.data || linesRes.data;
+            if (Array.isArray(data)) {
+              setLines(
+                data
+                  .filter((l) => l.Active)
+                  .map((l) => ({ value: l._id, label: l.LineNo }))
+              );
+            }
           }
         }
 
@@ -329,13 +318,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
     if (selectedTemplate) fetchResources();
   }, [selectedTemplate, config, orderData]);
 
-  // -- AQL Sync Effect --
+  // AQL Sync
   useEffect(() => {
-    if (isAQL && groups.length > 0) {
-      const firstGroup = groups[0];
-      const firstAssignment = firstGroup.assignments[0];
-
-      if (firstAssignment.qty !== aqlSampleSize.toString()) {
+    if (isAQL && groups.length > 0 && groups[0].assignments[0]) {
+      if (groups[0].assignments[0].qty !== aqlSampleSize.toString()) {
         const updated = [...groups];
         updated[0].assignments[0].qty = aqlSampleSize.toString();
         setGroups(updated);
@@ -344,297 +330,274 @@ const YPivotQAInspectionLineTableColorConfig = ({
     }
   }, [isAQL, aqlSampleSize, groups, onUpdate]);
 
-  // -- Auto Calculation for Total Qty (Header) --
+  // Calculate total
   const totalDisplayQty = useMemo(() => {
     if (isAQL) return aqlSampleSize;
     return groups.reduce((total, group) => {
-      const groupTotal = group.assignments.reduce(
-        (sum, assign) => sum + (parseInt(assign.qty) || 0),
-        0
+      return (
+        total +
+        group.assignments.reduce((sum, a) => sum + (parseInt(a.qty) || 0), 0)
       );
-      return total + groupTotal;
     }, 0);
   }, [groups, isAQL, aqlSampleSize]);
 
-  // -- Handlers --
-
+  // Handlers
   const handleAddGroup = () => {
-    let defaultRowQty = "";
+    let defaultQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
-      defaultRowQty = selectedTemplate.InspectedQty.toString();
+      defaultQty = selectedTemplate.InspectedQty.toString();
     }
 
     const newGroup = {
       id: Date.now(),
       line: "",
+      lineName: "",
       table: "",
+      tableName: config?.isSubCon ? "N/A" : "",
       color: "",
-      assignments: [{ id: Date.now() + 1, qcUser: null, qty: defaultRowQty }]
+      colorName: "",
+      assignments: [{ id: Date.now() + 1, qcUser: null, qty: defaultQty }]
     };
     const updated = [...groups, newGroup];
     setGroups(updated);
+    setEditingGroupId(newGroup.id);
     onUpdate({ lineTableConfig: updated });
   };
 
-  // --- NEW: Add All Colors Handler ---
-  // Only executed if button is clicked
   const handleAddAllColors = () => {
     if (orderColors.length === 0) {
-      Swal.fire({
-        icon: "warning",
-        title: "No Colors Found",
-        text: "There are no colors available to add."
-      });
+      Swal.fire("No Colors", "No colors available.", "warning");
       return;
     }
 
-    // Default Row Quantity
-    let defaultRowQty = "";
+    let defaultQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
-      defaultRowQty = selectedTemplate.InspectedQty.toString();
+      defaultQty = selectedTemplate.InspectedQty.toString();
     }
 
-    // Filter out colors that are already present in existing groups
-    // This prevents adding duplicate color cards if some already exist
-    const existingColors = new Set(groups.map((g) => g.color));
-    const colorsToAdd = orderColors.filter((c) => !existingColors.has(c.value));
+    const existing = new Set(groups.map((g) => g.color));
+    const toAdd = orderColors.filter((c) => !existing.has(c.value));
 
-    if (colorsToAdd.length === 0) {
-      Swal.fire({
-        icon: "info",
-        title: "No New Colors",
-        text: "All available colors are already added.",
-        timer: 1500,
-        showConfirmButton: false
-      });
+    if (toAdd.length === 0) {
+      Swal.fire("Done", "All colors already added.", "info");
       return;
     }
 
-    const newGroups = colorsToAdd.map((colorObj, index) => ({
-      id: Date.now() + index, // Ensure unique ID base
-      line: "", // No line based on requirements
-      table: "", // No table based on requirements
-      color: colorObj.value,
+    const newGroups = toAdd.map((c, i) => ({
+      id: Date.now() + i,
+      line: "",
+      lineName: "",
+      table: "",
+      tableName: config?.isSubCon ? "N/A" : "",
+      color: c.value,
+      colorName: c.label,
       assignments: [
-        { id: Date.now() + index + 1000, qcUser: null, qty: defaultRowQty }
+        { id: Date.now() + i + 1000, qcUser: null, qty: defaultQty }
       ]
     }));
 
     const updated = [...groups, ...newGroups];
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
-
-    Swal.fire({
-      icon: "success",
-      title: "Colors Added",
-      text: `Added ${newGroups.length} configuration groups for remaining colors.`,
-      timer: 1500,
-      showConfirmButton: false
-    });
+    Swal.fire("Added", `${newGroups.length} color groups added.`, "success");
   };
 
-  const handleRemoveGroup = (index) => {
-    if (window.confirm("Remove this configuration group?")) {
+  const handleRemoveGroup = async (index) => {
+    const result = await Swal.fire({
+      title: "Remove Group?",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      confirmButtonText: "Remove"
+    });
+
+    if (result.isConfirmed) {
       const updated = [...groups];
-      if (activeGroup?.id === updated[index].id) {
-        onSetActiveGroup(null);
-      }
+      if (activeGroup?.id === updated[index].id) onSetActiveGroup(null);
+      if (editingGroupId === updated[index].id) setEditingGroupId(null);
       updated.splice(index, 1);
       setGroups(updated);
       onUpdate({ lineTableConfig: updated });
+      if (onSaveWithData) onSaveWithData(updated);
     }
   };
 
-  const checkForDuplicateScope = (newValues, currentIndex) => {
-    const { line, table, color } = newValues;
-    const exists = groups.some((g, idx) => {
-      if (idx === currentIndex) return false;
-      const lineMatch = (g.line || "") === (line || "");
-      const tableMatch = (g.table || "") === (table || "");
-      const colorMatch = (g.color || "") === (color || "");
-      let isMatch = true;
-      if (selectedTemplate.Line === "Yes" && !lineMatch) isMatch = false;
-      if (selectedTemplate.Table === "Yes" && !tableMatch) isMatch = false;
-      if (selectedTemplate.Colors === "Yes" && !colorMatch) isMatch = false;
-      return isMatch;
+  const checkDuplicate = (vals, idx) => {
+    return groups.some((g, i) => {
+      if (i === idx) return false;
+      let match = true;
+      if (selectedTemplate.Line === "Yes" && g.line !== vals.line)
+        match = false;
+      if (selectedTemplate.Table === "Yes" && g.table !== vals.table)
+        match = false;
+      if (selectedTemplate.Colors === "Yes" && g.color !== vals.color)
+        match = false;
+      return match;
     });
-    return exists;
   };
 
-  const handleUpdateGroup = (index, field, value) => {
+  const handleUpdateGroup = (idx, field, value, opts = []) => {
     const updated = [...groups];
-    const groupToUpdate = { ...updated[index], [field]: value };
+    const test = { ...updated[idx], [field]: value };
 
-    if (checkForDuplicateScope(groupToUpdate, index)) {
-      Swal.fire({
-        icon: "warning",
-        title: "Duplicate",
-        text: "This combination exists.",
-        timer: 2000,
-        showConfirmButton: false
-      });
+    if (checkDuplicate(test, idx)) {
+      Swal.fire("Duplicate", "This combination exists.", "warning");
       return;
     }
 
-    updated[index][field] = value;
+    updated[idx][field] = value;
+    const nameField = `${field}Name`;
+    const opt = opts.find((o) => o.value === value);
+    updated[idx][nameField] = opt ? opt.label : value;
+
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
 
-    if (activeGroup?.id === updated[index].id) {
-      // Re-resolve names if active group modified
-      const newLineName =
-        lines.find((l) => l.value === updated[index].line)?.label ||
-        updated[index].line ||
-        "";
-      const newTableName =
-        tables.find((t) => t.value === updated[index].table)?.label ||
-        updated[index].table ||
-        "";
-      const newColorName =
-        orderColors.find((c) => c.value === updated[index].color)?.label ||
-        updated[index].color ||
-        "";
-
+    if (activeGroup?.id === updated[idx].id) {
       onSetActiveGroup({
-        ...updated[index],
-        lineName: newLineName,
-        tableName: newTableName,
-        colorName: newColorName,
+        ...updated[idx],
+        lineName: updated[idx].lineName || updated[idx].line,
+        tableName: updated[idx].tableName || updated[idx].table,
+        colorName: updated[idx].colorName || updated[idx].color,
         activeAssignmentId: activeGroup.activeAssignmentId,
         activeQC: activeGroup.activeQC
       });
     }
   };
 
-  const handleAddAssignment = (groupIndex, qcUser = null) => {
+  const handleAddAssignment = (gIdx, qcUser = null) => {
     if (qcUser) {
-      const group = groups[groupIndex];
-      const exists = group.assignments.some(
-        (a) => a.qcUser && a.qcUser.emp_id === qcUser.emp_id
+      const exists = groups[gIdx].assignments.some(
+        (a) => a.qcUser?.emp_id === qcUser.emp_id
       );
       if (exists) {
-        Swal.fire({
-          icon: "error",
-          title: "Duplicate QC",
-          text: "QC already added."
-        });
+        Swal.fire("Duplicate", "QC already added.", "error");
         return;
       }
     }
 
-    let defaultRowQty = "";
+    let defaultQty = "";
     if (!isAQL && selectedTemplate.InspectedQty) {
-      defaultRowQty = selectedTemplate.InspectedQty.toString();
+      defaultQty = selectedTemplate.InspectedQty.toString();
     }
 
     const updated = [...groups];
-    updated[groupIndex].assignments.push({
-      id: Date.now(),
-      qcUser: qcUser,
-      qty: defaultRowQty
-    });
+    updated[gIdx].assignments.push({ id: Date.now(), qcUser, qty: defaultQty });
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
   };
 
-  const handleRemoveAssignment = (groupIndex, assignIndex) => {
+  const handleRemoveAssignment = (gIdx, aIdx) => {
     const updated = [...groups];
-    updated[groupIndex].assignments.splice(assignIndex, 1);
+    updated[gIdx].assignments.splice(aIdx, 1);
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
   };
 
-  const handleUpdateAssignment = (groupIndex, assignIndex, field, value) => {
+  const handleUpdateAssignment = (gIdx, aIdx, field, value) => {
     const updated = [...groups];
     if (field === "qcUser" && value) {
-      const group = groups[groupIndex];
-      const exists = group.assignments.some(
-        (a, idx) =>
-          idx !== assignIndex && a.qcUser && a.qcUser.emp_id === value.emp_id
+      const exists = groups[gIdx].assignments.some(
+        (a, i) => i !== aIdx && a.qcUser?.emp_id === value.emp_id
       );
       if (exists) {
-        Swal.fire({
-          icon: "error",
-          title: "Duplicate QC",
-          text: "QC already added."
-        });
+        Swal.fire("Duplicate", "QC already added.", "error");
         return;
       }
     }
-    updated[groupIndex].assignments[assignIndex][field] = value;
+    updated[gIdx].assignments[aIdx][field] = value;
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
   };
 
-  const handleQCSelect = (userData, groupIndex) => {
-    const group = groups[groupIndex];
-    const isDuplicate = group.assignments.some(
-      (a) => a.qcUser && a.qcUser.emp_id === userData.emp_id
+  const handleQCSelect = (user, gIdx) => {
+    const group = groups[gIdx];
+    const exists = group.assignments.some(
+      (a) => a.qcUser?.emp_id === user.emp_id
     );
-
-    if (isDuplicate) {
-      Swal.fire({
-        icon: "error",
-        title: "Duplicate",
-        text: "QC already in list."
-      });
+    if (exists) {
+      Swal.fire("Duplicate", "QC already in list.", "error");
       return;
     }
 
-    const emptySlotIndex = group.assignments.findIndex((a) => !a.qcUser);
-    if (emptySlotIndex !== -1) {
-      handleUpdateAssignment(groupIndex, emptySlotIndex, "qcUser", userData);
+    const empty = group.assignments.findIndex((a) => !a.qcUser);
+    if (empty !== -1) {
+      handleUpdateAssignment(gIdx, empty, "qcUser", user);
     } else {
-      handleAddAssignment(groupIndex, userData);
+      handleAddAssignment(gIdx, user);
     }
   };
 
-  const handleOpenScanner = (groupIndex) => {
-    setActiveGroupIndex(groupIndex);
-    setIsScannerOpen(true);
-  };
-
   const handleScanSuccess = (userData) => {
-    if (activeGroupIndex !== null) handleQCSelect(userData, activeGroupIndex);
+    if (activeGroupIndex !== null) {
+      if (config?.isSubCon) {
+        const id = userData.emp_id || userData;
+        const found = subConQCs.find((q) => q.value === id);
+        if (found) handleQCSelect(found.originalData, activeGroupIndex);
+        else Swal.fire("Error", "QC not in factory list.", "error");
+      } else {
+        handleQCSelect(userData, activeGroupIndex);
+      }
+    }
     setIsScannerOpen(false);
     setActiveGroupIndex(null);
   };
 
   const handleActivateGroup = (group, assignment = null) => {
-    if (selectedTemplate.Line === "Yes" && !group.line)
-      return Swal.fire("Missing Info", "Please select a Line.", "warning");
-    if (selectedTemplate.Table === "Yes" && !group.table)
-      return Swal.fire("Missing Info", "Please select a Table.", "warning");
-    if (selectedTemplate.Colors === "Yes" && !group.color)
-      return Swal.fire("Missing Info", "Please select a Color.", "warning");
+    if (selectedTemplate.Line === "Yes" && !group.line) {
+      return Swal.fire("Missing", "Select a Line.", "warning");
+    }
+    if (selectedTemplate.Table === "Yes" && !config?.isSubCon && !group.table) {
+      return Swal.fire("Missing", "Select a Table.", "warning");
+    }
+    if (selectedTemplate.Colors === "Yes" && !group.color) {
+      return Swal.fire("Missing", "Select a Color.", "warning");
+    }
 
-    // Resolve human readable names
-    const lineName =
-      lines.find((l) => l.value === group.line)?.label || group.line || "";
-    const tableName =
-      tables.find((t) => t.value === group.table)?.label || group.table || "";
-    const colorName =
-      orderColors.find((c) => c.value === group.color)?.label ||
-      group.color ||
-      "";
+    // Lock the card when activated
+    setEditingGroupId(null);
 
-    const context = {
+    const ctx = {
       ...group,
-      lineName,
-      tableName,
-      colorName,
+      lineName: lines.find((l) => l.value === group.line)?.label || group.line,
+      tableName: config?.isSubCon
+        ? "N/A"
+        : tables.find((t) => t.value === group.table)?.label || group.table,
+      colorName:
+        orderColors.find((c) => c.value === group.color)?.label || group.color,
       activeAssignmentId: assignment?.id,
       activeQC: assignment?.qcUser
     };
 
-    onSetActiveGroup(context);
+    onSetActiveGroup(ctx);
     Swal.fire({
       icon: "success",
-      title: "Inspection Active",
-      text: "You can now proceed to Measurement or Defect tabs.",
-      timer: 1500,
+      title: "Session Active",
+      timer: 1200,
       showConfirmButton: false
     });
+  };
+
+  const handleToggleEdit = (targetId) => {
+    if (editingGroupId !== null) {
+      const current = groups.find((g) => g.id === editingGroupId);
+      if (current) {
+        const missing = [];
+        if (showLine && !current.line) missing.push("Line");
+        if (showTable && !config?.isSubCon && !current.table)
+          missing.push("Table");
+        if (showColors && !current.color) missing.push("Color");
+        if (showQC && current.assignments.some((a) => !a.qcUser))
+          missing.push("QC");
+
+        if (missing.length > 0) {
+          Swal.fire("Incomplete", `Fill: ${missing.join(", ")}`, "warning");
+          return;
+        }
+      }
+    }
+
+    setEditingGroupId(editingGroupId === targetId ? null : targetId);
   };
 
   if (!selectedTemplate) return null;
@@ -643,39 +606,51 @@ const YPivotQAInspectionLineTableColorConfig = ({
   const showTable = selectedTemplate.Table === "Yes";
   const showColors = selectedTemplate.Colors === "Yes";
   const showQC = selectedTemplate.isQCScan === "Yes";
-
-  // Check conditions for "Add All Colors" button
   const canAddAllColors =
     showColors && !showLine && !showTable && orderColors.length > 0;
 
+  const isCurrentComplete = useMemo(() => {
+    if (editingGroupId === null) return true;
+    const g = groups.find((g) => g.id === editingGroupId);
+    if (!g) return true;
+    if (showLine && !g.line) return false;
+    if (showTable && !config?.isSubCon && !g.table) return false;
+    if (showColors && !g.color) return false;
+    if (showQC && g.assignments.some((a) => !a.qcUser)) return false;
+    return true;
+  }, [groups, editingGroupId, showLine, showTable, showColors, showQC, config]);
+
   return (
-    <div className="space-y-6 pb-20">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden sticky top-0 z-30">
-        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4 flex justify-between items-center shadow-md">
-          <div>
-            <h2 className="text-white font-bold text-lg flex items-center gap-2">
-              <FileText className="w-5 h-5" />
-              {selectedTemplate.ReportType}
+    <div className="space-y-3 sm:space-y-4 pb-20">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md border border-gray-200 dark:border-gray-700 overflow-hidden sticky top-0 z-30">
+        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-3 sm:px-4 py-2.5 sm:py-3 flex justify-between items-center">
+          <div className="min-w-0">
+            <h2 className="text-white font-bold text-sm sm:text-base flex items-center gap-1.5 truncate">
+              <FileText className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">{selectedTemplate.ReportType}</span>
             </h2>
-            <p className="text-indigo-100 text-xs mt-1 opacity-80">
-              {isAQL ? "AQL Standard" : "Fixed Quantity Inspection"}
+            <p className="text-indigo-200 text-[10px] sm:text-xs">
+              {isAQL ? "AQL Standard" : "Fixed Quantity"}
             </p>
           </div>
-          <div className="flex flex-col items-end">
-            <span className="text-indigo-200 text-xs font-bold uppercase tracking-wider">
-              {isAQL ? "Target Sample Size" : "Total Inspected Qty"}
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-3xl font-black text-white">
-                {totalDisplayQty || 0}
+          <div className="text-right flex-shrink-0">
+            <p className="text-indigo-200 text-[9px] sm:text-[10px] font-bold uppercase">
+              {isAQL ? "Sample" : "Total Qty"}
+            </p>
+            <div className="flex items-center gap-1.5 justify-end">
+              <span className="text-xl sm:text-2xl font-black text-white">
+                {totalDisplayQty}
               </span>
               {isAQL ? (
-                <span className="bg-orange-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                  <Hash className="w-3 h-3" /> AQL
+                <span className="bg-orange-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                  <Hash className="w-2.5 h-2.5" />
+                  AQL
                 </span>
               ) : (
-                <span className="bg-purple-500 text-white text-[10px] px-2 py-0.5 rounded-full font-bold flex items-center gap-1">
-                  <Calculator className="w-3 h-3" /> Auto
+                <span className="bg-purple-500 text-white text-[8px] px-1.5 py-0.5 rounded-full font-bold flex items-center gap-0.5">
+                  <Calculator className="w-2.5 h-2.5" />
+                  Auto
                 </span>
               )}
             </div>
@@ -683,147 +658,177 @@ const YPivotQAInspectionLineTableColorConfig = ({
         </div>
       </div>
 
+      {/* Active Session Banner */}
       {activeGroup && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-4 rounded-xl flex items-center justify-between animate-fadeIn">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-green-100 dark:bg-green-800 rounded-full">
-              <Play className="w-5 h-5 text-green-600 dark:text-green-300 fill-current" />
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-1.5 bg-green-100 dark:bg-green-800 rounded-full flex-shrink-0">
+              <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 dark:text-green-300 fill-current" />
             </div>
-            <div>
-              <p className="text-sm font-bold text-green-800 dark:text-green-300">
-                Active Inspection Session
+            <div className="min-w-0">
+              <p className="text-xs sm:text-sm font-bold text-green-800 dark:text-green-300 truncate">
+                Active Session
               </p>
-              <p className="text-xs text-green-700 dark:text-green-400">
-                {/* Use Resolved Names in Banner */}
-                {activeGroup.lineName && `Line: ${activeGroup.lineName}`}
-                {activeGroup.lineName && activeGroup.tableName && " • "}
-                {activeGroup.tableName && `Table: ${activeGroup.tableName}`}
-                {(activeGroup.lineName || activeGroup.tableName) &&
-                  activeGroup.colorName &&
-                  " • "}
-                {activeGroup.colorName && `Color: ${activeGroup.colorName}`}
+              <p className="text-[10px] sm:text-xs text-green-700 dark:text-green-400 truncate">
+                {[
+                  activeGroup.lineName,
+                  activeGroup.tableName,
+                  activeGroup.colorName
+                ]
+                  .filter(Boolean)
+                  .join(" • ")}
               </p>
             </div>
           </div>
           <button
             onClick={() => onSetActiveGroup(null)}
-            className="px-3 py-1.5 bg-white dark:bg-gray-800 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-400 text-xs font-bold rounded-lg hover:bg-green-50 dark:hover:bg-green-900/40"
+            className="px-2 py-1 bg-white dark:bg-gray-800 border border-green-200 dark:border-green-700 text-green-700 dark:text-green-400 text-[10px] sm:text-xs font-bold rounded-lg flex-shrink-0"
           >
-            End Session
+            End
           </button>
         </div>
       )}
 
-      <div className="space-y-4">
+      {/* Groups */}
+      <div className="space-y-3">
         {groups.map((group, gIdx) => {
           const isActive = activeGroup?.id === group.id;
+          const isEditing = editingGroupId === group.id;
+          const isLocked = !isEditing;
+
           return (
             <div
               key={group.id}
-              className={`bg-white dark:bg-gray-800 rounded-xl shadow-md border transition-all hover:shadow-lg ${
+              className={`bg-white dark:bg-gray-800 rounded-xl shadow border transition-all ${
                 isActive
                   ? "border-green-500 ring-2 ring-green-100 dark:ring-green-900/30"
                   : "border-gray-200 dark:border-gray-700"
               }`}
             >
-              <div className="p-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50 rounded-t-xl">
-                <div className="flex flex-wrap items-end gap-4">
+              {/* Card Header */}
+              <div className="p-2.5 sm:p-3 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-700">
+                {/* Dropdowns */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-2">
                   {showLine && (
-                    <div className="w-full sm:w-40">
-                      <SearchableSingleSelect
-                        label={config?.isSubCon ? "SubCon Line" : "Line No"}
-                        options={lines}
-                        selectedValue={group.line}
-                        onSelectionChange={(val) =>
-                          handleUpdateGroup(gIdx, "line", val)
-                        }
-                        placeholder="Select Line"
-                      />
-                    </div>
-                  )}
-                  {showTable && (
-                    <div className="w-full sm:w-32">
-                      <SearchableSingleSelect
-                        label="Table No"
-                        options={tables}
-                        selectedValue={group.table}
-                        onSelectionChange={(val) =>
-                          handleUpdateGroup(gIdx, "table", val)
-                        }
-                        placeholder="Select Table"
-                      />
-                    </div>
-                  )}
-                  {showColors && (
-                    <div className="w-full sm:w-48">
-                      <SearchableSingleSelect
-                        label="Color"
-                        options={orderColors}
-                        selectedValue={group.color}
-                        onSelectionChange={(val) =>
-                          handleUpdateGroup(gIdx, "color", val)
-                        }
-                        placeholder="Select Color"
-                      />
-                    </div>
+                    <SimpleSelect
+                      label={config?.isSubCon ? "SubCon Line" : "Line"}
+                      options={lines}
+                      value={group.line}
+                      onChange={(v) =>
+                        handleUpdateGroup(gIdx, "line", v, lines)
+                      }
+                      placeholder="Select..."
+                      disabled={isLocked}
+                    />
                   )}
 
-                  <div className="ml-auto flex items-center gap-2">
+                  {showTable &&
+                    (config?.isSubCon ? (
+                      <div>
+                        <label className="block text-[10px] sm:text-xs font-bold text-gray-500 mb-1">
+                          Table
+                        </label>
+                        <div className="px-2 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-xs text-gray-500 font-bold text-center min-h-[36px] flex items-center justify-center">
+                          N/A
+                        </div>
+                      </div>
+                    ) : (
+                      <SimpleSelect
+                        label="Table"
+                        options={tables}
+                        value={group.table}
+                        onChange={(v) =>
+                          handleUpdateGroup(gIdx, "table", v, tables)
+                        }
+                        placeholder="Select..."
+                        disabled={isLocked}
+                      />
+                    ))}
+
+                  {showColors && (
+                    <SimpleSelect
+                      label="Color"
+                      options={orderColors}
+                      value={group.color}
+                      onChange={(v) =>
+                        handleUpdateGroup(gIdx, "color", v, orderColors)
+                      }
+                      placeholder="Select..."
+                      disabled={isLocked}
+                    />
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                  <div className="flex gap-1.5">
                     {isActive && (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-bold rounded-lg flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3" /> Active
+                      <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded flex items-center gap-0.5">
+                        <CheckCircle2 className="w-3 h-3" />
+                        Active
                       </span>
                     )}
+                    {isLocked && !isActive && (
+                      <span className="px-1.5 py-0.5 bg-gray-100 text-gray-500 text-[10px] font-medium rounded">
+                        Locked
+                      </span>
+                    )}
+                    {isEditing && (
+                      <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-bold rounded">
+                        Editing
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => handleToggleEdit(group.id)}
+                      className={`p-1.5 rounded-lg border ${
+                        isEditing
+                          ? "bg-indigo-50 border-indigo-200 text-indigo-600"
+                          : "bg-white border-gray-200 text-gray-500 hover:text-indigo-600"
+                      }`}
+                    >
+                      {isEditing ? (
+                        <Save className="w-3.5 h-3.5" />
+                      ) : (
+                        <Edit className="w-3.5 h-3.5" />
+                      )}
+                    </button>
                     <button
                       onClick={() => handleRemoveGroup(gIdx)}
-                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                      disabled={isLocked}
+                      className="p-1.5 text-gray-400 hover:text-red-500 rounded-lg disabled:opacity-30"
                     >
-                      <Trash2 className="w-5 h-5" />
+                      <Trash2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
               </div>
 
-              <div className="p-0 overflow-x-auto">
-                <table className="w-full text-sm text-left">
-                  <thead className="bg-white dark:bg-gray-800 text-gray-500 border-b border-gray-100 dark:border-gray-700">
-                    <tr>
+              {/* Assignments */}
+              <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                {group.assignments.map((assign, aIdx) => (
+                  <div key={assign.id} className="p-2.5 sm:p-3">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:items-center">
+                      {/* QC Section */}
                       {showQC && (
-                        <th className="px-4 py-2 font-medium w-1/2">
-                          QC / Inspector
-                        </th>
-                      )}
-                      {!isAQL && (
-                        <th className="px-4 py-2 font-medium">
-                          Inspected Qty (Row)
-                        </th>
-                      )}
-                      <th className="px-4 py-2 font-medium text-right">
-                        Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                    {group.assignments.map((assign, aIdx) => (
-                      <tr
-                        key={assign.id}
-                        className="group hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                      >
-                        {showQC && (
-                          <td className="px-4 py-3 align-top">
-                            {assign.qcUser ? (
-                              <div className="flex items-center gap-3">
-                                <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold">
+                        <div className="flex-1 min-w-0">
+                          {assign.qcUser ? (
+                            <div className="flex items-center justify-between gap-2 p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="w-7 h-7 rounded-full bg-emerald-200 dark:bg-emerald-800 flex items-center justify-center text-emerald-700 dark:text-emerald-300 font-bold text-xs flex-shrink-0">
                                   {assign.qcUser.eng_name?.charAt(0) || "U"}
                                 </div>
-                                <div>
-                                  <p className="font-bold text-gray-800 dark:text-gray-200">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-gray-800 dark:text-white truncate">
                                     {assign.qcUser.eng_name}
                                   </p>
-                                  <p className="text-xs text-gray-500">
+                                  <p className="text-[10px] text-gray-500">
                                     {assign.qcUser.emp_id}
                                   </p>
                                 </div>
+                              </div>
+                              {!isLocked && (
                                 <button
                                   onClick={() =>
                                     handleUpdateAssignment(
@@ -833,100 +838,119 @@ const YPivotQAInspectionLineTableColorConfig = ({
                                       null
                                     )
                                   }
-                                  className="ml-auto text-gray-300 hover:text-red-500"
+                                  className="p-1 text-gray-400 hover:text-red-500"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <X className="w-3.5 h-3.5" />
                                 </button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2 items-center">
-                                <button
-                                  onClick={() => handleOpenScanner(gIdx)}
-                                  className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-600 rounded-lg"
-                                >
-                                  <Scan className="w-4 h-4" />{" "}
-                                  <span className="hidden sm:inline text-xs font-bold">
-                                    Scan
-                                  </span>
-                                </button>
-                                <div className="flex-1">
-                                  <QCUserSearch
-                                    onSelect={(user) =>
-                                      handleQCSelect(user, gIdx)
-                                    }
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </td>
-                        )}
-                        {!isAQL && (
-                          <td className="px-4 py-3 align-middle">
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                value={assign.qty}
-                                onChange={(e) =>
-                                  handleUpdateAssignment(
-                                    gIdx,
-                                    aIdx,
-                                    "qty",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-24 px-3 py-2 border rounded-lg text-sm font-bold text-center focus:ring-2 focus:ring-indigo-500 outline-none bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
-                                placeholder="0"
-                              />
-                              <span className="text-xs text-gray-400 font-medium">
-                                pcs
-                              </span>
-                            </div>
-                          </td>
-                        )}
-                        <td className="px-4 py-3 text-right align-middle">
-                          <div className="flex justify-end gap-2">
-                            {group.assignments.length > 1 && (
-                              <button
-                                onClick={() =>
-                                  handleRemoveAssignment(gIdx, aIdx)
-                                }
-                                className="p-2 text-gray-400 hover:text-red-500"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            )}
-                            <button
-                              onClick={() => handleActivateGroup(group, assign)}
-                              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg shadow-md transition-all active:scale-95 disabled:opacity-50 ${
-                                isActive
-                                  ? "bg-gray-200 text-gray-600 cursor-default"
-                                  : "bg-emerald-500 hover:bg-emerald-600 text-white"
-                              }`}
-                              disabled={(showQC && !assign.qcUser) || isActive}
-                            >
-                              {isActive ? (
-                                <PauseCircle className="w-4 h-4" />
-                              ) : (
-                                <Play className="w-4 h-4 fill-current" />
                               )}
-                              <span className="text-xs font-bold">
-                                {isActive ? "Active" : "Start"}
-                              </span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                {showQC && !isAQL && (
-                  <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900/30 border-t border-gray-100 dark:border-gray-700">
+                            </div>
+                          ) : (
+                            <div
+                              className={`flex gap-2 items-center ${
+                                isLocked ? "opacity-50 pointer-events-none" : ""
+                              }`}
+                            >
+                              <button
+                                onClick={() => {
+                                  setActiveGroupIndex(gIdx);
+                                  setIsScannerOpen(true);
+                                }}
+                                className="px-2 py-2 bg-indigo-50 text-indigo-600 rounded-lg flex items-center gap-1 flex-shrink-0"
+                              >
+                                <Scan className="w-3.5 h-3.5" />
+                                <span className="text-[10px] font-bold hidden sm:inline">
+                                  Scan
+                                </span>
+                              </button>
+                              <div className="flex-1">
+                                {config?.isSubCon ? (
+                                  subConQCs.length > 0 ? (
+                                    <QCInlineSelect
+                                      options={subConQCs}
+                                      onSelect={(u) => handleQCSelect(u, gIdx)}
+                                      disabled={isLocked}
+                                    />
+                                  ) : (
+                                    <div className="px-2 py-2 bg-gray-100 text-gray-400 text-xs rounded-lg">
+                                      No QC List
+                                    </div>
+                                  )
+                                ) : (
+                                  <SimpleQCSearch
+                                    onSelect={(u) => handleQCSelect(u, gIdx)}
+                                    disabled={isLocked}
+                                  />
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Qty Input */}
+                      {!isAQL && (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            value={assign.qty}
+                            onChange={(e) =>
+                              handleUpdateAssignment(
+                                gIdx,
+                                aIdx,
+                                "qty",
+                                e.target.value
+                              )
+                            }
+                            disabled={isLocked}
+                            className={`w-20 sm:w-24 px-2 py-2 border rounded-lg text-xs sm:text-sm font-bold text-center focus:ring-2 focus:ring-indigo-500 outline-none ${
+                              isLocked ? "bg-gray-50 text-gray-500" : "bg-white"
+                            }`}
+                            placeholder="Qty"
+                          />
+                          <span className="text-[10px] text-gray-400">pcs</span>
+                        </div>
+                      )}
+
+                      {/* Row Actions */}
+                      <div className="flex items-center gap-2 justify-end sm:justify-start">
+                        {group.assignments.length > 1 && !isLocked && (
+                          <button
+                            onClick={() => handleRemoveAssignment(gIdx, aIdx)}
+                            className="p-1.5 text-gray-400 hover:text-red-500"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleActivateGroup(group, assign)}
+                          disabled={(showQC && !assign.qcUser) || isActive}
+                          className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-bold shadow transition-all ${
+                            isActive
+                              ? "bg-gray-200 text-gray-500 cursor-default"
+                              : "bg-emerald-500 hover:bg-emerald-600 text-white"
+                          } disabled:opacity-50`}
+                        >
+                          {isActive ? (
+                            <PauseCircle className="w-3.5 h-3.5" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5 fill-current" />
+                          )}
+                          {isActive ? "Active" : "Start"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Add Inspector */}
+                {showQC && !isAQL && !isLocked && (
+                  <div className="p-2 bg-gray-50 dark:bg-gray-900/30">
                     <button
                       onClick={() => handleAddAssignment(gIdx)}
-                      className="text-xs font-bold text-indigo-600 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-dashed border-indigo-300 w-full justify-center hover:bg-indigo-50"
+                      className="w-full py-2 text-[10px] sm:text-xs font-bold text-indigo-600 border border-dashed border-indigo-300 rounded-lg flex items-center justify-center gap-1 hover:bg-indigo-50"
                     >
-                      <Plus className="w-4 h-4" /> Add Inspector / Split
-                      Quantity
+                      <Plus className="w-3.5 h-3.5" /> Add Inspector
                     </button>
                   </div>
                 )}
@@ -935,41 +959,48 @@ const YPivotQAInspectionLineTableColorConfig = ({
           );
         })}
 
+        {/* Empty State */}
         {groups.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-16 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700">
-            <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-full mb-3">
-              <FileText className="w-8 h-8 text-gray-400" />
-            </div>
-            <p className="text-gray-500 font-medium">
-              No inspection groups configured.
+          <div className="flex flex-col items-center justify-center py-10 bg-gray-50 dark:bg-gray-800/50 rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700">
+            <FileText className="w-8 h-8 text-gray-400 mb-2" />
+            <p className="text-gray-500 text-sm font-medium">
+              No groups configured
             </p>
+            <p className="text-gray-400 text-xs">Add a group below to start</p>
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-3">
+        {/* Action Buttons */}
+        <div className="grid grid-cols-1 gap-2">
           <button
             onClick={handleAddGroup}
-            className="flex-1 py-4 border-2 border-dashed border-indigo-300 rounded-xl flex items-center justify-center gap-2 text-indigo-600 font-bold hover:bg-indigo-50 transition-colors"
+            disabled={!isCurrentComplete}
+            className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all ${
+              isCurrentComplete
+                ? "bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-purple-700 active:scale-[0.98]"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            }`}
           >
-            <Plus className="w-5 h-5" /> Add New Configuration Group
+            <Plus className="w-5 h-5" />
+            Add Configuration Group
           </button>
 
-          {/* Conditional Render for Add All Colors */}
           {canAddAllColors && (
             <button
               onClick={handleAddAllColors}
-              className="flex-1 py-4 bg-indigo-50 dark:bg-indigo-900/20 border-2 border-dashed border-indigo-300 dark:border-indigo-700 rounded-xl flex items-center justify-center gap-2 text-indigo-600 dark:text-indigo-400 font-bold hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors"
+              className="py-3 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:from-amber-600 hover:to-orange-700 active:scale-[0.98] transition-all"
             >
-              <CopyPlus className="w-5 h-5" /> Add All Colors (
-              {orderColors.length})
+              <CopyPlus className="w-5 h-5" />
+              Add All Colors ({orderColors.length})
             </button>
           )}
         </div>
       </div>
 
+      {/* Scanner */}
       {isScannerOpen && (
         <EmpQRCodeScanner
-          onUserDataFetched={(user) => handleScanSuccess(user)}
+          onUserDataFetched={handleScanSuccess}
           onClose={() => {
             setIsScannerOpen(false);
             setActiveGroupIndex(null);

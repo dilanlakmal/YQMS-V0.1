@@ -25,7 +25,7 @@ const SelectedPhotoSectionSchema = new mongoose.Schema(
 
 const qaSectionsTemplatesSchema = new mongoose.Schema(
   {
-    no: { type: Number, required: true, unique: true },
+    no: { type: Number, required: true },
     ReportType: { type: String, required: true },
 
     // Config Fields

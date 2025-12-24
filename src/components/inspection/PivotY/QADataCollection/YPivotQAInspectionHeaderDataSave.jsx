@@ -1,9 +1,58 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
-import { Save, Loader2 } from "lucide-react";
+import { Save, Loader2, Edit3, CheckCircle2, AlertCircle } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesHeader from "../QATemplates/YPivotQATemplatesHeader";
 
+// ==============================================================================
+// INTERNAL COMPONENT: AUTO-DISMISS STATUS MODAL
+// ==============================================================================
+const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 1200); // Auto close after 1.2 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const isSuccess = type === "success";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+        <div
+          className={`p-3 rounded-full ${
+            isSuccess
+              ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+          }`}
+        >
+          {isSuccess ? (
+            <CheckCircle2 className="w-8 h-8" />
+          ) : (
+            <AlertCircle className="w-8 h-8" />
+          )}
+        </div>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+          {isSuccess ? "Success" : "Error"}
+        </h3>
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+          {message}
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ==============================================================================
+// MAIN COMPONENT
+// ==============================================================================
 const YPivotQAInspectionHeaderDataSave = ({
   headerData,
   onUpdateHeaderData,
@@ -12,6 +61,16 @@ const YPivotQAInspectionHeaderDataSave = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+
+  // NEW: Track if we are in Update mode based on loaded data
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+
+  // NEW: State for the status modal
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    type: "success", // 'success' or 'error'
+    message: ""
+  });
 
   // --- FETCH EXISTING DATA ON MOUNT OR ID CHANGE ---
   useEffect(() => {
@@ -26,6 +85,16 @@ const YPivotQAInspectionHeaderDataSave = ({
 
         if (res.data.success && res.data.data.headerData) {
           const backendHeaderData = res.data.data.headerData;
+
+          // LOGIC: If backend returns non-empty array, set button to Update
+          if (
+            Array.isArray(backendHeaderData) &&
+            backendHeaderData.length > 0
+          ) {
+            setIsUpdateMode(true);
+          } else {
+            setIsUpdateMode(false);
+          }
 
           const newSelectedOptions = {};
           const newRemarks = {};
@@ -77,17 +146,28 @@ const YPivotQAInspectionHeaderDataSave = ({
 
     // Check if we should load data
     const hasData = Object.keys(headerData.selectedOptions || {}).length > 0;
-    if (reportId && !hasData) {
-      fetchExistingHeaderData();
+
+    // Always check for update mode even if we have local data (e.g. from QR scan)
+    // But only fetch if we don't have it, or if we want to ensure sync
+    if (reportId) {
+      // If headerData is empty, definitely fetch
+      if (!hasData) {
+        fetchExistingHeaderData();
+      } else {
+        // If we have data (e.g. from QR), we assume it came from DB, so it's update mode
+        setIsUpdateMode(true);
+      }
     }
   }, [reportId]);
 
-  // --- SAVE HANDLER---
+  // --- SAVE HANDLER ---
   const handleSaveHeaderData = async () => {
     if (!isReportSaved || !reportId) {
-      alert(
-        "Please save the Order information first before saving Header data."
-      );
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Please save Order information first."
+      });
       return;
     }
 
@@ -111,14 +191,12 @@ const YPivotQAInspectionHeaderDataSave = ({
 
             if (img.url.startsWith("data:")) {
               // Case A: New Image (Base64)
-              // We send it in 'imgSrc' so backend can save it to disk
               payloadImgSrc = img.url;
               payloadImageURL = null;
             } else {
               // Case B: Existing Image (Full URL)
-              // We strip the API_BASE_URL to save only relative path
               payloadImageURL = img.url.replace(API_BASE_URL, "");
-              payloadImgSrc = null; // No need to re-upload
+              payloadImgSrc = null;
             }
 
             return {
@@ -146,12 +224,24 @@ const YPivotQAInspectionHeaderDataSave = ({
       );
 
       if (res.data.success) {
-        alert("Header data saved successfully!");
-        // Optional: Reload data here to refresh logic if needed
+        // Switch to Update Mode immediately upon success
+        setIsUpdateMode(true);
+
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: isUpdateMode
+            ? "Header Data Updated Successfully!"
+            : "Header Data Saved Successfully!"
+        });
       }
     } catch (error) {
       console.error("Error saving header data:", error);
-      alert("Failed to save header data.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Failed to save header data."
+      });
     } finally {
       setSaving(false);
     }
@@ -176,7 +266,7 @@ const YPivotQAInspectionHeaderDataSave = ({
         onUpdateHeaderData={onUpdateHeaderData}
       />
 
-      {/* 2. Floating Save Button */}
+      {/* 2. Floating Save/Update Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
         <div className="max-w-5xl mx-auto flex justify-end">
           <button
@@ -185,29 +275,47 @@ const YPivotQAInspectionHeaderDataSave = ({
             className={`
               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
               ${
-                isReportSaved
-                  ? "bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
-                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                !isReportSaved
+                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                  : isUpdateMode
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" // Update Colors
+                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white" // Save Colors
               }
             `}
             title={
-              !isReportSaved ? "Save Order Data first" : "Save Header Data"
+              !isReportSaved
+                ? "Save Order Data first"
+                : isUpdateMode
+                ? "Update existing header data"
+                : "Save new header data"
             }
           >
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Saving...
+                {isUpdateMode ? "Updating..." : "Saving..."}
               </>
             ) : (
               <>
-                <Save className="w-5 h-5" />
-                Save Header Data
+                {isUpdateMode ? (
+                  <Edit3 className="w-5 h-5" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                {isUpdateMode ? "Update Header Data" : "Save Header Data"}
               </>
             )}
           </button>
         </div>
       </div>
+
+      {/* 3. Status Modal */}
+      <AutoDismissModal
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        type={statusModal.type}
+        message={statusModal.message}
+      />
     </div>
   );
 };

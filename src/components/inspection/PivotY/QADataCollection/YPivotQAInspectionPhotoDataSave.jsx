@@ -1,9 +1,65 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
-import { Save, Loader2, Camera } from "lucide-react";
+import {
+  Save,
+  Loader2,
+  Camera,
+  Edit3,
+  CheckCircle2,
+  AlertCircle
+} from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesPhotos from "../QATemplates/YPivotQATemplatesPhotos";
 
+// ==============================================================================
+// INTERNAL COMPONENT: AUTO-DISMISS STATUS MODAL
+// ==============================================================================
+const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 1500); // Auto close after 1.5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const isSuccess = type === "success";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+        <div
+          className={`p-3 rounded-full ${
+            isSuccess
+              ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+          }`}
+        >
+          {isSuccess ? (
+            <CheckCircle2 className="w-8 h-8" />
+          ) : (
+            <AlertCircle className="w-8 h-8" />
+          )}
+        </div>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+          {isSuccess ? "Success" : "Error"}
+        </h3>
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+          {message}
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ==============================================================================
+// MAIN COMPONENT
+// ==============================================================================
 const YPivotQAInspectionPhotoDataSave = ({
   reportData,
   onUpdatePhotoData,
@@ -12,6 +68,16 @@ const YPivotQAInspectionPhotoDataSave = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+
+  // NEW: Track update mode vs save mode
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+
+  // NEW: Status Modal State
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    type: "success",
+    message: ""
+  });
 
   // 1. Determine Allowed Sections based on Template (Logic from Determination component)
   const selectedTemplate = reportData?.selectedTemplate;
@@ -38,6 +104,13 @@ const YPivotQAInspectionPhotoDataSave = ({
 
         if (res.data.success && res.data.data.photoData) {
           const backendPhotoData = res.data.data.photoData;
+
+          // LOGIC: If backend returns non-empty array, set button to Update
+          if (Array.isArray(backendPhotoData) && backendPhotoData.length > 0) {
+            setIsUpdateMode(true);
+          } else {
+            setIsUpdateMode(false);
+          }
 
           const newRemarks = {};
           const newCapturedImages = {};
@@ -92,19 +165,31 @@ const YPivotQAInspectionPhotoDataSave = ({
       }
     };
 
-    // Check if we already have data in state to avoid overwrite on navigation
-    // But if we just loaded the saved order, we need to fetch.
-    const hasData =
-      Object.keys(reportData.photoData?.capturedImages || {}).length > 0;
-    if (reportId && !hasData) {
-      fetchExistingPhotoData();
+    // Check if we should load data
+    // If we have reportId, we should check/sync, unless we are certain we have latest
+    // Using simple heuristic: if reportId exists, fetch unless specifically blocked
+    if (reportId) {
+      // If we already have local data (e.g. from QR scan initial load), we assume it's an update
+      const hasLocalData =
+        Object.keys(reportData.photoData?.capturedImages || {}).length > 0;
+
+      if (!hasLocalData) {
+        fetchExistingPhotoData();
+      } else {
+        // Data exists locally (from QR hydration likely), so it is an Update scenario
+        setIsUpdateMode(true);
+      }
     }
   }, [reportId]);
 
   // 3. Save Handler
   const handleSavePhotoData = async () => {
     if (!isReportSaved || !reportId) {
-      alert("Please save the Order information first.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Please save Order information first."
+      });
       return;
     }
 
@@ -123,9 +208,6 @@ const YPivotQAInspectionPhotoDataSave = ({
 
       const payloadData = relevantSections
         .map((section) => {
-          // Find items in this section that have data (images or remarks)
-          // OR simply iterate all items defined in the config to be safe
-
           const processedItems = section.itemList.map((item) => {
             const itemKeyBase = `${section._id}_${item.no}`;
 
@@ -175,9 +257,7 @@ const YPivotQAInspectionPhotoDataSave = ({
             };
           });
 
-          // Filter out items that are completely empty to save DB space?
-          // Or keep them to show empty state next time?
-          // Let's keep items if they have remarks OR images.
+          // Keep items if they have remarks OR images.
           const itemsWithData = processedItems.filter(
             (i) => i.remarks || i.images.length > 0
           );
@@ -199,11 +279,22 @@ const YPivotQAInspectionPhotoDataSave = ({
       );
 
       if (res.data.success) {
-        alert("Photo data saved successfully!");
+        setIsUpdateMode(true);
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: isUpdateMode
+            ? "Photo Data Updated Successfully!"
+            : "Photo Data Saved Successfully!"
+        });
       }
     } catch (error) {
       console.error("Error saving photo data:", error);
-      alert("Failed to save photo data.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Failed to save photo data."
+      });
     } finally {
       setSaving(false);
     }
@@ -285,7 +376,7 @@ const YPivotQAInspectionPhotoDataSave = ({
         onUpdatePhotoData={onUpdatePhotoData}
       />
 
-      {/* 3. Floating Save Button */}
+      {/* 3. Floating Save/Update Button */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
         <div className="max-w-8xl mx-auto flex justify-end">
           <button
@@ -294,27 +385,47 @@ const YPivotQAInspectionPhotoDataSave = ({
             className={`
               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
               ${
-                isReportSaved
-                  ? "bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
-                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                !isReportSaved
+                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                  : isUpdateMode
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  : "bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white"
               }
             `}
-            title={!isReportSaved ? "Save Order Data first" : "Save Photo Data"}
+            title={
+              !isReportSaved
+                ? "Save Order Data first"
+                : isUpdateMode
+                ? "Update Photo Data"
+                : "Save Photo Data"
+            }
           >
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Saving...
+                {isUpdateMode ? "Updating..." : "Saving..."}
               </>
             ) : (
               <>
-                <Save className="w-5 h-5" />
-                Save Photo Data
+                {isUpdateMode ? (
+                  <Edit3 className="w-5 h-5" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                {isUpdateMode ? "Update Photo Data" : "Save Photo Data"}
               </>
             )}
           </button>
         </div>
       </div>
+
+      {/* 4. Status Modal */}
+      <AutoDismissModal
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        type={statusModal.type}
+        message={statusModal.message}
+      />
     </div>
   );
 };
