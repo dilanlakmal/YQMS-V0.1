@@ -506,32 +506,91 @@ const normalizeImageUrl = (imageUrl) => {
   return `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
 };
 
+// Helper function to ensure string is never empty (for React PDF compatibility)
+const safeString = (value, fallback = "N/A") => {
+  if (value === null || value === undefined) return fallback;
+  if (typeof value === 'string' && value.trim() === '') return fallback;
+  return String(value);
+};
+
 const EMBReportPDF = ({ report, isPrinting = false }) => {
   if (!report) {
     console.warn("EMBReportPDF: No report data provided");
     return null;
   }
 
-  // Debug: Log report data only when printing
-  if (isPrinting) {
-    console.log("EMBReportPDF - Report data:", {
-      inspectionType: report.inspectionType,
-      reportType: report.reportType,
-      inspectionDate: report.inspectionDate,
-      factoryName: report.factoryName,
-      moNo: report.moNo,
-      totalPcs: report.totalPcs,
-      defectsQty: report.defectsQty,
-      result: report.result,
-      hasAqlData: !!report.aqlData,
-      hasDefects: !!report.defects && report.defects.length > 0,
-      hasChecklist: !!report.checklist,
-      hasPhotos: !!report.photos,
-      photosKeys: report.photos ? Object.keys(report.photos) : [],
-      photosCount: report.photos ? Object.keys(report.photos).length : 0,
-      photosStructure: report.photos ? typeof report.photos : "none"
-    });
-  }
+  // CRITICAL: Sanitize the entire report object to ensure NO empty strings
+  const sanitizeValue = (value, fallback = "N/A") => {
+    if (value === null || value === undefined) return fallback;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      return trimmed === '' ? fallback : trimmed;
+    }
+    if (typeof value === 'number') return String(value);
+    return String(value);
+  };
+
+  // Helper to sanitize arrays - filter out empty strings and join, or return fallback
+  const sanitizeArray = (arr, fallback = "N/A") => {
+    if (!arr) return fallback;
+    if (!Array.isArray(arr)) return sanitizeValue(arr, fallback);
+    const filtered = arr.filter(item => item && String(item).trim() !== '');
+    return filtered.length > 0 ? filtered.map(item => sanitizeValue(item)).join(", ") : fallback;
+  };
+
+  // Deep sanitize the report to prevent any empty strings
+  const sanitizedReport = {
+    // DO NOT spread report here - only include explicitly sanitized fields
+    _id: sanitizeValue(report._id),
+    inspectionType: sanitizeValue(report.inspectionType, "First Output"),
+    reportType: sanitizeValue(report.reportType, "EMB"),
+    moNo: sanitizeValue(report.moNo),
+    status: sanitizeValue(report.status, "Pending"),
+    result: sanitizeValue(report.result, "Pending"),
+    factoryName: sanitizeValue(report.factoryName),
+    inspector: sanitizeValue(report.inspector),
+    buyer: sanitizeValue(report.buyer),
+    buyerStyle: sanitizeValue(report.buyerStyle),
+    color: sanitizeArray(report.color),
+    skuNumber: sanitizeArray(report.skuNumber),
+    remarks: sanitizeValue(report.remarks),
+    inspectionDate: report.inspectionDate,
+    inspectionTime: report.inspectionTime,
+    totalPcs: String(report.totalPcs || 0),
+    totalOrderQty: String(report.totalOrderQty || 0),
+    defectsQty: String(report.defectsQty || 0),
+    embDetails: report.embDetails ? {
+      speed: sanitizeValue(report.embDetails.speed),
+      stitch: sanitizeValue(report.embDetails.stitch),
+      needleSize: sanitizeValue(report.embDetails.needleSize),
+      machineNo: sanitizeValue(report.embDetails.machineNo)
+    } : null,
+    printingDetails: report.printingDetails ? {
+      method: sanitizeValue(report.printingDetails.method),
+      curingTime: sanitizeValue(report.printingDetails.curingTime),
+      curingPressure: sanitizeValue(report.printingDetails.curingPressure)
+    } : null,
+    aqlData: report.aqlData ? {
+      sampleSize: String(report.aqlData.sampleSize || 0),
+      level: sanitizeValue(report.aqlData.level, "II"),
+      ac: report.aqlData.ac,
+      re: report.aqlData.re
+    } : null,
+    checklist: report.checklist || {},
+    defects: report.defects ? report.defects.map(defect => ({
+      category: sanitizeValue(defect.category),
+      name: sanitizeValue(defect.name),
+      defectType: sanitizeValue(defect.defectType),
+      qty: defect.qty || defect.count || 0,
+      machineNo: sanitizeValue(defect.machineNo),
+      remarks: sanitizeValue(defect.remarks),
+      image: defect.image
+    })) : [],
+    photos: report.photos || {}
+  };
+
+  // Use sanitizedReport instead of report from here on
+  const workingReport = sanitizedReport;
 
   const formatDate = (dateString) => {
     if (!dateString) return "N/A";
@@ -570,7 +629,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
   };
 
   const formatTime = (timeString) => {
-    return timeString || "N/A";
+    return safeString(timeString);
   };
 
   const formatInspectionDateTime = (dateString, timeString) => {
@@ -660,13 +719,13 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
   // Calculate defect counts by category
   const calculateDefectCounts = () => {
-    if (!report.defects || report.defects.length === 0) {
+    if (!workingReport.defects || workingReport.defects.length === 0) {
       return { critical: 0, major: 0, minor: 0 };
     }
     
     let critical = 0, major = 0, minor = 0;
-    report.defects.forEach(defect => {
-      const category = defect.category?.toLowerCase() || "";
+    workingReport.defects.forEach(defect => {
+      const category = (defect.category || "minor").toLowerCase();
       const qty = defect.qty || defect.count || 0;
       
       if (category.includes("critical")) {
@@ -698,17 +757,22 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
   // Helper function to group photos by category - only first photo per category (matching EMBInspectionView)
   const groupPhotosByCategory = () => {
-    if (!report.photos) return [];
+    if (!workingReport.photos) return [];
     
     const categories = [];
     
     // Get all photo categories - Object.keys() preserves insertion order in modern JavaScript
-    const photoKeys = Object.keys(report.photos);
+    const photoKeys = Object.keys(workingReport.photos);
     
     // Process each category and get only the first photo
-    photoKeys.forEach(categoryId => {
-      const category = report.photos[categoryId];
-      const categoryTitle = category?.categoryTitle || categoryId;
+    photoKeys.forEach((categoryId, index) => {
+      // Skip if categoryId is empty or invalid
+      if (!categoryId || (typeof categoryId === 'string' && categoryId.trim() === '')) {
+        return;
+      }
+      
+      const category = workingReport.photos[categoryId];
+      const categoryTitle = safeString(category?.categoryTitle || categoryId, `Category ${index + 1}`);
       let photos = [];
       
       if (Array.isArray(category?.photos)) {
@@ -722,13 +786,21 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
         const firstPhoto = photos[0];
         const rawImageUrl = firstPhoto.url || firstPhoto.preview || firstPhoto;
         if (rawImageUrl && typeof rawImageUrl === 'string') {
+          // Sanitize photo description - empty string becomes null to prevent rendering
+          const photoDescription = firstPhoto.description && typeof firstPhoto.description === 'string' && firstPhoto.description.trim() !== '' 
+            ? firstPhoto.description.trim() 
+            : null;
+          
           categories.push({
-            categoryId,
+            categoryId: safeString(categoryId, `cat-${index + 1}`),
             categoryTitle,
             photos: [{
-              ...firstPhoto,
+              // Don't spread photo - explicitly include only safe fields
+              url: firstPhoto.url,
+              preview: firstPhoto.preview,
+              description: photoDescription,
               categoryTitle,
-              categoryId,
+              categoryId: safeString(categoryId, `cat-${index + 1}`),
               rawImageUrl,
               index: 0
             }],
@@ -791,25 +863,34 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
     }, 0);
   };
 
-  // Split categories into pages: 2 columns, 4-6 photos per page (matching EMBInspectionView.jsx)
+  // Split categories into pages: 2 columns, max 2 rows per page (4 photos max) to avoid blank pages
   const splitCategoriesIntoPages = (categories) => {
     const pages = [];
-    const MAX_PHOTOS_PER_PAGE = 6; // 2 columns x 3 rows = 6 photos max per page
+    const MAX_PHOTOS_PER_PAGE = 4; // 2 columns x 2 rows = 4 photos max per page (prevents blank pages)
     
-    categories.forEach((category) => {
+    categories.forEach((category, index) => {
+      // Ensure categoryTitle and categoryId are never empty
+      const safeCat = {
+        ...category,
+        categoryId: safeString(category.categoryId, `cat-${index + 1}`),
+        categoryTitle: safeString(category.categoryTitle, safeString(category.categoryId, `Category ${index + 1}`)),
+        displayPhotos: category.photos
+      };
+      
       // Each category has only 1 photo (first photo only)
       if (pages.length === 0) {
-        pages.push([{ ...category, displayPhotos: category.photos }]);
+        pages.push([safeCat]);
       } else {
         const currentPage = pages[pages.length - 1];
         const currentPagePhotoCount = getPagePhotoCount(currentPage);
         
-        // If adding this category would exceed max photos per page, create new page
-        if (currentPagePhotoCount + category.photos.length > MAX_PHOTOS_PER_PAGE) {
-          pages.push([{ ...category, displayPhotos: category.photos }]);
+        // If current page is full (has 4 photos = 2 rows), create new page
+        // This ensures only 2 rows per page, preventing blank pages
+        if (currentPagePhotoCount >= MAX_PHOTOS_PER_PAGE) {
+          pages.push([safeCat]);
         } else {
-          // Add to current page
-          currentPage.push({ ...category, displayPhotos: category.photos });
+          // Add to current page (will have max 2 rows = 4 photos)
+          currentPage.push(safeCat);
         }
       }
     });
@@ -824,12 +905,12 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
   
   const photoPages = splitCategoriesIntoPages(photoCategories);
   
-  // Split defects into pages: 2 columns, 6 defects per page
+  // Split defects into pages: 2 columns, max 2 rows per page (4 defects max) to avoid blank pages
   const splitDefectsIntoPages = (defects) => {
     if (!defects || defects.length === 0) return [];
     
     const pages = [];
-    const MAX_DEFECTS_PER_PAGE = 6; // 2 columns x 3 rows = 6 defects max per page
+    const MAX_DEFECTS_PER_PAGE = 4; // 2 columns x 2 rows = 4 defects max per page (prevents blank pages)
     
     for (let i = 0; i < defects.length; i += MAX_DEFECTS_PER_PAGE) {
       pages.push(defects.slice(i, i + MAX_DEFECTS_PER_PAGE));
@@ -838,24 +919,11 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
     return pages;
   };
   
-  const defectsPages = splitDefectsIntoPages(report.defects || []);
+  const defectsPages = splitDefectsIntoPages(workingReport.defects || []);
   
   // Calculate total pages: Header+Inspection Details (1) + Checklists (1 if exists) + Photo pages + Defects pages + Conclusion (1)
-  const hasChecklists = report.checklist && Object.keys(report.checklist).length > 0;
+  const hasChecklists = workingReport.checklist && Object.keys(workingReport.checklist).length > 0;
   const totalPages = 1 + (hasChecklists ? 1 : 0) + photoPages.length + defectsPages.length + 1;
-
-  // Debug: Log photo information
-  if (isPrinting) {
-    console.log("EMBReportPDF - Photo Debug:", {
-      totalPhotos,
-      totalCategories: photoCategories.length,
-      categories: photoCategories.map(cat => ({
-        title: cat.categoryTitle,
-        photoCount: cat.photos.length
-      })),
-      totalPages
-    });
-  }
 
   return (
     <Document>
@@ -873,22 +941,22 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
               </View>
               <View style={styles.headerTextContainer}>
                 <Text style={styles.title}>
-                  {`${report.inspectionType || "First Output"}${report.reportType === "EMB + Print" ? " - EMB + Print" : report.reportType === "Printing" ? " - Printing" : " - EMB"}`}
+                  {`${workingReport.inspectionType}${workingReport.reportType === "EMB + Print" ? " - EMB + Print" : workingReport.reportType === "Printing" ? " - Printing" : " - EMB"}`}
                 </Text>
                 <Text style={styles.inspectionNumbers}>
-                  {`Inspection #: ${report.moNo || "N/A"} | Group #: ${report._id?.slice(-6) || "N/A"}`}
+                  {`Inspection #: ${workingReport.moNo} | Group #: ${workingReport._id && workingReport._id.length >= 6 ? workingReport._id.slice(-6) : workingReport._id}`}
                 </Text>
               </View>
             </View>
             <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-              <View style={getStatusButtonStyle(report.status)}>
+              <View style={getStatusButtonStyle(workingReport.status)}>
                 <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "bold" }}>
-                  {report.status || "Pending"}
+                  {workingReport.status}
                 </Text>
               </View>
-              <View style={getResultButtonStyle(report.result)}>
+              <View style={getResultButtonStyle(workingReport.result)}>
                 <Text style={{ color: "#ffffff", fontSize: 11, fontWeight: "bold" }}>
-                  {report.result || "Pending"}
+                  {workingReport.result}
                 </Text>
               </View>
             </View>
@@ -904,11 +972,11 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
           <View style={styles.dateHeaderRow}>
             <View style={styles.dateHeaderItem}>
               <Text style={styles.dateHeaderLabel}>Scheduled Inspection Date:</Text>
-              <Text style={styles.dateHeaderValue}>{formatDateTime(report.inspectionDate)}</Text>
+              <Text style={styles.dateHeaderValue}>{formatDateTime(workingReport.inspectionDate)}</Text>
             </View>
             <View style={styles.dateHeaderItem}>
               <Text style={styles.dateHeaderLabel}>Inspection Time:</Text>
-              <Text style={styles.dateHeaderValue}>{formatInspectionDateTime(report.inspectionDate, report.inspectionTime)}</Text>
+              <Text style={styles.dateHeaderValue}>{formatInspectionDateTime(workingReport.inspectionDate, workingReport.inspectionTime)}</Text>
             </View>
           
           </View>
@@ -917,87 +985,83 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Report Type:</Text>
               <Text style={styles.twoColumnValue}>
-                {`${report.inspectionType || "First Output"} - ${report.reportType || "EMB"}`}
+                {`${workingReport.inspectionType} - ${workingReport.reportType}`}
               </Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Factory Name:</Text>
-              <Text style={styles.twoColumnValue}>{report.factoryName || "N/A"}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.factoryName}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Inspector:</Text>
-              <Text style={styles.twoColumnValue}>{report.inspector || "N/A"}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.inspector}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>MO Number:</Text>
-              <Text style={styles.twoColumnValue}>{report.moNo || "N/A"}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.moNo}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Buyer:</Text>
-              <Text style={styles.twoColumnValue}>{report.buyer || "N/A"}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.buyer}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Buyer Style:</Text>
-              <Text style={styles.twoColumnValue}>{report.buyerStyle || "N/A"}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.buyerStyle}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Color:</Text>
-              <Text style={styles.twoColumnValue}>
-                {Array.isArray(report.color) ? report.color.join(", ") : report.color || "N/A"}
-              </Text>
+              <Text style={styles.twoColumnValue}>{workingReport.color}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>SKU #:</Text>
-              <Text style={styles.twoColumnValue}>
-                {Array.isArray(report.skuNumber) ? report.skuNumber.join(", ") : report.skuNumber || "N/A"}
-              </Text>
+              <Text style={styles.twoColumnValue}>{workingReport.skuNumber}</Text>
             </View>
           
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Sample Inspected:</Text>
-              <Text style={styles.twoColumnValue}>{report.aqlData?.sampleSize || report.totalPcs || 0}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.aqlData?.sampleSize || workingReport.totalPcs}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Total PO Items Qty:</Text>
-              <Text style={styles.twoColumnValue}>{report.totalOrderQty || 0}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.totalOrderQty}</Text>
             </View>
             <View style={styles.twoColumnRow}>
               <Text style={styles.twoColumnLabel}>Inspected Qty (Pcs):</Text>
-              <Text style={styles.twoColumnValue}>{report.totalPcs || 0}</Text>
+              <Text style={styles.twoColumnValue}>{workingReport.totalPcs}</Text>
             </View>
-            {(report.reportType === "EMB" || report.reportType === "EMB + Print") && report.embDetails && (
+            {(workingReport.reportType === "EMB" || workingReport.reportType === "EMB + Print") && workingReport.embDetails && (
               <>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>EMB Speed:</Text>
-                  <Text style={styles.twoColumnValue}>{report.embDetails.speed || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.embDetails.speed}</Text>
                 </View>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>EMB Stitch:</Text>
-                  <Text style={styles.twoColumnValue}>{report.embDetails.stitch || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.embDetails.stitch}</Text>
                 </View>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>EMB Needle Size:</Text>
-                  <Text style={styles.twoColumnValue}>{report.embDetails.needleSize || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.embDetails.needleSize}</Text>
                 </View>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>EMB Machine No:</Text>
-                  <Text style={styles.twoColumnValue}>{report.embDetails.machineNo || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.embDetails.machineNo}</Text>
                 </View>
               </>
             )}
-            {(report.reportType === "Printing" || report.reportType === "EMB + Print") && report.printingDetails && (
+            {(workingReport.reportType === "Printing" || workingReport.reportType === "EMB + Print") && workingReport.printingDetails && (
               <>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>Printing Method:</Text>
-                  <Text style={styles.twoColumnValue}>{report.printingDetails.method || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.printingDetails.method}</Text>
                 </View>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>Curing Time:</Text>
-                  <Text style={styles.twoColumnValue}>{report.printingDetails.curingTime || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.printingDetails.curingTime}</Text>
                 </View>
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>Curing Pressure:</Text>
-                  <Text style={styles.twoColumnValue}>{report.printingDetails.curingPressure || "N/A"}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.printingDetails.curingPressure}</Text>
                 </View>
               </>
             )}
@@ -1006,13 +1070,13 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>Page 1 of {totalPages}</Text>
+          <Text>Page 1 of {String(totalPages || 1)}</Text>
           <Text>Powered by YaiKh</Text>
         </View>
       </Page>
 
       {/* Page 2: Checklists Section (if exists) */}
-      {report.checklist && Object.keys(report.checklist).length > 0 && (
+      {workingReport.checklist && Object.keys(workingReport.checklist).length > 0 && (
         <Page size="A4" style={styles.page}>
           <View style={styles.checklistSection}>
             <View style={styles.sectionHeader}>
@@ -1020,12 +1084,12 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             </View>
             <View style={styles.contentSection}>
               {checklistItems.map((item) => {
-                const value = report.checklist[item.key];
-                if (!value) return null;
+                const value = workingReport.checklist[item.key];
+                if (!value || (typeof value === 'string' && value.trim() === '')) return null;
                 return (
                   <View key={item.key} style={styles.checklistRow}>
                     <Text style={styles.checklistLabel}>{item.label}:</Text>
-                    <Text style={styles.checklistValue}>{value}</Text>
+                    <Text style={styles.checklistValue}>{safeString(value)}</Text>
                   </View>
                 );
               })}
@@ -1034,7 +1098,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
           {/* Footer */}
           <View style={styles.footer}>
-            <Text>Page {hasChecklists ? 2 : 1} of {totalPages}</Text>
+            <Text>Page {String(hasChecklists ? 2 : 1)} of {String(totalPages || 1)}</Text>
             <Text>Powered by YaiKh</Text>
           </View>
         </Page>
@@ -1054,7 +1118,9 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             {/* Photos Section */}
             <View>
               <View style={styles.sectionHeader}>
-                <Text style={{ color: "#ffffff" }}>Photos{pageIndex > 0 ? " (Continued)" : ""}</Text>
+                <Text style={{ color: "#ffffff" }}>
+                  {pageIndex > 0 ? "Photos (Continued)" : "Photos"}
+                </Text>
               </View>
               <View style={[styles.contentSection, { padding: 20, paddingTop: 20 }]}>
                 
@@ -1073,16 +1139,19 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
                   
                   return rows.map((row, rowIndex) => (
                     <View key={`row-${rowIndex}`} style={{ flexDirection: "row", marginBottom: 20, gap: 20 }}>
-                      {row.map((category) => {
+                      {row.map((category, catIndex) => {
                         const photo = category.displayPhotos[0];
                         if (!photo) return null;
                         
                         const imageUrl = normalizeImageUrl(photo.rawImageUrl);
                         if (!imageUrl) return null;
                         
+                        // Ensure we have a safe categoryId for the key
+                        const safeCategoryId = category.categoryId;
+                        
                         return (
                           <View 
-                            key={`category-${category.categoryId}`} 
+                            key={`category-${safeCategoryId}`} 
                             style={{
                               width: "48%"
                             }}
@@ -1138,7 +1207,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text>Page {hasChecklists ? pageIndex + 3 : pageIndex + 2} of {totalPages}</Text>
+              <Text>Page {String(hasChecklists ? pageIndex + 3 : pageIndex + 2)} of {String(totalPages || 1)}</Text>
               <Text>Powered by YaiKh</Text>
             </View>
           </Page>
@@ -1154,7 +1223,9 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             {/* Defects Section */}
             <View>
               <View style={styles.sectionHeader}>
-                <Text style={{ color: "#ffffff" }}>Defects{pageIndex > 0 ? " (Continued)" : ""}</Text>
+                <Text style={{ color: "#ffffff" }}>
+                  {pageIndex > 0 ? "Defects (Continued)" : "Defects"}
+                </Text>
               </View>
               <View style={[styles.contentSection, { padding: 20, paddingTop: 20 }]}>
                 {/* Display defects in 2-column grid */}
@@ -1190,7 +1261,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
                                 color: "#374151",
                                 textAlign: "center"
                               }}>
-                                {`${defect.category || "N/A"} - ${defect.name || defect.defectType || "N/A"}`}
+                                {`${defect.category} - ${defect.defectType || defect.name}`}
                               </Text>
                             </View>
                             
@@ -1231,23 +1302,23 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
                             ]}>
                               <View style={styles.defectInfoRow}>
                                 <Text style={styles.defectInfoLabel}>Category:</Text>
-                                <Text style={styles.defectInfoValue}>{defect.category || "N/A"}</Text>
+                                <Text style={styles.defectInfoValue}>{defect.category}</Text>
                               </View>
                               <View style={styles.defectInfoRow}>
                                 <Text style={styles.defectInfoLabel}>Defect Type:</Text>
-                                <Text style={styles.defectInfoValue}>{defect.defectType || defect.name || "N/A"}</Text>
+                                <Text style={styles.defectInfoValue}>{defect.defectType || defect.name}</Text>
                               </View>
                               <View style={styles.defectInfoRow}>
                                 <Text style={styles.defectInfoLabel}>Quantity:</Text>
-                                <Text style={styles.defectInfoValue}>{defect.qty || defect.count || 0}</Text>
+                                <Text style={styles.defectInfoValue}>{String(defect.qty)}</Text>
                               </View>
-                              {defect.machineNo && (
+                              {defect.machineNo && defect.machineNo !== "N/A" && (
                                 <View style={styles.defectInfoRow}>
                                   <Text style={styles.defectInfoLabel}>Machine No:</Text>
                                   <Text style={styles.defectInfoValue}>{defect.machineNo}</Text>
                                 </View>
                               )}
-                              {defect.remarks && defect.remarks.trim() !== "" && (
+                              {defect.remarks && defect.remarks !== "N/A" && (
                                 <View style={styles.defectRemarks}>
                                   <View style={styles.defectRemarksRow}>
                                     <Text style={styles.defectRemarksLabel}>Remarks:</Text>
@@ -1267,7 +1338,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
             {/* Footer */}
             <View style={styles.footer}>
-              <Text>Page {hasChecklists ? photoPages.length + pageIndex + 3 : photoPages.length + pageIndex + 2} of {totalPages}</Text>
+              <Text>Page {String(hasChecklists ? photoPages.length + pageIndex + 3 : photoPages.length + pageIndex + 2)} of {String(totalPages || 1)}</Text>
               <Text>Powered by YaiKh</Text>
             </View>
           </Page>
@@ -1284,14 +1355,14 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             {/* Inspection Result Bar */}
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Inspection Result</Text>
-              <Text style={[styles.conclusionValue, getResultTextStyle(report.result)]}>
-                {report.result || "Pending"}
+              <Text style={[styles.conclusionValue, getResultTextStyle(workingReport.result)]}>
+                {workingReport.result}
               </Text>
             </View>
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Approval Status</Text>
-              <Text style={[styles.conclusionValue, getResultTextStyle(report.result)]}>
-                {report.result === "Pass" ? "Accepted" : report.result === "Reject" ? "Rejected" : "Pending"}
+              <Text style={[styles.conclusionValue, getResultTextStyle(workingReport.result)]}>
+                {workingReport.result === "Pass" ? "Accepted" : workingReport.result === "Reject" ? "Rejected" : "Pending"}
               </Text>
             </View>
 
@@ -1305,20 +1376,20 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
               </View>
               <View style={styles.twoColumnRow}>
                 <Text style={styles.twoColumnLabel}>Packing, Packaging & Labelling</Text>
-                <View style={[styles.badge, getResultBadgeStyle(report.packingResult)]}>
-                  <Text>{report.packingResult || "N/A"}</Text>
+                <View style={[styles.badge, getResultBadgeStyle(workingReport.packingResult)]}>
+                  <Text>{safeString(workingReport.packingResult)}</Text>
                 </View>
               </View>
               <View style={styles.twoColumnRow}>
                 <Text style={styles.twoColumnLabel}>Workmanship</Text>
-                <View style={[styles.badge, getResultBadgeStyle(report.workmanshipResult)]}>
-                  <Text>{report.workmanshipResult || "N/A"}</Text>
+                <View style={[styles.badge, getResultBadgeStyle(workingReport.workmanshipResult)]}>
+                  <Text>{safeString(workingReport.workmanshipResult)}</Text>
                 </View>
               </View>
               <View style={styles.twoColumnRow}>
                 <Text style={styles.twoColumnLabel}>Quality Plan</Text>
-                <View style={[styles.badge, getResultBadgeStyle(report.qualityPlanResult)]}>
-                  <Text>{report.qualityPlanResult || "N/A"}</Text>
+                <View style={[styles.badge, getResultBadgeStyle(workingReport.qualityPlanResult)]}>
+                  <Text>{safeString(workingReport.qualityPlanResult)}</Text>
                 </View>
               </View>
             </View> */}
@@ -1355,12 +1426,12 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             <View style={{ marginTop: 10 }}>
               <View style={styles.twoColumnRow}>
                 <Text style={styles.twoColumnLabel}>Total Defective Units:</Text>
-                <Text style={styles.twoColumnValue}>{report.defectsQty || 0}</Text>
+                <Text style={styles.twoColumnValue}>{workingReport.defectsQty}</Text>
               </View>
-              {report.remarks && report.remarks !== "NA" && (
+              {workingReport.remarks && workingReport.remarks !== "N/A" && (
                 <View style={styles.twoColumnRow}>
                   <Text style={styles.twoColumnLabel}>Comments:</Text>
-                  <Text style={styles.twoColumnValue}>{report.remarks}</Text>
+                  <Text style={styles.twoColumnValue}>{workingReport.remarks}</Text>
                 </View>
               )}
             </View>
@@ -1369,7 +1440,7 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text>Page {totalPages} of {totalPages}</Text>
+          <Text>Page {String(totalPages || 1)} of {String(totalPages || 1)}</Text>
           <Text>Powered by YaiKh</Text>
         </View>
       </Page>
@@ -1382,12 +1453,12 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
           <View style={styles.contentSection}>
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Total Defective Units</Text>
-              <Text style={styles.conclusionValue}>{report.defectsQty || 0}</Text>
+              <Text style={styles.conclusionValue}>{String(workingReport.defectsQty || 0)}</Text>
             </View>
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Inspection Result</Text>
-              <View style={[styles.badge, getResultBadgeStyle(report.packingResult)]}>
-                <Text>{report.packingResult || "N/A"}</Text>
+              <View style={[styles.badge, getResultBadgeStyle(workingReport.packingResult)]}>
+                <Text>{safeString(workingReport.packingResult)}</Text>
               </View>
             </View>
           </View>
@@ -1412,12 +1483,12 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
               </View>
               <View style={styles.aqlRow}>
                 <Text style={[styles.aqlCell, { width: "20%" }]}>normal</Text>
-                <Text style={[styles.aqlCell, { width: "15%" }]}>{report.aqlData?.level || "II"}</Text>
+                <Text style={[styles.aqlCell, { width: "15%" }]}>{safeString(workingReport.aqlData?.level, "II")}</Text>
                 <Text style={[styles.aqlCell, { width: "13%" }]}>0.010</Text>
                 <Text style={[styles.aqlCell, { width: "13%" }]}>1.500</Text>
                 <Text style={[styles.aqlCell, { width: "13%" }]}>0.010</Text>
-                <Text style={[styles.aqlCell, { width: "13%" }]}>{report.totalPcs || 0}</Text>
-                <Text style={[styles.aqlCell, { width: "13%" }]}>{report.aqlData?.sampleSize || 0}</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>{String(workingReport.totalPcs || 0)}</Text>
+                <Text style={[styles.aqlCell, { width: "13%" }]}>{String(workingReport.aqlData?.sampleSize || 0)}</Text>
               </View>
             </View>
 
@@ -1459,12 +1530,12 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             Total Defective Units & Result
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Total Defective Units</Text>
-              <Text style={styles.conclusionValue}>{report.defectsQty || 0}</Text>
+              <Text style={styles.conclusionValue}>{String(workingReport.defectsQty || 0)}</Text>
             </View>
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Inspection Result</Text>
-              <View style={[styles.badge, getResultBadgeStyle(report.workmanshipResult)]}>
-                <Text>{report.workmanshipResult || "N/A"}</Text>
+              <View style={[styles.badge, getResultBadgeStyle(workingReport.workmanshipResult)]}>
+                <Text>{safeString(workingReport.workmanshipResult)}</Text>
               </View>
             </View>
           </View>
@@ -1482,8 +1553,8 @@ const EMBReportPDF = ({ report, isPrinting = false }) => {
             </View>
             <View style={styles.conclusionBar}>
               <Text style={styles.conclusionLabel}>Inspection Result</Text>
-              <View style={[styles.badge, getResultBadgeStyle(report.qualityPlanResult)]}>
-                <Text>{report.qualityPlanResult || "N/A"}</Text>
+              <View style={[styles.badge, getResultBadgeStyle(workingReport.qualityPlanResult)]}>
+                <Text>{safeString(workingReport.qualityPlanResult)}</Text>
               </View>
             </View>
           </View>
