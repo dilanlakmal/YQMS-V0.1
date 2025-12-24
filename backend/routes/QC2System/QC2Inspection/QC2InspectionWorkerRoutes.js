@@ -6,7 +6,7 @@ import {
 
 const router = express.Router();
 
-router.get('/api/qc2-workers-data/log-scan', getWorkerdate);
+router.post('/api/qc2-workers-data/log-scan', getWorkerdate);
 router.get('/api/qc2-workers-data/today/:qc_id', getWorkerCurrentData);
 
 export default router;

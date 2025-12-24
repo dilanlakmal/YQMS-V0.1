@@ -18,6 +18,14 @@ import QRCodePreview from "../components/forms/QRCodePreview";
 import ReprintTab from "../components/forms/ReprintTab";
 import BundleRegistrationRecordData from "../components/inspection/qc2/BundleRegistrationRecordData";
 import BundleRegistrationTabData from "../components/inspection/qc2/BundleRegistrationTabData";
+import {
+  Sparkles,
+  User,
+  ClipboardCheck as ClipboardCheckLucide,
+  Database as DatabaseLucide,
+  RotateCcw,
+  Package
+} from "lucide-react";
 
 function BundleRegistration() {
   const { t } = useTranslation();
@@ -54,7 +62,6 @@ function BundleRegistration() {
   const [hasSizes, setHasSizes] = useState(false);
 
   const savedContextData = persistedFormData.bundleRegistration;
-
   const [formData, setFormData] = useState(() => {
     const today = new Date();
     return {
@@ -85,16 +92,43 @@ function BundleRegistration() {
   const [subConNameState, setSubConNameState] = useState(
     () => savedContextData?.subConName || ""
   );
-
   const [estimatedTotal, setEstimatedTotal] = useState(null);
   const bluetoothComponentRef = useRef();
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editRecordId, setEditRecordId] = useState(null);
+
   const isMobileDevice = useMemo(
     () => /Mobi|Android/i.test(navigator.userAgent),
     []
   );
+
   const memoizedQrData = useMemo(() => qrData, [qrData]);
+
+  // Define tabs with modern icons
+  const tabs = useMemo(() => [
+    {
+      id: "registration",
+      label: t("bundle.registration"),
+      icon: <ClipboardCheckLucide size={20} />,
+      description: "Bundle Registration Form"
+    },
+    {
+      id: "data",
+      label: t("bundle.data"),
+      icon: <DatabaseLucide size={20} />,
+      description: "View Registration Data"
+    },
+    {
+      id: "reprint",
+      label: t("bundle.reprint"),
+      icon: <RotateCcw size={20} />,
+      description: "Reprint Bundle Labels"
+    }
+  ], [t]);
+
+  const activeTabData = useMemo(() => {
+    return tabs.find((tab) => tab.id === activeTab);
+  }, [activeTab, tabs]);
 
   // Effect to fetch sub-con factories
   useEffect(() => {
@@ -113,6 +147,7 @@ function BundleRegistration() {
         console.error("Error fetching sub-con factories:", error);
       }
     };
+
     fetchFactories();
   }, []);
 
@@ -127,6 +162,7 @@ function BundleRegistration() {
       registrationType,
       selectedTaskNo
     };
+
     updateFormData("bundleRegistration", dataToPersist);
   }, [
     formData,
@@ -194,11 +230,13 @@ function BundleRegistration() {
         setTotalBundleQty(0);
         return;
       }
+
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/order-details/${formData.selectedMono}`
         );
         const data = await response.json();
+
         setFormData((prev) => ({
           ...prev,
           buyer: data.engName,
@@ -214,13 +252,16 @@ function BundleRegistration() {
           sizeOrderQty: "",
           planCutQty: ""
         }));
+
         const totalResponse = await fetch(
           `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
         );
         if (!totalResponse.ok)
           throw new Error("Failed to fetch total bundle quantity");
+
         const totalData = await totalResponse.json();
         setTotalBundleQty(totalData.total);
+
         if (data.colors && data.colors.length > 0) {
           setColors(data.colors);
           setHasColors(true);
@@ -239,6 +280,7 @@ function BundleRegistration() {
         setHasSizes(false);
       }
     };
+
     fetchOrderDetails();
   }, [formData.selectedMono]);
 
@@ -257,6 +299,7 @@ function BundleRegistration() {
         }));
         return;
       }
+
       try {
         const sizesResponse = await fetch(
           `${API_BASE_URL}/api/order-sizes/${formData.selectedMono}/${formData.color}`
@@ -266,6 +309,7 @@ function BundleRegistration() {
         if (sizesData && sizesData.length > 0) {
           setSizes(sizesData);
           setHasSizes(true);
+
           const currentSizeToFetch = formData.size || sizesData[0].size;
 
           // Fetch total count using the selected type
@@ -278,6 +322,7 @@ function BundleRegistration() {
             const selectedSizeDetails =
               sizesData.find((s) => s.size === currentSizeToFetch) ||
               sizesData[0];
+
             return {
               ...prev,
               size: currentSizeToFetch,
@@ -310,6 +355,7 @@ function BundleRegistration() {
         }));
       }
     };
+
     fetchSizesAndInitialCount();
   }, [formData.selectedMono, formData.color, formData.size, registrationType]);
 
@@ -325,6 +371,7 @@ function BundleRegistration() {
         const response = await fetch(
           `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}?type=${registrationType}`
         );
+
         if (!response.ok) {
           // If the API returns an error (like 400), don't update the count
           console.error(
@@ -332,6 +379,7 @@ function BundleRegistration() {
           );
           return;
         }
+
         const data = await response.json();
         setFormData((prev) => {
           // Only update if the value has actually changed to prevent re-renders
@@ -355,6 +403,7 @@ function BundleRegistration() {
   useEffect(() => {
     const fetchTotalBundleQtyPoll = async () => {
       if (!formData.selectedMono) return;
+
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/total-bundle-qty/${formData.selectedMono}`
@@ -367,6 +416,7 @@ function BundleRegistration() {
         console.error("Error polling total bundle quantity:", error);
       }
     };
+
     if (formData.selectedMono) {
       fetchTotalBundleQtyPoll();
       const interval = setInterval(fetchTotalBundleQtyPoll, 3000);
@@ -388,6 +438,7 @@ function BundleRegistration() {
       setEstimatedTotal(null);
       return;
     }
+
     const newEstimatedTotal =
       formData.totalGarmentsCount +
       parseInt(formData.count) * parseInt(formData.bundleQty);
@@ -398,6 +449,7 @@ function BundleRegistration() {
   useEffect(() => {
     const fetchUserBatches = async () => {
       if (!user) return;
+
       try {
         const response = await fetch(
           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -408,6 +460,7 @@ function BundleRegistration() {
         console.error("Error fetching user batches:", error);
       }
     };
+
     fetchUserBatches();
   }, [user]);
 
@@ -427,10 +480,12 @@ function BundleRegistration() {
       const lineNoNum = parseInt(formData.lineNo);
       return !isNaN(lineNoNum) && lineNoNum >= 1 && lineNoNum <= 30;
     }
+
     if (formData.department === "Washing") return formData.lineNo === "WS";
     if (formData.department === "Sub-con") return formData.lineNo === "SUB";
     if (!formData.department && formData.lineNo === "") return true;
     if (formData.lineNo === "") return false;
+
     return true;
   }, [formData.factoryInfo, formData.department, formData.lineNo]);
 
@@ -441,24 +496,30 @@ function BundleRegistration() {
       alert("User data is not available. Please try again.");
       return;
     }
+
     if (!validateLineNo()) {
       alert("Invalid or missing Line No for the selected department.");
       return;
     }
+
     if (!selectedTaskNo) {
       alert("Please select a valid Task No.");
       return;
     }
+
     const bundleQtyNum = parseInt(formData.bundleQty);
     const countNum = parseInt(formData.count);
+
     if (isNaN(bundleQtyNum) || bundleQtyNum <= 0) {
       alert("Bundle Qty must be a positive number.");
       return;
     }
+
     if (isNaN(countNum) || countNum <= 0) {
       alert("Count must be a positive number.");
       return;
     }
+
     if (
       estimatedTotal !== null &&
       formData.planCutQty > 0 &&
@@ -472,6 +533,7 @@ function BundleRegistration() {
         return;
       }
     }
+
     // --- End: Validations ---
 
     // Disable button immediately to prevent double clicks
@@ -484,6 +546,7 @@ function BundleRegistration() {
 
     let subConStatus = "No";
     let subConFactoryName = "N/A";
+
     if (formData.department === "Washing") {
       if (isSubConState) {
         subConStatus = "Yes";
@@ -541,7 +604,6 @@ function BundleRegistration() {
         // SUCCESS: Set QR data, which will show the Preview/Print buttons
         setQrData(savedData.data);
         // Keep the generate button disabled until the user prints or clears.
-
         // Refresh other data on screen
         const [totalBundleRes, totalGarmentsRes] = await Promise.all([
           fetch(
@@ -551,6 +613,7 @@ function BundleRegistration() {
             `${API_BASE_URL}/api/total-garments-count/${formData.selectedMono}/${formData.color}/${formData.size}?type=${registrationType}`
           )
         ]);
+
         const totalBundleData = await totalBundleRes.json();
         const totalGarmentsData = await totalGarmentsRes.json();
 
@@ -592,14 +655,17 @@ function BundleRegistration() {
       setIsGenerateDisabled(false);
       return;
     }
+
     try {
       setIsPrinting(true);
+
       for (const data of qrData) {
         await bluetoothComponentRef.current.printData({
           ...data,
           bundle_id: data.bundle_random_id
         });
       }
+
       setFormData((prev) => ({
         ...prev,
         size: "",
@@ -608,8 +674,10 @@ function BundleRegistration() {
         sizeOrderQty: "",
         planCutQty: ""
       }));
+
       setQrData([]);
       setIsGenerateDisabled(false);
+
       if (user) {
         const batchesResponse = await fetch(
           `${API_BASE_URL}/api/user-batches?emp_id=${user.emp_id}`
@@ -643,54 +711,221 @@ function BundleRegistration() {
     [editRecordId, userBatches]
   );
 
-  const PageTitle = useCallback(
-    () => (
-      <div className="text-center">
-        <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
-          Yorkmars (Cambodia) Garment MFG Co., LTD
-        </h1>
-        <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
-          {t("bundle.bundle_registration")}
-          {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
-        </p>
-      </div>
-    ),
-    [t, user]
-  );
-
-  const tabIcons = useMemo(
-    () => ({
-      registration: <FaClipboardCheck />,
-      data: <FaDatabase />,
-      reprint: <FaRedoAlt />
-    }),
-    []
-  );
+  const handleTabChange = (tabName) => {
+    setActiveTab(tabName);
+  };
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-100 text-gray-800">
-      {/* Mobile Layout */}
-      <div className="md:hidden flex flex-col h-screen">
-        <header className="bg-white shadow-md p-3 sticky top-0 z-20">
-          <PageTitle />
-          <div className="mt-3 flex space-x-1 justify-center">
-            {["registration", "data", "reprint"].map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`flex-1 px-3 py-2.5 text-xs rounded-lg font-semibold transition-all duration-150 focus:outline-none flex items-center justify-center space-x-1.5
-                  ${
-                    activeTab === tab
-                      ? "bg-indigo-600 text-white shadow-md"
-                      : "bg-slate-200 text-slate-700 hover:bg-slate-300"
-                  }`}
-              >
-                {tabIcons[tab]} <span>{t(`bundle.${tab}`)}</span>
-              </button>
-            ))}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
+      {/* Header Section */}
+      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
+          
+          {/* MOBILE/TABLET LAYOUT (< lg) */}
+          <div className="lg:hidden space-y-3">
+            {/* Top Row: Title + User */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                  <Package size={20} className="text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                      {t("bundle.bundle_registration")}
+                    </h1>
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
+                      <Sparkles size={10} className="text-yellow-300" />
+                      <span className="text-[10px] font-bold text-white">
+                        QC
+                      </span>
+                    </div>
+                  </div>
+                  {/* Active Tab Indicator - Inline with title */}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <div className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                    </div>
+                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                      {activeTabData?.label} • Active
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {user && (
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
+                    <User size={16} className="text-white" />
+                  </div>
+                  <div className="hidden sm:block">
+                    <p className="text-white font-bold text-xs leading-tight">
+                      {user.job_title || "Operator"}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      ID: {user.emp_id}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Main Tabs - Scrollable */}
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                        isActive
+                          ? "bg-white shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      <div
+                        className={`transition-colors duration-300 ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                                                   isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
-        </header>
-        <main className="flex-1 overflow-y-auto p-3">
+
+          {/* DESKTOP LAYOUT (>= lg) */}
+          <div className="hidden lg:flex lg:flex-col lg:gap-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-6 flex-1">
+                {/* Logo Area */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                    <Package size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h1 className="text-2xl font-black text-white tracking-tight">
+                        {t("bundle.bundle_registration")}
+                      </h1>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
+                        <Sparkles size={12} className="text-yellow-300" />
+                        <span className="text-xs font-bold text-white">
+                          QC
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-indigo-100 font-medium">
+                      Yorkmars (Cambodia) Garment MFG Co., LTD
+                    </p>
+                  </div>
+                </div>
+
+                {/* Navigation Bar */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                    {tabs.map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => handleTabChange(tab.id)}
+                          className={`group relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-300 ${
+                            isActive
+                              ? "bg-white shadow-lg scale-105"
+                              : "bg-transparent hover:bg-white/20 hover:scale-102"
+                          }`}
+                        >
+                          <div
+                            className={`transition-colors duration-300 ${
+                              isActive ? "text-indigo-600" : "text-white"
+                            }`}
+                          >
+                            {React.cloneElement(tab.icon, {
+                              className: "w-5 h-5"
+                            })}
+                          </div>
+                          <span
+                            className={`text-xs font-bold transition-colors duration-300 ${
+                              isActive ? "text-indigo-600" : "text-white"
+                            }`}
+                          >
+                            {tab.label}
+                          </span>
+                          {isActive && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Status Indicator */}
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+                    <div className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-sm leading-tight">
+                        {activeTabData?.label}
+                      </p>
+                      <p className="text-indigo-200 text-xs font-medium leading-tight">
+                        Active Module
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* User Info */}
+              {user && (
+                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
+                    <User size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
+                      {user.job_title || "Operator"}
+                    </p>
+                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      ID: {user.emp_id}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
+        <div className="animate-fadeIn">
           {activeTab === "registration" && (
             <BundleRegistrationTabData
               formData={formData}
@@ -704,10 +939,10 @@ function BundleRegistration() {
               setIsSubCon={setIsSubConState}
               subConName={subConNameState}
               setSubConName={setSubConNameState}
-              subConFactories={subConFactories} // NEW
+              subConFactories={subConFactories}
               // Additional Lines Props
-              additionalLines={additionalLines} // NEW
-              setAdditionalLines={setAdditionalLines} // NEW
+              additionalLines={additionalLines}
+              setAdditionalLines={setAdditionalLines}
               // Other props
               totalBundleQty={totalBundleQty}
               estimatedTotal={estimatedTotal}
@@ -721,7 +956,7 @@ function BundleRegistration() {
               isPrinting={isPrinting}
               setShowQRPreview={setShowQRPreview}
               bluetoothComponentRef={bluetoothComponentRef}
-              // --- FIX 4: PASS NEW PROPS ---
+              // Pass new props
               registrationType={registrationType}
               setRegistrationType={setRegistrationType}
               selectedTaskNo={selectedTaskNo}
@@ -729,87 +964,13 @@ function BundleRegistration() {
               validateLineNo={validateLineNo}
             />
           )}
-          {activeTab === "data" && (
-            <BundleRegistrationRecordData handleEdit={handleEdit} />
-          )}
-          {activeTab === "reprint" && <ReprintTab />}
-        </main>
-      </div>
 
-      {/* Desktop Layout */}
-      <div className="hidden md:block">
-        <header className="bg-gradient-to-r from-slate-50 to-gray-100 shadow-lg py-5 px-8">
-          <PageTitle />
-        </header>
-        <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="border-b border-gray-300 mb-8">
-            <nav
-              className="-mb-px flex space-x-6 justify-center"
-              aria-label="Tabs"
-            >
-              {["registration", "data", "reprint"].map((tab) => (
-                <button
-                  key={tab}
-                  onClick={() => setActiveTab(tab)}
-                  className={`group inline-flex items-center py-3 px-5 border-b-2 font-semibold text-sm focus:outline-none transition-all duration-200 ease-in-out rounded-t-lg
-                        ${
-                          activeTab === tab
-                            ? "border-indigo-600 text-indigo-700 bg-indigo-50 shadow-sm"
-                            : "border-transparent text-gray-500 hover:text-indigo-700 hover:border-indigo-300 hover:bg-gray-50"
-                        }`}
-                >
-                  {React.cloneElement(tabIcons[tab], {
-                    className: `mr-2 h-5 w-5 ${
-                      activeTab === tab
-                        ? "text-indigo-600"
-                        : "text-gray-400 group-hover:text-indigo-500"
-                    }`
-                  })}
-                  {t(`bundle.${tab}`)}
-                </button>
-              ))}
-            </nav>
-          </div>
-          {activeTab === "registration" && (
-            <BundleRegistrationTabData
-              formData={formData}
-              setFormData={setFormData}
-              colors={colors}
-              sizes={sizes}
-              hasColors={hasColors}
-              hasSizes={hasSizes}
-              isSubCon={isSubConState}
-              setIsSubCon={setIsSubConState}
-              subConName={subConNameState}
-              setSubConName={setSubConNameState}
-              subConFactories={subConFactories} // NEW
-              additionalLines={additionalLines} // NEW
-              setAdditionalLines={setAdditionalLines} // NEW
-              totalBundleQty={totalBundleQty}
-              estimatedTotal={estimatedTotal}
-              isMobileDevice={isMobileDevice}
-              setShowNumberPad={setShowNumberPad}
-              setNumberPadTarget={setNumberPadTarget}
-              handleGenerateQR={handleGenerateQR}
-              handlePrintQR={handlePrintQR}
-              qrData={qrData}
-              isGenerateDisabled={isGenerateDisabled}
-              isPrinting={isPrinting}
-              setShowQRPreview={setShowQRPreview}
-              bluetoothComponentRef={bluetoothComponentRef}
-              // --- FIX 5: PASS NEW PROPS ---
-              registrationType={registrationType}
-              setRegistrationType={setRegistrationType}
-              selectedTaskNo={selectedTaskNo}
-              setSelectedTaskNo={setSelectedTaskNo}
-              validateLineNo={validateLineNo}
-            />
-          )}
           {activeTab === "data" && (
             <BundleRegistrationRecordData handleEdit={handleEdit} />
           )}
+
           {activeTab === "reprint" && <ReprintTab />}
-        </main>
+        </div>
       </div>
 
       {/* Modals */}
@@ -834,6 +995,7 @@ function BundleRegistration() {
           </div>
         </div>
       )}
+
       <QRCodePreview
         isOpen={showQRPreview}
         onClose={() => setShowQRPreview(false)}
@@ -841,6 +1003,7 @@ function BundleRegistration() {
         onPrint={handlePrintQR}
         mode="production"
       />
+
       {editModalOpen && recordToEdit && (
         <EditModal
           isOpen={true}
@@ -863,8 +1026,64 @@ function BundleRegistration() {
           setEditModalOpen={setEditModalOpen}
         />
       )}
+
+      {/* Custom Styles */}
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out;
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+        }
+        .bg-grid-white {
+          background-image: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            );
+        }
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+        .hover\\:scale-102:hover {
+          transform: scale(1.02);
+        }
+      `}</style>
     </div>
   );
 }
 
 export default BundleRegistration;
+

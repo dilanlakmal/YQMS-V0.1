@@ -33,10 +33,10 @@ const QrCodeScanner = ({
   isWashingPage,
   isPackingPage,
   isOPAPage,
-  isDefectCard
+  isDefectCard,
+  hideScanner = false, // New prop to hide scanner when using upload
 }) => {
   const { t } = useTranslation();
-
   // State from Scanner.jsx
   const [scanning, setScanning] = useState(false);
   const [html5QrCodeInstance, setHtml5QrCodeInstance] = useState(null);
@@ -50,7 +50,6 @@ const QrCodeScanner = ({
           device.label.toLowerCase().includes("back") ||
           device.label.toLowerCase().includes("environment")
       );
-
       if (backCamera) {
         setSelectedCameraId(backCamera.id);
         return;
@@ -64,7 +63,8 @@ const QrCodeScanner = ({
   }, []);
 
   useEffect(() => {
-    if (html5QrCodeInstance) return;
+    // Don't initialize camera if scanner is hidden
+    if (hideScanner || html5QrCodeInstance) return;
 
     const instance = new Html5Qrcode("qr-reader");
     setHtml5QrCodeInstance(instance);
@@ -79,7 +79,7 @@ const QrCodeScanner = ({
       .catch((err) => {
         onScanError(err.message || "Failed to access cameras");
       });
-  }, [html5QrCodeInstance, onScanError, selectDefaultCamera]);
+  }, [html5QrCodeInstance, onScanError, selectDefaultCamera, hideScanner]);
 
   useEffect(() => {
     return () => {
@@ -110,6 +110,7 @@ const QrCodeScanner = ({
       onScanError("Scanner not ready or no camera selected.");
       return;
     }
+
     setScanning(true);
     try {
       await html5QrCodeInstance.start(
@@ -140,67 +141,75 @@ const QrCodeScanner = ({
 
   return (
     <div className="bg-white p-6 rounded-lg shadow-lg relative">
-      {/* Integrated Scanner UI */}
-      <div
-        id="qr-reader"
-        className="mb-6 rounded-lg overflow-hidden border-2 border-gray-300 w-full h-[250px] bg-gray-300 flex justify-center items-center"
-      ></div>
-      {cameras.length > 1 && (
-        <div className="flex justify-center mb-4">
-          <select
-            value={selectedCameraId || ""}
-            onChange={(e) => setSelectedCameraId(e.target.value)}
-            className="px-4 py-2 border rounded-lg text-sm bg-white"
-            disabled={scanning}
-          >
-            {cameras.map((camera, index) => (
-              <option key={camera.id} value={camera.id}>
-                {camera.label || `Camera ${index + 1}`}
-              </option>
-            ))}
-          </select>
-        </div>
+      {/* Conditionally render scanner UI based on hideScanner prop */}
+      {!hideScanner && (
+        <>
+          {/* Integrated Scanner UI */}
+          <div
+            id="qr-reader"
+            className="mb-6 rounded-lg overflow-hidden border-2 border-gray-300 w-full h-[250px] bg-gray-300 flex justify-center items-center"
+          ></div>
+
+          {cameras.length > 1 && (
+            <div className="flex justify-center mb-4">
+              <select
+                value={selectedCameraId || ""}
+                onChange={(e) => setSelectedCameraId(e.target.value)}
+                className="px-4 py-2 border rounded-lg text-sm bg-white"
+                disabled={scanning}
+              >
+                {cameras.map((camera, index) => (
+                  <option key={camera.id} value={camera.id}>
+                    {camera.label || `Camera ${index + 1}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="flex justify-center mb-6">
+            {!scanning ? (
+              <button
+                onClick={startScanning}
+                disabled={!html5QrCodeInstance || !selectedCameraId}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400"
+              >
+                <Camera className="w-5 h-5" />
+                {t("scan.start")}
+              </button>
+            ) : (
+              <button
+                onClick={stopScanning}
+                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+              >
+                <X className="w-5 h-5" />
+                {t("scan.stop")}
+              </button>
+            )}
+          </div>
+          {/* End of Integrated Scanner UI */}
+        </>
       )}
-      <div className="flex justify-center mb-6">
-        {" "}
-        {/* Added mb-6 for spacing */}
-        {!scanning ? (
-          <button
-            onClick={startScanning}
-            disabled={!html5QrCodeInstance || !selectedCameraId}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400"
-          >
-            <Camera className="w-5 h-5" />
-            {t("scan.start")}
-          </button>
-        ) : (
-          <button
-            onClick={stopScanning}
-            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
-          >
-            <X className="w-5 h-5" />
-            {t("scan.stop")}
-          </button>
-        )}
-      </div>
-      {/* End of Integrated Scanner UI */}
+
+      {/* Loading indicator - always show when loading */}
       {loadingData && (
         <div className="flex items-center justify-center gap-2 text-blue-600 mt-4">
           <Loader2 className="w-5 h-5 animate-spin" />
-
           <p>{t("qrCodeScan.loading_bundle")}</p>
         </div>
       )}
 
+      {/* Data display modal - always show when scannedData exists */}
       {scannedData && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-blue-50 p-6 border border-blue-200 rounded-lg max-w-2xl w-full mx-4">
+          <div className="bg-blue-50 p-6 border border-blue-200 rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start gap-4">
               <Package className="w-6 h-6 text-blue-600 flex-shrink-0 mt-1" />
               <div className="flex-grow">
                 <h2 className="text-xl font-semibold text-gray-800 mb-4">
                   {isDefectCard ? "Defect Card Details" : "Order Details"}
                 </h2>
+
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-3 overflow-hidden">
                   <div>
                     <p className="text-sm text-gray-600">
@@ -417,6 +426,7 @@ const QrCodeScanner = ({
                       </>
                     )}
                   </button>
+
                   <button
                     onClick={handleReset}
                     className="px-4 py-2 rounded-md bg-gray-500 text-white flex items-center gap-2"

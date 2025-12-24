@@ -1,6 +1,7 @@
 import {
  OPA,
- QC2InspectionPassBundle,               
+ QC2InspectionPassBundle, 
+ IEWorkerTask,             
 } from "../../MongoDB/dbConnectionController.js";
 
 /* ------------------------------
@@ -184,5 +185,28 @@ export const getOpaFilterOptions = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch distinct OPA filter options" });
+  }
+};
+
+export const getUserOPATasks = async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    
+    const workerTasks = await IEWorkerTask.findOne({ emp_id });
+    
+    if (!workerTasks || !workerTasks.tasks) {
+      return res.json({ assignedTasks: [] });
+    }
+    
+    // Filter tasks that are relevant to OPA (60, 61, 62, 103, 104, 105)
+    const opaRelevantTasks = [60, 61, 62, 103, 104, 105];
+    const assignedOpaTasks = workerTasks.tasks.filter(task => 
+      opaRelevantTasks.includes(task)
+    );
+    
+    res.json({ assignedTasks: assignedOpaTasks });
+  } catch (error) {
+    console.error("Error fetching user OPA tasks:", error);
+    res.status(500).json({ error: "Failed to fetch user tasks" });
   }
 };

@@ -1,6 +1,7 @@
 import {
  Packing,
- QC2InspectionPassBundle,                
+ QC2InspectionPassBundle,  
+ IEWorkerTask,              
 } from "../../MongoDB/dbConnectionController.js";
 
 // /* ------------------------------
@@ -211,4 +212,27 @@ export const getPackingFilterOptions = async (req, res) => {
         .status(500)
         .json({ message: "Failed to fetch distinct packing filter options" });
     }
+};
+
+export const getUserPackingTasks = async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+    
+    const workerTasks = await IEWorkerTask.findOne({ emp_id });
+    
+    if (!workerTasks || !workerTasks.tasks) {
+      return res.json({ assignedTasks: [] });
+    }
+    
+    // Filter tasks that are relevant to Packing (63, 66, 67, 68)
+    const packingRelevantTasks = [63, 66, 67, 68];
+    const assignedPackingTasks = workerTasks.tasks.filter(task => 
+      packingRelevantTasks.includes(task)
+    );
+    
+    res.json({ assignedTasks: assignedPackingTasks });
+  } catch (error) {
+    console.error("Error fetching user Packing tasks:", error);
+    res.status(500).json({ error: "Failed to fetch user tasks" });
+  }
 };
