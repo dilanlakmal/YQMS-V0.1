@@ -1,0 +1,18 @@
+import express from 'express';
+import {
+  saveHtFirstOutput,
+  getHtFirstOutput,
+  saveFuFirstOutput,
+  getFuFirstOutput,
+  getFirstOutput,
+} from '../../../controller/SCC/SCC_Inspection/sccFirstOutPutHTFUController.js';
+
+const router = express.Router();
+
+router.post('/api/scc/ht-first-output', saveHtFirstOutput);
+router.get('/api/scc/ht-first-output', getHtFirstOutput);
+router.post('/api/scc/fu-first-output', saveFuFirstOutput);
+router.get('/api/scc/fu-first-output', getFuFirstOutput);
+router.get('/api/scc/get-first-output-specs', getFirstOutput);
+
+export default router;
