@@ -245,6 +245,7 @@ import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspe
 ------------------------------ */
 import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
 import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
+import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
 
 /* -----------------------------
   After Ironing Import
@@ -278,12 +279,12 @@ import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
-import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 /* ------------------------------
   SQL Query routs
 ------------------------------ */
-app.use(sqlQuery);
+// app.use(sqlQuery);
 /* ------------------------------
   Functional routs
 ------------------------------ */
@@ -544,7 +545,7 @@ app.use(FincheckInspection);
 ------------------------------ */
 app.use(p88Upload);
 app.use(p88Summarydata);
-
+app.use(downloadP88Report);
 /* -----------------------------
 AI Routes
 ------------------------------ */
@@ -576,16 +577,16 @@ app.use(ceMasterRoutes);
 app.use(ceTargetMasterRoutes);
 
 
-process.on("SIGINT", async () => {
-  try {
-    await closeSQLPools();
-    console.log("SQL connection pools closed.");
-  } catch (err) {
-    console.error("Error closing SQL connection pools:", err);
-  } finally {
-    process.exit(0);
-  }
-});
+// process.on("SIGINT", async () => {
+//   try {
+//     await closeSQLPools();
+//     console.log("SQL connection pools closed.");
+//   } catch (err) {
+//     console.error("Error closing SQL connection pools:", err);
+//   } finally {
+//     process.exit(0);
+//   }
+// });
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
