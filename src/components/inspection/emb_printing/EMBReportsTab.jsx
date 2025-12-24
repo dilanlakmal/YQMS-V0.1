@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
@@ -7,13 +7,13 @@ import {
   Loader2,
   FileText,
   Search,
-  RefreshCw,
   Download,
   Printer,
   CheckCircle,
   XCircle,
   MoreVertical,
-  Eye
+  Eye,
+  RefreshCw
 } from "lucide-react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
@@ -23,13 +23,23 @@ import showToast from "../../../utils/toast";
 import ConfirmDialog from "./ComfirmModal/ConfirmDialog";
 
 
-const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmitting, setIsSubmitting, inspectionType }) => {
+const EMBReportsTab = ({ 
+  formData, 
+  onFormDataChange, 
+  onSubmitHandlerRef, 
+  isSubmitting, 
+  setIsSubmitting, 
+  inspectionType,
+  reports = [],
+  reportsLoading = false,
+  reportsError = null,
+  fetchReports,
+  onDateRangeChange,
+  reportsDateRange
+}) => {
   const { t } = useTranslation();
-  const [reports, setReports] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [startDate, setStartDate] = useState(new Date(new Date().setDate(new Date().getDate() - 7)));
-  const [endDate, setEndDate] = useState(new Date());
+  const [startDate, setStartDate] = useState(reportsDateRange?.startDate || new Date(new Date().setDate(new Date().getDate() - 7)));
+  const [endDate, setEndDate] = useState(reportsDateRange?.endDate || new Date());
   const [searchTerm, setSearchTerm] = useState("");
   // Pending filters (what user selects)
   const [filterFactoryName, setFilterFactoryName] = useState("");
@@ -60,40 +70,34 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
     onConfirm: null
   });
 
-  const fetchReports = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/scc/subcon-emb-reports`, {
-        params: {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString()
-        }
-      });
-      
-      if (response.data.success) {
-        setReports(response.data.data || []);
-      } else {
-        setReports([]);
-        setError(response.data.message || "Failed to load reports.");
-      }
-    } catch (err) {
-      console.error("Error fetching reports:", err);
-      if (err.response?.status === 404) {
-        setError("Report endpoint not found. Please check the API.");
-      } else if (err.response?.status === 500) {
-        setError(err.response?.data?.message || "Server error. Please try again later.");
-      } else {
-        setError("Failed to load reports. Please try again.");
-      }
-      setReports([]);
-    } finally {
-      setLoading(false);
+  // Sync local date state with parent's date range
+  useEffect(() => {
+    if (reportsDateRange) {
+      setStartDate(reportsDateRange.startDate);
+      setEndDate(reportsDateRange.endDate);
+    }
+  }, [reportsDateRange]);
+
+  // Handle date range changes and trigger fetch
+  const handleStartDateChange = (date) => {
+    setStartDate(date);
+    if (onDateRangeChange && fetchReports) {
+      onDateRangeChange({ startDate: date, endDate: endDate });
+      fetchReports(date, endDate);
     }
   };
 
-  const fetchReportDetails = async (reportId, showLoading = false) => {
-    if (selectedReport[reportId]) {
+  const handleEndDateChange = (date) => {
+    setEndDate(date);
+    if (onDateRangeChange && fetchReports) {
+      onDateRangeChange({ startDate: startDate, endDate: date });
+      fetchReports(startDate, date);
+    }
+  };
+
+  const fetchReportDetails = async (reportId, showLoading = false, forceRefresh = false) => {
+    // If forceRefresh is true, always fetch fresh data from server
+    if (!forceRefresh && selectedReport[reportId]) {
       return selectedReport[reportId];
     }
     if (showLoading) {
@@ -125,7 +129,8 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
     setOpenMenuId(null);
     
     try {
-      const reportData = await fetchReportDetails(report._id, true);
+      // Force refresh to get latest status from database
+      const reportData = await fetchReportDetails(report._id, true, true);
       if (!reportData) {
         showToast.error("Failed to load report data for download.");
         return;
@@ -169,6 +174,11 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
         }, 100);
         
         showToast.success("PDF download started.");
+        
+        // Refresh reports list to ensure status is up to date
+        if (fetchReports) {
+          fetchReports();
+        }
       } catch (pdfError) {
         showToast.dismiss(loadingToast);
         console.error("Error generating PDF for download:", pdfError);
@@ -192,7 +202,8 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
 
   const handlePrintPDF = async (report) => {
     setOpenMenuId(null);
-    const reportData = await fetchReportDetails(report._id, true);
+    // Force refresh to get latest status from database
+    const reportData = await fetchReportDetails(report._id, true, true);
     if (!reportData) {
       showToast.error("Failed to load report data for printing.");
       return;
@@ -201,6 +212,11 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
     // Set the report data with unique key to force regeneration
     setPrintReportData(reportData);
     setPrintKey(prev => prev + 1); // Force regeneration even for same report
+    
+    // Refresh reports list to ensure status is up to date
+    if (fetchReports) {
+      fetchReports();
+    }
   };
 
   useEffect(() => {
@@ -262,7 +278,9 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           if (response.data.success) {
             showToast.success("Inspection has been approved successfully.");
             setOpenMenuId(null);
-            fetchReports();
+            if (fetchReports) {
+              fetchReports();
+            }
           } else {
             throw new Error(response.data.message || "Failed to approve inspection");
           }
@@ -292,7 +310,9 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           if (response.data.success) {
             showToast.success("Inspection has been rejected successfully.");
             setOpenMenuId(null);
-            fetchReports();
+            if (fetchReports) {
+              fetchReports();
+            }
           } else {
             throw new Error(response.data.message || "Failed to reject inspection");
           }
@@ -328,9 +348,28 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
     showToast.success("Filters applied successfully.");
   };
 
+  // Listen for refresh messages from child windows (inspection view)
   useEffect(() => {
-    fetchReports();
-  }, [startDate, endDate]);
+    const handleMessage = (event) => {
+      // Verify message is from same origin
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      
+      if (event.data && event.data.type === 'REFRESH_EMB_REPORTS') {
+        console.log("🔄 Received refresh message from inspection view, refreshing reports...");
+        if (fetchReports) {
+          fetchReports();
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [fetchReports]);
 
   // Reactive print handler - automatically regenerates and prints when printReportData or printKey changes
   useEffect(() => {
@@ -687,7 +726,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
             </label>
             <DatePicker
               selected={startDate}
-              onChange={(date) => setStartDate(date)}
+              onChange={handleStartDateChange}
               dateFormat="MM/dd/yyyy"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -698,7 +737,7 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
             </label>
             <DatePicker
               selected={endDate}
-              onChange={(date) => setEndDate(date)}
+              onChange={handleEndDateChange}
               dateFormat="MM/dd/yyyy"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -824,13 +863,6 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
           </div> */}
           <div className="col-span-1 md:col-span-2 lg:col-span-4 flex items-end justify-end gap-2">
             <button
-              onClick={fetchReports}
-              className="flex items-center justify-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <RefreshCw size={18} className="mr-2" />
-              {t("embPrinting.reports.refresh", "Refresh")}
-            </button>
-            <button
               onClick={() => {
                 setFilterFactoryName("");
                 setFilterMoNumber("");
@@ -858,22 +890,39 @@ const EMBReportsTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmi
       {/* Reports Table */}
       <div className="bg-white rounded-lg border shadow-sm">
         <div className="p-4 border-b">
-          <h3 className="text-lg font-semibold text-gray-800 flex items-center">
-            <FileText size={20} className="mr-2" />
-            {t("embPrinting.reports.title", "Submitted Reports")}
-            <span className="ml-2 text-sm font-normal text-gray-500">
-              ({filteredReports.length})
-            </span>
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+              <FileText size={20} className="mr-2" />
+              {t("embPrinting.reports.title", "Reports")}
+              <span className="ml-2 text-sm font-normal text-gray-500">
+                ({filteredReports.length})
+              </span>
+            </h3>
+            <button
+              onClick={() => {
+                if (fetchReports) {
+                  fetchReports(startDate, endDate);
+                }
+              }}
+              disabled={reportsLoading}
+              className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Refresh reports list"
+            >
+              <RefreshCw 
+                size={18} 
+                className={reportsLoading ? "animate-spin" : ""}
+              />
+            </button>
+          </div>
         </div>
 
-        {loading ? (
+        {reportsLoading ? (
           <div className="flex justify-center items-center py-12">
             <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
           </div>
-        ) : error ? (
+        ) : reportsError ? (
           <div className="p-6 text-center">
-            <p className="text-red-600">{error}</p>
+            <p className="text-red-600">{reportsError}</p>
           </div>
         ) : filteredReports.length === 0 ? (
           <div className="p-6 text-center text-gray-500">

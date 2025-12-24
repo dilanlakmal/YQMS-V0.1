@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { API_BASE_URL } from "../../../../config";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, ArrowLeft } from "lucide-react";
 import showToast from "../../../utils/toast";
 import ConfirmDialog from "./ComfirmModal/ConfirmDialog";
 
@@ -338,6 +338,7 @@ const EMBInspectionView = () => {
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex justify-between items-center">
             <div className="flex-1 flex items-center gap-4">
+
               <img
                 src="/assets/Img/sub-emb-pdf/photo_2025-12-05_09-58-53.jpg"
                 alt="Logo"
@@ -354,6 +355,7 @@ const EMBInspectionView = () => {
               </div>
             </div>
             <div className="flex gap-2" style={{ margin: 0, padding: 0 }}>
+              
               <button
                 onClick={handleApprove}
                 disabled={processing || report.status === "Approved" || report.status === "Rejected"}
@@ -382,13 +384,37 @@ const EMBInspectionView = () => {
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Status and Result Badges */}
-        <div className="mb-6 flex gap-3">
-          <span className={`px-4 py-2 text-sm font-semibold rounded-full ${getResultBadgeClass(report.status)}`}>
-            {report.status || "Pending"}
-          </span>
-          <span className={`px-4 py-2 text-sm font-semibold rounded-full ${getResultBadgeClass(report.result)}`}>
-            {report.result || "Pending"}
-          </span>
+        <div className="mb-6 flex gap-3 justify-between items-center">
+            <div>
+                  <button
+                        onClick={() => {
+                          // Notify parent window to refresh reports list
+                          if (window.opener && !window.opener.closed) {
+                            try {
+                              // Send message to parent window to refresh
+                              window.opener.postMessage({ type: 'REFRESH_EMB_REPORTS' }, window.location.origin);
+                            } catch (error) {
+                              console.error("Error sending message to parent:", error);
+                            }
+                          }
+                          // Close this window
+                          window.close();
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+                        title="Go back to EMB Printing"
+                      >
+                        <ArrowLeft size={20} />
+                        <span className="font-medium">Back</span>
+                  </button>
+            </div>
+            <div className="flex gap-2">
+                <span className={`px-4 py-2 text-sm font-semibold rounded-full ${getResultBadgeClass(report.status)}`}>
+                    {report.status || "Pending"}
+                  </span>
+                  <span className={`px-4 py-2 text-sm font-semibold rounded-full ${getResultBadgeClass(report.result)}`}>
+                    {report.result || "Pending"}
+                  </span>
+            </div>
         </div>
 
         {/* Inspection Details Section */}

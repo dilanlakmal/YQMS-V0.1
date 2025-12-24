@@ -113,7 +113,7 @@ const getBuyerFromMoNumber = (moNo) => {
   return null;
 };
 
-const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmitting, setIsSubmitting, inspectionType }) => {
+const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmitting, setIsSubmitting, inspectionType, setActiveTabRef, onSuccess }) => {
   const { t } = useTranslation();
   const { user } = useAuth();
 
@@ -2052,15 +2052,35 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         payload
       );
 
-      // Show success notification
-      showToast.success(
-        response.data?.message || t("embPrinting.conclusion.reportSaved", "Report saved successfully")
-      );
+      // Check if submission was successful (status 201 or 200)
+      if (response.status === 201 || response.status === 200) {
+        console.log("✅ Form submitted successfully, starting refresh process...");
+        
+        // Show success notification
+        showToast.success(
+          response.data?.message || t("embPrinting.conclusion.reportSaved", "Report saved successfully")
+        );
 
-      // Reset form after successful submission
-      resetForm();
+        // Reset form after successful submission
+        resetForm();
 
-      console.log(response.data.message || t("embPrinting.conclusion.reportSaved", "Report saved successfully"));
+        // Call onSuccess callback to refresh reports list in parent
+        if (onSuccess) {
+          console.log("🔄 Calling onSuccess to refresh reports list...");
+          onSuccess();
+          console.log("✅ Reports list refresh triggered");
+        }
+        
+        // Switch to Reports tab after successful submission
+        if (setActiveTabRef && setActiveTabRef.current) {
+          console.log("📋 Switching to Reports tab...");
+          setActiveTabRef.current("reports");
+        }
+
+        console.log("✅ Submission process complete");
+      } else {
+        throw new Error(response.data?.message || "Failed to submit report");
+      }
     } catch (error) {
       console.error("Error submitting report:", error);
       console.error("Error details:", error.response?.data);
@@ -2074,7 +2094,7 @@ const EMBHeaderTab = ({ formData, onFormDataChange, onSubmitHandlerRef, isSubmit
         setIsSubmitting(false);
       }
     }
-  }, [formData, availableColors, availableSkus, user, inspectionType, setIsSubmitting, t, resetForm, preparePhotosForSubmission, prepareDefectsForSubmission]);
+  }, [formData, availableColors, availableSkus, user, inspectionType, setIsSubmitting, t, resetForm, preparePhotosForSubmission, prepareDefectsForSubmission, setActiveTabRef, onSuccess]);
 
   React.useEffect(() => {
     if (onSubmitHandlerRef) {

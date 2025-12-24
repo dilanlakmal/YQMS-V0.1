@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
+import axios from "axios";
+import { API_BASE_URL } from "../../../../config";
 import {
   FileText,
   Camera,
@@ -27,6 +29,57 @@ const EMBPrintingInspection = () => {
   const [showChangeTypeModal, setShowChangeTypeModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitHandlerRef = useRef(null);
+  const setActiveTabRef = useRef(null);
+
+  // Reports state - lifted up to parent
+  const [reports, setReports] = useState([]);
+  const [reportsLoading, setReportsLoading] = useState(false);
+  const [reportsError, setReportsError] = useState(null);
+  const [reportsDateRange, setReportsDateRange] = useState({
+    startDate: new Date(new Date().setDate(new Date().getDate() - 7)),
+    endDate: new Date()
+  });
+
+  // Fetch reports function - lifted up to parent
+  const fetchReports = useCallback(async (startDateOverride, endDateOverride) => {
+    const dateStart = startDateOverride || reportsDateRange.startDate;
+    const dateEnd = endDateOverride || reportsDateRange.endDate;
+    
+    setReportsLoading(true);
+    setReportsError(null);
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/scc/subcon-emb-reports`, {
+        params: {
+          startDate: dateStart.toISOString(),
+          endDate: dateEnd.toISOString()
+        }
+      });
+      
+      if (response.data.success) {
+        setReports(response.data.data || []);
+      } else {
+        setReports([]);
+        setReportsError(response.data.message || "Failed to load reports.");
+      }
+    } catch (err) {
+      console.error("Error fetching reports:", err);
+      if (err.response?.status === 404) {
+        setReportsError("Report endpoint not found. Please check the API.");
+      } else if (err.response?.status === 500) {
+        setReportsError(err.response?.data?.message || "Server error. Please try again later.");
+      } else {
+        setReportsError("Failed to load reports. Please try again.");
+      }
+      setReports([]);
+    } finally {
+      setReportsLoading(false);
+    }
+  }, [reportsDateRange.startDate, reportsDateRange.endDate]);
+
+  // Load reports on mount and when date range changes
+  useEffect(() => {
+    fetchReports();
+  }, [fetchReports]);
 
   // Form data state
   const [formData, setFormData] = useState({
@@ -117,6 +170,32 @@ const EMBPrintingInspection = () => {
     }));
   }, []);
 
+  // Expose setActiveTab to child components via ref
+  useEffect(() => {
+    setActiveTabRef.current = setActiveTab;
+  }, []);
+
+  // Listen for refresh messages from child windows (inspection view)
+  useEffect(() => {
+    const handleMessage = (event) => {
+      // Verify message is from same origin
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      
+      if (event.data && event.data.type === 'REFRESH_EMB_REPORTS') {
+        console.log("🔄 Received refresh message from inspection view, refreshing reports...");
+        fetchReports();
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [fetchReports]);
+
   return (
     <div className="space-y-4">
       {/* Header Section */}
@@ -197,6 +276,16 @@ const EMBPrintingInspection = () => {
                 isSubmitting={isSubmitting}
                 setIsSubmitting={setIsSubmitting}
                 inspectionType={inspectionType}
+                setActiveTabRef={setActiveTabRef}
+                // Pass reports state and fetch function to ReportsTab
+                reports={tab.id === "reports" ? reports : undefined}
+                reportsLoading={tab.id === "reports" ? reportsLoading : undefined}
+                reportsError={tab.id === "reports" ? reportsError : undefined}
+                fetchReports={tab.id === "reports" ? fetchReports : undefined}
+                onDateRangeChange={tab.id === "reports" ? setReportsDateRange : undefined}
+                reportsDateRange={tab.id === "reports" ? reportsDateRange : undefined}
+                // Pass onSuccess callback to HeaderTab and PhotosTab
+                onSuccess={tab.id !== "reports" ? fetchReports : undefined}
               />
             </div>
           );
