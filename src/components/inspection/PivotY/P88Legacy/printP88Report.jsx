@@ -68,6 +68,11 @@ const PrintP88Report = () => {
             if (response.ok) {
                 const data = await response.json();
                 setDateFilteredStats(data);
+                if (data.totalRecords > 0) {
+                    setStartRange(1);
+                    setEndRange(data.totalRecords);
+                    checkAvailableSpace(selectedPath, { start: 1, end: data.totalRecords });
+                }
                 setStatus({ message: '', type: '' });
             } else {
                 console.error(`Failed to fetch date filtered stats: ${response.status} ${response.statusText}`);
@@ -79,15 +84,15 @@ const PrintP88Report = () => {
         }
     };
 
-    const checkAvailableSpace = async (path = '') => {
+    const checkAvailableSpace = async (path = '', rangeOverrides = null) => {
         try {
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
             const endpoint = 'check-bulk-space';
             
             const body = { 
                 downloadPath: path, 
-                startRange: downloadMode === 'range' ? startRange : null,
-                endRange: downloadMode === 'range' ? endRange : null,
+                startRange: downloadMode === 'range' ? (rangeOverrides?.start ?? startRange) : null,
+                endRange: downloadMode === 'range' ? (rangeOverrides?.end ?? endRange) : null,
                 downloadAll: downloadMode === 'all',
                 includeDownloaded: includeDownloaded,
                 startDate: startDate || null,
@@ -472,8 +477,9 @@ const PrintP88Report = () => {
                                             type="number"
                                             value={startRange}
                                             onChange={(e) => {
-                                                setStartRange(parseInt(e.target.value) || 1);
-                                                checkAvailableSpace(selectedPath);
+                                                const val = parseInt(e.target.value) || 1;
+                                                setStartRange(val);
+                                                checkAvailableSpace(selectedPath, { start: val });
                                             }}
                                             min="1"
                                             max={dateFilteredStats.totalRecords}
@@ -492,8 +498,12 @@ const PrintP88Report = () => {
                                             type="number"
                                             value={endRange}
                                             onChange={(e) => {
-                                                setEndRange(parseInt(e.target.value) || 1);
-                                                checkAvailableSpace(selectedPath);
+                                                let val = parseInt(e.target.value) || 1;
+                                                if (val > dateFilteredStats.totalRecords) {
+                                                    val = dateFilteredStats.totalRecords;
+                                                }
+                                                setEndRange(val);
+                                                checkAvailableSpace(selectedPath, { end: val });
                                             }}
                                             min="1"
                                             max={dateFilteredStats.totalRecords}
