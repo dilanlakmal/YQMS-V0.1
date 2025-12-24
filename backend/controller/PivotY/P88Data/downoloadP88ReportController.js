@@ -79,8 +79,6 @@ const getAvailableSpace = async (dirPath) => {
 
 export const initializeDownloadStatus = async (req, res) => {
   try {
-    console.log("Initializing download status for all records...");
-
     // Count records without downloadStatus
     const recordsWithoutStatus = await p88LegacyData.countDocuments({
       downloadStatus: { $exists: false }
@@ -206,7 +204,6 @@ const updateDownloadStatus = async (recordId, status, downloadedAt = null) => {
     }
 
     await p88LegacyData.findByIdAndUpdate(recordId, updateData);
-    console.log(`Updated download status for record ${recordId}: ${status}`);
   } catch (error) {
     console.error(
       `Error updating download status for record ${recordId}:`,
@@ -220,10 +217,26 @@ const getInspectionRecords = async (
   startRange,
   endRange,
   downloadAll,
-  includeDownloaded = false
+  includeDownloaded = false,
+  startDate = null,
+  endDate = null,
+  factoryName = null
 ) => {
   try {
     let query = {};
+
+    // Add date range filter
+    if (startDate && endDate) {
+      query.submittedInspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate + "T23:59:59.999Z")
+      };
+    }
+
+    // Add factory filter
+    if (factoryName && factoryName.trim() !== "") {
+      query.supplier = factoryName;
+    }
 
     // Filter out already downloaded records unless specifically requested
     if (!includeDownloaded) {
@@ -231,15 +244,14 @@ const getInspectionRecords = async (
     }
 
     let records;
-
     if (downloadAll) {
-      // Get all records
+      // Get all records matching criteria
       records = await p88LegacyData
         .find(query)
         .select(
-          "_id groupNumber inspectionNumbers inspectionNumbersKey project supplier poNumbers reportType downloadStatus"
+          "_id groupNumber inspectionNumbers inspectionNumbersKey project supplier poNumbers reportType downloadStatus submittedInspectionDate"
         )
-        .sort({ createdAt: 1 })
+        .sort({ submittedInspectionDate: 1 })
         .lean();
     } else {
       // Get records in specified range
@@ -249,17 +261,14 @@ const getInspectionRecords = async (
       records = await p88LegacyData
         .find(query)
         .select(
-          "_id groupNumber inspectionNumbers inspectionNumbersKey project supplier poNumbers reportType downloadStatus"
+          "_id groupNumber inspectionNumbers inspectionNumbersKey project supplier poNumbers reportType downloadStatus submittedInspectionDate"
         )
-        .sort({ createdAt: 1 })
+        .sort({ submittedInspectionDate: 1 })
         .skip(skip)
         .limit(limit)
         .lean();
     }
 
-    console.log(
-      `Found ${records.length} inspection records (excluding already downloaded)`
-    );
     return records;
   } catch (error) {
     console.error("Database error:", error);
@@ -364,22 +373,14 @@ const downloadSingleReport = async (
   page,
   inspectionNumber,
   targetDownloadDir,
-  record
+  record,
+  includeDownloaded = false
 ) => {
   try {
     const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
 
-    console.log(
-      `Downloading report for inspection: ${inspectionNumber} (Group: ${
-        record.groupNumber || "N/A"
-      })`
-    );
-
-    // Check if already downloaded
-    if (record.downloadStatus === "Downloaded") {
-      console.log(
-        `⏭️ Skipping inspection ${inspectionNumber} - already downloaded`
-      );
+    // Check if already downloaded - ONLY skip if includeDownloaded is false
+    if (!includeDownloaded && record.downloadStatus === "Downloaded") {
       return {
         inspectionNumber,
         groupNumber: record.groupNumber,
@@ -432,7 +433,7 @@ const downloadSingleReport = async (
     await page.click("#page-wrapper a");
 
     // Wait for download to complete
-    await new Promise((resolve) => setTimeout(resolve, 6000));
+    await new Promise((resolve) => setTimeout(resolve, 8000));
 
     // Get new files
     const finalFiles = await getFileList();
@@ -454,10 +455,17 @@ const downloadSingleReport = async (
 
     // Generate custom filename and rename files
     const customFileName = generateCustomFileName(record);
+
+    // If re-downloading, add timestamp to avoid filename conflicts
+    const finalCustomFileName =
+      includeDownloaded && record.downloadStatus === "Downloaded"
+        ? `${customFileName}_${Date.now()}`
+        : customFileName;
+
     const renamedFiles = await renameDownloadedFiles(
       targetDownloadDir,
       newFiles,
-      customFileName
+      finalCustomFileName
     );
 
     let totalSize = 0;
@@ -469,13 +477,13 @@ const downloadSingleReport = async (
       totalSize += size;
       fileDetails.push({
         name: fileInfo.name,
-        originalName: fileInfo.originalName,
+        originalName: fileInfo.originalName || fileInfo.name,
         size: formatBytes(size),
         sizeBytes: size,
         inspectionNumber: inspectionNumber,
         groupNumber: record.groupNumber,
         project: record.project,
-        customFileName: customFileName
+        customFileName: finalCustomFileName
       });
     }
 
@@ -490,7 +498,8 @@ const downloadSingleReport = async (
       totalSize,
       files: fileDetails,
       success: true,
-      customFileName: customFileName
+      customFileName: finalCustomFileName,
+      redownloaded: includeDownloaded && record.downloadStatus === "Downloaded"
     };
   } catch (error) {
     console.error(`Error downloading report ${inspectionNumber}:`, error);
@@ -519,40 +528,31 @@ export const downloadBulkReports = async (req, res) => {
       startRange,
       endRange,
       downloadAll,
-      includeDownloaded = false
+      includeDownloaded = false,
+      startDate,
+      endDate,
+      factoryName
     } = req.body;
+
     const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
-    // Validate input
-    if (
-      !downloadAll &&
-      (!startRange || !endRange || startRange > endRange || startRange < 1)
-    ) {
-      return res.status(400).json({
-        success: false,
-        error:
-          "Invalid range specified. Start range must be >= 1 and <= end range."
-      });
-    }
+    // ... existing validation code ...
 
-    // Ensure download directory exists
-    if (!fs.existsSync(targetDownloadDir)) {
-      fs.mkdirSync(targetDownloadDir, { recursive: true });
-    }
-
-    // Get inspection records from database
+    // Get inspection records from database with date and factory filters
     const records = await getInspectionRecords(
       startRange,
       endRange,
       downloadAll,
-      includeDownloaded
+      includeDownloaded,
+      startDate,
+      endDate,
+      factoryName
     );
 
     if (records.length === 0) {
       return res.json({
         success: true,
-        message:
-          "No records found in the specified range (excluding already downloaded)",
+        message: "No records found matching the specified criteria",
         downloadInfo: {
           totalRecords: 0,
           successfulDownloads: 0,
@@ -565,8 +565,9 @@ export const downloadBulkReports = async (req, res) => {
       });
     }
 
+    // Launch browser for downloading
     const browser = await puppeteer.launch({
-      headless: false, // Set to true for production
+      headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
@@ -579,119 +580,104 @@ export const downloadBulkReports = async (req, res) => {
       downloadPath: targetDownloadDir
     });
 
-    // Login once
-    console.log("Logging in to P88 system...");
+    // Login process
     await page.goto(CONFIG.LOGIN_URL);
     await page.waitForSelector("#username");
     await page.type("#username", "sreynoch");
     await page.type("#password", "today2020#88");
     await page.click("#js-login-submit");
     await page.waitForNavigation();
-    console.log("Login successful");
 
     // Download reports
     const downloadResults = [];
-    let totalFiles = 0;
-    let totalSizeBytes = 0;
     let successfulDownloads = 0;
     let failedDownloads = 0;
     let skippedDownloads = 0;
+    let redownloadedCount = 0;
+    let totalFiles = 0;
+    let totalSizeBytes = 0;
 
     for (let i = 0; i < records.length; i++) {
       const record = records[i];
       const inspectionNumber = getFirstInspectionNumber(record);
 
       if (!inspectionNumber) {
-        console.warn(`No inspection number found for record ${record._id}`);
         failedDownloads++;
-        await updateDownloadStatus(record._id, "Failed");
         downloadResults.push({
           inspectionNumber: "N/A",
           groupNumber: record.groupNumber,
           project: record.project,
-          fileCount: 0,
-          totalSize: 0,
-          files: [],
           success: false,
-          error: "No inspection number found in record"
+          error: "No inspection number found"
         });
         continue;
       }
 
-      console.log(
-        `Processing ${i + 1}/${
-          records.length
-        }: Inspection ${inspectionNumber} (Group: ${record.groupNumber})`
-      );
+      try {
+        // Pass includeDownloaded parameter to downloadSingleReport
+        const result = await downloadSingleReport(
+          page,
+          inspectionNumber,
+          targetDownloadDir,
+          record,
+          includeDownloaded
+        );
+        downloadResults.push(result);
 
-      const result = await downloadSingleReport(
-        page,
-        inspectionNumber,
-        targetDownloadDir,
-        record
-      );
-      downloadResults.push(result);
+        if (result.success) {
+          if (result.skipped) {
+            skippedDownloads++;
+          } else {
+            successfulDownloads++;
+            totalFiles += result.fileCount;
+            totalSizeBytes += result.totalSize;
 
-      if (result.success) {
-        if (result.skipped) {
-          skippedDownloads++;
-          console.log(
-            `⏭️ Skipped: ${result.reason} for inspection ${inspectionNumber}`
-          );
+            if (result.redownloaded) {
+              redownloadedCount++;
+            } else {
+              console.log(
+                `✅ Downloaded: ${inspectionNumber} (${result.fileCount} files)`
+              );
+            }
+          }
         } else {
-          successfulDownloads++;
-          totalFiles += result.fileCount;
-          totalSizeBytes += result.totalSize;
-          console.log(
-            `✅ Success: ${result.fileCount} files downloaded for inspection ${inspectionNumber} as ${result.customFileName}`
-          );
+          failedDownloads++;
+          console.log(`❌ Failed: ${inspectionNumber} - ${result.error}`);
         }
-      } else {
+      } catch (error) {
+        console.error(`Error processing record ${record._id}:`, error);
         failedDownloads++;
-        console.log(
-          `❌ Failed: ${result.error} for inspection ${inspectionNumber}`
-        );
-      }
-
-      // Add delay between downloads to avoid overwhelming the server
-      if (i < records.length - 1) {
-        console.log(
-          `Waiting ${CONFIG.DELAY_BETWEEN_DOWNLOADS}ms before next download...`
-        );
-        await new Promise((resolve) =>
-          setTimeout(resolve, CONFIG.DELAY_BETWEEN_DOWNLOADS)
-        );
+        downloadResults.push({
+          inspectionNumber: inspectionNumber,
+          groupNumber: record.groupNumber,
+          project: record.project,
+          success: false,
+          error: error.message
+        });
       }
     }
 
     await browser.close();
 
-    const summary = {
-      totalRecords: records.length,
-      successfulDownloads,
-      failedDownloads,
-      skippedDownloads,
-      totalFiles,
-      totalSize: formatBytes(totalSizeBytes),
-      totalSizeBytes,
-      downloadPath: targetDownloadDir,
-      details: downloadResults,
-      range: downloadAll ? "All records" : `Records ${startRange}-${endRange}`
-    };
-
-    console.log("Bulk download completed:", {
-      total: records.length,
-      successful: successfulDownloads,
-      failed: failedDownloads,
-      skipped: skippedDownloads,
-      totalFiles,
-      totalSize: formatBytes(totalSizeBytes)
-    });
+    const summaryMessage = includeDownloaded
+      ? `Download completed: ${successfulDownloads} successful (${redownloadedCount} re-downloaded), ${failedDownloads} failed, ${skippedDownloads} skipped`
+      : `Download completed: ${successfulDownloads} successful, ${failedDownloads} failed, ${skippedDownloads} skipped`;
 
     res.json({
       success: true,
-      message: `Bulk download completed! ${successfulDownloads} successful, ${failedDownloads} failed, ${skippedDownloads} skipped.`,
-      downloadInfo: summary
+      message: summaryMessage,
+      downloadInfo: {
+        totalRecords: records.length,
+        successfulDownloads,
+        failedDownloads,
+        skippedDownloads,
+        redownloadedCount,
+        totalFiles,
+        totalSize: formatBytes(totalSizeBytes),
+        downloadPath: targetDownloadDir,
+        details: downloadResults,
+        includeDownloaded
+      }
     });
   } catch (error) {
     console.error("Bulk download failed:", error);
@@ -705,17 +691,25 @@ export const downloadBulkReports = async (req, res) => {
 // Get total record count endpoint (updated)
 export const getRecordCount = async (req, res) => {
   try {
-    const { includeDownloaded = false } = req.query;
-    const totalCount = await getTotalRecordCount(includeDownloaded === "true");
-    const downloadedCount = await p88LegacyData.countDocuments({
+    const { includeDownloaded = "false" } = req.query;
+
+    let query = {};
+    if (includeDownloaded !== "true") {
+      query.downloadStatus = { $ne: "Downloaded" };
+    }
+
+    const totalRecords = await p88LegacyData.countDocuments(query);
+    const downloadedRecords = await p88LegacyData.countDocuments({
       downloadStatus: "Downloaded"
     });
+    const pendingRecords =
+      totalRecords - (includeDownloaded === "true" ? 0 : downloadedRecords);
 
     res.json({
       success: true,
-      totalRecords: totalCount,
-      downloadedRecords: downloadedCount,
-      pendingRecords: totalCount
+      totalRecords,
+      downloadedRecords: includeDownloaded === "true" ? downloadedRecords : 0,
+      pendingRecords
     });
   } catch (error) {
     console.error("Error getting record count:", error);
@@ -768,18 +762,42 @@ export const checkBulkSpace = async (req, res) => {
       startRange,
       endRange,
       downloadAll,
-      includeDownloaded = false
+      includeDownloaded = false,
+      startDate,
+      endDate,
+      factoryName
     } = req.body;
+
     const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
 
-    // Get record count from database (excluding downloaded unless specified)
+    // Build query for counting records
+    let query = {};
+
+    // Add date range filter
+    if (startDate && endDate) {
+      query.submittedInspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate + "T23:59:59.999Z")
+      };
+    }
+
+    // Add factory filter
+    if (factoryName && factoryName.trim() !== "") {
+      query.supplier = factoryName;
+    }
+
+    // Filter out already downloaded records unless specifically requested
+    if (!includeDownloaded) {
+      query.downloadStatus = { $ne: "Downloaded" };
+    }
+
     let recordCount;
     if (downloadAll) {
-      recordCount = await getTotalRecordCount(includeDownloaded);
+      recordCount = await p88LegacyData.countDocuments(query);
     } else {
       if (!startRange || !endRange || startRange > endRange || startRange < 1) {
         return res.status(400).json({
@@ -787,14 +805,14 @@ export const checkBulkSpace = async (req, res) => {
           error: "Invalid range specified"
         });
       }
-      recordCount = Math.max(0, endRange - startRange + 1);
 
-      // Verify the range doesn't exceed available records
-      const totalRecords = await getTotalRecordCount(includeDownloaded);
+      const totalRecords = await p88LegacyData.countDocuments(query);
       if (startRange > totalRecords) {
         recordCount = 0;
       } else if (endRange > totalRecords) {
         recordCount = totalRecords - startRange + 1;
+      } else {
+        recordCount = endRange - startRange + 1;
       }
     }
 
@@ -813,7 +831,15 @@ export const checkBulkSpace = async (req, res) => {
       path: targetDir,
       recommendation: hasEnoughSpace
         ? `You have sufficient space to download ${recordCount} reports.`
-        : `Warning: Limited disk space for ${recordCount} reports. Consider freeing up space or choosing a different location.`
+        : `Warning: Limited disk space for ${recordCount} reports. Consider freeing up space or choosing a different location.`,
+      filters: {
+        dateRange:
+          startDate && endDate
+            ? `${startDate} to ${endDate}`
+            : "No date filter",
+        factory: factoryName || "All factories",
+        includeDownloaded: includeDownloaded
+      }
     });
   } catch (error) {
     console.error("Error checking bulk space:", error);
@@ -1012,6 +1038,84 @@ export const validateDownloadParth = async (req, res) => {
       });
     }
   } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get unique factories from database
+export const getFactories = async (req, res) => {
+  try {
+    const factories = await p88LegacyData.distinct("supplier");
+    const filteredFactories = factories.filter(
+      (factory) => factory && factory.trim() !== ""
+    );
+
+    res.json({
+      success: true,
+      factories: filteredFactories.sort()
+    });
+  } catch (error) {
+    console.error("Error getting factories:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get date filtered statistics
+export const getDateFilteredStats = async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      factoryName,
+      includeDownloaded = "false"
+    } = req.query;
+
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        success: false,
+        error: "Start date and end date are required"
+      });
+    }
+
+    let query = {
+      submittedInspectionDate: {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate + "T23:59:59.999Z")
+      }
+    };
+
+    if (factoryName && factoryName.trim() !== "") {
+      query.supplier = factoryName;
+    }
+
+    if (includeDownloaded !== "true") {
+      query.downloadStatus = { $ne: "Downloaded" };
+    }
+
+    const totalRecords = await p88LegacyData.countDocuments(query);
+    const downloadedQuery = { ...query, downloadStatus: "Downloaded" };
+    const downloadedRecords = await p88LegacyData.countDocuments(
+      downloadedQuery
+    );
+    const pendingRecords =
+      totalRecords - (includeDownloaded === "true" ? 0 : downloadedRecords);
+
+    res.json({
+      success: true,
+      totalRecords,
+      downloadedRecords: includeDownloaded === "true" ? downloadedRecords : 0,
+      pendingRecords,
+      dateRange: { startDate, endDate },
+      factory: factoryName || "All Factories"
+    });
+  } catch (error) {
+    console.error("Error getting date filtered stats:", error);
     res.status(500).json({
       success: false,
       error: error.message
