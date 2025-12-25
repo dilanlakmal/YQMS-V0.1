@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { API_BASE_URL } from "../../../../config"; // Add this import
+import { API_BASE_URL } from "../../../../config";
 import {
   Table,
   TableBody,
@@ -45,7 +45,6 @@ const QC2InspectionReturnDetails = ({
           const data = await response.json();
           setBGradeData(data);
         } else {
-          // If no B-Grade data found, that's okay - just set to null
           setBGradeData(null);
         }
       } catch (error) {
