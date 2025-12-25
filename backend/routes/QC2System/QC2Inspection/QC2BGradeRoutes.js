@@ -5,6 +5,7 @@ import {
   saveBGradeStock,
   getBGradeStockFilters,
   saveBGradeDefect,
+  fixExistingBGradeQty,
 } from '../../../controller/QC2System//QC2Inspection/QC2BGradeController.js';
 
 const router = express.Router();
@@ -19,5 +20,6 @@ router.get('/api/b-grade-stock/filter-options', getBGradeStockFilters);
 
 //Confermation of B-Grade.
 router.post('/api/b-grade-defects/process-decisions', saveBGradeDefect);
+router.post('/api/fix-bgrade-qty', fixExistingBGradeQty);
 
 export default router;
