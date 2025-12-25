@@ -959,9 +959,9 @@ const YPivotQAInspectionOrderData = ({
     }
 
     // If shipping stage is required
-    if (template.ShippingStage === "Yes") {
-      if (!config.shippingStage) return false;
-    }
+    // if (template.ShippingStage === "Yes") {
+    //   if (!config.shippingStage) return false;
+    // }
 
     // Product Type is required
     if (!config.productTypeId && !orderData?.yorksysOrder?.productType)

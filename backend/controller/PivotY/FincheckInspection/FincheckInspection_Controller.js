@@ -4,7 +4,8 @@ import {
   QASectionsAqlBuyerConfig,
   SubconSewingFactory,
   QASectionsProductType,
-  FincheckInspectionReports
+  FincheckInspectionReports,
+  UserMain
 } from "../../MongoDB/dbConnectionController.js";
 import fs from "fs";
 import path from "path";
@@ -983,9 +984,28 @@ export const getInspectionReportById = async (req, res) => {
       });
     }
 
+    // DYNAMIC LOOKUP: Match empId in UserMain to get the photo
+    let inspectorPhoto = null;
+    if (report.empId) {
+      const inspector = await UserMain.findOne(
+        { emp_id: report.empId },
+        "face_photo"
+      ).lean();
+
+      if (inspector && inspector.face_photo) {
+        inspectorPhoto = inspector.face_photo;
+      }
+    }
+
+    // Attach the photo to the response object (not saved to DB)
+    const reportData = {
+      ...report,
+      inspectorPhoto: inspectorPhoto // Frontend can access this now
+    };
+
     return res.status(200).json({
       success: true,
-      data: report
+      data: reportData
     });
   } catch (error) {
     console.error("Error fetching report by ID:", error);
@@ -1481,17 +1501,20 @@ const uploadDirDefectManual = path.join(
   "../../../storage/PivotY/Fincheck/DefectManualData"
 );
 
-// Ensure directory exists
+// Ensure directories exist
 if (!fs.existsSync(uploadDirDefect)) {
   fs.mkdirSync(uploadDirDefect, { recursive: true });
 }
 
-if (!fs.existsSync(uploadDirDefectManual))
+if (!fs.existsSync(uploadDirDefectManual)) {
   fs.mkdirSync(uploadDirDefectManual, { recursive: true });
+}
 
-// Helper: Save Defect Base64 Image
-const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
+// Helper: Generic Base64 Image Saver
+const saveBase64ImageToPath = (base64String, directory, filenamePrefix) => {
   try {
+    if (!base64String || typeof base64String !== "string") return null;
+
     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
     if (!matches || matches.length !== 3) return null;
 
@@ -1499,190 +1522,262 @@ const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
     const data = Buffer.from(matches[2], "base64");
     const ext = type.split("/")[1] || "jpg";
 
-    // Create unique filename
-    const filename = `defect_${reportId}_${defectCode}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirDefect, filename);
+    const filename = `${filenamePrefix}_${Date.now()}.${ext}`;
+    const filepath = path.join(directory, filename);
 
     fs.writeFileSync(filepath, data);
 
-    // Return relative URL
-    return `/storage/PivotY/Fincheck/DefectData/${filename}`;
+    // Return relative URL based on directory
+    const relativePath = directory.includes("DefectManualData")
+      ? `/storage/PivotY/Fincheck/DefectManualData/${filename}`
+      : `/storage/PivotY/Fincheck/DefectData/${filename}`;
+
+    return relativePath;
   } catch (error) {
-    console.error("Error saving defect base64 image:", error);
+    console.error("Error saving base64 image:", error);
     return null;
   }
 };
 
-// Helper: Save Defect LOCATION Image
-const saveDefectLocationBase64Image = (
-  base64String,
+// Helper: Process single image object from frontend
+const processImageObject = (imgObj, directory, filenamePrefix, index) => {
+  if (!imgObj) return null;
+
+  let finalUrl = imgObj.imageURL || null;
+
+  // Check for base64 data in various possible fields
+  const base64Data =
+    imgObj.editedImgSrc || imgObj.imgSrc || imgObj.base64 || null;
+
+  if (base64Data && base64Data.startsWith("data:image")) {
+    const savedPath = saveBase64ImageToPath(
+      base64Data,
+      directory,
+      `${filenamePrefix}_${index}`
+    );
+    if (savedPath) {
+      finalUrl = savedPath;
+    }
+  }
+
+  if (!finalUrl) return null;
+
+  return {
+    imageId:
+      imgObj.id || imgObj.imageId || `${filenamePrefix}_${index}_${Date.now()}`,
+    imageURL: finalUrl,
+    uploadedAt: imgObj.uploadedAt || new Date()
+  };
+};
+
+// Helper: Process Position for Location-based defects
+const processDefectPosition = (
+  position,
   reportId,
   defectCode,
   locationId,
-  index
+  posIndex
 ) => {
-  try {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+  const filenameBase = `def_pos_${reportId}_${defectCode}_${locationId}_pcs${position.pcsNo}`;
 
-    // Naming: def_loc_{reportId}_{defectCode}_{locationId}_{index}_{timestamp}
-    const filename = `def_loc_${reportId}_${defectCode}_${locationId}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirDefect, filename);
-    fs.writeFileSync(filepath, data);
-    return `/storage/PivotY/Fincheck/DefectData/${filename}`;
-  } catch (error) {
-    console.error("Error saving defect location image:", error);
-    return null;
+  // Process required image
+  let processedRequiredImage = null;
+  if (position.requiredImage) {
+    processedRequiredImage = processImageObject(
+      position.requiredImage,
+      uploadDirDefect,
+      `${filenameBase}_req`,
+      posIndex
+    );
   }
+
+  // Process additional images (up to 5)
+  const processedAdditionalImages = [];
+  if (Array.isArray(position.additionalImages)) {
+    position.additionalImages.slice(0, 5).forEach((img, imgIdx) => {
+      const processed = processImageObject(
+        img,
+        uploadDirDefect,
+        `${filenameBase}_add`,
+        imgIdx
+      );
+      if (processed) {
+        processedAdditionalImages.push(processed);
+      }
+    });
+  }
+
+  return {
+    pcsNo: position.pcsNo,
+    status: position.status || "Major",
+    requiredImage: processedRequiredImage,
+    additionalRemark: (position.additionalRemark || "").slice(0, 250),
+    additionalImages: processedAdditionalImages,
+    // Legacy fields
+    position: position.position || "Outside",
+    comment: position.comment || "",
+    qcUser: position.qcUser || null
+  };
 };
 
-// Helper: Save Defect MANUAL Image
-const saveDefectManualBase64Image = (
-  base64String,
-  reportId,
-  groupId,
-  index
-) => {
-  try {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+// Helper: Process Location
+const processDefectLocation = (location, reportId, defectCode) => {
+  const processedPositions = (location.positions || []).map((pos, posIdx) =>
+    processDefectPosition(
+      pos,
+      reportId,
+      defectCode,
+      location.locationId,
+      posIdx
+    )
+  );
 
-    const filename = `def_man_${reportId}_${groupId}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirDefectManual, filename);
-    fs.writeFileSync(filepath, data);
-    return `/storage/PivotY/Fincheck/DefectManualData/${filename}`;
-  } catch (error) {
-    console.error("Error saving defect manual image:", error);
-    return null;
-  }
+  return {
+    uniqueId: location.uniqueId,
+    locationId: location.locationId,
+    locationNo: location.locationNo,
+    locationName: location.locationName,
+    view: location.view,
+    qty: location.qty || processedPositions.length || 1,
+    positions: processedPositions
+  };
 };
 
+// Main Controller
 export const updateDefectData = async (req, res) => {
   try {
     const { reportId, defectData, defectManualData } = req.body;
 
-    if (!reportId)
+    if (!reportId) {
       return res
         .status(400)
         .json({ success: false, message: "Report ID required." });
+    }
 
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
     });
-    if (!report)
+
+    if (!report) {
       return res
         .status(404)
         .json({ success: false, message: "Report not found." });
+    }
 
     // A. Process Standard Defects
     if (Array.isArray(defectData)) {
       const processedDefectData = defectData.map((defect) => {
-        // 1. Process Locations (and their images)
-        const processedLocations = (defect.locations || []).map((loc) => {
-          const processedLocImages = (loc.images || [])
-            .map((img, idx) => {
-              let finalUrl = img.imageURL;
-              if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-                const savedPath = saveDefectLocationBase64Image(
-                  img.imgSrc,
-                  reportId,
-                  defect.defectCode,
-                  loc.locationId,
-                  idx
-                );
-                if (savedPath) finalUrl = savedPath;
-              }
-              // Determine name (Pcs1, Pcs2, Extra...)
-              // Logic: if index < qty, it is Pcs{index+1}, else Extra
-              const name = idx < loc.qty ? `Pcs${idx + 1}` : "Extra";
+        const defectCode = defect.defectCode || "unknown";
 
-              return {
-                imageId: img.id || `${loc.locationId}_${idx}_${Date.now()}`,
-                imageURL: finalUrl,
-                name: name
-              };
-            })
-            .filter((img) => img.imageURL);
+        if (defect.isNoLocation) {
+          // ========== NO-LOCATION MODE ==========
+          // Images are stored at defect level
+          const processedImages = [];
+
+          if (Array.isArray(defect.images)) {
+            defect.images.forEach((img, imgIdx) => {
+              const processed = processImageObject(
+                img,
+                uploadDirDefect,
+                `def_noloc_${reportId}_${defectCode}`,
+                imgIdx
+              );
+              if (processed) {
+                processedImages.push(processed);
+              }
+            });
+          }
 
           return {
-            ...loc,
-            images: processedLocImages
+            groupId: defect.groupId,
+            defectId: defect.defectId,
+            defectName: defect.defectName,
+            defectCode: defectCode,
+            categoryName: defect.categoryName || "",
+            status: defect.status || "Major",
+            qty: defect.qty || 1,
+            determinedBuyer: defect.determinedBuyer || "Unknown",
+            additionalRemark: (defect.additionalRemark || "").slice(0, 250),
+            isNoLocation: true,
+            locations: [],
+            images: processedImages,
+            lineName: defect.lineName || "",
+            tableName: defect.tableName || "",
+            colorName: defect.colorName || "",
+            qcUser: defect.qcUser || null,
+            timestamp: defect.timestamp || new Date()
           };
-        });
+        } else {
+          // ========== LOCATION-BASED MODE ==========
+          const processedLocations = (defect.locations || []).map((loc) =>
+            processDefectLocation(loc, reportId, defectCode)
+          );
 
-        // 2. Process General Defect Images (Legacy or top-level)
-        const processedGeneralImages = (defect.images || [])
-          .map((img, idx) => {
-            let finalUrl = img.imageURL;
-            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-              const savedPath = saveDefectBase64Image(
-                img.imgSrc,
-                reportId,
-                defect.defectCode,
-                idx
-              );
-              if (savedPath) finalUrl = savedPath;
-            }
-            return {
-              imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
-              imageURL: finalUrl
-            };
-          })
-          .filter((img) => img.imageURL);
+          // Calculate total qty from positions
+          const totalQty = processedLocations.reduce(
+            (sum, loc) => sum + (loc.positions?.length || loc.qty || 0),
+            0
+          );
 
-        return {
-          ...defect,
-          locations: processedLocations,
-          images: processedGeneralImages,
-          additionalRemark: defect.additionalRemark || ""
-        };
+          return {
+            groupId: defect.groupId,
+            defectId: defect.defectId,
+            defectName: defect.defectName,
+            defectCode: defectCode,
+            categoryName: defect.categoryName || "",
+            status: null, // Status is per-position for location-based
+            qty: totalQty || defect.qty || 1,
+            determinedBuyer: defect.determinedBuyer || "Unknown",
+            additionalRemark: (defect.additionalRemark || "").slice(0, 250),
+            isNoLocation: false,
+            locations: processedLocations,
+            images: [], // No top-level images for location-based
+            lineName: defect.lineName || "",
+            tableName: defect.tableName || "",
+            colorName: defect.colorName || "",
+            qcUser: defect.qcUser || null,
+            timestamp: defect.timestamp || new Date()
+          };
+        }
       });
+
       report.defectData = processedDefectData;
     }
 
     // B. Process Manual Defect Data
     if (Array.isArray(defectManualData)) {
       const processedManualData = defectManualData.map((manualItem) => {
-        const processedImages = (manualItem.images || [])
-          .map((img, idx) => {
-            let finalUrl = img.imageURL;
-            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-              const savedPath = saveDefectManualBase64Image(
-                img.imgSrc,
-                reportId,
-                manualItem.groupId,
-                idx
-              );
-              if (savedPath) finalUrl = savedPath;
+        const groupId = manualItem.groupId || 0;
+        const processedImages = [];
+
+        if (Array.isArray(manualItem.images)) {
+          manualItem.images.forEach((img, idx) => {
+            const processed = processImageObject(
+              img,
+              uploadDirDefectManual,
+              `def_man_${reportId}_${groupId}`,
+              idx
+            );
+            if (processed) {
+              processedImages.push({
+                ...processed,
+                remark: (img.remark || "").slice(0, 100)
+              });
             }
-            return {
-              imageId:
-                img.id ||
-                img.imageId ||
-                `dm_${manualItem.groupId}_${idx}_${Date.now()}`,
-              imageURL: finalUrl,
-              remark: img.remark || ""
-            };
-          })
-          .filter((img) => img.imageURL);
+          });
+        }
 
         return {
-          groupId: manualItem.groupId,
+          groupId: groupId,
           remarks: manualItem.remarks || "",
           images: processedImages,
-          // Add context fields if provided by frontend
           line: manualItem.line || "",
           table: manualItem.table || "",
           color: manualItem.color || "",
           qcUser: manualItem.qcUser || null
         };
       });
+
       report.defectManualData = processedManualData;
     }
 
@@ -1698,15 +1793,252 @@ export const updateDefectData = async (req, res) => {
     });
   } catch (error) {
     console.error("Error updating defect data:", error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Internal Error",
-        error: error.message
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Internal Error",
+      error: error.message
+    });
   }
 };
+
+// // Define Defect Storage Path
+// const uploadDirDefect = path.join(
+//   __dirname,
+//   "../../../storage/PivotY/Fincheck/DefectData"
+// );
+
+// // Define Manual Defect Storage Path
+// const uploadDirDefectManual = path.join(
+//   __dirname,
+//   "../../../storage/PivotY/Fincheck/DefectManualData"
+// );
+
+// // Ensure directory exists
+// if (!fs.existsSync(uploadDirDefect)) {
+//   fs.mkdirSync(uploadDirDefect, { recursive: true });
+// }
+
+// if (!fs.existsSync(uploadDirDefectManual))
+//   fs.mkdirSync(uploadDirDefectManual, { recursive: true });
+
+// // Helper: Save Defect Base64 Image
+// const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
+//   try {
+//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+//     if (!matches || matches.length !== 3) return null;
+
+//     const type = matches[1];
+//     const data = Buffer.from(matches[2], "base64");
+//     const ext = type.split("/")[1] || "jpg";
+
+//     // Create unique filename
+//     const filename = `defect_${reportId}_${defectCode}_${index}_${Date.now()}.${ext}`;
+//     const filepath = path.join(uploadDirDefect, filename);
+
+//     fs.writeFileSync(filepath, data);
+
+//     // Return relative URL
+//     return `/storage/PivotY/Fincheck/DefectData/${filename}`;
+//   } catch (error) {
+//     console.error("Error saving defect base64 image:", error);
+//     return null;
+//   }
+// };
+
+// // Helper: Save Defect LOCATION Image
+// const saveDefectLocationBase64Image = (
+//   base64String,
+//   reportId,
+//   defectCode,
+//   locationId,
+//   index
+// ) => {
+//   try {
+//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+//     if (!matches || matches.length !== 3) return null;
+//     const type = matches[1];
+//     const data = Buffer.from(matches[2], "base64");
+//     const ext = type.split("/")[1] || "jpg";
+
+//     // Naming: def_loc_{reportId}_{defectCode}_{locationId}_{index}_{timestamp}
+//     const filename = `def_loc_${reportId}_${defectCode}_${locationId}_${index}_${Date.now()}.${ext}`;
+//     const filepath = path.join(uploadDirDefect, filename);
+//     fs.writeFileSync(filepath, data);
+//     return `/storage/PivotY/Fincheck/DefectData/${filename}`;
+//   } catch (error) {
+//     console.error("Error saving defect location image:", error);
+//     return null;
+//   }
+// };
+
+// // Helper: Save Defect MANUAL Image
+// const saveDefectManualBase64Image = (
+//   base64String,
+//   reportId,
+//   groupId,
+//   index
+// ) => {
+//   try {
+//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+//     if (!matches || matches.length !== 3) return null;
+//     const type = matches[1];
+//     const data = Buffer.from(matches[2], "base64");
+//     const ext = type.split("/")[1] || "jpg";
+
+//     const filename = `def_man_${reportId}_${groupId}_${index}_${Date.now()}.${ext}`;
+//     const filepath = path.join(uploadDirDefectManual, filename);
+//     fs.writeFileSync(filepath, data);
+//     return `/storage/PivotY/Fincheck/DefectManualData/${filename}`;
+//   } catch (error) {
+//     console.error("Error saving defect manual image:", error);
+//     return null;
+//   }
+// };
+
+// export const updateDefectData = async (req, res) => {
+//   try {
+//     const { reportId, defectData, defectManualData } = req.body;
+
+//     if (!reportId)
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Report ID required." });
+
+//     const report = await FincheckInspectionReports.findOne({
+//       reportId: parseInt(reportId)
+//     });
+//     if (!report)
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Report not found." });
+
+//     // A. Process Standard Defects
+//     if (Array.isArray(defectData)) {
+//       const processedDefectData = defectData.map((defect) => {
+//         // 1. Process Locations (and their images)
+//         const processedLocations = (defect.locations || []).map((loc) => {
+//           const processedLocImages = (loc.images || [])
+//             .map((img, idx) => {
+//               let finalUrl = img.imageURL;
+//               if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+//                 const savedPath = saveDefectLocationBase64Image(
+//                   img.imgSrc,
+//                   reportId,
+//                   defect.defectCode,
+//                   loc.locationId,
+//                   idx
+//                 );
+//                 if (savedPath) finalUrl = savedPath;
+//               }
+//               // Determine name (Pcs1, Pcs2, Extra...)
+//               // Logic: if index < qty, it is Pcs{index+1}, else Extra
+//               const name = idx < loc.qty ? `Pcs${idx + 1}` : "Extra";
+
+//               return {
+//                 imageId: img.id || `${loc.locationId}_${idx}_${Date.now()}`,
+//                 imageURL: finalUrl,
+//                 name: name
+//               };
+//             })
+//             .filter((img) => img.imageURL);
+
+//           return {
+//             ...loc,
+//             images: processedLocImages
+//           };
+//         });
+
+//         // 2. Process General Defect Images (Legacy or top-level)
+//         const processedGeneralImages = (defect.images || [])
+//           .map((img, idx) => {
+//             let finalUrl = img.imageURL;
+//             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+//               const savedPath = saveDefectBase64Image(
+//                 img.imgSrc,
+//                 reportId,
+//                 defect.defectCode,
+//                 idx
+//               );
+//               if (savedPath) finalUrl = savedPath;
+//             }
+//             return {
+//               imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
+//               imageURL: finalUrl
+//             };
+//           })
+//           .filter((img) => img.imageURL);
+
+//         return {
+//           ...defect,
+//           locations: processedLocations,
+//           images: processedGeneralImages,
+//           additionalRemark: defect.additionalRemark || ""
+//         };
+//       });
+//       report.defectData = processedDefectData;
+//     }
+
+//     // B. Process Manual Defect Data
+//     if (Array.isArray(defectManualData)) {
+//       const processedManualData = defectManualData.map((manualItem) => {
+//         const processedImages = (manualItem.images || [])
+//           .map((img, idx) => {
+//             let finalUrl = img.imageURL;
+//             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+//               const savedPath = saveDefectManualBase64Image(
+//                 img.imgSrc,
+//                 reportId,
+//                 manualItem.groupId,
+//                 idx
+//               );
+//               if (savedPath) finalUrl = savedPath;
+//             }
+//             return {
+//               imageId:
+//                 img.id ||
+//                 img.imageId ||
+//                 `dm_${manualItem.groupId}_${idx}_${Date.now()}`,
+//               imageURL: finalUrl,
+//               remark: img.remark || ""
+//             };
+//           })
+//           .filter((img) => img.imageURL);
+
+//         return {
+//           groupId: manualItem.groupId,
+//           remarks: manualItem.remarks || "",
+//           images: processedImages,
+//           // Add context fields if provided by frontend
+//           line: manualItem.line || "",
+//           table: manualItem.table || "",
+//           color: manualItem.color || "",
+//           qcUser: manualItem.qcUser || null
+//         };
+//       });
+//       report.defectManualData = processedManualData;
+//     }
+
+//     await report.save();
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Defect data saved successfully.",
+//       data: {
+//         defectData: report.defectData,
+//         defectManualData: report.defectManualData
+//       }
+//     });
+//   } catch (error) {
+//     console.error("Error updating defect data:", error);
+//     return res
+//       .status(500)
+//       .json({
+//         success: false,
+//         message: "Internal Error",
+//         error: error.message
+//       });
+//   }
+// };
 
 // ============================================================
 // Update PP Sheet Data
@@ -1807,5 +2139,313 @@ export const updatePPSheetData = async (req, res) => {
       message: "Internal server error.",
       error: error.message
     });
+  }
+};
+
+// ============================================================
+// SUBMIT FULL REPORT (Master Save)
+// Saves/Updates all sections at once
+// ============================================================
+export const submitFullInspectionReport = async (req, res) => {
+  try {
+    const {
+      reportId,
+      inspectionDetails, // Order/Config Data
+      headerData,
+      photoData,
+      measurementData,
+      defectData,
+      defectManualData,
+      ppSheetData
+    } = req.body;
+
+    if (!reportId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID is required." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // 1. Update Inspection Details (Order Tab & Info Tab data)
+    if (inspectionDetails) {
+      // Process AQL if present
+      let processedAqlConfig = report.inspectionDetails.aqlConfig; // Keep existing if not provided
+      if (inspectionDetails.method === "AQL" && inspectionDetails.aqlConfig) {
+        const src = inspectionDetails.aqlConfig;
+        processedAqlConfig = {
+          inspectionType: src.inspectionType || "",
+          level: src.level || "",
+          minorAQL: parseFloat(src.minorAQL) || 0,
+          majorAQL: parseFloat(src.majorAQL) || 0,
+          criticalAQL: parseFloat(src.criticalAQL) || 0,
+          inspectedQty: parseIntWithDefault(src.inspectedQty, 0),
+          batch: src.batch || "",
+          sampleLetter: src.sampleLetter || "",
+          sampleSize: parseIntWithDefault(src.sampleSize, 0),
+          items: Array.isArray(src.items) ? src.items : []
+        };
+      }
+
+      // Merge updates into inspectionDetails
+      report.inspectionDetails = {
+        ...report.inspectionDetails, // Keep existing fields
+        ...inspectionDetails, // Overwrite with new data
+        // Explicitly map key fields to ensure they update
+        inspectedQty: parseNullableInt(inspectionDetails.inspectedQty),
+        cartonQty: parseNullableInt(inspectionDetails.cartonQty),
+        shippingStage:
+          inspectionDetails.shippingStage ||
+          report.inspectionDetails.shippingStage,
+        remarks: inspectionDetails.remarks || report.inspectionDetails.remarks,
+        subConFactory:
+          inspectionDetails.subConFactory ||
+          report.inspectionDetails.subConFactory,
+        isSubCon:
+          inspectionDetails.isSubCon !== undefined
+            ? inspectionDetails.isSubCon
+            : report.inspectionDetails.isSubCon,
+        aqlConfig: processedAqlConfig
+      };
+
+      // Update Root Level fields if changed in Info Tab
+      if (inspectionDetails.measurement)
+        report.measurementMethod = inspectionDetails.measurement;
+      if (inspectionDetails.method)
+        report.inspectionMethod = inspectionDetails.method;
+    }
+
+    // 2. Process Header Data
+    if (headerData && Array.isArray(headerData)) {
+      const processedHeaderData = headerData.map((section) => {
+        const processedImages = (section.images || [])
+          .map((img, idx) => {
+            let finalUrl = img.imageURL;
+            if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+              const savedPath = saveBase64Image(
+                img.imgSrc,
+                reportId,
+                section.headerId,
+                idx
+              );
+              if (savedPath) finalUrl = savedPath;
+            }
+            return {
+              imageId:
+                img.id ||
+                img.imageId ||
+                `${section.headerId}_${idx}_${Date.now()}`,
+              imageURL: finalUrl
+            };
+          })
+          .filter((img) => img.imageURL);
+
+        return {
+          headerId: section.headerId,
+          name: section.name,
+          selectedOption: section.selectedOption,
+          remarks: section.remarks,
+          images: processedImages
+        };
+      });
+      report.headerData = processedHeaderData;
+    }
+
+    // 3. Process Photo Data
+    if (photoData && Array.isArray(photoData)) {
+      const processedPhotoData = photoData.map((section) => {
+        const processedItems = (section.items || []).map((item) => {
+          const processedImages = (item.images || [])
+            .map((img, idx) => {
+              let finalUrl = img.imageURL;
+              if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+                const savedPath = savePhotoBase64Image(
+                  img.imgSrc,
+                  reportId,
+                  section.sectionId,
+                  item.itemNo,
+                  idx
+                );
+                if (savedPath) finalUrl = savedPath;
+              }
+              return {
+                imageId:
+                  img.id ||
+                  `${section.sectionId}_${item.itemNo}_${idx}_${Date.now()}`,
+                imageURL: finalUrl
+              };
+            })
+            .filter((img) => img.imageURL);
+
+          return {
+            itemNo: item.itemNo,
+            itemName: item.itemName,
+            remarks: item.remarks,
+            images: processedImages
+          };
+        });
+        return {
+          sectionId: section.sectionId,
+          sectionName: section.sectionName,
+          items: processedItems
+        };
+      });
+      report.photoData = processedPhotoData;
+    }
+
+    // 4. Process Measurement Data
+    if (measurementData && Array.isArray(measurementData)) {
+      const processedMeasurementData = measurementData.map((item) => {
+        let processedManualData = null;
+        if (item.manualData) {
+          const processedImages = (item.manualData.images || [])
+            .map((img, idx) => {
+              let finalUrl = img.imageURL;
+              if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+                const savedPath = saveMeasManualBase64Image(
+                  img.imgSrc,
+                  reportId,
+                  item.groupId,
+                  idx
+                );
+                if (savedPath) finalUrl = savedPath;
+              }
+              return {
+                imageId:
+                  img.id ||
+                  img.imageId ||
+                  `mm_${item.groupId}_${idx}_${Date.now()}`,
+                imageURL: finalUrl,
+                remark: img.remark || ""
+              };
+            })
+            .filter((img) => img.imageURL);
+
+          processedManualData = {
+            remarks: item.manualData.remarks || "",
+            status: item.manualData.status || "Pass",
+            images: processedImages
+          };
+        }
+        return { ...item, manualData: processedManualData };
+      });
+      report.measurementData = processedMeasurementData;
+    }
+
+    // 5. Process Defect Data
+    if (Array.isArray(defectData)) {
+      const processedDefectData = defectData.map((defect) => {
+        const defectCode = defect.defectCode || "unknown";
+        if (defect.isNoLocation) {
+          // No Location Logic
+          const processedImages = (defect.images || [])
+            .map((img, imgIdx) => {
+              const processed = processImageObject(
+                img,
+                uploadDirDefect,
+                `def_noloc_${reportId}_${defectCode}`,
+                imgIdx
+              );
+              return processed;
+            })
+            .filter(Boolean);
+
+          return {
+            ...defect, // Keep other fields
+            locations: [],
+            images: processedImages
+          };
+        } else {
+          // Location Logic
+          const processedLocations = (defect.locations || []).map((loc) =>
+            processDefectLocation(loc, reportId, defectCode)
+          );
+          const totalQty = processedLocations.reduce(
+            (sum, loc) => sum + (loc.positions?.length || loc.qty || 0),
+            0
+          );
+          return {
+            ...defect,
+            qty: totalQty || defect.qty || 1,
+            locations: processedLocations,
+            images: []
+          };
+        }
+      });
+      report.defectData = processedDefectData;
+    }
+
+    // 6. Process Manual Defect Data
+    if (Array.isArray(defectManualData)) {
+      const processedManualData = defectManualData.map((manualItem) => {
+        const groupId = manualItem.groupId || 0;
+        const processedImages = (manualItem.images || [])
+          .map((img, idx) => {
+            const processed = processImageObject(
+              img,
+              uploadDirDefectManual,
+              `def_man_${reportId}_${groupId}`,
+              idx
+            );
+            if (processed) processed.remark = (img.remark || "").slice(0, 100);
+            return processed;
+          })
+          .filter(Boolean);
+
+        return { ...manualItem, images: processedImages };
+      });
+      report.defectManualData = processedManualData;
+    }
+
+    // 7. Process PP Sheet Data
+    if (ppSheetData) {
+      const processedImages = (ppSheetData.images || [])
+        .map((img, idx) => {
+          let finalUrl = img.imageURL;
+          if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+            const savedPath = savePPSheetBase64Image(img.imgSrc, reportId, idx);
+            if (savedPath) finalUrl = savedPath;
+          }
+          return {
+            imageId: img.id || `pp_${idx}_${Date.now()}`,
+            imageURL: finalUrl
+          };
+        })
+        .filter((img) => img.imageURL);
+
+      report.ppSheetData = {
+        ...ppSheetData,
+        images: processedImages,
+        timestamp: new Date()
+      };
+    }
+
+    // 8. Final Status Update
+    report.status = "completed"; // Mark as completed on submit
+
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Report submitted successfully!",
+      data: report
+    });
+  } catch (error) {
+    console.error("Error submitting full report:", error);
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Submission failed.",
+        error: error.message
+      });
   }
 };

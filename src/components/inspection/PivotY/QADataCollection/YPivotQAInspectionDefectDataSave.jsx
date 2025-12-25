@@ -1,9 +1,690 @@
-import React, { useState, useEffect } from "react";
+// import React, { useState, useEffect } from "react";
+// import axios from "axios";
+// import { Save, Loader2, Bug } from "lucide-react";
+// import { API_BASE_URL } from "../../../../../config";
+// import YPivotQAInspectionDefectConfig from "./YPivotQAInspectionDefectConfig";
+
+// const YPivotQAInspectionDefectDataSave = ({
+//   selectedOrders,
+//   orderData,
+//   reportData,
+//   onUpdateDefectData,
+//   activeGroup,
+//   reportId,
+//   isReportSaved
+// }) => {
+//   const [saving, setSaving] = useState(false);
+//   const [loadingData, setLoadingData] = useState(false);
+
+//   // --- FETCH EXISTING DATA ---
+//   useEffect(() => {
+//     const fetchExistingDefectData = async () => {
+//       if (!reportId) return;
+
+//       // Check if data already exists in client state
+//       const hasDefects = reportData.defectData?.savedDefects?.length > 0;
+//       const hasManual =
+//         Object.keys(reportData.defectData?.manualDataByGroup || {}).length > 0;
+
+//       if (hasDefects || hasManual) {
+//         return;
+//       }
+
+//       setLoadingData(true);
+//       try {
+//         const res = await axios.get(
+//           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
+//         );
+
+//         if (res.data.success) {
+//           const backendData = res.data.data;
+
+//           // 1. Process Standard Defects (Deep Restore)
+//           const backendDefects = backendData.defectData || [];
+//           const processedDefects = backendDefects.map((defect) => {
+//             // Restore Location Images & Logic
+//             const restoredLocations = (defect.locations || []).map((loc) => {
+//               const restoredLocImages = (loc.images || []).map((img) => {
+//                 let displayUrl = img.imageURL;
+//                 if (
+//                   displayUrl &&
+//                   !displayUrl.startsWith("http") &&
+//                   !displayUrl.startsWith("data:")
+//                 ) {
+//                   displayUrl = `${API_BASE_URL}${displayUrl}`;
+//                 }
+//                 return {
+//                   id: img.imageId,
+//                   url: displayUrl,
+//                   imgSrc: displayUrl,
+//                   editedImgSrc: displayUrl,
+//                   history: []
+//                 };
+//               });
+
+//               return { ...loc, images: restoredLocImages };
+//             });
+
+//             // Restore General Images
+//             const restoredImages = (defect.images || []).map((img) => {
+//               let displayUrl = img.imageURL;
+//               if (
+//                 displayUrl &&
+//                 !displayUrl.startsWith("http") &&
+//                 !displayUrl.startsWith("data:")
+//               ) {
+//                 displayUrl = `${API_BASE_URL}${displayUrl}`;
+//               }
+//               return {
+//                 id: img.imageId,
+//                 url: displayUrl,
+//                 imgSrc: displayUrl,
+//                 history: []
+//               };
+//             });
+
+//             return {
+//               ...defect,
+//               locations: restoredLocations,
+//               images: restoredImages
+//             };
+//           });
+
+//           // 2. Process Manual Defect Data (Array -> Object Map)
+//           const backendManualData = backendData.defectManualData || [];
+//           const processedManualDataByGroup = {};
+
+//           backendManualData.forEach((item) => {
+//             const groupId = item.groupId;
+//             const processedImages = (item.images || []).map((img) => {
+//               let displayUrl = img.imageURL;
+//               if (
+//                 displayUrl &&
+//                 !displayUrl.startsWith("http") &&
+//                 !displayUrl.startsWith("data:")
+//               ) {
+//                 displayUrl = `${API_BASE_URL}${displayUrl}`;
+//               }
+//               return {
+//                 id: img.imageId,
+//                 url: displayUrl,
+//                 imgSrc: displayUrl,
+//                 editedImgSrc: displayUrl,
+//                 remark: img.remark || "",
+//                 history: []
+//               };
+//             });
+
+//             processedManualDataByGroup[groupId] = {
+//               remarks: item.remarks || "",
+//               images: processedImages
+//             };
+//           });
+
+//           // Update parent state
+//           onUpdateDefectData({
+//             savedDefects: processedDefects,
+//             manualDataByGroup: processedManualDataByGroup
+//           });
+//         }
+//       } catch (error) {
+//         console.error("Error fetching defect data:", error);
+//       } finally {
+//         setLoadingData(false);
+//       }
+//     };
+
+//     if (reportId) {
+//       fetchExistingDefectData();
+//     }
+//   }, [reportId]);
+
+//   // --- SAVE HANDLER ---
+//   const handleSaveData = async () => {
+//     if (!isReportSaved || !reportId) {
+//       alert("Please save the Order information first.");
+//       return;
+//     }
+
+//     const currentDefects = reportData.defectData?.savedDefects || [];
+//     const manualDataByGroup = reportData.defectData?.manualDataByGroup || {};
+
+//     if (
+//       currentDefects.length === 0 &&
+//       Object.keys(manualDataByGroup).length === 0
+//     ) {
+//       alert("No defect data recorded to save.");
+//       return;
+//     }
+
+//     setSaving(true);
+//     try {
+//       // 1. Prepare Standard Defects Payload
+//       const payloadDefects = currentDefects.map((defect) => {
+//         // Process Location Images
+//         const processedLocations = (defect.locations || []).map((loc) => {
+//           const locImages = (loc.images || []).map((img) => {
+//             let payloadImageURL = null;
+//             let payloadImgSrc = null;
+//             const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+//             if (imageData && imageData.startsWith("data:")) {
+//               payloadImgSrc = imageData;
+//             } else if (imageData) {
+//               payloadImageURL = imageData.replace(API_BASE_URL, "");
+//             }
+
+//             return {
+//               id: img.id,
+//               imageURL: payloadImageURL,
+//               imgSrc: payloadImgSrc
+//             };
+//           });
+//           return { ...loc, images: locImages };
+//         });
+
+//         // Process General Images
+//         const processedImages = (defect.images || []).map((img) => {
+//           let payloadImageURL = null;
+//           let payloadImgSrc = null;
+//           const imageData = img.url || img.imgSrc;
+
+//           if (imageData && imageData.startsWith("data:")) {
+//             payloadImgSrc = imageData;
+//           } else if (imageData) {
+//             payloadImageURL = imageData.replace(API_BASE_URL, "");
+//           }
+
+//           return {
+//             id: img.id,
+//             imageURL: payloadImageURL,
+//             imgSrc: payloadImgSrc
+//           };
+//         });
+
+//         return {
+//           ...defect,
+//           additionalRemark: defect.additionalRemark || "",
+//           locations: processedLocations,
+//           images: processedImages
+//         };
+//       });
+
+//       // 2. Prepare Manual Defects Payload
+//       const payloadManualData = Object.entries(manualDataByGroup).map(
+//         ([groupIdStr, data]) => {
+//           const groupId = isNaN(Number(groupIdStr))
+//             ? groupIdStr
+//             : Number(groupIdStr);
+
+//           const processedImages = (data.images || []).map((img) => {
+//             let payloadImageURL = null;
+//             let payloadImgSrc = null;
+//             const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+//             if (imageData && imageData.startsWith("data:")) {
+//               payloadImgSrc = imageData;
+//             } else if (imageData) {
+//               payloadImageURL = imageData.replace(API_BASE_URL, "");
+//             }
+
+//             return {
+//               id: img.id,
+//               imageId: img.id,
+//               imageURL: payloadImageURL,
+//               imgSrc: payloadImgSrc,
+//               remark: img.remark
+//             };
+//           });
+
+//           return {
+//             groupId: groupId,
+//             remarks: data.remarks,
+//             images: processedImages
+//             // We can attach minimal context if needed, otherwise backend relies on groupId
+//           };
+//         }
+//       );
+
+//       const res = await axios.post(
+//         `${API_BASE_URL}/api/fincheck-inspection/update-defect-data`,
+//         {
+//           reportId: reportId,
+//           defectData: payloadDefects,
+//           defectManualData: payloadManualData
+//         }
+//       );
+
+//       if (res.data.success) {
+//         alert("Defect data saved successfully!");
+//       }
+//     } catch (error) {
+//       console.error("Error saving defect data:", error);
+//       alert("Failed to save defect data.");
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+
+//   if (loadingData) {
+//     return (
+//       <div className="flex justify-center items-center h-64">
+//         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+//         <span className="ml-3 text-gray-600 font-medium">
+//           Loading existing defects...
+//         </span>
+//       </div>
+//     );
+//   }
+
+//   if (!reportData?.selectedTemplate) {
+//     return (
+//       <div className="flex flex-col items-center justify-center py-16">
+//         <Bug className="w-12 h-12 text-gray-300 mb-4" />
+//         <p className="text-gray-500">Please select a Report Type first.</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="relative pb-24">
+//       <YPivotQAInspectionDefectConfig
+//         selectedOrders={selectedOrders}
+//         orderData={orderData}
+//         reportData={reportData}
+//         onUpdateDefectData={onUpdateDefectData}
+//         activeGroup={activeGroup}
+//       />
+
+//       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+//         <div className="max-w-8xl mx-auto flex justify-end px-4">
+//           <button
+//             onClick={handleSaveData}
+//             disabled={!isReportSaved || saving}
+//             className={`
+//               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
+//               ${
+//                 isReportSaved
+//                   ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white"
+//                   : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+//               }
+//             `}
+//             title={
+//               !isReportSaved ? "Save Order Data first" : "Save Defect Data"
+//             }
+//           >
+//             {saving ? (
+//               <>
+//                 <Loader2 className="w-5 h-5 animate-spin" />
+//                 Saving...
+//               </>
+//             ) : (
+//               <>
+//                 <Save className="w-5 h-5" />
+//                 Save Defects
+//               </>
+//             )}
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default YPivotQAInspectionDefectDataSave;
+
+import React, { useState, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
-import { Save, Loader2, Bug } from "lucide-react";
+import {
+  Save,
+  Loader2,
+  Edit3,
+  CheckCircle2,
+  AlertCircle,
+  Bug,
+  RefreshCw
+} from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionDefectConfig from "./YPivotQAInspectionDefectConfig";
 
+// ==============================================================================
+// INTERNAL COMPONENT: AUTO-DISMISS STATUS MODAL
+// ==============================================================================
+const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 1500); // Auto close after 1.5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const isSuccess = type === "success";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+        <div
+          className={`p-3 rounded-full ${
+            isSuccess
+              ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+          }`}
+        >
+          {isSuccess ? (
+            <CheckCircle2 className="w-8 h-8" />
+          ) : (
+            <AlertCircle className="w-8 h-8" />
+          )}
+        </div>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+          {isSuccess ? "Success" : "Error"}
+        </h3>
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+          {message}
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// ==============================================================================
+// HELPER: Transform Backend Image to Frontend Format
+// ==============================================================================
+const transformImageFromBackend = (img) => {
+  if (!img) return null;
+
+  let displayUrl = img.imageURL || "";
+
+  // Prepend API_BASE_URL if it's a relative path
+  if (
+    displayUrl &&
+    !displayUrl.startsWith("http") &&
+    !displayUrl.startsWith("data:")
+  ) {
+    displayUrl = `${API_BASE_URL}${displayUrl}`;
+  }
+
+  return {
+    id: img.imageId || img.id,
+    imageId: img.imageId || img.id,
+    imageURL: img.imageURL, // Keep original relative URL for backend reference
+    imgSrc: displayUrl, // Full URL for display
+    editedImgSrc: null,
+    uploadedAt: img.uploadedAt
+  };
+};
+
+// ==============================================================================
+// HELPER: Transform Frontend Image to Backend Format
+// ==============================================================================
+const transformImageToBackend = (img) => {
+  if (!img) return null;
+
+  // Determine if this is a new image (base64) or existing (URL)
+  const isBase64 =
+    img.imgSrc?.startsWith("data:") || img.editedImgSrc?.startsWith("data:");
+  const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+
+  return {
+    id: img.id || img.imageId,
+    imageId: img.id || img.imageId,
+    // If we have a new edited image, send it as imgSrc
+    imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
+    // If it's an existing image, keep the relative URL
+    imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null
+  };
+};
+
+// ==============================================================================
+// HELPER: Transform Position from Backend
+// ==============================================================================
+const transformPositionFromBackend = (pos) => {
+  return {
+    pcsNo: pos.pcsNo,
+    status: pos.status || "Major",
+    requiredImage: pos.requiredImage
+      ? transformImageFromBackend(pos.requiredImage)
+      : null,
+    additionalRemark: pos.additionalRemark || "",
+    additionalImages: (pos.additionalImages || [])
+      .map(transformImageFromBackend)
+      .filter(Boolean),
+    position: pos.position || "Outside",
+    comment: pos.comment || "",
+    qcUser: pos.qcUser || null
+  };
+};
+
+// ==============================================================================
+// HELPER: Transform Position to Backend
+// ==============================================================================
+const transformPositionToBackend = (pos) => {
+  return {
+    pcsNo: pos.pcsNo,
+    status: pos.status || "Major",
+    requiredImage: pos.requiredImage
+      ? transformImageToBackend(pos.requiredImage)
+      : null,
+    additionalRemark: (pos.additionalRemark || "").slice(0, 250),
+    additionalImages: (pos.additionalImages || [])
+      .slice(0, 5)
+      .map(transformImageToBackend)
+      .filter(Boolean),
+    position: pos.position || "Outside",
+    comment: pos.comment || "",
+    qcUser: pos.qcUser || null
+  };
+};
+
+// ==============================================================================
+// HELPER: Transform Location from Backend
+// ==============================================================================
+const transformLocationFromBackend = (loc) => {
+  return {
+    uniqueId: loc.uniqueId,
+    locationId: loc.locationId,
+    locationNo: loc.locationNo,
+    locationName: loc.locationName,
+    view: loc.view,
+    qty: loc.qty || 1,
+    positions: (loc.positions || []).map(transformPositionFromBackend)
+  };
+};
+
+// ==============================================================================
+// HELPER: Transform Location to Backend
+// ==============================================================================
+const transformLocationToBackend = (loc) => {
+  const positions = (loc.positions || []).map(transformPositionToBackend);
+  return {
+    uniqueId: loc.uniqueId,
+    locationId: loc.locationId,
+    locationNo: loc.locationNo,
+    locationName: loc.locationName,
+    view: loc.view,
+    qty: positions.length || loc.qty || 1,
+    positions
+  };
+};
+
+// ==============================================================================
+// HELPER: Transform Defect from Backend
+// ==============================================================================
+const transformDefectFromBackend = (defect) => {
+  if (defect.isNoLocation) {
+    // No-Location mode
+    return {
+      defectId: defect.defectId,
+      defectName: defect.defectName,
+      defectCode: defect.defectCode,
+      categoryName: defect.categoryName || "",
+      groupId: defect.groupId,
+      lineName: defect.lineName || "",
+      tableName: defect.tableName || "",
+      colorName: defect.colorName || "",
+      determinedBuyer: defect.determinedBuyer || "Unknown",
+      timestamp: defect.timestamp,
+      isNoLocation: true,
+      status: defect.status || "Major",
+      qty: defect.qty || 1,
+      qcUser: defect.qcUser || null,
+      additionalRemark: defect.additionalRemark || "",
+      images: (defect.images || [])
+        .map(transformImageFromBackend)
+        .filter(Boolean),
+      locations: []
+    };
+  } else {
+    // Location-based mode
+    return {
+      defectId: defect.defectId,
+      defectName: defect.defectName,
+      defectCode: defect.defectCode,
+      categoryName: defect.categoryName || "",
+      groupId: defect.groupId,
+      lineName: defect.lineName || "",
+      tableName: defect.tableName || "",
+      colorName: defect.colorName || "",
+      determinedBuyer: defect.determinedBuyer || "Unknown",
+      timestamp: defect.timestamp,
+      isNoLocation: false,
+      status: null,
+      qty: defect.qty || 1,
+      qcUser: defect.qcUser || null,
+      additionalRemark: defect.additionalRemark || "",
+      images: [],
+      locations: (defect.locations || []).map(transformLocationFromBackend)
+    };
+  }
+};
+
+// ==============================================================================
+// HELPER: Transform Defect to Backend
+// ==============================================================================
+const transformDefectToBackend = (defect) => {
+  if (defect.isNoLocation) {
+    // No-Location mode
+    return {
+      groupId: defect.groupId,
+      defectId: defect.defectId,
+      defectName: defect.defectName,
+      defectCode: defect.defectCode,
+      categoryName: defect.categoryName || "",
+      status: defect.status || "Major",
+      qty: defect.qty || 1,
+      determinedBuyer: defect.determinedBuyer || "Unknown",
+      additionalRemark: (defect.additionalRemark || "").slice(0, 250),
+      isNoLocation: true,
+      locations: [],
+      images: (defect.images || [])
+        .map(transformImageToBackend)
+        .filter(Boolean),
+      lineName: defect.lineName || "",
+      tableName: defect.tableName || "",
+      colorName: defect.colorName || "",
+      qcUser: defect.qcUser || null,
+      timestamp: defect.timestamp
+    };
+  } else {
+    // Location-based mode
+    const locations = (defect.locations || []).map(transformLocationToBackend);
+    const totalQty = locations.reduce(
+      (sum, loc) => sum + (loc.positions?.length || loc.qty || 0),
+      0
+    );
+
+    return {
+      groupId: defect.groupId,
+      defectId: defect.defectId,
+      defectName: defect.defectName,
+      defectCode: defect.defectCode,
+      categoryName: defect.categoryName || "",
+      status: null, // Status is per-position for location-based
+      qty: totalQty || defect.qty || 1,
+      determinedBuyer: defect.determinedBuyer || "Unknown",
+      additionalRemark: (defect.additionalRemark || "").slice(0, 250),
+      isNoLocation: false,
+      locations,
+      images: [],
+      lineName: defect.lineName || "",
+      tableName: defect.tableName || "",
+      colorName: defect.colorName || "",
+      qcUser: defect.qcUser || null,
+      timestamp: defect.timestamp
+    };
+  }
+};
+
+// ==============================================================================
+// HELPER: Transform Manual Data from Backend
+// ==============================================================================
+const transformManualDataFromBackend = (backendManualData) => {
+  const manualDataByGroup = {};
+
+  (backendManualData || []).forEach((manual) => {
+    const groupId = manual.groupId;
+    manualDataByGroup[groupId] = {
+      remarks: manual.remarks || "",
+      images: (manual.images || []).map((img) => ({
+        id: img.imageId || img.id,
+        imageId: img.imageId || img.id,
+        imageURL: img.imageURL,
+        imgSrc: img.imageURL
+          ? img.imageURL.startsWith("http")
+            ? img.imageURL
+            : `${API_BASE_URL}${img.imageURL}`
+          : null,
+        editedImgSrc: null,
+        remark: img.remark || "",
+        uploadedAt: img.uploadedAt
+      })),
+      line: manual.line || "",
+      table: manual.table || "",
+      color: manual.color || "",
+      qcUser: manual.qcUser || null
+    };
+  });
+
+  return manualDataByGroup;
+};
+
+// ==============================================================================
+// HELPER: Transform Manual Data to Backend
+// ==============================================================================
+const transformManualDataToBackend = (manualDataByGroup) => {
+  return Object.entries(manualDataByGroup || {}).map(([groupId, data]) => ({
+    groupId: parseInt(groupId) || groupId,
+    remarks: data.remarks || "",
+    images: (data.images || []).map((img) => {
+      const isBase64 =
+        img.imgSrc?.startsWith("data:") ||
+        img.editedImgSrc?.startsWith("data:");
+      const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+
+      return {
+        id: img.id || img.imageId,
+        imageId: img.id || img.imageId,
+        imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
+        imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null,
+        remark: (img.remark || "").slice(0, 100)
+      };
+    }),
+    line: data.line || "",
+    table: data.table || "",
+    color: data.color || "",
+    qcUser: data.qcUser || null
+  }));
+};
+
+// ==============================================================================
+// MAIN COMPONENT
+// ==============================================================================
 const YPivotQAInspectionDefectDataSave = ({
   selectedOrders,
   orderData,
@@ -15,18 +696,63 @@ const YPivotQAInspectionDefectDataSave = ({
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  // --- FETCH EXISTING DATA ---
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    type: "success",
+    message: ""
+  });
+
+  // Check if there's existing defect data
+  const hasDefectData = useMemo(() => {
+    const defects = reportData?.defectData?.savedDefects || [];
+    const manualData = reportData?.defectData?.manualDataByGroup || {};
+    return defects.length > 0 || Object.keys(manualData).length > 0;
+  }, [reportData?.defectData]);
+
+  // Get defect counts for display
+  const defectStats = useMemo(() => {
+    const defects = reportData?.defectData?.savedDefects || [];
+    let total = 0;
+    let critical = 0;
+    let major = 0;
+    let minor = 0;
+
+    defects.forEach((d) => {
+      if (d.isNoLocation) {
+        total += d.qty || 1;
+        if (d.status === "Critical") critical += d.qty || 1;
+        else if (d.status === "Major") major += d.qty || 1;
+        else if (d.status === "Minor") minor += d.qty || 1;
+      } else {
+        (d.locations || []).forEach((loc) => {
+          (loc.positions || []).forEach((pos) => {
+            total += 1;
+            if (pos.status === "Critical") critical += 1;
+            else if (pos.status === "Major") major += 1;
+            else if (pos.status === "Minor") minor += 1;
+          });
+        });
+      }
+    });
+
+    return { total, critical, major, minor };
+  }, [reportData?.defectData?.savedDefects]);
+
+  // --- FETCH EXISTING DATA ON MOUNT ---
   useEffect(() => {
     const fetchExistingDefectData = async () => {
-      if (!reportId) return;
+      if (!reportId) {
+        setIsUpdateMode(false);
+        setDataLoaded(true);
+        return;
+      }
 
-      // Check if data already exists in client state
-      const hasDefects = reportData.defectData?.savedDefects?.length > 0;
-      const hasManual =
-        Object.keys(reportData.defectData?.manualDataByGroup || {}).length > 0;
-
-      if (hasDefects || hasManual) {
+      // If we already have data loaded from parent, check update mode
+      if (hasDefectData && dataLoaded) {
+        setIsUpdateMode(true);
         return;
       }
 
@@ -37,257 +763,144 @@ const YPivotQAInspectionDefectDataSave = ({
         );
 
         if (res.data.success) {
-          const backendData = res.data.data;
+          const backendDefectData = res.data.data.defectData || [];
+          const backendManualData = res.data.data.defectManualData || [];
 
-          // 1. Process Standard Defects (Deep Restore)
-          const backendDefects = backendData.defectData || [];
-          const processedDefects = backendDefects.map((defect) => {
-            // Restore Location Images & Logic
-            const restoredLocations = (defect.locations || []).map((loc) => {
-              const restoredLocImages = (loc.images || []).map((img) => {
-                let displayUrl = img.imageURL;
-                if (
-                  displayUrl &&
-                  !displayUrl.startsWith("http") &&
-                  !displayUrl.startsWith("data:")
-                ) {
-                  displayUrl = `${API_BASE_URL}${displayUrl}`;
-                }
-                return {
-                  id: img.imageId,
-                  url: displayUrl,
-                  imgSrc: displayUrl,
-                  editedImgSrc: displayUrl,
-                  history: []
-                };
-              });
+          if (backendDefectData.length > 0 || backendManualData.length > 0) {
+            setIsUpdateMode(true);
 
-              return { ...loc, images: restoredLocImages };
+            // Transform backend data to frontend format
+            const transformedDefects = backendDefectData.map(
+              transformDefectFromBackend
+            );
+            const transformedManualData =
+              transformManualDataFromBackend(backendManualData);
+
+            onUpdateDefectData({
+              savedDefects: transformedDefects,
+              manualDataByGroup: transformedManualData
             });
-
-            // Restore General Images
-            const restoredImages = (defect.images || []).map((img) => {
-              let displayUrl = img.imageURL;
-              if (
-                displayUrl &&
-                !displayUrl.startsWith("http") &&
-                !displayUrl.startsWith("data:")
-              ) {
-                displayUrl = `${API_BASE_URL}${displayUrl}`;
-              }
-              return {
-                id: img.imageId,
-                url: displayUrl,
-                imgSrc: displayUrl,
-                history: []
-              };
-            });
-
-            return {
-              ...defect,
-              locations: restoredLocations,
-              images: restoredImages
-            };
-          });
-
-          // 2. Process Manual Defect Data (Array -> Object Map)
-          const backendManualData = backendData.defectManualData || [];
-          const processedManualDataByGroup = {};
-
-          backendManualData.forEach((item) => {
-            const groupId = item.groupId;
-            const processedImages = (item.images || []).map((img) => {
-              let displayUrl = img.imageURL;
-              if (
-                displayUrl &&
-                !displayUrl.startsWith("http") &&
-                !displayUrl.startsWith("data:")
-              ) {
-                displayUrl = `${API_BASE_URL}${displayUrl}`;
-              }
-              return {
-                id: img.imageId,
-                url: displayUrl,
-                imgSrc: displayUrl,
-                editedImgSrc: displayUrl,
-                remark: img.remark || "",
-                history: []
-              };
-            });
-
-            processedManualDataByGroup[groupId] = {
-              remarks: item.remarks || "",
-              images: processedImages
-            };
-          });
-
-          // Update parent state
-          onUpdateDefectData({
-            savedDefects: processedDefects,
-            manualDataByGroup: processedManualDataByGroup
-          });
+          } else {
+            setIsUpdateMode(false);
+          }
         }
       } catch (error) {
         console.error("Error fetching defect data:", error);
+        setIsUpdateMode(false);
       } finally {
         setLoadingData(false);
+        setDataLoaded(true);
       }
     };
 
-    if (reportId) {
+    if (reportId && !dataLoaded) {
       fetchExistingDefectData();
     }
-  }, [reportId]);
+  }, [reportId, dataLoaded]);
+
+  // Update isUpdateMode when data changes
+  useEffect(() => {
+    if (dataLoaded && hasDefectData) {
+      setIsUpdateMode(true);
+    }
+  }, [hasDefectData, dataLoaded]);
 
   // --- SAVE HANDLER ---
-  const handleSaveData = async () => {
+  const handleSaveDefectData = async () => {
     if (!isReportSaved || !reportId) {
-      alert("Please save the Order information first.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Please save Order information first."
+      });
       return;
     }
 
-    const currentDefects = reportData.defectData?.savedDefects || [];
-    const manualDataByGroup = reportData.defectData?.manualDataByGroup || {};
+    const savedDefects = reportData?.defectData?.savedDefects || [];
+    const manualDataByGroup = reportData?.defectData?.manualDataByGroup || {};
 
+    // Validation: Check if there's anything to save
     if (
-      currentDefects.length === 0 &&
+      savedDefects.length === 0 &&
       Object.keys(manualDataByGroup).length === 0
     ) {
-      alert("No defect data recorded to save.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "No defect data to save. Add defects first."
+      });
       return;
     }
 
     setSaving(true);
     try {
-      // 1. Prepare Standard Defects Payload
-      const payloadDefects = currentDefects.map((defect) => {
-        // Process Location Images
-        const processedLocations = (defect.locations || []).map((loc) => {
-          const locImages = (loc.images || []).map((img) => {
-            let payloadImageURL = null;
-            let payloadImgSrc = null;
-            const imageData = img.editedImgSrc || img.imgSrc || img.url;
-
-            if (imageData && imageData.startsWith("data:")) {
-              payloadImgSrc = imageData;
-            } else if (imageData) {
-              payloadImageURL = imageData.replace(API_BASE_URL, "");
-            }
-
-            return {
-              id: img.id,
-              imageURL: payloadImageURL,
-              imgSrc: payloadImgSrc
-            };
-          });
-          return { ...loc, images: locImages };
-        });
-
-        // Process General Images
-        const processedImages = (defect.images || []).map((img) => {
-          let payloadImageURL = null;
-          let payloadImgSrc = null;
-          const imageData = img.url || img.imgSrc;
-
-          if (imageData && imageData.startsWith("data:")) {
-            payloadImgSrc = imageData;
-          } else if (imageData) {
-            payloadImageURL = imageData.replace(API_BASE_URL, "");
-          }
-
-          return {
-            id: img.id,
-            imageURL: payloadImageURL,
-            imgSrc: payloadImgSrc
-          };
-        });
-
-        return {
-          ...defect,
-          additionalRemark: defect.additionalRemark || "",
-          locations: processedLocations,
-          images: processedImages
-        };
-      });
-
-      // 2. Prepare Manual Defects Payload
-      const payloadManualData = Object.entries(manualDataByGroup).map(
-        ([groupIdStr, data]) => {
-          const groupId = isNaN(Number(groupIdStr))
-            ? groupIdStr
-            : Number(groupIdStr);
-
-          const processedImages = (data.images || []).map((img) => {
-            let payloadImageURL = null;
-            let payloadImgSrc = null;
-            const imageData = img.editedImgSrc || img.imgSrc || img.url;
-
-            if (imageData && imageData.startsWith("data:")) {
-              payloadImgSrc = imageData;
-            } else if (imageData) {
-              payloadImageURL = imageData.replace(API_BASE_URL, "");
-            }
-
-            return {
-              id: img.id,
-              imageId: img.id,
-              imageURL: payloadImageURL,
-              imgSrc: payloadImgSrc,
-              remark: img.remark
-            };
-          });
-
-          return {
-            groupId: groupId,
-            remarks: data.remarks,
-            images: processedImages
-            // We can attach minimal context if needed, otherwise backend relies on groupId
-          };
-        }
-      );
+      // Transform frontend data to backend format
+      const defectPayload = savedDefects.map(transformDefectToBackend);
+      const manualPayload = transformManualDataToBackend(manualDataByGroup);
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-defect-data`,
         {
-          reportId: reportId,
-          defectData: payloadDefects,
-          defectManualData: payloadManualData
+          reportId,
+          defectData: defectPayload,
+          defectManualData: manualPayload
         }
       );
 
       if (res.data.success) {
-        alert("Defect data saved successfully!");
+        const wasUpdateMode = isUpdateMode;
+        setIsUpdateMode(true);
+
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: wasUpdateMode
+            ? "Defect Data Updated Successfully!"
+            : "Defect Data Saved Successfully!"
+        });
+
+        // Optionally update local state with saved URLs from backend
+        if (res.data.data) {
+          const updatedDefects = (res.data.data.defectData || []).map(
+            transformDefectFromBackend
+          );
+          const updatedManual = transformManualDataFromBackend(
+            res.data.data.defectManualData || []
+          );
+
+          onUpdateDefectData({
+            savedDefects: updatedDefects,
+            manualDataByGroup: updatedManual
+          });
+        }
       }
     } catch (error) {
       console.error("Error saving defect data:", error);
-      alert("Failed to save defect data.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: error.response?.data?.message || "Failed to save defect data."
+      });
     } finally {
       setSaving(false);
     }
   };
 
+  // --- LOADING STATE ---
   if (loadingData) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
-        <span className="ml-3 text-gray-600 font-medium">
-          Loading existing defects...
+      <div className="flex flex-col justify-center items-center h-64 gap-3">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        <span className="text-gray-600 dark:text-gray-400 font-medium text-sm">
+          Loading defect data...
         </span>
       </div>
     );
   }
 
-  if (!reportData?.selectedTemplate) {
-    return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <Bug className="w-12 h-12 text-gray-300 mb-4" />
-        <p className="text-gray-500">Please select a Report Type first.</p>
-      </div>
-    );
-  }
-
   return (
-    <div className="relative pb-24">
+    <div className="relative pb-28">
+      {/* Main Defect Config Component */}
       <YPivotQAInspectionDefectConfig
         selectedOrders={selectedOrders}
         orderData={orderData}
@@ -296,37 +909,142 @@ const YPivotQAInspectionDefectDataSave = ({
         activeGroup={activeGroup}
       />
 
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
-        <div className="max-w-8xl mx-auto flex justify-end px-4">
+      {/* Fixed Bottom Save Button */}
+      <div className="fixed bottom-0 left-0 right-0 p-3 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_12px_-1px_rgba(0,0,0,0.1)] z-40">
+        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          {/* Left Side: Status & Stats */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Save Status Badge */}
+            {isUpdateMode ? (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
+                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                Data Saved
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
+                <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                Not Saved
+              </span>
+            )}
+
+            {/* Defect Stats - Hidden on mobile */}
+            {defectStats.total > 0 && (
+              <div className="hidden sm:flex items-center gap-2 text-xs">
+                <span className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+                  <Bug className="w-3 h-3 text-gray-500" />
+                  <span className="font-bold text-gray-700 dark:text-gray-300">
+                    {defectStats.total}
+                  </span>
+                </span>
+                {defectStats.critical > 0 && (
+                  <span className="px-2 py-1 bg-red-100 text-red-700 rounded font-bold">
+                    C:{defectStats.critical}
+                  </span>
+                )}
+                {defectStats.major > 0 && (
+                  <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded font-bold">
+                    M:{defectStats.major}
+                  </span>
+                )}
+                {defectStats.minor > 0 && (
+                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-bold">
+                    m:{defectStats.minor}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Right Side: Save Button */}
           <button
-            onClick={handleSaveData}
+            onClick={handleSaveDefectData}
             disabled={!isReportSaved || saving}
-            className={`
-              flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
-              ${
-                isReportSaved
-                  ? "bg-gradient-to-r from-red-500 to-rose-600 hover:from-red-600 hover:to-rose-700 text-white"
-                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
-              }
-            `}
+            className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-[0.98] ${
+              isReportSaved
+                ? isUpdateMode
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+                : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+            }`}
             title={
-              !isReportSaved ? "Save Order Data first" : "Save Defect Data"
+              !isReportSaved
+                ? "Save Order Data first"
+                : isUpdateMode
+                ? "Update existing defect data"
+                : "Save new defect data"
             }
           >
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Saving...
+                {isUpdateMode ? "Updating..." : "Saving..."}
+              </>
+            ) : isUpdateMode ? (
+              <>
+                <RefreshCw className="w-5 h-5" />
+                Update Defect Data
               </>
             ) : (
               <>
                 <Save className="w-5 h-5" />
-                Save Defects
+                Save Defect Data
               </>
             )}
           </button>
         </div>
+
+        {/* Mobile Stats Row */}
+        {defectStats.total > 0 && (
+          <div className="sm:hidden flex items-center justify-center gap-2 mt-2 text-xs">
+            <span className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
+              <Bug className="w-3 h-3 text-gray-500" />
+              <span className="font-bold text-gray-700 dark:text-gray-300">
+                {defectStats.total} Total
+              </span>
+            </span>
+            {defectStats.critical > 0 && (
+              <span className="px-2 py-1 bg-red-100 text-red-700 rounded font-bold">
+                C:{defectStats.critical}
+              </span>
+            )}
+            {defectStats.major > 0 && (
+              <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded font-bold">
+                M:{defectStats.major}
+              </span>
+            )}
+            {defectStats.minor > 0 && (
+              <span className="px-2 py-1 bg-green-100 text-green-700 rounded font-bold">
+                m:{defectStats.minor}
+              </span>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* Status Modal */}
+      <AutoDismissModal
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        type={statusModal.type}
+        message={statusModal.message}
+      />
+
+      {/* Animation Styles */}
+      <style jsx>{`
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: scale(0.95);
+          }
+          to {
+            opacity: 1;
+            transform: scale(1);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.2s ease-out;
+        }
+      `}</style>
     </div>
   );
 };
