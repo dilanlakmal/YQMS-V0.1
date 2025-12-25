@@ -1208,34 +1208,41 @@ const YPivotQAInspectionSummary = ({
 
   return (
     <div className="max-w-7xl mx-auto space-y-4 pb-24 animate-fadeIn">
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-50 flex justify-center">
-        <div className="max-w-7xl w-full flex justify-end">
-          <button
-            onClick={handleFullSubmit}
-            disabled={submitting}
-            className={`px-8 py-3 rounded-xl font-bold shadow-xl flex items-center gap-2 transition-all ${
-              submitting
-                ? "bg-gray-400 cursor-not-allowed text-white"
-                : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white hover:scale-105 active:scale-95"
-            }`}
-          >
-            {submitting ? (
-              <>
-                <Loader className="w-5 h-5 animate-spin" />
-                Submitting...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-5 h-5" />
-                Submit Final Report
-              </>
-            )}
-          </button>
+      {/* --- NEW: TOP HEADER WITH SUBMIT BUTTON --- */}
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-200 dark:border-gray-700 p-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+          <h1 className="text-xl font-black text-gray-800 dark:text-white tracking-tight">
+            Inspection Summary
+          </h1>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Review results below. Click submit to finalize the report.
+          </p>
         </div>
+
+        <button
+          onClick={handleFullSubmit}
+          disabled={submitting}
+          className={`px-6 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all transform active:scale-95 ${
+            submitting
+              ? "bg-gray-400 cursor-not-allowed text-white"
+              : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+          }`}
+        >
+          {submitting ? (
+            <>
+              <Loader className="w-5 h-5 animate-spin" />
+              Submitting...
+            </>
+          ) : (
+            <>
+              <CheckCircle2 className="w-5 h-5" />
+              Submit Final Report
+            </>
+          )}
+        </button>
       </div>
 
       {/* 1. QR CODE AND USER INFO */}
-
       <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
         {/* LEFT: INSPECTOR CARD */}
         <div className="md:col-span-4 lg:col-span-3">
