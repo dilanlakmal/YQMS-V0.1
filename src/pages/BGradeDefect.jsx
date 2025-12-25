@@ -631,7 +631,7 @@ const BGradeDefect = () => {
         }
         @keyframes slideDown {
           from {
-            opacity: 0;
+            opacity: 0; 
             transform: translateY(-10px);
           }
           to {
