@@ -219,7 +219,7 @@ const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
                   : "bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600"
               }`}
             >
-              Acknowledge
+              OK
             </button>
           </div>
         </div>
