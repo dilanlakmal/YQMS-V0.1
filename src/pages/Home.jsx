@@ -266,42 +266,51 @@ function Home() {
           {
             path: "/qa-sections",
             roles: ["Fincheck Config"],
-            image: "assets/Home/FinCheck.png",
+            image: "assets/Home/Fincheck_Setting.png",
             title: t("home.qa_sections"),
-            description: "Fin Check Configuration",
-            version: '0',
+            description: "Configuration",
+            version: "0"
           },
           {
             path: "/qa-measurements",
             roles: ["Fincheck Measurement"],
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
-            description: "Fin Check Measurements",
-            version: '0.1',
+            description: "Upload/Measurement Settings",
+            version: "0"
           },
           {
             path: "/qa-templates",
             roles: ["Fincheck Templates"],
-            image: "assets/Home/qatemplates.png",
+            image: "assets/Home/Fincheck_Templates.png",
             title: t("home.qa_templates"),
-            description: "QA Inspection Templates",
-            version: '0',
+            description: "...",
+            version: "0"
           },
           {
             path: "/fincheck-inspection",
             roles: ["Fincheck Inspections"],
-            image: "assets/Home/yPivotInspection.png",
+            image: "assets/Home/Fincheck_Inspection.png",
             title: t("home.y_pivot_inspection"),
-            description: "Pivot Y Inspections",
-            version: '0.1',
+            description: "...",
+            version: "0"
+          },
+          {
+            path: "/fincheck-reports",
+            //pageId: "y-pivot-inspection",
+            roles: ["Fincheck Reports"],
+            image: "assets/Home/Fincheck_Reports.png",
+            title: t("home.y_pivot_report"),
+            description: "...",
+            version: "0"
           },
           {
             path: "/P88Legacy",
             roles: ["P88"],
             image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
-            description: "P88 Legacy Data",
-            version: '0',
+            description: "Historical Data",
+            version: "0"
           }
         ]
       },

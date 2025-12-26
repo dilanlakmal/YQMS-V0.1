@@ -46,8 +46,9 @@
     "Measurement": "Measurement",
     "qa_sections": "Fin Check | Settings",
     "qa_templates": "Fin Check | Templates",
-    "qa_measurements": "Fin Check | Measurements",
+    "qa_measurements": "Fin Check | Upload",
     "y_pivot_inspection": "Fin Check | Inspection",
+    "y_pivot_report": "Fin Check | Reports",
     "afterIroning": "After Ironing",
     "p88_Legacy": "P88 Legacy"
   },

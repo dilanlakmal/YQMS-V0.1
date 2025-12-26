@@ -209,44 +209,66 @@ const createFincheckInspectionReportsModel = (connection) => {
   // DEFECT DATA SCHEMAS
   // ===========================
 
-  // Image inside a specific Location (e.g., "Pcs1", "Extra")
-  const DefectLocationImageSchema = new mongoose.Schema(
+  // NEW: Image schema for position-level images
+  const DefectPositionImageSchema = new mongoose.Schema(
     {
       imageId: { type: String, required: true },
       imageURL: { type: String, required: true },
-      name: { type: String, default: "" }, // "Pcs1", "Pcs2", "Extra"
       uploadedAt: { type: Date, default: Date.now }
     },
     { _id: false }
   );
 
-  // Position details for a specific piece inside a Location
+  // UPDATED: Position details for a specific piece inside a Location
   const DefectLocationPositionSchema = new mongoose.Schema(
     {
-      pcsNo: { type: Number, required: true }, // 1, 2, 3...
-      position: { type: String, default: "Outside" }, // "Inside", "Outside"
-      comment: { type: String, default: "" } // Comment for this specific piece
+      pcsNo: { type: Number, required: true },
+      status: {
+        type: String,
+        enum: ["Minor", "Major", "Critical"],
+        default: "Major"
+      },
+
+      // NEW: Required image for this piece (mandatory for validation)
+      requiredImage: { type: DefectPositionImageSchema, default: null },
+
+      // NEW: Additional remark for this specific piece (max 250 chars from frontend)
+      additionalRemark: { type: String, default: "" },
+
+      // NEW: Additional images for this piece (up to 5)
+      additionalImages: {
+        type: [DefectPositionImageSchema],
+        default: [],
+        validate: [
+          (val) => val.length <= 5,
+          "Maximum 5 additional images allowed"
+        ]
+      },
+
+      // Legacy fields (kept for backward compatibility)
+      position: { type: String, default: "Outside" },
+      comment: { type: String, default: "" },
+      qcUser: { type: mongoose.Schema.Types.Mixed, default: null }
     },
     { _id: false }
   );
 
-  // Main Defect Location Schema
+  // UPDATED: Main Defect Location Schema (removed location-level images)
   const DefectLocationSchema = new mongoose.Schema(
     {
-      uniqueId: { type: String, required: true }, // e.g., Front_LocationID
-      locationId: { type: String, required: true }, // ID from ProductLocation collection
+      uniqueId: { type: String, required: true },
+      locationId: { type: String, required: true },
       locationNo: { type: Number, required: true },
       locationName: { type: String, required: true },
       view: { type: String, required: true }, // "Front" or "Back"
-
-      qty: { type: Number, default: 1 }, // Quantity for this location
-      positions: { type: [DefectLocationPositionSchema], default: [] }, // Array of position details
-      images: { type: [DefectLocationImageSchema], default: [] } // Array of images for this location
+      qty: { type: Number, default: 1 },
+      positions: { type: [DefectLocationPositionSchema], default: [] }
+      // NOTE: Removed 'images' array - images are now stored in positions
     },
     { _id: false }
   );
 
-  // Image at Defect Level (General images for defect, legacy support)
+  // Image at Defect Level (for No-Location mode)
   const DefectImageSchema = new mongoose.Schema(
     {
       imageId: { type: String, required: true },
@@ -256,7 +278,7 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
-  // Individual Defect Item Schema (Updated)
+  // UPDATED: Individual Defect Item Schema
   const DefectItemSchema = new mongoose.Schema(
     {
       // Context
@@ -269,23 +291,27 @@ const createFincheckInspectionReportsModel = (connection) => {
       categoryName: { type: String, default: "" },
 
       // Status & Quantity
-      status: { type: String, required: true },
-      qty: { type: Number, required: true, default: 1 }, // Total Qty (Sum of locations or manual)
+      // For No-Location: status is set directly on the defect
+      // For Location-based: status is null here, stored in each position
+      status: {
+        type: String,
+        enum: ["Minor", "Major", "Critical", null],
+        default: null
+      },
+      qty: { type: Number, required: true, default: 1 },
 
       // Metadata
       determinedBuyer: { type: String, default: "Unknown" },
       additionalRemark: { type: String, default: "" },
+
       // Location Data
       isNoLocation: { type: Boolean, default: false },
       locations: { type: [DefectLocationSchema], default: [] },
 
-      // General Images (if any, though mostly location-based now)
+      // Images for No-Location mode (contains requiredImage)
       images: { type: [DefectImageSchema], default: [] },
 
       // Snapshot Data
-      line: { type: String, default: "" },
-      table: { type: String, default: "" },
-      color: { type: String, default: "" },
       lineName: { type: String, default: "" },
       tableName: { type: String, default: "" },
       colorName: { type: String, default: "" },
@@ -409,9 +435,17 @@ const createFincheckInspectionReportsModel = (connection) => {
       },
       buyer: { type: String, required: true },
       productType: { type: String, required: true },
-      productTypeId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      productTypeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+        ref: "QASectionsProductType"
+      },
       reportType: { type: String, required: true },
-      reportTypeId: { type: mongoose.Schema.Types.ObjectId, required: true },
+      reportTypeId: {
+        type: mongoose.Schema.Types.ObjectId,
+        required: true,
+        ref: "QASectionsTemplates"
+      },
       empId: { type: String, required: true },
       empName: { type: String },
       measurementMethod: {

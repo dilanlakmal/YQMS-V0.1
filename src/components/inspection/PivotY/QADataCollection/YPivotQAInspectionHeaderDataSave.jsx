@@ -57,7 +57,8 @@ const YPivotQAInspectionHeaderDataSave = ({
   headerData,
   onUpdateHeaderData,
   reportId,
-  isReportSaved
+  isReportSaved,
+  onSaveSuccess
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -131,11 +132,14 @@ const YPivotQAInspectionHeaderDataSave = ({
             }
           });
 
-          onUpdateHeaderData({
-            selectedOptions: newSelectedOptions,
-            remarks: newRemarks,
-            capturedImages: newCapturedImages
-          });
+          onUpdateHeaderData(
+            {
+              selectedOptions: newSelectedOptions,
+              remarks: newRemarks,
+              capturedImages: newCapturedImages
+            },
+            { isFromBackend: true }
+          );
         }
       } catch (error) {
         console.error("Error fetching existing header data:", error);
@@ -226,6 +230,11 @@ const YPivotQAInspectionHeaderDataSave = ({
       if (res.data.success) {
         // Switch to Update Mode immediately upon success
         setIsUpdateMode(true);
+
+        // CALL onSaveSuccess TO MARK SECTION AS CLEAN
+        if (onSaveSuccess) {
+          onSaveSuccess(); // <-- ADD THIS
+        }
 
         setStatusModal({
           isOpen: true,

@@ -1,8 +1,59 @@
 import React, { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import axios from "axios";
-import { Save, Loader2, Ruler } from "lucide-react";
+import {
+  Save,
+  Loader2,
+  Ruler,
+  Edit3,
+  CheckCircle2,
+  AlertCircle
+} from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionMeasurementConfig from "./YPivotQAInspectionMeasurementConfig";
+
+// --- AUTO DISMISS MODAL COMPONENT HERE ---
+const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+  useEffect(() => {
+    if (isOpen) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 1200);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
+  const isSuccess = type === "success";
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+        <div
+          className={`p-3 rounded-full ${
+            isSuccess
+              ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+              : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+          }`}
+        >
+          {isSuccess ? (
+            <CheckCircle2 className="w-8 h-8" />
+          ) : (
+            <AlertCircle className="w-8 h-8" />
+          )}
+        </div>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+          {isSuccess ? "Success" : "Error"}
+        </h3>
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+          {message}
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+};
 
 const YPivotQAInspectionMeasurementDataSave = ({
   selectedOrders,
@@ -11,10 +62,17 @@ const YPivotQAInspectionMeasurementDataSave = ({
   onUpdateMeasurementData,
   activeGroup,
   reportId,
-  isReportSaved
+  isReportSaved,
+  onSaveSuccess
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
+  const [isUpdateMode, setIsUpdateMode] = useState(false);
+  const [statusModal, setStatusModal] = useState({
+    isOpen: false,
+    type: "success",
+    message: ""
+  });
 
   // --- FETCH EXISTING DATA ---
   useEffect(() => {
@@ -29,6 +87,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
           .length > 0;
 
       if (hasSavedMeasurements || hasManualData) {
+        setIsUpdateMode(true);
         return;
       }
 
@@ -40,6 +99,13 @@ const YPivotQAInspectionMeasurementDataSave = ({
 
         if (res.data.success && res.data.data.measurementData) {
           const backendData = res.data.data.measurementData;
+
+          // Check if backend actually has array data to determine Update Mode
+          if (Array.isArray(backendData) && backendData.length > 0) {
+            setIsUpdateMode(true);
+          } else {
+            setIsUpdateMode(false);
+          }
 
           // 1. Process Standard Measurements
           const processedMeasurements = backendData
@@ -89,11 +155,14 @@ const YPivotQAInspectionMeasurementDataSave = ({
             }
           });
 
-          onUpdateMeasurementData({
-            savedMeasurements: processedMeasurements,
-            manualDataByGroup: processedManualDataByGroup,
-            isConfigured: processedMeasurements.length > 0
-          });
+          onUpdateMeasurementData(
+            {
+              savedMeasurements: processedMeasurements,
+              manualDataByGroup: processedManualDataByGroup,
+              isConfigured: processedMeasurements.length > 0
+            },
+            { isFromBackend: true }
+          );
         }
       } catch (error) {
         console.error("Error fetching measurement data:", error);
@@ -110,7 +179,11 @@ const YPivotQAInspectionMeasurementDataSave = ({
   // --- SAVE HANDLER ---
   const handleSaveData = async () => {
     if (!isReportSaved || !reportId) {
-      alert("Please save the Order information first.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Please save Order information first."
+      });
       return;
     }
 
@@ -218,7 +291,11 @@ const YPivotQAInspectionMeasurementDataSave = ({
 
       if (payload.length === 0) {
         setSaving(false);
-        alert("No data to save.");
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message: "No data to save."
+        });
         return;
       }
 
@@ -231,15 +308,25 @@ const YPivotQAInspectionMeasurementDataSave = ({
       );
 
       if (res.data.success) {
-        alert("Measurement results saved successfully!");
-
-        // OPTIONAL: Reload data to ensure image URLs are synced back from server
-        // This fixes the "broken image" issue immediately after save if frontend kept base64
-        // You might want to update the state here with the response data if returned
+        setIsUpdateMode(true);
+        if (onSaveSuccess) {
+          onSaveSuccess();
+        }
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: isUpdateMode
+            ? "Measurement Data Updated Successfully!"
+            : "Measurement Data Saved Successfully!"
+        });
       }
     } catch (error) {
       console.error("Error saving measurement results:", error);
-      alert("Failed to save measurement results.");
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Failed to save measurement results."
+      });
     } finally {
       setSaving(false);
     }
@@ -283,29 +370,46 @@ const YPivotQAInspectionMeasurementDataSave = ({
             className={`
               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
               ${
-                isReportSaved
-                  ? "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
-                  : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                !isReportSaved
+                  ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+                  : isUpdateMode
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" // Blue for Update
+                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white" // Green for Save
               }
             `}
             title={
-              !isReportSaved ? "Save Order Data first" : "Save Measurements"
+              !isReportSaved
+                ? "Save Order Data first"
+                : isUpdateMode
+                ? "Update Measurement Data"
+                : "Save Measurement Data"
             }
           >
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Saving...
+                {isUpdateMode ? "Updating..." : "Saving..."}
               </>
             ) : (
               <>
-                <Save className="w-5 h-5" />
-                Save Measurements
+                {isUpdateMode ? (
+                  <Edit3 className="w-5 h-5" />
+                ) : (
+                  <Save className="w-5 h-5" />
+                )}
+                {isUpdateMode ? "Update Measurements" : "Save Measurements"}
               </>
             )}
           </button>
         </div>
       </div>
+      {/* Auto Dismiss Modal */}
+      <AutoDismissModal
+        isOpen={statusModal.isOpen}
+        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+        type={statusModal.type}
+        message={statusModal.message}
+      />
     </div>
   );
 };
