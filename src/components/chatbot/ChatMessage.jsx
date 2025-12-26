@@ -26,7 +26,7 @@ export function ChatMessage({
  
 
   return (
-    <div className={cn("flex gap-4 py-2 px-3 overflow-hidden", isUser && "flex-row-reverse")}>
+    <div className={cn("flex gap-4 py-2 px-3 overflow-hidden", isUser && "items-end", isUser && "flex-row-reverse")}>
       {/* Avatar */}
       <div
         className={cn(
@@ -140,12 +140,12 @@ export function MarkdownViewer({ text = "" }) {
   const safeHtml = DOMPurify.sanitize(rawHtml);
 
   const modifiedHtml = safeHtml.replace(
-    /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
+    /<pre(?:\s[^>]*)?><code(?:\s[^>]*)?>([\s\S]*?)<\/code><\/pre>/g,
     (_, code) => {
       const encoded = encodeURIComponent(code);
       return `
         <div class="relative group">
-          <pre><code>${code}</code></pre>
+          <pre class="!m-0 !p-2 !rounded bg-gray-200 overflow-x-auto break-words"><code>${code}</code></pre>
           <button
             type="button"
             data-code="${encoded}"
@@ -181,13 +181,14 @@ export function MarkdownViewer({ text = "" }) {
           [&>table]:w-full
           [&>table]:overflow-x-auto
           [&>pre]:overflow-x-auto
-          [&>pre]:bg-gray-100
+          [&>pre]:bg-gray-200
           [&>pre]:p-2
           [&>pre]:rounded
           [&>pre]:max-w-full
           [&>code]:break-words
-          [&>code]:bg-gray-100
+          [&>code]:bg-gray-200
           [&>code]:px-1
+          [&>code]:p-5
           [&>code]:rounded
           [&>p]:overflow-wrap-anywhere
         "
