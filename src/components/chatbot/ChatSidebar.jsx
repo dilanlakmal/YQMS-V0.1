@@ -179,6 +179,8 @@ function ExpandedSidebar({
     onSelectConversation(_id);
     const activeConversation = conversations.find((conv) => conv._id === _id);
     setModel(activeConversation.model);
+    console.log("set model to", activeConversation.model)
+    console.log(conversations)
     setCurrentService("");
     await updateConversationStatus(_id);
   };

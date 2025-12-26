@@ -9,6 +9,7 @@ import ChatGuide from "./ChatStepIntro";
 import { getModels } from "./lib/api/chat";
 
 export default function ChatInput({
+  setConversations,
   conversations,
   activeConversationId,
   lastMessage,
@@ -86,6 +87,8 @@ export default function ChatInput({
   const handleChangeModel = async (e) => {
     const newModel = e.target.value;
     setModel(newModel);
+    const updatedConversations = conversations.map(conv => conv._id === activeConversationId ? {...conv, model: newModel}: conv)
+    setConversations(updatedConversations);
     await editConversationModel(activeConversationId, newModel);
   };
 

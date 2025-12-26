@@ -149,7 +149,7 @@ export function MarkdownViewer({ text = "" }) {
           <button
             type="button"
             data-code="${encoded}"
-            class="copy-btn absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 text-gray-800 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            class="copy-btn absolute top-2 right-2 bg-gray-500 hover:bg-gray-800 text-white font-bold p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
           >
             Copy
           </button>
@@ -191,6 +191,15 @@ export function MarkdownViewer({ text = "" }) {
           [&>code]:p-5
           [&>code]:rounded
           [&>p]:overflow-wrap-anywhere
+          [&>h1]:font-bold
+          [&>h1]:text-2xl
+          [&>h2]:text-xl
+          [&>h2]:font-bold
+          [&>h3]:text-lg
+          [&>h3]:font-bold
+          [&>h4]:font-bold
+          [&>h5]:font-bold
+          [&>h6]:font-bold
         "
         dangerouslySetInnerHTML={{ __html: modifiedHtml }}
       />

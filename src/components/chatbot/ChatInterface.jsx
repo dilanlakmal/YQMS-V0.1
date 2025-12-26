@@ -245,6 +245,7 @@ const handleSubmit = async (e) => {
           <div className="absolute top-[0%] bottom-1 left-[0%] right-[0%] flex justify-center flex-col bg-background text-foreground">
             {currentService === "" && (
               <ChatService
+                setConversations={setConversations}
                 conversations={conversations}
                 thinking={thinking}
                 setThinking={setThinking}
@@ -272,6 +273,7 @@ const handleSubmit = async (e) => {
 }
 
 function ChatService({
+  setConversations,
   conversations,
   setInput,
   input,
@@ -334,6 +336,7 @@ function ChatService({
       </div>
       <div className="mt-1">
         <ChatInput
+          setConversations={setConversations}
           conversations={conversations}
           activeConversationId={activeConversationId}
           lastMessage={lastMessage}
