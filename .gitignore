@@ -40,7 +40,7 @@ dist-ssr
 public/storage/
 
 backend/.env
-
+.env
 
 # ==================================
 #      AI Service API
