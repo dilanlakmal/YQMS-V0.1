@@ -279,12 +279,12 @@ import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
-// import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
-// import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
+import sqlQuery from "./routes/SQL/sqlQueryRoutes.js";
+import { closeSQLPools } from "./controller/SQL/sqlQueryController.js";
 /* ------------------------------
   SQL Query routs
 ------------------------------ */
-// app.use(sqlQuery);
+app.use(sqlQuery);
 /* ------------------------------
   Functional routs
 ------------------------------ */
@@ -577,16 +577,16 @@ app.use(ceMasterRoutes);
 app.use(ceTargetMasterRoutes);
 
 
-// process.on("SIGINT", async () => {
-//   try {
-//     await closeSQLPools();
-//     console.log("SQL connection pools closed.");
-//   } catch (err) {
-//     console.error("Error closing SQL connection pools:", err);
-//   } finally {
-//     process.exit(0);
-//   }
-// });
+process.on("SIGINT", async () => {
+  try {
+    await closeSQLPools();
+    console.log("SQL connection pools closed.");
+  } catch (err) {
+    console.error("Error closing SQL connection pools:", err);
+  } finally {
+    process.exit(0);
+  }
+});
 
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });

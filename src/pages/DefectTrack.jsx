@@ -100,7 +100,6 @@ const DefectTrack = () => {
           const isInitiallyBGrade = garment.defects.some(
             (d) => d.status === "B Grade"
           );
-
           return {
             ...garment,
             isPermanentlyBGrade: isInitiallyBGrade,
@@ -108,7 +107,6 @@ const DefectTrack = () => {
               const defectEntry = defectsMasterList.find(
                 (d) => d.english === defect.name
               );
-
               return {
                 ...defect,
                 displayName: defectEntry
@@ -143,20 +141,17 @@ const DefectTrack = () => {
           if (garment.garmentNumber !== garmentNumber) {
             return garment;
           }
-
           return {
             ...garment,
             defects: garment.defects.map((defect) => {
               if (defect.name !== defectName) {
                 return defect;
               }
-
               return { ...defect, status: newStatus };
             })
           };
         })
       };
-
       return newData;
     });
   };
@@ -295,7 +290,6 @@ const DefectTrack = () => {
 
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
-
     if (scannedData) {
       setScannedData((prev) => ({
         ...prev,
@@ -318,7 +312,7 @@ const DefectTrack = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
@@ -326,8 +320,8 @@ const DefectTrack = () => {
       </div>
 
       {/* Header Section */}
-      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
-        <div className="absolute inset-0 bg-black/10"></div>
+      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 dark:from-gray-800 dark:via-slate-800 dark:to-gray-900 shadow-2xl transition-colors duration-300">
+        <div className="absolute inset-0 bg-black/10 dark:bg-black/20"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
           
@@ -335,48 +329,47 @@ const DefectTrack = () => {
           <div className="lg:hidden space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
-                  <Wrench size={20} className="text-white" />
+                <div className="flex items-center justify-center w-10 h-10 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                  <Wrench size={20} className="text-white dark:text-gray-200" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                    <h1 className="text-sm sm:text-base font-black text-white dark:text-gray-100 tracking-tight truncate">
                       {t("defectTrack.header", "Repair Tracking")}
                     </h1>
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
-                      <Sparkles size={10} className="text-yellow-300" />
-                      <span className="text-[10px] font-bold text-white">QC</span>
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-full flex-shrink-0">
+                      <Sparkles size={10} className="text-yellow-300 dark:text-yellow-400" />
+                      <span className="text-[10px] font-bold text-white dark:text-gray-200">QC</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 dark:bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400 dark:bg-green-500"></span>
                     </div>
-                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                    <p className="text-[10px] text-indigo-100 dark:text-gray-300 font-medium truncate">
                       {activeTabData?.label} • Active
                     </p>
                   </div>
                 </div>
               </div>
               {user && (
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
-                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
+                <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-md shadow-lg">
                     <User size={16} className="text-white" />
                   </div>
                   <div className="hidden sm:block">
-                    <p className="text-white font-bold text-xs leading-tight">
+                    <p className="text-white dark:text-gray-100 font-bold text-xs leading-tight">
                       {user.job_title || "Operator"}
                     </p>
-                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                    <p className="text-indigo-200 dark:text-gray-300 text-[10px] font-medium leading-tight">
                       ID: {user.emp_id}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-
-            <div className="flex items-center justify-center gap-4 text-white/80 text-xs">
+            <div className="flex items-center justify-center gap-4 text-white/80 dark:text-gray-300 text-xs">
               <div className="flex items-center gap-1">
                 <CalendarDays size={14} />
                 <span>{currentTime.toLocaleDateString()}</span>
@@ -386,9 +379,8 @@ const DefectTrack = () => {
                 <span>{currentTime.toLocaleTimeString()}</span>
               </div>
             </div>
-
             <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
+              <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl p-1.5 min-w-max">
                 {tabs.map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
@@ -397,18 +389,18 @@ const DefectTrack = () => {
                       onClick={() => handleTabChange(tab.id)}
                       className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
                         isActive
-                          ? "bg-white shadow-lg scale-105"
-                          : "bg-transparent hover:bg-white/20 hover:scale-102"
+                          ? "bg-white dark:bg-gray-700 shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20 dark:hover:bg-gray-600/30 hover:scale-102"
                       }`}
                     >
-                      <div className={`transition-colors duration-300 ${isActive ? "text-indigo-600" : "text-white"}`}>
+                      <div className={`transition-colors duration-300 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"}`}>
                         {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
                       </div>
-                      <span className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${isActive ? "text-indigo-600" : "text-white"}`}>
+                      <span className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"}`}>
                         {tab.label}
                       </span>
                       {isActive && (
-                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 dark:bg-green-500 rounded-full shadow-lg animate-pulse"></div>
                       )}
                     </button>
                   );
@@ -422,26 +414,25 @@ const DefectTrack = () => {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-6 flex-1">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
-                    <Wrench size={24} className="text-white" />
+                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-xl shadow-lg">
+                    <Wrench size={24} className="text-white dark:text-gray-200" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <h1 className="text-2xl font-black text-white tracking-tight">
+                      <h1 className="text-2xl font-black text-white dark:text-gray-100 tracking-tight">
                         {t("defectTrack.header", "Repair Tracking")}
                       </h1>
-                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
-                        <Sparkles size={12} className="text-yellow-300" />
-                        <span className="text-xs font-bold text-white">QC</span>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-full">
+                        <Sparkles size={12} className="text-yellow-300 dark:text-yellow-400" />
+                        <span className="text-xs font-bold text-white dark:text-gray-200">QC</span>
                       </div>
                     </div>
-                    <p className="text-sm text-indigo-100 font-medium">
+                    <p className="text-sm text-indigo-100 dark:text-gray-300 font-medium">
                       Yorkmars (Cambodia) Garment MFG Co., LTD
                     </p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-4 text-white/80 text-sm">
+                <div className="flex items-center gap-4 text-white/80 dark:text-gray-300 text-sm">
                   <div className="flex items-center gap-2">
                     <CalendarDays size={16} />
                     <span>{currentTime.toLocaleDateString()}</span>
@@ -451,9 +442,8 @@ const DefectTrack = () => {
                     <span>{currentTime.toLocaleTimeString()}</span>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                  <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl p-2">
                     {tabs.map((tab) => {
                       const isActive = activeTab === tab.id;
                       return (
@@ -462,51 +452,49 @@ const DefectTrack = () => {
                           onClick={() => handleTabChange(tab.id)}
                           className={`group relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-300 ${
                             isActive
-                              ? "bg-white shadow-lg scale-105"
-                              : "bg-transparent hover:bg-white/20 hover:scale-102"
+                              ? "bg-white dark:bg-gray-700 shadow-lg scale-105"
+                              : "bg-transparent hover:bg-white/20 dark:hover:bg-gray-600/30 hover:scale-102"
                           }`}
                         >
-                          <div className={`transition-colors duration-300 ${isActive ? "text-indigo-600" : "text-white"}`}>
+                          <div className={`transition-colors duration-300 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"}`}>
                             {React.cloneElement(tab.icon, { className: "w-5 h-5" })}
                           </div>
-                          <span className={`text-xs font-bold transition-colors duration-300 ${isActive ? "text-indigo-600" : "text-white"}`}>
+                          <span className={`text-xs font-bold transition-colors duration-300 ${isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"}`}>
                             {tab.label}
                           </span>
                           {isActive && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full shadow-lg animate-pulse"></div>
                           )}
                         </button>
                       );
                     })}
                   </div>
-
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+                  <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5">
                     <div className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 dark:bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400 dark:bg-green-500"></span>
                     </div>
                     <div>
-                      <p className="text-white font-bold text-sm leading-tight">
+                      <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
                         {activeTabData?.label}
                       </p>
-                      <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
                         Active Module
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
-
               {user && (
-                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
+                <div className="flex items-center gap-3 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5 shadow-xl">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-lg shadow-lg">
                     <User size={20} className="text-white" />
                   </div>
                   <div>
-                    <p className="text-white font-bold text-sm leading-tight">
+                    <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
                       {user.job_title || "Operator"}
                     </p>
-                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                    <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
                       ID: {user.emp_id}
                     </p>
                   </div>
@@ -522,43 +510,43 @@ const DefectTrack = () => {
         <div className="animate-fadeIn">
           {/* Error Alert */}
           {error && (
-            <div className="mb-6 bg-red-50 border-l-4 border-red-400 p-4 rounded-lg shadow-md">
+            <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-red-400 dark:border-red-600 p-4 rounded-lg shadow-md">
               <div className="flex items-center">
-                <AlertTriangle className="w-5 h-5 text-red-400 mr-3 flex-shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-red-400 dark:text-red-300 mr-3 flex-shrink-0" />
                 <div>
-                  <h3 className="text-sm font-medium text-red-800">Error</h3>
-                  <p className="text-sm text-red-700 mt-1">{error}</p>
+                  <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Error</h3>
+                  <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
                 </div>
               </div>
             </div>
           )}
 
           {activeTab === "scan" ? (
-            <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden border dark:border-gray-700 transition-colors duration-300">
               {showScanner && (
                 <div className="p-6 lg:p-8">
                   {/* Header */}
                   <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full mb-4 shadow-lg">
+                    <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 dark:from-indigo-600 dark:to-purple-700 rounded-full mb-4 shadow-lg">
                       <Scan className="w-8 h-8 text-white" />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
                       Defect Card Scanner
                     </h2>
-                    <p className="text-gray-600 max-w-md mx-auto">
+                    <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
                       Scan a defect card QR code to start repair tracking process
                     </p>
                   </div>
 
                   {/* Scan Method Selection */}
                   <div className="flex justify-center mb-8">
-                    <div className="inline-flex bg-gray-100 rounded-xl p-1 shadow-inner">
+                    <div className="inline-flex bg-gray-100 dark:bg-gray-700 rounded-xl p-1 shadow-inner">
                       <button
                         onClick={() => setScanMethod("camera")}
                         className={`flex items-center gap-3 px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
                           scanMethod === "camera"
-                            ? "bg-white text-indigo-600 shadow-md transform scale-105"
-                            : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                            ? "bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-md transform scale-105"
+                            : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600"
                         }`}
                       >
                         <Camera size={20} />
@@ -568,8 +556,8 @@ const DefectTrack = () => {
                         onClick={() => setScanMethod("upload")}
                         className={`flex items-center gap-3 px-6 py-3 rounded-lg font-medium transition-all duration-300 ${
                           scanMethod === "upload"
-                            ? "bg-white text-indigo-600 shadow-md transform scale-105"
-                            : "text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                            ? "bg-white dark:bg-gray-600 text-indigo-600 dark:text-indigo-400 shadow-md transform scale-105"
+                            : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-600"
                         }`}
                       >
                         <Upload size={20} />
@@ -579,7 +567,6 @@ const DefectTrack = () => {
                   </div>
 
                   {/* Scanner Component */}
-                  <div className="max-w-md mx-auto">
                     {scanMethod === "camera" ? (
                       <QrCodeScannerRepair
                         onScanSuccess={onScanSuccess}
@@ -592,13 +579,12 @@ const DefectTrack = () => {
                         disabled={loading}
                       />
                     )}
-                  </div>
 
                   {/* Loading State */}
                   {loading && (
                     <div className="flex flex-col items-center justify-center mt-8 p-8">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-                      <p className="text-gray-600 font-medium">Processing QR code...</p>
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400 mb-4"></div>
+                      <p className="text-gray-600 dark:text-gray-400 font-medium">Processing QR code...</p>
                     </div>
                   )}
                 </div>
@@ -607,25 +593,25 @@ const DefectTrack = () => {
               {scannedData && (
                 <div className="p-6 lg:p-8">
                   {/* Defect Card Details Header */}
-                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 mb-6 border border-blue-100">
+                  <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 mb-6 border border-blue-100 dark:border-blue-800">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                        <Info className="w-5 h-5 text-blue-600" />
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                        <Info className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                         Defect Card Details
                       </h3>
                       
                       {/* Language Selector */}
                       <div className="flex items-center gap-2">
-                        <Globe className="w-4 h-4 text-gray-500" />
-                        <div className="flex bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <Globe className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        <div className="flex bg-white dark:bg-gray-700 rounded-lg shadow-sm border border-gray-200 dark:border-gray-600 overflow-hidden">
                           {["english", "khmer", "chinese"].map((lang) => (
                             <button
                               key={lang}
                               onClick={() => handleLanguageChange(lang)}
                               className={`px-3 py-1.5 text-xs font-medium transition-colors ${
                                 language === lang
-                                  ? "bg-indigo-600 text-white"
-                                  : "text-gray-600 hover:bg-gray-50"
+                                  ? "bg-indigo-600 dark:bg-indigo-500 text-white"
+                                  : "text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600"
                               }`}
                             >
                               {lang === "english" ? "EN" : lang === "khmer" ? "KH" : "CN"}
@@ -634,79 +620,77 @@ const DefectTrack = () => {
                         </div>
                       </div>
                     </div>
-
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium">MO No</p>
-                        <p className="text-sm font-bold text-gray-900">{scannedData.moNo}</p>
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-100 dark:border-gray-600 transition-colors duration-300">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">MO No</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{scannedData.moNo}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium">Line No</p>
-                        <p className="text-sm font-bold text-gray-900">{scannedData.lineNo}</p>
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-100 dark:border-gray-600 transition-colors duration-300">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Line No</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{scannedData.lineNo}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium">Color</p>
-                        <p className="text-sm font-bold text-gray-900">{scannedData.color}</p>
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-100 dark:border-gray-600 transition-colors duration-300">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Color</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{scannedData.color}</p>
                       </div>
-                      <div className="bg-white rounded-lg p-3 border border-gray-100">
-                        <p className="text-xs text-gray-500 font-medium">Size</p>
-                        <p className="text-sm font-bold text-gray-900">{scannedData.size}</p>
+                      <div className="bg-white dark:bg-gray-700 rounded-lg p-3 border border-gray-100 dark:border-gray-600 transition-colors duration-300">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">Size</p>
+                        <p className="text-sm font-bold text-gray-900 dark:text-gray-100">{scannedData.size}</p>
                       </div>
                     </div>
                   </div>
 
                   {/* Defects Table */}
-                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                      <h4 className="text-lg font-semibold text-gray-900">
+                  <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-600 overflow-hidden shadow-sm transition-colors duration-300">
+                    <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                      <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                         Defect Status ({language})
                       </h4>
                     </div>
                     
                     <div className="overflow-x-auto">
                       <table className="w-full">
-                        <thead className="bg-gray-50 border-b border-gray-200">
+                        <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                               Garment No.
                             </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                               Defect Name
                             </th>
-                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                               Count
                             </th>
-                                                        <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                               Action
                             </th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                           {scannedData.garments.map((garment) => {
                             const isBGradeNow = garment.defects.some(
                               (d) => d.status === "B Grade"
                             );
-
                             return garment.defects.map((defect, index) => (
                               <tr
                                 key={`${garment.garmentNumber}-${defect.name}-${index}`}
                                 className={`transition-colors duration-200 ${
                                   defect.isLocked
-                                    ? "bg-gray-100"
+                                    ? "bg-gray-100 dark:bg-gray-700"
                                     : isBGradeNow
-                                    ? "bg-red-50 hover:bg-red-100"
+                                    ? "bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30"
                                     : defect.status === "OK"
-                                    ? "bg-green-50 hover:bg-green-100"
-                                    : "hover:bg-gray-50"
+                                    ? "bg-green-50 dark:bg-green-900/20 hover:bg-green-100 dark:hover:bg-green-900/30"
+                                    : "hover:bg-gray-50 dark:hover:bg-gray-700"
                                 }`}
                               >
                                 {index === 0 && (
                                   <td
                                     rowSpan={garment.defects.length}
-                                    className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 border-r border-gray-200 bg-gray-50"
+                                    className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700"
                                   >
-                                    <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 rounded-full">
-                                      <span className="text-indigo-600 font-bold">
+                                    <div className="flex items-center justify-center w-10 h-10 bg-indigo-100 dark:bg-indigo-900/50 rounded-full">
+                                      <span className="text-indigo-600 dark:text-indigo-400 font-bold">
                                         {garment.garmentNumber}
                                       </span>
                                     </div>
@@ -716,25 +700,25 @@ const DefectTrack = () => {
                                   <div className="flex items-center">
                                     <div className={`w-3 h-3 rounded-full mr-3 ${
                                       defect.status === "OK"
-                                        ? "bg-green-400"
+                                        ? "bg-green-400 dark:bg-green-500"
                                         : defect.status === "B Grade"
-                                        ? "bg-red-400"
-                                        : "bg-gray-400"
+                                        ? "bg-red-400 dark:bg-red-500"
+                                        : "bg-gray-400 dark:bg-gray-500"
                                     }`}></div>
-                                    <span className="text-sm font-medium text-gray-900">
+                                    <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                       {defect.displayName}
                                     </span>
                                   </div>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
                                     {defect.count}
                                   </span>
                                 </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                   <div className="flex justify-center">
                                     {defect.isLocked || garment.isPermanentlyBGrade ? (
-                                      <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 text-gray-500 border border-gray-200">
+                                      <div className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600">
                                         <Ban className="w-3 h-3 mr-1" />
                                         Locked
                                       </div>
@@ -750,8 +734,8 @@ const DefectTrack = () => {
                                           }
                                           className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                                             defect.status === "Fail"
-                                              ? "bg-gray-600 text-white shadow-md transform scale-105"
-                                              : "bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200"
+                                              ? "bg-gray-600 dark:bg-gray-500 text-white shadow-md transform scale-105"
+                                              : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600"
                                           }`}
                                         >
                                           <Ban className="w-3 h-3 mr-1" />
@@ -767,8 +751,8 @@ const DefectTrack = () => {
                                           }
                                           className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                                             defect.status === "OK"
-                                              ? "bg-green-600 text-white shadow-md transform scale-105"
-                                              : "bg-green-100 text-green-600 hover:bg-green-200 border border-green-200"
+                                              ? "bg-green-600 dark:bg-green-500 text-white shadow-md transform scale-105"
+                                              : "bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 hover:bg-green-200 dark:hover:bg-green-900/50 border border-green-200 dark:border-green-800"
                                           }`}
                                         >
                                           <CheckCircle className="w-3 h-3 mr-1" />
@@ -784,8 +768,8 @@ const DefectTrack = () => {
                                           }
                                           className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                                             defect.status === "B Grade"
-                                              ? "bg-red-600 text-white shadow-md transform scale-105"
-                                              : "bg-red-100 text-red-600 hover:bg-red-200 border border-red-200"
+                                              ? "bg-red-600 dark:bg-red-500 text-white shadow-md transform scale-105"
+                                              : "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 border border-red-200 dark:border-red-800"
                                           }`}
                                         >
                                           <AlertTriangle className="w-3 h-3 mr-1" />
@@ -804,11 +788,11 @@ const DefectTrack = () => {
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8 pt-6 border-t border-gray-200">
+                  <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8 pt-6 border-t border-gray-200 dark:border-gray-600">
                     <button
                       onClick={handleSave}
                       disabled={loading}
-                      className="inline-flex items-center justify-center px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white font-semibold rounded-xl shadow-lg hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transform transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="inline-flex items-center justify-center px-8 py-3 bg-gradient-to-r from-green-600 to-green-700 dark:from-green-500 dark:to-green-600 text-white font-semibold rounded-xl shadow-lg hover:from-green-700 hover:to-green-800 dark:hover:from-green-600 dark:hover:to-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 dark:focus:ring-green-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transform transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       {loading ? (
                         <>
@@ -825,7 +809,7 @@ const DefectTrack = () => {
                     <button
                       onClick={handleCancel}
                       disabled={loading}
-                      className="inline-flex items-center justify-center px-8 py-3 bg-white text-gray-700 font-semibold rounded-xl border-2 border-gray-300 shadow-lg hover:bg-gray-50 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transform transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      className="inline-flex items-center justify-center px-8 py-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 font-semibold rounded-xl border-2 border-gray-300 dark:border-gray-600 shadow-lg hover:bg-gray-50 dark:hover:bg-gray-600 hover:border-gray-400 dark:hover:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400 focus:ring-offset-2 dark:focus:ring-offset-gray-800 transform transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
                     >
                       <X className="w-4 h-4 mr-2" />
                       Cancel
@@ -836,20 +820,20 @@ const DefectTrack = () => {
             </div>
           ) : (
             // Data Tab - Enhanced placeholder
-            <div className="bg-white rounded-2xl shadow-xl p-8 lg:p-12">
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8 lg:p-12 border dark:border-gray-700 transition-colors duration-300">
               <div className="text-center max-w-md mx-auto">
-                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-full mb-6 shadow-inner">
-                  <Database className="w-10 h-10 text-indigo-600" />
+                <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 dark:from-indigo-900/50 dark:to-purple-900/50 rounded-full mb-6 shadow-inner">
+                  <Database className="w-10 h-10 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
                   Repair Tracking Data
                 </h3>
-                <p className="text-gray-600 mb-6 leading-relaxed">
+                <p className="text-gray-600 dark:text-gray-400 mb-6 leading-relaxed">
                   Data view functionality is coming soon. This will display comprehensive repair tracking records, analytics, and reporting features.
                 </p>
-                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
-                  <h4 className="text-sm font-semibold text-gray-900 mb-2">Coming Features:</h4>
-                  <ul className="text-sm text-gray-600 space-y-1">
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-6 border border-blue-100 dark:border-blue-800">
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100 mb-2">Coming Features:</h4>
+                  <ul className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
                     <li>• Repair tracking history</li>
                     <li>• Status analytics</li>
                     <li>• Performance reports</li>
@@ -862,7 +846,7 @@ const DefectTrack = () => {
         </div>
       </div>
 
-      {/* Custom Styles */}
+      {/* Enhanced Custom Styles for Dark Mode */}
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -914,6 +898,38 @@ const DefectTrack = () => {
         }
         .hover\\:scale-102:hover {
           transform: scale(1.02);
+        }
+        
+        /* Dark mode specific styles */
+        @media (prefers-color-scheme: dark) {
+          .bg-grid-white {
+            background-image: linear-gradient(
+                to right,
+                rgba(255, 255, 255, 0.05) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0.05) 1px,
+                transparent 1px
+              );
+          }
+        }
+        
+        /* Custom scrollbar for dark mode */
+        .dark .overflow-x-auto::-webkit-scrollbar {
+          height: 8px;
+        }
+        .dark .overflow-x-auto::-webkit-scrollbar-track {
+          background: #374151;
+          border-radius: 4px;
+        }
+        .dark .overflow-x-auto::-webkit-scrollbar-thumb {
+          background: #6b7280;
+          border-radius: 4px;
+        }
+        .dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+          background: #9ca3af;
         }
       `}</style>
     </div>

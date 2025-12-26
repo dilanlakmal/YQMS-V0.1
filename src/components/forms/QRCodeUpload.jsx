@@ -80,7 +80,6 @@ const QRCodeUpload = ({ onScanSuccess, onScanError, disabled = false }) => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-
     if (disabled) return;
 
     const files = e.dataTransfer.files;
@@ -110,10 +109,10 @@ const QRCodeUpload = ({ onScanSuccess, onScanError, disabled = false }) => {
       <div
         className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${
           dragActive
-            ? 'border-indigo-500 bg-indigo-50'
+            ? 'border-indigo-500 dark:border-indigo-400 bg-indigo-50 dark:bg-indigo-900/20'
             : disabled
-            ? 'border-gray-200 bg-gray-50'
-            : 'border-gray-300 bg-white hover:border-indigo-400 hover:bg-indigo-50'
+            ? 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
+            : 'border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 hover:border-indigo-400 dark:hover:border-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
         } ${disabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
@@ -132,51 +131,64 @@ const QRCodeUpload = ({ onScanSuccess, onScanError, disabled = false }) => {
 
         {processing ? (
           <div className="flex flex-col items-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-            <p className="text-sm text-gray-600">Processing image...</p>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400 mb-4"></div>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Processing image...</p>
           </div>
         ) : uploadedImage ? (
           <div className="relative">
             <img
               src={uploadedImage}
               alt="Uploaded QR Code"
-              className="max-w-full max-h-48 mx-auto rounded-lg shadow-md"
+              className="max-w-full max-h-48 mx-auto rounded-lg shadow-md border dark:border-gray-600"
             />
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 clearImage();
               }}
-              className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+              className="absolute -top-2 -right-2 bg-red-500 dark:bg-red-600 text-white rounded-full p-1 hover:bg-red-600 dark:hover:bg-red-700 transition-colors shadow-lg"
             >
               <X size={16} />
             </button>
-            <div className="mt-3 flex items-center justify-center text-green-600">
+            <div className="mt-3 flex items-center justify-center text-green-600 dark:text-green-400">
               <CheckCircle size={16} className="mr-1" />
               <span className="text-sm font-medium">QR Code detected!</span>
             </div>
           </div>
         ) : (
           <div className="flex flex-col items-center">
-            <div className={`p-3 rounded-full mb-4 ${
-              disabled ? 'bg-gray-200' : 'bg-indigo-100'
+            <div className={`p-3 rounded-full mb-4 transition-colors duration-300 ${
+              disabled 
+                ? 'bg-gray-200 dark:bg-gray-600' 
+                : 'bg-indigo-100 dark:bg-indigo-900/50'
             }`}>
-              <Upload className={`w-8 h-8 ${
-                disabled ? 'text-gray-400' : 'text-indigo-600'
+              <Upload className={`w-8 h-8 transition-colors duration-300 ${
+                disabled 
+                  ? 'text-gray-400 dark:text-gray-500' 
+                  : 'text-indigo-600 dark:text-indigo-400'
               }`} />
             </div>
-            <h3 className={`text-lg font-semibold mb-2 ${
-              disabled ? 'text-gray-400' : 'text-gray-700'
+
+            <h3 className={`text-lg font-semibold mb-2 transition-colors duration-300 ${
+              disabled 
+                ? 'text-gray-400 dark:text-gray-500' 
+                : 'text-gray-700 dark:text-gray-200'
             }`}>
               Upload QR Code Image
             </h3>
-            <p className={`text-sm mb-4 ${
-              disabled ? 'text-gray-400' : 'text-gray-500'
+
+            <p className={`text-sm mb-4 transition-colors duration-300 ${
+              disabled 
+                ? 'text-gray-400 dark:text-gray-500' 
+                : 'text-gray-500 dark:text-gray-400'
             }`}>
               Drag and drop an image here, or click to select
             </p>
-            <div className={`text-xs ${
-              disabled ? 'text-gray-400' : 'text-gray-400'
+
+            <div className={`text-xs transition-colors duration-300 ${
+              disabled 
+                ? 'text-gray-400 dark:text-gray-500' 
+                : 'text-gray-400 dark:text-gray-500'
             }`}>
               Supports: JPG, PNG, GIF (Max 10MB)
             </div>
@@ -186,8 +198,8 @@ const QRCodeUpload = ({ onScanSuccess, onScanError, disabled = false }) => {
 
       {!disabled && (
         <div className="mt-4 text-center">
-          <p className="text-xs text-gray-500">
-            💡 Tip: Make sure the QR code is clearly visible and well-lit in the image
+          <p className="text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border dark:border-gray-700">
+            💡 <span className="font-medium">Tip:</span> Make sure the QR code is clearly visible and well-lit in the image
           </p>
         </div>
       )}

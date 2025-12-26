@@ -17,7 +17,6 @@ import {
   Camera,
   Upload
 } from "lucide-react";
-
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -54,7 +53,6 @@ const PackingPage = () => {
   // Add new state variables for task management
   const [userAssignedTasks, setUserAssignedTasks] = useState([]);
   const [loadingTasks, setLoadingTasks] = useState(true);
-
   const [filters, setFilters] = useState({
     filterDate: new Date().toISOString().split("T")[0],
     qcId: "",
@@ -92,19 +90,16 @@ const PackingPage = () => {
   // Fetch user's assigned Packing tasks
   const fetchUserAssignedTasks = useCallback(async () => {
     if (!user?.emp_id) return;
-
     try {
       setLoadingTasks(true);
       const response = await fetch(
         `${API_BASE_URL}/api/packing-records/user-packing-tasks/${user.emp_id}`
       );
-
       if (!response.ok) {
         setUserAssignedTasks([]);
         setSelectedPackingTaskNo(null);
         return;
       }
-
       const data = await response.json();
       setUserAssignedTasks(data.assignedTasks || []);
       
@@ -486,7 +481,7 @@ const PackingPage = () => {
   }, [packingRecords, user, authLoading]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
@@ -494,8 +489,8 @@ const PackingPage = () => {
       </div>
 
       {/* Header Section */}
-      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
-        <div className="absolute inset-0 bg-black/10"></div>
+      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 dark:from-gray-800 dark:via-slate-800 dark:to-gray-900 shadow-2xl transition-colors duration-300">
+        <div className="absolute inset-0 bg-black/10 dark:bg-black/20"></div>
         <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
           
@@ -504,52 +499,50 @@ const PackingPage = () => {
             {/* Top Row: Title + User */}
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 flex-1 min-w-0">
-                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
-                  <PackageCheck size={20} className="text-white" />
+                <div className="flex items-center justify-center w-10 h-10 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                  <PackageCheck size={20} className="text-white dark:text-gray-200" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                    <h1 className="text-sm sm:text-base font-black text-white dark:text-gray-100 tracking-tight truncate">
                       {t("pack.header", "Packing Process")}
                     </h1>
-                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
-                      <Sparkles size={10} className="text-yellow-300" />
-                      <span className="text-[10px] font-bold text-white">
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-full flex-shrink-0">
+                      <Sparkles size={10} className="text-yellow-300 dark:text-yellow-400" />
+                      <span className="text-[10px] font-bold text-white dark:text-gray-200">
                         QC
                       </span>
                     </div>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <div className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 dark:bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400 dark:bg-green-500"></span>
                     </div>
-                    <p className="text-[10px] text-indigo-100 font-medium truncate">
+                    <p className="text-[10px] text-indigo-100 dark:text-gray-300 font-medium truncate">
                       {activeTabData?.label} • Active
                     </p>
                   </div>
                 </div>
               </div>
-
               {user && (
-                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
-                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
+                <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-md shadow-lg">
                     <User size={16} className="text-white" />
                   </div>
                   <div className="hidden sm:block">
-                    <p className="text-white font-bold text-xs leading-tight">
+                    <p className="text-white dark:text-gray-100 font-bold text-xs leading-tight">
                       {user.job_title || "Operator"}
                     </p>
-                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                    <p className="text-indigo-200 dark:text-gray-300 text-[10px] font-medium leading-tight">
                       ID: {user.emp_id}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-
             {/* Date and Time Info */}
-            <div className="flex items-center justify-center gap-4 text-white/80 text-xs">
+            <div className="flex items-center justify-center gap-4 text-white/80 dark:text-gray-300 text-xs">
               <div className="flex items-center gap-1">
                 <CalendarDays size={14} />
                 <span>{currentTime.toLocaleDateString()}</span>
@@ -559,10 +552,9 @@ const PackingPage = () => {
                 <span>{currentTime.toLocaleTimeString()}</span>
               </div>
             </div>
-
             {/* Main Tabs - Scrollable */}
             <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
+              <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl p-1.5 min-w-max">
                 {tabs.map((tab) => {
                   const isActive = activeTab === tab.id;
                   return (
@@ -571,26 +563,26 @@ const PackingPage = () => {
                       onClick={() => handleTabChange(tab.id)}
                       className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
                         isActive
-                          ? "bg-white shadow-lg scale-105"
-                          : "bg-transparent hover:bg-white/20 hover:scale-102"
+                          ? "bg-white dark:bg-gray-700 shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20 dark:hover:bg-gray-600/30 hover:scale-102"
                       }`}
                     >
                       <div
                         className={`transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
+                          isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"
                         }`}
                       >
                         {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
                       </div>
                       <span
                         className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
-                          isActive ? "text-indigo-600" : "text-white"
+                          isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"
                         }`}
                       >
                         {tab.label}
                       </span>
                       {isActive && (
-                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 dark:bg-green-500 rounded-full shadow-lg animate-pulse"></div>
                       )}
                     </button>
                   );
@@ -604,28 +596,27 @@ const PackingPage = () => {
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-6 flex-1">
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
-                    <PackageCheck size={24} className="text-white" />
+                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-xl shadow-lg">
+                    <PackageCheck size={24} className="text-white dark:text-gray-200" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <h1 className="text-2xl font-black text-white tracking-tight">
+                      <h1 className="text-2xl font-black text-white dark:text-gray-100 tracking-tight">
                         {t("pack.header", "Packing Process")}
                       </h1>
-                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
-                        <Sparkles size={12} className="text-yellow-300" />
-                        <span className="text-xs font-bold text-white">
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-full">
+                        <Sparkles size={12} className="text-yellow-300 dark:text-yellow-400" />
+                        <span className="text-xs font-bold text-white dark:text-gray-200">
                           QC
                         </span>
-                                              </div>
+                      </div>
                     </div>
-                    <p className="text-sm text-indigo-100 font-medium">
+                    <p className="text-sm text-indigo-100 dark:text-gray-300 font-medium">
                       Yorkmars (Cambodia) Garment MFG Co., LTD
                     </p>
                   </div>
                 </div>
-
-                <div className="flex items-center gap-4 text-white/80 text-sm">
+                <div className="flex items-center gap-4 text-white/80 dark:text-gray-300 text-sm">
                   <div className="flex items-center gap-2">
                     <CalendarDays size={16} />
                     <span>{currentTime.toLocaleDateString()}</span>
@@ -635,9 +626,8 @@ const PackingPage = () => {
                     <span>{currentTime.toLocaleTimeString()}</span>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                  <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl p-2">
                     {tabs.map((tab) => {
                       const isActive = activeTab === tab.id;
                       return (
@@ -646,13 +636,13 @@ const PackingPage = () => {
                           onClick={() => handleTabChange(tab.id)}
                           className={`group relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-300 ${
                             isActive
-                              ? "bg-white shadow-lg scale-105"
-                              : "bg-transparent hover:bg-white/20 hover:scale-102"
+                              ? "bg-white dark:bg-gray-700 shadow-lg scale-105"
+                              : "bg-transparent hover:bg-white/20 dark:hover:bg-gray-600/30 hover:scale-102"
                           }`}
                         >
                           <div
                             className={`transition-colors duration-300 ${
-                              isActive ? "text-indigo-600" : "text-white"
+                              isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"
                             }`}
                           >
                             {React.cloneElement(tab.icon, {
@@ -661,45 +651,44 @@ const PackingPage = () => {
                           </div>
                           <span
                             className={`text-xs font-bold transition-colors duration-300 ${
-                              isActive ? "text-indigo-600" : "text-white"
+                              isActive ? "text-indigo-600 dark:text-indigo-400" : "text-white dark:text-gray-200"
                             }`}
                           >
                             {tab.label}
                           </span>
                           {isActive && (
-                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 dark:bg-green-500 rounded-full shadow-lg animate-pulse"></div>
                           )}
                         </button>
                       );
                     })}
                   </div>
-                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+                  <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5">
                     <div className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 dark:bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400 dark:bg-green-500"></span>
                     </div>
                     <div>
-                      <p className="text-white font-bold text-sm leading-tight">
+                      <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
                         {activeTabData?.label}
                       </p>
-                      <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
                         Active Module
                       </p>
                     </div>
                   </div>
                 </div>
               </div>
-
               {user && (
-                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
-                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
+                <div className="flex items-center gap-3 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5 shadow-xl">
+                                    <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-lg shadow-lg">
                     <User size={20} className="text-white" />
                   </div>
                   <div>
-                    <p className="text-white font-bold text-sm leading-tight">
+                    <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
                       {user.job_title || "Operator"}
                     </p>
-                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                    <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
                       ID: {user.emp_id}
                     </p>
                   </div>
@@ -714,9 +703,9 @@ const PackingPage = () => {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
         <div className="animate-fadeIn">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-300 rounded-lg flex items-center gap-3 shadow-md mb-6">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-300 dark:border-red-700/50 rounded-lg flex items-center gap-3 shadow-md mb-6">
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
             </div>
           )}
 
@@ -755,13 +744,14 @@ const PackingPage = () => {
                   className="w-full"
                 />
               )}
-
-              <div className="bg-white shadow-lg rounded-xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              
+              {/* Auto Add and Task Selector */}
+              <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border dark:border-gray-700 transition-colors duration-300">
                 {/* Left Part: Auto Add Checkbox */}
                 <div className="flex items-center">
                   <label
                     htmlFor="autoAddCheckboxPacking"
-                    className="text-sm font-medium text-gray-700 mr-2"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2"
                   >
                     {t("iro.auto_add_record", "Auto Add")}:
                   </label>
@@ -770,7 +760,7 @@ const PackingPage = () => {
                     type="checkbox"
                     checked={autoAdd}
                     onChange={(e) => setAutoAdd(e.target.checked)}
-                    className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                    className="h-4 w-4 text-indigo-600 dark:text-indigo-400 border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:focus:ring-indigo-400 bg-white dark:bg-gray-700"
                     disabled={!hasValidPackingTasks}
                   />
                 </div>
@@ -779,18 +769,18 @@ const PackingPage = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                   <label
                     htmlFor="packingTaskSelector"
-                    className="text-sm font-medium text-gray-700"
+                    className="text-sm font-medium text-gray-700 dark:text-gray-300"
                   >
                     {t("pack.select_task", "Packing Task")}:
                   </label>
                   
                   {loadingTasks ? (
                     <div className="flex items-center gap-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600"></div>
-                      <span className="text-sm text-gray-500">Loading tasks...</span>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">Loading tasks...</span>
                     </div>
                   ) : !hasValidPackingTasks ? (
-                    <div className="text-sm text-orange-600 bg-orange-50 px-3 py-1 rounded border border-orange-200">
+                    <div className="text-sm text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 px-3 py-1 rounded border border-orange-200 dark:border-orange-800">
                       No Packing tasks assigned
                     </div>
                   ) : (
@@ -799,7 +789,7 @@ const PackingPage = () => {
                         id="packingTaskSelector"
                         value={selectedPackingTaskNo || ""}
                         onChange={(e) => setSelectedPackingTaskNo(Number(e.target.value))}
-                        className="h-8 text-sm border-gray-300 rounded focus:ring-indigo-500 focus:border-indigo-500 px-2 py-1"
+                        className="h-8 text-sm border-gray-300 dark:border-gray-600 rounded focus:ring-indigo-500 dark:focus:ring-indigo-400 focus:border-indigo-500 dark:focus:border-indigo-400 px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                         disabled={!hasValidPackingTasks}
                       >
                         {availableTaskOptions.map((option) => (
@@ -811,7 +801,7 @@ const PackingPage = () => {
                       
                       {selectedPackingTaskNo && (
                         <span
-                          className="text-xs sm:text-sm text-gray-600 truncate max-w-[150px] sm:max-w-[250px]"
+                          className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate max-w-[150px] sm:max-w-[250px]"
                           title={
                             availableTaskOptions.find(
                               (opt) => opt.value === selectedPackingTaskNo
@@ -829,7 +819,7 @@ const PackingPage = () => {
                       )}
                       
                       {userAssignedTasks.length > 0 && (
-                        <div className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">
+                        <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded border border-blue-200 dark:border-blue-800">
                           Assigned: {userAssignedTasks.filter(task => 
                             [63, 66, 67, 68].includes(task)
                           ).join(", ")}
@@ -842,15 +832,15 @@ const PackingPage = () => {
 
               {/* Scan Method Selection - Only show if user has valid tasks */}
               {!loadingTasks && hasValidPackingTasks && selectedPackingTaskNo && (
-                <div className="bg-white shadow-lg rounded-xl p-4 sm:p-6">
+                <div className="bg-white dark:bg-gray-800 shadow-lg rounded-xl p-4 sm:p-6 border dark:border-gray-700 transition-colors duration-300">
                   <div className="flex items-center justify-center mb-6">
-                    <div className="flex items-center gap-2 bg-gray-100 rounded-lg p-1">
+                    <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
                       <button
                         onClick={() => setScanMethod("camera")}
                         className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-300 ${
                           scanMethod === "camera"
-                            ? "bg-white shadow-md text-indigo-600"
-                            : "text-gray-600 hover:text-gray-800"
+                            ? "bg-white dark:bg-gray-600 shadow-md text-indigo-600 dark:text-indigo-400"
+                            : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
                         }`}
                       >
                         <Camera size={18} />
@@ -860,8 +850,8 @@ const PackingPage = () => {
                         onClick={() => setScanMethod("upload")}
                         className={`flex items-center gap-2 px-4 py-2 rounded-md transition-all duration-300 ${
                           scanMethod === "upload"
-                            ? "bg-white shadow-md text-indigo-600"
-                            : "text-gray-600 hover:text-gray-800"
+                            ? "bg-white dark:bg-gray-600 shadow-md text-indigo-600 dark:text-indigo-400"
+                            : "text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
                         }`}
                       >
                         <Upload size={18} />
@@ -921,19 +911,19 @@ const PackingPage = () => {
 
               {/* Show message if no tasks assigned */}
               {!loadingTasks && !hasValidPackingTasks && (
-                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 border border-orange-200 rounded-xl p-8 text-center shadow-lg">
-                  <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-r from-orange-100 to-yellow-100 rounded-full mx-auto mb-6 shadow-inner">
-                    <PackageCheck className="w-10 h-10 text-orange-600" />
+                <div className="bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20 border border-orange-200 dark:border-orange-800 rounded-xl p-8 text-center shadow-lg">
+                  <div className="flex items-center justify-center w-20 h-20 bg-gradient-to-r from-orange-100 to-yellow-100 dark:from-orange-800/50 dark:to-yellow-800/50 rounded-full mx-auto mb-6 shadow-inner">
+                    <PackageCheck className="w-10 h-10 text-orange-600 dark:text-orange-400" />
                   </div>
-                  <h3 className="text-xl font-bold text-orange-800 mb-3">
+                  <h3 className="text-xl font-bold text-orange-800 dark:text-orange-300 mb-3">
                     Access Restricted
                   </h3>
-                  <p className="text-orange-700 mb-4 max-w-md mx-auto leading-relaxed">
+                  <p className="text-orange-700 dark:text-orange-300 mb-4 max-w-md mx-auto leading-relaxed">
                     You don't have any Packing tasks (63, 66, 67, 68) assigned to your account. 
                     Scanning is currently disabled for your user profile.
                   </p>
-                  <div className="bg-white/60 rounded-lg p-4 border border-orange-200">
-                    <p className="text-sm text-orange-600 font-medium">
+                  <div className="bg-white/60 dark:bg-gray-800/60 rounded-lg p-4 border border-orange-200 dark:border-orange-800">
+                    <p className="text-sm text-orange-600 dark:text-orange-400 font-medium">
                       📞 Please contact your supervisor or administrator to assign the appropriate Packing tasks to your account.
                     </p>
                   </div>
@@ -941,27 +931,30 @@ const PackingPage = () => {
               )}
             </div>
           ) : (
-            <div className="bg-white rounded-xl shadow-xl p-4 md:p-6">
+            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-xl p-4 md:p-6 border dark:border-gray-700 transition-colors duration-300">
+              {/* Statistics Cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <StatCard
                   title={t("pack.stats.total_garments", "Total Garments Packed")}
                   value={packingStats.totalGarmentsPacking.toLocaleString()}
                   icon={<Shirt />}
-                  colorClass="border-l-blue-500 text-blue-500 bg-blue-500"
+                  colorClass="border-l-blue-500 dark:border-l-blue-400 text-blue-500 dark:text-blue-400 bg-blue-500 dark:bg-blue-400"
                   loading={loadingData}
                 />
+
                 <StatCard
                   title={t("pack.stats.total_bundles", "Total Bundles Processed")}
                   value={packingStats.totalBundlesProcessed.toLocaleString()}
                   icon={<Package />}
-                  colorClass="border-l-green-500 text-green-500 bg-green-500"
+                  colorClass="border-l-green-500 dark:border-l-green-400 text-green-500 dark:text-green-400 bg-green-500 dark:bg-green-400"
                   loading={loadingData}
                 />
+
                 <StatCard
                   title={t("pack.stats.total_styles", "Total Styles")}
                   value={packingStats.totalStyles.toLocaleString()}
                   icon={<Palette />}
-                  colorClass="border-l-purple-500 text-purple-500 bg-purple-500"
+                  colorClass="border-l-purple-500 dark:border-l-purple-400 text-purple-500 dark:text-purple-400 bg-purple-500 dark:bg-purple-400"
                   loading={loadingData}
                 />
               </div>
@@ -972,124 +965,125 @@ const PackingPage = () => {
                 distinctFiltersEndpoint="/api/packing-records/distinct-filters"
               />
 
-              <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm relative mt-6">
-                <table className="min-w-full divide-y divide-gray-200 border border-gray-200">
-                  <thead className="bg-slate-100 sticky top-0 z-10">
+              {/* Data Table */}
+              <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600 shadow-sm relative mt-6">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600 border border-gray-200 dark:border-gray-600">
+                  <thead className="bg-slate-100 dark:bg-gray-700 sticky top-0 z-10">
                     <tr>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("pack.packing_id", "Card Type")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("iro.task_no")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.package_no")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.department")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("iro.updated_date")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("iro.updated_time")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.mono")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.customer_style")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.buyer")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.country")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.factory")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.line_no")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.color")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.size")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("bundle.count")}
                       </th>
-                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap">
+                      <th className="px-3 md:px-5 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                         {t("pack.pass_qty", "Pass Qty")}
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
                     {filteredPackingRecords.map((record, index) => (
                       <tr
                         key={record._id || index}
-                        className="hover:bg-slate-50 transition-colors duration-150"
+                        className="hover:bg-slate-50 dark:hover:bg-gray-700 transition-colors duration-150"
                       >
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           <div className="flex items-center gap-2">
                             {record.packing_record_id === 0 ? (
                               <>
-                                <AlertTriangle className="w-4 h-4 text-red-500" />
+                                <AlertTriangle className="w-4 h-4 text-red-500 dark:text-red-400" />
                                 <span>Defect</span>
                               </>
                             ) : (
                               <>
-                                <CheckCircle className="w-4 h-4 text-green-500" />
+                                <CheckCircle className="w-4 h-4 text-green-500 dark:text-green-400" />
                                 <span>Order</span>
                               </>
                             )}
                           </div>
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.task_no_packing}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.package_no}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.department}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.packing_updated_date}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.packing_update_time}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.moNo}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.custStyle}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.buyer}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.country}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.factory}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.lineNo}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.color}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.size}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.count}
                         </td>
-                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 whitespace-nowrap">
+                        <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.passQtyPack}
                         </td>
                       </tr>
@@ -1102,7 +1096,7 @@ const PackingPage = () => {
         </div>
       </div>
 
-      {/* Custom Styles */}
+      {/* Enhanced Custom Styles for Dark Mode */}
       <style>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;
@@ -1155,6 +1149,38 @@ const PackingPage = () => {
         .hover\\:scale-102:hover {
           transform: scale(1.02);
         }
+        
+        /* Dark mode specific styles */
+        @media (prefers-color-scheme: dark) {
+          .bg-grid-white {
+            background-image: linear-gradient(
+                to right,
+                rgba(255, 255, 255, 0.05) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0.05) 1px,
+                transparent 1px
+              );
+          }
+        }
+        
+        /* Custom scrollbar for dark mode */
+        .dark .overflow-x-auto::-webkit-scrollbar {
+          height: 8px;
+        }
+        .dark .overflow-x-auto::-webkit-scrollbar-track {
+          background: #374151;
+          border-radius: 4px;
+        }
+        .dark .overflow-x-auto::-webkit-scrollbar-thumb {
+          background: #6b7280;
+          border-radius: 4px;
+        }
+        .dark .overflow-x-auto::-webkit-scrollbar-thumb:hover {
+          background: #9ca3af;
+        }
       `}</style>
     </div>
   );
@@ -1162,4 +1188,3 @@ const PackingPage = () => {
 
 export default PackingPage;
 
-                      

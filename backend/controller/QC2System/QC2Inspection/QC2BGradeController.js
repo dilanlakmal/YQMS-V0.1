@@ -12,11 +12,6 @@ export const saveBGradeData = async (req, res) => {
       return res.status(400).json({ message: "Missing required data." });
     }
 
-    console.log("=== Saving B-Grade Data ===");
-    console.log("defect_print_id:", defect_print_id);
-    console.log("garmentData:", garmentData);
-    console.log("leader_status:", garmentData.leader_status);
-
     // First, check if this garment is already in the B-Grade document to prevent duplicates
     const existingBGrade = await QC2BGrade.findOne({
       defect_print_id,
@@ -42,17 +37,13 @@ export const saveBGradeData = async (req, res) => {
     }
 
     const bundle_random_id = inspectionDoc.bundle_random_id;
-    console.log(`Found bundle_random_id: ${bundle_random_id} for defect_print_id: ${defect_print_id}`);
 
     // Check if document exists
     let bGradeRecord = await QC2BGrade.findOne({ defect_print_id });
     
     if (!bGradeRecord) {
-      // Document doesn't exist - create new one
-      console.log("Creating new B-Grade document");
       
       const initialTotalBgradeQty = garmentData.leader_status === "B Grade" ? 1 : 0;
-      console.log(`Setting initial totalBgradeQty to: ${initialTotalBgradeQty}`);
       
       bGradeRecord = new QC2BGrade({
         ...headerData,
@@ -63,40 +54,29 @@ export const saveBGradeData = async (req, res) => {
       });
       
       await bGradeRecord.save();
-      console.log(`✓ Created new B-Grade document with totalBgradeQty: ${bGradeRecord.totalBgradeQty}`);
     } else {
-      // Document exists - update it
-      console.log("Updating existing B-Grade document");
-      console.log(`Current totalBgradeQty: ${bGradeRecord.totalBgradeQty}`);
       
       bGradeRecord.bgradeArray.push(garmentData);
       
       // Increment totalBgradeQty if leader_status is "B Grade"
       if (garmentData.leader_status === "B Grade") {
         bGradeRecord.totalBgradeQty += 1;
-        console.log(`Incremented totalBgradeQty to: ${bGradeRecord.totalBgradeQty}`);
       }
       
       // Ensure bundle_random_id is set if missing
       if (!bGradeRecord.bundle_random_id) {
         bGradeRecord.bundle_random_id = bundle_random_id;
-        console.log("Set missing bundle_random_id");
       }
       
       await bGradeRecord.save();
-      console.log(`✓ Updated B-Grade document with totalBgradeQty: ${bGradeRecord.totalBgradeQty}`);
     }
 
     // VERIFICATION: Double-check the saved document
     const verificationDoc = await QC2BGrade.findOne({ defect_print_id });
-    console.log("=== Verification ===");
-    console.log(`Saved document totalBgradeQty: ${verificationDoc.totalBgradeQty}`);
-    console.log(`Actual B-Grade garments: ${verificationDoc.bgradeArray.filter(g => g.leader_status === "B Grade").length}`);
 
     // If there's a mismatch, fix it immediately
     const actualBGradeCount = verificationDoc.bgradeArray.filter(g => g.leader_status === "B Grade").length;
     if (verificationDoc.totalBgradeQty !== actualBGradeCount) {
-      console.log(`⚠️ Mismatch detected! Fixing: ${verificationDoc.totalBgradeQty} → ${actualBGradeCount}`);
       
       await QC2BGrade.updateOne(
         { defect_print_id },
@@ -105,7 +85,6 @@ export const saveBGradeData = async (req, res) => {
       
       // Get the corrected document
       bGradeRecord = await QC2BGrade.findOne({ defect_print_id });
-      console.log(`✓ Fixed totalBgradeQty to: ${bGradeRecord.totalBgradeQty}`);
     }
 
     // Always decrement reject counts when adding to B-Grade collection
@@ -118,8 +97,6 @@ export const saveBGradeData = async (req, res) => {
         }
       }
     );
-
-    console.log(`Decremented reject counts for defect_print_id: ${defect_print_id}`, updateResult);
 
     res.status(200).json({
       message: "B-Grade garment recorded successfully.",
@@ -290,9 +267,6 @@ export const saveBGradeDefect = async (req, res) => {
   }
 
   try {
-    console.log("=== Processing B-Grade Decisions ===");
-    console.log("defect_print_id:", defect_print_id);
-    console.log("decisions:", decisions);
 
     // Step 1: Find the B-Grade document
     const bGradeDoc = await QC2BGrade.findOne({ defect_print_id });
@@ -300,20 +274,10 @@ export const saveBGradeDefect = async (req, res) => {
       throw new Error(`B-Grade document not found for defect ID: ${defect_print_id}`);
     }
 
-    console.log("Current B-Grade document:", {
-      bundle_random_id: bGradeDoc.bundle_random_id,
-      totalBgradeQty: bGradeDoc.totalBgradeQty,
-      garments: bGradeDoc.bgradeArray.map(g => ({
-        garmentNumber: g.garmentNumber,
-        leader_status: g.leader_status
-      }))
-    });
-
     // Step 2: Find bundle_random_id if missing
     let bundle_random_id = bGradeDoc.bundle_random_id;
     
     if (!bundle_random_id) {
-      console.log("bundle_random_id is missing, searching for it...");
       
       const inspectionDoc = await QC2InspectionPassBundle.findOne({
         "printArray.defect_print_id": defect_print_id
@@ -324,7 +288,6 @@ export const saveBGradeDefect = async (req, res) => {
       }
 
       bundle_random_id = inspectionDoc.bundle_random_id;
-      console.log(`Found bundle_random_id: ${bundle_random_id}`);
 
       // Update the B-Grade document with the found bundle_random_id
       bGradeDoc.bundle_random_id = bundle_random_id;
@@ -338,24 +301,18 @@ export const saveBGradeDefect = async (req, res) => {
       const garmentNumberStr = String(garment.garmentNumber);
       const decision = decisions[garmentNumberStr];
       
-      console.log(`Garment ${garment.garmentNumber}: current=${garment.leader_status}, decision=${decision}`);
-      
       if (decision) {
         const oldStatus = garment.leader_status;
         
         if (decision === "Not B Grade" && oldStatus === "B Grade") {
           garment.leader_status = "Not B Grade";
           garmentsChangedToNotBGrade++;
-          console.log(`✓ Garment ${garment.garmentNumber}: B Grade → Not B Grade`);
         } else if (decision === "Accept" && oldStatus === "Not B Grade") {
           garment.leader_status = "B Grade";
           garmentsChangedToBGrade++;
-          console.log(`✓ Garment ${garment.garmentNumber}: Not B Grade → B Grade`);
         }
       }
     });
-
-    console.log(`Changes: ${garmentsChangedToNotBGrade} to "Not B Grade", ${garmentsChangedToBGrade} to "B Grade"`);
 
     if (garmentsChangedToNotBGrade === 0 && garmentsChangedToBGrade === 0) {
       return res.status(200).json({ message: "No changes to garment statuses were made." });
@@ -368,12 +325,6 @@ export const saveBGradeDefect = async (req, res) => {
     bGradeDoc.totalBgradeQty = newTotalBgradeQty;
     bGradeDoc.markModified("bgradeArray");
     await bGradeDoc.save();
-
-    console.log(`Updated B-Grade document: totalBgradeQty = ${newTotalBgradeQty}`);
-
-    // Step 5: Update inspection document - ONLY reject counts, NO totalPass changes
-    console.log("=== Updating Inspection Document ===");
-    console.log("Looking for bundle_random_id:", bundle_random_id);
 
     const inspectionDoc = await QC2InspectionPassBundle.findOne({ 
       bundle_random_id: bundle_random_id 
@@ -390,11 +341,6 @@ export const saveBGradeDefect = async (req, res) => {
     }
 
     const printElement = inspectionDoc.printArray[printElementIndex];
-    console.log("Current print element:", {
-      defect_print_id: printElement.defect_print_id,
-      totalRejectGarmentCount: printElement.totalRejectGarmentCount,
-      totalRejectGarment_Var: printElement.totalRejectGarment_Var
-    });
 
     // Calculate changes for inspection document
     const oldRejectCount = printElement.totalRejectGarmentCount;
@@ -405,24 +351,17 @@ export const saveBGradeDefect = async (req, res) => {
       // Garments changed from "B Grade" to "Not B Grade" - increment reject counts back
       inspectionDoc.printArray[printElementIndex].totalRejectGarmentCount += garmentsChangedToNotBGrade;
       inspectionDoc.printArray[printElementIndex].totalRejectGarment_Var += garmentsChangedToNotBGrade;
-      console.log(`Incremented reject counts for ${garmentsChangedToNotBGrade} garments changed to "Not B Grade"`);
     }
 
     if (garmentsChangedToBGrade > 0) {
       // Garments changed from "Not B Grade" to "B Grade" - decrement reject counts
       inspectionDoc.printArray[printElementIndex].totalRejectGarmentCount -= garmentsChangedToBGrade;
       inspectionDoc.printArray[printElementIndex].totalRejectGarment_Var -= garmentsChangedToBGrade;
-      console.log(`Decremented reject counts for ${garmentsChangedToBGrade} garments changed to "B Grade"`);
     }
 
     // Mark the array as modified and save
     inspectionDoc.markModified('printArray');
     await inspectionDoc.save();
-
-    console.log("=== Final Results ===");
-    console.log(`Reject counts: ${oldRejectCount} → ${inspectionDoc.printArray[printElementIndex].totalRejectGarmentCount}`);
-    console.log(`Reject vars: ${oldRejectVar} → ${inspectionDoc.printArray[printElementIndex].totalRejectGarment_Var}`);
-    console.log("totalPass: NO CHANGES (as requested)");
 
     res.status(200).json({
       message: "B-Grade decisions processed successfully.",
@@ -457,17 +396,13 @@ export const fixExistingBGradeQty = async (req, res) => {
     const documentsToFix = await QC2BGrade.find({});
     let fixedCount = 0;
     
-    console.log(`Found ${documentsToFix.length} B-Grade documents to check`);
-    
     for (const doc of documentsToFix) {
       const actualBGradeCount = doc.bgradeArray.filter(
         garment => garment.leader_status === "B Grade"
       ).length;
       
-      console.log(`Document ${doc.defect_print_id}: stored=${doc.totalBgradeQty}, actual=${actualBGradeCount}`);
       
       if (doc.totalBgradeQty !== actualBGradeCount) {
-        console.log(`🔧 Fixing document ${doc.defect_print_id}: ${doc.totalBgradeQty} → ${actualBGradeCount}`);
         
         await QC2BGrade.updateOne(
           { _id: doc._id },
