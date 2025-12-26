@@ -65,9 +65,23 @@ const PaperPreview = ({ data }) => {
                     <tbody>
                         {(formData.history || formData.inspectionRecords || []).map((rec, idx) => {
                             const formatTime = (timeStr) => {
-                                if (!timeStr) return '';
+                                if (!timeStr || timeStr === 'N/A') return '';
+                                if (timeStr.includes('AM') || timeStr.includes('PM')) return timeStr;
+
                                 const match = timeStr.match(/(\d{1,2}):(\d{2})/);
-                                if (!match) return timeStr;
+                                if (!match) {
+                                    if (timeStr.includes('T') || (timeStr.includes('-') && timeStr.includes(' '))) {
+                                        const date = new Date(timeStr);
+                                        if (isNaN(date.getTime())) return timeStr;
+                                        return date.toLocaleTimeString('en-US', {
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                            hour12: true
+                                        });
+                                    }
+                                    return timeStr;
+                                }
+
                                 const hour = parseInt(match[1], 10);
                                 const minute = match[2];
                                 const ampm = hour >= 12 ? 'PM' : 'AM';
@@ -75,14 +89,14 @@ const PaperPreview = ({ data }) => {
                                 return `${h12}:${minute} ${ampm}`;
                             };
 
-                            // Read times from this specific history entry, not from main document
+                            // Read times ONLY from history entry
                             const beforeTime = rec.beforeDryRoom || rec.beforeDryRoomTime || '';
                             const afterTime = rec.afterDryRoom || rec.afterDryRoomTime || '';
 
                             return (
                                 <tr key={idx}>
-                                    <td className="border px-2 py-1 text-center">{formatDate(rec.date || formData.date)}</td>
-                                    <td className="border px-2 py-1 text-center">{rec.colorName || formData.colorName}</td>
+                                    <td className="border px-2 py-1 text-center">{formatDate(rec.date)}</td>
+                                    <td className="border px-2 py-1 text-center">{rec.colorName || ''}</td>
                                     <td className="border px-2 py-1 text-center">{formatTime(beforeTime)}</td>
                                     <td className="border px-2 py-1 text-center">{formatTime(afterTime)}</td>
                                     {['top', 'middle', 'bottom'].map(section => {

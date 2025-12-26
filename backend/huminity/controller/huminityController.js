@@ -272,8 +272,6 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     sheet.pageSetup.horizontalCentered = true;
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
-
-    // margins
     sheet.pageMargins = { left: 0.3, right: 0.3, top: 0.3, bottom: 0.3, header: 0.3, footer: 0 };
 
     // add logo if exists (look in public/img/header.png)
@@ -546,9 +544,10 @@ export const createHumidityReport = async (req, res) => {
       const record = payload.inspectionRecords[0]; // Take first record
 
       // Add date and dry room times to each history entry
-      historyEntry.date = new Date().toISOString();
+      historyEntry.date = payload.date || new Date().toISOString();
       historyEntry.beforeDryRoom = payload.beforeDryRoom || '';
       historyEntry.afterDryRoom = payload.afterDryRoom || '';
+      historyEntry.colorName = payload.colorName || '';
 
       historyEntry.top = {
         body: record.top?.body || '',
@@ -565,7 +564,18 @@ export const createHumidityReport = async (req, res) => {
         ribs: record.bottom?.ribs || '',
         status: record.bottom?.pass ? 'pass' : (record.bottom?.fail ? 'fail' : '')
       };
+
+      historyEntry.images = Array.isArray(record.images) ? record.images : [];
       historyEntry.generalRemark = payload.generalRemark || '';
+
+      // Capture the exact time of the save action
+      const now = new Date();
+      historyEntry.saveTime = now.toLocaleTimeString('en-US', {
+        hour12: true,
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
     }
 
     const model = HumidityReport;
@@ -684,7 +694,7 @@ export const getAggregatedByCustomers = async (req, res) => {
         ribsCounts
       };
     }
-    
+
     return res.json({ success: true, data: [{ _id: new Date().toISOString(), ...resultObj }] });
   } catch (err) {
     console.error("Error aggregating customer data:", err);
@@ -742,6 +752,46 @@ export const getFabricValuesByBuyer = async (req, res) => {
   } catch (err) {
     console.error("Error computing fabric values by buyer:", err);
     return res.status(500).json({ success: false, message: "Failed to compute fabric values" });
+  }
+};
+
+// POST /api/humidity-reports/:id/approve
+export const approveHumidityReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { empId, engName } = req.body;
+
+    if (!id) {
+      return res.status(400).json({ success: false, message: "Report ID is required" });
+    }
+
+    if (!empId || !engName) {
+      return res.status(400).json({ success: false, message: "Approver information is required" });
+    }
+
+    const model = HumidityReport;
+    const report = await model.findById(id);
+
+    if (!report) {
+      return res.status(404).json({ success: false, message: "Report not found" });
+    }
+
+    // Check if already approved
+    if (report.approvalStatus === 'approved') {
+      return res.status(400).json({ success: false, message: "Report is already approved" });
+    }
+
+    // Update the report with approval details
+    report.approvalStatus = 'approved';
+    report.approvedBy = { empId, engName };
+    report.approvedAt = new Date();
+
+    await report.save();
+
+    return res.json({ success: true, data: report, message: "Report approved successfully" });
+  } catch (err) {
+    console.error("Error approving humidity report:", err);
+    return res.status(500).json({ success: false, message: "Failed to approve report" });
   }
 };
 

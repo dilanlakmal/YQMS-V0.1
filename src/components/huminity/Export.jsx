@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { API_BASE_URL } from '../../../config';
 import PaperPreview from './PaperPreview';
+import { useAuth } from '../authentication/AuthContext';
 
 export default function ExportPanel() {
+    const { user } = useAuth();
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [factoryStyleFilter, setFactoryStyleFilter] = useState('');
@@ -87,30 +89,37 @@ export default function ExportPanel() {
 
     const handleExport = async () => {
         try {
-            if (!startDate || !endDate) {
-                alert('Please select a start and end date');
-                return;
-            }
-
             setIsLoading(true);
-
-            // Construct start/end ISO strings
-            const s = new Date(startDate);
-            s.setHours(0, 0, 0, 0);
-            const e = new Date(endDate);
-            e.setHours(23, 59, 59, 999);
-
-            const startIso = s.toISOString();
-            const endIso = e.toISOString();
 
             const base = (API_BASE_URL && API_BASE_URL !== '') ? API_BASE_URL : '';
             const prefix = base.endsWith('/') ? base.slice(0, -1) : base;
 
-            // Fetch data
-            let url = `${prefix}/api/humidity-reports?limit=0&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
+            // Fetch data - build URL with optional filters
+            let url = `${prefix}/api/humidity-reports?limit=0`;
 
-            // Add filters if selected
-            if (factoryStyleFilter) url += `&factoryStyleNo=${encodeURIComponent(factoryStyleFilter)}`;
+            // Add date filters only if both are selected
+            if (startDate && endDate) {
+                const s = new Date(startDate);
+                s.setHours(0, 0, 0, 0);
+                const e = new Date(endDate);
+                e.setHours(23, 59, 59, 999);
+
+                const startIso = s.toISOString();
+                const endIso = e.toISOString();
+
+                url += `&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(endIso)}`;
+                console.log('Exporting with date range:', startIso, 'to', endIso);
+            } else {
+                console.log('Exporting all reports (no date filter)');
+            }
+
+            // Add factory style filter if selected
+            if (factoryStyleFilter) {
+                url += `&factoryStyleNo=${encodeURIComponent(factoryStyleFilter)}`;
+                console.log('Filtering by Factory Style:', factoryStyleFilter);
+            }
+
+            console.log('Fetching reports from:', url);
 
             const res = await fetch(url);
             if (!res.ok) {
@@ -119,6 +128,8 @@ export default function ExportPanel() {
             }
             const json = await res.json();
             const docs = json && json.data ? json.data : [];
+
+            console.log('Reports fetched:', docs.length);
 
             if (!Array.isArray(docs) || docs.length === 0) {
                 alert('No reports found for the selected period.');
@@ -171,21 +182,73 @@ export default function ExportPanel() {
         }
     };
 
+    const handleApprove = async (reportId) => {
+        try {
+            if (!user || !user.empId || !user.engName) {
+                alert('User information not available. Please log in again.');
+                return;
+            }
+
+            const confirmApprove = window.confirm('Are you sure you want to approve this report?');
+            if (!confirmApprove) return;
+
+            const base = (API_BASE_URL && API_BASE_URL !== '') ? API_BASE_URL : '';
+            const prefix = base.endsWith('/') ? base.slice(0, -1) : base;
+
+            const res = await fetch(`${prefix}/api/humidity-reports/${reportId}/approve`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    empId: user.empId,
+                    engName: user.engName
+                })
+            });
+
+            const json = await res.json();
+
+            if (res.ok && json.success) {
+                alert('Report approved successfully!');
+
+                // Update the local state to reflect the approval
+                setDisplayedReports(prev => prev.map(report =>
+                    report._id === reportId
+                        ? { ...report, approvalStatus: 'approved', approvedBy: { empId: user.empId, engName: user.engName }, approvedAt: new Date() }
+                        : report
+                ));
+                setOrdersRaw(prev => prev.map(report =>
+                    report._id === reportId
+                        ? { ...report, approvalStatus: 'approved', approvedBy: { empId: user.empId, engName: user.engName }, approvedAt: new Date() }
+                        : report
+                ));
+            } else {
+                alert(json.message || 'Failed to approve report');
+            }
+        } catch (err) {
+            console.error('Approval error', err);
+            alert('Failed to approve report. See console for details.');
+        }
+    };
+
     const formatDate = (dateStr) => {
         if (!dateStr) return 'N/A';
         try {
             const date = new Date(dateStr);
+            // Check if date is valid
+            if (isNaN(date.getTime())) return 'N/A';
             return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
         } catch (e) {
-            return dateStr;
+            return 'N/A';
         }
     };
 
     const formatTime = (timeStr) => {
         if (!timeStr) return 'N/A';
         try {
-            if (timeStr.includes('T') || timeStr.includes(' ')) {
+            if (timeStr.includes('T') || (timeStr.includes('-') && timeStr.includes(' '))) {
                 const date = new Date(timeStr);
+                if (isNaN(date.getTime())) return timeStr;
                 return date.toLocaleTimeString('en-US', {
                     hour: 'numeric',
                     minute: '2-digit',
@@ -196,7 +259,9 @@ export default function ExportPanel() {
             const timeParts = timeStr.split(':');
             if (timeParts.length >= 2) {
                 let hours = parseInt(timeParts[0], 10);
-                const minutes = timeParts[1];
+                const minutes = timeParts[1].substring(0, 2); // Get "mm" part
+                if (isNaN(hours) || isNaN(parseInt(minutes, 10))) return timeStr;
+
                 const period = hours >= 12 ? 'PM' : 'AM';
                 hours = hours % 12;
                 if (hours === 0) hours = 12;
@@ -219,9 +284,9 @@ export default function ExportPanel() {
             latestCheck.bottom?.status === 'pass';
 
         if (allPassed) {
-            return <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 font-medium">✓ Complete</span>;
+            return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">✓ Complete</span>;
         } else {
-            return <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-700 font-medium">⚡ In Progress</span>;
+            return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium">⚡ In Progress</span>;
         }
     };
 
@@ -280,7 +345,7 @@ export default function ExportPanel() {
                                 readOnly
                                 className="w-full px-3 py-2 border rounded-lg bg-gray-50"
                             />
-                            <button onClick={handleExport} disabled={isLoading || !startDate || !endDate || !factoryStyleFilter} className="px-4 py-2 bg-red-500 text-white rounded disabled:opacity-50 flex items-center gap-2 flex-shrink-0">
+                            <button onClick={handleExport} disabled={isLoading || !factoryStyleFilter} className="px-4 py-2 bg-red-500 text-white rounded disabled:opacity-50 flex items-center gap-2 flex-shrink-0">
                                 {isLoading ? (
                                     <>
                                         <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -336,6 +401,7 @@ export default function ExportPanel() {
                                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">Latest Check</th>
                                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">Checks</th>
                                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                                    <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">Approval</th>
                                     <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -345,6 +411,8 @@ export default function ExportPanel() {
                                     const isExpanded = expandedRows[reportId];
                                     const history = report.history || [];
                                     const latestDate = report.updatedAt || report.createdAt || '';
+                                    const isSupervisor = user && user.roles && user.roles.includes('supervisor');
+                                    const isApproved = report.approvalStatus === 'approved';
 
                                     return (
                                         <React.Fragment key={reportId}>
@@ -362,97 +430,153 @@ export default function ExportPanel() {
                                                     {getStatusBadge(history)}
                                                 </td>
                                                 <td className="px-4 py-3 text-sm text-center">
-                                                    {history.length > 0 && (
-                                                        <button
-                                                            onClick={() => toggleRowExpansion(reportId)}
-                                                            className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
-                                                        >
-                                                            {isExpanded ? (
-                                                                <>
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                                                    </svg>
-                                                                    Hide
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                    </svg>
-                                                                    View History
-                                                                </>
+                                                    {isApproved ? (
+                                                        <div className="flex flex-col items-center gap-1">
+                                                            <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-700 font-medium">✓ Approved</span>
+                                                            {report.approvedBy && (
+                                                                <span className="text-xs text-gray-500">by {report.approvedBy.engName}</span>
                                                             )}
-                                                        </button>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium">Pending</span>
                                                     )}
+                                                </td>
+                                                <td className="px-4 py-3 text-sm text-center">
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        {history.length > 0 && (
+                                                            <button
+                                                                onClick={() => toggleRowExpansion(reportId)}
+                                                                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                                            >
+                                                                {isExpanded ? (
+                                                                    <>
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                                                                        </svg>
+                                                                        Hide
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                        </svg>
+                                                                        View
+                                                                    </>
+                                                                )}
+                                                            </button>
+                                                        )}
+                                                        {isSupervisor && !isApproved && (
+                                                            <button
+                                                                onClick={() => handleApprove(reportId)}
+                                                                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded transition-colors"
+                                                                title="Supervisor Approve"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                                </svg>
+                                                                Approve
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
 
                                             {isExpanded && history.length > 0 && (
                                                 <tr>
-                                                    <td colSpan="7" className="px-4 py-4 bg-gray-50">
+                                                    <td colSpan="8" className="px-4 py-4 bg-gray-50">
                                                         <div className="space-y-3">
                                                             <h4 className="text-sm font-semibold text-gray-700 mb-3">Inspection History</h4>
-                                                            <div className="overflow-x-auto">
-                                                                <table className="w-full text-sm border rounded">
-                                                                    <thead className="bg-white">
+                                                            <div className="overflow-x-auto rounded-lg">
+                                                                <table className="w-full text-sm border">
+                                                                    <thead className="bg-gray-100">
                                                                         <tr>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b">Check #</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b">Date</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b">Before Dry</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b">After Dry</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b" colSpan="2">Top</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b" colSpan="2">Middle</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-semibold text-gray-600 border-b" colSpan="2">Bottom</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>Check #</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>Date</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>Before Dry</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>After Dry</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" colSpan="3">Top</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" colSpan="3">Middle</th>
+                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" colSpan="3">Bottom</th>
                                                                         </tr>
-                                                                        <tr className="bg-gray-50">
-                                                                            <th className="px-3 py-1 border-b"></th>
-                                                                            <th className="px-3 py-1 border-b"></th>
-                                                                            <th className="px-3 py-1 border-b"></th>
-                                                                            <th className="px-3 py-1 border-b"></th>
-                                                                            <th className="px-3 py-1 text-xs text-gray-500 border-b">Body/Ribs</th>
-                                                                            <th className="px-3 py-1 text-xs text-gray-500 border-b">Status</th>
-                                                                            <th className="px-3 py-1 text-xs text-gray-500 border-b">Body/Ribs</th>
-                                                                            <th className="px-3 py-1 text-xs text-gray-500 border-b">Status</th>
-                                                                            <th className="px-3 py-1 text-xs text-gray-500 border-b">Body/Ribs</th>
-                                                                            <th className="px-3 py-1 text-xs text-gray-500 border-b">Status</th>
+                                                                        <tr>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">Body</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">Body</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">Body</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
+                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody className="bg-white divide-y divide-gray-200">
                                                                         {history.map((check, checkIdx) => (
                                                                             <tr key={checkIdx} className="hover:bg-gray-50">
                                                                                 <td className="px-3 py-2 text-center font-medium text-gray-700">{checkIdx + 1}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-600">{formatDate(check.date)}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-600">{formatTime(check.beforeDryRoom)}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-600">{formatTime(check.afterDryRoom)}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-700">
-                                                                                    {check.top?.body || '-'} / {check.top?.ribs || '-'}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 text-center">
+                                                                                <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">{formatDate(check.date)}</td>
+                                                                                <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">{formatTime(check.beforeDryRoom || check.beforeDryRoomTime)}</td>
+                                                                                <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">{formatTime(check.afterDryRoom || check.afterDryRoomTime)}</td>
+                                                                                {/* Top Section */}
+                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.top?.body || 'N/A'}</td>
+                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.top?.ribs || 'N/A'}</td>
+                                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
                                                                                     {check.top?.status === 'pass' ? (
-                                                                                        <span className="text-green-600 font-medium">✓</span>
+                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
+                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                            </svg>
+                                                                                            Pass
+                                                                                        </span>
                                                                                     ) : check.top?.status === 'fail' ? (
-                                                                                        <span className="text-red-600 font-medium">✗</span>
-                                                                                    ) : '-'}
+                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
+                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                            </svg>
+                                                                                            Fail
+                                                                                        </span>
+                                                                                    ) : 'N/A'}
                                                                                 </td>
-                                                                                <td className="px-3 py-2 text-center text-gray-700">
-                                                                                    {check.middle?.body || '-'} / {check.middle?.ribs || '-'}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 text-center">
+                                                                                {/* Middle Section */}
+                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middle?.body || 'N/A'}</td>
+                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middle?.ribs || 'N/A'}</td>
+                                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
                                                                                     {check.middle?.status === 'pass' ? (
-                                                                                        <span className="text-green-600 font-medium">✓</span>
+                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
+                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                            </svg>
+                                                                                            Pass
+                                                                                        </span>
                                                                                     ) : check.middle?.status === 'fail' ? (
-                                                                                        <span className="text-red-600 font-medium">✗</span>
-                                                                                    ) : '-'}
+                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
+                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                            </svg>
+                                                                                            Fail
+                                                                                        </span>
+                                                                                    ) : 'N/A'}
                                                                                 </td>
-                                                                                <td className="px-3 py-2 text-center text-gray-700">
-                                                                                    {check.bottom?.body || '-'} / {check.bottom?.ribs || '-'}
-                                                                                </td>
-                                                                                <td className="px-3 py-2 text-center">
+                                                                                {/* Bottom Section */}
+                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottom?.body || 'N/A'}</td>
+                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottom?.ribs || 'N/A'}</td>
+                                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
                                                                                     {check.bottom?.status === 'pass' ? (
-                                                                                        <span className="text-green-600 font-medium">✓</span>
+                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
+                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                                            </svg>
+                                                                                            Pass
+                                                                                        </span>
                                                                                     ) : check.bottom?.status === 'fail' ? (
-                                                                                        <span className="text-red-600 font-medium">✗</span>
-                                                                                    ) : '-'}
+                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
+                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                                            </svg>
+                                                                                            Fail
+                                                                                        </span>
+                                                                                    ) : 'N/A'}
                                                                                 </td>
                                                                             </tr>
                                                                         ))}

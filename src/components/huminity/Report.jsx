@@ -46,6 +46,7 @@ const FormPage = () => {
                     middle: { body: '', ribs: '', pass: false, fail: false },
                     bottom: { body: '', ribs: '', pass: false, fail: false }
                 },
+                images: []
             }
         ],
         generalRemark: '',
@@ -349,7 +350,7 @@ const FormPage = () => {
                             const v = (m && m.computedValue !== null && m.computedValue !== undefined) ? Number(m.computedValue) : 0;
                             return acc + (isNaN(v) ? 0 : v);
                         }, 0);
-                        
+
                         let totalFormatted = '';
                         if (Number.isFinite(total)) {
                             totalFormatted = String(Math.round(total));
@@ -394,7 +395,7 @@ const FormPage = () => {
                 reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
                 if (reports.length > 0) {
-                    const mainDoc = reports[0]; 
+                    const mainDoc = reports[0];
                     const historyArray = mainDoc.history || [];
                     const determineStatus = (section) => {
                         if (!section) return 'fail';
@@ -418,9 +419,11 @@ const FormPage = () => {
                         const middleStatus = historyEntry.middle?.status || determineStatus(historyEntry.middle);
                         const bottomStatus = historyEntry.bottom?.status || determineStatus(historyEntry.bottom);
 
+                        console.log(`History entry ${index + 1} has ${historyEntry.images?.length || 0} images`);
+
                         return {
                             checkNumber: index + 1,
-                            date: historyEntry.date || mainDoc.createdAt || new Date().toISOString(),
+                            date: historyEntry.date || historyEntry.saveTime || mainDoc.createdAt || mainDoc.date || '',
                             factoryStyleNo: mainDoc.factoryStyleNo || '',
                             top: topStatus,
                             middle: middleStatus,
@@ -430,7 +433,10 @@ const FormPage = () => {
                             middleBodyReading: historyEntry.middle?.body || '',
                             middleRibsReading: historyEntry.middle?.ribs || '',
                             bottomBodyReading: historyEntry.bottom?.body || '',
-                            bottomRibsReading: historyEntry.bottom?.ribs || ''
+                            bottomRibsReading: historyEntry.bottom?.ribs || '',
+                            beforeDryRoom: historyEntry.beforeDryRoom || historyEntry.beforeDryRoomTime || '',
+                            afterDryRoom: historyEntry.afterDryRoom || historyEntry.afterDryRoomTime || '',
+                            images: historyEntry.images || []
                         };
                     });
 
@@ -527,6 +533,7 @@ const FormPage = () => {
                         middle: { body: '', ribs: '', pass: false, fail: false },
                         bottom: { body: '', ribs: '', pass: false, fail: false }
                     },
+                    images: [],
                     remark: ''
                 }]
             };
@@ -684,6 +691,63 @@ const FormPage = () => {
         }
     };
 
+    // Image upload handlers
+    const handleImageUpload = async (recordIndex, files) => {
+        const validFiles = Array.from(files).filter(file => {
+            const isValidType = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type);
+            const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+            return isValidType && isValidSize;
+        });
+
+        // Convert files to Base64 for database storage
+        const imagePromises = validFiles.map(file => {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    resolve({
+                        id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                        preview: reader.result, // Base64 string
+                        name: file.name,
+                        size: file.size
+                    });
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        const newImages = await Promise.all(imagePromises);
+
+        setFormData(prev => ({
+            ...prev,
+            inspectionRecords: prev.inspectionRecords.map((record, i) =>
+                i === recordIndex
+                    ? { ...record, images: [...(record.images || []), ...newImages] }
+                    : record
+            )
+        }));
+    };
+
+    const removeImage = (recordIndex, imageId) => {
+        setFormData(prev => ({
+            ...prev,
+            inspectionRecords: prev.inspectionRecords.map((record, i) => {
+                if (i !== recordIndex) return record;
+
+                // Find and revoke the object URL to prevent memory leaks
+                const imageToRemove = (record.images || []).find(img => img.id === imageId);
+                if (imageToRemove && imageToRemove.preview) {
+                    URL.revokeObjectURL(imageToRemove.preview);
+                }
+
+                return {
+                    ...record,
+                    images: (record.images || []).filter(img => img.id !== imageId)
+                };
+            })
+        }));
+    };
+
+
     const validateForm = () => {
         const newErrors = {};
 
@@ -724,9 +788,12 @@ const FormPage = () => {
                 inspectionRecords: (formData.inspectionRecords || []).map(rec => ({
                     ...rec,
                     beforeDryRoom: rec.beforeDryRoomTime || rec.beforeDryRoom || '',
-                    afterDryRoom: rec.afterDryRoomTime || rec.afterDryRoom || ''
+                    afterDryRoom: rec.afterDryRoomTime || rec.afterDryRoom || '',
+                    images: rec.images || [] // Explicitly include images
                 }))
             };
+
+            console.log('Saving payload with images:', payload.inspectionRecords[0]?.images?.length || 0, 'images');
 
             const response = await fetch(`${API_BASE_URL || 'http://localhost:5001'}/api/humidity-reports`, {
                 method: 'POST',
@@ -792,6 +859,7 @@ const FormPage = () => {
                                 middle: { body: '', ribs: '', pass: false, fail: false },
                                 bottom: { body: '', ribs: '', pass: false, fail: false }
                             },
+                            images: []
                         }
                     ],
                     generalRemark: '',
@@ -839,19 +907,26 @@ const FormPage = () => {
                         {tabs.map(tab => {
                             let icon = null;
                             if (tab === 'Inspection') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M5 13l4 4L19 7" /></svg>;
                             } else if (tab === 'Results-size') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>;
                             } else if (tab === 'Qc-daily-report') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
                             } else if (tab === 'Style-view') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
                             } else if (tab === 'Buyer-report-size') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>;
                             } else if (tab === 'Buyer-style-view') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>;
                             } else if (tab === 'Dashboard') {
-                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>;
+                                icon = <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round"
+                                    strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>;
                             }
                             return (
                                 <button
@@ -959,42 +1034,54 @@ const FormPage = () => {
                                         <table className="w-full text-sm">
                                             <thead className="bg-blue-100">
                                                 <tr>
-                                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-l border-blue-200" rowSpan={2}>Check #</th>
-                                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-l border-blue-200" rowSpan={2}>Date/Time</th>
-                                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-l border-blue-200" colSpan={3}>Top</th>
-                                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-l border-blue-200" colSpan={3}>Middle</th>
-                                                    <th className="px-3 py-2 text-center font-semibold text-gray-700 border-l border-blue-200" colSpan={3}>Bottom</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>Check #</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>Date</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>Before Dry</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>After Dry</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" colSpan={3}>Top</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" colSpan={3}>Middle</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" colSpan={3}>Bottom</th>
+                                                    <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                            </svg>
+                                                            Images
+                                                        </div>
+                                                    </th>
                                                 </tr>
                                                 <tr>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs border-l border-blue-200">Body</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs">Ribs</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs">Status</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs border-l border-blue-200">Body</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs">Ribs</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs">Status</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs border-l border-blue-200">Body</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs">Ribs</th>
-                                                    <th className="px-2 py-2 text-center font-medium text-gray-600 text-xs">Status</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-blue-200">Body</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-blue-200">Body</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-blue-200">Body</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
+                                                    <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="bg-white">
                                                 {checkHistory.map((check, idx) => (
                                                     <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
                                                         <td className="px-3 py-2 font-medium text-center text-gray-700 border-l border-gray-200">{check.checkNumber}</td>
-                                                        <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap border-l border-gray-200">{new Date(check.date).toLocaleString()}</td>
+                                                        <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap border-l border-gray-200">{new Date(check.date).toLocaleDateString()}</td>
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.beforeDryRoom || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.afterDryRoom || 'N/A'}</td>
                                                         {/* Top Section */}
-                                                        <td className="px-2 py-2 text-center text-gray-700 border-l border-gray-200">{check.topBodyReading || '—'}</td>
-                                                        <td className="px-2 py-2 text-center text-gray-700">{check.topRibsReading || '—'}</td>
-                                                        <td className="px-2 py-2 text-center">
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.topBodyReading || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.topRibsReading || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
                                                             {check.top === 'pass' ? (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-xs">
+                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
                                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                                     </svg>
                                                                     Pass
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-xs">
+                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
                                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                                     </svg>
@@ -1003,18 +1090,18 @@ const FormPage = () => {
                                                             )}
                                                         </td>
                                                         {/* Middle Section */}
-                                                        <td className="px-2 py-2 text-center text-gray-700 border-l border-gray-200">{check.middleBodyReading || '—'}</td>
-                                                        <td className="px-2 py-2 text-center text-gray-700">{check.middleRibsReading || '—'}</td>
-                                                        <td className="px-2 py-2 text-center">
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middleBodyReading || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middleRibsReading || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
                                                             {check.middle === 'pass' ? (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-xs">
+                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
                                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                                     </svg>
                                                                     Pass
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-xs">
+                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
                                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                                     </svg>
@@ -1023,23 +1110,54 @@ const FormPage = () => {
                                                             )}
                                                         </td>
                                                         {/* Bottom Section */}
-                                                        <td className="px-2 py-2 text-center text-gray-700 border-l border-gray-200">{check.bottomBodyReading || '—'}</td>
-                                                        <td className="px-2 py-2 text-center text-gray-700">{check.bottomRibsReading || '—'}</td>
-                                                        <td className="px-2 py-2 text-center">
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottomBodyReading || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottomRibsReading || 'N/A'}</td>
+                                                        <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
                                                             {check.bottom === 'pass' ? (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-xs">
+                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
                                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                                     </svg>
                                                                     Pass
                                                                 </span>
                                                             ) : (
-                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-xs">
+                                                                <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
                                                                     <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                                                     </svg>
                                                                     Fail
                                                                 </span>
+                                                            )}
+                                                        </td>
+                                                        {/* Images Column */}
+                                                        <td className="px-3 py-3 text-center border-l border-gray-200">
+                                                            {check.images && check.images.length > 0 ? (
+                                                                <div className="flex items-center justify-center gap-2">
+                                                                    {/* Show first thumbnail */}
+                                                                    {check.images[0]?.preview && (
+                                                                        <div className="relative group cursor-pointer">
+                                                                            <img
+                                                                                src={check.images[0].preview}
+                                                                                alt="Inspection"
+                                                                                className="w-16 h-16 object-cover rounded-lg border-2 border-blue-300 shadow-md group-hover:border-blue-500 group-hover:shadow-lg transition-all duration-200"
+                                                                            />
+                                                                            {check.images.length > 1 && (
+                                                                                <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white">
+                                                                                    {check.images.length}
+                                                                                </span>
+                                                                            )}
+                                                                            {/* Hover overlay */}
+                                                                            <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all duration-200 flex items-center justify-center">
+                                                                                <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                                </svg>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <span className="text-gray-400 text-sm italic">No images</span>
                                                             )}
                                                         </td>
                                                     </tr>
@@ -1436,6 +1554,120 @@ const FormPage = () => {
                                             </div>
                                         </div>
                                     ))}
+
+                                    {/* Image Upload Section */}
+                                    <div className="w-full mt-6 border-t pt-6">
+                                        <h4 className="font-bold text-gray-700 text-base mb-4 flex items-center gap-2">
+                                            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            Inspection Photos
+                                        </h4>
+
+                                        {/* Upload Zone */}
+                                        <div
+                                            onDragOver={(e) => {
+                                                if (!formData.factoryStyleNo) return;
+                                                e.preventDefault();
+                                                e.currentTarget.classList.add('border-blue-400', 'bg-blue-50');
+                                            }}
+                                            onDragLeave={(e) => {
+                                                e.preventDefault();
+                                                e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+                                            }}
+                                            onDrop={(e) => {
+                                                if (!formData.factoryStyleNo) return;
+                                                e.preventDefault();
+                                                e.currentTarget.classList.remove('border-blue-400', 'bg-blue-50');
+                                                handleImageUpload(index, e.dataTransfer.files);
+                                            }}
+                                            className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${formData.factoryStyleNo
+                                                ? 'border-gray-300 hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-transparent cursor-pointer group'
+                                                : 'border-gray-200 bg-gray-50 cursor-not-allowed opacity-60'
+                                                }`}
+                                            onClick={() => {
+                                                if (formData.factoryStyleNo) {
+                                                    document.getElementById(`image-upload-${index}`).click();
+                                                }
+                                            }}
+                                        >
+                                            <input
+                                                id={`image-upload-${index}`}
+                                                type="file"
+                                                multiple
+                                                accept="image/jpeg,image/jpg,image/png,image/webp"
+                                                onChange={(e) => handleImageUpload(index, e.target.files)}
+                                                className="hidden"
+                                                disabled={!formData.factoryStyleNo}
+                                            />
+                                            <div className="flex flex-col items-center gap-3">
+                                                <div className={`w-16 h-16 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center transition-transform duration-300 ${formData.factoryStyleNo ? 'group-hover:scale-110' : ''
+                                                    }`}>
+                                                    <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                    </svg>
+                                                </div>
+                                                <div>
+                                                    {formData.factoryStyleNo ? (
+                                                        <>
+                                                            <p className="text-base font-semibold text-gray-700 mb-1">
+                                                                Click to upload or drag and drop
+                                                            </p>
+                                                            <p className="text-sm text-gray-500">
+                                                                PNG, JPG, WEBP up to 5MB
+                                                            </p>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <p className="text-base font-semibold text-gray-500 mb-1">
+                                                                📋 Select Factory Style No first
+                                                            </p>
+                                                            <p className="text-sm text-gray-400">
+                                                                Image upload will be enabled after selection
+                                                            </p>
+                                                        </>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Image Preview Grid */}
+                                        {record.images && record.images.length > 0 && (
+                                            <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                                                {record.images.map((image) => (
+                                                    <div
+                                                        key={image.id}
+                                                        className="relative group rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+                                                    >
+                                                        <img
+                                                            src={image.preview}
+                                                            alt={image.name}
+                                                            className="w-full h-32 object-cover"
+                                                        />
+                                                        {/* Overlay with delete button */}
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-between p-3">
+                                                            <span className="text-white text-xs font-medium truncate max-w-[70%]">
+                                                                {image.name}
+                                                            </span>
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    removeImage(index, image.id);
+                                                                }}
+                                                                className="w-8 h-8 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center transition-colors duration-200 shadow-lg"
+                                                                title="Remove image"
+                                                            >
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>

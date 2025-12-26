@@ -17,6 +17,17 @@ const historySchema = new mongoose.Schema(
       ribs: { type: String, default: "" },
       status: { type: String, default: "" },
     },
+    images: [
+      {
+        id: { type: String },
+        preview: { type: String }, // Base64 string
+        name: { type: String },
+        size: { type: Number }
+      }
+    ],
+    date: { type: String, default: "" },
+    beforeDryRoom: { type: String, default: "" },
+    afterDryRoom: { type: String, default: "" },
     generalRemark: { type: String, default: "" },
   },
   { _id: false }
@@ -46,7 +57,17 @@ const humidityReportSchema = new mongoose.Schema(
     createdBy: {
       empId: { type: String },
       engName: { type: String }
-    }
+    },
+    approvalStatus: {
+      type: String,
+      enum: ['pending', 'approved'],
+      default: 'pending'
+    },
+    approvedBy: {
+      empId: { type: String },
+      engName: { type: String }
+    },
+    approvedAt: { type: Date }
   },
   {
     collection: "humidity_reports",
@@ -61,4 +82,3 @@ humidityReportSchema.index({ customer: 1 });
 
 export default (connection) =>
   connection.model("HumidityReport", humidityReportSchema);
-
