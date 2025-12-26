@@ -32,6 +32,8 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
   const [activeConversationId, setActiveConversationId] = useState(null);
   const [model, setModel] = useState("");
   const [currentService, setCurrentService] = useState("");
+  const [models, setModels] = useState([{name: "Loading"}]);
+  
 
   const initialMessages = [
     {
@@ -47,6 +49,8 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
       const fetchedModels = response.models;
       console.log("model fetched", fetchedModels)
       setModel(fetchedModels[0].model);
+      setModels(fetchedModels);
+
     };
 
     fetchModels();
@@ -71,10 +75,11 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
     const loadConversations = async () => {
       try {
         const data = await fetchUserConversation(userData.emp_id);
+        const activeCon = data.find(d => d.active_status === true)
         if (data?.length) {
           setConversations([...data].reverse());
-          setActiveConversationId(data.find(d => d.active_status === true)._id);
-          setModel(data[0].model ?? model);
+          setActiveConversationId(activeCon._id);
+          setModel(activeCon.model ?? model);
         } else if (!conversationCreated.current) {
           conversationCreated.current = true;
           const newConversation = {
@@ -103,6 +108,7 @@ export default function YQMSAIChatBox({ isOpen, setIsOpen }) {
 
   return (
     <ChatInterface
+      models={models}
       currentService={currentService}
       setCurrentService={setCurrentService}
       messages={messages}
