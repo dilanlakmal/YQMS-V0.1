@@ -68,7 +68,8 @@ const YPivotQAInspectionConfigSave = ({
   onSetActiveGroup,
   activeGroup,
   reportId,
-  isReportSaved
+  isReportSaved,
+  onSaveSuccess
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -104,7 +105,10 @@ const YPivotQAInspectionConfigSave = ({
         if (res.data.success && res.data.data.inspectionConfig) {
           const savedConfig = res.data.data.inspectionConfig;
           if (savedConfig?.configGroups?.length > 0) {
-            onUpdate({ lineTableConfig: savedConfig.configGroups });
+            onUpdate(
+              { lineTableConfig: savedConfig.configGroups },
+              { isFromBackend: true }
+            );
             setIsUpdateMode(true);
           } else {
             setIsUpdateMode(false);
@@ -159,6 +163,9 @@ const YPivotQAInspectionConfigSave = ({
       if (res.data.success) {
         setIsUpdateMode(true);
         setLockTrigger((prev) => prev + 1);
+        if (onSaveSuccess) {
+          onSaveSuccess();
+        }
         if (showModal) {
           setStatusModal({
             isOpen: true,

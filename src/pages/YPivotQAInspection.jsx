@@ -17,7 +17,8 @@ import {
   CheckCircle2,
   Loader2,
   Plus,
-  AlertTriangle
+  AlertTriangle,
+  QrCode
 } from "lucide-react";
 import React, {
   useMemo,
@@ -36,6 +37,7 @@ import YPivotQAInspectionConfigSave from "../components/inspection/PivotY/QAData
 import YPivotQAInspectionMeasurementDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionMeasurementDataSave";
 import YPivotQAInspectionDefectDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectDataSave";
 import YPivotQAInspectionPPSheetDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDataSave";
+import YPivotQAInspectionPreviousReport from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPreviousReport";
 
 // ==================================================================================
 // 1. INDEXED DB UTILITY (Handles Large Data & Images preventing QuotaExceededError)
@@ -271,6 +273,68 @@ const YPivotQAInspection = () => {
   // State for Active Inspection Context (Activated via Play button)
   const [activeGroup, setActiveGroup] = useState(null);
 
+  // ===========================================================================
+  // NEW: DIRTY SECTIONS STATE - Tracks which sections have unsaved changes
+  // ===========================================================================
+  const [dirtySections, setDirtySections] = useState({
+    inspectionDetails: false,
+    headerData: false,
+    photoData: false,
+    inspectionConfig: false,
+    measurementData: false,
+    defectData: false,
+    defectManualData: false,
+    ppSheetData: false
+  });
+
+  // Add a ref to track if we're currently loading data from backend
+  const isLoadingFromBackendRef = useRef(false);
+
+  // Helper function to mark a section as dirty (has unsaved changes)
+  const markSectionDirty = useCallback((sectionName) => {
+    setDirtySections((prev) => {
+      // Only update if not already dirty (optimization)
+      if (prev[sectionName]) return prev;
+      return { ...prev, [sectionName]: true };
+    });
+  }, []);
+
+  // Helper function to mark a section as clean (after individual save)
+  const markSectionClean = useCallback((sectionName) => {
+    setDirtySections((prev) => {
+      // Only update if dirty (optimization)
+      if (!prev[sectionName]) return prev;
+      return { ...prev, [sectionName]: false };
+    });
+  }, []);
+
+  // Helper to mark all sections as clean
+  const markAllSectionsClean = useCallback(() => {
+    setDirtySections({
+      inspectionDetails: false,
+      headerData: false,
+      photoData: false,
+      inspectionConfig: false,
+      measurementData: false,
+      defectData: false,
+      defectManualData: false,
+      ppSheetData: false
+    });
+  }, []);
+
+  // Get list of dirty section names
+  const getDirtySectionsList = useCallback(() => {
+    return Object.entries(dirtySections)
+      .filter(([_, isDirty]) => isDirty)
+      .map(([name]) => name);
+  }, [dirtySections]);
+
+  // Check if any section is dirty
+  const hasUnsavedChanges = useMemo(() => {
+    return Object.values(dirtySections).some((dirty) => dirty);
+  }, [dirtySections]);
+  // ===========================================================================
+
   // NEW: State for the Status Modal
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
@@ -302,6 +366,8 @@ const YPivotQAInspection = () => {
           setSharedReportState(draft.sharedReportState);
         if (draft.qualityPlanData) setQualityPlanData(draft.qualityPlanData);
         if (draft.activeGroup) setActiveGroup(draft.activeGroup);
+        // Restore dirty sections state
+        if (draft.dirtySections) setDirtySections(draft.dirtySections);
       }
       setIsRestoring(false);
     };
@@ -329,7 +395,8 @@ const YPivotQAInspection = () => {
         sharedOrderState,
         sharedReportState,
         qualityPlanData,
-        activeGroup
+        activeGroup,
+        dirtySections // Include dirty sections in persistence
       };
 
       // Async save to IndexedDB
@@ -345,56 +412,74 @@ const YPivotQAInspection = () => {
     sharedOrderState,
     sharedReportState,
     qualityPlanData,
-    activeGroup
+    activeGroup,
+    dirtySections
   ]);
 
-  // Handler to update PP Sheet data
-  const handlePPSheetUpdate = useCallback((newData) => {
-    setSharedReportState((prev) => ({
-      ...prev,
-      ppSheetData: newData
-    }));
-  }, []);
+  // Handler to update PP Sheet data - MODIFIED to mark dirty
+  const handlePPSheetUpdate = useCallback(
+    (newData, options = {}) => {
+      // ✅ Added options = {}
+      setSharedReportState((prev) => ({
+        ...prev,
+        ppSheetData: newData
+      }));
+      if (!options?.isFromBackend) {
+        // ✅ Use optional chaining
+        markSectionDirty("ppSheetData");
+      }
+    },
+    [markSectionDirty]
+  );
 
   // Handler for save complete
-  const handleSaveComplete = useCallback((result) => {
-    // Destructure the result passed from the Modal
-    const { reportData, isNew, message } = result;
+  const handleSaveComplete = useCallback(
+    (result) => {
+      // Destructure the result passed from the Modal
+      const { reportData, isNew, message } = result;
 
-    setSavedReportData(reportData);
-    setIsReportSaved(true);
+      setSavedReportData(reportData);
+      setIsReportSaved(true);
 
-    // --- LOGIC TO SHOW NICE MODAL ---
-    if (isNew === false) {
-      // EXISTING REPORT (Update Scenario)
-      setStatusModal({
-        isOpen: true,
-        type: "info",
-        title: "Existing Report Updated",
-        message: message || "Report updated successfully.",
-        subMessage:
-          "The system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data."
-      });
-    } else {
-      // NEW REPORT (Create Scenario)
-      setStatusModal({
-        isOpen: true,
-        type: "success",
-        title: "Report Created",
-        message: "New inspection report created successfully.",
-        subMessage:
-          "You can now proceed to fill in the Header, Photos, and Measurement details."
-      });
-    }
-  }, []);
+      // Mark inspectionDetails as clean since we just saved
+      markSectionClean("inspectionDetails");
+      markSectionClean("inspectionConfig");
+
+      // --- LOGIC TO SHOW NICE MODAL ---
+      if (isNew === false) {
+        // EXISTING REPORT (Update Scenario)
+        setStatusModal({
+          isOpen: true,
+          type: "info",
+          title: "Existing Report Updated",
+          message: message || "Report updated successfully.",
+          subMessage:
+            "The system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data."
+        });
+      } else {
+        // NEW REPORT (Create Scenario)
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          title: "Report Created",
+          message: "New inspection report created successfully.",
+          subMessage:
+            "You can now proceed to fill in the Header, Photos, and Measurement details."
+        });
+      }
+    },
+    [markSectionClean]
+  );
 
   // Handle tab change with validation
   const handleTabChange = useCallback(
-    (tabId) => {
-      // If trying to leave "order" tab and report is not saved
-      if (activeTab === "order" && tabId !== "order" && !isReportSaved) {
-        // Could show a warning or prevent navigation
-        // For now, we just block it
+    (tabId, targetRequiresSave) => {
+      if (
+        activeTab === "order" &&
+        tabId !== "order" &&
+        !isReportSaved &&
+        targetRequiresSave
+      ) {
         return;
       }
       setActiveTab(tabId);
@@ -402,64 +487,122 @@ const YPivotQAInspection = () => {
     [activeTab, isReportSaved]
   );
 
-  // Handler for order data changes
-  const handleOrderDataChange = useCallback((newState) => {
-    setSharedOrderState((prev) => ({ ...prev, ...newState }));
-  }, []);
+  // Handler for order data changes - MODIFIED to mark dirty
+  const handleOrderDataChange = useCallback(
+    (newState) => {
+      setSharedOrderState((prev) => ({ ...prev, ...newState }));
+      markSectionDirty("inspectionDetails"); // Mark as dirty when order data changes
+    },
+    [markSectionDirty]
+  );
 
-  // Handler for report data changes
-  const handleReportDataChange = useCallback((newState) => {
-    setSharedReportState((prev) => ({ ...prev, ...newState }));
-  }, []);
+  // Handler for report data changes - MODIFIED to mark dirty
+  const handleReportDataChange = useCallback(
+    (newState, options = {}) => {
+      // ✅ Added options = {}
+      setSharedReportState((prev) => ({ ...prev, ...newState }));
+      if (!options?.isFromBackend) {
+        // ✅ Use optional chaining
+        if (newState.config !== undefined) {
+          markSectionDirty("inspectionDetails");
+        }
+        if (newState.lineTableConfig !== undefined) {
+          markSectionDirty("inspectionConfig");
+        }
+      }
+    },
+    [markSectionDirty]
+  );
 
   // Add after other handlers:
-  const handleQualityPlanChange = useCallback((newData) => {
-    setQualityPlanData(newData);
-  }, []);
+  const handleQualityPlanChange = useCallback(
+    (newData) => {
+      setQualityPlanData(newData);
+      markSectionDirty("inspectionDetails"); // Quality plan is part of inspection details
+    },
+    [markSectionDirty]
+  );
 
-  // Handler for header updates
-  const handleHeaderDataUpdate = useCallback((headerUpdates) => {
-    setSharedReportState((prev) => ({
-      ...prev,
-      headerData: {
-        ...prev.headerData,
-        ...headerUpdates
+  // Handler for header updates - MODIFIED to mark dirty
+  const handleHeaderDataUpdate = useCallback(
+    (headerUpdates, options = {}) => {
+      // ✅ Added options = {}
+      setSharedReportState((prev) => ({
+        ...prev,
+        headerData: {
+          ...prev.headerData,
+          ...headerUpdates
+        }
+      }));
+      if (!options?.isFromBackend) {
+        // ✅ Use optional chaining
+        markSectionDirty("headerData");
       }
-    }));
-  }, []);
+    },
+    [markSectionDirty]
+  );
 
-  // Handler for photo updates
-  const handlePhotoDataUpdate = useCallback((photoUpdates) => {
-    setSharedReportState((prev) => ({
-      ...prev,
-      photoData: {
-        ...prev.photoData,
-        ...photoUpdates
+  // Handler for photo updates - MODIFIED to mark dirty
+  const handlePhotoDataUpdate = useCallback(
+    (photoUpdates, options = {}) => {
+      // ✅ Added options = {}
+      setSharedReportState((prev) => ({
+        ...prev,
+        photoData: {
+          ...prev.photoData,
+          ...photoUpdates
+        }
+      }));
+      if (!options?.isFromBackend) {
+        // ✅ Use optional chaining
+        markSectionDirty("photoData");
       }
-    }));
-  }, []);
+    },
+    [markSectionDirty]
+  );
 
-  // Handler specifically for measurement updates
-  const handleMeasurementDataUpdate = useCallback((measurementUpdates) => {
-    setSharedReportState((prev) => ({
-      ...prev,
-      measurementData: {
-        ...prev.measurementData,
-        ...measurementUpdates
+  // Handler specifically for measurement updates - MODIFIED to mark dirty
+  const handleMeasurementDataUpdate = useCallback(
+    (measurementUpdates, options = {}) => {
+      // ✅ Added options = {}
+      setSharedReportState((prev) => ({
+        ...prev,
+        measurementData: {
+          ...prev.measurementData,
+          ...measurementUpdates
+        }
+      }));
+      if (!options?.isFromBackend) {
+        // ✅ Use optional chaining
+        markSectionDirty("measurementData");
       }
-    }));
-  }, []);
+    },
+    [markSectionDirty]
+  );
 
-  // Handler for defect updates
-  const handleDefectDataUpdate = useCallback((defectUpdates) => {
-    setSharedReportState((prev) => ({
-      ...prev,
-      defectData: {
-        ...prev.defectData,
-        ...defectUpdates
+  // Handler for defect updates - MODIFIED to mark dirty
+  const handleDefectDataUpdate = useCallback(
+    (defectUpdates, options = {}) => {
+      // ✅ Added options = {}
+      setSharedReportState((prev) => ({
+        ...prev,
+        defectData: {
+          ...prev.defectData,
+          ...defectUpdates
+        }
+      }));
+      if (!options?.isFromBackend) {
+        // ✅ Use optional chaining
+        if (defectUpdates.savedDefects !== undefined) {
+          markSectionDirty("defectData");
+        }
+        if (defectUpdates.manualDataByGroup !== undefined) {
+          markSectionDirty("defectManualData");
+        }
       }
-    }));
-  }, []);
+    },
+    [markSectionDirty]
+  );
 
   // Handler for setting active group (Play button)
   const handleSetActiveGroup = useCallback((group) => {
@@ -473,19 +616,27 @@ const YPivotQAInspection = () => {
   }, [navigate]);
 
   // --- Prepare QR Data Object ---
-  // This object aggregates the necessary info for the QR code.
-  // It prefers saved data (from DB), falling back to current state (for drafts).
   const qrData = useMemo(() => {
     return {
-      reportId: savedReportData?.reportId, // Only exists if saved
+      reportId: savedReportData?.reportId,
       inspectionDate: sharedOrderState.inspectionDate,
       orderNos: sharedOrderState.selectedOrders,
       reportType: sharedReportState.selectedTemplate?.ReportType || "N/A",
       inspectionType: sharedOrderState.inspectionType,
-      // If report is saved, use the empId from it. If new/draft, use current user's emp_id.
-      empId: savedReportData?.empId || user?.emp_id || "Unknown"
+      empId: savedReportData?.empId || user?.emp_id || "Unknown",
+      empName: savedReportData?.empName || user?.eng_name || "Unknown"
     };
   }, [savedReportData, sharedOrderState, sharedReportState, user]);
+
+  // ===========================================================================
+  // NEW: Callback for when a section is saved individually (passed to children)
+  // ===========================================================================
+  const handleSectionSaveSuccess = useCallback(
+    (sectionName) => {
+      markSectionClean(sectionName);
+    },
+    [markSectionClean]
+  );
 
   const tabs = useMemo(
     () => [
@@ -501,7 +652,6 @@ const YPivotQAInspection = () => {
             externalOrderType={sharedOrderState.orderType}
             externalInspectionDate={sharedOrderState.inspectionDate}
             externalInspectionType={sharedOrderState.inspectionType}
-            //Pass report-related props
             onReportDataChange={handleReportDataChange}
             savedReportState={sharedReportState}
             onQualityPlanChange={handleQualityPlanChange}
@@ -524,15 +674,15 @@ const YPivotQAInspection = () => {
               label: "PP Sheet",
               icon: <FileSpreadsheet size={18} />,
               component: (
-                // MODIFIED: Use the Wrapper Component
                 <YPivotQAInspectionPPSheetDataSave
                   orderData={sharedOrderState.orderData}
                   selectedOrders={sharedOrderState.selectedOrders}
                   inspectionDate={sharedOrderState.inspectionDate}
-                  reportData={sharedReportState} // Access ppSheetData from here
+                  reportData={sharedReportState}
                   onUpdatePPSheetData={handlePPSheetUpdate}
-                  reportId={savedReportData?.reportId} // Pass ID
-                  isReportSaved={isReportSaved} // Pass Status
+                  reportId={savedReportData?.reportId}
+                  isReportSaved={isReportSaved}
+                  onSaveSuccess={() => handleSectionSaveSuccess("ppSheetData")}
                 />
               ),
               gradient: "from-indigo-600 to-blue-600",
@@ -546,12 +696,12 @@ const YPivotQAInspection = () => {
         label: "Header",
         icon: <FileText size={18} />,
         component: (
-          // Use the Wrapper Component instead of YPivotQATemplatesHeader directly
           <YPivotQAInspectionHeaderDataSave
             headerData={sharedReportState.headerData}
             onUpdateHeaderData={handleHeaderDataUpdate}
-            reportId={savedReportData?.reportId} // Pass the ID from saved order
-            isReportSaved={isReportSaved} // Pass status to enable button
+            reportId={savedReportData?.reportId}
+            isReportSaved={isReportSaved}
+            onSaveSuccess={() => handleSectionSaveSuccess("headerData")}
           />
         ),
         gradient: "from-purple-500 to-pink-500",
@@ -568,6 +718,7 @@ const YPivotQAInspection = () => {
             onUpdatePhotoData={handlePhotoDataUpdate}
             reportId={savedReportData?.reportId}
             isReportSaved={isReportSaved}
+            onSaveSuccess={() => handleSectionSaveSuccess("photoData")}
           />
         ),
         gradient: "from-orange-500 to-red-500",
@@ -579,15 +730,15 @@ const YPivotQAInspection = () => {
         label: "Info",
         icon: <Info size={18} />,
         component: (
-          // Use the Wrapper Component
           <YPivotQAInspectionConfigSave
             reportData={sharedReportState}
             orderData={sharedOrderState}
             onUpdate={handleReportDataChange}
             onSetActiveGroup={handleSetActiveGroup}
             activeGroup={activeGroup}
-            reportId={savedReportData?.reportId} // Pass ID
-            isReportSaved={isReportSaved} // Pass Status
+            reportId={savedReportData?.reportId}
+            isReportSaved={isReportSaved}
+            onSaveSuccess={() => handleSectionSaveSuccess("inspectionConfig")}
           />
         ),
         gradient: "from-teal-500 to-cyan-500",
@@ -599,15 +750,15 @@ const YPivotQAInspection = () => {
         label: "Measurement",
         icon: <Ruler size={18} />,
         component: (
-          // Use the Wrapper Component
           <YPivotQAInspectionMeasurementDataSave
             selectedOrders={sharedOrderState.selectedOrders}
             orderData={sharedOrderState.orderData}
             reportData={sharedReportState}
             onUpdateMeasurementData={handleMeasurementDataUpdate}
             activeGroup={activeGroup}
-            reportId={savedReportData?.reportId} // Pass ID
-            isReportSaved={isReportSaved} // Pass Status
+            reportId={savedReportData?.reportId}
+            isReportSaved={isReportSaved}
+            onSaveSuccess={() => handleSectionSaveSuccess("measurementData")}
           />
         ),
         gradient: "from-green-500 to-emerald-500",
@@ -619,15 +770,18 @@ const YPivotQAInspection = () => {
         label: "Defects",
         icon: <ClipboardCheck size={18} />,
         component: (
-          // Use the Wrapper Component
           <YPivotQAInspectionDefectDataSave
             selectedOrders={sharedOrderState.selectedOrders}
             orderData={sharedOrderState.orderData}
             reportData={sharedReportState}
             onUpdateDefectData={handleDefectDataUpdate}
             activeGroup={activeGroup}
-            reportId={savedReportData?.reportId} // Pass ID
-            isReportSaved={isReportSaved} // Pass Status
+            reportId={savedReportData?.reportId}
+            isReportSaved={isReportSaved}
+            onSaveSuccess={(type) => {
+              // Type can be 'defectData' or 'defectManualData'
+              handleSectionSaveSuccess(type || "defectData");
+            }}
           />
         ),
         gradient: "from-red-500 to-rose-500",
@@ -643,11 +797,26 @@ const YPivotQAInspection = () => {
             orderData={sharedOrderState}
             reportData={sharedReportState}
             qrData={qrData}
+            // NEW: Pass dirty state props
+            dirtySections={dirtySections}
+            getDirtySectionsList={getDirtySectionsList}
+            hasUnsavedChanges={hasUnsavedChanges}
+            markAllSectionsClean={markAllSectionsClean}
+            activeGroup={activeGroup}
           />
         ),
         gradient: "from-indigo-500 to-violet-500",
         description: "Inspection summary",
         requiresSave: true
+      },
+      {
+        id: "qr_history",
+        label: "History",
+        icon: <QrCode size={18} />,
+        component: <YPivotQAInspectionPreviousReport user={user} />,
+        gradient: "from-slate-700 to-gray-800",
+        description: "Search & Download Previous Reports",
+        requiresSave: false
       }
     ],
     [
@@ -668,7 +837,12 @@ const YPivotQAInspection = () => {
       savedReportData,
       isReportSaved,
       handlePPSheetUpdate,
-      qrData
+      qrData,
+      handleSectionSaveSuccess,
+      dirtySections,
+      getDirtySectionsList,
+      hasUnsavedChanges,
+      markAllSectionsClean
     ]
   );
 
@@ -718,10 +892,13 @@ const YPivotQAInspection = () => {
     setIsReportSaved(false);
     setActiveGroup(null);
 
-    // 6. Navigate to Order Tab
+    // 6. Reset dirty sections
+    markAllSectionsClean();
+
+    // 7. Navigate to Order Tab
     setActiveTab("order");
 
-    // 7. Close Modal
+    // 8. Close Modal
     setShowNewConfirm(false);
   };
 
@@ -803,6 +980,11 @@ const YPivotQAInspection = () => {
                     </div>
                     <p className="text-[10px] text-indigo-100 font-medium truncate">
                       {activeTabData?.label} • Active
+                      {hasUnsavedChanges && (
+                        <span className="ml-1 text-amber-300">
+                          • Unsaved changes
+                        </span>
+                      )}
                     </p>
                   </div>
                 </div>
@@ -834,7 +1016,9 @@ const YPivotQAInspection = () => {
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => !isLocked && handleTabChange(tab.id)}
+                      onClick={() =>
+                        !isLocked && handleTabChange(tab.id, tab.requiresSave)
+                      }
                       disabled={isLocked}
                       className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
                         isActive
@@ -922,7 +1106,9 @@ const YPivotQAInspection = () => {
                   return (
                     <button
                       key={tab.id}
-                      onClick={() => !isLocked && handleTabChange(tab.id)}
+                      onClick={() =>
+                        !isLocked && handleTabChange(tab.id, tab.requiresSave)
+                      }
                       disabled={isLocked}
                       className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
                         isActive
@@ -973,7 +1159,9 @@ const YPivotQAInspection = () => {
                     {activeTabData?.label}
                   </p>
                   <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                    Active Section
+                    {hasUnsavedChanges
+                      ? `Unsaved: ${getDirtySectionsList().length}`
+                      : "All Saved"}
                   </p>
                 </div>
               </div>

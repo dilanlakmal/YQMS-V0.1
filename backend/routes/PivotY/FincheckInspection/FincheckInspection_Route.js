@@ -19,7 +19,8 @@ import {
   updateMeasurementData,
   updateDefectData,
   updatePPSheetData,
-  submitFullInspectionReport
+  submitFullInspectionReport,
+  searchPreviousReports
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
@@ -113,5 +114,8 @@ router.post(
   "/api/fincheck-inspection/submit-full-report",
   submitFullInspectionReport
 );
+
+// Search Previous Reports (QR Tab)
+router.get("/api/fincheck-inspection/previous-reports", searchPreviousReports);
 
 export default router;

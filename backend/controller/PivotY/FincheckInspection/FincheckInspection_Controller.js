@@ -1801,245 +1801,6 @@ export const updateDefectData = async (req, res) => {
   }
 };
 
-// // Define Defect Storage Path
-// const uploadDirDefect = path.join(
-//   __dirname,
-//   "../../../storage/PivotY/Fincheck/DefectData"
-// );
-
-// // Define Manual Defect Storage Path
-// const uploadDirDefectManual = path.join(
-//   __dirname,
-//   "../../../storage/PivotY/Fincheck/DefectManualData"
-// );
-
-// // Ensure directory exists
-// if (!fs.existsSync(uploadDirDefect)) {
-//   fs.mkdirSync(uploadDirDefect, { recursive: true });
-// }
-
-// if (!fs.existsSync(uploadDirDefectManual))
-//   fs.mkdirSync(uploadDirDefectManual, { recursive: true });
-
-// // Helper: Save Defect Base64 Image
-// const saveDefectBase64Image = (base64String, reportId, defectCode, index) => {
-//   try {
-//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-//     if (!matches || matches.length !== 3) return null;
-
-//     const type = matches[1];
-//     const data = Buffer.from(matches[2], "base64");
-//     const ext = type.split("/")[1] || "jpg";
-
-//     // Create unique filename
-//     const filename = `defect_${reportId}_${defectCode}_${index}_${Date.now()}.${ext}`;
-//     const filepath = path.join(uploadDirDefect, filename);
-
-//     fs.writeFileSync(filepath, data);
-
-//     // Return relative URL
-//     return `/storage/PivotY/Fincheck/DefectData/${filename}`;
-//   } catch (error) {
-//     console.error("Error saving defect base64 image:", error);
-//     return null;
-//   }
-// };
-
-// // Helper: Save Defect LOCATION Image
-// const saveDefectLocationBase64Image = (
-//   base64String,
-//   reportId,
-//   defectCode,
-//   locationId,
-//   index
-// ) => {
-//   try {
-//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-//     if (!matches || matches.length !== 3) return null;
-//     const type = matches[1];
-//     const data = Buffer.from(matches[2], "base64");
-//     const ext = type.split("/")[1] || "jpg";
-
-//     // Naming: def_loc_{reportId}_{defectCode}_{locationId}_{index}_{timestamp}
-//     const filename = `def_loc_${reportId}_${defectCode}_${locationId}_${index}_${Date.now()}.${ext}`;
-//     const filepath = path.join(uploadDirDefect, filename);
-//     fs.writeFileSync(filepath, data);
-//     return `/storage/PivotY/Fincheck/DefectData/${filename}`;
-//   } catch (error) {
-//     console.error("Error saving defect location image:", error);
-//     return null;
-//   }
-// };
-
-// // Helper: Save Defect MANUAL Image
-// const saveDefectManualBase64Image = (
-//   base64String,
-//   reportId,
-//   groupId,
-//   index
-// ) => {
-//   try {
-//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-//     if (!matches || matches.length !== 3) return null;
-//     const type = matches[1];
-//     const data = Buffer.from(matches[2], "base64");
-//     const ext = type.split("/")[1] || "jpg";
-
-//     const filename = `def_man_${reportId}_${groupId}_${index}_${Date.now()}.${ext}`;
-//     const filepath = path.join(uploadDirDefectManual, filename);
-//     fs.writeFileSync(filepath, data);
-//     return `/storage/PivotY/Fincheck/DefectManualData/${filename}`;
-//   } catch (error) {
-//     console.error("Error saving defect manual image:", error);
-//     return null;
-//   }
-// };
-
-// export const updateDefectData = async (req, res) => {
-//   try {
-//     const { reportId, defectData, defectManualData } = req.body;
-
-//     if (!reportId)
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Report ID required." });
-
-//     const report = await FincheckInspectionReports.findOne({
-//       reportId: parseInt(reportId)
-//     });
-//     if (!report)
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Report not found." });
-
-//     // A. Process Standard Defects
-//     if (Array.isArray(defectData)) {
-//       const processedDefectData = defectData.map((defect) => {
-//         // 1. Process Locations (and their images)
-//         const processedLocations = (defect.locations || []).map((loc) => {
-//           const processedLocImages = (loc.images || [])
-//             .map((img, idx) => {
-//               let finalUrl = img.imageURL;
-//               if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-//                 const savedPath = saveDefectLocationBase64Image(
-//                   img.imgSrc,
-//                   reportId,
-//                   defect.defectCode,
-//                   loc.locationId,
-//                   idx
-//                 );
-//                 if (savedPath) finalUrl = savedPath;
-//               }
-//               // Determine name (Pcs1, Pcs2, Extra...)
-//               // Logic: if index < qty, it is Pcs{index+1}, else Extra
-//               const name = idx < loc.qty ? `Pcs${idx + 1}` : "Extra";
-
-//               return {
-//                 imageId: img.id || `${loc.locationId}_${idx}_${Date.now()}`,
-//                 imageURL: finalUrl,
-//                 name: name
-//               };
-//             })
-//             .filter((img) => img.imageURL);
-
-//           return {
-//             ...loc,
-//             images: processedLocImages
-//           };
-//         });
-
-//         // 2. Process General Defect Images (Legacy or top-level)
-//         const processedGeneralImages = (defect.images || [])
-//           .map((img, idx) => {
-//             let finalUrl = img.imageURL;
-//             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-//               const savedPath = saveDefectBase64Image(
-//                 img.imgSrc,
-//                 reportId,
-//                 defect.defectCode,
-//                 idx
-//               );
-//               if (savedPath) finalUrl = savedPath;
-//             }
-//             return {
-//               imageId: img.id || `${defect.defectCode}_${idx}_${Date.now()}`,
-//               imageURL: finalUrl
-//             };
-//           })
-//           .filter((img) => img.imageURL);
-
-//         return {
-//           ...defect,
-//           locations: processedLocations,
-//           images: processedGeneralImages,
-//           additionalRemark: defect.additionalRemark || ""
-//         };
-//       });
-//       report.defectData = processedDefectData;
-//     }
-
-//     // B. Process Manual Defect Data
-//     if (Array.isArray(defectManualData)) {
-//       const processedManualData = defectManualData.map((manualItem) => {
-//         const processedImages = (manualItem.images || [])
-//           .map((img, idx) => {
-//             let finalUrl = img.imageURL;
-//             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-//               const savedPath = saveDefectManualBase64Image(
-//                 img.imgSrc,
-//                 reportId,
-//                 manualItem.groupId,
-//                 idx
-//               );
-//               if (savedPath) finalUrl = savedPath;
-//             }
-//             return {
-//               imageId:
-//                 img.id ||
-//                 img.imageId ||
-//                 `dm_${manualItem.groupId}_${idx}_${Date.now()}`,
-//               imageURL: finalUrl,
-//               remark: img.remark || ""
-//             };
-//           })
-//           .filter((img) => img.imageURL);
-
-//         return {
-//           groupId: manualItem.groupId,
-//           remarks: manualItem.remarks || "",
-//           images: processedImages,
-//           // Add context fields if provided by frontend
-//           line: manualItem.line || "",
-//           table: manualItem.table || "",
-//           color: manualItem.color || "",
-//           qcUser: manualItem.qcUser || null
-//         };
-//       });
-//       report.defectManualData = processedManualData;
-//     }
-
-//     await report.save();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Defect data saved successfully.",
-//       data: {
-//         defectData: report.defectData,
-//         defectManualData: report.defectManualData
-//       }
-//     });
-//   } catch (error) {
-//     console.error("Error updating defect data:", error);
-//     return res
-//       .status(500)
-//       .json({
-//         success: false,
-//         message: "Internal Error",
-//         error: error.message
-//       });
-//   }
-// };
-
 // ============================================================
 // Update PP Sheet Data
 // ============================================================
@@ -2143,20 +1904,38 @@ export const updatePPSheetData = async (req, res) => {
 };
 
 // ============================================================
-// SUBMIT FULL REPORT (Master Save)
-// Saves/Updates all sections at once
+// HELPER: Array Sanitizer (Fixes the CastError)
+// ============================================================
+const sanitizeNumberArray = (arr) => {
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((item) => {
+      // Handle edge case where frontend sends stringified array like "[1,2]"
+      if (typeof item === "string" && item.startsWith("[")) return null;
+      const num = Number(item);
+      return isNaN(num) ? null : num;
+    })
+    .filter((n) => n !== null); // Remove invalid entries
+};
+
+// ============================================================
+// SUBMIT FULL REPORT (OPTIMIZED Version)
+// Only processes sections that have unsaved changes
 // ============================================================
 export const submitFullInspectionReport = async (req, res) => {
   try {
     const {
       reportId,
-      inspectionDetails, // Order/Config Data
+      inspectionDetails,
       headerData,
       photoData,
+      inspectionConfig,
       measurementData,
       defectData,
       defectManualData,
-      ppSheetData
+      ppSheetData,
+      // NEW: Frontend specifies which sections have unsaved changes
+      sectionsToUpdate = null // null = process all (backward compatible), [] = none, ['headerData', ...] = specific
     } = req.body;
 
     if (!reportId) {
@@ -2175,10 +1954,41 @@ export const submitFullInspectionReport = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // 1. Update Inspection Details (Order Tab & Info Tab data)
-    if (inspectionDetails) {
-      // Process AQL if present
-      let processedAqlConfig = report.inspectionDetails.aqlConfig; // Keep existing if not provided
+    // ============================================================
+    // HELPER: Determine if section should be processed
+    // ============================================================
+    const shouldProcessSection = (sectionName, data) => {
+      // If data is undefined/null/empty, skip
+      if (data === undefined || data === null) return false;
+      if (Array.isArray(data) && data.length === 0) return false;
+      if (
+        typeof data === "object" &&
+        !Array.isArray(data) &&
+        Object.keys(data).length === 0
+      )
+        return false;
+
+      // If sectionsToUpdate is null, process ALL provided sections (backward compatible / full save)
+      if (sectionsToUpdate === null) return true;
+
+      // If sectionsToUpdate is specified, only process those sections
+      return (
+        Array.isArray(sectionsToUpdate) &&
+        sectionsToUpdate.includes(sectionName)
+      );
+    };
+
+    // Track what was actually updated
+    let hasChanges = false;
+    const updatedSections = [];
+    const skippedSections = [];
+
+    // ============================================================
+    // SECTION 1: Inspection Details
+    // ============================================================
+    if (shouldProcessSection("inspectionDetails", inspectionDetails)) {
+      let processedAqlConfig = report.inspectionDetails?.aqlConfig || {};
+
       if (inspectionDetails.method === "AQL" && inspectionDetails.aqlConfig) {
         const src = inspectionDetails.aqlConfig;
         processedAqlConfig = {
@@ -2195,40 +2005,41 @@ export const submitFullInspectionReport = async (req, res) => {
         };
       }
 
-      // Merge updates into inspectionDetails
       report.inspectionDetails = {
-        ...report.inspectionDetails, // Keep existing fields
-        ...inspectionDetails, // Overwrite with new data
-        // Explicitly map key fields to ensure they update
-        inspectedQty: parseNullableInt(inspectionDetails.inspectedQty),
-        cartonQty: parseNullableInt(inspectionDetails.cartonQty),
-        shippingStage:
-          inspectionDetails.shippingStage ||
-          report.inspectionDetails.shippingStage,
-        remarks: inspectionDetails.remarks || report.inspectionDetails.remarks,
-        subConFactory:
-          inspectionDetails.subConFactory ||
-          report.inspectionDetails.subConFactory,
-        isSubCon:
-          inspectionDetails.isSubCon !== undefined
-            ? inspectionDetails.isSubCon
-            : report.inspectionDetails.isSubCon,
+        ...report.inspectionDetails,
+        ...inspectionDetails,
+        inspectedQty:
+          inspectionDetails.inspectedQty !== undefined
+            ? parseNullableInt(inspectionDetails.inspectedQty)
+            : report.inspectionDetails?.inspectedQty,
+        cartonQty:
+          inspectionDetails.cartonQty !== undefined
+            ? parseNullableInt(inspectionDetails.cartonQty)
+            : report.inspectionDetails?.cartonQty,
         aqlConfig: processedAqlConfig
       };
 
-      // Update Root Level fields if changed in Info Tab
       if (inspectionDetails.measurement)
         report.measurementMethod = inspectionDetails.measurement;
       if (inspectionDetails.method)
         report.inspectionMethod = inspectionDetails.method;
+
+      hasChanges = true;
+      updatedSections.push("inspectionDetails");
+    } else {
+      skippedSections.push("inspectionDetails");
     }
 
-    // 2. Process Header Data
-    if (headerData && Array.isArray(headerData)) {
+    // ============================================================
+    // SECTION 2: Header Data
+    // ============================================================
+    if (shouldProcessSection("headerData", headerData)) {
       const processedHeaderData = headerData.map((section) => {
         const processedImages = (section.images || [])
           .map((img, idx) => {
             let finalUrl = img.imageURL;
+
+            // ONLY save to disk if new base64 data exists
             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
               const savedPath = saveBase64Image(
                 img.imgSrc,
@@ -2238,6 +2049,9 @@ export const submitFullInspectionReport = async (req, res) => {
               );
               if (savedPath) finalUrl = savedPath;
             }
+
+            if (!finalUrl) return null;
+
             return {
               imageId:
                 img.id ||
@@ -2246,7 +2060,7 @@ export const submitFullInspectionReport = async (req, res) => {
               imageURL: finalUrl
             };
           })
-          .filter((img) => img.imageURL);
+          .filter(Boolean);
 
         return {
           headerId: section.headerId,
@@ -2256,16 +2070,24 @@ export const submitFullInspectionReport = async (req, res) => {
           images: processedImages
         };
       });
+
       report.headerData = processedHeaderData;
+      hasChanges = true;
+      updatedSections.push("headerData");
+    } else {
+      skippedSections.push("headerData");
     }
 
-    // 3. Process Photo Data
-    if (photoData && Array.isArray(photoData)) {
+    // ============================================================
+    // SECTION 3: Photo Data
+    // ============================================================
+    if (shouldProcessSection("photoData", photoData)) {
       const processedPhotoData = photoData.map((section) => {
         const processedItems = (section.items || []).map((item) => {
           const processedImages = (item.images || [])
             .map((img, idx) => {
               let finalUrl = img.imageURL;
+
               if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
                 const savedPath = savePhotoBase64Image(
                   img.imgSrc,
@@ -2276,6 +2098,9 @@ export const submitFullInspectionReport = async (req, res) => {
                 );
                 if (savedPath) finalUrl = savedPath;
               }
+
+              if (!finalUrl) return null;
+
               return {
                 imageId:
                   img.id ||
@@ -2283,7 +2108,7 @@ export const submitFullInspectionReport = async (req, res) => {
                 imageURL: finalUrl
               };
             })
-            .filter((img) => img.imageURL);
+            .filter(Boolean);
 
           return {
             itemNo: item.itemNo,
@@ -2292,19 +2117,51 @@ export const submitFullInspectionReport = async (req, res) => {
             images: processedImages
           };
         });
+
         return {
           sectionId: section.sectionId,
           sectionName: section.sectionName,
           items: processedItems
         };
       });
+
       report.photoData = processedPhotoData;
+      hasChanges = true;
+      updatedSections.push("photoData");
+    } else {
+      skippedSections.push("photoData");
     }
 
-    // 4. Process Measurement Data
-    if (measurementData && Array.isArray(measurementData)) {
+    // ============================================================
+    // SECTION 4: Inspection Config
+    // ============================================================
+    if (shouldProcessSection("inspectionConfig", inspectionConfig)) {
+      if (inspectionConfig.configGroups) {
+        report.inspectionConfig = {
+          reportName:
+            inspectionConfig.reportName || report.inspectionConfig?.reportName,
+          inspectionMethod:
+            inspectionConfig.inspectionMethod ||
+            report.inspectionConfig?.inspectionMethod,
+          sampleSize: inspectionConfig.sampleSize || 0,
+          configGroups: inspectionConfig.configGroups,
+          updatedAt: new Date()
+        };
+        report.markModified("inspectionConfig");
+        hasChanges = true;
+        updatedSections.push("inspectionConfig");
+      }
+    } else {
+      skippedSections.push("inspectionConfig");
+    }
+
+    // ============================================================
+    // SECTION 5: Measurement Data
+    // ============================================================
+    if (shouldProcessSection("measurementData", measurementData)) {
       const processedMeasurementData = measurementData.map((item) => {
         let processedManualData = null;
+
         if (item.manualData) {
           const processedImages = (item.manualData.images || [])
             .map((img, idx) => {
@@ -2318,6 +2175,7 @@ export const submitFullInspectionReport = async (req, res) => {
                 );
                 if (savedPath) finalUrl = savedPath;
               }
+              if (!finalUrl) return null;
               return {
                 imageId:
                   img.id ||
@@ -2327,7 +2185,7 @@ export const submitFullInspectionReport = async (req, res) => {
                 remark: img.remark || ""
               };
             })
-            .filter((img) => img.imageURL);
+            .filter(Boolean);
 
           processedManualData = {
             remarks: item.manualData.remarks || "",
@@ -2335,43 +2193,57 @@ export const submitFullInspectionReport = async (req, res) => {
             images: processedImages
           };
         }
-        return { ...item, manualData: processedManualData };
+
+        const cleanAllEnabled = sanitizeNumberArray(item.allEnabledPcs);
+        const cleanCriticalEnabled = sanitizeNumberArray(
+          item.criticalEnabledPcs
+        );
+
+        return {
+          ...item,
+          allEnabledPcs: cleanAllEnabled,
+          criticalEnabledPcs: cleanCriticalEnabled,
+          manualData: processedManualData
+        };
       });
+
       report.measurementData = processedMeasurementData;
+      hasChanges = true;
+      updatedSections.push("measurementData");
+    } else {
+      skippedSections.push("measurementData");
     }
 
-    // 5. Process Defect Data
-    if (Array.isArray(defectData)) {
+    // ============================================================
+    // SECTION 6A: Defect Data
+    // ============================================================
+    if (shouldProcessSection("defectData", defectData)) {
       const processedDefectData = defectData.map((defect) => {
         const defectCode = defect.defectCode || "unknown";
+
         if (defect.isNoLocation) {
-          // No Location Logic
           const processedImages = (defect.images || [])
-            .map((img, imgIdx) => {
-              const processed = processImageObject(
+            .map((img, imgIdx) =>
+              processImageObject(
                 img,
                 uploadDirDefect,
                 `def_noloc_${reportId}_${defectCode}`,
                 imgIdx
-              );
-              return processed;
-            })
+              )
+            )
             .filter(Boolean);
 
-          return {
-            ...defect, // Keep other fields
-            locations: [],
-            images: processedImages
-          };
+          return { ...defect, locations: [], images: processedImages };
         } else {
-          // Location Logic
           const processedLocations = (defect.locations || []).map((loc) =>
             processDefectLocation(loc, reportId, defectCode)
           );
+
           const totalQty = processedLocations.reduce(
             (sum, loc) => sum + (loc.positions?.length || loc.qty || 0),
             0
           );
+
           return {
             ...defect,
             qty: totalQty || defect.qty || 1,
@@ -2380,11 +2252,18 @@ export const submitFullInspectionReport = async (req, res) => {
           };
         }
       });
+
       report.defectData = processedDefectData;
+      hasChanges = true;
+      updatedSections.push("defectData");
+    } else {
+      skippedSections.push("defectData");
     }
 
-    // 6. Process Manual Defect Data
-    if (Array.isArray(defectManualData)) {
+    // ============================================================
+    // SECTION 6B: Defect Manual Data
+    // ============================================================
+    if (shouldProcessSection("defectManualData", defectManualData)) {
       const processedManualData = defectManualData.map((manualItem) => {
         const groupId = manualItem.groupId || 0;
         const processedImages = (manualItem.images || [])
@@ -2402,11 +2281,18 @@ export const submitFullInspectionReport = async (req, res) => {
 
         return { ...manualItem, images: processedImages };
       });
+
       report.defectManualData = processedManualData;
+      hasChanges = true;
+      updatedSections.push("defectManualData");
+    } else {
+      skippedSections.push("defectManualData");
     }
 
-    // 7. Process PP Sheet Data
-    if (ppSheetData) {
+    // ============================================================
+    // SECTION 6C: PP Sheet Data
+    // ============================================================
+    if (shouldProcessSection("ppSheetData", ppSheetData)) {
       const processedImages = (ppSheetData.images || [])
         .map((img, idx) => {
           let finalUrl = img.imageURL;
@@ -2414,38 +2300,151 @@ export const submitFullInspectionReport = async (req, res) => {
             const savedPath = savePPSheetBase64Image(img.imgSrc, reportId, idx);
             if (savedPath) finalUrl = savedPath;
           }
+          if (!finalUrl) return null;
           return {
             imageId: img.id || `pp_${idx}_${Date.now()}`,
             imageURL: finalUrl
           };
         })
-        .filter((img) => img.imageURL);
+        .filter(Boolean);
 
       report.ppSheetData = {
         ...ppSheetData,
         images: processedImages,
         timestamp: new Date()
       };
+
+      hasChanges = true;
+      updatedSections.push("ppSheetData");
+    } else {
+      skippedSections.push("ppSheetData");
     }
 
-    // 8. Final Status Update
-    report.status = "completed"; // Mark as completed on submit
+    // ============================================================
+    // FINALIZATION
+    // ============================================================
 
-    await report.save();
+    // Always mark as completed
+    const wasAlreadyCompleted = report.status === "completed";
+    report.status = "completed";
+
+    if (hasChanges) {
+      // Save the document with all changes
+      await report.save();
+
+      return res.status(200).json({
+        success: true,
+        message: `Report submitted successfully! Updated: ${updatedSections.join(
+          ", "
+        )}`,
+        hasChanges: true,
+        updatedSections: updatedSections,
+        skippedSections: skippedSections,
+        data: {
+          reportId: report.reportId,
+          status: report.status,
+          updatedAt: report.updatedAt
+        }
+      });
+    } else {
+      // No section changes - just update status if needed
+      if (!wasAlreadyCompleted) {
+        await FincheckInspectionReports.updateOne(
+          { reportId: parseInt(reportId) },
+          { $set: { status: "completed" } }
+        );
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: wasAlreadyCompleted
+          ? "Report already completed. No changes needed."
+          : "Report finalized successfully. All sections were already saved.",
+        hasChanges: false,
+        updatedSections: [],
+        skippedSections: skippedSections,
+        data: {
+          reportId: report.reportId,
+          status: "completed"
+        }
+      });
+    }
+  } catch (error) {
+    console.error("Error submitting full report:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Submission failed due to server error.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Search Previous Reports (for QR Tab)
+// ============================================================
+export const searchPreviousReports = async (req, res) => {
+  try {
+    const { startDate, endDate, orderNo, reportType, empId } = req.query;
+
+    let query = {
+      // Default: exclude draft/cancelled if needed, or show all
+      status: { $ne: "cancelled" }
+    };
+
+    // 1. Date Filter (Default to today logic handled in frontend, but backend enforces range)
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
+      query.inspectionDate = { $gte: start, $lte: end };
+    }
+
+    // 2. Emp ID Filter
+    if (empId) {
+      query.empId = empId;
+    }
+
+    // 3. Report Type Filter
+    if (reportType && reportType !== "All") {
+      query.reportType = reportType;
+    }
+
+    // 4. Order No Filter (Search inside array or string)
+    if (orderNo) {
+      query.$or = [
+        { orderNosString: { $regex: orderNo, $options: "i" } },
+        { orderNos: { $in: [new RegExp(orderNo, "i")] } }
+      ];
+    }
+
+    // Fetch Results
+    // We select specific fields for the table + QR generation
+    const reports = await FincheckInspectionReports.find(query)
+      .select({
+        reportId: 1,
+        inspectionDate: 1,
+        empId: 1,
+        reportType: 1,
+        orderNosString: 1,
+        orderNos: 1,
+        inspectionType: 1
+      })
+      .sort({ inspectionDate: -1, createdAt: -1 }) // Newest first
+      .lean();
 
     return res.status(200).json({
       success: true,
-      message: "Report submitted successfully!",
-      data: report
+      data: reports
     });
   } catch (error) {
-    console.error("Error submitting full report:", error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Submission failed.",
-        error: error.message
-      });
+    console.error("Error searching previous reports:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message
+    });
   }
 };

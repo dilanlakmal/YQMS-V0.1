@@ -692,7 +692,8 @@ const YPivotQAInspectionDefectDataSave = ({
   onUpdateDefectData,
   activeGroup,
   reportId,
-  isReportSaved
+  isReportSaved,
+  onSaveSuccess
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -776,10 +777,13 @@ const YPivotQAInspectionDefectDataSave = ({
             const transformedManualData =
               transformManualDataFromBackend(backendManualData);
 
-            onUpdateDefectData({
-              savedDefects: transformedDefects,
-              manualDataByGroup: transformedManualData
-            });
+            onUpdateDefectData(
+              {
+                savedDefects: transformedDefects,
+                manualDataByGroup: transformedManualData
+              },
+              { isFromBackend: true }
+            );
           } else {
             setIsUpdateMode(false);
           }
@@ -850,6 +854,10 @@ const YPivotQAInspectionDefectDataSave = ({
       if (res.data.success) {
         const wasUpdateMode = isUpdateMode;
         setIsUpdateMode(true);
+
+        if (onSaveSuccess) {
+          onSaveSuccess("defectData");
+        }
 
         setStatusModal({
           isOpen: true,
