@@ -43,6 +43,7 @@ const handleChatWithOllama = async (req, res) => {
       messages,
       stream: false,
       tools: toolsEnabled ? getMoNumberTools : null,
+      keep_alive: "1h",
       fetch: (url, options) =>
         fetch(url, { ...options, signal: abortController.signal }),
     });
@@ -77,6 +78,7 @@ const handleChatWithOllama = async (req, res) => {
       model,
       messages: followUpMessages,
       stream: false,
+      keep_alive: "1h"
     });
 
     return res.status(200).json(finalResponse);
