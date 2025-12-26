@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { MdOutlineKeyboardVoice } from "react-icons/md";
 import { Button } from "@/components/Chatbot/ui/button";
-import { Textarea } from "@/components/Chatbot/ui/textarea";
+import {Textarea} from "./ui/textarea";
 import { editConversationModel } from "./lib/api/conversation";
 import { motion } from "framer-motion";
 import ChatGuide from "./ChatStepIntro";
@@ -19,11 +19,11 @@ export default function ChatInput({
   setInput,
   handleSubmit,
   isLoading,
+  models
 
 }) {
   const textareaRef = useRef(null);
   const [historyIndex, setHistoryIndex] = useState(-1);
-  const [models, setModels] = useState([{name: "Loading"}]);
 
 
 
@@ -80,16 +80,7 @@ export default function ChatInput({
     }
   }, [input]);
 
-  useEffect(() => {
-    const fetchModels = async () => {
-      const response = await getModels();
-      const fetchedModels = response.models;
-      console.log("model fetched", fetchedModels)
-      setModels(fetchedModels);
-    };
 
-    fetchModels();
-  }, []);
 
 
   const handleChangeModel = async (e) => {

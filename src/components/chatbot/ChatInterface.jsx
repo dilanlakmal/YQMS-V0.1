@@ -17,12 +17,15 @@ import AzureTranslator from "./services/azureTranslation";
 
 
 function strictThreeWords(text) {
-  return text
-    .trim()
-    .replace(/[^\w\s]/g, "")   // remove punctuation
-    .split(/\s+/)
-    .slice(0, 3)
-    .join(" ");
+  if (text.split(" ").length > 10) {
+    return text
+      .trim()
+      .replace(/[^\w\s]/g, "")   // remove punctuation
+      .split(/\s+/)
+      .slice(0, 3)
+      .join(" ");    
+  }
+  return text;
 }
 
 
@@ -39,6 +42,7 @@ export default function ChatInterface({
   conversations,
   setConversations,
   onClose,
+  models,
 }) {
   const [isLoading, setIsLoading] = useState(false);
   const [input, setInput] = useState("");
@@ -71,167 +75,148 @@ export default function ChatInterface({
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!input.trim() || isLoading) return;
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!input.trim() || isLoading) return;
 
-    setIsLoading(true);
+  setIsLoading(true);
 
-    const userMessage = {
+  const userMessage = {
+    _id: Date.now().toString(),
+    role: "user",
+    content: input,
+    timestamp: new Date(),
+  };
+
+  let updatedConversations = [...conversations];
+  let activeID = activeConversationId;
+
+  // Helper to add message to a conversation
+  const addMessageToConversation = (convId, message) => {
+    return updatedConversations.map((conv) =>
+      conv._id === convId
+        ? { ...conv, messages: [...(conv.messages || []), message] }
+        : conv
+    );
+  };
+
+  // 1️⃣ Handle new conversation
+  if (updatedConversations.length === 0) {
+    const newConversation = {
+      userID: userData.emp_id,
+      title: "New conversation",
+      date: new Date(),
+      model,
+      active_status: true,
+      messages: [userMessage],
+    };
+    const created = await createConversation(newConversation);
+    updatedConversations = [created];
+    activeID = created._id;
+    setActiveConversationId(created._id);
+  } else {
+    // 2️⃣ Add user message to existing conversation
+    updatedConversations = addMessageToConversation(activeID, userMessage);
+  }
+
+  // 3️⃣ Update UI immediately
+  setConversations(updatedConversations);
+  setInput("");
+
+  try {
+    const activeConversation = updatedConversations.find(
+      (conv) => conv._id === activeID
+    );
+
+    const messages = activeConversation.messages.map((msg) => ({
+      role: msg.role,
+      content: msg.content,
+    }));
+
+    const data = await getOllamaResponse(model, messages, true);
+
+    // Determine topic
+    let topicText = activeConversation.title;
+    if (!activeConversation.title || activeConversation.title === "New conversation") {
+      const topic = await getOllamaResponse(model, [
+        {
+          role: "user",
+          content: `
+            You must output EXACTLY three words.
+            No punctuation. No explanations. No line breaks.
+            If unsure, still output exactly three words.
+            Text:
+            ${input}
+          `,
+        },
+      ], false);
+
+      topicText = strictThreeWords(topic.message.content.trim());
+    }
+
+    // Assistant message
+    const assistantMessage = data?.message
+      ? {
+          _id: data.created_at.toString(),
+          role: data.message.role,
+          content: data.message.content,
+          timestamp: new Date(),
+        }
+      : {
+          _id: Date.now().toString(),
+          role: "assistant",
+          content: "No response available right now.",
+          timestamp: new Date(),
+        };
+
+    // 4️⃣ Update conversation with assistant message
+    updatedConversations = updatedConversations.map((conv) => {
+      if (conv._id !== activeID) return conv;
+
+      const updatedConv = {
+        ...conv,
+        messages: [...conv.messages, assistantMessage],
+      };
+
+      // Update title if new
+      if (conv.title === "New conversation") {
+        setGenerateTopic(true);
+        updatedConv.title = topicText;
+        editConversationTitle(activeID, topicText); // persist to backend
+      }
+
+      return updatedConv;
+    });
+
+    // Save messages to backend
+    const activeAssistant = updatedConversations.find((conv) => conv._id === activeID);
+    if (activeAssistant) {
+      await addMessages(activeID, activeAssistant.messages);
+    }
+
+    setConversations(updatedConversations);
+  } catch (error) {
+    console.error("Error:", error);
+
+    const errorMessage = {
       _id: Date.now().toString(),
-      role: "user",
-      content: input,
+      role: "assistant",
+      content: "Unable to reach the server.",
       timestamp: new Date(),
     };
 
-    let updatedConversations = [...conversations];
-    let activeID = activeConversationId;
-
-    // 1️⃣ If no conversations exist, create a new one
-    if (updatedConversations.length === 0) {
-      const newConversation = {
-        userID: userData.emp_id,
-        title: "New conversation",
-        date: new Date(),
-        model: model,
-        active_status: true,
-        messages: [userMessage], // include the user message immediately
-      };
-      const created = await createConversation(newConversation);
-      updatedConversations = [created];
-      activeID = created._id;
-      setActiveConversationId(created._id);
-    } else {
-      // 2️⃣ Add user message to existing conversation
-      updatedConversations = updatedConversations.map((conv) =>
-        conv._id === activeConversationId
-          ? { ...conv, messages: [...(conv.messages || []), userMessage] }
-          : conv,
-      );
-    }
-
-    // 3️⃣ Update UI immediately
+    updatedConversations = addMessageToConversation(activeID, errorMessage);
     setConversations(updatedConversations);
-    setInput("");
 
-    try {
-      // 4️⃣ Request assistant response
-      const activeConversation = updatedConversations.find((conv) => {
-        return conv._id === activeID;
-      });
+    const activeErr = updatedConversations.find((conv) => conv._id === activeID);
+    if (activeErr) await addMessages(activeID, activeErr.messages);
 
-      const messages = activeConversation.messages.map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
-
-      const data = await getOllamaResponse(model, messages, true);
-
-      let topic;
-      if (activeConversation.title === "New conversation" || !activeConversation.title) {
-          topic = await getOllamaResponse(model, [
-          {
-            role: "user",
-            content: `
-            You must output EXACTLY three words.
-            No punctuation.
-            No explanations.
-            No line breaks.
-            If unsure, still output exactly three words.
-
-            Text:
-            ${input}
-            `,
-          },
-        ], false);
-      } else {
-        topic = {message: {content: activeConversation.title}};
-      }
-
-
-      const topicText = strictThreeWords(topic.message.content.trim());
-
-      if (data?.message?.thinking) {
-        setThinking(data.message.thinking);
-      }
-
-      const assistantMessage = data
-        ? {
-            _id: data.created_at.toString(),
-            role: data.message.role,
-            content: data.message.content,
-            timestamp: new Date(),
-          }
-        : {
-            _id: Date.now().toString(),
-            role: "assistant",
-            content: "No response available right now.",
-            timestamp: new Date(),
-          };
-
-      // 5️⃣ Add assistant message
-      updatedConversations = updatedConversations.map((conv) => {
-        if (conv._id !== activeID) return conv;
-
-        const updateConv = {
-          ...conv,
-          messages: [...conv.messages, assistantMessage],
-        };
-
-        // Update title if new
-        if (updateConv.title === "New conversation") {
-          setGenerateTopic(true);
-          updateConv.title = topicText;
-          editConversationTitle(activeID, topicText); // persist to backend
-        }
-
-        return updateConv;
-      });
-
-      // Save assistant message to backend
-      const activeAssistant = updatedConversations.find(
-        (conv) => conv._id === activeID,
-      );
-      if (activeAssistant) {
-        await addMessages(activeID, activeAssistant.messages);
-      }
-
-      setConversations(updatedConversations);
-    } catch (error) {
-      console.error("Error:", error);
-      const errorMessage = {
-        _id: Date.now().toString(),
-        role: "assistant",
-        content: "Unable to reach the server.",
-        timestamp: new Date(),
-      };
-
-      // 5️⃣ Again, build from updatedConversations (NOT old state)
-      updatedConversations = updatedConversations.map((conv) =>
-        conv._id === activeID
-          ? { ...conv, messages: [...conv.messages, errorMessage] }
-          : conv,
-      );
-
-      const activeErr = updatedConversations.find(
-        (conv) => conv._id === activeID,
-      );
-
-      if (activeErr) {
-        await addMessages(activeID, activeErr.messages);
-      }
-      setConversations(updatedConversations);
-      setLastMessage(false);
-      console.log("Set last message to false", lastMessage);
-    } finally {
-      setIsLoading(false);
-      setLastMessage(true);
-      console.log(
-        "Set last message to true to finally submit text to bot",
-        lastMessage,
-      );
-    }
-  };
+    setLastMessage(false);
+  } finally {
+    setIsLoading(false);
+    setLastMessage(true);
+  }
+};
 
   return (
     <div className="flex h-screen w-screen max-w-full">
@@ -275,6 +260,7 @@ export default function ChatInterface({
                 setModel={setModel}
                 input={input}
                 setInput={setInput}
+                models={models}
               />
             )}
             {currentService === "translator" && <AzureTranslator />}
@@ -301,6 +287,7 @@ function ChatService({
   isLoading,
   handleSubmit,
   messagesEndRef,
+  models
 }) {
   return (
     <>
@@ -357,6 +344,7 @@ function ChatService({
           setInput={setInput}
           handleSubmit={handleSubmit}
           isLoading={isLoading}
+          models={models}
         />
       </div>
     </>

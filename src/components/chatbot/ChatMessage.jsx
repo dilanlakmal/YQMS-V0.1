@@ -135,40 +135,65 @@ export function ChatMessageTyping({ message, speed = 10, onFinish }) {
   
   ;
 }
-
 export function MarkdownViewer({ text = "" }) {
   const rawHtml = marked.parse(text);
   const safeHtml = DOMPurify.sanitize(rawHtml);
 
+  const modifiedHtml = safeHtml.replace(
+    /<pre><code>([\s\S]*?)<\/code><\/pre>/g,
+    (_, code) => {
+      const encoded = encodeURIComponent(code);
+      return `
+        <div class="relative group">
+          <pre><code>${code}</code></pre>
+          <button
+            type="button"
+            data-code="${encoded}"
+            class="copy-btn absolute top-2 right-2 bg-gray-200 hover:bg-gray-300 text-gray-800 p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+          >
+            Copy
+          </button>
+        </div>
+      `;
+    }
+  );
+
+  const handleClick = (e) => {
+    const btn = e.target.closest(".copy-btn");
+    if (!btn) return;
+
+    const code = decodeURIComponent(btn.dataset.code);
+    navigator.clipboard.writeText(code);
+  };
+
   return (
-    <div className="w-full overflow-x-hidden">
-      {/* Inner wrapper allows scrolling for code but prevents overall overflow */}
+    <div className="w-full break-words" onClick={handleClick}>
       <div
         className="
           prose
           prose-neutral
-          max-w-1/2
+          max-w-2xl
           dark:prose-invert
           break-words
+          hyphens-auto
           [&>*]:mb-6
           [&>table]:block
           [&>table]:w-full
           [&>table]:overflow-x-auto
-          [&>pre]:overflow-hidden
+          [&>pre]:overflow-x-auto
           [&>pre]:bg-gray-100
           [&>pre]:p-2
           [&>pre]:rounded
+          [&>pre]:max-w-full
           [&>code]:break-words
           [&>code]:bg-gray-100
           [&>code]:px-1
-          [&>code]:py-0.5
           [&>code]:rounded
-          [&>code]:overflow-hidden
+          [&>p]:overflow-wrap-anywhere
         "
-        dangerouslySetInnerHTML={{ __html: safeHtml }}
+        dangerouslySetInnerHTML={{ __html: modifiedHtml }}
       />
     </div>
   );
 }
-
 
