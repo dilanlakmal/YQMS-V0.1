@@ -37,6 +37,7 @@ const useTheme = () => {
 
   const toggleTheme = () =>
     setTheme((prev) => (prev === "light" ? "dark" : "light"));
+
   return { theme, toggleTheme };
 };
 
@@ -45,14 +46,14 @@ function Home() {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
   const { theme, toggleTheme } = useTheme();
-
   const [errorMessage, setErrorMessage] = useState("");
   const [userRoles, setUserRoles] = useState([]);
   const [roleManagement, setRoleManagement] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [accessMap, setAccessMap] = useState({});
-
   const sectionRefs = useRef({});
+
+  const backgroundImageUrl = "assets/Home/background.avif"; 
 
   const allSections = useMemo(
     () => [
@@ -60,7 +61,7 @@ function Home() {
         id: "qc2-system",
         title: "QC2 System",
         icon: <Layers className="w-5 h-5 mr-2" />,
-        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        bgColor: "bg-blue-50/80 dark:bg-blue-900/40",
         items: [
           {
             path: "/bundle-registration",
@@ -76,7 +77,7 @@ function Home() {
             image: "assets/Home/washing.jpg",
             title: t("home.washing"),
             description: "Scan orders for Washing",
-           version: '0',
+            version: '0',
           },
           {
             path: "/opa",
@@ -84,7 +85,7 @@ function Home() {
             image: "assets/Home/dyeing.png",
             title: t("home.opa"),
             description: "Scan orders in OPA",
-             version: '0',
+            version: '0',
           },
           {
             path: "/ironing",
@@ -140,7 +141,7 @@ function Home() {
         id: "fabric-cutting",
         title: "Fabric & Cutting",
         icon: <Scissors className="w-5 h-5 mr-2" />,
-        bgColor: "bg-teal-50 dark:bg-teal-900/20",
+        bgColor: "bg-teal-50/80 dark:bg-teal-900/40",
         items: [
           {
             path: "/Fabric",
@@ -164,7 +165,7 @@ function Home() {
             image: "assets/Home/cutting-inline.png",
             title: t("home.cutting-inline"),
             description: "Cutting Inline Inspection",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/scc",
@@ -172,7 +173,7 @@ function Home() {
             image: "assets/Home/SCCLogo.jpg",
             title: t("SCC"),
             description: "Spreading & Cutting",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/qcWashing",
@@ -180,7 +181,7 @@ function Home() {
             image: "assets/Home/qcWashing.png",
             title: t("home.qcWashing"),
             description: "Washing Report",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/afterIroning",
@@ -188,7 +189,7 @@ function Home() {
             image: "assets/Home/after_ironing.png",
             title: t("home.afterIroning"),
             description: "After Ironing Report",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/select-dt-specs",
@@ -196,7 +197,7 @@ function Home() {
             image: "assets/Home/select-specs.png",
             title: t("home.select_dt_specs"),
             description: "Select After Wash DT Specs",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/anf-washing",
@@ -204,7 +205,7 @@ function Home() {
             image: "assets/Home/anf-washing.png",
             title: t("home.anf_washing"),
             description: "QC After Wash Measurements",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/supplier-issues",
@@ -212,7 +213,7 @@ function Home() {
             image: "assets/Home/supplier-issues.png",
             title: t("home.supplier-issues"),
             description: "Supplier Issues Sub-Con Fty",
-             version: '0.1',
+            version: '0.1',
           }
         ]
       },
@@ -220,7 +221,7 @@ function Home() {
         id: "sewing-qc",
         title: "Sewing QC",
         icon: <CheckSquare className="w-5 h-5 mr-2" />,
-        bgColor: "bg-purple-50 dark:bg-purple-900/20",
+        bgColor: "bg-purple-50/80 dark:bg-purple-900/40",
         items: [
           {
             path: "/roving",
@@ -228,7 +229,7 @@ function Home() {
             image: "assets/Home/qcinline.png",
             title: "QC Inline Roving",
             description: "QC Inline Roving Point",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/details",
@@ -236,7 +237,7 @@ function Home() {
             image: "assets/Home/qcc.png",
             title: t("home.qc1_inspection"),
             description: "QC1 Inspection Point",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/sub-con-qc1",
@@ -244,7 +245,7 @@ function Home() {
             image: "assets/Home/sub-con-qc1.png",
             title: t("home.qc1_subcon_inspection"),
             description: "QC1 Sub Con Inspection",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/inline-emp",
@@ -252,7 +253,7 @@ function Home() {
             image: "assets/Home/qc2.png",
             title: "Print QR",
             description: "Sewing Worker QR Code",
-             version: '0.1',
+            version: '0.1',
           }
         ]
       },
@@ -260,11 +261,10 @@ function Home() {
         id: "y-pivot",
         title: "Fin Check",
         icon: <Layers className="w-5 h-5 mr-2" />,
-        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        bgColor: "bg-blue-50/80 dark:bg-blue-900/40",
         items: [
           {
             path: "/qa-sections",
-            //pageId: "qa-sections",
             roles: ["Fincheck Config"],
             image: "assets/Home/FinCheck.png",
             title: t("home.qa_sections"),
@@ -273,16 +273,14 @@ function Home() {
           },
           {
             path: "/qa-measurements",
-            //pageId: "qa-measurements",
             roles: ["Fincheck Measurement"],
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
             description: "Fin Check Measurements",
-            version: '0',
+            version: '0.1',
           },
           {
             path: "/qa-templates",
-            //pageId: "qa-templates",
             roles: ["Fincheck Templates"],
             image: "assets/Home/qatemplates.png",
             title: t("home.qa_templates"),
@@ -291,16 +289,14 @@ function Home() {
           },
           {
             path: "/fincheck-inspection",
-            //pageId: "y-pivot-inspection",
             roles: ["Fincheck Inspections"],
             image: "assets/Home/yPivotInspection.png",
             title: t("home.y_pivot_inspection"),
             description: "Pivot Y Inspections",
-            version: '0',
+            version: '0.1',
           },
           {
             path: "/P88Legacy",
-            //pageId: "y-pivot-inspection",
             roles: ["P88"],
             image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
@@ -313,7 +309,7 @@ function Home() {
         id: "qa-inspection",
         title: "QA Inspection",
         icon: <Shield className="w-5 h-5 mr-2" />,
-        bgColor: "bg-yellow-50 dark:bg-yellow-900/20",
+        bgColor: "bg-yellow-50/80 dark:bg-yellow-900/40",
         items: [
           {
             path: "/audit",
@@ -321,7 +317,7 @@ function Home() {
             image: "assets/Home/qaa.png",
             title: "QMS Audit",
             description: "QMS Audit Check Point",
-             version: '0',
+            version: '0',
           },
           {
             path: "/qc2-upload-data",
@@ -329,7 +325,7 @@ function Home() {
             image: "assets/Home/qc2-workers-upload.png",
             title: t("home.qc2_upload_data"),
             description: "QC2 Upload Data",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/qc2-washing-upload",
@@ -337,7 +333,7 @@ function Home() {
             image: "assets/Home/qc2WashingUpload.png",
             title: t("home.qc2_washing_data"),
             description: "QC2 Washing Data",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/qc-accuracy",
@@ -345,7 +341,7 @@ function Home() {
             image: "assets/Home/qc-accuracy.png",
             title: "QA Random Inspection",
             description: "QA Random Checks",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/qc-output",
@@ -353,7 +349,7 @@ function Home() {
             image: "assets/Home/qcOutput.png",
             title: "QC Output",
             description: "QC Output | Sunrise & Old Barcode System",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/training",
@@ -361,7 +357,7 @@ function Home() {
             image: "assets/Home/training.jpg",
             title: "YQMS Training",
             description: "Training Schedule & Progress",
-             version: '0',
+            version: '0',
           },
           {
             path: "/exam",
@@ -369,22 +365,15 @@ function Home() {
             image: "assets/Home/exam.jpg",
             title: "YQMS Exam",
             description: "Create Exam & Preview",
-             version: '0',
+            version: '0',
           },
-          // {
-          //   path: "/qa-yorksys",
-          //   roles: ["QA Clerk"],
-          //   image: "assets/Home/upload-orders.png",
-          //   title: "Upload Orders",
-          //   description: "Order data from York-sys"
-          // },
           {
             path: "/packing-list",
             roles: ["QA Clerk"],
             image: "assets/Home/PackingList.png",
             title: "Upload Packing List",
             description: "Packing List from Shipping Dept",
-             version: '0',
+            version: '0',
           },
           {
             path: "/final-inspection",
@@ -392,7 +381,7 @@ function Home() {
             image: "assets/Home/qafinal.png",
             title: "Final Inspection",
             description: "QA Final Inspection",
-             version: '0',
+            version: '0',
           }
         ]
       },
@@ -400,7 +389,7 @@ function Home() {
         id: "ce-section",
         title: "CE",
         icon: <ClipboardList className="w-5 h-5 mr-2" />,
-        bgColor: "bg-orange-50 dark:bg-orange-900/20",
+        bgColor: "bg-orange-50/80 dark:bg-orange-900/40",
         items: [
           {
             path: "/master-list",
@@ -416,7 +405,7 @@ function Home() {
         id: "admin-panel",
         title: "Admin Panel",
         icon: <Settings className="w-5 h-5 mr-2" />,
-        bgColor: "bg-gray-100 dark:bg-gray-800/20",
+        bgColor: "bg-gray-100/80 dark:bg-gray-800/40",
         items: [
           {
             path: "/ieadmin",
@@ -424,7 +413,7 @@ function Home() {
             image: "assets/Home/ie.png",
             title: t("home.ieadmin"),
             description: "IE System Admin",
-             version: '0',
+            version: '0',
           },
           {
             path: "/sysadmin",
@@ -432,7 +421,7 @@ function Home() {
             image: "assets/Home/sysadmin.jpg",
             title: t("home.systemadmin"),
             description: "Modify Defects",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/yqms",
@@ -440,7 +429,7 @@ function Home() {
             image: "assets/Home/yqms.png",
             title: t("home.yqms"),
             description: "Project Management",
-             version: '0',
+            version: '0',
           }
         ]
       },
@@ -448,7 +437,7 @@ function Home() {
         id: "analytics",
         title: "Analytics",
         icon: <BarChart3 className="w-5 h-5 mr-2" />,
-        bgColor: "bg-red-50 dark:bg-red-900/20",
+        bgColor: "bg-red-50/80 dark:bg-red-900/40",
         items: [
           {
             path: "/download-data",
@@ -456,7 +445,7 @@ function Home() {
             image: "assets/Home/download.jpg",
             title: t("home.download_data"),
             description: "Download Raw Data",
-             version: '0',
+            version: '0',
           },
           {
             path: "/live-dashboard",
@@ -464,7 +453,7 @@ function Home() {
             image: "assets/Home/dash.png",
             title: t("home.live_dashboard"),
             description: "QC2 Live Dashboard",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/powerbi",
@@ -472,7 +461,7 @@ function Home() {
             image: "assets/Home/powerbi.png",
             title: "Power BI",
             description: "View Power BI Reports",
-             version: '0.1',
+            version: '0.1',
           },
           {
             path: "/qa-pivot",
@@ -480,7 +469,7 @@ function Home() {
             image: "assets/Home/qalogo.png",
             title: "QA Evaluation",
             description: "Upload & View Data",
-             version: '0',
+            version: '0',
           },
           {
             path: "/qc1-sunrise",
@@ -488,7 +477,7 @@ function Home() {
             image: "assets/Home/sunrise.png",
             title: "QC1 Sunrise",
             description: "Upload Excel Data",
-             version: '0.1',
+            version: '0.1',
           }
         ]
       },
@@ -496,7 +485,7 @@ function Home() {
         id: "ai-section",
         title: "AI-Servicers",
         icon: <ClipboardList className="w-5 h-5 mr-2" />,
-        bgColor: "bg-rose-50 dark:bg-rose-900/20",
+        bgColor: "bg-rose-50/80 dark:bg-rose-900/40",
         items: [
           {
             path: "/translator",
@@ -512,7 +501,7 @@ function Home() {
         id: "ydt",
         title: "YDT",
         icon: <ClipboardList className="w-5 h-5 mr-2" />,
-        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        bgColor: "bg-blue-50/80 dark:bg-blue-900/40",
         items: [
           {
             path: "/production-Sheet",
@@ -546,6 +535,7 @@ function Home() {
             axios.get(`${API_BASE_URL}/api/role-management`),
             axios.get(`${API_BASE_URL}/api/user-roles/${user.emp_id}`)
           ]);
+
           setRoleManagement(roleManagementRes.data);
           setUserRoles(userRolesRes.data.roles);
         } catch (error) {
@@ -555,6 +545,7 @@ function Home() {
         }
         // Do not set pageLoading to false here, let the next step do it
       };
+
       fetchBaseRoles();
     }
   }, [user]);
@@ -581,8 +572,8 @@ function Home() {
           );
 
           const results = await Promise.all(accessPromises);
-
           const newAccessMap = {};
+
           results.forEach((res, index) => {
             newAccessMap[pageIdsToCheck[index]] = res.data.hasAccess;
           });
@@ -596,6 +587,7 @@ function Home() {
           setPageLoading(false);
         }
       };
+
       checkAllIEAccess();
     }
   }, [roleManagement, user, allSections]); // Dependency on roleManagement is key
@@ -604,10 +596,14 @@ function Home() {
   const hasAccess = useCallback(
     (item) => {
       if (!user) return false;
+
       const isSuperAdmin = userRoles.includes("Super Admin");
       const isAdmin = userRoles.includes("Admin");
+
       if (isSuperAdmin || isAdmin) return true;
+
       if (item.pageId) return accessMap[item.pageId] === true;
+
       if (item.roles && roleManagement && user.job_title) {
         return roleManagement.some(
           (role) =>
@@ -615,6 +611,7 @@ function Home() {
             role.jobTitles.includes(user.job_title)
         );
       }
+
       return false;
     },
     [user, userRoles, roleManagement, accessMap]
@@ -623,6 +620,7 @@ function Home() {
   // Dynamic filtering logic remains the same
   const accessibleSections = useMemo(() => {
     if (pageLoading || !userRoles) return [];
+
     return allSections
       .map((section) => ({
         ...section,
@@ -658,106 +656,119 @@ function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
-      <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
-        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto">
-              {accessibleSections.map((section) => (
-                <button
-                  key={section.id}
-                  onClick={() => handleTabClick(section.id)}
-                  className="flex-shrink-0 flex items-center px-3 py-2 text-sm font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
-                >
-                  {section.icon}
-                  <span>{section.title}</span>
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
-        {errorMessage && (
-          <div className="bg-red-500 text-white text-center py-2 mb-6 rounded-md">
-            {errorMessage}
-          </div>
-        )}
-        <div className="space-y-12">
-          {accessibleSections.length > 0 ? (
-            accessibleSections.map((section) => (
-              <section
-                key={section.id}
-                ref={(el) => (sectionRefs.current[section.id] = el)}
-                className={`p-6 rounded-2xl ${section.bgColor} transition-colors`}
+    <div className="min-h-screen relative">
+      {/* Fixed Background Image */}
+      <div 
+        className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: `url(${backgroundImageUrl})`,
+          backgroundAttachment: 'fixed'
+        }}
+      />
+      
+      {/* Content Overlay */}
+      <div className="relative z-10 min-h-screen">
+        <header className="fixed top-16 w-full z-40 bg-white/60 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm">
+          <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between h-16">
+              <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto">
+                {accessibleSections.map((section) => (
+                  <button
+                    key={section.id}
+                    onClick={() => handleTabClick(section.id)}
+                    className="flex-shrink-0 flex items-center px-2 py-2 text-sm font-semibold rounded-md text-slate-600 dark:text-slate-300 hover:bg-gray-200/80 dark:hover:bg-slate-800/80 transition-colors backdrop-blur-sm"
+                  >
+                    {section.icon}
+                    <span>{section.title}</span>
+                  </button>
+                ))}
+              </nav>
+              
+              {/* <button
+                onClick={toggleTheme}
+                className="p-2 rounded-md text-slate-600 dark:text-slate-300 hover:bg-gray-200/80 dark:hover:bg-slate-800/80 transition-colors backdrop-blur-sm"
               >
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center">
-                  {section.icon}
-                  {section.title}
-                </h2>
-                <div
-                  className="grid gap-4"
-                  style={{
-                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
-                  }}
-                >
-                  {section.items.map((item, itemIndex) => {
-                    const getVersionStyle = () => {
-                      if (item.version === '0') {
-                        return 'border-2 border-red-500';
-                      } else if (item.version === '0.1') {
-                        return 'border-2 border-green-500';
-                      }
-                      return '';
-                    };
+                {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+              </button> */}
+            </div>
+          </div>
+        </header>
 
-                    return (
-                      <div
-                        key={itemIndex}
-                        onClick={() => handleNavigation(item)}
-                        className={`group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1 ${getVersionStyle()}`}
-                      >
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="w-16 h-16 object-contain mb-3"
-                        />
-                        <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
-                          {item.title}
-                        </h3>
-                        <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
-                          {item.description}
-                        </p>
-                        {/* {item.version === '0' && (
-                          <span className="absolute top-2 right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
-                            Coming Soon
-                          </span>
-                        )}
-                        {item.version === '0.1' && (
-                          <span className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                            Active
-                          </span>
-                        )} */}
-                      </div>
-                    );
-                  })}
-                </div>
-              </section>
-            ))
-          ) : (
-            <div className="text-center py-20">
-              <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                No Accessible Modules
-              </h2>
-              <p className="mt-2 text-slate-500">
-                Please contact your administrator if you believe you should have
-                access.
-              </p>
+        <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8 mt-16">
+          {errorMessage && (
+            <div className="bg-red-500/90 text-white text-center py-2 mb-6 rounded-md backdrop-blur-sm">
+              {errorMessage}
             </div>
           )}
-        </div>
-      </main>
+
+          <div className="space-y-12">
+            {accessibleSections.length > 0 ? (
+              accessibleSections.map((section) => (
+                <section
+                  key={section.id}
+                  ref={(el) => (sectionRefs.current[section.id] = el)}
+                  className={`scroll-mt-20 p-6 rounded-2xl ${section.bgColor} transition-colors backdrop-blur-sm border border-white/20 dark:border-slate-700/20`}
+                >
+                  <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center">
+                    {section.icon}
+                    {section.title}
+                  </h2>
+
+                  <div
+                    className="grid gap-4"
+                    style={{
+                      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
+                    }}
+                  >
+                    {section.items.map((item, itemIndex) => {
+                      const getVersionStyle = () => {
+                        if (item.version === '0') {
+                          return 'border-4 border-red-500';
+                        } else if (item.version === '0.1') {
+                          return 'border-4 border-green-500';
+                        }
+                        return '';
+                      };
+
+                      return (
+                        <div
+                          key={itemIndex}
+                          onClick={() => handleNavigation(item)}
+                          className={`group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white/90 dark:bg-slate-800/90 cursor-pointer hover:shadow-xl hover:-translate-y-1 backdrop-blur-sm ${getVersionStyle()}`}
+                        >
+                          <img
+                            src={item.image}
+                            alt={item.title}
+                            className="w-16 h-16 object-contain mb-3"
+                          />
+
+                          <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
+                            {item.title}
+                          </h3>
+
+                          <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
+                            {item.description}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))
+            ) : (
+              <div className="text-center py-20 bg-white/80 dark:bg-slate-800/80 rounded-2xl backdrop-blur-sm">
+                <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
+                  No Accessible Modules
+                </h2>
+                <p className="mt-2 text-slate-500">
+                  Please contact your administrator if you believe you should have
+                  access.
+                </p>
+              </div>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }
