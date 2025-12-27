@@ -1,6 +1,7 @@
 import {
- OPA,
- QC2InspectionPassBundle,               
+  OPA,
+  QC2InspectionPassBundle,
+  IEWorkerTask
 } from "../../MongoDB/dbConnectionController.js";
 
 /* ------------------------------
@@ -22,7 +23,7 @@ import {
 // };
 
 export const getOPAId = async (req, res) => {
-    try {
+  try {
     const record = await OPA.findOne({
       opa_bundle_id: req.params.bundleId
     });
@@ -33,7 +34,7 @@ export const getOPAId = async (req, res) => {
 };
 
 export const getOPADefectId = async (req, res) => {
-    try {
+  try {
     const { defectPrintId } = req.params;
     const defectRecord = await QC2InspectionPassBundle.findOne({
       "printArray.defect_print_id": defectPrintId,
@@ -88,22 +89,22 @@ export const getOPADefectId = async (req, res) => {
 
 export const getLastOPAId = async (req, res) => {
   try {
-      const { emp_id } = req.params;
-      const lastRecord = await OPA.findOne(
-        { emp_id_opa: emp_id },
-        {},
-        { sort: { opa_record_id: -1 } }
-      );
-      const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
-      res.json({ lastRecordId });
-    } catch (error) {
-      console.error("Error fetching last OPA record ID:", error);
-      res.status(500).json({ error: "Failed to fetch last OPA record ID" });
-    }
+    const { emp_id } = req.params;
+    const lastRecord = await OPA.findOne(
+      { emp_id_opa: emp_id },
+      {},
+      { sort: { opa_record_id: -1 } }
+    );
+    const lastRecordId = lastRecord ? lastRecord.opa_record_id : 0;
+    res.json({ lastRecordId });
+  } catch (error) {
+    console.error("Error fetching last OPA record ID:", error);
+    res.status(500).json({ error: "Failed to fetch last OPA record ID" });
+  }
 };
 
 export const saveOPA = async (req, res) => {
-    try {
+  try {
     const newRecord = new OPA(req.body);
     await newRecord.save();
     res.status(201).json({ message: "Record saved successfully" });
@@ -117,7 +118,7 @@ export const saveOPA = async (req, res) => {
 };
 
 export const getOPARecords = async (req, res) => {
-    try {
+  try {
     const records = await OPA.find();
     res.json(records);
   } catch (error) {
@@ -128,14 +129,13 @@ export const getOPARecords = async (req, res) => {
 // GET distinct filter options for OPA records
 export const getOpaFilterOptions = async (req, res) => {
   try {
-    
     const [
       distinctTaskNos,
       moNosFromMoNoField,
       moNosFromSelectedMonoField,
       distinctPackageNos,
       distinctDepartments,
-      distinctLineNos, 
+      distinctLineNos,
       distinctQcIds
     ] = await Promise.all([
       OPA.distinct("task_no_opa").exec(),
@@ -143,8 +143,8 @@ export const getOpaFilterOptions = async (req, res) => {
       OPA.distinct("selectedMono").exec(),
       OPA.distinct("package_no").exec(),
       OPA.distinct("department").exec(),
-      OPA.distinct("lineNo").exec(), 
-      OPA.distinct("emp_id_opa").exec() 
+      OPA.distinct("lineNo").exec(),
+      OPA.distinct("emp_id_opa").exec()
     ]);
 
     // Combine MO numbers from two different fields and get only unique values
@@ -184,5 +184,28 @@ export const getOpaFilterOptions = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch distinct OPA filter options" });
+  }
+};
+
+export const getUserOPATasks = async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+
+    const workerTasks = await IEWorkerTask.findOne({ emp_id });
+
+    if (!workerTasks || !workerTasks.tasks) {
+      return res.json({ assignedTasks: [] });
+    }
+
+    // Filter tasks that are relevant to OPA (60, 61, 62, 103, 104, 105)
+    const opaRelevantTasks = [60, 61, 62, 103, 104, 105];
+    const assignedOpaTasks = workerTasks.tasks.filter((task) =>
+      opaRelevantTasks.includes(task)
+    );
+
+    res.json({ assignedTasks: assignedOpaTasks });
+  } catch (error) {
+    console.error("Error fetching user OPA tasks:", error);
+    res.status(500).json({ error: "Failed to fetch user tasks" });
   }
 };
