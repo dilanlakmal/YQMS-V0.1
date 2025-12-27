@@ -17,7 +17,7 @@ import AzureTranslator from "./services/azureTranslation";
 
 
 function strictThreeWords(text) {
-  if (text.split(" ").length > 10) {
+  if (text.split(" ").length > 3) {
     return text
       .trim()
       .replace(/[^\w\s]/g, "")   // remove punctuation

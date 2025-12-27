@@ -23,7 +23,11 @@ export function ChatMessage({
 }) {
   const isUser = message.role === "user";
 
- 
+  const handleCopy = (e) => {
+    if (!isUser){
+      navigator.clipboard.writeText(message.content);
+    }
+  }
 
   return (
     <div className={cn("flex gap-4 py-2 px-3 overflow-hidden", isUser && "items-end", isUser && "flex-row-reverse")}>
@@ -78,7 +82,7 @@ export function ChatMessage({
           {!isUser && (
             <div className="relative top-4 left-0 w-full gap-3 flex items-center">
               <button className="border-none">
-                <FaRegCopy className="w-4 h-4" />
+                <FaRegCopy className="w-4 h-4" onClick={handleCopy}/>
               </button>
               <button className="border-none">
                 <AiOutlineLike className="w-4 h-4" />
@@ -167,7 +171,7 @@ export function MarkdownViewer({ text = "" }) {
   };
 
   return (
-    <div className="w-full break-words" onClick={handleClick}>
+    <div className="w-full break-words font-serif" onClick={handleClick}>
       <div
         className="
           prose
@@ -178,28 +182,43 @@ export function MarkdownViewer({ text = "" }) {
           hyphens-auto
           [&>*]:mb-6
           [&>table]:block
-          [&>table]:w-full
+          [&_table]:table-auto
           [&>table]:overflow-x-auto
-          [&>pre]:overflow-x-auto
+          [&_table]:border
+          [&_table]:border-gray-300
+          [&_td]:border
+          [&_td]:border-gray-300
+          [&_td]:p-2
+          [&>th]:border
+          [&_th]:border-gray-300
+          [&_th]:bg-gray-100
+          [&_th]:p-2
+          [&_th]:border
+          [&_pre]:overflow-x-auto
           [&>pre]:bg-gray-200
           [&>pre]:p-2
           [&>pre]:rounded
           [&>pre]:max-w-full
-          [&>code]:break-words
+          [&_code]:break-words
           [&>code]:bg-gray-200
-          [&>code]:px-1
-          [&>code]:p-5
-          [&>code]:rounded
+          [&_code]:px-1
+          [&_code]:py-0.5
+          [&_code]:rounded
           [&>p]:overflow-wrap-anywhere
           [&>h1]:font-bold
-          [&>h1]:text-2xl
-          [&>h2]:text-xl
-          [&>h2]:font-bold
-          [&>h3]:text-lg
-          [&>h3]:font-bold
-          [&>h4]:font-bold
-          [&>h5]:font-bold
-          [&>h6]:font-bold
+          [&_h1]:text-2xl
+          [&_h2]:text-xl
+          [&_h2]:font-bold
+          [&_h3]:text-lg
+          [&_h3]:font-bold
+          [&_h4]:font-bold
+          [&_h5]:font-bold
+          [&_h6]:font-bold
+          [&_span]:bg-yellow-100
+          [&_ol]:list-decimal
+          [&_ol]:ml-6
+          [&_ul]:list-disc
+          [&_ul]:ml-6
         "
         dangerouslySetInnerHTML={{ __html: modifiedHtml }}
       />
