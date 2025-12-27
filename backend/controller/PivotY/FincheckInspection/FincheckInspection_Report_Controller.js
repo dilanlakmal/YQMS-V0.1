@@ -1,4 +1,8 @@
-import { FincheckInspectionReports } from "../../MongoDB/dbConnectionController.js";
+import {
+  FincheckInspectionReports,
+  QASectionsMeasurementSpecs,
+  DtOrder
+} from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
 // Get Filtered Inspection Reports
@@ -81,5 +85,222 @@ export const getInspectionReports = async (req, res) => {
       message: "Server Error",
       error: error.message
     });
+  }
+};
+
+// ============================================================
+// Get Flattened Defect Images for a Report
+// ============================================================
+export const getDefectImagesForReport = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    })
+      .select("defectData defectManualData")
+      .lean();
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found"
+      });
+    }
+
+    const allImages = [];
+
+    // 1. Process Structured Defect Data
+    if (report.defectData && Array.isArray(report.defectData)) {
+      report.defectData.forEach((defect) => {
+        const defectName = defect.defectName;
+        const defectCode = defect.defectCode;
+
+        if (defect.isNoLocation) {
+          // A. No Location Mode (Images at root)
+          if (defect.images && Array.isArray(defect.images)) {
+            defect.images.forEach((img) => {
+              allImages.push({
+                imageId: img.imageId,
+                url: img.imageURL,
+                defectName: defectName,
+                defectCode: defectCode,
+                position: "General", // No specific position
+                locationInfo: "No Location Config",
+                type: "Defect"
+              });
+            });
+          }
+        } else {
+          // B. Location Based Mode
+          if (defect.locations && Array.isArray(defect.locations)) {
+            defect.locations.forEach((loc) => {
+              const locationInfo = `${loc.locationName} (${loc.view})`;
+
+              if (loc.positions && Array.isArray(loc.positions)) {
+                loc.positions.forEach((pos) => {
+                  const positionType = pos.position || "Outside"; // Inside/Outside
+
+                  // Required Image
+                  if (pos.requiredImage) {
+                    allImages.push({
+                      imageId: pos.requiredImage.imageId,
+                      url: pos.requiredImage.imageURL,
+                      defectName: defectName,
+                      defectCode: defectCode,
+                      position: positionType,
+                      locationInfo: locationInfo,
+                      type: "Defect"
+                    });
+                  }
+
+                  // Additional Images
+                  if (
+                    pos.additionalImages &&
+                    Array.isArray(pos.additionalImages)
+                  ) {
+                    pos.additionalImages.forEach((img) => {
+                      allImages.push({
+                        imageId: img.imageId,
+                        url: img.imageURL,
+                        defectName: defectName,
+                        defectCode: defectCode,
+                        position: positionType,
+                        locationInfo: locationInfo,
+                        type: "Defect (Add.)"
+                      });
+                    });
+                  }
+                });
+              }
+            });
+          }
+        }
+      });
+    }
+
+    // 2. Process Manual Defect Data (Optional, but good to have)
+    if (report.defectManualData && Array.isArray(report.defectManualData)) {
+      report.defectManualData.forEach((item) => {
+        if (item.images && Array.isArray(item.images)) {
+          item.images.forEach((img) => {
+            allImages.push({
+              imageId: img.imageId,
+              url: img.imageURL,
+              defectName: "Manual Entry",
+              defectCode: "N/A",
+              position: item.line || "Manual",
+              locationInfo: item.remarks || "",
+              type: "Manual"
+            });
+          });
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: allImages.length,
+      data: allImages
+    });
+  } catch (error) {
+    console.error("Error fetching defect images:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// Get Measurement Specifications Linked to a Report
+// ============================================================
+export const getReportMeasurementSpecs = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    // 1. Fetch the Report to get Order No and Measurement Method
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    }).select("orderNos measurementMethod inspectionDetails");
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    // Determine Method (Check root field, fallback to inspectionDetails)
+    const method =
+      report.measurementMethod || report.inspectionDetails?.measurement;
+    const orderNos = report.orderNos;
+
+    // Validation
+    if (
+      !method ||
+      method === "N/A" ||
+      method === "No" ||
+      !orderNos ||
+      orderNos.length === 0
+    ) {
+      return res.status(200).json({
+        success: true,
+        message: "No measurement configuration found",
+        full: [],
+        selected: []
+      });
+    }
+
+    // Use the first order number to find specs
+    const primaryOrderNo = orderNos[0];
+
+    // 2. Find the Specs in the Specs Collection
+    const specsRecord = await QASectionsMeasurementSpecs.findOne({
+      Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+    }).lean();
+
+    let fullSpecs = [];
+    let selectedSpecs = [];
+
+    if (specsRecord) {
+      // 3a. Extract based on Method (Before vs After)
+      if (method === "Before") {
+        fullSpecs = specsRecord.AllBeforeWashSpecs || [];
+        selectedSpecs = specsRecord.selectedBeforeWashSpecs || [];
+      } else if (method === "After") {
+        fullSpecs = specsRecord.AllAfterWashSpecs || [];
+        selectedSpecs = specsRecord.selectedAfterWashSpecs || [];
+      }
+    } else {
+      // 3b. Fallback: If not in QASections, check DtOrder (Legacy/Raw Data)
+      // Note: DtOrder usually only has raw Before Wash data
+      if (method === "Before") {
+        const dtOrder = await DtOrder.findOne({
+          Order_No: primaryOrderNo
+        }).lean();
+        if (dtOrder && dtOrder.BeforeWashSpecs) {
+          // Map _id to id string if needed
+          fullSpecs = dtOrder.BeforeWashSpecs.map((s) => ({
+            ...s,
+            id: s._id ? s._id.toString() : s.id
+          }));
+        }
+      }
+    }
+
+    // If "Selected" array is empty, it implies all specs are active/critical
+    // or the user hasn't filtered them. We return full list as selected in that case.
+    const finalSelected = selectedSpecs.length > 0 ? selectedSpecs : fullSpecs;
+
+    return res.status(200).json({
+      success: true,
+      measurementMethod: method,
+      full: fullSpecs,
+      selected: finalSelected
+    });
+  } catch (error) {
+    console.error("Error fetching report measurement specs:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
