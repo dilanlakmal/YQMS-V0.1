@@ -39,6 +39,9 @@ import YPivotQAInspectionDefectDataSave from "../components/inspection/PivotY/QA
 import YPivotQAInspectionPPSheetDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDataSave";
 import YPivotQAInspectionPreviousReport from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPreviousReport";
 
+import axios from "axios";
+import { API_BASE_URL } from "../../config";
+
 // ==================================================================================
 // 1. INDEXED DB UTILITY (Handles Large Data & Images preventing QuotaExceededError)
 // ==================================================================================
@@ -226,6 +229,174 @@ const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
       </div>
     </div>
   );
+};
+
+// ==================================================================================
+// HELPER FUNCTIONS TO TRANSFORM BACKEND DATA TO COMPONENT FORMAT
+// ==================================================================================
+
+// Transform header data from backend format to component format
+const transformHeaderDataFromBackend = (backendHeaderData) => {
+  if (!backendHeaderData || !Array.isArray(backendHeaderData)) {
+    return {};
+  }
+
+  const selectedOptions = {};
+  const remarks = {};
+  const capturedImages = {};
+
+  backendHeaderData.forEach((section) => {
+    const headerId = section.headerId;
+
+    if (section.selectedOption) {
+      selectedOptions[headerId] = section.selectedOption;
+    }
+
+    if (section.remarks) {
+      remarks[headerId] = section.remarks;
+    }
+
+    if (section.images && Array.isArray(section.images)) {
+      section.images.forEach((img, index) => {
+        const key = img.id || `${headerId}_${index}`;
+        capturedImages[key] = {
+          id: img.id || key,
+          url: img.imageURL ? `${API_BASE_URL}${img.imageURL}` : img.imgSrc
+        };
+      });
+    }
+  });
+
+  return { selectedOptions, remarks, capturedImages };
+};
+
+// Transform photo data from backend format to component format
+const transformPhotoDataFromBackend = (backendPhotoData) => {
+  if (!backendPhotoData || !Array.isArray(backendPhotoData)) {
+    return {};
+  }
+
+  const remarks = {};
+  const capturedImages = {};
+
+  backendPhotoData.forEach((section) => {
+    if (section.items && Array.isArray(section.items)) {
+      section.items.forEach((item) => {
+        const itemKeyBase = `${section.sectionId}_${item.itemNo}`;
+
+        if (item.remarks) {
+          remarks[itemKeyBase] = item.remarks;
+        }
+
+        if (item.images && Array.isArray(item.images)) {
+          item.images.forEach((img, index) => {
+            const key = img.id || `${itemKeyBase}_${index}`;
+            capturedImages[key] = {
+              id: img.id || key,
+              url: img.imageURL ? `${API_BASE_URL}${img.imageURL}` : img.imgSrc
+            };
+          });
+        }
+      });
+    }
+  });
+
+  return { remarks, capturedImages };
+};
+
+// Transform defect manual data from backend array to component object format
+const transformDefectManualData = (backendManualData) => {
+  if (!backendManualData || !Array.isArray(backendManualData)) {
+    return {};
+  }
+
+  const result = {};
+  backendManualData.forEach((item) => {
+    const groupId = item.groupId || 0;
+    result[groupId] = item;
+  });
+
+  return result;
+};
+
+// Transform measurement data from backend format to component format
+const transformMeasurementDataFromBackend = (backendMeasurementData) => {
+  if (!backendMeasurementData || !Array.isArray(backendMeasurementData)) {
+    return { savedMeasurements: [], manualDataByGroup: {} };
+  }
+
+  // 1. Process Standard Measurements (convert arrays to Sets)
+  const processedMeasurements = backendMeasurementData
+    .filter((m) => m.size !== "Manual_Entry")
+    .map((m) => ({
+      ...m,
+      allEnabledPcs: new Set(m.allEnabledPcs || []),
+      criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+    }));
+
+  // 2. Process Manual Data by Group
+  const processedManualDataByGroup = {};
+
+  backendMeasurementData.forEach((item) => {
+    if (item.manualData) {
+      const groupId = item.groupId;
+
+      // Process Images - prepend API_BASE_URL for relative paths
+      const processedImages = (item.manualData.images || []).map((img) => {
+        let displayUrl = img.imageURL;
+
+        // Prepend API_BASE_URL for display if it's a relative path
+        if (
+          displayUrl &&
+          !displayUrl.startsWith("http") &&
+          !displayUrl.startsWith("data:")
+        ) {
+          displayUrl = `${API_BASE_URL}${displayUrl}`;
+        }
+
+        return {
+          id: img.imageId || img.id,
+          url: displayUrl,
+          imgSrc: displayUrl,
+          editedImgSrc: displayUrl,
+          remark: img.remark || "",
+          history: []
+        };
+      });
+
+      processedManualDataByGroup[groupId] = {
+        remarks: item.manualData.remarks || "",
+        status: item.manualData.status || "Pass",
+        images: processedImages
+      };
+    }
+  });
+
+  return {
+    savedMeasurements: processedMeasurements,
+    manualDataByGroup: processedManualDataByGroup,
+    isConfigured: processedMeasurements.length > 0
+  };
+};
+
+// Helper function to extract sizes from order data
+const extractOrderSizes = (orderData) => {
+  if (!orderData) return [];
+  const allSizes = new Set();
+
+  if (orderData.orderBreakdowns && Array.isArray(orderData.orderBreakdowns)) {
+    orderData.orderBreakdowns.forEach((breakdown) => {
+      if (breakdown.colorSizeBreakdown?.sizeList) {
+        breakdown.colorSizeBreakdown.sizeList.forEach((s) => allSizes.add(s));
+      }
+    });
+  } else if (orderData.colorSizeBreakdown?.sizeList) {
+    orderData.colorSizeBreakdown.sizeList.forEach((s) => allSizes.add(s));
+  } else if (orderData.dtOrder?.sizeList) {
+    orderData.dtOrder.sizeList.forEach((s) => allSizes.add(s));
+  }
+
+  return Array.from(allSizes);
 };
 
 const YPivotQAInspection = () => {
@@ -416,6 +587,92 @@ const YPivotQAInspection = () => {
     dirtySections
   ]);
 
+  // ==================================================================================
+  // FETCH MEASUREMENT SPECS WHEN REPORT IS LOADED (for Summary to display properly)
+  // ==================================================================================
+  useEffect(() => {
+    const fetchMeasurementSpecs = async () => {
+      // Only run if we have a loaded report
+      if (!savedReportData || !isReportSaved) return;
+
+      const template = sharedReportState.selectedTemplate;
+      const measConfig = template?.Measurement;
+
+      // Skip if no measurement required
+      if (!measConfig || measConfig === "No") return;
+
+      // Skip if specs already loaded
+      if (sharedReportState.measurementData?.fullSpecsList?.length > 0) return;
+
+      const moNo = sharedOrderState.selectedOrders?.[0];
+      if (!moNo) return;
+
+      console.log(
+        "Fetching measurement specs for loaded report...",
+        moNo,
+        measConfig
+      );
+
+      try {
+        const endpoint =
+          measConfig === "Before"
+            ? `/api/qa-sections/measurement-specs/${moNo}`
+            : `/api/qa-sections/measurement-specs-aw/${moNo}`;
+
+        const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+        const { source, data } = res.data;
+
+        let all = [];
+        let selected = [];
+        let kValues = [];
+
+        if (measConfig === "Before") {
+          all = data.AllBeforeWashSpecs || [];
+          selected = data.selectedBeforeWashSpecs || [];
+          const kSet = new Set(
+            all.map((s) => s.kValue).filter((k) => k && k !== "NA")
+          );
+          kValues = Array.from(kSet).sort();
+        } else {
+          all = data.AllAfterWashSpecs || [];
+          selected = data.selectedAfterWashSpecs || [];
+        }
+
+        const finalList =
+          source === "qa_sections" && selected.length > 0 ? selected : all;
+
+        // Extract sizes from order data
+        const orderSizes = extractOrderSizes(sharedOrderState.orderData);
+
+        // Update measurement data with specs (preserving existing savedMeasurements)
+        setSharedReportState((prev) => ({
+          ...prev,
+          measurementData: {
+            ...prev.measurementData,
+            fullSpecsList: all,
+            selectedSpecsList: finalList,
+            sourceType: source,
+            isConfigured: source === "qa_sections",
+            kValuesList: kValues,
+            orderSizes: orderSizes
+          }
+        }));
+
+        console.log("Measurement specs loaded:", all.length, "specs");
+      } catch (error) {
+        console.error("Error fetching measurement specs:", error);
+      }
+    };
+
+    fetchMeasurementSpecs();
+  }, [
+    savedReportData?._id,
+    isReportSaved,
+    sharedReportState.selectedTemplate?.Measurement,
+    sharedOrderState.selectedOrders?.[0],
+    sharedReportState.measurementData?.fullSpecsList?.length // Track if already loaded
+  ]);
+
   // Handler to update PP Sheet data - MODIFIED to mark dirty
   const handlePPSheetUpdate = useCallback(
     (newData, options = {}) => {
@@ -435,7 +692,6 @@ const YPivotQAInspection = () => {
   // Handler for save complete
   const handleSaveComplete = useCallback(
     (result) => {
-      // Destructure the result passed from the Modal
       const { reportData, isNew, message } = result;
 
       setSavedReportData(reportData);
@@ -445,19 +701,119 @@ const YPivotQAInspection = () => {
       markSectionClean("inspectionDetails");
       markSectionClean("inspectionConfig");
 
+      // ========================================================================
+      // NEW: HYDRATE sharedReportState when loading an EXISTING report
+      // ========================================================================
+      if (!isNew && reportData) {
+        console.log("Hydrating state from loaded report:", reportData._id);
+
+        // *** PROCESS MEASUREMENT DATA PROPERLY ***
+        const processedMeasurementData = transformMeasurementDataFromBackend(
+          reportData.measurementData
+        );
+
+        // Hydrate sharedReportState from loaded report data
+        setSharedReportState((prev) => {
+          const newState = {
+            ...prev,
+            // Template - might be stored differently based on your backend
+            selectedTemplate:
+              reportData.selectedTemplate || prev.selectedTemplate,
+
+            // Config from inspectionDetails
+            config: {
+              ...prev.config,
+              productType:
+                reportData.inspectionDetails?.productType ||
+                prev.config?.productType,
+              productTypeId:
+                reportData.inspectionDetails?.productTypeId ||
+                prev.config?.productTypeId,
+              inspectedQty:
+                reportData.inspectionDetails?.inspectedQty ??
+                prev.config?.inspectedQty,
+              cartonQty:
+                reportData.inspectionDetails?.cartonQty ??
+                prev.config?.cartonQty,
+              shippingStage:
+                reportData.inspectionDetails?.shippingStage ||
+                prev.config?.shippingStage,
+              remarks:
+                reportData.inspectionDetails?.remarks || prev.config?.remarks,
+              isSubCon:
+                reportData.inspectionDetails?.isSubCon ?? prev.config?.isSubCon,
+              selectedSubConFactory:
+                reportData.inspectionDetails?.subConFactoryId ||
+                prev.config?.selectedSubConFactory,
+              selectedSubConFactoryName:
+                reportData.inspectionDetails?.subConFactory ||
+                prev.config?.selectedSubConFactoryName,
+              aqlSampleSize:
+                reportData.inspectionDetails?.aqlSampleSize ||
+                prev.config?.aqlSampleSize,
+              aqlConfig:
+                reportData.inspectionDetails?.aqlConfig ||
+                prev.config?.aqlConfig
+            },
+
+            // Line/Table Config
+            lineTableConfig:
+              reportData.inspectionConfig?.configGroups || prev.lineTableConfig,
+
+            // Header Data - needs to be transformed to match your component's expected format
+            headerData: reportData.headerData
+              ? transformHeaderDataFromBackend(reportData.headerData)
+              : prev.headerData,
+
+            // Photo Data - needs to be transformed
+            photoData: reportData.photoData
+              ? transformPhotoDataFromBackend(reportData.photoData)
+              : prev.photoData,
+
+            // *** MEASUREMENT DATA - Use the processed data ***
+            measurementData: {
+              ...prev.measurementData,
+              ...processedMeasurementData,
+              // Keep other measurement config if exists
+              fullSpecsList: prev.measurementData?.fullSpecsList || [],
+              selectedSpecsList: prev.measurementData?.selectedSpecsList || [],
+              sourceType: prev.measurementData?.sourceType || "",
+              orderSizes: prev.measurementData?.orderSizes || [],
+              kValuesList: prev.measurementData?.kValuesList || []
+            },
+
+            // Defect Data
+            defectData: {
+              ...prev.defectData,
+              savedDefects:
+                reportData.defectData || prev.defectData?.savedDefects || [],
+              manualDataByGroup: reportData.defectManualData
+                ? transformDefectManualData(reportData.defectManualData)
+                : prev.defectData?.manualDataByGroup || {}
+            },
+
+            // PP Sheet Data
+            ppSheetData: reportData.ppSheetData || prev.ppSheetData
+          };
+
+          return newState;
+        });
+
+        // Mark all sections as clean since we just loaded from backend
+        markAllSectionsClean();
+      }
+
       // --- LOGIC TO SHOW NICE MODAL ---
       if (isNew === false) {
-        // EXISTING REPORT (Update Scenario)
         setStatusModal({
           isOpen: true,
           type: "info",
-          title: "Existing Report Updated",
-          message: message || "Report updated successfully.",
+          title: "Existing Report Loaded",
+          message: message || "Report loaded successfully.",
           subMessage:
-            "The system detected a report for this Date, Order, and Inspection Type created by you. It has been updated with your current data."
+            "All saved data has been loaded. You can continue editing or submit the report."
         });
       } else {
-        // NEW REPORT (Create Scenario)
         setStatusModal({
           isOpen: true,
           type: "success",
@@ -468,7 +824,7 @@ const YPivotQAInspection = () => {
         });
       }
     },
-    [markSectionClean]
+    [markSectionClean, markAllSectionsClean]
   );
 
   // Handle tab change with validation

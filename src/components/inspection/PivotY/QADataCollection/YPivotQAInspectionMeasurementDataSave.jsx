@@ -79,18 +79,50 @@ const YPivotQAInspectionMeasurementDataSave = ({
     const fetchExistingMeasurementData = async () => {
       if (!reportId) return;
 
-      // Check if data already exists in client state to avoid overwrite
-      const hasSavedMeasurements =
-        reportData.measurementData?.savedMeasurements?.length > 0;
+      // Check if data already exists AND is properly formatted (Sets, not arrays)
+      const savedMeasurements =
+        reportData.measurementData?.savedMeasurements || [];
+      const hasProperlyFormattedData =
+        savedMeasurements.length > 0 &&
+        savedMeasurements[0]?.allEnabledPcs instanceof Set;
+
       const hasManualData =
         Object.keys(reportData.measurementData?.manualDataByGroup || {})
           .length > 0;
 
-      if (hasSavedMeasurements || hasManualData) {
+      // If data is already properly formatted (hydrated from parent), skip fetch
+      if (hasProperlyFormattedData || hasManualData) {
+        setIsUpdateMode(true);
+        console.log("Measurement data already hydrated, skipping fetch");
+        return;
+      }
+
+      // Check if we have raw data (arrays, not Sets) - this means parent hydrated but didn't process
+      const hasRawData =
+        savedMeasurements.length > 0 &&
+        Array.isArray(savedMeasurements[0]?.allEnabledPcs);
+
+      if (hasRawData) {
+        console.log("Converting raw measurement data to proper format");
+        // Convert in place
+        const processedMeasurements = savedMeasurements.map((m) => ({
+          ...m,
+          allEnabledPcs: new Set(m.allEnabledPcs || []),
+          criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+        }));
+
+        onUpdateMeasurementData(
+          {
+            ...reportData.measurementData,
+            savedMeasurements: processedMeasurements
+          },
+          { isFromBackend: true }
+        );
         setIsUpdateMode(true);
         return;
       }
 
+      // No data exists, fetch from backend
       setLoadingData(true);
       try {
         const res = await axios.get(
@@ -100,14 +132,13 @@ const YPivotQAInspectionMeasurementDataSave = ({
         if (res.data.success && res.data.data.measurementData) {
           const backendData = res.data.data.measurementData;
 
-          // Check if backend actually has array data to determine Update Mode
           if (Array.isArray(backendData) && backendData.length > 0) {
             setIsUpdateMode(true);
           } else {
             setIsUpdateMode(false);
           }
 
-          // 1. Process Standard Measurements
+          // Process Standard Measurements
           const processedMeasurements = backendData
             .filter((m) => m.size !== "Manual_Entry")
             .map((m) => ({
@@ -116,18 +147,14 @@ const YPivotQAInspectionMeasurementDataSave = ({
               criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
             }));
 
-          // 2. Process Manual Data
+          // Process Manual Data
           const processedManualDataByGroup = {};
-
           backendData.forEach((item) => {
             if (item.manualData) {
               const groupId = item.groupId;
-
-              // Process Images
               const processedImages = (item.manualData.images || []).map(
                 (img) => {
                   let displayUrl = img.imageURL;
-                  // Prepend API_BASE_URL for display if it's a relative path
                   if (
                     displayUrl &&
                     !displayUrl.startsWith("http") &&
@@ -135,12 +162,11 @@ const YPivotQAInspectionMeasurementDataSave = ({
                   ) {
                     displayUrl = `${API_BASE_URL}${displayUrl}`;
                   }
-
                   return {
                     id: img.imageId,
-                    url: displayUrl, // Used for display logic in Editor
-                    imgSrc: displayUrl, // Used for display logic in Manual Component
-                    editedImgSrc: displayUrl, // Ensure preview works
+                    url: displayUrl,
+                    imgSrc: displayUrl,
+                    editedImgSrc: displayUrl,
                     remark: img.remark || "",
                     history: []
                   };

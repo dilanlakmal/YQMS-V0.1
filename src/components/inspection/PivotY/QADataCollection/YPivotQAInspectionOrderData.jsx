@@ -1000,7 +1000,6 @@ const YPivotQAInspectionOrderData = ({
         // Extract key info from the report
         const backendOrderType = reportData.orderType || "single";
         const backendOrderNos = reportData.orderNos || [];
-        // Format date to YYYY-MM-DD for the input
         const backendInspectionDate = reportData.inspectionDate
           ? reportData.inspectionDate.split("T")[0]
           : new Date().toISOString().split("T")[0];
@@ -1010,7 +1009,6 @@ const YPivotQAInspectionOrderData = ({
         let orderFetchSuccess = false;
 
         if (backendOrderType === "single" && backendOrderNos.length > 0) {
-          // Fetch Single Order Details
           const orderRes = await axios.get(
             `${API_BASE_URL}/api/fincheck-inspection/order-details/${backendOrderNos[0]}`
           );
@@ -1028,13 +1026,12 @@ const YPivotQAInspectionOrderData = ({
               ]
             };
 
-            // Update all state at once
             updateState({
               selectedOrders: backendOrderNos,
               orderData: newOrderData,
               inspectionDate: backendInspectionDate,
               inspectionType: backendInspectionType,
-              orderType: "single" // Auto-switch tab to Single
+              orderType: "single"
             });
             orderFetchSuccess = true;
           }
@@ -1042,7 +1039,6 @@ const YPivotQAInspectionOrderData = ({
           (backendOrderType === "multi" || backendOrderType === "batch") &&
           backendOrderNos.length > 0
         ) {
-          // Fetch Multi/Batch Details
           const orderRes = await axios.post(
             `${API_BASE_URL}/api/fincheck-inspection/multiple-order-details`,
             { orderNos: backendOrderNos }
@@ -1053,14 +1049,39 @@ const YPivotQAInspectionOrderData = ({
               orderData: { ...orderRes.data.data, isSingle: false },
               inspectionDate: backendInspectionDate,
               inspectionType: backendInspectionType,
-              orderType: backendOrderType // Auto-switch tab to Multi/Batch
+              orderType: backendOrderType
             });
             orderFetchSuccess = true;
           }
         }
 
         if (orderFetchSuccess) {
-          // Hydrate Quality Plan / Production Status from QR Load
+          // =====================================================
+          // NEW: Fetch the Report Template if we have the ID
+          // =====================================================
+          let selectedTemplate = null;
+          const reportTypeId = reportData.inspectionDetails?.reportTypeId;
+
+          if (reportTypeId) {
+            try {
+              const templateRes = await axios.get(
+                `${API_BASE_URL}/api/qa-template-report-type/${reportTypeId}`
+              );
+              if (templateRes.data.success || templateRes.data) {
+                selectedTemplate = templateRes.data.data || templateRes.data;
+              }
+            } catch (templateErr) {
+              console.warn("Could not fetch template:", templateErr);
+            }
+          }
+
+          // Attach the template to the report data
+          const enrichedReportData = {
+            ...reportData,
+            selectedTemplate: selectedTemplate
+          };
+
+          // Hydrate Quality Plan / Production Status
           if (onQualityPlanChange && reportData.inspectionDetails) {
             onQualityPlanChange({
               productionStatus:
@@ -1073,14 +1094,11 @@ const YPivotQAInspectionOrderData = ({
           // 3. Hydrate Parent State via onSaveComplete
           if (onSaveComplete) {
             onSaveComplete({
-              reportData: reportData,
+              reportData: enrichedReportData,
               isNew: false,
               message: "Report loaded via QR Code"
             });
           }
-          // Note: The parent component (YPivotQAInspection) will handle loading the
-          // report configuration (headers, photos, etc) via its internal useEffect
-          // that watches savedReportData/reportId.
         } else {
           setError("Order data linked to this report could not be found.");
         }
@@ -1092,9 +1110,7 @@ const YPivotQAInspectionOrderData = ({
     } catch (err) {
       console.error("QR Load Error:", err);
       if (err.response && err.response.status === 404) {
-        setError(
-          "Report ID does not exist. This might be a new order, please start a new inspection."
-        );
+        setError("Report ID does not exist.");
       } else {
         setError("Failed to load report data. Please try again.");
       }
