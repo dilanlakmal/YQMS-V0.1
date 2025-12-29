@@ -1232,7 +1232,7 @@ const OPAPage = () => {
                         <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.opa_record_id}
                         </td>
-                                               <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {record.task_no_opa}
                         </td>
                         <td className="px-3 md:px-5 py-2 md:py-3 text-xs md:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">

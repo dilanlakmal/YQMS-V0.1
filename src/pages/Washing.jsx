@@ -665,7 +665,7 @@ const WashingPage = () => {
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400 dark:bg-green-500"></span>
                     </div>
                     <div>
-                                           <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
+                        <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
                         {activeTabData?.label}
                       </p>
                       <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">

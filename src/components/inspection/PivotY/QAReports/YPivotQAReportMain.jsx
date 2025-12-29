@@ -204,9 +204,15 @@ const YPivotQAReportMain = () => {
   };
 
   const handleViewReport = (report) => {
-    console.log("View Report:", report.reportId);
-    // Add your navigation logic here
+    // Open in new tab
+    const url = `/fincheck-reports/view/${report.reportId}`;
+    window.open(url, "_blank");
   };
+
+  //   const handleViewReport = (report) => {
+  //     console.log("View Report:", report.reportId);
+  //     // Add your navigation logic here
+  //   };
 
   const handleDeleteReport = (report) => {
     if (

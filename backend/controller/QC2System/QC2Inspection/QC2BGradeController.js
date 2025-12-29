@@ -1,6 +1,6 @@
 import {
   QC2BGrade,
-  QC2InspectionPassBundle,
+  QC2InspectionPassBundle
 } from "../../MongoDB/dbConnectionController.js";
 
 // --- COMPLETELY FIXED: To save or update B-Grade garment data ---
