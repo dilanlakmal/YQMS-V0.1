@@ -4,7 +4,7 @@ import { object, z } from 'zod';
 
 // Reusable Ollama client to avoid creating it on every request
 const ollamaClient = new Ollama({
-  host:  "http://localhost:11439",
+  host: process.env.OLLAMA_BASE_URL ?? "http://localhost:11439",
   headers: {
     Authorization: `Bearer ${process.env.OLLAMA_API_KEY}`,
   },
