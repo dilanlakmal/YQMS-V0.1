@@ -10,7 +10,7 @@ const ollamaClient = new Ollama({
   },
 });
 
-const LLMTextExtractor = async(text, formatJson, formatSchema) => {
+const LLMTextExtractor = async(text, formatJson) => {
   try {
     const response = await ollamaClient.chat({
       model: "gpt-oss:20b",
