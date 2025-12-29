@@ -277,7 +277,7 @@ function Home() {
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
             description: "Upload/Measurement Settings",
-            version: "0"
+            version: "0.1"
           },
           {
             path: "/qa-templates",
@@ -293,7 +293,7 @@ function Home() {
             image: "assets/Home/Fincheck_Inspection.png",
             title: t("home.y_pivot_inspection"),
             description: "...",
-            version: "0"
+            version: "0.1"
           },
           {
             path: "/fincheck-reports",
@@ -302,7 +302,7 @@ function Home() {
             image: "assets/Home/Fincheck_Reports.png",
             title: t("home.y_pivot_report"),
             description: "...",
-            version: "0"
+            version: "0.1"
           },
           {
             path: "/P88Legacy",
@@ -310,7 +310,7 @@ function Home() {
             image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
             description: "Historical Data",
-            version: "0"
+            version: "0.1"
           }
         ]
       },

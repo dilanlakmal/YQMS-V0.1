@@ -1,74 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import axios from "axios";
-// import { API_BASE_URL } from "../../../../config";
-// import DataTableWOI from "./DataTableWOI";
-// import FilterPaneWOI from "./FilterPaneWOI";
-
-// const IroningLive = () => {
-//   const [tableData, setTableData] = useState([]);
-//   const [totalRecords, setTotalRecords] = useState(0);
-//   const [page, setPage] = useState(1);
-//   const limit = 50;
-
-//   const [filters, setFilters] = useState({
-//     moNo: "",
-//     custStyle: "",
-//     buyer: "",
-//     color: "",
-//     size: "",
-//     empId: ""
-//   });
-
-//   // Fetch ironing data
-//   const fetchIroningData = async (filters = {}, currentPage = page) => {
-//     try {
-//       const response = await axios.get(`${API_BASE_URL}/api/ironing-summary`, {
-//         params: { ...filters, page: currentPage, limit }
-//       });
-//       setTableData(response.data.tableData);
-//       setTotalRecords(response.data.total);
-//     } catch (error) {
-//       console.error("Error fetching ironing data:", error);
-//     }
-//   };
-
-//   // Handle pagination
-//   const handlePageChange = async (newPage) => {
-//     setPage(newPage);
-//     await fetchIroningData(filters, newPage);
-//   };
-
-//   // Initial fetch and auto-refresh
-//   useEffect(() => {
-//     fetchIroningData();
-
-//     const intervalId = setInterval(() => fetchIroningData(filters), 5000);
-//     return () => clearInterval(intervalId);
-//   }, [filters]);
-
-//   return (
-//     <div className="p-6 bg-gray-100 min-h-screen">
-//       <FilterPaneWOI
-//         module="ironing"
-//         empIdField="emp_id_ironing"
-//         filters={filters}
-//         setFilters={setFilters}
-//         fetchData={fetchIroningData}
-//         setPage={setPage}
-//       />
-//       <DataTableWOI
-//         tableData={tableData}
-//         totalRecords={totalRecords}
-//         page={page}
-//         limit={limit}
-//         handlePageChange={handlePageChange}
-//       />
-//     </div>
-//   );
-// };
-
-// export default IroningLive;
-
 import axios from "axios";
 import {
   BarElement,
@@ -97,8 +26,17 @@ import {
   Shirt,
   TrendingDown,
   TrendingUp,
-  X
-} from "lucide-react"; // Added Shirt for Ironing
+  X,
+  Calendar,
+  Users,
+  Package,
+  BarChart3,
+  Eye,
+  EyeOff,
+  RefreshCw,
+  Moon,
+  Sun
+} from "lucide-react";
 import React, {
   useCallback,
   useEffect,
@@ -134,6 +72,7 @@ const normalizeDateStringForAPI_Ironing = (date) => {
     return String(date);
   }
 };
+
 const formatDisplayDate_Ironing = (dateString) => {
   if (!dateString) return "N/A";
   try {
@@ -142,11 +81,24 @@ const formatDisplayDate_Ironing = (dateString) => {
     return String(dateString);
   }
 };
+
 const LoadingSpinner_Ironing = () => (
   <div className="flex justify-center items-center h-32">
-    {" "}
-    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-pink-500"></div>{" "}
+    <div className="relative">
+      <div className="animate-spin rounded-full h-16 w-16 border-4 border-pink-200 dark:border-pink-800"></div>
+      <div className="animate-spin rounded-full h-16 w-16 border-4 border-pink-600 dark:border-pink-400 border-t-transparent absolute top-0 left-0"></div>
+    </div>
   </div>
+);
+
+const DarkModeToggle_Ironing = ({ darkMode, setDarkMode }) => (
+  <button
+    onClick={() => setDarkMode(!darkMode)}
+    className="fixed top-4 right-4 z-50 p-3 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 border border-gray-200 dark:border-gray-700"
+    title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+  >
+    {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+  </button>
 );
 
 const SummaryStatCard_Ironing = ({
@@ -155,9 +107,10 @@ const SummaryStatCard_Ironing = ({
   previousDayValue,
   icon
 }) => {
-  const IconComponent = icon || Shirt; // Default to Shirt icon for Ironing
+  const IconComponent = icon || Shirt;
   const prevValue = previousDayValue || 0;
   const currValue = currentValue || 0;
+
   let percentageChange = 0;
   if (prevValue > 0)
     percentageChange = ((currValue - prevValue) / prevValue) * 100;
@@ -167,45 +120,48 @@ const SummaryStatCard_Ironing = ({
   const isPositive = percentageChange > 0;
   const isNegative = percentageChange < 0;
   const noChange = percentageChange === 0;
+
   const changeColor = isPositive
-    ? "text-green-500"
+    ? "text-emerald-600 dark:text-emerald-400"
     : isNegative
-    ? "text-red-500"
-    : "text-gray-500";
+    ? "text-red-500 dark:text-red-400"
+    : "text-gray-500 dark:text-gray-400";
+
   const ChangeIcon = isPositive ? ArrowUp : isNegative ? ArrowDown : null;
 
   return (
-    <div className="bg-white p-5 shadow-xl rounded-xl border border-gray-200 flex flex-col justify-between min-h-[160px] hover:shadow-2xl transition-shadow duration-300">
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          {" "}
-          <h3 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
+    <div className="group relative bg-gradient-to-br from-white to-gray-50 dark:from-gray-800 dark:to-gray-900 p-6 shadow-lg dark:shadow-gray-900/50 rounded-2xl border border-gray-200 dark:border-gray-700 hover:shadow-2xl dark:hover:shadow-gray-900/70 hover:scale-105 transition-all duration-300 min-h-[180px]">
+      <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-purple-50/50 dark:from-pink-900/20 dark:to-purple-900/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+      
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
             {title}
-          </h3>{" "}
-          <div className="p-2 bg-pink-100 text-pink-600 rounded-lg">
-            {" "}
-            <IconComponent size={20} />{" "}
-          </div>{" "}
+          </h3>
+          <div className="p-3 bg-gradient-to-br from-pink-500 to-pink-600 dark:from-pink-600 dark:to-pink-700 text-white rounded-xl shadow-lg group-hover:shadow-xl transition-shadow duration-300">
+            <IconComponent size={24} />
+          </div>
         </div>
-        <p className="text-3xl font-bold text-gray-800">
+        
+        <p className="text-4xl font-bold text-gray-800 dark:text-gray-100 mb-4">
           {currValue.toLocaleString()}
         </p>
-      </div>
-      <div className="mt-2 pt-2 border-t border-gray-100">
-        <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-500">
-            Prev. Day: {prevValue.toLocaleString()}
-          </span>
-          {!noChange && ChangeIcon && (
-            <span className={`flex items-center font-semibold ${changeColor}`}>
-              {" "}
-              <ChangeIcon size={14} className="mr-0.5" />{" "}
-              {percentageChange.toFixed(1)}%{" "}
+
+        <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-medium">
+              Previous Day: {prevValue.toLocaleString()}
             </span>
-          )}
-          {noChange && (
-            <span className={`font-semibold ${changeColor}`}>0.0%</span>
-          )}
+            {!noChange && ChangeIcon && (
+              <span className={`flex items-center font-bold text-sm ${changeColor}`}>
+                <ChangeIcon size={16} className="mr-1" />
+                {percentageChange.toFixed(1)}%
+              </span>
+            )}
+            {noChange && (
+              <span className={`font-bold text-sm ${changeColor}`}>0.0%</span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -215,28 +171,28 @@ const SummaryStatCard_Ironing = ({
 const InspectorColumnToggleButton_Ironing = ({ label, isActive, onClick }) => (
   <button
     onClick={onClick}
-    className={`flex items-center px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs text-white rounded-md shadow-sm transition-colors duration-150
-                    ${
-                      isActive
-                        ? "bg-green-500 hover:bg-green-600"
-                        : "bg-gray-400 hover:bg-gray-500"
-                    }`}
+    className={`flex items-center px-3 py-2 text-xs font-medium rounded-lg shadow-sm transition-all duration-200 transform hover:scale-105
+                ${
+                  isActive
+                    ? "bg-gradient-to-r from-emerald-500 to-emerald-600 dark:from-emerald-600 dark:to-emerald-700 text-white shadow-emerald-200 dark:shadow-emerald-900/50"
+                    : "bg-gradient-to-r from-gray-400 to-gray-500 dark:from-gray-600 dark:to-gray-700 text-white shadow-gray-200 dark:shadow-gray-900/50"
+                } hover:shadow-lg`}
   >
     {isActive ? (
-      <Check size={12} className="mr-1" />
+      <Check size={14} className="mr-1.5" />
     ) : (
-      <X size={12} className="mr-1" />
+      <X size={14} className="mr-1.5" />
     )}
     {label}
   </button>
 );
 
 const IroningLive = () => {
+  const [darkMode, setDarkMode] = useState(false);
   const [isFilterVisible, setIsFilterVisible] = useState(true);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingFilters, setIsLoadingFilters] = useState(false);
   const [isLoadingHourlyChart, setIsLoadingHourlyChart] = useState(false);
-
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
   const [moNo, setMoNo] = useState(null);
@@ -247,7 +203,6 @@ const IroningLive = () => {
   const [size, setSize] = useState(null);
   const [qcId, setQcId] = useState(null);
   const [appliedFiltersForDisplay, setAppliedFiltersForDisplay] = useState({});
-
   const [filterOptions, setFilterOptions] = useState({
     moNos: [],
     packageNos: [],
@@ -275,10 +230,8 @@ const IroningLive = () => {
     totalRecords: 0,
     limit: 20
   });
-
   const [hourlyChartData, setHourlyChartData] = useState([]);
   const [chartDataType, setChartDataType] = useState("ironing");
-
   const [visibleCols, setVisibleCols] = useState({
     totalIroningQty: true,
     totalBundles: true,
@@ -286,6 +239,15 @@ const IroningLive = () => {
   });
 
   const currentFiltersRef = useRef({});
+
+  // Apply dark mode to document
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   useEffect(() => {
     currentFiltersRef.current = {
@@ -382,14 +344,9 @@ const IroningLive = () => {
   );
 
   const fetchData = useCallback(
-    async (filters = {}, page = 1, isInitialLoad = false) => {
-      if (isInitialLoad) setIsLoading(true);
-
-      const chartPromise = fetchHourlyChartData(filters);
-      const filterOptionsPromise =
-        isInitialLoad || Object.keys(filters).length === 0
-          ? fetchFilterOptions(filters)
-          : Promise.resolve();
+    async (filters = {}, page = 1) => {
+      setIsLoading(true);
+      fetchHourlyChartData(filters);
 
       try {
         const queryParams = {
@@ -397,18 +354,14 @@ const IroningLive = () => {
           page,
           limit: pagination.limit
         };
-        const mainDataPromise = axios.get(
+
+        const response = await axios.get(
           `${API_BASE_URL}/api/ironing/dashboard-data`,
           { params: queryParams }
         );
 
-        const [mainDataResponse] = await Promise.all([
-          mainDataPromise,
-          chartPromise,
-          filterOptionsPromise
-        ]);
+        const data = response.data;
 
-        const data = mainDataResponse.data;
         setSummaryData(
           data.overallSummary || {
             totalIroningQty: 0,
@@ -416,6 +369,7 @@ const IroningLive = () => {
             totalRecheckIroningQty: 0
           }
         );
+
         setPreviousDaySummary(
           data.previousDaySummary || {
             totalIroningQty: 0,
@@ -423,6 +377,7 @@ const IroningLive = () => {
             totalRecheckIroningQty: 0
           }
         );
+
         setInspectorSummary(data.inspectorSummaryData || []);
         setDetailedRecords(data.detailedRecords || []);
         setPagination(
@@ -453,6 +408,7 @@ const IroningLive = () => {
         if (filters.size) displayableFilters["Size"] = filters.size.label;
         if (filters.qcId)
           displayableFilters["QC ID (Ironing)"] = filters.qcId.label;
+
         setAppliedFiltersForDisplay(displayableFilters);
       } catch (error) {
         console.error("Error fetching Ironing dashboard data:", error);
@@ -469,29 +425,33 @@ const IroningLive = () => {
         setInspectorSummary([]);
         setDetailedRecords([]);
       } finally {
-        if (isInitialLoad) setIsLoading(false);
+        setIsLoading(false);
       }
     },
     [
       pagination.limit,
       buildFilterQueryParams,
-      fetchHourlyChartData,
-      fetchFilterOptions
+      fetchHourlyChartData
     ]
   );
 
   useEffect(() => {
-    fetchData(currentFiltersRef.current, 1, true);
+    const initialFilters = currentFiltersRef.current;
+    fetchFilterOptions(initialFilters);
+    fetchData(initialFilters, 1);
+
     const intervalId = setInterval(() => {
-      fetchData(currentFiltersRef.current, pagination.currentPage, false);
+      fetchData(currentFiltersRef.current, pagination.currentPage);
     }, 30000);
+
     return () => clearInterval(intervalId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleApplyFilters = () => {
-    fetchData(currentFiltersRef.current, 1, false);
-    fetchFilterOptions(currentFiltersRef.current);
+    const currentFilters = currentFiltersRef.current;
+    fetchData(currentFilters, 1);
+    fetchFilterOptions(currentFilters);
   };
 
   const handleResetFilters = () => {
@@ -504,25 +464,29 @@ const IroningLive = () => {
     setColor(null);
     setSize(null);
     setQcId(null);
+
     const emptyFilters = {};
     currentFiltersRef.current = emptyFilters;
     setAppliedFiltersForDisplay({});
-    fetchData(emptyFilters, 1, false);
+
+    fetchData(emptyFilters, 1);
     fetchFilterOptions(emptyFilters);
   };
 
   const handlePageChange = (newPage) => {
-    fetchData(currentFiltersRef.current, newPage, false);
+    fetchData(currentFiltersRef.current, newPage);
   };
 
   const handleColToggle = (colName) =>
     setVisibleCols((prev) => ({ ...prev, [colName]: !prev[colName] }));
+
   const handleAddAllCols = () =>
     setVisibleCols({
       totalIroningQty: true,
       totalBundles: true,
       totalRecheckIroningQty: true
     });
+
   const handleClearSomeCols = () =>
     setVisibleCols((prev) => ({
       ...prev,
@@ -533,6 +497,7 @@ const IroningLive = () => {
   const inspectorTableData = useMemo(() => {
     const dataByInspector = {};
     const allDatesSet = new Set();
+
     inspectorSummary.forEach((item) => {
       if (!dataByInspector[item.emp_id]) {
         dataByInspector[item.emp_id] = {
@@ -541,51 +506,98 @@ const IroningLive = () => {
           dates: {}
         };
       }
+
       const displayDate = formatDisplayDate_Ironing(item.date);
       allDatesSet.add(displayDate);
+
       dataByInspector[item.emp_id].dates[displayDate] = {
         totalIroningQty: item.dailyIroningQty,
         totalBundles: item.dailyBundles,
         totalRecheckIroningQty: item.dailyRecheckIroningQty
       };
     });
+
     const sortedDates = Array.from(allDatesSet).sort(
       (a, b) => new Date(a) - new Date(b)
     );
+
     return { data: Object.values(dataByInspector), sortedDates };
   }, [inspectorSummary]);
 
   const selectStyles = {
-    control: (p) => ({
-      ...p,
-      minHeight: "38px",
-      height: "38px",
-      borderColor: "#D1D5DB",
-      borderRadius: "0.375rem",
-      boxShadow: "0 1px 2px 0 rgb(0 0 0 / 0.05)"
+    control: (provided, state) => ({
+      ...provided,
+      minHeight: "42px",
+      height: "42px",
+      borderColor: state.isFocused ? "#EC4899" : (darkMode ? "#4B5563" : "#D1D5DB"),
+      borderRadius: "0.75rem",
+      boxShadow: state.isFocused ? "0 0 0 3px rgba(236, 72, 153, 0.1)" : "0 1px 3px 0 rgb(0 0 0 / 0.1)",
+      borderWidth: "2px",
+      backgroundColor: darkMode ? "#374151" : "white",
+      "&:hover": {
+        borderColor: "#EC4899"
+      }
     }),
-    valueContainer: (p) => ({ ...p, height: "38px", padding: "0 8px" }),
-    input: (p) => ({ ...p, margin: "0px" }),
+    valueContainer: (provided) => ({ 
+      ...provided, 
+      height: "42px", 
+      padding: "0 12px" 
+    }),
+    input: (provided) => ({ 
+      ...provided, 
+      margin: "0px",
+      color: darkMode ? "#F9FAFB" : "#111827"
+    }),
+    singleValue: (provided) => ({
+      ...provided,
+      color: darkMode ? "#F9FAFB" : "#111827"
+    }),
     indicatorSeparator: () => ({ display: "none" }),
-    indicatorsContainer: (p) => ({ ...p, height: "38px" }),
-    menu: (p) => ({ ...p, zIndex: 9999 })
+    indicatorsContainer: (provided) => ({ ...provided, height: "42px" }),
+    menu: (provided) => ({ 
+      ...provided, 
+      zIndex: 9999,
+      borderRadius: "0.75rem",
+      boxShadow: "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 10px 10px -5px rgb(0 0 0 / 0.04)",
+      backgroundColor: darkMode ? "#374151" : "white",
+      border: darkMode ? "1px solid #4B5563" : "1px solid #E5E7EB"
+    }),
+    option: (provided, state) => ({
+      ...provided,
+      backgroundColor: state.isSelected 
+        ? "#EC4899" 
+        : state.isFocused 
+        ? (darkMode ? "#4B5563" : "#FDF2F8")
+        : (darkMode ? "#374151" : "white"),
+      color: state.isSelected ? "white" : (darkMode ? "#F9FAFB" : "#374151"),
+      "&:hover": {
+        backgroundColor: state.isSelected ? "#EC4899" : (darkMode ? "#4B5563" : "#FDF2F8")
+      }
+    }),
+    placeholder: (provided) => ({
+      ...provided,
+      color: darkMode ? "#9CA3AF" : "#6B7280"
+    })
   };
+
   const datePickerClass =
-    "w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm h-[38px]";
+    "w-full p-3 border-2 border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded-xl shadow-sm focus:ring-pink-500 focus:border-pink-500 text-sm h-[42px] transition-all duration-200 hover:border-pink-400 dark:hover:border-pink-500";
 
   const filterFields = [
     {
       label: "Start Date",
       state: startDate,
       setState: setStartDate,
-      type: "date"
+      type: "date",
+      icon: Calendar
     },
     {
       label: "End Date",
       state: endDate,
       setState: setEndDate,
       type: "date",
-      minDate: startDate
+      minDate: startDate,
+      icon: Calendar
     },
     {
       label: "MO No",
@@ -593,7 +605,8 @@ const IroningLive = () => {
       setState: setMoNo,
       options: filterOptions.moNos,
       type: "select",
-      placeholder: "Select MO..."
+      placeholder: "Select MO...",
+      icon: Package
     },
     {
       label: "Package No",
@@ -601,15 +614,17 @@ const IroningLive = () => {
       setState: setPackageNo,
       options: filterOptions.packageNos,
       type: "select",
-      placeholder: "Select Pkg..."
+      placeholder: "Select Package...",
+      icon: Package
     },
     {
-      label: "Cust. Style",
+      label: "Customer Style",
       state: custStyle,
       setState: setCustStyle,
       options: filterOptions.custStyles,
       type: "select",
-      placeholder: "Select Style..."
+      placeholder: "Select Style...",
+      icon: Package
     },
     {
       label: "Buyer",
@@ -617,7 +632,8 @@ const IroningLive = () => {
       setState: setBuyer,
       options: filterOptions.buyers,
       type: "select",
-      placeholder: "Select Buyer..."
+      placeholder: "Select Buyer...",
+      icon: Users
     },
     {
       label: "Color",
@@ -625,7 +641,8 @@ const IroningLive = () => {
       setState: setColor,
       options: filterOptions.colors,
       type: "select",
-      placeholder: "Select Color..."
+      placeholder: "Select Color...",
+      icon: Package
     },
     {
       label: "Size",
@@ -633,7 +650,8 @@ const IroningLive = () => {
       setState: setSize,
       options: filterOptions.sizes,
       type: "select",
-      placeholder: "Select Size..."
+      placeholder: "Select Size...",
+      icon: Package
     },
     {
       label: "QC ID (Ironing)",
@@ -641,7 +659,8 @@ const IroningLive = () => {
       setState: setQcId,
       options: filterOptions.qcIds,
       type: "select",
-      placeholder: "Select QC..."
+      placeholder: "Select QC...",
+      icon: Users
     }
   ];
 
@@ -664,7 +683,9 @@ const IroningLive = () => {
         display: true,
         text: `Hourly ${
           chartDataType === "ironing" ? "Ironing Qty" : "Bundle Count"
-        }`
+        }`,
+        font: { size: 16, weight: 'bold' },
+        color: darkMode ? '#F9FAFB' : '#374151'
       },
       datalabels: {
         anchor: "end",
@@ -675,9 +696,11 @@ const IroningLive = () => {
             chartDataType === "ironing"
               ? parseFloat(item.ironingQtyChange)
               : parseFloat(item.bundleQtyChange);
+
           let changeStr = "";
           if (change > 0) changeStr = ` ▲${change.toFixed(1)}%`;
           else if (change < 0) changeStr = ` ▼${Math.abs(change).toFixed(1)}%`;
+
           return `${value.toLocaleString()}${changeStr}`;
         },
         color: (context) => {
@@ -686,19 +709,33 @@ const IroningLive = () => {
             chartDataType === "ironing"
               ? parseFloat(item.ironingQtyChange)
               : parseFloat(item.bundleQtyChange);
-          return change < 0 ? "#EF4444" : change > 0 ? "#22C55E" : "#6B7280";
+
+          return change < 0 ? "#EF4444" : change > 0 ? "#22C55E" : (darkMode ? "#9CA3AF" : "#6B7280");
         },
-        font: { size: 10 }
+        font: { size: 11, weight: 'bold' }
       }
     },
     scales: {
       x: {
-        title: { display: true, text: "Hour of Day" },
-        grid: { display: false }
+        title: { 
+          display: true, 
+          text: "Hour of Day",
+          font: { size: 14, weight: 'bold' },
+          color: darkMode ? '#F9FAFB' : '#374151'
+        },
+        grid: { display: false },
+        ticks: { color: darkMode ? '#9CA3AF' : '#6B7280' }
       },
       y: {
-        title: { display: true, text: "Total Quantity" },
-        beginAtZero: true
+        title: { 
+          display: true, 
+          text: "Total Quantity",
+          font: { size: 14, weight: 'bold' },
+          color: darkMode ? '#F9FAFB' : '#374151'
+        },
+        beginAtZero: true,
+        grid: { color: darkMode ? '#374151' : '#F3F4F6' },
+        ticks: { color: darkMode ? '#9CA3AF' : '#6B7280' }
       }
     }
   };
@@ -712,507 +749,581 @@ const IroningLive = () => {
         data: hourlyChartData.map((d) =>
           chartDataType === "ironing" ? d.totalIroningQty : d.totalBundles
         ),
-        backgroundColor:
-          chartDataType === "ironing"
-            ? "rgba(236, 72, 153, 0.6)"
-            : "rgba(168, 85, 247, 0.6)",
-        borderColor:
-          chartDataType === "ironing"
-            ? "rgba(236, 72, 153, 1)"
-            : "rgba(168, 85, 247, 1)",
-        borderWidth: 1
+        backgroundColor: chartDataType === "ironing"
+          ? (darkMode ? "rgba(236, 72, 153, 0.8)" : "rgba(236, 72, 153, 0.8)")
+          : (darkMode ? "rgba(168, 85, 247, 0.8)" : "rgba(168, 85, 247, 0.8)"),
+        borderColor: chartDataType === "ironing"
+          ? (darkMode ? "rgba(236, 72, 153, 1)" : "rgba(236, 72, 153, 1)")
+          : (darkMode ? "rgba(168, 85, 247, 1)" : "rgba(168, 85, 247, 1)"),
+        borderWidth: 2,
+        borderRadius: 8,
+        borderSkipped: false,
       }
     ]
   };
 
-  if (isLoading && !detailedRecords.length) {
-    return (
-      <div className="flex justify-center items-center min-h-screen">
-        <LoadingSpinner_Ironing />
-      </div>
-    );
-  }
-
   return (
-    <div className="p-2 md:p-4 bg-gray-50 min-h-screen max-w-[2350px]">
-      <header className="mb-4 md:mb-6">
-        {" "}
-        <h1 className="text-lg md:text-2xl font-semibold text-gray-800 text-center">
-          {" "}
-          Yorkmars (Cambodia) Garment MFG Co., LTD | Ironing Live Dashboard{" "}
-        </h1>{" "}
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-pink-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 transition-colors duration-300">
+      {/* Dark Mode Toggle */}
+      <DarkModeToggle_Ironing darkMode={darkMode} setDarkMode={setDarkMode} />
 
-      <button
-        onClick={() => setIsFilterVisible(!isFilterVisible)}
-        className="mb-4 px-3 py-1.5 md:px-4 md:py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 flex items-center text-xs md:text-sm shadow-md"
-      >
-        {" "}
-        <FilterIcon size={16} className="mr-1 md:mr-2" />{" "}
-        {isFilterVisible ? "Hide Filters" : "Show Filters"}{" "}
-        {isFilterVisible ? (
-          <ChevronDown size={16} className="ml-1" />
-        ) : (
-          <ChevronRight size={16} className="ml-1" />
-        )}{" "}
-      </button>
-
-      {isFilterVisible && (
-        <div className="mb-4 md:mb-6 p-3 md:p-4 bg-white shadow-lg rounded-lg border border-gray-200">
-          <div className="flex flex-nowrap gap-x-3 md:gap-x-4 overflow-x-auto pb-2 custom-scrollbar">
-            {" "}
-            {filterFields.map((f) => (
-              <div key={f.label} className="flex-shrink-0 w-36 md:w-48 lg:w-56">
-                {" "}
-                <label
-                  className="block text-xs font-medium text-gray-700 mb-1 truncate"
-                  title={f.label}
-                >
-                  {f.label}
-                </label>{" "}
-                {f.type === "date" ? (
-                  <DatePicker
-                    selected={f.state}
-                    onChange={f.setState}
-                    dateFormat="MM/dd/yyyy"
-                    className={datePickerClass}
-                    placeholderText="MM/DD/YYYY"
-                    minDate={f.minDate}
-                    isClearable
-                    wrapperClassName="w-full"
-                  />
-                ) : (
-                  <Select
-                    options={f.options}
-                    value={f.state}
-                    onChange={f.setState}
-                    placeholder={f.placeholder || `Select...`}
-                    isClearable
-                    isLoading={isLoadingFilters}
-                    styles={selectStyles}
-                    menuPosition="fixed"
-                    classNamePrefix="react-select"
-                  />
-                )}{" "}
-              </div>
-            ))}{" "}
-          </div>{" "}
-          <div className="mt-3 md:mt-4 flex flex-col sm:flex-row justify-end items-center space-y-2 sm:space-y-0 sm:space-x-2 md:space-x-3">
-            {" "}
-            <button
-              onClick={handleApplyFilters}
-              disabled={isLoadingFilters}
-              className="w-full sm:w-auto px-4 py-1.5 md:px-6 md:py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center justify-center text-xs md:text-sm shadow-md disabled:opacity-60"
-            >
-              {" "}
-              <SearchIcon size={16} className="mr-1 md:mr-2" /> Apply{" "}
-            </button>{" "}
-            <button
-              onClick={handleResetFilters}
-              disabled={isLoadingFilters}
-              className="w-full sm:w-auto p-2 md:p-2.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 shadow-md disabled:opacity-60"
-              title="Clear Filters"
-            >
-              {" "}
-              <RotateCcw size={16} />{" "}
-            </button>{" "}
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700 transition-colors duration-300">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+              Yorkmars (Cambodia) Garment MFG Co., LTD
+            </h1>
+            <p className="text-lg text-pink-600 dark:text-pink-400 font-semibold">
+              Ironing Live Dashboard
+            </p>
           </div>
         </div>
-      )}
+      </div>
 
-      {isLoading && detailedRecords.length > 0 && (
-        <div className="fixed top-0 left-0 w-full h-full flex justify-center items-center bg-gray-500 bg-opacity-50 z-50">
-          <LoadingSpinner_Ironing />
-        </div>
-      )}
-
-      {(!isLoading || detailedRecords.length > 0) && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 mb-4 md:mb-8">
-            <SummaryStatCard_Ironing
-              title="Total Ironing Qty"
-              currentValue={summaryData.totalIroningQty}
-              previousDayValue={previousDaySummary.totalIroningQty}
-              icon={TrendingUp}
-            />
-            <SummaryStatCard_Ironing
-              title="Total Bundles"
-              currentValue={summaryData.totalBundles}
-              previousDayValue={previousDaySummary.totalBundles}
-              icon={TrendingUp}
-            />
-            <SummaryStatCard_Ironing
-              title="Total Re-Check Ironing Qty"
-              currentValue={summaryData.totalRecheckIroningQty}
-              previousDayValue={previousDaySummary.totalRecheckIroningQty}
-              icon={TrendingDown}
-            />
-          </div>
-
-          <div className="mb-4 md:mb-8 p-3 md:p-4 bg-white shadow-xl rounded-xl border border-gray-200">
-            <h2 className="text-base md:text-xl font-semibold text-gray-700 mb-2">
-              Ironing Qty Summary by Inspector
-            </h2>
-            {Object.keys(appliedFiltersForDisplay).length > 0 && (
-              <div className="mb-2 md:mb-3 text-[10px] md:text-xs text-gray-500 italic">
-                {" "}
-                Filters:{" "}
-                {Object.entries(appliedFiltersForDisplay)
-                  .map(([k, v]) => `${k}: ${v}`)
-                  .join(", ")}{" "}
-              </div>
-            )}
-            <div className="mb-3 md:mb-4 flex flex-wrap gap-1 md:gap-2 items-center">
-              <button
-                onClick={handleAddAllCols}
-                className="px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs text-white rounded-md shadow-sm bg-blue-500 hover:bg-blue-600"
-              >
-                Add All
-              </button>
-              <button
-                onClick={handleClearSomeCols}
-                className="px-2 py-1 md:px-3 md:py-1.5 text-[10px] md:text-xs text-white rounded-md shadow-sm bg-orange-500 hover:bg-orange-600"
-              >
-                Clear Some
-              </button>
-              <div className="flex gap-1 md:gap-2 ml-auto">
-                <InspectorColumnToggleButton_Ironing
-                  label="Ironing Qty"
-                  isActive={visibleCols.totalIroningQty}
-                  onClick={() => handleColToggle("totalIroningQty")}
-                />
-                <InspectorColumnToggleButton_Ironing
-                  label="Bundles"
-                  isActive={visibleCols.totalBundles}
-                  onClick={() => handleColToggle("totalBundles")}
-                />
-                <InspectorColumnToggleButton_Ironing
-                  label="Re-Check"
-                  isActive={visibleCols.totalRecheckIroningQty}
-                  onClick={() => handleColToggle("totalRecheckIroningQty")}
-                />
-              </div>
-            </div>
-            <div className="overflow-x-auto custom-scrollbar text-[11px] md:text-sm">
-              <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-md overflow-hidden">
-                <thead className="bg-gray-100">
-                  <tr className="text-gray-600 uppercase text-xs tracking-wider">
-                    <th className="px-2 py-2 md:px-3 md:py-3 text-left font-semibold border-r sticky left-0 bg-gray-100 z-20 min-w-[80px] md:min-w-[100px]">
-                      Emp ID
-                    </th>
-                    <th className="px-2 py-2 md:px-3 md:py-3 text-left font-semibold border-r sticky left-[calc(var(--emp-id-width,80px)+1px)] md:left-[calc(var(--emp-id-width-md,100px)+1px)] bg-gray-100 z-20 min-w-[120px] md:min-w-[150px]">
-                      Emp Name
-                    </th>
-                    {inspectorTableData.sortedDates.map((date) => (
-                      <th
-                        key={date}
-                        colSpan={
-                          Object.values(visibleCols).filter((v) => v).length ||
-                          1
-                        }
-                        className="px-1 py-2 md:px-1 md:py-3 text-center font-semibold border-r min-w-[120px] md:min-w-[150px]"
-                      >
-                        {date}
-                        {Object.values(visibleCols).filter((v) => v).length >
-                          0 && (
-                          <div className="flex justify-around mt-0.5 md:mt-1 text-[9px] md:text-[10px] font-normal normal-case text-gray-500">
-                            {visibleCols.totalIroningQty && (
-                              <span className="w-1/3 text-center px-0.5">
-                                Iron
-                              </span>
-                            )}
-                            {visibleCols.totalBundles && (
-                              <span className="w-1/3 text-center px-0.5">
-                                Bundle
-                              </span>
-                            )}
-                            {visibleCols.totalRecheckIroningQty && (
-                              <span className="w-1/3 text-center px-0.5">
-                                Re-Chk
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {inspectorTableData.data.length > 0 ? (
-                    inspectorTableData.data.map((inspector) => (
-                      <tr
-                        key={inspector.emp_id}
-                        className="hover:bg-pink-50 transition-colors duration-150"
-                      >
-                        <td
-                          className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-0 bg-white hover:bg-pink-50 z-10"
-                          style={{
-                            width: "var(--emp-id-width, 80px)",
-                            minWidth: "var(--emp-id-width, 80px)"
-                          }}
-                        >
-                          {inspector.emp_id}
-                        </td>
-                        <td
-                          className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-[calc(var(--emp-id-width,80px)+1px)] md:left-[calc(var(--emp-id-width-md,100px)+1px)] bg-white hover:bg-pink-50 z-10"
-                          style={{
-                            width: "var(--emp-name-width, 120px)",
-                            minWidth: "var(--emp-name-width, 120px)"
-                          }}
-                        >
-                          {inspector.eng_name}
-                        </td>
-                        {inspectorTableData.sortedDates.map((date) => {
-                          const dayData = inspector.dates[date] || {};
-                          const hasVisibleCols = Object.values(
-                            visibleCols
-                          ).some((v) => v);
-                          return hasVisibleCols ? (
-                            <React.Fragment key={`${inspector.emp_id}-${date}`}>
-                              {visibleCols.totalIroningQty && (
-                                <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
-                                  {dayData.totalIroningQty || 0}
-                                </td>
-                              )}
-                              {visibleCols.totalBundles && (
-                                <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
-                                  {dayData.totalBundles || 0}
-                                </td>
-                              )}
-                              {visibleCols.totalRecheckIroningQty && (
-                                <td className="px-1 py-1.5 md:px-1 md:py-2 text-center border-r">
-                                  {dayData.totalRecheckIroningQty || 0}
-                                </td>
-                              )}
-                            </React.Fragment>
-                          ) : (
-                            <td
-                              key={`${inspector.emp_id}-${date}-empty`}
-                              className="px-1 py-1.5 md:px-1 md:py-2 text-center text-gray-400 border-r"
-                            >
-                              -
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={
-                          2 +
-                          inspectorTableData.sortedDates.length *
-                            (Object.values(visibleCols).filter((v) => v)
-                              .length || 1)
-                        }
-                        className="text-center py-4 text-gray-500"
-                      >
-                        No summary data available for selected filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="mb-4 md:mb-8 p-3 md:p-4 bg-white shadow-xl rounded-xl border border-gray-200">
-            <div className="flex justify-between items-center mb-3">
-              <h2 className="text-base md:text-xl font-semibold text-gray-700">
-                Hourly Performance (Ironing)
-              </h2>
-              <div className="flex space-x-1">
-                <button
-                  onClick={() => setChartDataType("ironing")}
-                  className={`px-2 py-1 text-xs rounded-md ${
-                    chartDataType === "ironing"
-                      ? "bg-pink-500 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-                >
-                  Ironing Qty
-                </button>
-                <button
-                  onClick={() => setChartDataType("bundle")}
-                  className={`px-2 py-1 text-xs rounded-md ${
-                    chartDataType === "bundle"
-                      ? "bg-purple-500 text-white"
-                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                  }`}
-                >
-                  Bundle Count
-                </button>
-              </div>
-            </div>
-            {isLoadingHourlyChart ? (
-              <LoadingSpinner_Ironing />
-            ) : hourlyChartData.length > 0 ? (
-              <div className="h-[300px] md:h-[400px]">
-                <Bar
-                  options={hourlyBarChartOptions_Ironing}
-                  data={preparedHourlyChartData_Ironing}
-                />
-              </div>
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filter Toggle Button */}
+        <div className="mb-8">
+          <button
+            onClick={() => setIsFilterVisible(!isFilterVisible)}
+            className="group flex items-center px-6 py-3 bg-gradient-to-r from-pink-600 to-pink-700 dark:from-pink-700 dark:to-pink-800 text-white rounded-xl hover:from-pink-700 hover:to-pink-800 dark:hover:from-pink-800 dark:hover:to-pink-900 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
+          >
+            <FilterIcon size={20} className="mr-3" />
+            <span className="font-semibold">
+              {isFilterVisible ? "Hide Filters" : "Show Filters"}
+            </span>
+            {isFilterVisible ? (
+              <ChevronDown size={20} className="ml-2 group-hover:rotate-180 transition-transform duration-300" />
             ) : (
-              <p className="text-center text-gray-500 py-8">
-                No hourly Ironing data available for selected filters.
-              </p>
+              <ChevronRight size={20} className="ml-2 group-hover:translate-x-1 transition-transform duration-300" />
             )}
-          </div>
+          </button>
+        </div>
 
-          <div className="p-3 md:p-4 bg-white shadow-xl rounded-xl border border-gray-200">
-            <h2 className="text-base md:text-xl font-semibold text-gray-700 mb-3 md:mb-4">
-              Detailed Ironing Records
-            </h2>
-            <div className="overflow-x-auto max-h-[500px] md:max-h-[600px] custom-scrollbar text-[11px] md:text-sm">
-              <table className="min-w-full divide-y divide-gray-200 border border-gray-300 rounded-md overflow-hidden">
-                <thead className="bg-gray-100 sticky top-0 z-10">
-                  <tr className="text-gray-600 uppercase text-xs tracking-wider">
-                    {[
-                      "Insp. Date",
-                      "Emp ID",
-                      "Emp Name",
-                      "Dept.",
-                      "MO No",
-                      "Pkg No",
-                      "Cust. Style",
-                      "Buyer",
-                      "Color",
-                      "Size",
-                      "Insp. Time",
-                      "Iron Qty",
-                      "Bundles",
-                      "Re-Chk Qty"
-                    ].map((h, idx) => (
-                      <th
-                        key={h}
-                        className={`px-2 py-2 md:px-3 md:py-3 text-left font-semibold border-r whitespace-nowrap ${
-                          idx === 0
-                            ? "sticky left-0 bg-gray-100 z-20 min-w-[90px] md:min-w-[100px]"
-                            : ""
-                        }`}
+        {/* Filter Panel */}
+        {isFilterVisible && (
+          <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+            <div className="bg-gradient-to-r from-gray-50 to-pink-50 dark:from-gray-700 dark:to-gray-600 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 flex items-center">
+                <FilterIcon size={20} className="mr-2 text-pink-600 dark:text-pink-400" />
+                Filter Options
+              </h3>
+            </div>
+            
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-10 gap-6">
+                {filterFields.map((field) => {
+                  const IconComponent = field.icon;
+                  return (
+                    <div key={field.label} className="space-y-2">
+                      <label className="flex items-center text-sm font-semibold text-gray-700 dark:text-gray-300">
+                        <IconComponent size={16} className="mr-2 text-pink-600 dark:text-pink-400" />
+                        {field.label}
+                      </label>
+                      {field.type === "date" ? (
+                        <DatePicker
+                          selected={field.state}
+                          onChange={field.setState}
+                          dateFormat="MM/dd/yyyy"
+                          className={datePickerClass}
+                          placeholderText="Select date..."
+                          minDate={field.minDate}
+                          isClearable
+                          wrapperClassName="w-full"
+                        />
+                      ) : (
+                        <Select
+                          options={field.options}
+                          value={field.state}
+                          onChange={field.setState}
+                          placeholder={field.placeholder}
+                          isClearable
+                          isLoading={isLoadingFilters}
+                          styles={selectStyles}
+                          menuPosition="fixed"
+                          classNamePrefix="react-select"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Applied Filters Display */}
+              {Object.keys(appliedFiltersForDisplay).length > 0 && (
+                <div className="mt-6 p-4 bg-pink-50 dark:bg-pink-900/30 rounded-xl border border-pink-200 dark:border-pink-700">
+                  <h4 className="text-sm font-semibold text-pink-800 dark:text-pink-300 mb-2">Applied Filters:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {Object.entries(appliedFiltersForDisplay).map(([key, value]) => (
+                      <span
+                        key={key}
+                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-pink-100 dark:bg-pink-800 text-pink-800 dark:text-pink-200 border border-pink-200 dark:border-pink-600"
                       >
-                        {h}
-                      </th>
+                        {key}: {value}
+                      </span>
                     ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {detailedRecords.length > 0 ? (
-                    detailedRecords.map((record, index) => (
-                      <tr
-                        key={index}
-                        className="hover:bg-pink-50 transition-colors duration-150"
-                      >
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r sticky left-0 bg-white hover:bg-pink-50 z-0">
-                          {formatDisplayDate_Ironing(
-                            record.ironing_updated_date
-                          )}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.emp_id_ironing}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.eng_name_ironing || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.dept_name_ironing || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.selectedMono || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.package_no}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.custStyle || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.buyer || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.color || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.size || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r">
-                          {record.ironing_update_time || "N/A"}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r text-center">
-                          {record.ironingQty || 0}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r text-center">
-                          {1}
-                        </td>
-                        <td className="px-2 py-1.5 md:px-3 md:py-2 whitespace-nowrap border-r text-center">
-                          {record.recheckIroningQty || 0}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="mt-6 flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-4">
+                <button
+                  onClick={handleResetFilters}
+                  disabled={isLoading || isLoadingFilters}
+                  className="flex items-center justify-center px-6 py-3 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-xl hover:bg-gray-200 dark:hover:bg-gray-600 shadow-md hover:shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <RotateCcw size={18} className="mr-2" />
+                  <span className="font-semibold">Reset Filters</span>
+                </button>
+                
+                <button
+                  onClick={handleApplyFilters}
+                  disabled={isLoading || isLoadingFilters}
+                  className="flex items-center justify-center px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 dark:from-emerald-700 dark:to-emerald-800 text-white rounded-xl hover:from-emerald-700 hover:to-emerald-800 dark:hover:from-emerald-800 dark:hover:to-emerald-900 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isLoading || isLoadingFilters ? (
+                    <RefreshCw size={18} className="mr-2 animate-spin" />
+                  ) : (
+                    <SearchIcon size={18} className="mr-2" />
+                  )}
+                  <span className="font-semibold">Apply Filters</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 transition-colors duration-300">
+            <LoadingSpinner_Ironing />
+            <p className="text-center text-gray-600 dark:text-gray-400 mt-4 font-medium">Loading dashboard data...</p>
+          </div>
+        )}
+
+        {!isLoading && (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
+              <SummaryStatCard_Ironing
+                title="Total Ironing Qty"
+                currentValue={summaryData.totalIroningQty}
+                previousDayValue={previousDaySummary.totalIroningQty}
+                icon={TrendingUp}
+              />
+              <SummaryStatCard_Ironing
+                title="Total Bundles"
+                currentValue={summaryData.totalBundles}
+                previousDayValue={previousDaySummary.totalBundles}
+                icon={Package}
+              />
+              <SummaryStatCard_Ironing
+                title="Total Re-Check Ironing Qty"
+                currentValue={summaryData.totalRecheckIroningQty}
+                previousDayValue={previousDaySummary.totalRecheckIroningQty}
+                icon={TrendingDown}
+              />
+            </div>
+
+            {/* Inspector Summary Table */}
+            <div className="mb-10 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+              <div className="bg-gradient-to-r from-gray-50 to-pink-50 dark:from-gray-700 dark:to-gray-600 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                    <Users size={24} className="mr-3 text-pink-600 dark:text-pink-400" />
+                    Ironing Qty Summary by Inspector
+                  </h2>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {/* Column Toggle Controls */}
+                <div className="mb-6 flex flex-wrap items-center gap-3">
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={handleAddAllCols}
+                      className="flex items-center px-4 py-2 bg-gradient-to-r from-pink-500 to-pink-600 dark:from-pink-600 dark:to-pink-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                    >
+                      <Eye size={16} className="mr-2" />
+                      <span className="font-medium">Show All</span>
+                    </button>
+                    
+                    <button
+                      onClick={handleClearSomeCols}
+                      className="flex items-center px-4 py-2 bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 transform hover:scale-105"
+                    >
+                      <EyeOff size={16} className="mr-2" />
+                      <span className="font-medium">Hide Some</span>
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2 ml-auto">
+                    <InspectorColumnToggleButton_Ironing
+                      label="Ironing Qty"
+                      isActive={visibleCols.totalIroningQty}
+                      onClick={() => handleColToggle("totalIroningQty")}
+                    />
+                    <InspectorColumnToggleButton_Ironing
+                      label="Bundles"
+                      isActive={visibleCols.totalBundles}
+                      onClick={() => handleColToggle("totalBundles")}
+                    />
+                    <InspectorColumnToggleButton_Ironing
+                      label="Re-Check"
+                      isActive={visibleCols.totalRecheckIroningQty}
+                      onClick={() => handleColToggle("totalRecheckIroningQty")}
+                    />
+                  </div>
+                </div>
+
+                {/* Inspector Table */}
+                <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-600 shadow-sm">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                    <thead className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600">
+                      <tr>
+                        <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 z-20 border-r border-gray-300 dark:border-gray-500">
+                          Employee ID
+                        </th>
+                        <th className="px-4 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider sticky left-[120px] bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 z-20 border-r border-gray-300 dark:border-gray-500">
+                          Employee Name
+                        </th>
+                        {inspectorTableData.sortedDates.map((date) => (
+                          <th
+                            key={date}
+                            colSpan={Object.values(visibleCols).filter((v) => v).length || 1}
+                            className="px-4 py-4 text-center text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-300 dark:border-gray-500"
+                          >
+                            <div className="font-semibold text-gray-800 dark:text-gray-200">{date}</div>
+                            {Object.values(visibleCols).filter((v) => v).length > 0 && (
+                              <div className="flex justify-around mt-2 text-[10px] font-medium text-gray-600 dark:text-gray-400 space-x-1">
+                                {visibleCols.totalIroningQty && (
+                                  <span className="bg-pink-100 dark:bg-pink-800 text-pink-800 dark:text-pink-200 px-2 py-1 rounded-md">Iron</span>
+                                )}
+                                {visibleCols.totalBundles && (
+                                  <span className="bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 px-2 py-1 rounded-md">Bundle</span>
+                                )}
+                                {visibleCols.totalRecheckIroningQty && (
+                                  <span className="bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 px-2 py-1 rounded-md">Re-Chk</span>
+                                )}
+                              </div>
+                            )}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                      {inspectorTableData.data.length > 0 ? (
+                        inspectorTableData.data.map((inspector, index) => (
+                          <tr
+                            key={inspector.emp_id}
+                            className={`hover:bg-pink-50 dark:hover:bg-pink-900/30 transition-colors duration-200 ${
+                              index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-750'
+                            }`}
+                          >
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-900 dark:text-gray-100 sticky left-0 bg-inherit border-r border-gray-200 dark:border-gray-600 z-10">
+                              {inspector.emp_id}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 sticky left-[120px] bg-inherit border-r border-gray-200 dark:border-gray-600 z-10">
+                              {inspector.eng_name}
+                            </td>
+                            {inspectorTableData.sortedDates.map((date) => {
+                              const dayData = inspector.dates[date] || {};
+                              const hasVisibleCols = Object.values(visibleCols).some((v) => v);
+                              return hasVisibleCols ? (
+                                <React.Fragment key={`${inspector.emp_id}-${date}`}>
+                                  {visibleCols.totalIroningQty && (
+                                    <td className="px-3 py-3 text-center text-sm font-medium text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 dark:bg-pink-800 text-pink-800 dark:text-pink-200">
+                                        {dayData.totalIroningQty || 0}
+                                      </span>
+                                    </td>
+                                  )}
+                                  {visibleCols.totalBundles && (
+                                    <td className="px-3 py-3 text-center text-sm font-medium text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200">
+                                        {dayData.totalBundles || 0}
+                                      </span>
+                                    </td>
+                                  )}
+                                  {visibleCols.totalRecheckIroningQty && (
+                                    <td className="px-3 py-3 text-center text-sm font-medium text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600">
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200">
+                                        {dayData.totalRecheckIroningQty || 0}
+                                      </span>
+                                    </td>
+                                  )}
+                                </React.Fragment>
+                              ) : (
+                                <td
+                                  key={`${inspector.emp_id}-${date}-empty`}
+                                  className="px-3 py-3 text-center text-sm text-gray-400 dark:text-gray-500 border-r border-gray-200 dark:border-gray-600"
+                                >
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400">
+                                    -
+                                  </span>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td
+                            colSpan={
+                              2 +
+                              inspectorTableData.sortedDates.length *
+                                (Object.values(visibleCols).filter((v) => v).length || 1)
+                            }
+                            className="text-center py-12 text-gray-500 dark:text-gray-400"
+                          >
+                            <div className="flex flex-col items-center">
+                              <Users size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
+                              <p className="text-lg font-medium">No inspector data available</p>
+                              <p className="text-sm">Try adjusting your filters</p>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+
+            {/* Hourly Performance Chart */}
+            <div className="mb-10 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+              <div className="bg-gradient-to-r from-gray-50 to-pink-50 dark:from-gray-700 dark:to-gray-600 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                    <BarChart3 size={24} className="mr-3 text-pink-600 dark:text-pink-400" />
+                    Hourly Performance (Ironing)
+                  </h2>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => setChartDataType("ironing")}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                        chartDataType === "ironing"
+                          ? "bg-pink-600 dark:bg-pink-700 text-white shadow-lg"
+                          : "bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500"
+                      }`}
+                    >
+                      Ironing Qty
+                    </button>
+                    <button
+                      onClick={() => setChartDataType("bundle")}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                        chartDataType === "bundle"
+                          ? "bg-purple-600 dark:bg-purple-700 text-white shadow-lg"
+                          : "bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500"
+                      }`}
+                    >
+                      Bundle Count
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6">
+                {isLoadingHourlyChart ? (
+                  <div className="h-96 flex items-center justify-center">
+                    <LoadingSpinner_Ironing />
+                  </div>
+                ) : hourlyChartData.length > 0 ? (
+                  <div className="h-96">
+                    <Bar options={hourlyBarChartOptions_Ironing} data={preparedHourlyChartData_Ironing} />
+                  </div>
+                ) : (
+                  <div className="h-96 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400">
+                    <BarChart3 size={64} className="text-gray-300 dark:text-gray-600 mb-4" />
+                    <p className="text-lg font-medium">No hourly ironing data available</p>
+                    <p className="text-sm">Try adjusting your date filters</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Detailed Records Table */}
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+              <div className="bg-gradient-to-r from-gray-50 to-pink-50 dark:from-gray-700 dark:to-gray-600 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+                <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100 flex items-center">
+                  <Shirt size={24} className="mr-3 text-pink-600 dark:text-pink-400" />
+                  Detailed Ironing Records
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  Showing {detailedRecords.length} of {pagination.totalRecords} records
+                </p>
+              </div>
+
+              <div className="overflow-x-auto max-h-[600px]">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
+                  <thead className="bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 sticky top-0 z-10">
+                    <tr>
+                      {[
+                        "Insp. Date",
+                        "Emp ID",
+                        "Emp Name",
+                        "Dept.",
+                        "MO No",
+                        "Pkg No",
+                        "Cust. Style",
+                        "Buyer",
+                        "Color",
+                        "Size",
+                        "Insp. Time",
+                        "Iron Qty",
+                        "Bundles",
+                        "Re-Chk Qty"
+                      ].map((header, index) => (
+                        <th
+                          key={header}
+                          className={`px-4 py-4 text-left text-xs font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-300 dark:border-gray-500 ${
+                            index === 0 ? "sticky left-0 bg-gradient-to-r from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-600 z-20" : ""
+                          }`}
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                    {detailedRecords.length > 0 ? (
+                      detailedRecords.map((record, index) => (
+                        <tr
+                          key={index}
+                          className={`hover:bg-pink-50 dark:hover:bg-pink-900/30 transition-colors duration-200 ${
+                            index % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-750'
+                          }`}
+                        >
+                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-gray-100 sticky left-0 bg-inherit border-r border-gray-200 dark:border-gray-600 z-10">
+                            {formatDisplayDate_Ironing(record.ironing_updated_date)}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-pink-100 dark:bg-pink-800 text-pink-800 dark:text-pink-200">
+                              {record.emp_id_ironing}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.eng_name_ironing || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.dept_name_ironing || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.selectedMono || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.package_no}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.custStyle || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.buyer || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.color || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.size || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 border-r border-gray-200 dark:border-gray-600">
+                            {record.ironing_update_time || "N/A"}
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-r border-gray-200 dark:border-gray-600">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200">
+                              {record.ironingQty || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-r border-gray-200 dark:border-gray-600">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200">
+                              1
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-center border-r border-gray-200 dark:border-gray-600">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200">
+                              {record.recheckIroningQty || 0}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={14} className="text-center py-12 text-gray-500 dark:text-gray-400">
+                          <div className="flex flex-col items-center">
+                            <Shirt size={48} className="text-gray-300 dark:text-gray-600 mb-4" />
+                                                       <p className="text-lg font-medium">No detailed ironing records found</p>
+                            <p className="text-sm">Try adjusting your filters</p>
+                          </div>
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan={14}
-                        className="text-center py-4 text-gray-500"
-                      >
-                        No detailed Ironing records available for selected
-                        filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {pagination.totalPages > 1 && (
-              <div className="mt-3 md:mt-4 flex flex-col sm:flex-row justify-between items-center space-y-2 sm:space-y-0">
-                {" "}
-                <span className="text-[10px] sm:text-xs text-gray-700">
-                  {" "}
-                  Page {pagination.currentPage} of {pagination.totalPages}{" "}
-                  (Total: {pagination.totalRecords} records){" "}
-                </span>{" "}
-                <div className="flex space-x-1">
-                  {" "}
-                  <button
-                    onClick={() => handlePageChange(1)}
-                    disabled={pagination.currentPage === 1}
-                    className="px-2 py-1 md:px-2.5 md:py-1.5 border border-gray-300 text-[10px] md:text-xs rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    First
-                  </button>{" "}
-                  <button
-                    onClick={() => handlePageChange(pagination.currentPage - 1)}
-                    disabled={pagination.currentPage === 1}
-                    className="px-2 py-1 md:px-2.5 md:py-1.5 border border-gray-300 text-[10px] md:text-xs rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronLeft size={14} />
-                  </button>{" "}
-                  <span className="px-2 py-1 md:px-2.5 md:py-1.5 text-[10px] md:text-xs">
-                    Page {pagination.currentPage}
-                  </span>{" "}
-                  <button
-                    onClick={() => handlePageChange(pagination.currentPage + 1)}
-                    disabled={pagination.currentPage === pagination.totalPages}
-                    className="px-2 py-1 md:px-2.5 md:py-1.5 border border-gray-300 text-[10px] md:text-xs rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <ChevronRight size={14} />
-                  </button>{" "}
-                  <button
-                    onClick={() => handlePageChange(pagination.totalPages)}
-                    disabled={pagination.currentPage === pagination.totalPages}
-                    className="px-2 py-1 md:px-2.5 md:py-1.5 border border-gray-300 text-[10px] md:text-xs rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Last
-                  </button>{" "}
-                </div>{" "}
+                    )}
+                  </tbody>
+                </table>
               </div>
-            )}
-          </div>
-        </>
-      )}
+
+              {/* Enhanced Pagination */}
+              {pagination.totalPages > 1 && (
+                <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600">
+                  <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
+                    <div className="text-sm text-gray-700 dark:text-gray-300">
+                      <span className="font-medium">
+                        Page {pagination.currentPage} of {pagination.totalPages}
+                      </span>
+                      <span className="mx-2">•</span>
+                      <span>
+                        Total: <span className="font-medium">{pagination.totalRecords}</span> records
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handlePageChange(1)}
+                        disabled={pagination.currentPage === 1}
+                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      >
+                        First
+                      </button>
+                      
+                      <button
+                        onClick={() => handlePageChange(pagination.currentPage - 1)}
+                        disabled={pagination.currentPage === 1}
+                        className="p-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      >
+                        <ChevronLeft size={16} />
+                      </button>
+                      
+                      <span className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-pink-50 dark:bg-pink-900/50 border border-pink-200 dark:border-pink-700 rounded-lg">
+                        {pagination.currentPage}
+                      </span>
+                      
+                      <button
+                        onClick={() => handlePageChange(pagination.currentPage + 1)}
+                        disabled={pagination.currentPage === pagination.totalPages}
+                        className="p-2 text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                      
+                      <button
+                        onClick={() => handlePageChange(pagination.totalPages)}
+                        disabled={pagination.currentPage === pagination.totalPages}
+                        className="px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-600 border border-gray-300 dark:border-gray-500 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                      >
+                        Last
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
 export default IroningLive;
+
+
