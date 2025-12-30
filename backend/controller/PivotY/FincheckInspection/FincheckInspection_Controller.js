@@ -1184,6 +1184,10 @@ export const updateHeaderData = async (req, res) => {
   }
 };
 
+// ============================================================
+// Update Photo Data (Images, Remarks)
+// ============================================================
+
 // Define Photo Storage Path
 const uploadDirPhoto = path.join(
   __dirname,
@@ -1226,8 +1230,354 @@ const savePhotoBase64Image = (
 };
 
 // ============================================================
-// Update Photo Data (Images, Remarks)
+// Helper: Process and Save Single Image (Async)
 // ============================================================
+const processAndSaveImageAsync = (
+  imgData,
+  reportId,
+  sectionId,
+  itemNo,
+  index
+) => {
+  return new Promise((resolve) => {
+    try {
+      // If already a server URL, just return it
+      if (imgData.imageURL && !imgData.imgSrc) {
+        resolve({
+          imageId:
+            imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
+          imageURL: imgData.imageURL
+        });
+        return;
+      }
+
+      // Check if it's base64
+      const base64Data = imgData.imgSrc || imgData.url;
+      if (!base64Data || !base64Data.startsWith("data:image")) {
+        // Not base64, might be existing URL
+        if (base64Data && base64Data.includes("/storage/")) {
+          resolve({
+            imageId:
+              imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
+            imageURL: base64Data.replace(process.env.API_BASE_URL || "", "")
+          });
+        } else {
+          resolve(null);
+        }
+        return;
+      }
+
+      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+      if (!matches || matches.length !== 3) {
+        resolve(null);
+        return;
+      }
+
+      const type = matches[1];
+      const data = Buffer.from(matches[2], "base64");
+      const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+
+      const filename = `photo_${reportId}_${sectionId}_${itemNo}_${index}_${Date.now()}.${ext}`;
+      const filepath = path.join(uploadDirPhoto, filename);
+
+      // Use async file write
+      fs.writeFile(filepath, data, (err) => {
+        if (err) {
+          console.error("Error writing file:", err);
+          resolve(null);
+          return;
+        }
+
+        resolve({
+          imageId:
+            imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
+          imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`
+        });
+      });
+    } catch (error) {
+      console.error("Error processing image:", error);
+      resolve(null);
+    }
+  });
+};
+
+// ============================================================
+// NEW: Upload Photo Batch - Saves images for ONE item at a time
+// ============================================================
+export const uploadPhotoBatch = async (req, res) => {
+  try {
+    const {
+      reportId,
+      sectionId,
+      sectionName,
+      itemNo,
+      itemName,
+      images, // Array of { id, imgSrc/url, index }
+      remarks // Optional item remark
+    } = req.body;
+
+    // Validation
+    if (!reportId || !sectionId || itemNo === undefined) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: reportId, sectionId, itemNo"
+      });
+    }
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No images provided"
+      });
+    }
+
+    // Limit batch size (max 20 per item based on your Image Editor MAX_IMAGES)
+    if (images.length > 20) {
+      return res.status(400).json({
+        success: false,
+        message: "Maximum 20 images per batch"
+      });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found."
+      });
+    }
+
+    // Process all images in parallel
+    const imagePromises = images.map((img, idx) =>
+      processAndSaveImageAsync(
+        img,
+        reportId,
+        sectionId,
+        itemNo,
+        img.index ?? idx
+      )
+    );
+
+    const processedImages = await Promise.all(imagePromises);
+    const savedImages = processedImages.filter((img) => img && img.imageURL);
+
+    if (savedImages.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "No images could be processed"
+      });
+    }
+
+    // Initialize photoData if empty
+    if (!report.photoData) {
+      report.photoData = [];
+    }
+
+    // Find or create section
+    let sectionIndex = report.photoData.findIndex(
+      (sec) =>
+        sec.sectionId && sec.sectionId.toString() === sectionId.toString()
+    );
+
+    if (sectionIndex === -1) {
+      report.photoData.push({
+        sectionId: sectionId,
+        sectionName: sectionName || "Unknown Section",
+        items: []
+      });
+      sectionIndex = report.photoData.length - 1;
+    }
+
+    const section = report.photoData[sectionIndex];
+
+    // Find or create item
+    let itemIndex = section.items.findIndex(
+      (item) => item.itemNo === parseInt(itemNo)
+    );
+
+    if (itemIndex === -1) {
+      section.items.push({
+        itemNo: parseInt(itemNo),
+        itemName: itemName || `Item ${itemNo}`,
+        remarks: remarks || "",
+        images: savedImages
+      });
+    } else {
+      // Replace all images for this item
+      section.items[itemIndex].images = savedImages;
+
+      // Update remarks if provided
+      if (remarks !== undefined) {
+        section.items[itemIndex].remarks = remarks;
+      }
+    }
+
+    report.markModified("photoData");
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: `${savedImages.length} image(s) saved successfully.`,
+      data: {
+        sectionId,
+        itemNo,
+        savedImages
+      }
+    });
+  } catch (error) {
+    console.error("Error uploading photo batch:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server error while saving images.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// NEW: Delete Single Photo from Item
+// ============================================================
+export const deletePhotoFromItem = async (req, res) => {
+  try {
+    const { reportId, sectionId, itemNo, imageId } = req.body;
+
+    if (!reportId || !sectionId || itemNo === undefined || !imageId) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields"
+      });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    const section = report.photoData?.find(
+      (sec) => sec.sectionId?.toString() === sectionId.toString()
+    );
+
+    if (!section) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Section not found." });
+    }
+
+    const item = section.items?.find((i) => i.itemNo === parseInt(itemNo));
+
+    if (!item) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Item not found." });
+    }
+
+    const imageIndex = item.images.findIndex((img) => img.imageId === imageId);
+
+    if (imageIndex === -1) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Image not found." });
+    }
+
+    const removedImage = item.images[imageIndex];
+    item.images.splice(imageIndex, 1);
+
+    // Delete file from disk (async, don't wait)
+    if (removedImage.imageURL) {
+      const filePath = path.join(__dirname, "../../..", removedImage.imageURL);
+      fs.unlink(filePath, (err) => {
+        if (err) console.log("Could not delete file:", err.message);
+      });
+    }
+
+    report.markModified("photoData");
+    await report.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Image deleted successfully."
+    });
+  } catch (error) {
+    console.error("Error deleting photo:", error);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+};
+
+// ============================================================
+// NEW: Update Photo Item Remark Only
+// ============================================================
+export const updatePhotoItemRemark = async (req, res) => {
+  try {
+    const { reportId, sectionId, sectionName, itemNo, itemName, remarks } =
+      req.body;
+
+    if (!reportId || !sectionId || itemNo === undefined) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    if (!report.photoData) report.photoData = [];
+
+    let section = report.photoData.find(
+      (sec) => sec.sectionId?.toString() === sectionId.toString()
+    );
+
+    if (!section) {
+      report.photoData.push({
+        sectionId,
+        sectionName: sectionName || "Unknown",
+        items: [
+          {
+            itemNo: parseInt(itemNo),
+            itemName: itemName || `Item ${itemNo}`,
+            remarks: remarks || "",
+            images: []
+          }
+        ]
+      });
+    } else {
+      let item = section.items.find((i) => i.itemNo === parseInt(itemNo));
+      if (!item) {
+        section.items.push({
+          itemNo: parseInt(itemNo),
+          itemName: itemName || `Item ${itemNo}`,
+          remarks: remarks || "",
+          images: []
+        });
+      } else {
+        item.remarks = remarks || "";
+      }
+    }
+
+    report.markModified("photoData");
+    await report.save();
+
+    return res.status(200).json({ success: true, message: "Remark updated." });
+  } catch (error) {
+    console.error("Error updating remark:", error);
+    return res.status(500).json({ success: false, message: "Server error." });
+  }
+};
+
 export const updatePhotoData = async (req, res) => {
   try {
     const { reportId, photoData } = req.body;
