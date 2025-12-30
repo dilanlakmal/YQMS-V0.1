@@ -745,6 +745,10 @@ const LiveDashboard = () => {
                         {activeTabData?.label} • Active
                       </p>
                     </div>
+                     <div className="flex items-center gap-1">
+                      <CalendarDays size={14} />
+                      <span>{currentTime.toLocaleDateString()}</span>
+                    </div>
                   </div>
                 </div>
 
@@ -778,14 +782,14 @@ const LiveDashboard = () => {
 
               {/* Date and Time Info */}
               <div className="flex items-center justify-center gap-4 text-white/80 dark:text-gray-300 text-xs">
-                <div className="flex items-center gap-1">
+                {/* <div className="flex items-center gap-1">
                   <CalendarDays size={14} />
                   <span>{currentTime.toLocaleDateString()}</span>
-                </div>
-                <div className="flex items-center gap-1">
+                </div> */}
+                {/* <div className="flex items-center gap-1">
                   <Clock size={14} />
                   <span>{currentTime.toLocaleTimeString()}</span>
-                </div>
+                </div> */}
               </div>
             </div>
 
@@ -820,10 +824,10 @@ const LiveDashboard = () => {
                       <CalendarDays size={16} />
                       <span>{currentTime.toLocaleDateString()}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    {/* <div className="flex items-center gap-2">
                       <Clock size={16} />
                       <span>{currentTime.toLocaleTimeString()}</span>
-                    </div>
+                    </div> */}
                   </div>
 
                   <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5">
