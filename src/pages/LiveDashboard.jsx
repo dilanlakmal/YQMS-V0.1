@@ -843,15 +843,6 @@ const LiveDashboard = () => {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  {/* Dark Mode Toggle */}
-                  <button
-                    onClick={toggleDark}
-                    className="p-3 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl transition-all duration-200 hover:bg-white/20 dark:hover:bg-gray-600/50 shadow-lg"
-                    title="Toggle Dark Mode"
-                  >
-                    {isDark ? <Sun size={20} className="text-white" /> : <Moon size={20} className="text-white" />}
-                  </button>
-
                   {user && (
                     <div className="flex items-center gap-3 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5 shadow-xl">
                       <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-lg shadow-lg">
@@ -1282,7 +1273,7 @@ const LiveDashboard = () => {
         {["Monthly Analysis"].includes(activeSection) && (
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-12 border border-gray-200 dark:border-gray-700 transition-all duration-300">
             <div className="text-center">
-                            <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <div className="p-4 bg-gradient-to-br from-purple-100 to-purple-200 dark:from-purple-900/30 dark:to-purple-800/30 rounded-full w-20 h-20 mx-auto mb-6 flex items-center justify-center">
                 <CalendarDays size={32} className="text-purple-600 dark:text-purple-400" />
               </div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-3">
