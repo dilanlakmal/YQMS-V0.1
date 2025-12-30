@@ -1,27 +1,28 @@
 import axios from "axios";
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw, Filter, Calendar, User, Package, Hash, Shirt, UserCheck } from "lucide-react";
 import React, { useCallback, useEffect, useState } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import Select from "react-select"; // Import the new library
+import Select from "react-select";
 import { API_BASE_URL } from "../../../../config";
 import { useTheme } from "../../context/ThemeContext";
 
-// --- NEW: Custom styling for react-select to match the theme ---
+// Custom styling for react-select (unchanged)
 const getCustomStyles = (theme) => ({
   control: (provided, state) => ({
     ...provided,
     backgroundColor: theme === "dark" ? "#374151" : "#F9FAFB",
     borderColor: theme === "dark" ? "#4B5563" : "#D1D5DB",
-    minHeight: "42px",
+    minHeight: "44px",
     boxShadow: state.isFocused ? "0 0 0 2px #3B82F6" : "none",
+    borderRadius: "8px",
     "&:hover": {
       borderColor: theme === "dark" ? "#6B7280" : "#A5B4FC"
     }
   }),
   valueContainer: (provided) => ({
     ...provided,
-    padding: "0 8px"
+    padding: "0 12px"
   }),
   singleValue: (provided) => ({
     ...provided,
@@ -38,7 +39,9 @@ const getCustomStyles = (theme) => ({
   menu: (provided) => ({
     ...provided,
     backgroundColor: theme === "dark" ? "#374151" : "#FFFFFF",
-    border: `1px solid ${theme === "dark" ? "#4B5563" : "#D1D5DB"}`
+    border: `1px solid ${theme === "dark" ? "#4B5563" : "#D1D5DB"}`,
+    borderRadius: "8px",
+    boxShadow: "0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)"
   }),
   option: (provided, state) => ({
     ...provided,
@@ -65,9 +68,10 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
     qcIds: [],
     colors: []
   });
+
   const { theme } = useTheme();
 
-  // The core fetching logic remains the same
+  // All existing functions remain unchanged
   const fetchOptions = useCallback(async (currentFilters) => {
     try {
       const params = {
@@ -79,14 +83,17 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
           ? currentFilters.endDate.toISOString().split("T")[0]
           : ""
       };
+
       Object.keys(params).forEach(
         (key) =>
           (params[key] === "" || params[key] === null) && delete params[key]
       );
+
       const response = await axios.get(
         `${API_BASE_URL}/api/cutting-dashboard/filters`,
         { params }
       );
+
       setFilterOptions(response.data);
     } catch (error) {
       console.error("Failed to fetch dynamic filter options:", error);
@@ -101,7 +108,6 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
   };
 
-  // A new handler specifically for react-select components
   const handleSelectChange = (key, selectedOption) => {
     handleFilterChange(key, selectedOption ? selectedOption.value : "");
   };
@@ -121,183 +127,198 @@ const CuttingDashboardFilter = ({ filters, setFilters, onApply }) => {
     onApply(initialFilters);
   };
 
-  // Get the custom styles based on the current theme
   const customStyles = getCustomStyles(theme);
-
-  // Helper function to transform string arrays into { value, label } objects
   const toSelectOptions = (arr) =>
     arr.map((item) => ({ value: item, label: item }));
 
   return (
-    <div
-      className={`p-4 mb-6 rounded-lg shadow-md ${
-        theme === "dark" ? "bg-gray-800" : "bg-white"
-      }`}
-    >
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-9 gap-4 items-end">
-        {/* Date Filters remain the same */}
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            Start Date
-          </label>
-          <DatePicker
-            selected={filters.startDate}
-            onChange={(date) => handleFilterChange("startDate", date)}
-            className={`w-full p-2 rounded-md focus:ring-2 focus:ring-blue-500 ${
-              theme === "dark"
-                ? "bg-gray-700 text-white"
-                : "bg-gray-50 text-black"
-            }`}
-          />
-        </div>
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            End Date
-          </label>
-          <DatePicker
-            selected={filters.endDate}
-            onChange={(date) => handleFilterChange("endDate", date)}
-            className={`w-full p-2 rounded-md focus:ring-2 focus:ring-blue-500 ${
-              theme === "dark"
-                ? "bg-gray-700 text-white"
-                : "bg-gray-50 text-black"
-            }`}
-          />
-        </div>
+    <div className={`p-6 mb-8 rounded-xl shadow-lg border ${
+      theme === "dark" 
+        ? "bg-gray-800 border-gray-700" 
+        : "bg-white border-gray-200"
+    }`}>
+      {/* Header */}
+      <div className="flex items-center mb-6">
+        <Filter className={`mr-3 ${theme === "dark" ? "text-blue-400" : "text-blue-600"}`} size={24} />
+        <h2 className={`text-xl font-semibold ${
+          theme === "dark" ? "text-white" : "text-gray-800"
+        }`}>
+          Dashboard Filters
+        </h2>
+      </div>
 
-        {/* --- MODIFIED: Select Filters now use react-select --- */}
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
+      {/* All Filter Options in One Section */}
+      <div className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 2xl:grid-cols-10 gap-4">
+          {/* Start Date */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
               theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            Buyer
-          </label>
-          <Select
-            options={toSelectOptions(filterOptions.buyers)}
-            value={
-              filters.buyer
-                ? { value: filters.buyer, label: filters.buyer }
-                : null
-            }
-            onChange={(option) => handleSelectChange("buyer", option)}
-            placeholder="All Buyers"
-            isClearable
-            isSearchable
-            styles={customStyles}
-          />
-        </div>
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            MO No
-          </label>
-          <Select
-            options={toSelectOptions(filterOptions.moNos)}
-            value={
-              filters.moNo ? { value: filters.moNo, label: filters.moNo } : null
-            }
-            onChange={(option) => handleSelectChange("moNo", option)}
-            placeholder="All MOs"
-            isClearable
-            isSearchable
-            styles={customStyles}
-          />
-        </div>
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            Table No
-          </label>
-          <Select
-            options={toSelectOptions(filterOptions.tableNos)}
-            value={
-              filters.tableNo
-                ? { value: filters.tableNo, label: filters.tableNo }
-                : null
-            }
-            onChange={(option) => handleSelectChange("tableNo", option)}
-            placeholder="All Tables"
-            isClearable
-            isSearchable
-            styles={customStyles}
-          />
-        </div>
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            Garment Type
-          </label>
-          <Select
-            options={toSelectOptions(filterOptions.garmentTypes)}
-            value={
-              filters.garmentType
-                ? { value: filters.garmentType, label: filters.garmentType }
-                : null
-            }
-            onChange={(option) => handleSelectChange("garmentType", option)}
-            placeholder="All Types"
-            isClearable
-            isSearchable
-            styles={customStyles}
-          />
-        </div>
-        <div>
-          <label
-            className={`block text-sm font-medium mb-1 ${
-              theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
-          >
-            Emp ID
-          </label>
-          <Select
-            options={toSelectOptions(filterOptions.qcIds)}
-            value={
-              filters.qcId ? { value: filters.qcId, label: filters.qcId } : null
-            }
-            onChange={(option) => handleSelectChange("qcId", option)}
-            placeholder="All Inspectors"
-            isClearable
-            isSearchable
-            styles={customStyles}
-          />
-        </div>
+            }`}>
+              <Calendar className="mr-1" size={14} />
+              Start Date
+            </label>
+            <DatePicker
+              selected={filters.startDate}
+              onChange={(date) => handleFilterChange("startDate", date)}
+              className={`w-full p-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                theme === "dark"
+                  ? "bg-gray-700 text-white border-gray-600"
+                  : "bg-gray-50 text-black border-gray-300"
+              }`}
+              placeholderText="Select start date"
+            />
+          </div>
 
-        {/* Action Buttons remain the same */}
-        <div className="flex space-x-2">
-          <button
-            onClick={() => onApply(filters)}
-            className="flex-1 flex justify-center items-center bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition duration-200"
-            title="Apply Filters"
-          >
-            <Check size={20} />
-          </button>
-          <button
-            onClick={handleReset}
-            className="flex-1 flex justify-center items-center bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-200"
-            title="Reset Filters"
-          >
-            <RotateCcw size={20} />
-          </button>
+          {/* End Date */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              <Calendar className="mr-1" size={14} />
+              End Date
+            </label>
+            <DatePicker
+              selected={filters.endDate}
+              onChange={(date) => handleFilterChange("endDate", date)}
+              className={`w-full p-3 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all ${
+                theme === "dark"
+                  ? "bg-gray-700 text-white border-gray-600"
+                  : "bg-gray-50 text-black border-gray-300"
+              }`}
+              placeholderText="Select end date"
+            />
+          </div>
+
+          {/* Buyer */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              <User className="mr-1" size={14} />
+              Buyer
+            </label>
+            <Select
+              options={toSelectOptions(filterOptions.buyers)}
+              value={
+                filters.buyer
+                  ? { value: filters.buyer, label: filters.buyer }
+                  : null
+              }
+              onChange={(option) => handleSelectChange("buyer", option)}
+              placeholder="All Buyers"
+              isClearable
+              isSearchable
+              styles={customStyles}
+            />
+          </div>
+
+          {/* MO No */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              <Hash className="mr-1" size={14} />
+              MO No
+            </label>
+            <Select
+              options={toSelectOptions(filterOptions.moNos)}
+              value={
+                filters.moNo ? { value: filters.moNo, label: filters.moNo } : null
+              }
+              onChange={(option) => handleSelectChange("moNo", option)}
+              placeholder="All MOs"
+              isClearable
+              isSearchable
+              styles={customStyles}
+            />
+          </div>
+
+          {/* Table No */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              <Hash className="mr-1" size={14} />
+              Table No
+            </label>
+            <Select
+              options={toSelectOptions(filterOptions.tableNos)}
+              value={
+                filters.tableNo
+                  ? { value: filters.tableNo, label: filters.tableNo }
+                  : null
+              }
+              onChange={(option) => handleSelectChange("tableNo", option)}
+              placeholder="All Tables"
+              isClearable
+              isSearchable
+              styles={customStyles}
+            />
+          </div>
+
+          {/* Garment Type */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              <Shirt className="mr-1" size={14} />
+              Garment Type
+            </label>
+            <Select
+              options={toSelectOptions(filterOptions.garmentTypes)}
+              value={
+                filters.garmentType
+                  ? { value: filters.garmentType, label: filters.garmentType }
+                  : null
+              }
+              onChange={(option) => handleSelectChange("garmentType", option)}
+              placeholder="All Types"
+              isClearable
+              isSearchable
+              styles={customStyles}
+            />
+          </div>
+
+          {/* Emp ID */}
+          <div className="space-y-2">
+            <label className={`block text-sm font-medium flex items-center ${
+              theme === "dark" ? "text-gray-300" : "text-gray-700"
+            }`}>
+              <UserCheck className="mr-1" size={14} />
+              Emp ID
+            </label>
+            <Select
+              options={toSelectOptions(filterOptions.qcIds)}
+              value={
+                filters.qcId ? { value: filters.qcId, label: filters.qcId } : null
+              }
+              onChange={(option) => handleSelectChange("qcId", option)}
+              placeholder="All Inspectors"
+              isClearable
+              isSearchable
+              styles={customStyles}
+            />
+          </div>
         </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+        <button
+          onClick={() => onApply(filters)}
+          className="flex-1 sm:flex-none sm:px-8 flex justify-center items-center bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+        >
+          <Check size={18} className="mr-2" />
+          Apply Filters
+        </button>
+        <button
+          onClick={handleReset}
+          className="flex-1 sm:flex-none sm:px-8 flex justify-center items-center bg-gradient-to-r from-red-500 to-red-600 hover:from-gray-600 hover:to-gray-700 text-white px-6 py-3 rounded-lg font-medium transition-all duration-200 shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+        >
+          <RotateCcw size={18} className="mr-2" />
+          Reset All
+        </button>
       </div>
     </div>
   );

@@ -528,7 +528,7 @@ const DigitalMeasurementPDFDownload = ({ selectedMono, filters }) => {
       ) : (
         <button
           disabled
-          className="w-full h-10 py-2 px-4 rounded bg-gray-200 text-gray-700 cursor-not-allowed flex items-center justify-center"
+          className="w-full h-10 py-2 px-4 rounded bg-green-600 dark:bg-green-300 text-gray-700 cursor-not-allowed flex items-center justify-center"
         >
           <FaFilePdf className="mr-2" />
           Download PDF

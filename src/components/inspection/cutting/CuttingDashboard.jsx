@@ -22,7 +22,7 @@ import {
   ClipboardList,
   FileCheck,
   FileText,
-  FlaskConical, // Icon for IE Table
+  FlaskConical,
   Grid,
   Layers,
   LayoutDashboard,
@@ -30,12 +30,17 @@ import {
   Percent,
   Scan,
   Scissors,
-  ScissorsIcon, // Icon for Overview
+  ScissorsIcon,
   Table,
   TrendingUp,
   View,
   XCircle,
-  ArrowLeft
+  ArrowLeft,
+  Activity,
+  RefreshCw,
+  Settings,
+  ChevronRight,
+  BarChart3
 } from "lucide-react";
 import { useAuth } from "../../authentication/AuthContext";
 
@@ -47,36 +52,62 @@ const formatDateForApi = (date) => {
   return `${year}-${month}-${day}`;
 };
 
-// --- NEW: Navigation Button Component ---
-const NavButton = ({ icon, label, isActive, onClick, theme }) => {
-  const activeClasses =
-    theme === "dark" ? "bg-blue-600 text-white" : "bg-blue-600 text-white";
-  const inactiveClasses =
-    theme === "dark"
-      ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
-      : "bg-white text-gray-600 hover:bg-gray-100";
-
+// Enhanced Navigation Button Component
+const NavButton = ({ icon, label, isActive, onClick, theme, description }) => {
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center text-center p-3 rounded-lg shadow-md transition-all duration-200 w-32 h-24 ${
-        isActive ? activeClasses : inactiveClasses
+      className={`group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 min-h-[120px] w-full ${
+        isActive
+          ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-blue-500/25"
+          : theme === "dark"
+          ? "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700"
+          : "bg-white text-gray-600 hover:bg-gray-50 border border-gray-200"
       }`}
     >
-      {icon}
-      <span className="text-xs font-semibold mt-2 leading-tight max-w-full">
+      <div className={`p-3 rounded-lg mb-2 ${
+        isActive 
+          ? "bg-white/20" 
+          : theme === "dark" 
+          ? "bg-gray-700 group-hover:bg-gray-600" 
+          : "bg-gray-100 group-hover:bg-gray-200"
+      }`}>
+        {React.cloneElement(icon, { 
+          size: 24, 
+          className: isActive ? "text-white" : theme === "dark" ? "text-gray-300" : "text-gray-600"
+        })}
+      </div>
+      <span className="text-sm font-semibold text-center leading-tight px-2">
         {label}
       </span>
+      {description && (
+        <span className="text-xs opacity-75 text-center mt-1 px-2">
+          {description}
+        </span>
+      )}
+      {isActive && (
+        <div className="absolute inset-0 rounded-xl border-2 border-blue-300 pointer-events-none"></div>
+      )}
     </button>
   );
 };
 
+// Loading Component
+const LoadingSpinner = ({ theme }) => (
+  <div className={`flex flex-col items-center justify-center h-64 ${
+    theme === "dark" ? "text-gray-300" : "text-gray-600"
+  }`}>
+    <RefreshCw className="w-8 h-8 animate-spin mb-4" />
+    <p className="text-lg font-medium">Loading dashboard data...</p>
+    <p className="text-sm opacity-75">Please wait while we fetch the latest information</p>
+  </div>
+);
+
 const CuttingDashboard = ({ onBackToCuttingLive }) => {
   const { theme } = useTheme();
   const { user } = useAuth();
-  // --- NEW: State to manage the active view ---
-  const [activeView, setActiveView] = useState("overview");
 
+  const [activeView, setActiveView] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState(null);
   const [filters, setFilters] = useState({
@@ -92,6 +123,52 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
   const [topN, setTopN] = useState(5);
   const [sortOrder, setSortOrder] = useState("top");
 
+  // Navigation items configuration
+  const navigationItems = [
+    {
+      id: "overview",
+      icon: <LayoutDashboard />,
+      label: "Overview",
+      description: "Main dashboard"
+    },
+    {
+      id: "style_ie_table",
+      icon: <Table />,
+      label: "Style & IE Table",
+      description: "Measurement failures"
+    },
+    {
+      id: "style_spread_table",
+      icon: <Grid />,
+      label: "Style & Spread",
+      description: "Spread table analysis"
+    },
+    {
+      id: "spread_table_overall",
+      icon: <View />,
+      label: "Spread Table",
+      description: "Overall analysis"
+    },
+    {
+      id: "fabric_defects",
+      icon: <Bug />,
+      label: "Fabric Defects",
+      description: "Defect analysis"
+    },
+    {
+      id: "cutting_defects",
+      icon: <ScissorsIcon />,
+      label: "Cutting Defects",
+      description: "Cutting issues"
+    },
+    {
+      id: "trend_analysis",
+      icon: <TrendingUp />,
+      label: "Trend Analysis",
+      description: "Historical trends"
+    }
+  ];
+
   const fetchDashboardData = useCallback(
     async (currentFilters, currentTopN, currentSortOrder) => {
       setLoading(true);
@@ -103,6 +180,7 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
           topN: currentTopN,
           sortOrder: currentSortOrder
         };
+
         const response = await axios.get(
           `${API_BASE_URL}/api/cutting-dashboard-data`,
           { params }
@@ -128,6 +206,7 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
       startDate: lastWeek,
       endDate: today
     };
+
     setFilters(initialFilters);
     fetchDashboardData(initialFilters, topN, sortOrder);
   }, []);
@@ -164,7 +243,6 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
     );
   }, [charts?.measurementIssuesBySpreadTable]);
 
-  // --- NEW: Memoized sorting for the overall spread table data ---
   const sortedSpreadTableOverallData = useMemo(() => {
     if (!charts?.measurementIssuesBySpreadTableOverall) return [];
     return [...charts.measurementIssuesBySpreadTableOverall].sort(
@@ -260,240 +338,252 @@ const CuttingDashboard = ({ onBackToCuttingLive }) => {
       ]
     : [];
 
+  const currentNavItem = navigationItems.find(item => item.id === activeView);
+
   if (loading && !data) {
     return (
-      <div
-        className={`flex justify-center items-center h-screen ${
-          theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-100"
-        }`}
-      >
-        Loading dashboard...
+      <div className={`min-h-screen ${
+        theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+      }`}>
+        <div className="container mx-auto px-6 py-8">
+          <LoadingSpinner theme={theme} />
+        </div>
       </div>
     );
   }
 
   return (
-    <div
-      className={`p-6 min-h-screen relative ${
-        theme === "dark" ? "bg-gray-900" : "bg-gray-100"
-      }`}
-    >
-      {onBackToCuttingLive && (
-        <div className="mb-4">
-          <button
-            onClick={onBackToCuttingLive}
-            className="flex items-center px-4 py-2 bg-blue-100 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
-          >
-            <ArrowLeft size={20} className="mr-2" />
-            Cutting Home
-          </button>
+    <div className={`min-h-screen transition-colors duration-300 ${
+      theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+    }`}>
+      <div className="container mx-auto px-6 py-8 max-w-7xl">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            {onBackToCuttingLive && (
+              <button
+                onClick={onBackToCuttingLive}
+                className={`flex items-center gap-3 px-6 py-3 rounded-xl shadow-md transition-all duration-200 group ${
+                  theme === "dark"
+                    ? "bg-gray-800 text-gray-300 hover:bg-gray-700 border border-gray-700"
+                    : "bg-white text-gray-700 hover:bg-gray-50 border border-gray-200"
+                }`}
+              >
+                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform duration-200" />
+                <span className="font-medium">Back to Cutting Home</span>
+              </button>
+            )}
+            
+            <div className="flex items-center gap-4">
+              <div className={`p-3 rounded-xl ${
+                theme === "dark" ? "bg-blue-900/30" : "bg-blue-100"
+              }`}>
+                <BarChart3 className={`w-8 h-8 ${
+                  theme === "dark" ? "text-blue-400" : "text-blue-600"
+                }`} />
+              </div>
+              <div>
+                <h1 className={`text-3xl font-bold ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}>
+                  Cutting Dashboard
+                </h1>
+                <p className={`${
+                  theme === "dark" ? "text-gray-400" : "text-gray-600"
+                }`}>
+                  Comprehensive cutting inspection analytics - Version 1.0
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
-      )}
-      {loading && (
-        <div className="absolute top-0 left-0 w-full h-full bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-          <div className="text-white text-xl animate-pulse">Updating...</div>
+
+        {/* Navigation Section */}
+        <div className={`mb-8 p-6 rounded-xl shadow-lg ${
+          theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"
+        }`}>
+          <div className="flex items-center gap-3 mb-4">
+            <Settings className={`w-5 h-5 ${
+              theme === "dark" ? "text-gray-400" : "text-gray-600"
+            }`} />
+            <h3 className={`font-semibold ${
+              theme === "dark" ? "text-white" : "text-gray-900"
+            }`}>
+              Dashboard Views
+            </h3>
+          </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+            {navigationItems.map((item) => (
+              <NavButton
+                key={item.id}
+                icon={item.icon}
+                label={item.label}
+                description={item.description}
+                isActive={activeView === item.id}
+                onClick={() => setActiveView(item.id)}
+                theme={theme}
+              />
+            ))}
+          </div>
         </div>
-      )}
 
-      <p
-        className={`mb-4 text-md ${
-          theme === "dark" ? "text-gray-400" : "text-gray-600"
-        }`}
-      >
-        Cutting Inspection Dashboard - Version 1.0
-      </p>
+        {/* Loading Overlay */}
+        {loading && data && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className={`p-6 rounded-xl shadow-xl ${
+              theme === "dark" ? "bg-gray-800" : "bg-white"
+            }`}>
+              <div className="flex items-center gap-3">
+                <RefreshCw className="w-6 h-6 animate-spin text-blue-500" />
+                <span className={`text-lg font-medium ${
+                  theme === "dark" ? "text-white" : "text-gray-900"
+                }`}>
+                  Updating dashboard...
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* --- NEW: Navigation Section --- */}
-      <div className="flex items-center gap-4 mb-6">
-        <NavButton
-          icon={<LayoutDashboard size={32} />}
-          label="Overview"
-          isActive={activeView === "overview"}
-          onClick={() => setActiveView("overview")}
-          theme={theme}
-        />
-        <NavButton
-          icon={<Table size={32} />}
-          label="Measurement Failure - By Style & IE Table"
-          isActive={activeView === "style_ie_table"}
-          onClick={() => setActiveView("style_ie_table")}
-          theme={theme}
-        />
-        <NavButton
-          icon={<Grid size={32} />}
-          label="Measurement Failure - By Style & Spread Table"
-          isActive={activeView === "style_spread_table"}
-          onClick={() => setActiveView("style_spread_table")}
-          theme={theme}
-        />
-        <NavButton
-          icon={<View size={32} />}
-          label="Measurement Failure by Spread Table"
-          isActive={activeView === "spread_table_overall"}
-          onClick={() => setActiveView("spread_table_overall")}
-          theme={theme}
-        />
-        <NavButton
-          icon={<Bug size={32} />}
-          label="Fabric Defect Analysis"
-          isActive={activeView === "fabric_defects"}
-          onClick={() => setActiveView("fabric_defects")}
-          theme={theme}
-        />
-        <NavButton
-          icon={<ScissorsIcon size={32} />}
-          label="Cutting Defect Analysis"
-          isActive={activeView === "cutting_defects"}
-          onClick={() => setActiveView("cutting_defects")}
-          theme={theme}
-        />
-        <NavButton
-          icon={<TrendingUp size={32} />}
-          label="Overall Trend Analysis"
-          isActive={activeView === "trend_analysis"}
-          onClick={() => setActiveView("trend_analysis")}
-          theme={theme}
-        />
+        {/* Content Section */}
+        <div className="space-y-8">
+          {activeView === "overview" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <CuttingDashboardCard title="Bundle Data" stats={bundleDataKpis} />
+                <CuttingDashboardCard title="Inspection Data" stats={inspectionDataKpis} />
+                <CuttingDashboardCard title="Results Section" stats={resultsKpis} />
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="lg:col-span-1 xl:col-span-1">
+                  <HorizontalBarChart
+                    data={charts?.passRateByMo || []}
+                    title="Pass Rate by MO No"
+                    onTopNChange={handleTopNChange}
+                    topN={topN}
+                    sortOrder={sortOrder}
+                    onSortOrderChange={handleSortOrderChange}
+                  />
+                </div>
+                <div className="lg:col-span-1 xl:col-span-1">
+                  <CuttingDashboardGarmentTypeChart
+                    data={charts?.passRateByGarmentType || []}
+                    title="Pass Rate by Garment Type"
+                  />
+                </div>
+                <div className="lg:col-span-2 xl:col-span-1">
+                  <TrendLineChart
+                    data={charts?.passRateByDate || []}
+                    title="Pass Rate by Date"
+                  />
+                </div>
+              </div>
+
+              <CuttingDashboardMeasurementIssues
+                data={charts?.measurementIssues || []}
+                title="Measurement Point Failure Analysis by Garment Type (Total)"
+              />
+            </>
+          )}
+
+          {activeView === "style_ie_table" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+              <CuttingDashboardMeasurementIssuesStyleCard
+                data={sortedStyleData}
+                title="Measurement Point Failure by MO and Table"
+              />
+            </>
+          )}
+
+          {activeView === "style_spread_table" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+              <CuttingDashboardSpreadTableStyleCard
+                data={sortedSpreadTableData}
+                title="Measurement Point Failure by MO and Spread Table"
+              />
+            </>
+          )}
+
+          {activeView === "spread_table_overall" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+              <CuttingDashboardSpreadTableOverallIssues
+                data={sortedSpreadTableOverallData}
+                title="Measurement Point Failure by Spread Table"
+              />
+            </>
+          )}
+
+          {activeView === "fabric_defects" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+              <CuttingDashboardFabricIssues
+                data={charts?.fabricDefectAnalysis || []}
+                totalInspectionQty={kpis?.totalInspectionQty || 0}
+                inspectionQtyByMo={charts?.inspectionQtyByMo || []}
+                title="Fabric Defect Analysis"
+              />
+            </>
+          )}
+
+          {activeView === "cutting_defects" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+              <CuttingDashboardCuttingDefectIssues
+                data={charts?.cuttingDefectAnalysis}
+                title="Cutting Defect Analysis"
+              />
+            </>
+          )}
+
+          {activeView === "trend_analysis" && (
+            <>
+              <CuttingDashboardFilter
+                filters={filters}
+                setFilters={setFilters}
+                onApply={handleApplyFilters}
+              />
+              <CuttingDashboardTrendAnalysis
+                measurementData={charts?.trendAnalysisData || []}
+                fabricData={charts?.fabricDefectTrendData || []}
+                cuttingData={charts?.cuttingDefectTrendData || []}
+                inspectionQtyByDate={charts?.inspectionQtyByDate || []}
+                title="Overall Trend Analysis"
+              />
+            </>
+          )}
+        </div>
       </div>
-
-      {/* --- NEW: Conditional Rendering based on activeView --- */}
-
-      {activeView === "overview" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-            <CuttingDashboardCard title="Bundle Data" stats={bundleDataKpis} />
-            <CuttingDashboardCard
-              title="Inspection Data"
-              stats={inspectionDataKpis}
-            />
-            <CuttingDashboardCard title="Results Section" stats={resultsKpis} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            <div className="lg:col-span-1 xl:col-span-1">
-              <HorizontalBarChart
-                data={charts?.passRateByMo || []}
-                title="Pass Rate by MO No"
-                onTopNChange={handleTopNChange}
-                topN={topN}
-                sortOrder={sortOrder}
-                onSortOrderChange={handleSortOrderChange}
-              />
-            </div>
-            <div className="lg:col-span-1 xl:col-span-1">
-              <CuttingDashboardGarmentTypeChart
-                data={charts?.passRateByGarmentType || []}
-                title="Pass Rate by Garment Type"
-              />
-            </div>
-            <div className="lg:col-span-2 xl:col-span-1">
-              <TrendLineChart
-                data={charts?.passRateByDate || []}
-                title="Pass Rate by Date"
-              />
-            </div>
-          </div>
-          <div className="mt-6">
-            <CuttingDashboardMeasurementIssues
-              data={charts?.measurementIssues || []}
-              title="Measurement Point Failure Analysis by Garment Type (Total)"
-            />
-          </div>
-        </>
-      )}
-
-      {activeView === "style_ie_table" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          <CuttingDashboardMeasurementIssuesStyleCard
-            data={sortedStyleData}
-            title="Measurement Point Failure by MO and Table"
-          />
-        </>
-      )}
-
-      {activeView === "style_spread_table" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          <CuttingDashboardSpreadTableStyleCard
-            data={sortedSpreadTableData}
-            title="Measurement Point Failure by MO and Spread Table"
-          />
-        </>
-      )}
-
-      {activeView === "spread_table_overall" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          <CuttingDashboardSpreadTableOverallIssues
-            data={sortedSpreadTableOverallData}
-            title="Measurement Point Failure by Spread Table"
-          />
-        </>
-      )}
-
-      {activeView === "fabric_defects" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          <CuttingDashboardFabricIssues
-            data={charts?.fabricDefectAnalysis || []}
-            totalInspectionQty={kpis?.totalInspectionQty || 0}
-            inspectionQtyByMo={charts?.inspectionQtyByMo || []}
-            title="Fabric Defect Analysis"
-          />
-        </>
-      )}
-      {activeView === "cutting_defects" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          <CuttingDashboardCuttingDefectIssues
-            data={charts?.cuttingDefectAnalysis}
-            title="Cutting Defect Analysis"
-          />
-        </>
-      )}
-
-      {activeView === "trend_analysis" && (
-        <>
-          <CuttingDashboardFilter
-            filters={filters}
-            setFilters={setFilters}
-            onApply={handleApplyFilters}
-          />
-          {/* --- MODIFIED: Pass all three data props to the component --- */}
-          <CuttingDashboardTrendAnalysis
-            measurementData={charts?.trendAnalysisData || []}
-            fabricData={charts?.fabricDefectTrendData || []}
-            cuttingData={charts?.cuttingDefectTrendData || []}
-            inspectionQtyByDate={charts?.inspectionQtyByDate || []}
-            title="Overall Trend Analysis"
-          />
-        </>
-      )}
     </div>
   );
 };

@@ -2,7 +2,31 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "antd/dist/reset.css";
 import { Modal } from "antd";
-import { FaClock } from "react-icons/fa";
+import { 
+  FaClock, 
+  FaChartLine, 
+  FaTable, 
+  FaEye, 
+  FaTrash, 
+  FaEdit, 
+  FaSave, 
+  FaTimes,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaInfoCircle
+} from "react-icons/fa";
+import { 
+  ChevronLeft, 
+  ChevronRight, 
+  Package, 
+  Calendar,
+  User,
+  Factory,
+  TrendingUp,
+  AlertCircle,
+  CheckCircle2,
+  XCircle
+} from "lucide-react";
 import DigitalMeasurementFilterPane from "../digital_measurement/DigitalMeasurementFilterPane";
 import DigialMeasurementSummaryCards from "../digital_measurement/DigialMeasurementSummaryCards";
 import DigitalMeasurementTotalSummary from "../digital_measurement/DigitalMeasurementTotalSummary";
@@ -45,6 +69,120 @@ const DigitalMeasurement = () => {
     ? measurementSummary.filter((item) => item.moNo === selectedMono)
     : measurementSummary;
 
+  // Enhanced Loading Component
+  const LoadingSpinner = ({ size = "default", text = "Loading..." }) => {
+    const sizeClasses = {
+      small: "h-6 w-6",
+      default: "h-12 w-12",
+      large: "h-16 w-16"
+    };
+
+    return (
+      <div className="flex flex-col items-center justify-center p-8 space-y-4">
+        <div className={`animate-spin rounded-full border-4 border-blue-200 border-t-blue-600 ${sizeClasses[size]}`}></div>
+        <p className="text-gray-600 dark:text-gray-400 font-medium">{text}</p>
+      </div>
+    );
+  };
+
+  // Enhanced Status Badge Component
+  const StatusBadge = ({ status, size = "default" }) => {
+    const baseClasses = "inline-flex items-center font-semibold rounded-full border-2";
+    const sizeClasses = {
+      small: "px-2 py-1 text-xs",
+      default: "px-3 py-1.5 text-sm",
+      large: "px-4 py-2 text-base"
+    };
+
+    const statusConfig = {
+      Pass: {
+        classes: "bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-700",
+        icon: CheckCircle2
+      },
+      Fail: {
+        classes: "bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-400 dark:border-red-700",
+        icon: XCircle
+      }
+    };
+
+    const config = statusConfig[status] || statusConfig.Fail;
+    const Icon = config.icon;
+
+    return (
+      <span className={`${baseClasses} ${sizeClasses[size]} ${config.classes}`}>
+        <Icon className="w-4 h-4 mr-1" />
+        {status}
+      </span>
+    );
+  };
+
+  // Enhanced Action Button Component
+  const ActionButton = ({ 
+    onClick, 
+    variant = "primary", 
+    size = "default", 
+    icon: Icon, 
+    children, 
+    disabled = false,
+    loading = false,
+    className = ""
+  }) => {
+    const baseClasses = "inline-flex items-center justify-center font-semibold rounded-lg transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-4 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none";
+    
+    const variants = {
+      primary: "bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/25 focus:ring-blue-500/50",
+      secondary: "bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-300 focus:ring-gray-300/50 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-200 dark:border-gray-600",
+      danger: "bg-red-600 hover:bg-red-700 text-white shadow-red-500/25 focus:ring-red-500/50",
+      success: "bg-green-600 hover:bg-green-700 text-white shadow-green-500/25 focus:ring-green-500/50",
+      warning: "bg-yellow-600 hover:bg-yellow-700 text-white shadow-yellow-500/25 focus:ring-yellow-500/50"
+    };
+    
+    const sizes = {
+      small: "px-3 py-1.5 text-sm",
+      default: "px-4 py-2 text-sm",
+      large: "px-6 py-3 text-base"
+    };
+    
+    return (
+      <button
+        onClick={onClick}
+        disabled={disabled || loading}
+        className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`}
+      >
+        {loading ? (
+          <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent mr-2" />
+        ) : Icon ? (
+          <Icon className="w-4 h-4 mr-2" />
+        ) : null}
+        {children}
+      </button>
+    );
+  };
+
+  // Enhanced Card Component
+  const Card = ({ children, className = "", title, subtitle, icon: Icon }) => (
+    <div className={`bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden ${className}`}>
+      {(title || subtitle || Icon) && (
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-700/50">
+          <div className="flex items-center space-x-3">
+            {Icon && (
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                <Icon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              </div>
+            )}
+            <div>
+              {title && <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{title}</h3>}
+              {subtitle && <p className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="p-6">
+        {children}
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     const fetchFilterOptions = async () => {
       try {
@@ -76,6 +214,7 @@ const DigitalMeasurement = () => {
         console.error("Error fetching filter options:", error);
       }
     };
+
     fetchFilterOptions();
   }, [filters]);
 
@@ -91,6 +230,7 @@ const DigitalMeasurement = () => {
         empId: filters.empId,
         stage: filters.stage
       };
+
       const response = await axios.get(
         `${API_BASE_URL}/api/measurement-summary`,
         {
@@ -98,6 +238,7 @@ const DigitalMeasurement = () => {
           withCredentials: true
         }
       );
+
       setSummaryData(response.data);
     } catch (error) {
       console.error("Error fetching summary data:", error);
@@ -119,6 +260,7 @@ const DigitalMeasurement = () => {
         empId: filters.empId,
         stage: filters.stage
       };
+
       const response = await axios.get(
         `${API_BASE_URL}/api/measurement-summary-per-mono`,
         {
@@ -126,6 +268,7 @@ const DigitalMeasurement = () => {
           withCredentials: true
         }
       );
+
       setMeasurementSummary(response.data.summaryPerMono);
       setTotalPages(response.data.totalPages);
     } catch (error) {
@@ -146,6 +289,7 @@ const DigitalMeasurement = () => {
           empId: filters.empId,
           stage: filters.stage
         };
+
         const response = await axios.get(
           `${API_BASE_URL}/api/measurement-details/${selectedMono}`,
           {
@@ -153,6 +297,7 @@ const DigitalMeasurement = () => {
             withCredentials: true
           }
         );
+
         setMeasurementDetails(response.data);
       } catch (error) {
         console.error("Error fetching measurement details:", error);
@@ -176,7 +321,7 @@ const DigitalMeasurement = () => {
   }, [selectedMono, filters]);
 
   const decimalToFraction = (decimal) => {
-    if (!decimal || isNaN(decimal)) return <span> </span>;
+    if (!decimal || isNaN(decimal)) return <span className="text-gray-400">-</span>;
 
     const sign = decimal < 0 ? "-" : "";
     const absDecimal = Math.abs(decimal);
@@ -186,7 +331,7 @@ const DigitalMeasurement = () => {
 
     if (fractionValue === 0)
       return (
-        <span>
+        <span className="font-mono">
           {sign}
           {whole || 0}
         </span>
@@ -218,22 +363,24 @@ const DigitalMeasurement = () => {
     if (closestFraction) {
       const { numerator, denominator } = closestFraction.fraction;
       const fractionElement = (
-        <span className="inline-flex flex-col items-center">
-          <span className="text-xs leading-none">{numerator}</span>
-          <span className="border-t border-black w-3"></span>
-          <span className="text-xs leading-none">{denominator}</span>
+        <span className="inline-flex flex-col items-center font-mono text-xs">
+          <span className="leading-none">{numerator}</span>
+          <span className="border-t border-gray-400 dark:border-gray-500 w-3"></span>
+          <span className="leading-none">{denominator}</span>
         </span>
       );
+
       return (
-        <span className="inline-flex items-center justify-center">
-          {sign}
-          {whole !== 0 && <span className="mr-1">{whole}</span>}
+        <span className="inline-flex items-center justify-center space-x-1">
+          <span>{sign}</span>
+          {whole !== 0 && <span className="font-mono">{whole}</span>}
           {fractionElement}
         </span>
       );
     }
+
     return (
-      <span>
+      <span className="font-mono">
         {sign}
         {fractionValue.toFixed(3)}
       </span>
@@ -272,8 +419,8 @@ const DigitalMeasurement = () => {
 
       const updatedRecords = [...measurementDetails.records];
       updatedRecords[garmentIndex].actual[actualIndex].value = newValue;
-      setMeasurementDetails({ ...measurementDetails, records: updatedRecords });
 
+      setMeasurementDetails({ ...measurementDetails, records: updatedRecords });
       setEditingCell(null);
       setEditValue("");
 
@@ -304,18 +451,32 @@ const DigitalMeasurement = () => {
     const halfRange = Math.floor(maxPagesToShow / 2);
     let start = Math.max(1, currentPage - halfRange);
     let end = Math.min(totalPages, start + maxPagesToShow - 1);
+
     if (end - start + 1 < maxPagesToShow)
       start = Math.max(1, end - maxPagesToShow + 1);
+
     return Array.from({ length: end - start + 1 }, (_, i) => start + i);
   };
 
   return (
-    <div className="min-h-screen bg-white text-black p-4">
-      <div className="max-w-8xl mx-auto">
-        <h1 className="text-3xl font-bold text-center mb-6">
-          Digital Measurement Dashboard
-        </h1>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
+      <div className="max-w-8xl mx-auto p-4 space-y-8">
+        {/* Header Section */}
+        <div className="text-center space-y-4">
+          <div className="inline-flex items-center space-x-3 bg-white dark:bg-gray-800 px-6 py-3 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-xl">
+              <FaChartLine className="w-6 h-6 text-white" />
+            </div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+              Digital Measurement Dashboard
+            </h1>
+          </div>
+          <p className="text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
+            Comprehensive measurement analysis and quality control system for manufacturing operations
+          </p>
+        </div>
 
+        {/* Filter Section */}
         <DigitalMeasurementFilterPane
           filters={filters}
           setFilters={setFilters}
@@ -323,155 +484,268 @@ const DigitalMeasurement = () => {
           selectedMono={selectedMono}
         />
 
+        {/* Summary Cards */}
         <DigialMeasurementSummaryCards summaryData={summaryData} />
 
-        <div className="flex items-center mb-4">
+        {/* Measurement Summary Section */}
+        <Card 
+          title="Measurement Summary" 
+          subtitle="Overview of all manufacturing orders and their inspection status"
+          icon={FaTable}
+          className="transition-all duration-300 hover:shadow-xl"
+        >
+          {/* Selected MO Indicator */}
           {selectedMono && (
-            <button
-              onClick={() => setSelectedMono(null)}
-              className="mr-2 text-red-600 hover:text-red-800 focus:outline-none"
-              title="Clear selected MO No"
-            >
-              <svg
-                className="w-5 h-5"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
-              </svg>
-            </button>
-          )}
-          <h2 className="text-lg font-semibold">Measurement Summary</h2>
-        </div>
-        <div className="relative overflow-x-auto mb-6">
-          {isLoadingSummary && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 bg-opacity-75">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-500"></div>
+            <div className="mb-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Package className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                  <div>
+                    <h4 className="font-semibold text-blue-900 dark:text-blue-100">
+                      Selected Manufacturing Order
+                    </h4>
+                    <p className="text-blue-700 dark:text-blue-300 font-mono text-lg">
+                      {selectedMono}
+                    </p>
+                  </div>
+                </div>
+                <ActionButton
+                  onClick={() => setSelectedMono(null)}
+                  variant="secondary"
+                  size="small"
+                  icon={FaTimes}
+                >
+                  Clear Selection
+                </ActionButton>
+              </div>
             </div>
           )}
-          <table className="w-full bg-white rounded border table-auto">
-            <thead>
-              <tr className="bg-gray-200 text-sm">
-                <th className="p-2 border">MO No</th>
-                <th className="p-2 border">Cust. Style</th>
-                <th className="p-2 border">Buyer</th>
-                <th className="p-2 border">Country</th>
-                <th className="p-2 border">Origin</th>
-                <th className="p-2 border">Mode</th>
-                <th className="p-2 border">Order Qty</th>
-                <th className="p-2 border">Inspected Qty</th>
-                <th className="p-2 border">Total Pass</th>
-                <th className="p-2 border">Total Reject</th>
-                <th className="p-2 border">Pass Rate</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredMeasurementSummary.length > 0 ? (
-                filteredMeasurementSummary.map((item, index) => (
-                  <tr key={index} className="text-center text-sm">
-                    <td
-                      className="p-2 border cursor-pointer text-blue-600 hover:underline"
-                      onClick={() => setSelectedMono(item.moNo)}
-                    >
-                      {item.moNo}
-                    </td>
-                    <td className="p-2 border">{item.custStyle || "N/A"}</td>
-                    <td className="p-2 border">{item.buyer || "N/A"}</td>
-                    <td className="p-2 border">{item.country || "N/A"}</td>
-                    <td className="p-2 border">{item.origin || "N/A"}</td>
-                    <td className="p-2 border">{item.mode || "N/A"}</td>
-                    <td className="p-2 border">{item.orderQty}</td>
-                    <td className="p-2 border">{item.inspectedQty}</td>
-                    <td className="p-2 border">{item.totalPass}</td>
-                    <td className="p-2 border">{item.totalReject}</td>
-                    <td className="p-2 border">{item.passRate}%</td>
+
+          {/* Table Container */}
+          <div className="relative">
+            {isLoadingSummary && (
+              <div className="absolute inset-0 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
+                <LoadingSpinner text="Loading measurement data..." />
+              </div>
+            )}
+
+            <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+              <table className="w-full bg-white dark:bg-gray-800">
+                <thead>
+                  <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600">
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center space-x-2">
+                        <Package className="w-4 h-4" />
+                        <span>MO Number</span>
+                      </div>
+                    </th>
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Customer Style</th>
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Buyer</th>
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Country</th>
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Origin</th>
+                    <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Mode</th>
+                    <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Order Qty</th>
+                    <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Inspected Qty</th>
+                    <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Total Pass</th>
+                    <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">Total Reject</th>
+                    <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                      <div className="flex items-center justify-center space-x-2">
+                        <TrendingUp className="w-4 h-4" />
+                        <span>Pass Rate</span>
+                      </div>
+                    </th>
                   </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="11" className="p-4 text-center text-gray-500">
-                    No data available
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {!selectedMono && totalPages > 1 && (
-          <div className="flex justify-center items-center space-x-2 mb-6">
-            <button
-              onClick={() => handlePageChange(currentPage - 1)}
-              disabled={currentPage === 1 || isLoadingSummary}
-              className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
-            >
-              Previous
-            </button>
-            {getPaginationRange().map((page) => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                disabled={isLoadingSummary}
-                className={`px-4 py-2 rounded ${
-                  page === currentPage
-                    ? "bg-blue-500 text-white"
-                    : "bg-gray-200 hover:bg-gray-300"
-                } disabled:opacity-50`}
-              >
-                {page}
-              </button>
-            ))}
-            <button
-              onClick={() => handlePageChange(currentPage + 1)}
-              disabled={currentPage === totalPages || isLoadingSummary}
-              className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50 hover:bg-gray-300"
-            >
-              Next
-            </button>
+                </thead>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {filteredMeasurementSummary.length > 0 ? (
+                    filteredMeasurementSummary.map((item, index) => (
+                      <tr 
+                        key={index} 
+                        className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
+                      >
+                        <td className="px-4 py-4 border-b border-gray-100 dark:border-gray-700">
+                          <button
+                            onClick={() => setSelectedMono(item.moNo)}
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-semibold hover:underline transition-colors duration-200 flex items-center space-x-2"
+                          >
+                            <FaEye className="w-4 h-4" />
+                            <span className="font-mono">{item.moNo}</span>
+                          </button>
+                        </td>
+                        <td className="px-4 py-4 text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.custStyle || <span className="text-gray-400">N/A</span>}
+                        </td>
+                        <td className="px-4 py-4 text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.buyer || <span className="text-gray-400">N/A</span>}
+                        </td>
+                        <td className="px-4 py-4 text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.country || <span className="text-gray-400">N/A</span>}
+                        </td>
+                        <td className="px-4 py-4 text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.origin || <span className="text-gray-400">N/A</span>}
+                        </td>
+                        <td className="px-4 py-4 text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.mode || <span className="text-gray-400">N/A</span>}
+                        </td>
+                        <td className="px-4 py-4 text-center font-mono text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.orderQty?.toLocaleString() || 0}
+                        </td>
+                        <td className="px-4 py-4 text-center font-mono text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                          {item.inspectedQty?.toLocaleString() || 0}
+                        </td>
+                        <td className="px-4 py-4 text-center border-b border-gray-100 dark:border-gray-700">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            {item.totalPass?.toLocaleString() || 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center border-b border-gray-100 dark:border-gray-700">
+                          <span className="inline-flex items-center px-2.5 py-1 rounded-full text-sm font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            {item.totalReject?.toLocaleString() || 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 text-center border-b border-gray-100 dark:border-gray-700">
+                          <div className="flex items-center justify-center space-x-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              (item.passRate || 0) >= 90 ? 'bg-green-500' : 
+                              (item.passRate || 0) >= 70 ? 'bg-yellow-500' : 'bg-red-500'
+                            }`}></div>
+                            <span className="font-semibold font-mono">
+                              {item.passRate || 0}%
+                            </span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="11" className="px-4 py-12 text-center">
+                        <div className="flex flex-col items-center space-y-3">
+                          <AlertCircle className="w-12 h-12 text-gray-400" />
+                          <p className="text-gray-500 dark:text-gray-400 text-lg">No measurement data available</p>
+                          <p className="text-gray-400 dark:text-gray-500 text-sm">Try adjusting your filters to see results</p>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        )}
 
-        <div>
-          {selectedMono && measurementDetails ? (
-            <>
-              <DigitalMeasurementTotalSummary
-                summaryData={measurementDetails.measurementPointSummary || []}
-                records={measurementDetails.records || []}
-                sizeSpec={measurementDetails.sizeSpec || []}
-                decimalToFraction={decimalToFraction}
-              />
-              <h2 className="text-lg font-semibold mb-4">
-                Inspected Summary for MO No: {selectedMono}
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="w-full bg-white rounded border table-auto">
+          {/* Enhanced Pagination */}
+          {!selectedMono && totalPages > 1 && (
+            <div className="mt-6 flex items-center justify-between">
+              <div className="flex items-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                <FaInfoCircle className="w-4 h-4" />
+                <span>
+                                    Page {currentPage} of {totalPages}
+                </span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <ActionButton
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  disabled={currentPage === 1 || isLoadingSummary}
+                  variant="secondary"
+                  size="small"
+                  icon={ChevronLeft}
+                >
+                  Previous
+                </ActionButton>
+                
+                <div className="flex items-center space-x-1">
+                  {getPaginationRange().map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => handlePageChange(page)}
+                      disabled={isLoadingSummary}
+                      className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        page === currentPage
+                          ? "bg-blue-600 text-white shadow-lg transform scale-105"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+                      } disabled:opacity-50`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                </div>
+
+                <ActionButton
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  disabled={currentPage === totalPages || isLoadingSummary}
+                  variant="secondary"
+                  size="small"
+                  icon={ChevronRight}
+                >
+                  Next
+                </ActionButton>
+              </div>
+            </div>
+          )}
+        </Card>
+
+        {/* Detailed Inspection Section */}
+        {selectedMono && measurementDetails ? (
+          <div className="space-y-8">
+            {/* Total Summary */}
+            <DigitalMeasurementTotalSummary
+              summaryData={measurementDetails.measurementPointSummary || []}
+              records={measurementDetails.records || []}
+              sizeSpec={measurementDetails.sizeSpec || []}
+              decimalToFraction={decimalToFraction}
+            />
+
+            {/* Detailed Inspection Table */}
+            <Card 
+              title={`Detailed Inspection Report`}
+              subtitle={`Manufacturing Order: ${selectedMono}`}
+              icon={FaEye}
+              className="transition-all duration-300 hover:shadow-xl"
+            >
+              <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                <table className="w-full bg-white dark:bg-gray-800">
                   <thead>
-                    <tr className="bg-gray-200 text-sm">
-                      <th className="p-2 border">Inspection Date</th>
-                      <th className="p-2 border">Garment NO</th>
-                      <th className="p-2 border">Size</th>
-                      <th className="p-2 border">Measurement Point</th>
-                      <th className="p-2 border">Buyer Specs</th>
-                      <th className="p-2 border">TolMinus</th>
-                      <th className="p-2 border">TolPlus</th>
-                      <th className="p-2 border">Measure Value</th>
-                      <th className="p-2 border">Diff</th>
-                      <th className="p-2 border">Status</th>
+                    <tr className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-600">
+                      <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4" />
+                          <span>Inspection Date</span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Garment Details
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Size
+                      </th>
+                      <th className="px-4 py-4 text-left text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Measurement Point
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Buyer Specs
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Tol. Minus
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Tol. Plus
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Measured Value
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Difference
+                      </th>
+                      <th className="px-4 py-4 text-center text-sm font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-200 dark:border-gray-600">
+                        Status
+                      </th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {measurementDetails.records.length > 0 ? (
                       measurementDetails.records.map((record, garmentIndex) => {
-                        const inspectionDate = new Date(
-                          record.created_at
-                        ).toLocaleDateString("en-US", {
+                        const inspectionDate = new Date(record.created_at).toLocaleDateString("en-US", {
                           year: "numeric",
                           month: "2-digit",
                           day: "2-digit"
@@ -481,22 +755,20 @@ const DigitalMeasurement = () => {
                         const points = record.actual
                           .map((actualItem, index) => {
                             if (actualItem.value === 0) return null;
+
                             const spec = measurementDetails.sizeSpec[index];
                             const measurementPoint = spec.EnglishRemark;
                             const tolMinus = spec.ToleranceMinus.decimal;
                             const tolPlus = spec.TolerancePlus.decimal;
-                            const buyerSpec =
-                              spec.Specs.find(
-                                (s) => Object.keys(s)[0] === record.size
-                              )?.[record.size]?.decimal || 0;
+                            const buyerSpec = spec.Specs.find(
+                              (s) => Object.keys(s)[0] === record.size
+                            )?.[record.size]?.decimal || 0;
                             const measureValue = actualItem.value;
                             const diff = buyerSpec - measureValue;
                             const lower = buyerSpec + tolMinus;
                             const upper = buyerSpec + tolPlus;
-                            const status =
-                              measureValue >= lower && measureValue <= upper
-                                ? "Pass"
-                                : "Fail";
+                            const status = measureValue >= lower && measureValue <= upper ? "Pass" : "Fail";
+
                             return {
                               measurementPoint,
                               buyerSpec,
@@ -514,33 +786,32 @@ const DigitalMeasurement = () => {
                         return points.map((point, pointIndex) => {
                           const cellId = `${garmentIndex}-${pointIndex}`;
                           const isEditing = editingCell === cellId;
-                          const diffBgColor =
-                            point.diff >= point.tolMinus &&
-                            point.diff <= point.tolPlus
-                              ? "bg-green-100"
-                              : "bg-red-100";
+                          const overallStatus = points.every((p) => p.status === "Pass") ? "Pass" : "Fail";
 
                           return (
                             <tr
                               key={`${garmentIndex}-${pointIndex}`}
-                              className="text-center text-sm"
+                              className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-200"
                             >
                               {pointIndex === 0 ? (
                                 <td
                                   rowSpan={points.length}
-                                  className="p-2 border align-middle"
+                                  className="px-4 py-4 border-b border-gray-100 dark:border-gray-700 align-top"
                                 >
-                                  <div className="flex flex-col items-center">
-                                    <span>{inspectionDate}</span>
-                                    <button
+                                  <div className="space-y-3">
+                                    <div className="flex items-center space-x-2 text-sm font-medium text-gray-900 dark:text-gray-100">
+                                      <Calendar className="w-4 h-4 text-blue-500" />
+                                      <span>{inspectionDate}</span>
+                                    </div>
+                                    <ActionButton
                                       onClick={() =>
                                         Modal.confirm({
                                           title: "Confirm Deletion",
-                                          content:
-                                            "Do you really need to delete this measurement record?",
-                                          okText: "Yes",
+                                          content: "Are you sure you want to delete this measurement record? This action cannot be undone.",
+                                          okText: "Delete",
                                           okType: "danger",
-                                          cancelText: "No",
+                                          cancelText: "Cancel",
+                                          icon: <AlertCircle className="w-6 h-6 text-red-500" />,
                                           onOk: async () => {
                                             try {
                                               await axios.delete(
@@ -548,151 +819,171 @@ const DigitalMeasurement = () => {
                                                 {
                                                   data: {
                                                     moNo: selectedMono,
-                                                    referenceNo:
-                                                      point.referenceNo
+                                                    referenceNo: point.referenceNo
                                                   },
                                                   withCredentials: true,
                                                   headers: {
-                                                    "Content-Type":
-                                                      "application/json"
+                                                    "Content-Type": "application/json"
                                                   }
                                                 }
                                               );
-                                              // Refresh all data
                                               await Promise.all([
                                                 fetchSummaryData(),
                                                 fetchMeasurementSummary(),
                                                 fetchMeasurementDetails()
                                               ]);
                                             } catch (error) {
-                                              console.error(
-                                                "Error deleting measurement record:",
-                                                error.response?.data ||
-                                                  error.message
-                                              );
+                                              console.error("Error deleting measurement record:", error.response?.data || error.message);
                                               Modal.error({
                                                 title: "Deletion Failed",
-                                                content:
-                                                  error.response?.data?.error ||
-                                                  error.message
+                                                content: error.response?.data?.error || error.message
                                               });
                                             }
                                           }
                                         })
                                       }
-                                      className="mt-1 px-2 py-1 bg-red-500 text-white rounded-md border-2 border-red-800 hover:bg-red-600 text-sm"
+                                      variant="danger"
+                                      size="small"
+                                      icon={FaTrash}
                                     >
-                                      Delete
-                                    </button>
+                                      Delete Record
+                                    </ActionButton>
                                   </div>
                                 </td>
                               ) : null}
+
                               {pointIndex === 0 ? (
                                 <td
                                   rowSpan={points.length}
-                                  className="p-2 border align-middle"
+                                  className="px-4 py-4 border-b border-gray-100 dark:border-gray-700 align-top"
                                 >
-                                  <div className="flex flex-col items-center">
-                                    <span>{garmentNo}</span>
-                                    <span>(Ref: "{point.referenceNo}")</span>
-                                    <span className="flex items-center">
-                                      <FaClock className="mr-1 text-sm" />
-                                      {new Date(
-                                        record.created_at
-                                      ).toLocaleTimeString("en-US", {
-                                        hour12: false,
-                                        hour: "2-digit",
-                                        minute: "2-digit",
-                                        second: "2-digit"
-                                      })}
-                                    </span>
-                                    <span
-                                      className={`mt-1 px-2 py-1 rounded-md border-2 text-sm font-semibold ${
-                                        points.every((p) => p.status === "Pass")
-                                          ? "bg-green-100 text-green-800 border-green-800"
-                                          : "bg-red-100 text-red-800 border-red-800"
-                                      }`}
-                                    >
-                                      {points.every((p) => p.status === "Pass")
-                                        ? "Pass"
-                                        : "Fail"}
-                                    </span>
+                                  <div className="space-y-3">
+                                    <div className="text-center">
+                                      <div className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                                        Garment #{garmentNo}
+                                      </div>
+                                      <div className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+                                        Ref: {point.referenceNo}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="flex items-center justify-center space-x-2 text-sm text-gray-600 dark:text-gray-400">
+                                      <FaClock className="w-4 h-4" />
+                                      <span>
+                                        {new Date(record.created_at).toLocaleTimeString("en-US", {
+                                          hour12: false,
+                                          hour: "2-digit",
+                                          minute: "2-digit",
+                                          second: "2-digit"
+                                        })}
+                                      </span>
+                                    </div>
+
+                                    <div className="flex justify-center">
+                                      <StatusBadge status={overallStatus} />
+                                    </div>
                                   </div>
                                 </td>
                               ) : null}
+
                               {pointIndex === 0 ? (
                                 <td
                                   rowSpan={points.length}
-                                  className="p-2 border align-middle"
+                                  className="px-4 py-4 text-center font-semibold text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700 align-middle"
                                 >
-                                  {size}
+                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+                                    {size}
+                                  </span>
                                 </td>
                               ) : null}
-                              <td className="p-2 border text-left">
-                                {point.measurementPoint}
+
+                              <td className="px-4 py-4 text-left text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
+                                <div className="font-medium">{point.measurementPoint}</div>
                               </td>
-                              <td className="p-2 border">
+
+                              <td className="px-4 py-4 text-center font-mono text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
                                 {decimalToFraction(point.buyerSpec)}
                               </td>
-                              <td className="p-2 border">
+
+                              <td className="px-4 py-4 text-center font-mono text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
                                 {decimalToFraction(point.tolMinus)}
                               </td>
-                              <td className="p-2 border">
+
+                              <td className="px-4 py-4 text-center font-mono text-gray-900 dark:text-gray-100 border-b border-gray-100 dark:border-gray-700">
                                 {decimalToFraction(point.tolPlus)}
                               </td>
-                              <td className="p-2 border">
-                                <div className="flex items-center justify-center space-x-2">
+
+                              <td className="px-4 py-4 border-b border-gray-100 dark:border-gray-700">
+                                <div className="flex items-center justify-center space-x-3">
                                   {isEditing ? (
-                                    <input
-                                      type="number"
-                                      inputMode="numeric"
-                                      value={editValue}
-                                      onChange={(e) =>
-                                        setEditValue(e.target.value)
-                                      }
-                                      className="w-20 p-1 border rounded text-center"
-                                      autoFocus
-                                    />
-                                  ) : (
-                                    <span>{point.measureValue.toFixed(3)}</span>
-                                  )}
-                                  <button
-                                    onClick={() =>
-                                      isEditing
-                                        ? handleSaveClick(
+                                    <div className="flex items-center space-x-2">
+                                      <input
+                                        type="number"
+                                        inputMode="numeric"
+                                        step="0.001"
+                                        value={editValue}
+                                        onChange={(e) => setEditValue(e.target.value)}
+                                        className="w-24 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-center font-mono text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                        autoFocus
+                                      />
+                                      <ActionButton
+                                        onClick={() =>
+                                          handleSaveClick(
                                             selectedMono,
                                             point.referenceNo,
                                             point.actualIndex,
                                             garmentIndex,
                                             pointIndex
                                           )
-                                        : handleEditClick(
-                                            garmentIndex,
-                                            pointIndex,
-                                            point.measureValue
-                                          )
-                                    }
-                                    className={`px-2 py-1 rounded text-sm ${
-                                      isEditing
-                                        ? "bg-green-500 text-white hover:bg-green-600"
-                                        : "bg-blue-500 text-white hover:bg-blue-600"
-                                    }`}
-                                  >
-                                    {isEditing ? "Save" : "Edit"}
-                                  </button>
+                                        }
+                                        variant="success"
+                                        size="small"
+                                        icon={FaSave}
+                                      >
+                                        Save
+                                      </ActionButton>
+                                      <ActionButton
+                                        onClick={() => {
+                                          setEditingCell(null);
+                                          setEditValue("");
+                                        }}
+                                        variant="secondary"
+                                        size="small"
+                                        icon={FaTimes}
+                                      >
+                                        Cancel
+                                      </ActionButton>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center space-x-2">
+                                      <span className="font-mono text-lg font-semibold text-gray-900 dark:text-gray-100">
+                                        {point.measureValue.toFixed(3)}
+                                      </span>
+                                      <ActionButton
+                                        onClick={() =>
+                                          handleEditClick(garmentIndex, pointIndex, point.measureValue)
+                                        }
+                                        variant="secondary"
+                                        size="small"
+                                        icon={FaEdit}
+                                      >
+                                        Edit
+                                      </ActionButton>
+                                    </div>
+                                  )}
                                 </div>
                               </td>
-                              <td className={`p-2 border ${diffBgColor}`}>
-                                {point.diff.toFixed(3)}
+
+                              <td className={`px-4 py-4 text-center font-mono font-semibold border-b border-gray-100 dark:border-gray-700 ${
+                                point.diff >= point.tolMinus && point.diff <= point.tolPlus
+                                  ? "bg-green-50 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                                  : "bg-red-50 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                              }`}>
+                                {point.diff > 0 ? '+' : ''}{point.diff.toFixed(3)}
                               </td>
-                              <td
-                                className={`p-2 border ${
-                                  point.status === "Pass"
-                                    ? "bg-green-100"
-                                    : "bg-red-100"
-                                }`}
-                              >
-                                {point.status}
+
+                              <td className="px-4 py-4 text-center border-b border-gray-100 dark:border-gray-700">
+                                <StatusBadge status={point.status} size="small" />
                               </td>
                             </tr>
                           );
@@ -700,27 +991,49 @@ const DigitalMeasurement = () => {
                       })
                     ) : (
                       <tr>
-                        <td
-                          colSpan="9"
-                          className="p-4 text-center text-gray-500"
-                        >
-                          No garments inspected for this MO No
+                        <td colSpan="10" className="px-4 py-12 text-center">
+                          <div className="flex flex-col items-center space-y-3">
+                            <AlertCircle className="w-12 h-12 text-gray-400" />
+                            <p className="text-gray-500 dark:text-gray-400 text-lg">
+                              No inspection records found
+                            </p>
+                            <p className="text-gray-400 dark:text-gray-500 text-sm">
+                              No garments have been inspected for this manufacturing order
+                            </p>
+                          </div>
                         </td>
                       </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-            </>
-          ) : (
-            <p className="text-center text-gray-500 mb-6">
-              Select a MO No to display in detail inspection summary
-            </p>
-          )}
-        </div>
+            </Card>
+          </div>
+        ) : selectedMono ? (
+          <Card className="text-center py-12">
+            <LoadingSpinner size="large" text="Loading detailed inspection data..." />
+          </Card>
+        ) : (
+          <Card className="text-center py-12">
+            <div className="flex flex-col items-center space-y-4">
+              <div className="p-4 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                <FaEye className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+                  Select a Manufacturing Order
+                </h3>
+                <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                  Click on any MO Number in the table above to view detailed inspection results and measurement data
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
       </div>
     </div>
   );
 };
 
 export default DigitalMeasurement;
+

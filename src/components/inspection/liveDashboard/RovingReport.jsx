@@ -13,7 +13,7 @@ import {
 } from "@react-pdf/renderer";
 import RovingReportPDFA3 from "./RovingReportPDFA3";
 import RovingReportPDFA4 from "./RovingReportPDFA4";
-import { Eye } from "lucide-react";
+import { Eye, RefreshCw, TrendingUp, TrendingDown, Activity, Moon, Sun } from "lucide-react";
 import RovingReportFilterPane from "./RovingReportFilterPane";
 import RovingReportDetailView from "./RovingReportDetailView";
 
@@ -30,6 +30,9 @@ const getBuyerFromMoNumber = (moNo) => {
 };
 
 const RovingReport = () => {
+  // Dark mode state
+  const [isDarkMode, setIsDarkMode] = useState(false);
+
   // Filter states
   const [startDate, setStartDate] = useState(new Date()); // Default to today
   const [endDate, setEndDate] = useState(null);
@@ -49,7 +52,36 @@ const RovingReport = () => {
   const [qcIds, setQcIds] = useState([]);
   const [lineNos, setLineNos] = useState([]); // Make lineNos stateful
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const RECORDS_PER_PAGE = 20;
+
+  // Toggle dark mode
+  const toggleDarkMode = () => {
+    setIsDarkMode(!isDarkMode);
+    // Apply dark class to document root
+    if (!isDarkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  };
+
+  // Initialize dark mode from localStorage or system preference
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme');
+    const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    
+    if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+      setIsDarkMode(true);
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
+
+  // Save theme preference
+  useEffect(() => {
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+  }, [isDarkMode]);
 
   // Format date to "MM/DD/YYYY"
   const formatDate = (date) => {
@@ -75,6 +107,7 @@ const RovingReport = () => {
   // Fetch report data
   const fetchReportData = async () => {
     try {
+      setIsLoading(true);
       const params = {};
       if (startDate) params.startDate = formatDate(startDate);
       if (endDate) params.endDate = formatDate(endDate);
@@ -96,13 +129,14 @@ const RovingReport = () => {
       console.error("Error fetching roving report data:", error);
       setReportData([]);
       setLastUpdated(new Date()); // Update timestamp even on error
+    } finally {
+      setIsLoading(false);
     }
   };
 
   // Initial data fetch and set up polling
   useEffect(() => {
     fetchReportData(); // Initial fetch
-
     // Set up polling every 10 seconds
     const intervalId = setInterval(() => {
       fetchReportData();
@@ -111,6 +145,7 @@ const RovingReport = () => {
     // Clean up the interval on component unmount
     return () => clearInterval(intervalId);
   }, [startDate, endDate, lineNo, moNo, qcId, buyer, operation]);
+
   // The dependency array ensures data is re-fetched whenever filters change.
 
   // Process fetched reportData and extract dropdown options
@@ -126,14 +161,11 @@ const RovingReport = () => {
       reportData.forEach((report) => {
         if (report.line_no) uniqueLineNos.add(report.line_no);
         if (report.mo_no) uniqueMoNos.add(report.mo_no);
-
         if (report.mo_no) {
           const derivedBuyer = getBuyerFromMoNumber(report.mo_no);
           uniqueBuyers.add(derivedBuyer);
         }
-
         //if (report.buyer_name) uniqueBuyers.add(report.buyer_name);
-
         if (report.inspection_rep && Array.isArray(report.inspection_rep)) {
           report.inspection_rep.forEach((repEntry) => {
             if (repEntry.emp_id) uniqueQcIds.add(repEntry.emp_id);
@@ -151,6 +183,7 @@ const RovingReport = () => {
           report.inspection_rep && Array.isArray(report.inspection_rep)
             ? report.inspection_rep.length
             : 0;
+
         return {
           ...report,
           inspectionRepCount,
@@ -170,6 +203,7 @@ const RovingReport = () => {
       setBuyers(Array.from(uniqueBuyers).sort());
       setQcIds(Array.from(uniqueQcIds).sort());
       setOperations(Array.from(uniqueTgNos).sort()); // Set TG Nos for Operations
+
       const groupedData = processedData;
       setFilteredData(groupedData);
 
@@ -285,6 +319,7 @@ const RovingReport = () => {
       totalCheckedQty += entry.checked_quantity || 0;
       totalDefectsQty += metrics.totalDefectsQty;
       totalRejectGarmentCount += metrics.rejectGarmentCount;
+
       if (entry.spi === "Pass") totalSpiPass++;
       if (entry.spi === "Reject") totalSpiReject++;
       if (entry.measurement === "Pass") totalMeasurementPass++;
@@ -315,6 +350,37 @@ const RovingReport = () => {
     };
   };
 
+  // Calculate overall summary metrics
+  const calculateOverallMetrics = () => {
+    let totalChecked = 0;
+    let totalDefects = 0;
+    let totalRejects = 0;
+    let totalSpiPass = 0;
+    let totalSpiReject = 0;
+
+    filteredData.forEach((record) => {
+      const metrics = calculateGroupMetrics(record);
+      totalChecked += metrics.totalCheckedQty;
+      totalDefects += metrics.totalDefectsQty;
+      totalRejects += metrics.totalRejectGarmentCount;
+      totalSpiPass += metrics.totalSpiPass;
+      totalSpiReject += metrics.totalSpiReject;
+    });
+
+    const overallDefectRate = totalChecked > 0 ? (totalDefects / totalChecked) * 100 : 0;
+    const overallPassRate = totalChecked > 0 ? ((totalChecked - totalRejects) / totalChecked) * 100 : 0;
+
+    return {
+      totalChecked,
+      totalDefects,
+      totalRejects,
+      overallDefectRate: overallDefectRate.toFixed(2),
+      overallPassRate: overallPassRate.toFixed(2),
+      totalSpiPass,
+      totalSpiReject
+    };
+  };
+
   // Pagination
   const totalPages = Math.ceil(filteredData.length / RECORDS_PER_PAGE);
   // Ensure validCurrentPage is 0 if totalPages is 0, otherwise between 0 and totalPages - 1
@@ -322,7 +388,6 @@ const RovingReport = () => {
     0,
     Math.min(currentPage, totalPages > 0 ? totalPages - 1 : 0)
   );
-
   const startIndex = validCurrentPage * RECORDS_PER_PAGE;
   const endIndex = startIndex + RECORDS_PER_PAGE;
   const currentRecordsOnPage = filteredData.slice(startIndex, endIndex);
@@ -358,325 +423,412 @@ const RovingReport = () => {
     setExpandedRowKey(null);
   };
 
-  // Helper function to get background color based on value and type
+  // Helper function to get background color based on value and type (updated for dark mode)
   const getBackgroundColor = (value, type) => {
     const numValue = parseFloat(value);
     if (type === "passRate") {
-      if (numValue > 80) return "bg-green-100";
-      if (numValue >= 50 && numValue <= 80) return "bg-orange-100";
-      return "bg-red-100";
+      if (numValue > 80) return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300";
+      if (numValue >= 50 && numValue <= 80) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300";
+      return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300";
     } else {
       // For defectRate and defectRatio
-      if (numValue > 10) return "bg-red-100";
-      if (numValue >= 5 && numValue <= 10) return "bg-orange-100";
-      return "bg-green-100";
+      if (numValue > 10) return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300";
+      if (numValue >= 5 && numValue <= 10) return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/40 dark:text-yellow-300";
+      return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300";
     }
   };
 
+  const overallMetrics = calculateOverallMetrics();
+
   return (
-    <div className="p-4 bg-gray-100 min-h-screen">
-      <RovingReportFilterPane
-        startDate={startDate}
-        setStartDate={setStartDate}
-        endDate={endDate}
-        setEndDate={setEndDate}
-        lineNo={lineNo}
-        setLineNo={setLineNo}
-        lineNos={lineNos}
-        buyer={buyer}
-        setBuyer={setBuyer}
-        buyers={buyers}
-        operation={operation}
-        setOperation={setOperation}
-        operations={operations}
-        qcId={qcId}
-        setQcId={setQcId}
-        qcIds={qcIds}
-        moNo={moNo}
-        setMoNo={setMoNo}
-        moNos={moNos}
-        onClearFilters={handleClearFilters}
-        lastUpdated={lastUpdated}
-        formatTimestamp={formatTimestamp}
-      />
-
-      {/* PDF Download Options - Kept separate from the filter pane */}
-      {/* <div className="bg-white p-4 rounded-lg shadow-md mb-6 flex items-end space-x-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-700 mb-1">
-            Report Paper Size
-          </label>
-          <select
-            value={paperSize}
-            onChange={(e) => setPaperSize(e.target.value)}
-            className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-          >
-            <option value="A3">A3</option>
-            <option value="A4">A4</option>
-          </select>
-        </div>
-        <div>
-         
-          <div className="flex space-x-2">
-            <PDFDownloadLink
-              document={
-                paperSize === "A3" ? (
-                  <RovingReportPDFA3 data={filteredData} />
-                ) : (
-                  <RovingReportPDFA4 data={filteredData} />
-                )
-              }
-              fileName={`QC_Inline_Roving_Report_${paperSize}.pdf`}
-              className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm shadow-sm"
-            >
-              {({ loading }) =>
-                loading ? (
-                  "Generating PDF..."
-                ) : (
-                  <>
-                    <FileText size={16} className="mr-2" /> Download PDF
-                  </>
-                )
-              }
-            </PDFDownloadLink>
-            
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-gray-900 dark:to-gray-800 transition-colors duration-300">
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        {/* Header Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
+                QC Inline Roving Report
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2">
+                <Activity className="w-4 h-4" />
+                Real-time quality control monitoring dashboard
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              {isLoading && (
+                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span className="text-sm">Updating...</span>
+                </div>
+              )}
+              <div className="text-right text-sm text-gray-500 dark:text-gray-400">
+                <div>Last Updated:</div>
+                <div className="font-medium">{formatTimestamp(lastUpdated)}</div>
+              </div>
+            </div>
           </div>
-        </div>
-      </div> */}
 
-      {/* Report Content */}
-      {filteredData.length === 0 ? (
-        <div className="text-center text-gray-700">
-          <h2 className="text-xl font-medium">
-            No data available for the selected filters.
-          </h2>
-        </div>
-      ) : (
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          {/* Title */}
-          <h1 className="text-3xl font-bold text-center text-gray-800 mb-6 bg-gradient-to-r from-blue-100 to-blue-100 text-gray py-4 rounded-t-lg">
-            QC Inline Roving - Summary Report
-          </h1>
+          {/* Summary Cards */}
+          {filteredData.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Checked</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{overallMetrics.totalChecked.toLocaleString()}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-full">
+                    <Activity className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </div>
 
-          {/* Summary Table */}
-          <div className="overflow-x-auto">
-            <table className="w-full mb-6 border border-gray-200 rounded-lg">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Inspection Date
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Line No
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    MO No
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Inspection Count
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Checked Qty
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Reject Garment
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Defect Qty
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Defect Rate (%)
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-r border-gray-200 align-middle"
-                  >
-                    Defect Ratio (%)
-                  </th>
-                  <th
-                    colSpan="2"
-                    className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b border-r border-gray-200"
-                  >
-                    Total SPI
-                  </th>
-                  <th
-                    colSpan="2"
-                    className="px-4 py-2 text-center text-sm font-medium text-gray-700 border-b border-r border-gray-200"
-                  >
-                    Measurement
-                  </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-2 text-left text-sm font-medium text-gray-700 border-b border-gray-200 align-middle"
-                  >
-                    View
-                  </th>
-                </tr>
-                <tr>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 border-b border-r border-gray-200">
-                    Pass
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 border-b border-r border-gray-200">
-                    Reject
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 border-b border-r border-gray-200">
-                    Pass
-                  </th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 border-b border-gray-200">
-                    Reject
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {currentRecordsOnPage.map((record) => {
-                  if (expandedRowKey && record.uniqueKey !== expandedRowKey) {
-                    return null; // Hide other rows when one is expanded
-                  }
-                  const metrics = calculateGroupMetrics(record);
-                  return (
-                    <React.Fragment key={record.uniqueKey}>
-                      <tr className="hover:bg-blue-100">
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                          {record.inspection_date}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                          {record.line_no}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                          {record.mo_no}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200">
-                          {record.inspectionRepCount}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center">
-                          {metrics.totalCheckedQty || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center">
-                          {metrics.totalRejectGarmentCount || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center">
-                          {metrics.totalDefectsQty || 0}
-                        </td>
-                        <td
-                          className={`px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center ${getBackgroundColor(
-                            metrics.defectRate,
-                            "defectRate"
-                          )}`}
-                        >
-                          {metrics.defectRate || 0}
-                        </td>
-                        <td
-                          className={`px-4 py-2 text-sm text-gray-700 border border-gray-200 text-center ${getBackgroundColor(
-                            metrics.defectRatio,
-                            "defectRatio"
-                          )}`}
-                        >
-                          {metrics.defectRatio || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-green-700 border border-gray-200 bg-green-50 text-center">
-                          {metrics.totalSpiPass || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-red-700 border border-gray-200 bg-red-50 text-center">
-                          {metrics.totalSpiReject || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-green-700 border border-gray-200 bg-green-50 text-center">
-                          {metrics.totalMeasurementPass || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-red-700 border border-gray-200 bg-red-50 text-center">
-                          {metrics.totalMeasurementReject || 0}
-                        </td>
-                        <td className="px-4 py-2 text-sm text-gray-700 text-center  border border-gray-200">
-                          <button
-                            onClick={() =>
-                              handleToggleDetailView(record.uniqueKey)
-                            }
-                            className="text-blue-600 hover:text-blue-800"
-                          >
-                            <Eye size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                      {expandedRowKey === record.uniqueKey && (
-                        <tr>
-                          <RovingReportDetailView
-                            reportDetail={record}
-                            onClose={closeDetailView}
-                            calculateGroupMetrics={calculateGroupMetrics}
-                            filters={{
-                              startDate: formatDate(startDate), // Pass formatted dates
-                              endDate: endDate ? formatDate(endDate) : null,
-                              lineNo,
-                              moNo,
-                              buyer,
-                              operation,
-                              qcId
-                            }}
-                          />
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pass Rate</p>
+                    <p className={`text-2xl font-bold ${parseFloat(overallMetrics.overallPassRate) > 80 ? 'text-green-600 dark:text-green-400' : parseFloat(overallMetrics.overallPassRate) >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
+                      {overallMetrics.overallPassRate}%
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-full ${parseFloat(overallMetrics.overallPassRate) > 80 ? 'bg-green-100 dark:bg-green-900/30' : parseFloat(overallMetrics.overallPassRate) >= 50 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                    <TrendingUp className={`w-6 h-6 ${parseFloat(overallMetrics.overallPassRate) > 80 ? 'text-green-600 dark:text-green-400' : parseFloat(overallMetrics.overallPassRate) >= 50 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Defect Rate</p>
+                    <p className={`text-2xl font-bold ${parseFloat(overallMetrics.overallDefectRate) > 10 ? 'text-red-600 dark:text-red-400' : parseFloat(overallMetrics.overallDefectRate) >= 5 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+                      {overallMetrics.overallDefectRate}%
+                    </p>
+                  </div>
+                  <div className={`p-3 rounded-full ${parseFloat(overallMetrics.overallDefectRate) > 10 ? 'bg-red-100 dark:bg-red-900/30' : parseFloat(overallMetrics.overallDefectRate) >= 5 ? 'bg-yellow-100 dark:bg-yellow-900/30' : 'bg-green-100 dark:bg-green-900/30'}`}>
+                    <TrendingDown className={`w-6 h-6 ${parseFloat(overallMetrics.overallDefectRate) > 10 ? 'text-red-600 dark:text-red-400' : parseFloat(overallMetrics.overallDefectRate) >= 5 ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6 transition-colors duration-300">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Records</p>
+                    <p className="text-2xl font-bold text-gray-900 dark:text-white">{filteredData.length}</p>
+                  </div>
+                  <div className="p-3 bg-purple-100 dark:bg-purple-900/30 rounded-full">
+                    <Eye className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Filter Panel */}
+        <div className="mb-6">
+          <RovingReportFilterPane
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
+            lineNo={lineNo}
+            setLineNo={setLineNo}
+            lineNos={lineNos}
+            buyer={buyer}
+            setBuyer={setBuyer}
+            buyers={buyers}
+            operation={operation}
+            setOperation={setOperation}
+            operations={operations}
+            qcId={qcId}
+            setQcId={setQcId}
+            qcIds={qcIds}
+            moNo={moNo}
+            setMoNo={setMoNo}
+            moNos={moNos}
+            onClearFilters={handleClearFilters}
+            lastUpdated={lastUpdated}
+            formatTimestamp={formatTimestamp}
+          />
+        </div>
+
+        {/* Report Content */}
+        {filteredData.length === 0 ? (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-12 transition-colors duration-300">
+            <div className="text-center">
+              <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center">
+                <Activity className="w-8 h-8 text-gray-400 dark:text-gray-500" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Data Available</h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-4">No records found for the selected filters.</p>
+              <button
+                onClick={handleClearFilters}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white rounded-lg transition-colors duration-200"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden transition-colors duration-300">
+            {/* Table Header */}
+            <div className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-800 dark:to-blue-900 px-6 py-4">
+              <h2 className="text-xl font-semibold text-white">Quality Control Summary</h2>
+              <p className="text-blue-100 dark:text-blue-200 text-sm mt-1">
+                Showing {startIndex + 1}-{Math.min(endIndex, filteredData.length)} of {filteredData.length} records
+              </p>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                  <tr>
+                    <th rowSpan="2" className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Inspection Date
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Line No
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      MO No
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Inspections
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Checked Qty
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Reject Garments
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Defect Qty
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Defect Rate (%)
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
+                      Defect Ratio (%)
+                    </th>
+                    <th colSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 bg-blue-50 dark:bg-blue-900/20">
+                      SPI Results
+                    </th>
+                    <th colSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
+                      Measurement
+                    </th>
+                    <th rowSpan="2" className="px-4 py-3 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                  <tr className="bg-gray-50 dark:bg-gray-700">
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
+                      Pass
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-600 bg-red-50 dark:bg-red-900/20">
+                      Reject
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-600 bg-green-50 dark:bg-green-900/20">
+                      Pass
+                    </th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-gray-600 dark:text-gray-400 border-r border-gray-200 dark:border-gray-600 bg-red-50 dark:bg-red-900/20">
+                      Reject
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                  {currentRecordsOnPage.map((record, index) => {
+                    if (expandedRowKey && record.uniqueKey !== expandedRowKey) {
+                      return null; // Hide other rows when one is expanded
+                    }
+
+                    const metrics = calculateGroupMetrics(record);
+                    const isEvenRow = index % 2 === 0;
+
+                    return (
+                      <React.Fragment key={record.uniqueKey}>
+                        <tr className={`${
+                          isEvenRow 
+                            ? 'bg-white dark:bg-gray-800' 
+                            : 'bg-gray-50 dark:bg-gray-700/50'
+                        } hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors duration-150 border-b border-gray-100 dark:border-gray-600/50`}>
+                          <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100 font-medium border-r border-gray-200 dark:border-gray-600/50">
+                            {record.inspection_date}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600/50">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-300">
+                              {record.line_no}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600/50">
+                            <span className="font-medium">{record.mo_no}</span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center border-r border-gray-200 dark:border-gray-600/50">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-300">
+                              {record.inspectionRepCount}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-600/50">
+                            {metrics.totalCheckedQty || 0}
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50">
+                            <span className={`${metrics.totalRejectGarmentCount > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                              {metrics.totalRejectGarmentCount || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50">
+                            <span className={`${metrics.totalDefectsQty > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                              {metrics.totalDefectsQty || 0}
+                            </span>
+                          </td>
+                          <td className={`px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBackgroundColor(metrics.defectRate, "defectRate")}`}>
+                              {metrics.defectRate}%
+                            </span>
+                          </td>
+                          <td className={`px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50`}>
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getBackgroundColor(metrics.defectRatio, "defectRatio")}`}>
+                              {metrics.defectRatio}%
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50 bg-green-50 dark:bg-green-900/10">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">
+                              {metrics.totalSpiPass || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50 bg-red-50 dark:bg-red-900/10">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300">
+                              {metrics.totalSpiReject || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50 bg-green-50 dark:bg-green-900/10">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-300">
+                              {metrics.totalMeasurementPass || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center font-semibold border-r border-gray-200 dark:border-gray-600/50 bg-red-50 dark:bg-red-900/10">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-300">
+                              {metrics.totalMeasurementReject || 0}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 text-sm text-center">
+                            <button
+                              onClick={() => handleToggleDetailView(record.uniqueKey)}
+                              className="inline-flex items-center p-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full transition-colors duration-150"
+                              title="View Details"
+                            >
+                              <Eye size={18} />
+                            </button>
+                          </td>
                         </tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
 
-          {/* Pagination */}
-          <div className="flex justify-between items-center mt-6">
-            <button
-              onClick={handlePrevPage}
-              disabled={currentPage === 0}
-              className={`px-4 py-2 rounded-md ${
-                currentPage === 0
-                  ? "bg-gray-300 cursor-not-allowed"
-                  : "bg-blue-500 text-white hover:bg-blue-600"
-              }`}
-            >
-              Previous
-            </button>
-            <span className="text-sm text-gray-700">
-              Page {totalPages > 0 ? validCurrentPage + 1 : 0} of {totalPages}
-            </span>
-            <button
-              onClick={handleNextPage}
-              disabled={currentPage >= totalPages - 1 || totalPages === 0}
-              className={`px-4 py-2 rounded-md ${
-                currentPage === totalPages - 1
-                  ? "bg-gray-300 cursor-not-allowed"
-                  : "bg-blue-500 text-white hover:bg-blue-600"
-              }`}
-            >
-              Next
-            </button>
+                        {expandedRowKey === record.uniqueKey && (
+                          <tr>
+                            <td colSpan="14" className="p-0">
+                              <div className="bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+                                <RovingReportDetailView
+                                  reportDetail={record}
+                                  onClose={closeDetailView}
+                                  calculateGroupMetrics={calculateGroupMetrics}
+                                  filters={{
+                                    startDate: formatDate(startDate),
+                                    endDate: endDate ? formatDate(endDate) : null,
+                                    lineNo,
+                                    moNo,
+                                    buyer,
+                                    operation,
+                                    qcId
+                                  }}
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-t border-gray-200 dark:border-gray-600 transition-colors duration-300">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center text-sm text-gray-700 dark:text-gray-300">
+                  <span>
+                    Showing <span className="font-medium">{startIndex + 1}</span> to{" "}
+                    <span className="font-medium">{Math.min(endIndex, filteredData.length)}</span> of{" "}
+                    <span className="font-medium">{filteredData.length}</span> results
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={handlePrevPage}
+                    disabled={currentPage === 0}
+                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+                      currentPage === 0
+                        ? "bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
+                    }`}
+                  >
+                    Previous
+                  </button>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      let pageNum;
+                      if (totalPages <= 5) {
+                        pageNum = i;
+                      } else if (currentPage < 3) {
+                        pageNum = i;
+                      } else if (currentPage > totalPages - 4) {
+                        pageNum = totalPages - 5 + i;
+                      } else {
+                        pageNum = currentPage - 2 + i;
+                      }
+
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setCurrentPage(pageNum)}
+                          className={`relative inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors duration-150 ${
+                            currentPage === pageNum
+                              ? "bg-blue-600 dark:bg-blue-700 text-white"
+                              : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700"
+                          }`}
+                        >
+                          {pageNum + 1}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={handleNextPage}
+                    disabled={currentPage >= totalPages - 1 || totalPages === 0}
+                    className={`relative inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 ${
+                      currentPage >= totalPages - 1 || totalPages === 0
+                        ? "bg-gray-100 dark:bg-gray-600 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+                        : "bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100"
+                    }`}
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
+        )}
+
+        {/* Footer with additional info */}
+        <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+          <p>Data refreshes automatically every 10 seconds • Last update: {formatTimestamp(lastUpdated)}</p>
         </div>
-      )}
+      </div>
     </div>
   );
 };
 
 export default RovingReport;
+
