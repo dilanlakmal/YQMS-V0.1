@@ -2,6 +2,14 @@ import mongoose from "mongoose";
 
 
 const documentSchema = new mongoose.Schema({
+    customer: {
+        type: String,
+    },
+    type: {
+        type: String,
+        required: true,
+        enum: ["instruction", "glossary"]
+    },
     filename: {
         type: String
     },

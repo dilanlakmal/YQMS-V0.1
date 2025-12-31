@@ -7,6 +7,7 @@ const imageSchema = new mongoose.Schema({
 })
 
 const extractionSchema = new mongoose.Schema({
+    documentId: {type: String, default: ''},
     customer: {type: String},
     pageNumber: {type: Number},
     content: {type: String},
@@ -17,5 +18,5 @@ const extractionSchema = new mongoose.Schema({
 }, {timestamps: true})
 
 export default function createConversationModel(connection) {
-    return connection.model("pt_extract", extractionSchema);
+    return connection.model("pt_page_extractions", extractionSchema);
 }   
