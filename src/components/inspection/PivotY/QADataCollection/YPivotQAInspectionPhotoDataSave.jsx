@@ -380,6 +380,7 @@ const YPivotQAInspectionPhotoDataSave = ({
       <YPivotQATemplatesPhotos
         allowedSectionIds={allowedSectionIds}
         reportData={reportData}
+        reportId={reportId}
         onUpdatePhotoData={onUpdatePhotoData}
       />
 

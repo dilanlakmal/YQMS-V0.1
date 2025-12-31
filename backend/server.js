@@ -279,6 +279,11 @@ import OverView from "./routes/YDT/CoverPage/overViewRoutes.js";
 ------------------------------ */
 import ceMasterRoutes from "./modules/CESystem/Routes/CEMasterRoutes.js";
 import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes.js";
+
+/* -----------------------------
+  Humidity
+------------------------------ */
+import huminityRoutes from "./routes/huminity/huminityRoutes.js";
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -580,7 +585,10 @@ app.use(OverView);
 ------------------------------ */
 app.use(ceMasterRoutes);
 app.use(ceTargetMasterRoutes);
-
+/* -----------------------------
+ Humidity Imports
+------------------------------ */
+app.use(huminityRoutes);
 
 // process.on("SIGINT", async () => {
 //   try {

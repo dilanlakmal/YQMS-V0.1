@@ -254,6 +254,14 @@ function Home() {
             title: "Print QR",
             description: "Sewing Worker QR Code",
             version: '0.1',
+          },
+          {
+            path: "/humidity-report",
+            roles: ["QA"],
+            image: "assets/Home/Humidity.jpg",
+            title: "Humidity Report",
+            description: "View Humidity Report",
+            version: '0.1',
           }
         ]
       },

@@ -127,7 +127,10 @@ export const getYorksysOrderFilterOptions = async (req, res) => {
 export const getYorksysOrdersPagination = async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
+    // Allow limit to be 0 for "all records", otherwise default to 10
+    let limit = parseInt(req.query.limit);
+    if (isNaN(limit)) limit = 10;
+
     const skip = (page - 1) * limit;
 
     // --- Build Filter Object ---
@@ -142,11 +145,15 @@ export const getYorksysOrdersPagination = async (req, res) => {
       filter.style = { $regex: new RegExp(req.query.style, "i") };
 
     // Fetch filtered data and total count in parallel
+    let query = YorksysOrders.find(filter).sort({ createdAt: -1 });
+
+    // Apply pagination only if limit is greater than 0
+    if (limit > 0) {
+      query = query.skip(skip).limit(limit);
+    }
+
     const [orders, totalRecords] = await Promise.all([
-      YorksysOrders.find(filter) // Apply the filter
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      query,
       YorksysOrders.countDocuments(filter) // Count only filtered documents
     ]);
 
