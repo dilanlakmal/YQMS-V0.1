@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../components/authentication/AuthContext";
 import { API_BASE_URL } from "../../config";
 import OrderDetailsSection from "../components/inspection/qc2_washing/Home/OrderDetailsSection";
@@ -11,6 +11,15 @@ import imageCompression from "browser-image-compression";
 import SubmittedWashingDataPage from "../components/inspection/qc2_washing/Home/SubmittedWashingData";
 import { useTranslation } from "react-i18next";
 import SubConEdit from "../components/inspection/qc2_washing/Home/SubConEdit";
+import { encodeColorForUrl } from "../utils/colorUtils";
+import {
+  Shield,
+  Sparkles,
+  User,
+  ClipboardList,
+  Edit,
+  BarChart3
+} from "lucide-react";
 
 const normalizeImageSrc = (src) => {
   if (!src) return "";
@@ -172,16 +181,16 @@ const initializeDefaultCheckpointData = async () => {
   }
 };
 
-function normalizeImagePreview(img) {
-  if (!img) return "";
-  if (typeof img === "string") return img;
-  if (typeof img === "object" && img.preview) {
-    return typeof img.preview === "string"
-      ? img.preview
-      : img.preview.preview || "";
-  }
-  return "";
-}
+// function normalizeImagePreview(img) {
+//   if (!img) return "";
+//   if (typeof img === "string") return img;
+//   if (typeof img === "object" && img.preview) {
+//     return typeof img.preview === "string"
+//       ? img.preview
+//       : img.preview.preview || "";
+//   }
+//   return "";
+// }
 
 function calculateSummaryData(currentFormData) {
   const currentDefectDetails = currentFormData.defectDetails;
@@ -207,28 +216,38 @@ function calculateSummaryData(currentFormData) {
   });
 
   // If no measurement data, fallback to checkedQty from form
+  const checkedQty = parseInt(currentFormData.checkedQty, 10) || 0;
   if (totalCheckedPcs === 0) {
     totalCheckedPcs = parseInt(currentFormData.checkedQty, 10) || 0;
   }
 
-  // 2. Calculate measurement points and passes (for measurement statistics only)
+  // 2. Calculate measurement points and passes using measurementSizeSummary if available
   let measurementPoints = 0;
   let measurementPass = 0;
 
-  measurementArray.forEach((data) => {
-    if (Array.isArray(data.pcs)) {
-      data.pcs.forEach((pc) => {
-        if (Array.isArray(pc.measurementPoints)) {
-          pc.measurementPoints.forEach((point) => {
-            if (point.result === "pass" || point.result === "fail") {
-              measurementPoints++;
-              if (point.result === "pass") measurementPass++;
-            }
-          });
-        }
-      });
-    }
-  });
+  // Check if measurementSizeSummary exists (same as backend logic)
+  if (currentMeasurementDetails?.measurementSizeSummary?.length > 0) {
+    currentMeasurementDetails.measurementSizeSummary.forEach((sizeData) => {
+      measurementPoints += sizeData.checkedPoints || 0;
+      measurementPass += sizeData.totalPass || 0;
+    });
+  } else {
+    // Fallback: Calculate from measurement array
+    measurementArray.forEach((data) => {
+      if (Array.isArray(data.pcs)) {
+        data.pcs.forEach((pc) => {
+          if (Array.isArray(pc.measurementPoints)) {
+            pc.measurementPoints.forEach((point) => {
+              if (point.result === "pass" || point.result === "fail") {
+                measurementPoints++;
+                if (point.result === "pass") measurementPass++;
+              }
+            });
+          }
+        });
+      }
+    });
+  }
 
   // 3. Defect calculations
   const rejectedDefectPcs = Array.isArray(currentDefectDetails?.defectsByPc)
@@ -261,52 +280,28 @@ function calculateSummaryData(currentFormData) {
       ? Number(((rejectedDefectPcs / totalCheckedPcs) * 100).toFixed(1))
       : 0;
 
-  // 5. Result logic - handle SOP differently
+  // 5. SIMPLIFIED LOGIC - only consider defectDetails.result and pass rate >= 95%
   let overallResult = "Pending";
-  const measurementOverallResult =
-    measurementPoints === 0
-      ? "Pending"
-      : measurementPoints - measurementPass > 0
-      ? "Fail"
-      : "Pass";
-  const defectOverallResult = currentDefectDetails?.result || "Pending";
+  const savedDefectResult = currentDefectDetails?.result || "Pending";
 
-  // Check if this is SOP report type
-  const isSOP =
-    currentFormData.reportType === "SOP" ||
-    currentFormData.reportType === "sop" ||
-    (currentFormData.reportType === "" &&
-      currentFormData.inline === "" &&
-      currentFormData.firstOutput === "");
+  // Calculate measurement pass rate - default to 100% when no measurement points
+  const measurementPassRate =
+    measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
 
-  if (isSOP) {
-    // For SOP, both measurement and defect results must be "Pass"
-    // The measurement result is based on a 95% pass rate threshold.
-    const measurementPassRate =
-      measurementPoints > 0 ? (measurementPass / measurementPoints) * 100 : 100;
-    const isMeasurementPass = measurementPassRate >= 95;
-    const isDefectPass = defectCount === 0 && rejectedDefectPcs === 0;
-
-    if (isMeasurementPass && isDefectPass) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Fail";
-    }
+  // Overall result: Pass only if defect result is Pass AND pass rate >= 95%
+  if (savedDefectResult === "Pass" && measurementPassRate >= 95.0) {
+    overallResult = "Pass";
+  } else if (
+    savedDefectResult === "Fail" ||
+    (measurementPoints > 0 && measurementPassRate < 95.0)
+  ) {
+    overallResult = "Fail";
   } else {
-    // For Inline/First Output: Use measurement + defect logic
-    if (measurementOverallResult === "Fail" || defectOverallResult === "Fail") {
-      overallResult = "Fail";
-    } else if (
-      measurementOverallResult === "Pass" &&
-      defectOverallResult === "Pass"
-    ) {
-      overallResult = "Pass";
-    } else {
-      overallResult = "Pending";
-    }
+    overallResult = "Pending";
   }
 
   return {
+    checkedQty: checkedQty, // Ensure checkedQty is a number
     totalCheckedPcs: totalCheckedPcs || 0, // This should be the sum of qty from each size
     rejectedDefectPcs: rejectedDefectPcs || 0,
     totalDefectCount: defectCount || 0,
@@ -339,30 +334,6 @@ function machineProcessesToObject(machineProcesses) {
     }
   });
   return obj;
-}
-
-function fractionToDecimal(fraction) {
-  if (typeof fraction === "number") return fraction;
-  if (!fraction || typeof fraction !== "string") return 0;
-  // Remove + or - for parsing, but keep sign
-  let sign = 1;
-  let str = fraction.trim();
-  if (str.startsWith("-")) {
-    sign = -1;
-    str = str.slice(1);
-  }
-  if (str.startsWith("+")) {
-    str = str.slice(1);
-  }
-  if (str === "" || str === "-") return 0;
-  if (str.includes("/")) {
-    const [num, den] = str.split("/").map(Number);
-    if (!isNaN(num) && !isNaN(den) && den !== 0) {
-      return sign * (num / den);
-    }
-  }
-  const parsed = parseFloat(str);
-  return isNaN(parsed) ? 0 : sign * parsed;
 }
 
 const QCWashingPage = () => {
@@ -571,17 +542,6 @@ const QCWashingPage = () => {
     }
   });
 
-  // Helper function to get English fiber remarks
-  const getFiberRemarkInEnglish = (decision) => {
-    const englishRemarks = {
-      1: "Cleaning must be done by fabric mill.",
-      2: "YM doing the cleaning, front & back side.",
-      3: "Randomly 2-3 pcs back side hairly can acceptable."
-    };
-
-    return englishRemarks[decision] || "";
-  };
-
   // Helper function to convert English fiber remarks to current language
   const convertEnglishToCurrentLanguage = (englishRemark, t) => {
     const englishToDecisionMap = {
@@ -672,7 +632,8 @@ const QCWashingPage = () => {
       (formData.inline === "Inline" ||
         formData.reportType === "Inline" ||
         formData.firstOutput === "First Output" ||
-        formData.reportType === "First Output") &&
+        formData.reportType === "First Output" ||
+        formData.reportType === "SOP") &&
       aql?.acceptedDefect !== undefined
     ) {
       const defectCheckedQty = parseInt(formData.checkedQty, 10) || 0;
@@ -719,18 +680,30 @@ const QCWashingPage = () => {
         return;
       }
       try {
+        // Clean and encode the color parameter properly
+        const encodedColor = encodeColorForUrl(formData.color);
+
         const response = await fetch(
-          `${API_BASE_URL}/api/qc-washing/order-color-qty/${
-            formData.orderNo
-          }/${encodeURIComponent(formData.color)}`
+          `${API_BASE_URL}/api/qc-washing/order-color-qty/${formData.orderNo}/${encodedColor}`
         );
+
+        if (!response.ok) {
+          console.warn(
+            `Failed to fetch color order qty: ${response.status} ${response.statusText}`
+          );
+          setColorOrderQty(null);
+          return;
+        }
+
         const data = await response.json();
         if (data.success) {
           setColorOrderQty(data.colorOrderQty);
         } else {
+          console.warn("Color order qty fetch unsuccessful:", data.message);
           setColorOrderQty(null);
         }
       } catch (error) {
+        console.error("Error fetching color order qty:", error);
         setColorOrderQty(null);
       }
     };
@@ -998,11 +971,7 @@ const QCWashingPage = () => {
           ...prev,
           orderQty: orderData.orderQty || "",
           buyer: orderData.buyer || "",
-          color:
-            prev.color ||
-            (orderData.colors && orderData.colors.length > 0
-              ? orderData.colors[0]
-              : "")
+          color: ""
         }));
       } else {
         throw new Error(
@@ -2492,382 +2461,418 @@ const QCWashingPage = () => {
     }
   }, [recordId, masterChecklist.length]);
 
-  const PageTitle = () => (
-    <div className="text-center">
-      <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
-        Yorkmars (Cambodia) Garment MFG Co., LTD
-      </h1>
-      <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
-        QC Washing
-        {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
-      </p>
-    </div>
-  );
+  // const PageTitle = () => (
+  //   <div className="text-center">
+  //     <h1 className="text-xl md:text-2xl font-bold text-indigo-700 tracking-tight">
+  //       Yorkmars (Cambodia) Garment MFG Co., LTD
+  //     </h1>
+  //     <p className="text-xs sm:text-sm md:text-base text-slate-600 mt-0.5 md:mt-1">
+  //       QC Washing
+  //       {user && ` | ${user.job_title || "Operator"} | ${user.emp_id}`}
+  //     </p>
+  //   </div>
+  // );
+
+  const tabs = [
+    {
+      id: "newInspection",
+      label: "New Inspection",
+      icon: <ClipboardList size={20} />,
+      description: "Create New QC Inspection"
+    },
+    {
+      id: "subConEditQty",
+      label: "Sub_Con Edit",
+      icon: <Edit size={20} />,
+      description: "Edit Sub Contractor Data"
+    },
+    {
+      id: "submittedData",
+      label: "Daily View",
+      icon: <BarChart3 size={20} />,
+      description: "View Daily Reports"
+    }
+  ];
+
+  const activeTabData = tabs.find((tab) => tab.id === activeTab);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-gray-100 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4 md:p-6">
-      <PageTitle />
-      <div className=" border-b border-gray-300 dark:border-gray-700 mb-6 mt-4">
-        <nav className="-mb-px flex justify-center space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => handleTabChange("newInspection")}
-            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === "newInspection"
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-          >
-            New Inspection
-          </button>
-          <button
-            onClick={() => handleTabChange("subConEditQty")}
-            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === "subConEditQty"
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-          >
-            Sub_Con Edit
-          </button>
-          <button
-            onClick={() => handleTabChange("submittedData")}
-            className={`group inline-flex items-center py-4 px-2 border-b-2 font-medium text-sm whitespace-nowrap
-                          ${
-                            activeTab === "submittedData"
-                              ? "border-indigo-500 text-indigo-600 dark:text-indigo-400"
-                              : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500"
-                          }`}
-          >
-            Daily View
-          </button>
-        </nav>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+      {/* Background Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
-      <main
-        className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
-          activeTab === "submittedData" || activeTab === "subConEditQty"
-            ? "max-w-none px-2 sm:px-4 lg:px-6"
-            : "max-w-7xl px-4 sm:px-6 lg:px-8"
-        }`}
-      >
-        {activeTab === "newInspection" && (
-          <>
-            <OverAllSummaryCard
-              summary={{
-                ...formData,
-                checkedQty: Number(formData.checkedQty) || 0,
-                washQty: Number(formData.washQty) || 0,
-                // Include inspection details for proper calculation
-                inspectionDetails: {
-                  checkpointInspectionData: checkpointInspectionData
-                }
-              }}
-              recordId={recordId}
-              onSummaryUpdate={(updatedSummary) => {
-                setFormData((prev) => ({
-                  ...prev,
-                  ...updatedSummary,
-                  // Ensure these critical fields are updated
-                  overallFinalResult: updatedSummary.overallFinalResult,
-                  totalCheckedPcs: updatedSummary.totalCheckedPcs,
-                  rejectedDefectPcs: updatedSummary.rejectedDefectPcs,
-                  totalDefectCount: updatedSummary.totalDefectCount,
-                  defectRate: updatedSummary.defectRate,
-                  defectRatio: updatedSummary.defectRatio
-                }));
-              }}
-              measurementData={formData.measurementDetails}
-              defectDetails={formData.defectDetails}
-              before_after_wash={formData.before_after_wash}
-              showMeasurementTable={showMeasurementTable}
-            />
-            <OrderDetailsSection
-              onLoadSavedDataById={loadSavedDataById}
-              setSavedSizes={setSavedSizes}
-              formData={formData}
-              setFormData={setFormData}
-              handleInputChange={handleInputChange}
-              fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
-              colorOptions={colorOptions}
-              subFactories={subFactories}
-              user={user}
-              isVisible={orderSectionVisible}
-              onToggle={toggleOrderSection}
-              activateNextSection={activateAllSections}
-              styleSuggestions={styleSuggestions}
-              fetchMatchingStyles={fetchMatchingStyles}
-              setStyleSuggestions={setStyleSuggestions}
-              orderNumbers={filteredOrderNumbers}
-              filterOrderNumbers={filterOrderNumbers}
-              orderNoSuggestions={orderNoSuggestions}
-              showOrderNoSuggestions={showOrderNoSuggestions}
-              setShowOrderNoSuggestions={setShowOrderNoSuggestions}
-              colorOrderQty={colorOrderQty}
-              inspectionData={inspectionData}
-              processData={processData}
-              defectData={defectData}
-              addedDefects={addedDefects}
-              comment={comment}
-              measurementData={measurementData}
-              uploadedImages={uploadedImages}
-              setRecordId={setRecordId}
-              isSaved={orderSectionSaved}
-              setIsSaved={setOrderSectionSaved}
-            />
-
-            {inspectionSectionVisible &&
-              formData.before_after_wash === "After Wash" && (
-                <InspectionDataSection
-                  onLoadSavedDataById={loadSavedDataById}
-                  inspectionData={inspectionData}
-                  setInspectionData={setInspectionData}
-                  processData={processData}
-                  setProcessData={setProcessData}
-                  defectData={defectData}
-                  isVisible={inspectionContentVisible} // Use content visibility state
-                  onToggle={toggleInspectionSection}
-                  machineType={machineType}
-                  setMachineType={setMachineType}
-                  washQty={formData.washQty}
-                  setDefectData={setDefectData}
-                  recordId={recordId}
-                  washType={formData.washType}
-                  standardValues={standardValues}
-                  setStandardValues={setStandardValues}
-                  actualValues={actualValues}
-                  setActualValues={setActualValues}
-                  machineStatus={machineStatus}
-                  setMachineStatus={setMachineStatus}
-                  normalizeImageSrc={normalizeImageSrc}
-                  checkpointInspectionData={checkpointInspectionData}
-                  setCheckpointInspectionData={setCheckpointInspectionData}
-                  timeCoolEnabled={timeCoolEnabled}
-                  setTimeCoolEnabled={setTimeCoolEnabled}
-                  timeHotEnabled={timeHotEnabled}
-                  setTimeHotEnabled={setTimeHotEnabled}
-                  checkpointDefinitions={checkpointDefinitions}
-                />
+      {/* Header Section */}
+      <div className="relative bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 shadow-2xl">
+        <div className="absolute inset-0 bg-black/10"></div>
+        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]"></div>
+        <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-3 lg:py-5">
+          {/* MOBILE/TABLET LAYOUT (< lg) */}
+          <div className="lg:hidden space-y-3">
+            {/* Top Row: Title + User */}
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                  <Shield size={20} className="text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <h1 className="text-sm sm:text-base font-black text-white tracking-tight truncate">
+                      QC Washing System
+                    </h1>
+                    <div className="flex items-center gap-1 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
+                      <Sparkles size={10} className="text-yellow-300" />
+                      <span className="text-[10px] font-bold text-white">
+                        PRO
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] sm:text-xs text-indigo-100 font-medium truncate">
+                    Quality Control & Inspection Management
+                  </p>
+                </div>
+              </div>
+              {user && (
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
+                  <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow-lg">
+                    <User size={16} className="text-white" />
+                  </div>
+                  <div className="hidden sm:block">
+                    <p className="text-white font-bold text-xs leading-tight">
+                      {user.job_title || "Operator"}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      ID: {user.emp_id}
+                    </p>
+                  </div>
+                </div>
               )}
+            </div>
 
-            {/* Only render when defectSectionVisible is true */}
-            {defectSectionVisible && (
-              <DefectDetailsSection
-                onLoadSavedDataById={loadSavedDataById}
-                formData={formData}
-                handleInputChange={handleInputChange}
-                defectOptions={defectOptions}
-                addedDefects={addedDefects}
-                setAddedDefects={setAddedDefects}
-                uploadedImages={uploadedImages}
-                setUploadedImages={setUploadedImages}
-                isVisible={defectContentVisible} // Use content visibility state
-                onToggle={toggleDefectSection}
-                defectStatus={formData.result}
-                recordId={recordId}
-                defectsByPc={defectsByPc}
-                setDefectsByPc={setDefectsByPc}
-                comment={comment}
-                setComment={setComment}
-                normalizeImageSrc={normalizeImageSrc}
-              />
-            )}
+            {/* Tab Navigation - Mobile */}
+            <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5 min-w-max">
+                {tabs.map((tab) => {
+                  const isActive = activeTab === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => handleTabChange(tab.id)}
+                      className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                        isActive
+                          ? "bg-white shadow-lg scale-105"
+                          : "bg-transparent hover:bg-white/20 hover:scale-102"
+                      }`}
+                    >
+                      <div
+                        className={`transition-colors duration-300 ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {React.cloneElement(tab.icon, { className: "w-4 h-4" })}
+                      </div>
+                      <span
+                        className={`text-[10px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                          isActive ? "text-indigo-600" : "text-white"
+                        }`}
+                      >
+                        {tab.label}
+                      </span>
+                      {isActive && (
+                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            {/* Only render when measurementSectionVisible is true */}
-            {measurementSectionVisible && (
-              <MeasurementDetailsSection
-                onLoadSavedDataById={loadSavedDataById}
-                orderNo={formData.orderNo || formData.style}
-                color={formData.color}
-                before_after_wash={formData.before_after_wash}
-                isVisible={measurementContentVisible} // Use content visibility state
-                onToggle={toggleMeasurementSection}
-                savedSizes={savedSizes}
-                setSavedSizes={setSavedSizes}
-                onSizeSubmit={handleSizeSubmit}
-                measurementData={measurementData}
-                showMeasurementTable={showMeasurementTable}
-                onMeasurementEdit={handleMeasurementEdit}
-                onMeasurementChange={handleMeasurementChange}
-                recordId={recordId}
-              />
-            )}
+            {/* Active Status Indicator */}
+            <div className="flex items-center justify-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-3 py-2">
+              <div className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+              </div>
+              <div>
+                <p className="text-white font-bold text-xs leading-tight">
+                  {activeTabData?.label}
+                </p>
+                <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                  Active Module
+                </p>
+              </div>
+            </div>
+          </div>
 
-            <div className="flex justify-end space-x-4">
-              <button
-                className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                onClick={async () => {
-                  // Show confirmation dialog first
-                  const result = await Swal.fire({
-                    title: "Are you sure?",
-                    text: "Do you want to submit this QC Washing data?",
-                    icon: "question",
-                    showCancelButton: true,
-                    confirmButtonColor: "#3085d6",
-                    cancelButtonColor: "#d33",
-                    confirmButtonText: "Yes, Submit!",
-                    cancelButtonText: "No, Cancel",
-                    reverseButtons: true
-                  });
+          {/* DESKTOP LAYOUT (>= lg) */}
+          <div className="hidden lg:flex lg:flex-col lg:gap-0">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-6 flex-1">
+                {/* Logo Area */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                    <Shield size={24} className="text-white" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h1 className="text-2xl font-black text-white tracking-tight">
+                        QC Washing System
+                      </h1>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
+                        <Sparkles size={12} className="text-yellow-300" />
+                        <span className="text-xs font-bold text-white">
+                          PRO
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-sm text-indigo-100 font-medium">
+                      Quality Control & Inspection Management Dashboard
+                    </p>
+                  </div>
+                </div>
 
-                  // If user clicked "No" or closed the dialog, return early
-                  if (!result.isConfirmed) {
-                    return;
-                  }
+                {/* Tab Navigation - Desktop */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-2">
+                    {tabs.map((tab) => {
+                      const isActive = activeTab === tab.id;
+                      return (
+                        <button
+                          key={tab.id}
+                          onClick={() => handleTabChange(tab.id)}
+                          className={`group relative flex flex-col items-center gap-1 px-4 py-2 rounded-lg transition-all duration-300 ${
+                            isActive
+                              ? "bg-white shadow-lg scale-105"
+                              : "bg-transparent hover:bg-white/20 hover:scale-102"
+                          }`}
+                        >
+                          <div
+                            className={`transition-colors duration-300 ${
+                              isActive ? "text-indigo-600" : "text-white"
+                            }`}
+                          >
+                            {React.cloneElement(tab.icon, {
+                              className: "w-5 h-5"
+                            })}
+                          </div>
+                          <span
+                            className={`text-xs font-bold transition-colors duration-300 ${
+                              isActive ? "text-indigo-600" : "text-white"
+                            }`}
+                          >
+                            {tab.label}
+                          </span>
+                          {isActive && (
+                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-green-400 rounded-full shadow-lg animate-pulse"></div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
 
-                  try {
-                    // --- 1. Recalculate summary with the latest state ---
-                    const defectDetails = {
-                      ...formData.defectDetails,
-                      checkedQty: formData.checkedQty,
-                      washQty: formData.washQty,
-                      result: formData.result,
-                      defectsByPc: Object.entries(defectsByPc).map(
-                        ([pcNumber, pcDefects]) => ({
-                          pcNumber,
-                          pcDefects
-                        })
-                      )
-                    };
+                  {/* Status Indicator */}
+                  <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5">
+                    <div className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400"></span>
+                    </div>
+                    <div>
+                      <p className="text-white font-bold text-sm leading-tight">
+                        {activeTabData?.label}
+                      </p>
+                      <p className="text-indigo-200 text-xs font-medium leading-tight">
+                        {activeTabData?.description}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
-                    const measurementDetails = {
-                      measurement: [
-                        ...measurementData.beforeWash.map((item) => ({
-                          ...item,
-                          before_after_wash: "beforeWash"
-                        })),
-                        ...measurementData.afterWash.map((item) => ({
-                          ...item,
-                          before_after_wash: "afterWash"
-                        }))
-                      ]
-                    };
+              {/* User Info */}
+              {user && (
+                <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-2.5 shadow-xl">
+                  <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow-lg">
+                    <User size={20} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
+                      {user.job_title || "Operator"}
+                    </p>
+                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      ID: {user.emp_id}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
-                    const summary = calculateSummaryData({
-                      ...formData,
-                      defectDetails,
-                      measurementDetails
-                    });
+      {/* Main Content Area */}
+      <div className="relative max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 pb-8 pt-6">
+        <div className="animate-fadeIn">
+          {/* Tab Content */}
+          <main
+            className={`mx-auto py-6 space-y-6 dark:bg-slate-900 ${
+              activeTab === "submittedData" || activeTab === "subConEditQty"
+                ? "max-w-none px-2 sm:px-4 lg:px-6"
+                : "max-w-7xl px-4 sm:px-6 lg:px-8"
+            }`}
+          >
+            {activeTab === "newInspection" && (
+              <>
+                <OverAllSummaryCard summary={formData} />
 
-                    // --- 2. Build the submitData payload ---
-                    const {
-                      totalCheckedPoint,
-                      totalPass,
-                      totalFail,
-                      passRate
-                    } = getMeasurementStats();
-                    const aql = formData.aql && formData.aql[0];
+                <OrderDetailsSection
+                  onLoadSavedDataById={loadSavedDataById}
+                  setSavedSizes={setSavedSizes}
+                  formData={formData}
+                  setFormData={setFormData}
+                  handleInputChange={handleInputChange}
+                  fetchOrderDetailsByStyle={fetchOrderDetailsByStyle}
+                  colorOptions={colorOptions}
+                  subFactories={subFactories}
+                  user={user}
+                  isVisible={orderSectionVisible}
+                  onToggle={toggleOrderSection}
+                  activateNextSection={activateAllSections}
+                  styleSuggestions={styleSuggestions}
+                  fetchMatchingStyles={fetchMatchingStyles}
+                  setStyleSuggestions={setStyleSuggestions}
+                  orderNumbers={filteredOrderNumbers}
+                  filterOrderNumbers={filterOrderNumbers}
+                  orderNoSuggestions={orderNoSuggestions}
+                  showOrderNoSuggestions={showOrderNoSuggestions}
+                  setShowOrderNoSuggestions={setShowOrderNoSuggestions}
+                  colorOrderQty={colorOrderQty}
+                  inspectionData={inspectionData}
+                  processData={processData}
+                  defectData={defectData}
+                  addedDefects={addedDefects}
+                  comment={comment}
+                  measurementData={measurementData}
+                  uploadedImages={uploadedImages}
+                  setRecordId={setRecordId}
+                  isSaved={orderSectionSaved}
+                  setIsSaved={setOrderSectionSaved}
+                />
 
-                    const submitAql = [
-                      {
-                        sampleSize: Number(aql?.sampleSize) || 0,
-                        acceptedDefect: Number(aql?.acceptedDefect) || 0,
-                        rejectedDefect: Number(aql?.rejectedDefect) || 0,
-                        levelUsed: Number(aql?.levelUsed) || 0
+                {inspectionSectionVisible &&
+                  formData.before_after_wash === "After Wash" && (
+                    <InspectionDataSection
+                      onLoadSavedDataById={loadSavedDataById}
+                      inspectionData={inspectionData}
+                      setInspectionData={setInspectionData}
+                      processData={processData}
+                      setProcessData={setProcessData}
+                      defectData={defectData}
+                      isVisible={inspectionContentVisible}
+                      onToggle={toggleInspectionSection}
+                      machineType={machineType}
+                      setMachineType={setMachineType}
+                      washQty={formData.washQty}
+                      setDefectData={setDefectData}
+                      recordId={recordId}
+                      washType={formData.washType}
+                      standardValues={standardValues}
+                      setStandardValues={setStandardValues}
+                      actualValues={actualValues}
+                      setActualValues={setActualValues}
+                      machineStatus={machineStatus}
+                      setMachineStatus={setMachineStatus}
+                      normalizeImageSrc={normalizeImageSrc}
+                      checkpointInspectionData={checkpointInspectionData}
+                      setCheckpointInspectionData={setCheckpointInspectionData}
+                      timeCoolEnabled={timeCoolEnabled}
+                      setTimeCoolEnabled={setTimeCoolEnabled}
+                      timeHotEnabled={timeHotEnabled}
+                      setTimeHotEnabled={setTimeHotEnabled}
+                      checkpointDefinitions={checkpointDefinitions}
+                    />
+                  )}
+
+                {defectSectionVisible && (
+                  <DefectDetailsSection
+                    onLoadSavedDataById={loadSavedDataById}
+                    formData={formData}
+                    handleInputChange={handleInputChange}
+                    defectOptions={defectOptions}
+                    addedDefects={addedDefects}
+                    setAddedDefects={setAddedDefects}
+                    uploadedImages={uploadedImages}
+                    setUploadedImages={setUploadedImages}
+                    isVisible={defectContentVisible}
+                    onToggle={toggleDefectSection}
+                    defectStatus={formData.result}
+                    recordId={recordId}
+                    defectsByPc={defectsByPc}
+                    setDefectsByPc={setDefectsByPc}
+                    comment={comment}
+                    setComment={setComment}
+                    normalizeImageSrc={normalizeImageSrc}
+                  />
+                )}
+
+                {measurementSectionVisible && (
+                  <MeasurementDetailsSection
+                    onLoadSavedDataById={loadSavedDataById}
+                    orderNo={formData.orderNo || formData.style}
+                    color={formData.color}
+                    before_after_wash={formData.before_after_wash}
+                    isVisible={measurementContentVisible}
+                    onToggle={toggleMeasurementSection}
+                    savedSizes={savedSizes}
+                    setSavedSizes={setSavedSizes}
+                    onSizeSubmit={handleSizeSubmit}
+                    measurementData={measurementData}
+                    showMeasurementTable={showMeasurementTable}
+                    onMeasurementEdit={handleMeasurementEdit}
+                    onMeasurementChange={handleMeasurementChange}
+                    recordId={recordId}
+                  />
+                )}
+
+                <div className="flex justify-end space-x-4">
+                  <button
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                    onClick={async () => {
+                      // Show confirmation dialog first
+                      const result = await Swal.fire({
+                        title: "Are you sure?",
+                        text: "Do you want to submit this QC Washing data?",
+                        icon: "question",
+                        showCancelButton: true,
+                        confirmButtonColor: "#3085d6",
+                        cancelButtonColor: "#d33",
+                        confirmButtonText: "Yes, Submit!",
+                        cancelButtonText: "No, Cancel",
+                        reverseButtons: true
+                      });
+
+                      // If user clicked "No" or closed the dialog, return early
+                      if (!result.isConfirmed) {
+                        return;
                       }
-                    ];
 
-                    const submitData = {
-                      orderNo: formData.orderNo || formData.style,
-                      date: formData.date,
-                      colorName: formData.color,
-                      before_after_wash: formData.before_after_wash,
-                      washQty: formData.washQty,
-                      checkedQty: formData.checkedQty,
-                      totalCheckedPoint,
-                      totalPass,
-                      totalFail,
-                      passRate,
-                      submitAql,
-                      totalCheckedPcs: summary.totalCheckedPcs,
-                      rejectedDefectPcs: summary.rejectedDefectPcs,
-                      totalDefectCount: summary.totalDefectCount,
-                      defectRate: summary.defectRate,
-                      defectRatio: summary.defectRatio,
-                      overallFinalResult: summary.overallFinalResult,
-                      submittedAt: new Date().toISOString(),
-                      userId: user?.emp_id,
-
-                      color: {
-                        orderDetails: {
-                          ...formData,
-                          inspector: {
-                            empId: user?.emp_id,
-                            name: user?.username
-                          }
-                        },
-                        inspectionDetails: {
-                          temp: processData.temperature,
-                          time: processData.time,
-                          chemical: processData.chemical,
-                          checkedPoints: inspectionData.map((item) => ({
-                            pointName: item.checkedList,
-                            approvedDate: item.approvedDate,
-                            condition: item.na ? "N/A" : "Active",
-                            remark: item.remark
-                          })),
-                          parameters: defectData.map((item) => {
-                            const checkedQty = Number(item.checkedQty) || 0;
-                            const failedQty = Number(item.failedQty) || 0;
-                            const passRate =
-                              checkedQty > 0
-                                ? (
-                                    ((checkedQty - failedQty) / checkedQty) *
-                                    100
-                                  ).toFixed(2)
-                                : "0.00";
-                            const result =
-                              item.aqlAcceptedDefect !== undefined &&
-                              checkedQty > 0
-                                ? failedQty <= item.aqlAcceptedDefect
-                                  ? "Pass"
-                                  : "Fail"
-                                : "";
-                            return {
-                              parameterName: item.parameter,
-                              checkedQty: item.checkedQty || 0,
-                              failedQty: item.failedQty || 0,
-                              passRate,
-                              result,
-                              remark: item.remark,
-                              ok: item.ok,
-                              no: item.no,
-                              checkboxes: item.checkboxes || {}
-                            };
-                          })
-                        },
-                        defectDetails: {
-                          washQty: formData.washQty,
+                      try {
+                        // --- 1. Recalculate summary with the latest state ---
+                        const defectDetails = {
+                          ...formData.defectDetails,
                           checkedQty: formData.checkedQty,
+                          washQty: formData.washQty,
                           result: formData.result,
-                          defectsByPc: await Promise.all(
-                            Object.entries(defectsByPc).map(
-                              async ([pcKey, pcDefects]) => ({
-                                pcNumber: pcKey,
-                                pcDefects: await Promise.all(
-                                  (Array.isArray(pcDefects)
-                                    ? pcDefects
-                                    : []
-                                  ).map(async (defect) => ({
-                                    defectName: defect.selectedDefect,
-                                    defectQty: defect.defectQty,
-                                    defectImages: await Promise.all(
-                                      (defect.defectImages || []).map((img) =>
-                                        imageToBase64(img)
-                                      )
-                                    )
-                                  }))
-                                )
-                              })
-                            )
-                          ),
-                          comment: comment,
-                          additionalImages: await Promise.all(
-                            uploadedImages.map((img) => imageToBase64(img))
+                          defectsByPc: Object.entries(defectsByPc).map(
+                            ([pcNumber, pcDefects]) => ({
+                              pcNumber,
+                              pcDefects
+                            })
                           )
-                        },
-                        measurementDetails: {
+                        };
+
+                        const measurementDetails = {
                           measurement: [
                             ...measurementData.beforeWash.map((item) => ({
                               ...item,
@@ -2878,63 +2883,256 @@ const QCWashingPage = () => {
                               before_after_wash: "afterWash"
                             }))
                           ]
+                        };
+
+                        const summary = calculateSummaryData({
+                          ...formData,
+                          defectDetails,
+                          measurementDetails
+                        });
+
+                        // --- 2. Build the submitData payload ---
+                        const {
+                          totalCheckedPoint,
+                          totalPass,
+                          totalFail,
+                          passRate
+                        } = getMeasurementStats();
+                        const aql = formData.aql && formData.aql[0];
+
+                        const submitAql = [
+                          {
+                            sampleSize: Number(aql?.sampleSize) || 0,
+                            acceptedDefect: Number(aql?.acceptedDefect) || 0,
+                            rejectedDefect: Number(aql?.rejectedDefect) || 0,
+                            levelUsed: Number(aql?.levelUsed) || 0
+                          }
+                        ];
+
+                        const submitData = {
+                          orderNo: formData.orderNo || formData.style,
+                          date: formData.date,
+                          colorName: formData.color,
+                          before_after_wash: formData.before_after_wash,
+                          washQty: formData.washQty,
+                          checkedQty: formData.checkedQty,
+                          totalCheckedPoint,
+                          totalPass,
+                          totalFail,
+                          passRate,
+                          submitAql,
+                          totalCheckedPcs: summary.totalCheckedPcs,
+                          rejectedDefectPcs: summary.rejectedDefectPcs,
+                          totalDefectCount: summary.totalDefectCount,
+                          defectRate: summary.defectRate,
+                          defectRatio: summary.defectRatio,
+                          overallFinalResult: summary.overallFinalResult,
+                          submittedAt: new Date().toISOString(),
+                          userId: user?.emp_id,
+
+                          color: {
+                            orderDetails: {
+                              ...formData,
+                              inspector: {
+                                empId: user?.emp_id,
+                                name: user?.username
+                              }
+                            },
+                            inspectionDetails: {
+                              temp: processData.temperature,
+                              time: processData.time,
+                              chemical: processData.chemical,
+                              checkedPoints: inspectionData.map((item) => ({
+                                pointName: item.checkedList,
+                                approvedDate: item.approvedDate,
+                                condition: item.na ? "N/A" : "Active",
+                                remark: item.remark
+                              })),
+                              parameters: defectData.map((item) => {
+                                const checkedQty = Number(item.checkedQty) || 0;
+                                const failedQty = Number(item.failedQty) || 0;
+                                const passRate =
+                                  checkedQty > 0
+                                    ? (
+                                        ((checkedQty - failedQty) /
+                                          checkedQty) *
+                                        100
+                                      ).toFixed(2)
+                                    : "0.00";
+                                const result =
+                                  item.aqlAcceptedDefect !== undefined &&
+                                  checkedQty > 0
+                                    ? failedQty <= item.aqlAcceptedDefect
+                                      ? "Pass"
+                                      : "Fail"
+                                    : "";
+                                return {
+                                  parameterName: item.parameter,
+                                  checkedQty: item.checkedQty || 0,
+                                  failedQty: item.failedQty || 0,
+                                  passRate,
+                                  result,
+                                  remark: item.remark,
+                                  ok: item.ok,
+                                  no: item.no,
+                                  checkboxes: item.checkboxes || {}
+                                };
+                              })
+                            },
+                            defectDetails: {
+                              washQty: formData.washQty,
+                              checkedQty: formData.checkedQty,
+                              result: formData.result,
+                              defectsByPc: await Promise.all(
+                                Object.entries(defectsByPc).map(
+                                  async ([pcKey, pcDefects]) => ({
+                                    pcNumber: pcKey,
+                                    pcDefects: await Promise.all(
+                                      (Array.isArray(pcDefects)
+                                        ? pcDefects
+                                        : []
+                                      ).map(async (defect) => ({
+                                        defectName: defect.selectedDefect,
+                                        defectQty: defect.defectQty,
+                                        defectImages: await Promise.all(
+                                          (defect.defectImages || []).map(
+                                            (img) => imageToBase64(img)
+                                          )
+                                        )
+                                      }))
+                                    )
+                                  })
+                                )
+                              ),
+                              comment: comment,
+                              additionalImages: await Promise.all(
+                                uploadedImages.map((img) => imageToBase64(img))
+                              )
+                            },
+                            measurementDetails: {
+                              measurement: [
+                                ...measurementData.beforeWash.map((item) => ({
+                                  ...item,
+                                  before_after_wash: "beforeWash"
+                                })),
+                                ...measurementData.afterWash.map((item) => ({
+                                  ...item,
+                                  before_after_wash: "afterWash"
+                                }))
+                              ]
+                            }
+                          }
+                        };
+
+                        // --- 3. Submit to the server ---
+                        const response = await fetch(
+                          `${API_BASE_URL}/api/qc-washing/submit`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify(submitData)
+                          }
+                        );
+
+                        const submitResult = await response.json();
+                        if (submitResult.success) {
+                          // Show success message
+                          await Swal.fire({
+                            icon: "success",
+                            title: "Success!",
+                            text: "QC Washing data submitted successfully!",
+                            confirmButtonText: "OK"
+                          });
+
+                          // Clear form data and reset states
+                          clearFormData();
+
+                          // Optional: Reload the page after a short delay
+                          // setTimeout(() => {
+                          //   window.location.reload();
+                          // }, 500);
+                        } else {
+                          Swal.fire({
+                            icon: "error",
+                            title: "Submission Failed",
+                            text:
+                              submitResult.message || "Failed to submit data"
+                          });
                         }
+                      } catch (error) {
+                        console.error("Submit error:", error);
+                        Swal.fire({
+                          icon: "error",
+                          title: "Error",
+                          text: "Failed to submit data. Please try again."
+                        });
                       }
-                    };
+                    }}
+                  >
+                    Submit
+                  </button>
+                </div>
+              </>
+            )}
 
-                    // --- 3. Submit to the server ---
-                    const response = await fetch(
-                      `${API_BASE_URL}/api/qc-washing/submit`,
-                      {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify(submitData)
-                      }
-                    );
-
-                    const submitResult = await response.json();
-                    if (submitResult.success) {
-                      // Show success message
-                      await Swal.fire({
-                        icon: "success",
-                        title: "Success!",
-                        text: "QC Washing data submitted successfully!",
-                        confirmButtonText: "OK"
-                      });
-
-                      // Clear form data and reset states
-                      clearFormData();
-
-                      // Optional: Reload the page after a short delay
-                      // setTimeout(() => {
-                      //   window.location.reload();
-                      // }, 500);
-                    } else {
-                      Swal.fire({
-                        icon: "error",
-                        title: "Submission Failed",
-                        text: submitResult.message || "Failed to submit data"
-                      });
-                    }
-                  } catch (error) {
-                    console.error("Submit error:", error);
-                    Swal.fire({
-                      icon: "error",
-                      title: "Error",
-                      text: "Failed to submit data. Please try again."
-                    });
-                  }
-                }}
-              >
-                Submit
-              </button>
-            </div>
-          </>
-        )}
-
-        {activeTab === "submittedData" && <SubmittedWashingDataPage />}
-        {activeTab === "subConEditQty" && <SubConEdit />}
-      </main>
+            {activeTab === "submittedData" && <SubmittedWashingDataPage />}
+            {activeTab === "subConEditQty" && <SubConEdit />}
+          </main>
+        </div>
+      </div>
+      <style>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        @keyframes fadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        @keyframes slideDown {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fadeIn {
+          animation: fadeIn 0.5s ease-out;
+        }
+        .animate-slideDown {
+          animation: slideDown 0.3s ease-out;
+        }
+        .bg-grid-white {
+          background-image: linear-gradient(
+              to right,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            ),
+            linear-gradient(
+              to bottom,
+              rgba(255, 255, 255, 0.1) 1px,
+              transparent 1px
+            );
+        }
+        .delay-1000 {
+          animation-delay: 1s;
+        }
+        .hover\\:scale-102:hover {
+          transform: scale(1.02);
+        }
+      `}</style>
     </div>
   );
 };

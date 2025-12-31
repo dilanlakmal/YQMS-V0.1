@@ -9,6 +9,7 @@ import {
 } from "../controller/MongoDB/dbConnectionController.js";
 import multer from "multer";
 import path from "path";
+import fs from "fs";
 import {
   // __dirname,
   __backendDir
@@ -832,6 +833,34 @@ export const processImageBuffer = async (buffer, filename, directory) => {
     throw new Error(`Failed to process image: ${error.message}`);
   }
 };
+
+// Washing Machine Test Image Upload Configuration
+const washingMachineTestUploadPath = path.join(
+  __backendDir,
+  "public",
+  "storage",
+  "washing_machine_test"
+);
+// Ensure directory exists
+if (!fs.existsSync(washingMachineTestUploadPath)) {
+  fs.mkdirSync(washingMachineTestUploadPath, { recursive: true });
+}
+
+const washingMachineTestMemoryStorage = multer.memoryStorage();
+export const uploadWashingMachineTestImage = multer({
+  storage: washingMachineTestMemoryStorage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPEG, PNG, GIF, and WebP images are allowed"), false);
+    }
+  }
+});
+
+export { washingMachineTestUploadPath };
 
 // Enhanced image validation
 export const validateImageBuffer = (buffer, maxSizeInMB = 5) => {

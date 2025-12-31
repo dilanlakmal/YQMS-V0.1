@@ -6,6 +6,7 @@ const PowerBI = () => {
   const [activeCard, setActiveCard] = useState(null);
   const [fullScreenCard, setFullScreenCard] = useState(null);
   const [screenWidth, setScreenWidth] = useState(window.innerWidth); // Track screen width dynamically
+  const [screenHeight, setScreenHeight] = useState(window.innerHeight);
 
   // Array of card data with titles and iframe sources
   const cards = [
@@ -156,7 +157,7 @@ const PowerBI = () => {
             <iframe
               title={cards[fullScreenCard].title}
               width={screenWidth} // Dynamically set to screen width
-              height="800"
+              height={screenHeight}
               src={cards[fullScreenCard].iframeSrc}
               frameBorder="0"
               allowFullScreen="true"

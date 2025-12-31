@@ -24,11 +24,11 @@ import QCWashingFullReportModal from "./QCWashingFullReportModal";
 const StatusBadge = ({ status }) => {
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
-      case "submitted":
+      case 'submitted':
         return "bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-300";
-      case "processing":
+      case 'processing':
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-300";
-      case "auto-saved":
+      case 'auto-saved':
         return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/50 dark:text-gray-300";
@@ -36,23 +36,13 @@ const StatusBadge = ({ status }) => {
   };
 
   return (
-    <span
-      className={`px-3 py-1 text-xs font-bold rounded-full inline-block ${getStatusColor(
-        status
-      )}`}
-    >
-      {status || "Unknown"}
+    <span className={`px-3 py-1 text-xs font-bold rounded-full inline-block ${getStatusColor(status)}`}>
+      {status || 'Unknown'}
     </span>
   );
 };
 
-const ActionMenu = ({
-  item,
-  onViewDetails,
-  onFullReport,
-  onDownloadPDF,
-  onDelete
-}) => {
+const ActionMenu = ({ item, onViewDetails, onFullReport, onDownloadPDF, onDelete }) => {
   return (
     <Menu as="div" className="relative inline-block text-left">
       <div>
@@ -76,9 +66,7 @@ const ActionMenu = ({
                 <button
                   onClick={() => onViewDetails(item)}
                   className={`${
-                    active
-                      ? "bg-indigo-500 text-white"
-                      : "text-gray-900 dark:text-gray-200"
+                    active ? "bg-indigo-500 text-white" : "text-gray-900 dark:text-gray-200"
                   } group flex rounded-md items-center w-full px-2 py-2 text-sm`}
                 >
                   <Eye className="w-5 h-5 mr-2" />
@@ -91,9 +79,7 @@ const ActionMenu = ({
                 <button
                   onClick={() => onFullReport(item)}
                   className={`${
-                    active
-                      ? "bg-indigo-500 text-white"
-                      : "text-gray-900 dark:text-gray-200"
+                    active ? "bg-indigo-500 text-white" : "text-gray-900 dark:text-gray-200"
                   } group flex rounded-md items-center w-full px-2 py-2 text-sm`}
                 >
                   <FileText className="w-5 h-5 mr-2" />
@@ -106,9 +92,7 @@ const ActionMenu = ({
                 <button
                   onClick={() => onDownloadPDF(item)}
                   className={`${
-                    active
-                      ? "bg-indigo-500 text-white"
-                      : "text-gray-900 dark:text-gray-200"
+                    active ? "bg-indigo-500 text-white" : "text-gray-900 dark:text-gray-200"
                   } group flex rounded-md items-center w-full px-2 py-2 text-sm`}
                 >
                   <Download className="w-5 h-5 mr-2" />
@@ -123,9 +107,7 @@ const ActionMenu = ({
                 <button
                   onClick={() => onDelete(item)}
                   className={`${
-                    active
-                      ? "bg-red-500 text-white"
-                      : "text-red-600 dark:text-red-400"
+                    active ? "bg-red-500 text-white" : "text-red-600 dark:text-red-400"
                   } group flex rounded-md items-center w-full px-2 py-2 text-sm`}
                 >
                   <Trash2 className="w-5 h-5 mr-2" />
@@ -172,9 +154,7 @@ const QCWashingResults = () => {
   useEffect(() => {
     const fetchOptions = async () => {
       try {
-        const res = await axios.get(
-          `${API_BASE_URL}/api/qc-washing/results/filters`
-        );
+        const res = await axios.get(`${API_BASE_URL}/api/qc-washing/results/filters`);
         setFilterOptions({
           buyers: [
             { value: "All", label: "All Buyers" },
@@ -209,11 +189,9 @@ const QCWashingResults = () => {
           params: {
             startDate: filters.startDate.toISOString().split("T")[0],
             endDate: filters.endDate.toISOString().split("T")[0],
-            buyer:
-              filters.buyer.value !== "All" ? filters.buyer.value : undefined,
+            buyer: filters.buyer.value !== "All" ? filters.buyer.value : undefined,
             moNo: filters.moNo.value !== "All" ? filters.moNo.value : undefined,
-            color:
-              filters.color.value !== "All" ? filters.color.value : undefined,
+            color: filters.color.value !== "All" ? filters.color.value : undefined,
             qcID: filters.qcID.value !== "All" ? filters.qcID.value : undefined
           }
         });
@@ -258,58 +236,45 @@ const QCWashingResults = () => {
       let inspectorDetails = null;
       if (item.userId) {
         try {
-          const inspectorResponse = await axios.get(
-            `${API_BASE_URL}/api/users/${item.userId}`
-          );
+          const inspectorResponse = await axios.get(`${API_BASE_URL}/api/users/${item.userId}`);
           if (inspectorResponse.data && !inspectorResponse.data.error) {
             inspectorDetails = inspectorResponse.data;
           }
         } catch (inspectorError) {
-          console.warn("Could not fetch inspector details:", inspectorError);
+          console.warn('Could not fetch inspector details:', inspectorError);
         }
       }
 
       // Call PDF generation endpoint with inspector details
-      const response = await axios.post(
-        `${API_BASE_URL}/api/qc-washing/pdf/${item._id}`,
-        {
-          inspectorDetails: inspectorDetails
-        },
-        {
-          responseType: "blob"
-        }
-      );
-
+      const response = await axios.post(`${API_BASE_URL}/api/qc-washing/pdf/${item._id}`, {
+        inspectorDetails: inspectorDetails
+      }, {
+        responseType: 'blob'
+      });
+      
       const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
+      const link = document.createElement('a');
       link.href = url;
-      link.setAttribute(
-        "download",
-        `QC_Washing_Report_${item.orderNo}_${item.colorName}.pdf`
-      );
+      link.setAttribute('download', `QC_Washing_Report_${item.orderNo}_${item.colorName}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("Error downloading PDF:", error);
-      alert("Failed to download PDF. Please try again.");
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF. Please try again.');
     }
   };
 
   const handleDelete = async (item) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete the record for ${item.orderNo} - ${item.colorName}?`
-      )
-    ) {
+    if (window.confirm(`Are you sure you want to delete the record for ${item.orderNo} - ${item.colorName}?`)) {
       try {
         await axios.delete(`${API_BASE_URL}/api/qc-washing/${item._id}`);
-        setData(data.filter((d) => d._id !== item._id));
-        alert("Record deleted successfully");
+        setData(data.filter(d => d._id !== item._id));
+        alert('Record deleted successfully');
       } catch (error) {
-        console.error("Error deleting record:", error);
-        alert("Failed to delete record. Please try again.");
+        console.error('Error deleting record:', error);
+        alert('Failed to delete record. Please try again.');
       }
     }
   };
@@ -348,14 +313,10 @@ const QCWashingResults = () => {
         <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md mb-3">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1">
-                Start Date
-              </label>
+              <label className="block text-sm font-medium mb-1">Start Date</label>
               <DatePicker
                 selected={filters.startDate}
-                onChange={(date) =>
-                  setFilters((f) => ({ ...f, startDate: date }))
-                }
+                onChange={(date) => setFilters((f) => ({ ...f, startDate: date }))}
                 className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
               />
             </div>
@@ -363,9 +324,7 @@ const QCWashingResults = () => {
               <label className="block text-sm font-medium mb-1">End Date</label>
               <DatePicker
                 selected={filters.endDate}
-                onChange={(date) =>
-                  setFilters((f) => ({ ...f, endDate: date }))
-                }
+                onChange={(date) => setFilters((f) => ({ ...f, endDate: date }))}
                 className="w-full p-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md"
               />
             </div>
@@ -412,11 +371,7 @@ const QCWashingResults = () => {
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
           <div className="p-4 border-b border-gray-200 dark:border-gray-700">
             <p className="text-sm font-semibold text-gray-600 dark:text-gray-300">
-              Found{" "}
-              <span className="text-indigo-600 dark:text-indigo-400">
-                {data.length}
-              </span>{" "}
-              records.
+              Found <span className="text-indigo-600 dark:text-indigo-400">{data.length}</span> records.
             </p>
           </div>
 
@@ -424,64 +379,34 @@ const QCWashingResults = () => {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
               <thead className="bg-gray-50 dark:bg-gray-700">
                 <tr>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     MO No
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Color
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     QC ID
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Order Qty
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Color Order Qty
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Size
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Status
                   </th>
-                  <th
-                    colSpan="3"
-                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-l border-r border-gray-200 dark:border-gray-600"
-                  >
+                  <th colSpan="3" className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-l border-r border-gray-200 dark:border-gray-600">
                     Defect Details
                   </th>
-                  <th
-                    colSpan="7"
-                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600"
-                  >
+                  <th colSpan="7" className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider border-r border-gray-200 dark:border-gray-600">
                     Measurement Details
                   </th>
-                  <th
-                    rowSpan="2"
-                    className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
-                  >
+                  <th rowSpan="2" className="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Action
                   </th>
                 </tr>
@@ -541,14 +466,13 @@ const QCWashingResults = () => {
                   </tr>
                 ) : (
                   paginatedData.map((item, index) => (
-                    <tr
-                      key={index}
-                      className="hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                    >
+                    <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
                         {item.orderNo}
                       </td>
-                      <td className="px-4 py-3 text-xs">{item.colorName}</td>
+                      <td className="px-4 py-3 text-xs">
+                        {item.colorName}
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm">
                         {item.userId}
                       </td>
@@ -559,8 +483,7 @@ const QCWashingResults = () => {
                         {item.colorOrderQty}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-center">
-                        {item.measurementDetails?.measurement?.[0]?.size ||
-                          "N/A"}
+                        {item.measurementDetails?.measurement?.[0]?.size || 'N/A'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
                         <StatusBadge status={item.status} />
@@ -569,12 +492,10 @@ const QCWashingResults = () => {
                         {item.defectDetails?.defectsByPc?.length || 0}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm text-center">
-                        {item.defectDetails?.defectsByPc?.[0]?.pcDefects?.[0]
-                          ?.defectName || "N/A"}
+                        {item.defectDetails?.defectsByPc?.[0]?.pcDefects?.[0]?.defectName || 'N/A'}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm text-center">
-                        {item.defectDetails?.defectsByPc?.[0]?.pcDefects?.[0]
-                          ?.defectQty || 0}
+                        {item.defectDetails?.defectsByPc?.[0]?.pcDefects?.[0]?.defectQty || 0}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm text-center">
                         {item.totalCheckedPoint}
@@ -586,12 +507,10 @@ const QCWashingResults = () => {
                         {item.totalFail}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm text-red-500 text-center">
-                        {item.measurementDetails?.measurementSizeSummary?.[0]
-                          ?.minusToleranceFailCount || 0}
+                        {item.measurementDetails?.measurementSizeSummary?.[0]?.minusToleranceFailCount || 0}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm text-rose-500 text-center">
-                        {item.measurementDetails?.measurementSizeSummary?.[0]
-                          ?.plusToleranceFailCount || 0}
+                        {item.measurementDetails?.measurementSizeSummary?.[0]?.plusToleranceFailCount || 0}
                       </td>
                       <td className="px-2 py-3 whitespace-nowrap text-sm font-semibold text-center">
                         {item.overallFinalResult}
@@ -628,27 +547,23 @@ const QCWashingResults = () => {
               </button>
 
               <div className="flex items-center gap-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                  (page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`w-9 h-9 flex items-center justify-center text-sm font-semibold rounded-md transition-colors ${
-                        currentPage === page
-                          ? "bg-indigo-600 text-white"
-                          : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  )
-                )}
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`w-9 h-9 flex items-center justify-center text-sm font-semibold rounded-md transition-colors ${
+                      currentPage === page
+                        ? "bg-indigo-600 text-white"
+                        : "bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
               </div>
 
               <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(prev + 1, totalPages))
-                }
+                onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
                 className="inline-flex items-center px-3 py-1.5 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >

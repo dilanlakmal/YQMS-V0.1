@@ -1,353 +1,3 @@
-// import axios from "axios";
-// import React, { useEffect, useState } from "react";
-// import { useNavigate } from "react-router-dom";
-// import { useAuth } from "../components/authentication/AuthContext";
-// import { useTranslation } from "react-i18next";
-// import { API_BASE_URL } from "../../config";
-
-// function Home() {
-//   const { t } = useTranslation();
-//   const navigate = useNavigate();
-//   const { user, loading } = useAuth();
-//   const [errorMessage, setErrorMessage] = useState("");
-//   const [userRoles, setUserRoles] = useState([]);
-//   const [roleManagement, setRoleManagement] = useState(null);
-//   const [pageLoading, setPageLoading] = useState(true);
-
-//   useEffect(() => {
-//     if (!loading) {
-//       if (!user) {
-//         navigate("/login");
-//         return;
-//       }
-//       fetchData();
-//     }
-//   }, [user, loading]);
-
-//   const fetchData = async () => {
-//     try {
-//       setPageLoading(true);
-//       await Promise.all([fetchUserRoles(), fetchRoleManagement()]);
-//     } catch (error) {
-//       console.error("Error fetching data:", error);
-//       setErrorMessage("Error loading data");
-//     } finally {
-//       setPageLoading(false);
-//     }
-//   };
-
-//   const fetchUserRoles = async () => {
-//     try {
-//       const response = await axios.get(
-//         `${API_BASE_URL}/api/user-roles/${user.emp_id}`
-//       );
-//       setUserRoles(response.data.roles);
-//     } catch (error) {
-//       console.error("Error fetching user roles:", error);
-//     }
-//   };
-
-//   const fetchRoleManagement = async () => {
-//     try {
-//       const response = await axios.get(`${API_BASE_URL}/api/role-management`);
-//       setRoleManagement(response.data);
-//     } catch (error) {
-//       console.error("Error fetching role management:", error);
-//     }
-//   };
-
-//   const hasAccess = (requiredRoles) => {
-//     if (!user || !roleManagement) return false;
-//     const isSuperAdmin = userRoles.includes("Super Admin");
-//     const isAdmin = userRoles.includes("Admin");
-//     if (isSuperAdmin || isAdmin) return true;
-//     return roleManagement.some(
-//       (role) =>
-//         requiredRoles.includes(role.role) &&
-//         role.jobTitles.includes(user.job_title)
-//     );
-//   };
-
-//   const handleNavigation = (path, requiredRoles) => {
-//     if (hasAccess(requiredRoles)) {
-//       navigate(path);
-//     } else {
-//       setErrorMessage("Unauthorized Access");
-//       setTimeout(() => {
-//         setErrorMessage("");
-//       }, 3000);
-//     }
-//   };
-
-//   if (loading || pageLoading) {
-//     return (
-//       <div className="min-h-screen flex items-center justify-center">
-//         <div className="text-xl text-gray-600">Loading...</div>
-//       </div>
-//     );
-//   }
-
-//   const cards = [
-//     {
-//       title: t("home.fabric/cutting/scc"),
-//       items: [
-//         {
-//           path: "/Fabric",
-//           roles: ["Admin", "Fabric"], // Matches "Fabric" role
-//           image: "assets/Home/fabric-logo.png",
-//           title: t("home.fabric"),
-//           description: "Fabric Inspection Reports"
-//         },
-//         {
-//           path: "/cutting",
-//           roles: ["Admin", "Cutting"], // Matches "Cutting" role
-//           image: "assets/Home/cutting.webp",
-//           title: t("home.cutting"),
-//           description: "Cutting Inspection Check Point"
-//         },
-//         {
-//           path: "/scc",
-//           roles: ["Admin", "SCC"], // Matches "SCC" role
-//           image: "assets/Home/bundle.avif",
-//           title: t("SCC"),
-//           description: "SCC Inspection Check Point"
-//         },
-//         {
-//           path: "/sysadmin",
-//           roles: ["Admin", "System Administration"], // Matches "System Administration" role
-//           image: "assets/Home/sysadmin.jpg",
-//           title: t("home.systemadmin"),
-//           description: "Modify Defect & Measurements"
-//         },
-//         {
-//           path: "/ieadmin",
-//           roles: ["Admin", "IE", "System Administration"], // Matches "System Administration" role
-//           image: "assets/Home/ie.png",
-//           title: t("home.ieadmin"),
-//           description: "IE System Administration"
-//         },
-//         {
-//           path: "/yqms",
-//           roles: ["Admin", "YQMS"], // Matches "YQMS" role
-//           image: "assets/Home/yqms.png",
-//           title: t("home.yqms"),
-//           description: "YQMS Project Management"
-//         }
-//       ]
-//     },
-//     {
-//       title: t("home.order_data"),
-//       items: [
-//         {
-//           path: "/bundle-registration",
-//           roles: ["Admin", "Bundle Registration"], // Matches "Bundle Registration" role
-//           image: "assets/Home/bundle.avif",
-//           title: t("home.bundle_registration"),
-//           description: "Order Registration: QC2."
-//         },
-//         {
-//           path: "/washing",
-//           roles: ["Admin", "Washing"], // Matches "Washing" role
-//           image: "assets/Home/washing.jpg",
-//           title: t("home.washing"),
-//           description: "Scan orders for Washing."
-//         },
-//         {
-//           path: "/opa",
-//           roles: ["Admin", "OPA"], // Matches "OPA" role
-//           image: "assets/Home/dyeing.png",
-//           title: t("home.opa"),
-//           description: "Scan orders in OPA."
-//         },
-//         {
-//           path: "/ironing",
-//           roles: ["Admin", "Ironing"], // Matches "Ironing" role
-//           image: "assets/Home/ironing.png",
-//           title: t("home.ironing"),
-//           description: "Scan orders for Ironing."
-//         },
-//         {
-//           path: "/packing",
-//           roles: ["Admin", "Packing"], // Matches "Packing" role
-//           image: "assets/Home/packing.webp",
-//           title: t("home.packing"),
-//           description: "Scan orders for Packing."
-//         }
-//       ]
-//     },
-//     {
-//       title: t("home.quality_inspection"),
-//       items: [
-//         {
-//           path: "/roving",
-//           roles: ["Admin", "QC Roving"], // Fixed: Changed "QC1" to "QC Roving"
-//           image: "assets/Home/qcinline.png",
-//           title: t("home.qc_inline_roving"),
-//           description: "QC Inline Roving Check Point."
-//         },
-//         {
-//           path: "/inline-emp",
-//           roles: ["Admin", "Printing"], // Matches "Printing" role
-//           image: "assets/Home/qc2.png",
-//           title: "Print QR",
-//           description: "Sewing Worker QR."
-//         },
-//         {
-//           path: "/details",
-//           roles: ["Admin", "QC1 Inspection"], // Matches "QC1 Inspection" role
-//           image: "assets/Home/qcc.png",
-//           title: t("home.qc1_inspection"),
-//           description: "QC1 Inspection Check Point."
-//         },
-//         {
-//           path: "/qc2-repair-tracking",
-//           roles: ["Admin", "QC2 Tracking"], // Matches "QC2 Tracking" role
-//           image: "assets/Home/repair.png",
-//           title: t("home.qc2_repair"),
-//           description: "QC2 Repair Tracking System."
-//         },
-//         {
-//           path: "/qc2-inspection",
-//           roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
-//           image: "assets/Home/qc2.png",
-//           title: t("home.qc2_inspection"),
-//           description: "QC2 Inspection Check Point."
-//         },
-//         {
-//           path: "/b-grade-defect",
-//           roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
-//           image: "assets/Home/bgrade.png",
-//           title: t("home.b-grade_defect"),
-//           description: "B-Grade defects Check Point."
-//         },
-//         {
-//           path: "/b-grade-stcok",
-//           roles: ["Admin", "QC2 Inspection"], // Matches "QC2 Inspection" role
-//           image: "assets/Home/bgrade.png",
-//           title: t("home.b-grade_stock"),
-//           description: "B-Grade Stock."
-//         }
-//       ]
-//     },
-//     {
-//       title: t("home.qa_audit"),
-//       items: [
-//         {
-//           path: "/audit",
-//           roles: ["Admin", "QA Audit"], // Matches "QA Audit" role
-//           image: "assets/Home/qaa.png",
-//           title: t("home.qa_audit"),
-//           description: "QA Audit Check Point."
-//         },
-//         {
-//           path: "/final-inspection",
-//           roles: ["Admin", "QA Audit"], // Matches "QA Audit" role (same as audit)
-//           image: "assets/Home/qafinal.png",
-//           title: t("home.final_inspection"),
-//           description: "QA Final Inspection."
-//         }
-//       ]
-//     },
-//     {
-//       title: t("home.data_analytics"),
-//       items: [
-//         {
-//           path: "/download-data",
-//           roles: ["Admin", "Download Data"], // Matches "Download Data" role
-//           image: "assets/Home/download.jpg",
-//           title: t("home.download_data"),
-//           description: "Download Raw Data."
-//         },
-//         {
-//           path: "/live-dashboard",
-//           roles: ["Admin", "Live Dashboard"], // Matches "Live Dashboard" role
-//           image: "assets/Home/dash.png",
-//           title: t("home.live_dashboard"),
-//           description: "YQMS QC2 Live Dashboard."
-//         },
-//         {
-//           path: "/powerbi",
-//           roles: ["Admin", "Power BI"], // Matches "Power BI" role
-//           image: "assets/Home/powerbi.png",
-//           title: "Power BI",
-//           description: "Power BI Report"
-//         },
-//         {
-//           path: "/qa-pivot",
-//           roles: ["Admin", "QA Pivot"], // Matches "QA Pivot" role
-//           image: "assets/Home/qalogo.png",
-//           title: "QA YM/Sub Con Evaluation",
-//           description: "Upload Excel / Dashboard"
-//         },
-//         {
-//           path: "/qc1-sunrise",
-//           roles: ["Admin", "QC1 Sunrise"], // Matches "QC1 Sunrise" role
-//           image: "assets/Home/sunrise.png",
-//           title: "QC1 Sunriser",
-//           description: "Upload Excel file here..."
-//         }
-//       ]
-//     }
-//   ];
-
-//   return (
-//     <div className="min-h-screen bg-gradient-to-r from-blue-50 to-gray-100 py-20 px-20">
-//       <div className="max-w-8xl mx-auto">
-//         {errorMessage && (
-//           <div className="bg-red-500 text-white text-center py-2 mb-4 rounded">
-//             {errorMessage}
-//           </div>
-//         )}
-//         <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-//           {cards.map((section, sectionIndex) => (
-//             <div key={sectionIndex} className="space-y-8">
-//               <h2 className="text-2xl font-bold text-blue-900 mb-4 text-center">
-//                 {section.title}
-//               </h2>
-//               {section.items.map((item, itemIndex) => (
-//                 <div
-//                   key={itemIndex}
-//                   onClick={() => handleNavigation(item.path, item.roles)}
-//                   className={`group bg-white p-6 rounded-xl shadow-lg cursor-pointer ${
-//                     hasAccess(item.roles)
-//                       ? "hover:shadow-2xl transition-transform transform hover:-translate-y-2 hover:scale-105"
-//                       : "bg-gray-200 cursor-not-allowed"
-//                   }`}
-//                 >
-//                   <div
-//                     className="flex flex-col items-center justify-center mb-2 w-16 h-16 bg-cover bg-center"
-//                     style={{ backgroundImage: `url(${item.image})` }}
-//                   ></div>
-//                   <h2
-//                     className={`text-xl font-bold text-gray-800 mb-2 ${
-//                       hasAccess(item.roles)
-//                         ? "group-hover:text-blue-600"
-//                         : "text-gray-500"
-//                     }`}
-//                   >
-//                     {item.title}
-//                   </h2>
-//                   <p
-//                     className={`text-sm text-gray-600 ${
-//                       hasAccess(item.roles)
-//                         ? "group-hover:text-gray-800"
-//                         : "text-gray-500"
-//                     }`}
-//                   >
-//                     {item.description}
-//                   </p>
-//                 </div>
-//               ))}
-//             </div>
-//           ))}
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// export default Home;
-
 import axios from "axios";
 import React, {
   useEffect,
@@ -508,7 +158,7 @@ function Home() {
           {
             path: "/scc",
             roles: ["SCC"],
-            image: "assets/Home/bundle.avif",
+            image: "assets/Home/SCCLogo.jpg",
             title: t("SCC"),
             description: "Spreading & Cutting",
           },
@@ -520,12 +170,26 @@ function Home() {
             description: "Washing Report",
           },
           {
-            path: "/upload-beforewash-specs",
-            roles: ["Washing Clerk"],
-            image: "assets/Home/uploadspecs.png",
-            title: t("home.upload_beforewash_specs"),
-            description: "Upload Beforewash Specs",
+            path: "/afterIroning",
+            roles: ["QC Ironing"],
+            image: "assets/Home/after_ironing.png",
+            title: t("home.afterIroning"),
+            description: "After Ironing Report"
           },
+          // {
+          //   path: "/measurement",
+          //   roles: ["QC Washing", "QA"],
+          //   image: "assets/Home/measurement.png",
+          //   title: t("home.Measurement"),
+          //   description: "All Style measurements"
+          // },
+          // {
+          //   path: "/upload-beforewash-specs",
+          //   roles: ["Washing Clerk"],
+          //   image: "assets/Home/uploadspecs.png",
+          //   title: t("home.upload_beforewash_specs"),
+          //   description: "Upload Beforewash Specs"
+          // },
           {
             path: "/select-dt-specs",
             roles: ["Washing Clerk", "QA Clerk"],
@@ -540,13 +204,13 @@ function Home() {
             title: t("home.anf_washing"),
             description: "QC After Wash Measurements",
           },
-          {
-            path: "/anf-washing-ver2",
-            roles: ["ANF QA"],
-            image: "assets/Home/anf-washing-ver2.png",
-            title: t("home.anf_washing_version2"),
-            description: "QC AW Measurements - Version 2",
-          },
+          // {
+          //   path: "/anf-washing-ver2",
+          //   roles: ["ANF QA"],
+          //   image: "assets/Home/anf-washing-ver2.png",
+          //   title: t("home.anf_washing_version2"),
+          //   description: "QC AW Measurements - Version 2"
+          // },
           {
             path: "/supplier-issues",
             roles: ["Supplier QC"],
@@ -562,12 +226,21 @@ function Home() {
             title: t("Emb-Print"),
             description: "EMB + Printing Inspection",
           },
+          
+          {
+            path: "/laundry-washing-machine-test",
+            roles: ["QC Washing", "QA"],
+            image: "assets/Home/laundry-washing-machine-test.png",
+            title: "Laundry Washing Machine Test",
+            description: "Laundry Washing Machine Test",
+            imageSize: "large", // Custom flag for larger image
+          },
 
         ],
       },
       {
         id: "sewing-qc",
-        title: "Sewing QC Inspection",
+        title: "Sewing QC",
         icon: <CheckSquare className="w-5 h-5 mr-2" />,
         bgColor: "bg-purple-50 dark:bg-purple-900/20",
         items: [
@@ -600,6 +273,55 @@ function Home() {
             description: "Sewing Worker QR Code",
           },
         ],
+      },
+      {
+        id: "y-pivot",
+        title: "Fin Check",
+        icon: <Layers className="w-5 h-5 mr-2" />,
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        items: [
+          {
+            path: "/qa-sections",
+            //pageId: "qa-sections",
+            roles: ["Fincheck Config"],
+            image: "assets/Home/FinCheck.png",
+            title: t("home.qa_sections"),
+            description: "Fin Check Configuration"
+          },
+          {
+            path: "/qa-measurements",
+            //pageId: "qa-measurements",
+            roles: ["Fincheck Measurement"],
+            image: "assets/Home/FinCheck_Measurements.png",
+            title: t("home.qa_measurements"),
+            description: "Fin Check Measurements"
+          },
+          {
+            path: "/qa-templates",
+            //pageId: "qa-templates",
+            roles: ["Fincheck Templates"],
+            image: "assets/Home/qatemplates.png",
+            title: t("home.qa_templates"),
+            description: "QA Inspection Templates"
+          },
+          {
+            path: "/fincheck-inspection",
+            //pageId: "y-pivot-inspection",
+            roles: ["Fincheck Inspections"],
+            image: "assets/Home/yPivotInspection.png",
+            title: t("home.y_pivot_inspection"),
+            description: "Pivot Y Inspections"
+          },
+          {
+            path: "/P88Legacy",
+            //pageId: "y-pivot-inspection",
+            roles: ["P88"],
+            image: "assets/Home/p88Legacy.png",
+            title: t("home.p88_Legacy"),
+            description: "P88 Legacy Data",
+            version: "0"
+          }
+        ]
       },
       {
         id: "qa-inspection",
@@ -636,9 +358,9 @@ function Home() {
             description: "QA Random Checks",
           },
           {
-            path: "/qc-accuracy-ver2",
+            path: "/qc-output",
             roles: ["QA"],
-            image: "assets/Home/qc-accuracy.png",
+            image: "assets/Home/qcOutput.png",
             title: "QC Output",
             description: "QC Output | Sunrise & Old Barcode System",
           },
@@ -656,13 +378,13 @@ function Home() {
             title: "YQMS Exam",
             description: "Create Exam & Preview",
           },
-          {
-            path: "/qa-yorksys",
-            roles: ["QA Clerk"],
-            image: "assets/Home/upload-orders.png",
-            title: "Upload Orders",
-            description: "Order data from York-sys",
-          },
+          // {
+          //   path: "/qa-yorksys",
+          //   roles: ["QA Clerk"],
+          //   image: "assets/Home/upload-orders.png",
+          //   title: "Upload Orders",
+          //   description: "Order data from York-sys"
+          // },
           {
             path: "/packing-list",
             roles: ["QA Clerk"],
@@ -688,11 +410,11 @@ function Home() {
           {
             path: "/master-list",
             roles: ["CE"],
-            image: "assets/Home/masterlist.png",
-            title: "Master List",
-            description: "View and manage the Master List",
-          },
-        ],
+            image: "assets/Home/CE-System.png",
+            title: "CE",
+            description: "Proudction Control & Monitoring"
+          }
+        ]
       },
       {
         id: "admin-panel",
@@ -762,10 +484,26 @@ function Home() {
             roles: ["QC1 Sunrise"],
             image: "assets/Home/sunrise.png",
             title: "QC1 Sunrise",
-            description: "Upload Excel Data",
-          },
-        ],
+            description: "Upload Excel Data"
+          }
+        ]
       },
+      {
+        id: "ydt",
+        title: "YDT",
+        icon: <ClipboardList className="w-5 h-5 mr-2" />,
+        bgColor: "bg-blue-50 dark:bg-blue-900/20",
+        items: [
+          {
+            path: "/production-Sheet",
+            roles: ["production"],
+            image: "assets/Home/coverPage.png",
+            title: "Production Sheet",
+            description: "Maintain the production sheet",
+            version: "0"
+          }
+        ]
+      }
     ],
     [t]
   );
@@ -916,17 +654,6 @@ function Home() {
                 </button>
               ))}
             </nav>
-            {/* <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === "light" ? (
-                <Moon className="w-5 h-5" />
-              ) : (
-                <Sun className="w-5 h-5" />
-              )}
-            </button> */}
           </div>
         </div>
       </header>
@@ -965,7 +692,7 @@ function Home() {
                       <img
                         src={item.image}
                         alt={item.title}
-                        className="w-14 h-14 object-contain mb-3"
+                        className={`${item.imageSize === "large" ? "w-20 h-20" : "w-14 h-14"} object-contain mb-3`}
                       />
                       <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
                         {item.title}

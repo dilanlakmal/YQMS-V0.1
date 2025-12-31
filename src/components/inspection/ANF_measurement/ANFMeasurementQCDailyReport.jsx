@@ -18,8 +18,6 @@ import {
 } from "lucide-react";
 import { Menu, Transition } from "@headlessui/react";
 import { Fragment } from "react";
-//import { PDFDownloadLink } from "@react-pdf/renderer";
-//import ANFMeasurementQCViewPDF from "./ANFMeasurementQCViewPDF";
 
 // Helper function to create a URL-safe ID
 const createPageId = (date, qcId, moNo) => {
@@ -31,9 +29,11 @@ const createPageId = (date, qcId, moNo) => {
 };
 
 // Reusable Action Menu
-const ActionMenu = ({ item }) => {
+const ActionMenu = ({ item, stage }) => {
   const pageId = createPageId(item.inspectionDate, item.qcID, item.moNo);
-  const reportUrl = `/anf-washing/qc-full-report/${pageId}`;
+  const reportUrl = `/anf-washing/qc-full-report/${pageId}?stage=${
+    stage?.value || "M1"
+  }`;
 
   // handleAction function ---
   const handleAction = (action) => {
@@ -119,6 +119,18 @@ const ANFMeasurementQCDailyReport = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const [stage, setStage] = useState({ value: "M1", label: "M1 - 5 Points" });
+  const stageOptions = [
+    { value: "M1", label: "M1 - 5 Points" },
+    { value: "M2", label: "M2 - 2 Points" }
+  ];
+
+  const getApiPrefix = () => {
+    return stage.value === "M2"
+      ? `${API_BASE_URL}/api/anf-measurement-packing`
+      : `${API_BASE_URL}/api/anf-measurement`;
+  };
+
   const [filters, setFilters] = useState({
     startDate: subDays(new Date(), 7),
     endDate: new Date(),
@@ -148,21 +160,27 @@ const ANFMeasurementQCDailyReport = () => {
   }, []);
 
   // Fetch master data based on date range
+  /* ------------------------------------------------------------------
+     Update Data Fetching to use Dynamic Prefix & Depend on Stage
+  ------------------------------------------------------------------ */
   useEffect(() => {
     const fetchMasterData = async () => {
       if (!filters.startDate || !filters.endDate) return;
       setIsLoading(true);
       setError(null);
+      const prefix = getApiPrefix(); // <--- Dynamic Prefix
+
       try {
         const [dataRes, optionsRes] = await Promise.all([
-          axios.get(`${API_BASE_URL}/api/anf-measurement/qc-daily-reports`, {
+          axios.get(`${prefix}/qc-daily-reports`, {
+            // Use prefix
             params: {
               startDate: filters.startDate.toISOString().split("T")[0],
               endDate: filters.endDate.toISOString().split("T")[0]
             }
           }),
           axios.get(
-            `${API_BASE_URL}/api/anf-measurement/qc-daily-reports/filters`,
+            `${prefix}/qc-daily-reports/filters`, // Use prefix
             {
               params: {
                 startDate: filters.startDate.toISOString().split("T")[0],
@@ -180,6 +198,7 @@ const ANFMeasurementQCDailyReport = () => {
           qcOptions,
           moToColorsMap
         } = optionsRes.data;
+
         setFilterOptions({
           buyers: [
             { value: "All", label: "All Buyers" },
@@ -207,7 +226,7 @@ const ANFMeasurementQCDailyReport = () => {
       }
     };
     fetchMasterData();
-  }, [filters.startDate, filters.endDate]);
+  }, [filters.startDate, filters.endDate, stage]); // <--- Add stage dependency
 
   // Derived color options based on selected MO
   const derivedColorOptions = useMemo(() => {
@@ -316,6 +335,16 @@ const ANFMeasurementQCDailyReport = () => {
               />
             </div>
             <div className="lg:col-span-1">
+              <label className="block text-sm font-medium mb-1">Stage</label>
+              <Select
+                options={stageOptions}
+                value={stage}
+                onChange={setStage}
+                styles={selectStyles}
+                isSearchable={false}
+              />
+            </div>
+            <div className="lg:col-span-1">
               <label className="block text-sm font-medium mb-1">Buyer</label>
               <Select
                 options={filterOptions.buyers}
@@ -360,62 +389,6 @@ const ANFMeasurementQCDailyReport = () => {
                 placeholder="All QCs"
               />
             </div>
-
-            {/* --- MODIFIED: PDF Download Button --- */}
-            {/* <div className="lg:col-span-1">
-              {isClient && filteredData.length > 0 ? (
-                <PDFDownloadLink
-                  document={<ANFMeasurementQCViewPDF data={filteredData} />}
-                  fileName={`ANF_QC_Report_${format(
-                    new Date(),
-                    "yyyy-MM-dd"
-                  )}.pdf`}
-                >
-                  {({ loading }) => (
-                    <button
-                      disabled={loading}
-                      className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
-                    >
-                      {loading ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                      ) : (
-                        <FileDown className="h-5 w-5" />
-                      )}
-                    </button>
-                  )}
-                </PDFDownloadLink>
-              ) : (
-                <button
-                  disabled
-                  className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-400 disabled:cursor-not-allowed"
-                >
-                  <FileDown className="h-5 w-5" />
-                </button>
-              )}
-            </div> */}
-
-            {/* <div className="lg:col-span-1">
-              <PDFDownloadLink
-                document={<ANFMeasurementQCViewPDF data={filteredData} />}
-                fileName={`ANF_QC_Report_${format(
-                  new Date(),
-                  "yyyy-MM-dd"
-                )}.pdf`}
-              >
-                {({ loading }) => (
-                  <button
-                    disabled={loading || filteredData.length === 0}
-                    className="w-full inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-red-600 hover:bg-red-700 disabled:bg-red-400 disabled:cursor-not-allowed"
-                  >
-                    {loading ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <FileDown className="h-5 w-5" />
-                    )}
-                  </button>
-                )}
-              </PDFDownloadLink>
-            </div> */}
           </div>
         </div>
 
@@ -609,7 +582,7 @@ const ANFMeasurementQCDailyReport = () => {
                           {passRatePoints}
                         </td>
                         <td className="px-3 py-2 text-center">
-                          <ActionMenu item={item} />
+                          <ActionMenu item={item} stage={stage} />
                         </td>
                       </tr>
                     );

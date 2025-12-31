@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../../config";
 import { useAuth } from "../../../authentication/AuthContext";
 import QCWashingFirstOutputForm from "./QCWashingFirstOutputForm";
-import { Edit3, Save, Trash2, XCircle, Loader2 } from "lucide-react";
+import {
+  Edit3,
+  Save,
+  Trash2,
+  XCircle,
+  Loader2
+} from "lucide-react";
 
 const QCWashingFirstOutputTab = () => {
   const { t } = useTranslation();
@@ -19,21 +25,15 @@ const QCWashingFirstOutputTab = () => {
   const fetchFirstOutputs = useCallback(async () => {
     setIsLoading(true);
     try {
-      const response = await axios.get(
-        `${API_BASE_URL}/api/qc-washing-first-outputs`
-      );
+      const response = await axios.get(`${API_BASE_URL}/api/qc-washing-first-outputs`);
       setFirstOutputs(response.data);
     } catch (error) {
       Swal.fire({
         icon: "error",
         title: t("common.error"),
         text: "Failed to fetch first output records",
-        background: document.documentElement.classList.contains("dark")
-          ? "#374151"
-          : "#ffffff",
-        color: document.documentElement.classList.contains("dark")
-          ? "#f3f4f6"
-          : "#1f2937"
+        background: document.documentElement.classList.contains('dark') ? '#374151' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#1f2937'
       });
     } finally {
       setIsLoading(false);
@@ -66,24 +66,17 @@ const QCWashingFirstOutputTab = () => {
         ...editedOutput,
         updatedBy: {
           emp_id: user?.emp_id,
-          eng_name: user?.eng_name
-        }
+          eng_name: user?.eng_name,
+        },
       };
 
-      await axios.put(
-        `${API_BASE_URL}/api/qc-washing-first-outputs/${id}`,
-        updateData
-      );
+      await axios.put(`${API_BASE_URL}/api/qc-washing-first-outputs/${id}`, updateData);
       Swal.fire({
         icon: "success",
         title: t("common.success"),
         text: "First output record updated successfully",
-        background: document.documentElement.classList.contains("dark")
-          ? "#374151"
-          : "#ffffff",
-        color: document.documentElement.classList.contains("dark")
-          ? "#f3f4f6"
-          : "#1f2937"
+        background: document.documentElement.classList.contains('dark') ? '#374151' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#1f2937'
       });
       setEditRowId(null);
       fetchFirstOutputs();
@@ -91,15 +84,9 @@ const QCWashingFirstOutputTab = () => {
       Swal.fire({
         icon: "error",
         title: t("common.error"),
-        text:
-          error.response?.data?.message ||
-          "Failed to update first output record",
-        background: document.documentElement.classList.contains("dark")
-          ? "#374151"
-          : "#ffffff",
-        color: document.documentElement.classList.contains("dark")
-          ? "#f3f4f6"
-          : "#1f2937"
+        text: error.response?.data?.message || "Failed to update first output record",
+        background: document.documentElement.classList.contains('dark') ? '#374151' : '#ffffff',
+        color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#1f2937'
       });
     } finally {
       setIsSaving(null);
@@ -116,44 +103,28 @@ const QCWashingFirstOutputTab = () => {
       cancelButtonColor: "#3085d6",
       confirmButtonText: t("common.yesDelete"),
       cancelButtonText: t("common.cancel"),
-      background: document.documentElement.classList.contains("dark")
-        ? "#374151"
-        : "#ffffff",
-      color: document.documentElement.classList.contains("dark")
-        ? "#f3f4f6"
-        : "#1f2937"
+      background: document.documentElement.classList.contains('dark') ? '#374151' : '#ffffff',
+      color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#1f2937'
     }).then(async (result) => {
       if (result.isConfirmed) {
         setIsSaving(id);
         try {
-          await axios.delete(
-            `${API_BASE_URL}/api/qc-washing-first-outputs/${id}`
-          );
+          await axios.delete(`${API_BASE_URL}/api/qc-washing-first-outputs/${id}`);
           Swal.fire({
             title: t("common.deleted"),
             text: "First output record deleted successfully",
             icon: "success",
-            background: document.documentElement.classList.contains("dark")
-              ? "#374151"
-              : "#ffffff",
-            color: document.documentElement.classList.contains("dark")
-              ? "#f3f4f6"
-              : "#1f2937"
+            background: document.documentElement.classList.contains('dark') ? '#374151' : '#ffffff',
+            color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#1f2937'
           });
           fetchFirstOutputs();
         } catch (error) {
           Swal.fire({
             icon: "error",
             title: t("common.error"),
-            text:
-              error.response?.data?.message ||
-              "Failed to delete first output record",
-            background: document.documentElement.classList.contains("dark")
-              ? "#374151"
-              : "#ffffff",
-            color: document.documentElement.classList.contains("dark")
-              ? "#f3f4f6"
-              : "#1f2937"
+            text: error.response?.data?.message || "Failed to delete first output record",
+            background: document.documentElement.classList.contains('dark') ? '#374151' : '#ffffff',
+            color: document.documentElement.classList.contains('dark') ? '#f3f4f6' : '#1f2937'
           });
         } finally {
           setIsSaving(null);
@@ -188,12 +159,12 @@ const QCWashingFirstOutputTab = () => {
   return (
     <div className="space-y-8">
       <QCWashingFirstOutputForm onOutputAdded={fetchFirstOutputs} />
-
+      
       <div className="p-4 sm:p-6 bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 transition-colors">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
           QC Washing First Output Records
         </h2>
-
+        
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-700">
@@ -204,7 +175,7 @@ const QCWashingFirstOutputTab = () => {
                   "Added Date",
                   "Updated By",
                   "Updated Date",
-                  "Actions"
+                  "Actions",
                 ].map((header) => (
                   <th
                     key={header}
@@ -215,38 +186,27 @@ const QCWashingFirstOutputTab = () => {
                 ))}
               </tr>
             </thead>
-
+            
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {isLoading ? (
                 <tr>
                   <td colSpan="6" className="text-center py-10">
                     <Loader2 className="h-8 w-8 animate-spin mx-auto text-indigo-600 dark:text-indigo-400" />
-                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-                      Loading...
-                    </p>
+                    <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
                   </td>
                 </tr>
               ) : firstOutputs.length === 0 ? (
                 <tr>
                   <td colSpan="6" className="text-center py-10">
-                    <p className="text-gray-500 dark:text-gray-400">
-                      No first output records found
-                    </p>
+                    <p className="text-gray-500 dark:text-gray-400">No first output records found</p>
                   </td>
                 </tr>
               ) : (
                 firstOutputs.map((output) => (
-                  <tr
-                    key={output._id}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                  >
+                  <tr key={output._id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                     {editRowId === output._id ? (
                       <>
-                        {renderEditCell(
-                          "quantity",
-                          editedOutput.quantity,
-                          "number"
-                        )}
+                        {renderEditCell("quantity", editedOutput.quantity, "number")}
                         {renderCell(output.addedBy?.eng_name)}
                         {renderCell(formatDate(output.createdAt))}
                         {renderCell(output.updatedBy?.eng_name)}

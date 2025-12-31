@@ -117,6 +117,7 @@ const ANFMeasurementInspectionForm = ({
 }) => {
   // Destructure the state from props for easier use
   const {
+    stage,
     inspectionDate,
     selectedMo,
     selectedSize,
@@ -146,6 +147,12 @@ const ANFMeasurementInspectionForm = ({
   const [currentSizeStatus, setCurrentSizeStatus] = useState("In Progress");
   const [isStatusUpdating, setIsStatusUpdating] = useState(false);
 
+  // Stage Options
+  const stageOptions = [
+    { value: "M1", label: "M1 - 5 Points" },
+    { value: "M2", label: "M2 - 2 Points" }
+  ];
+
   // Helper function to update a specific field in the parent's state
   const updateState = useCallback(
     (field, value) => {
@@ -154,18 +161,31 @@ const ANFMeasurementInspectionForm = ({
     [setInspectionState]
   );
 
+  // --- DYNAMIC API PREFIX HELPER ---
+  const getApiPrefix = useCallback(() => {
+    return stage.value === "M2"
+      ? `${API_BASE_URL}/api/anf-measurement-packing`
+      : `${API_BASE_URL}/api/anf-measurement`;
+  }, [stage]);
+
   // --- All useEffect hooks---
+
+  // --- 1. Fetch MO Options when STAGE changes ---
   useEffect(() => {
+    // Reset everything when stage changes to prevent mismatched data
+    updateState("selectedMo", null);
+
     axios
-      .get(`${API_BASE_URL}/api/anf-measurement/mo-options`, {
+      .get(`${getApiPrefix()}/mo-options`, {
         withCredentials: true
       })
       .then((res) =>
         setMoOptions(res.data.map((mo) => ({ value: mo, label: mo })))
       )
       .catch((err) => console.error("Error fetching MO options:", err));
-  }, []);
+  }, [stage, getApiPrefix, updateState]);
 
+  // --- 2. Fetch Details when MO selected ---
   useEffect(() => {
     const resetState = () => {
       setBuyer("");
@@ -173,30 +193,31 @@ const ANFMeasurementInspectionForm = ({
       setColorOptions([]);
       setOrderDetails(null);
       setSpecTableData([]);
-
-      // Reset parts of the parent state
+      // ... reset parent state helpers ...
       updateState("selectedSize", null);
       updateState("selectedColors", []);
       updateState("garments", [{}]);
       updateState("currentGarmentIndex", 0);
     };
+
     if (selectedMo) {
       resetState();
+      const prefix = getApiPrefix();
+
       axios
-        .get(
-          `${API_BASE_URL}/api/anf-measurement/mo-details/${selectedMo.value}`,
-          { withCredentials: true }
-        )
+        .get(`${prefix}/mo-details/${selectedMo.value}`, {
+          withCredentials: true
+        })
         .then((res) => {
           setBuyer(res.data.buyer);
           setSizeOptions(res.data.sizes.map((s) => ({ value: s, label: s })));
         })
         .catch((err) => console.error("Error fetching MO details:", err));
+
       axios
-        .get(
-          `${API_BASE_URL}/api/anf-measurement/order-details/${selectedMo.value}`,
-          { withCredentials: true }
-        )
+        .get(`${prefix}/order-details/${selectedMo.value}`, {
+          withCredentials: true
+        })
         .then((res) => {
           setOrderDetails(res.data);
           setColorOptions(res.data.colorOptions);
@@ -205,57 +226,47 @@ const ANFMeasurementInspectionForm = ({
     } else {
       resetState();
     }
-  }, [selectedMo, updateState]);
+  }, [selectedMo, updateState, getApiPrefix]);
 
+  // --- Effect 3: Fetch Size Data/Spec Table (Triggered when Size/Color selected) ---
   useEffect(() => {
     const fetchSizeData = async () => {
       if (selectedMo && selectedSize) {
         setIsLoadingSizeData(true);
-
-        // --- NEW: Reset status when fetching new size data ---
         setCurrentSizeStatus("In Progress");
+        const prefix = getApiPrefix();
 
         try {
-          // --- Step 1: Fetch the spec table (this is required for both new and existing data) ---
-          const specRes = await axios.get(
-            `${API_BASE_URL}/api/anf-measurement/spec-table`,
-            {
-              params: { moNo: selectedMo.value, size: selectedSize.value },
-              withCredentials: true
-            }
-          );
+          // 1. Fetch Spec Table
+          const specRes = await axios.get(`${prefix}/spec-table`, {
+            params: { moNo: selectedMo.value, size: selectedSize.value },
+            withCredentials: true
+          });
           const fetchedSpecTable = specRes.data;
           setSpecTableData(fetchedSpecTable);
 
-          // --- Step 2: Fetch existing measurement data for this size ---
-          const existingDataRes = await axios.get(
-            `${API_BASE_URL}/api/anf-measurement/existing-data`,
-            {
-              params: {
-                date: inspectionDate.toISOString().split("T")[0],
-                qcId: user.emp_id,
-                moNo: selectedMo.value,
-                color: selectedColors.map((c) => c.value).join(","), // Pass colors as comma-separated string
-                size: selectedSize.value
-              },
-              withCredentials: true
-            }
-          );
+          // 2. Fetch Existing Measurements
+          const existingDataRes = await axios.get(`${prefix}/existing-data`, {
+            params: {
+              date: inspectionDate.toISOString().split("T")[0],
+              qcId: user.emp_id,
+              moNo: selectedMo.value,
+              color: selectedColors.map((c) => c.value).join(","),
+              size: selectedSize.value
+            },
+            withCredentials: true
+          });
 
-          //const existingGarmentsData = existingDataRes.data;
-          // --- MODIFIED: Destructure both measurements and status from the response ---
           const { measurements: existingGarmentsData, status: loadedStatus } =
             existingDataRes.data;
 
-          // --- NEW: Set the status from the loaded data ---
           setCurrentSizeStatus(loadedStatus || "In Progress");
 
-          // --- Step 3: Process the data ---
+          // 3. Process Data
           if (
             Array.isArray(existingGarmentsData) &&
             existingGarmentsData.length > 0
           ) {
-            // DATA FOUND: Transform it to frontend state format
             const loadedGarments = existingGarmentsData.map(
               (backendGarment) => {
                 const frontendGarment = {};
@@ -264,8 +275,6 @@ const ANFMeasurementInspectionForm = ({
                     (s) => s.orderNo === measurement.orderNo
                   );
                   if (specRow) {
-                    // Re-calculate the ABSOLUTE decimal value from the saved DEVIATION
-                    // Frontend state requires the absolute value for the cell color logic
                     const absoluteDecimal =
                       specRow.specValueDecimal + measurement.decimalValue;
                     frontendGarment[measurement.orderNo] = {
@@ -277,25 +286,10 @@ const ANFMeasurementInspectionForm = ({
                 return frontendGarment;
               }
             );
-
-            // If any garments were empty, fill with default values
-            if (loadedGarments.length === 0) {
-              // Fallback to new garment logic if transform fails
-              const initialGarmentData = {};
-              fetchedSpecTable.forEach((row) => {
-                initialGarmentData[row.orderNo] = {
-                  decimal: null,
-                  fraction: "0"
-                };
-              });
-              updateState("garments", [initialGarmentData]);
-              updateState("currentGarmentIndex", 0);
-            } else {
-              updateState("garments", loadedGarments);
-              updateState("currentGarmentIndex", loadedGarments.length - 1); // Set to the last garment
-            }
+            updateState("garments", loadedGarments);
+            updateState("currentGarmentIndex", loadedGarments.length - 1);
           } else {
-            // NO DATA FOUND: Initialize a new, empty garment
+            // Initialize empty
             const initialGarmentData = {};
             fetchedSpecTable.forEach((row) => {
               initialGarmentData[row.orderNo] = {
@@ -308,16 +302,15 @@ const ANFMeasurementInspectionForm = ({
           }
         } catch (err) {
           console.error("Error fetching spec or existing data:", err);
-          setSpecTableData([]); // Clear on error
+          setSpecTableData([]);
           updateState("garments", [{}]);
           updateState("currentGarmentIndex", 0);
         } finally {
           setIsLoadingSizeData(false);
         }
       } else {
-        // Clear table if size is deselected
         setSpecTableData([]);
-        setCurrentSizeStatus("In Progress"); // Reset status if size is cleared
+        setCurrentSizeStatus("In Progress");
         updateState("garments", [{}]);
         updateState("currentGarmentIndex", 0);
       }
@@ -330,8 +323,9 @@ const ANFMeasurementInspectionForm = ({
     selectedColors,
     inspectionDate,
     user,
-    updateState
-  ]); // Add dependencies
+    updateState,
+    getApiPrefix
+  ]);
 
   // --- NEW: Helper variable for readability ---
   const isSizeCompleted = currentSizeStatus === "Completed";
@@ -512,6 +506,7 @@ const ANFMeasurementInspectionForm = ({
   }, [garments, specTableData]);
 
   // --- NEW: Save Logic ---
+  // --- Save Logic Update (Uses Dynamic Prefix) ---
   const handleSave = async () => {
     if (
       !user?.emp_id ||
@@ -528,16 +523,13 @@ const ANFMeasurementInspectionForm = ({
     }
     setIsSaving(true);
 
-    // This helper function correctly handles timezone offsets to get the right day.
     const toLocalISOString = (date) => {
       const offset = date.getTimezoneOffset();
       const adjustedDate = new Date(date.getTime() - offset * 60 * 1000);
       return adjustedDate.toISOString().split("T")[0];
     };
 
-    // 1. Construct the payload
     const payload = {
-      //inspectionDate,
       inspectionDate: toLocalISOString(inspectionDate),
       qcID: user.emp_id,
       moNo: selectedMo.value,
@@ -578,8 +570,6 @@ const ANFMeasurementInspectionForm = ({
             garmentNo: index + 1,
             measurements: specTableData.map((spec) => {
               const measurement = garment[spec.orderNo];
-
-              // Recalculate the deviation by subtracting the base spec from the final measured value.
               const deviationDecimal =
                 measurement?.decimal !== null &&
                 measurement?.decimal !== undefined
@@ -590,8 +580,8 @@ const ANFMeasurementInspectionForm = ({
 
               return {
                 orderNo: spec.orderNo,
-                decimalValue: deviationDecimal, // Now saves the correct deviation decimal
-                fractionValue: measurement?.fraction || "0" // The fraction is already the deviation
+                decimalValue: deviationDecimal,
+                fractionValue: measurement?.fraction || "0"
               };
             })
           }))
@@ -599,24 +589,12 @@ const ANFMeasurementInspectionForm = ({
       ]
     };
 
-    // 2. Send to the API
     try {
-      await axios.post(`${API_BASE_URL}/api/anf-measurement/reports`, payload, {
+      const prefix = getApiPrefix(); // <--- Dynamic URL
+      await axios.post(`${prefix}/reports`, payload, {
         withCredentials: true
       });
-      // Instead of Swal, set toast state to true
       setShowSuccessToast(true);
-      // Swal.fire(
-      //   "Success!",
-      //   "Measurement data for this size has been saved.",
-      //   "success"
-      // );
-
-      // // 3. Reset for next size
-      // updateState("selectedSize", null);
-      // setSpecTableData([]);
-      // updateState("garments", [{}]);
-      // updateState("currentGarmentIndex", 0);
     } catch (error) {
       console.error("Error saving inspection data:", error);
       Swal.fire(
@@ -631,7 +609,6 @@ const ANFMeasurementInspectionForm = ({
 
   // --- new button handlers ---
   const updateSizeStatus = async (newStatus) => {
-    // --- Central function to call the new PATCH endpoint ---
     if (!selectedMo || !selectedSize || selectedColors.length === 0) return;
 
     setIsStatusUpdating(true);
@@ -646,14 +623,12 @@ const ANFMeasurementInspectionForm = ({
         size: selectedSize.value,
         status: newStatus
       };
-      await axios.patch(
-        `${API_BASE_URL}/api/anf-measurement/reports/status`,
-        payload,
-        {
-          withCredentials: true
-        }
-      );
-      // On success, update the local state
+
+      const prefix = getApiPrefix(); // <--- Dynamic URL
+      await axios.patch(`${prefix}/reports/status`, payload, {
+        withCredentials: true
+      });
+
       setCurrentSizeStatus(newStatus);
       Swal.fire(
         "Success",
@@ -722,7 +697,21 @@ const ANFMeasurementInspectionForm = ({
     <div className="space-y-6">
       {/* Filters Section */}
       <div className="p-4 bg-white dark:bg-gray-800 rounded-lg shadow-md">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-end">
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-4 items-end">
+          {/* NEW: Measurement Stage Selector */}
+          <div className="md:col-span-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              Measurement Stage
+            </label>
+            <Select
+              options={stageOptions}
+              value={stage}
+              onChange={(val) => updateState("stage", val)}
+              styles={selectStyles}
+              isSearchable={false}
+            />
+          </div>
+
           <div className="md:col-span-1">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Inspection Date

@@ -15,6 +15,7 @@ import {
   Loader,
   Info
 } from "lucide-react";
+import Swal from "sweetalert2";
 
 const RovingPairingData = () => {
   const { t } = useTranslation();
@@ -42,6 +43,43 @@ const RovingPairingData = () => {
     measurements: true,
     defects: true
   });
+
+  const [defectDefinitions, setDefectDefinitions] = useState([]);
+  const [currentLanguage, setCurrentLanguage] = useState("en");
+
+  const showImagePopup = (imageUrl) => {
+    Swal.fire({
+      html: `<img src="${imageUrl}" style="max-width: 100%; max-height: 80vh; object-fit: contain;" />`,
+      showConfirmButton: false,
+      showCloseButton: true,
+      background: "transparent",
+      backdrop: "rgba(0,0,0,0.8)",
+      customClass: {
+        popup: "swal2-image-popup"
+      }
+    });
+  };
+
+  const showDetailsOnTap = (tooltipContent) => {
+    Swal.fire({
+      html: tooltipContent.html,
+      confirmButtonText: "Close",
+      width: "600px",
+      showCloseButton: true,
+      customClass: {
+        popup: "roving-pairing-data-swal-popup"
+      },
+      didOpen: () => {
+        const images = document.querySelectorAll(".defect-image-clickable");
+        images.forEach((img) => {
+          img.addEventListener("click", (e) => {
+            e.preventDefault();
+            showImagePopup(img.src);
+          });
+        });
+      }
+    });
+  };
 
   const formatDateForAPI = (date) => {
     return `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
@@ -101,7 +139,55 @@ const RovingPairingData = () => {
 
   useEffect(() => {
     fetchReportData();
+    fetchDefectDefinitions();
   }, [fetchReportData]);
+
+  useEffect(() => {
+    const userLanguage =
+      user?.language || localStorage.getItem("preferredLanguage") || "en";
+    setCurrentLanguage(userLanguage);
+  }, [user]);
+
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === "preferredLanguage") {
+        setCurrentLanguage(e.newValue || "en");
+      }
+    };
+
+    const handleCustomLanguageChange = (e) => {
+      setCurrentLanguage(e.detail.language);
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    window.addEventListener("languageChanged", handleCustomLanguageChange);
+
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("languageChanged", handleCustomLanguageChange);
+    };
+  }, []);
+
+  const fetchDefectDefinitions = async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/pairing-defects`);
+      if (response.data && Array.isArray(response.data)) {
+        setDefectDefinitions(response.data);
+      }
+    } catch (error) {
+      console.error("Error fetching pairing defects:", error);
+      setDefectDefinitions([]);
+    }
+  };
+
+  const getDefectNameByLanguage = (defect, language = "en") => {
+    if (language.startsWith("kh"))
+      return defect.defectNameKhmer || defect.defectNameEng;
+    if (language.startsWith("zh")) {
+      return defect.defectNameChinese || defect.defectNameEng;
+    }
+    return defect.defectNameEng;
+  };
 
   const handleFilterChange = (field, value) => {
     const newFilters = { ...filters, [field]: value };
@@ -461,15 +547,264 @@ const RovingPairingData = () => {
                       );
                       const summary = inspection?.totalSummary;
 
+                      const constructTooltipContent = (
+                        inspection,
+                        summary,
+                        row
+                      ) => {
+                        if (!inspection || !summary)
+                          return {
+                            text: "No inspection data",
+                            html: "<p>No inspection data available</p>"
+                          };
+
+                        let defectsHtmlList = [];
+                        let defectsTextList = [];
+                        let allImages = [];
+
+                        // Access defects from row.pairingData (the original MongoDB data structure)
+                        if (row?.pairingData?.length > 0) {
+                          const pairingRecord = row.pairingData.find((data) => {
+                            return (
+                              data.inspection_rep_name === inspection.rep_name
+                            );
+                          });
+
+                          if (pairingRecord) {
+                            if (
+                              pairingRecord.defectSummary?.defectDetails
+                                ?.length > 0
+                            ) {
+                              pairingRecord.defectSummary.defectDetails.forEach(
+                                (partTypeData) => {
+                                  if (
+                                    partTypeData?.defectsForPart?.length > 0
+                                  ) {
+                                    partTypeData.defectsForPart.forEach(
+                                      (partData) => {
+                                        if (partData?.defects?.length > 0) {
+                                          partData.defects.forEach((defect) => {
+                                            const defectName =
+                                              defect.defectNameEng ||
+                                              "Unknown Defect";
+                                            const localizedDefectName =
+                                              currentLanguage.startsWith("kh")
+                                                ? defect.defectNameKhmer ||
+                                                  defectName
+                                                : currentLanguage.startsWith(
+                                                    "zh"
+                                                  )
+                                                ? defect.defectNameChinese ||
+                                                  defectName
+                                                : defectName;
+
+                                            defectsTextList.push(
+                                              `${partTypeData.partType} Part ${partData.partNo}: ${localizedDefectName} (Qty: ${defect.count})`
+                                            );
+
+                                            let singleDefectHtml = `<div style="margin: 4px 0; padding: 6px; border-left: 3px solid #dc2626; background-color: #fef2f2;">`;
+                                            singleDefectHtml += `<strong>${partTypeData.partType} Part ${partData.partNo}:</strong> ${localizedDefectName} (Qty: ${defect.count})`;
+
+                                            // Handle defect images
+                                            if (
+                                              defect.images &&
+                                              Array.isArray(defect.images) &&
+                                              defect.images.length > 0
+                                            ) {
+                                              singleDefectHtml += `<div style="margin-top: 8px;">`;
+                                              defect.images.forEach(
+                                                (image, imgIndex) => {
+                                                  if (
+                                                    image &&
+                                                    typeof image === "string"
+                                                  ) {
+                                                    allImages.push(image);
+                                                    singleDefectHtml += `<img src="${image}" alt="Defect Image ${
+                                                      imgIndex + 1
+                                                    }" class="defect-image-clickable" style="max-width: 80px; max-height: 80px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />`;
+                                                  }
+                                                }
+                                              );
+                                              singleDefectHtml += `</div>`;
+                                            }
+                                            singleDefectHtml += `</div>`;
+                                            defectsHtmlList.push(
+                                              singleDefectHtml
+                                            );
+                                          });
+                                        }
+                                      }
+                                    );
+                                  }
+                                }
+                              );
+                            }
+
+                            // Collect measurement images from pairingData
+                            if (pairingRecord.measurementData?.length > 0) {
+                              pairingRecord.measurementData.forEach(
+                                (partTypeData) => {
+                                  if (partTypeData?.measurements?.length > 0) {
+                                    partTypeData.measurements.forEach(
+                                      (measurement) => {
+                                        if (measurement?.images?.length > 0) {
+                                          measurement.images.forEach(
+                                            (image) => {
+                                              if (
+                                                image &&
+                                                typeof image === "string"
+                                              ) {
+                                                allImages.push(image);
+                                              }
+                                            }
+                                          );
+                                        }
+                                      }
+                                    );
+                                  }
+                                }
+                              );
+                            }
+                          }
+                        }
+
+                        let finalDefectsHtml = "<strong>Defects:</strong> None";
+                        if (defectsHtmlList.length > 0) {
+                          finalDefectsHtml = `<strong>Defects Found:</strong><div style="margin-top: 8px;">${defectsHtmlList.join(
+                            ""
+                          )}</div>`;
+                        }
+
+                        // Add all other images section
+                        let allImagesHtml = "";
+                        if (allImages.length > 0) {
+                          allImagesHtml = `<div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                            <strong>All Images:</strong>
+                            <div style="margin-top: 8px;">`;
+                          allImages.forEach((image, index) => {
+                            allImagesHtml += `<img src="${image}" alt="Image ${
+                              index + 1
+                            }" class="defect-image-clickable" style="max-width: 80px; max-height: 80px; margin: 4px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;" />`;
+                          });
+                          allImagesHtml += `</div></div>`;
+                        }
+
+                        return {
+                          text: `Pairing Inspection Details:
+                              Date: ${
+                                filters.date
+                                  ? formatDateForAPI(filters.date)
+                                  : "N/A"
+                              }
+                              Line No: ${row.lineNo || "N/A"}
+                              MO No: ${row.moNo || "N/A"}
+                              Operator ID: ${row.operatorId || "N/A"}
+                              Inspection: ${inspection.rep_name}
+                              Accessory Complete: ${
+                                inspection.accessoryComplete || "N/A"
+                              }
+                              Total Parts: ${summary?.totalParts || 0}
+                              Total Pass: ${summary?.totalPass || 0}
+                              Total Rejects: ${summary?.totalRejects || 0}
+                              Pass Rate: ${summary?.passRate || "N/A"}
+                              Defect Rejected Parts: ${
+                                summary?.defectTotalRejectedParts || 0
+                              }
+                              Defect Total Qty: ${summary?.defectTotalQty || 0}
+
+                              Measurement Rejects:
+                                Total: ${summary?.measurementTotalRejects || 0}
+                                (+) ${summary?.measurementPositiveRejects || 0}
+                                (-) ${summary?.measurementNegativeRejects || 0}
+
+                              ${
+                                defectsTextList.length > 0
+                                  ? `Defects Found: ${defectsTextList.join(
+                                      ", "
+                                    )}`
+                                  : "Defects: None"
+                              }`,
+                          html: `
+                            <div style="text-align: left; font-family: monospace; font-size: 0.85rem; line-height: 1.4;">
+                              <h3 style="margin: 0 0 12px 0; color: #1f2937; border-bottom: 2px solid #3b82f6; padding-bottom: 4px;">Pairing Inspection Details</h3>
+                              <div style="margin-bottom: 12px;">
+                                <strong>Date:</strong> ${
+                                  filters.date
+                                    ? formatDateForAPI(filters.date)
+                                    : "N/A"
+                                }<br>
+                                <strong>Line No:</strong> ${
+                                  row.lineNo || "N/A"
+                                }<br>
+                                <strong>MO No:</strong> ${row.moNo || "N/A"}<br>
+                                <strong>Operator ID:</strong> ${
+                                  row.operatorId || "N/A"
+                                }<br>
+                                <strong>Inspection:</strong> ${
+                                  inspection.rep_name
+                                }
+                              </div>
+                              <div style="margin-bottom: 12px; padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                                <strong>Accessory Complete:</strong> ${
+                                  inspection.accessoryComplete || "N/A"
+                                }<br>
+                                <strong>Total Parts:</strong> ${
+                                  summary.totalParts || 0
+                                }<br>
+                                <strong>Total Pass:</strong> ${
+                                  summary?.totalPass || 0
+                                }<br>
+                                <strong>Total Rejects:</strong> ${
+                                  summary?.totalRejects || 0
+                                }<br>
+                                <strong>Pass Rate:</strong> ${
+                                  summary?.passRate || "N/A"
+                                }<br>
+                                <strong>Defect Rejected Parts:</strong> ${
+                                  summary?.defectTotalRejectedParts || 0
+                                }<br>
+                                <strong>Defect Total Qty:</strong> ${
+                                  summary?.defectTotalQty || 0
+                                }<br>
+                                <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+                                  <strong>Measurement Rejects:</strong><br>
+                                  &nbsp;&nbsp;Total: ${
+                                    summary?.measurementTotalRejects || 0
+                                  }<br>
+                                  &nbsp;&nbsp;Positive (+): ${
+                                    summary?.measurementPositiveRejects || 0
+                                  }<br>
+                                  &nbsp;&nbsp;Negative (-): ${
+                                    summary?.measurementNegativeRejects || 0
+                                  }
+                                </div>
+                              </div>
+                              <div style="padding-top: 8px; border-top: 1px solid #e5e7eb;">
+                                ${finalDefectsHtml}
+                              </div>
+                              ${allImagesHtml}
+                            </div>
+                          `
+                        };
+                      };
+
+                      const tooltipContent = constructTooltipContent(
+                        inspection,
+                        summary,
+                        row
+                      );
+
                       const accessoryCell = (
                         <td
-                          className={`p-2 border border-gray-300 text-center ${
+                          className={`p-2 border border-gray-300 text-center cursor-pointer hover:opacity-80 ${
                             !inspection
                               ? "bg-gray-200"
                               : inspection.accessoryComplete === "Yes"
                               ? "bg-green-100"
                               : "bg-red-100"
                           }`}
+                          title={tooltipContent.text}
+                          onClick={() => showDetailsOnTap(tooltipContent)}
                         >
                           {inspection &&
                             (inspection.accessoryComplete === "Yes" ? (
@@ -488,13 +823,15 @@ const RovingPairingData = () => {
 
                       const measurementCell = (
                         <td
-                          className={`p-2 border border-gray-300 text-center text-xs ${
+                          className={`p-2 border border-gray-300 text-center text-xs cursor-pointer hover:opacity-80 ${
                             !summary
                               ? "bg-gray-200"
                               : summary.measurementTotalRejects > 0
                               ? "bg-red-100"
                               : "bg-green-100"
                           }`}
+                          title={tooltipContent.text}
+                          onClick={() => showDetailsOnTap(tooltipContent)}
                         >
                           {summary && (
                             <div>
@@ -514,7 +851,7 @@ const RovingPairingData = () => {
 
                       const defectCell = (
                         <td
-                          className={`p-2 border border-gray-300 text-center text-xs ${
+                          className={`p-2 border border-gray-300 text-center text-xs cursor-pointer hover:opacity-80 ${
                             !summary
                               ? "bg-gray-200"
                               : summary.defectTotalRejectedParts > 0 ||
@@ -522,6 +859,8 @@ const RovingPairingData = () => {
                               ? "bg-red-100"
                               : "bg-green-100"
                           }`}
+                          title={tooltipContent.text}
+                          onClick={() => showDetailsOnTap(tooltipContent)}
                         >
                           {summary && (
                             <div>

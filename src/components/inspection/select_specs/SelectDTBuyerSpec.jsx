@@ -18,6 +18,8 @@ const getBuyerFromMoNumber = (moNo) => {
 };
 
 const SelectDTBuyerSpec = () => {
+  // NEW: Stage State
+  const [stage, setStage] = useState({ value: "M1", label: "M1 - 5 Points" });
   const [buyer, setBuyer] = useState({ value: "ANF", label: "ANF" });
   const [moNo, setMoNo] = useState(null);
   const [moOptions, setMoOptions] = useState([]);
@@ -26,6 +28,12 @@ const SelectDTBuyerSpec = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+
+  // NEW: Stage Options
+  const stageOptions = [
+    { value: "M1", label: "M1 - 5 Points" },
+    { value: "M2", label: "M2 - 2 Points" }
+  ];
 
   const buyerOptions = [
     { value: "ANF", label: "ANF" },
@@ -62,11 +70,30 @@ const SelectDTBuyerSpec = () => {
         setOrderData(null);
         setSelectedSpecs([]);
         try {
+          // Note: The order details (Available specs/Raw data) typically come from the same source
+          // regardless of stage. We will handle M1 vs M2 saving in the Preview component.
           const response = await axios.get(
             `${API_BASE_URL}/api/buyer-spec-order-details/${moNo.value}`,
             { withCredentials: true }
           );
-          const sortedSpec = response.data.buyerSpec.sort(
+          let fetchedData = response.data;
+
+          // Special handling for GPAF6117
+          if (moNo.value === "GPAF6117") {
+            const correctSizes = [
+              "2XS",
+              "XS",
+              "S",
+              "M",
+              "L",
+              "XL",
+              "XXL",
+              "XXXL"
+            ];
+            fetchedData.sizes = correctSizes;
+          }
+
+          const sortedSpec = fetchedData.buyerSpec.sort(
             (a, b) => a.seq - b.seq
           );
           setOrderData({ ...response.data, buyerSpec: sortedSpec });
@@ -81,15 +108,16 @@ const SelectDTBuyerSpec = () => {
       setOrderData(null);
       setSelectedSpecs([]);
     }
-  }, [moNo]);
+  }, [moNo]); // Note: We don't reset on stage change, as raw specs are usually the same
 
   const handleClearFilters = () => {
+    // Reset stage to default M1? Optional. I'll leave it as is.
+    // setStage({ value: "M1", label: "M1 - 5 Points" });
     setBuyer({ value: "ANF", label: "ANF" });
     setMoNo(null);
     setSearchTerm("");
   };
 
-  // --- MODIFIED: Simplified toggle function ---
   const handleSpecToggle = (spec) => {
     setSelectedSpecs((currentSelected) => {
       const isSelected = currentSelected.some((s) => s.seq === spec.seq);
@@ -157,6 +185,20 @@ const SelectDTBuyerSpec = () => {
             Filters
           </h2>
           <div className="flex flex-row items-end gap-6">
+            {/* NEW: Measurement Stage Select */}
+            <div className="w-48">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Measurement Stage
+              </label>
+              <Select
+                options={stageOptions}
+                value={stage}
+                onChange={setStage}
+                styles={selectStyles}
+                isSearchable={false}
+              />
+            </div>
+
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Buyer
@@ -183,7 +225,6 @@ const SelectDTBuyerSpec = () => {
                   }
                   setMoNo(selectedOption);
                 }}
-                //onChange={setMoNo}
                 isClearable
                 isLoading={!moOptions.length}
                 styles={selectStyles}
@@ -195,7 +236,7 @@ const SelectDTBuyerSpec = () => {
                 className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 dark:text-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
               >
                 <X className="mr-2 h-4 w-4" />
-                Clear Filters
+                Clear
               </button>
             </div>
           </div>
@@ -209,7 +250,7 @@ const SelectDTBuyerSpec = () => {
           <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md">
             <div className="p-4 border-b dark:border-gray-700 flex flex-col sm:flex-row justify-between items-center gap-4">
               <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-                Available Specs for {moNo && moNo.label}
+                Available Specs for {moNo && moNo.label} ({stage.label})
               </h2>
               <div className="flex items-center gap-4 w-full sm:w-auto">
                 <div className="relative w-full sm:w-64">
@@ -241,7 +282,6 @@ const SelectDTBuyerSpec = () => {
               </div>
             </div>
 
-            {/* --- MODIFIED: Spec Selection Grid --- */}
             <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {filteredSpecs.map((spec) => {
                 const isSelected = selectedSpecs.some(
@@ -279,7 +319,6 @@ const SelectDTBuyerSpec = () => {
                         <CheckCircle size={16} className="text-white" />
                       )}
                     </div>
-                    {/* Visually hidden but accessible checkbox */}
                     <input
                       type="checkbox"
                       checked={isSelected}
@@ -300,6 +339,7 @@ const SelectDTBuyerSpec = () => {
           selectedSpecs={selectedSpecs}
           orderData={orderData}
           selectedBuyer={buyer}
+          selectedStage={stage} // Pass the selected stage here
         />
       </div>
     </div>

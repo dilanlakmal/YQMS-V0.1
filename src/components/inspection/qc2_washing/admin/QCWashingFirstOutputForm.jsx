@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
@@ -19,12 +19,8 @@ const LabeledInput = ({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col">
-      <label
-        htmlFor={id}
-        className="mb-1 text-xs font-medium text-gray-700 dark:text-gray-300"
-      >
-        {labelKey}{" "}
-        {required && <span className="text-red-500 dark:text-red-400">*</span>}
+      <label htmlFor={id} className="mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+        {labelKey} {required && <span className="text-red-500 dark:text-red-400">*</span>}
       </label>
       <input
         id={id}
@@ -43,7 +39,7 @@ const LabeledInput = ({
 const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
   const { t } = useTranslation();
   const initialState = {
-    quantity: ""
+    quantity: "",
   };
 
   const [newOutput, setNewOutput] = useState(initialState);
@@ -64,14 +60,11 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
         ...newOutput,
         addedBy: {
           emp_id: user?.emp_id,
-          eng_name: user?.eng_name
-        }
+          eng_name: user?.eng_name,
+        },
       };
 
-      await axios.post(
-        `${API_BASE_URL}/api/qc-washing-first-outputs`,
-        outputData
-      );
+      await axios.post(`${API_BASE_URL}/api/qc-washing-first-outputs`, outputData);
 
       Swal.fire({
         icon: "success",
@@ -81,12 +74,12 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
 
       setNewOutput(initialState);
       if (onOutputAdded) onOutputAdded();
+
     } catch (error) {
       Swal.fire({
         icon: "error",
         title: t("common.error"),
-        text:
-          error.response?.data?.message || "Failed to add first output record"
+        text: error.response?.data?.message || "Failed to add first output record"
       });
     } finally {
       setIsSaving(false);
@@ -98,10 +91,7 @@ const QCWashingFirstOutputForm = ({ onOutputAdded }) => {
       <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
         Add New First Output Check Record
       </h2>
-      <form
-        onSubmit={handleSubmit}
-        className="space-y-6 border px-2 py-1 rounded bg-gray-100  dark:bg-gray-600 dark:text-white dark:border-gray-500"
-      >
+      <form onSubmit={handleSubmit} className="space-y-6 border px-2 py-1 rounded bg-gray-100  dark:bg-gray-600 dark:text-white dark:border-gray-500">
         <div className="max-w-xs">
           <LabeledInput
             id="quantity"

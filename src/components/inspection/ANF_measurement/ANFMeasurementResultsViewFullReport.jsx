@@ -76,7 +76,8 @@ const ANFMeasurementResultsViewFullReport = ({
   isOpen,
   onClose,
   itemData,
-  dateRange
+  dateRange,
+  stage
 }) => {
   const [details, setDetails] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -88,8 +89,16 @@ const ANFMeasurementResultsViewFullReport = ({
         setIsLoading(true);
         setError(null);
         try {
+          /* ------------------------------------------------------------------
+             Determine API URL based on Stage
+             ------------------------------------------------------------------ */
+          const apiPrefix =
+            stage?.value === "M2"
+              ? `${API_BASE_URL}/api/anf-measurement-packing`
+              : `${API_BASE_URL}/api/anf-measurement`;
+
           const res = await axios.get(
-            `${API_BASE_URL}/api/anf-measurement/results/full-report-detail`,
+            `${apiPrefix}/results/full-report-detail`, // Use dynamic prefix
             {
               params: {
                 startDate: dateRange.startDate.toISOString().split("T")[0],
@@ -111,7 +120,38 @@ const ANFMeasurementResultsViewFullReport = ({
       };
       fetchDetails();
     }
-  }, [isOpen, itemData, dateRange]);
+  }, [isOpen, itemData, dateRange, stage]);
+
+  // useEffect(() => {
+  //   if (isOpen && itemData) {
+  //     const fetchDetails = async () => {
+  //       setIsLoading(true);
+  //       setError(null);
+  //       try {
+  //         const res = await axios.get(
+  //           `${API_BASE_URL}/api/anf-measurement/results/full-report-detail`,
+  //           {
+  //             params: {
+  //               startDate: dateRange.startDate.toISOString().split("T")[0],
+  //               endDate: dateRange.endDate.toISOString().split("T")[0],
+  //               moNo: itemData.moNo,
+  //               qcID: itemData.qcID,
+  //               size: itemData.size,
+  //               colors: itemData.colors.join(",")
+  //             }
+  //           }
+  //         );
+  //         setDetails(res.data);
+  //       } catch (err) {
+  //         setError("Failed to load detailed report.");
+  //         console.error(err);
+  //       } finally {
+  //         setIsLoading(false);
+  //       }
+  //     };
+  //     fetchDetails();
+  //   }
+  // }, [isOpen, itemData, dateRange]);
 
   const dynamicColumns = useMemo(() => {
     if (!details?.measurementsTally) return [];

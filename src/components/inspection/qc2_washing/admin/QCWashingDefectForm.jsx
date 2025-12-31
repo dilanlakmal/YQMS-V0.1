@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useTranslation } from "react-i18next";
 import Swal from "sweetalert2";
@@ -19,12 +19,8 @@ const LabeledInput = ({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col">
-      <label
-        htmlFor={id}
-        className="mb-1 text-xs font-medium text-gray-700 dark:text-gray-300"
-      >
-        {labelKey}{" "}
-        {required && <span className="text-red-500 dark:text-red-400">*</span>}
+      <label htmlFor={id} className="mb-1 text-xs font-medium text-gray-700 dark:text-gray-300">
+        {labelKey} {required && <span className="text-red-500 dark:text-red-400">*</span>}
       </label>
       <input
         id={id}
@@ -36,8 +32,8 @@ const LabeledInput = ({
         placeholder={placeholderKey}
         readOnly={readOnly}
         className={`block w-full text-sm rounded-md border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-indigo-500 dark:focus:border-indigo-400 focus:ring-1 focus:ring-indigo-500 dark:focus:ring-indigo-400 py-2 px-3 placeholder-gray-400 dark:placeholder-gray-500 transition-colors duration-200 ${
-          readOnly
-            ? "bg-gray-100 dark:bg-gray-600 cursor-not-allowed text-gray-500 dark:text-gray-400"
+          readOnly 
+            ? "bg-gray-100 dark:bg-gray-600 cursor-not-allowed text-gray-500 dark:text-gray-400" 
             : ""
         }`}
       />
@@ -147,6 +143,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
       removeImage();
       if (onDefectAdded) onDefectAdded();
       fetchNextCode();
+
     } catch (error) {
       Swal.fire({
         icon: "error",
@@ -163,7 +160,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
       <h2 className="text-xl font-semibold text-gray-800 dark:text-gray-200 mb-4">
         Add New QC Washing Defect
       </h2>
-
+      
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <LabeledInput
@@ -176,7 +173,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
             readOnly
             required
           />
-
+          
           <LabeledInput
             id="english"
             labelKey="English"
@@ -185,7 +182,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
             onChange={handleInputChange}
             required
           />
-
+          
           <LabeledInput
             id="khmer"
             labelKey="Khmer"
@@ -194,7 +191,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
             onChange={handleInputChange}
             required
           />
-
+          
           <LabeledInput
             id="chinese"
             labelKey="Chinese"
@@ -229,7 +226,7 @@ const QCWashingDefectForm = ({ onDefectAdded }) => {
                 <ImageIcon className="text-gray-400 dark:text-gray-500 h-8 w-8" />
               </div>
             )}
-
+            
             <div className="flex flex-col justify-center">
               <button
                 type="button"

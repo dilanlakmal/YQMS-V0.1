@@ -1,23 +1,30 @@
 import react from "@vitejs/plugin-react";
 import fs from "fs";
+import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
   plugins: [react()],
   assetsInclude: ["**/*.ttf"],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "./src")
+    }
+  },
   optimizeDeps: {
     include: ["jspdf", "jspdf-autotable"]
   },
   server: {
+    // allowedHosts: ["https://3c418b8c2cf0.ngrok-free.app"],
     host: "0.0.0.0",
     port: 3001,
     open: true,
     // https: {
     //   key: fs.readFileSync(
-    //     "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162-key.pem"
+    //     "./backend/Config/192.167.6.207-key.pem"
     //   ),
     //   cert: fs.readFileSync(
-    //     "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/192.167.12.162.pem"
+    //     "./backend/Config/192.167.6.207.pem"
     //   )
     // }
   },

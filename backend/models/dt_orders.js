@@ -286,6 +286,11 @@ const DtOrderSchema = new mongoose.Schema(
       required: false,
       default: 0
     },
+    SizeList: {
+      type: [String],
+      required: false,
+      default: []
+    },
 
     // Nested Arrays
     SizeSpec: [SizeSpecSchema],

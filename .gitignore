@@ -1,3 +1,6 @@
+# Environment variables
+.env
+
 # Logs
 logs
 *.log
@@ -30,13 +33,13 @@ dist-ssr
 # all image upload folders (cutting, scc, etc.)
 /backend/public/storage/
 
+# Fincheck image upload folders in frontend
+/backend/storage/PivotY/Fincheck
 
 # --- USER UPLOADED CONTENT ---
 # Ignore all content within the public storage directory.
 # handles all image upload folders in frontend
 public/storage/
-
-
 
 # ==================================
 #      AI Service API
@@ -45,3 +48,10 @@ public/storage/
 # Ignore the .env file inside the ai_service folder and the virtual environment.
 /ai_service/.env
 /ai_service/venv
+
+
+# ==================================
+#      Heang Cause
+# ==================================
+# Ignore the  files me.
+src/components/inspection/emb_printing/

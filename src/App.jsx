@@ -50,11 +50,14 @@ import CuttingInline from "./pages/CuttingInline.jsx";
 import ManageBuyerSpecs from "./pages/ManageBuyerSpecs.jsx";
 import ANFMeasurement from "./pages/ANFMeasurement.jsx";
 import ANFMeasurementVer2 from "./pages/ANFMeasurementVer2.jsx";
-import CEMasterList from "./pages/CEMasterList.jsx";
+//import CEMasterList from "./pages/CEMasterList.jsx";
+import CESystem from "./pages/CESystem.jsx";
 import ANFMeasurementQCViewFullReport from "./components/inspection/ANF_measurement/ANFMeasurementQCViewFullReport.jsx";
 import ANFStyleViewFullReport from "./components/inspection/ANF_measurement/ANFStyleViewFullReport";
-import QCWashingPage from "./pages/QCWashing.jsx";
+import ANFBuyerStyleViewFullReport from "./components/inspection/ANF_measurement/ANFBuyerStyleViewFullReport.jsx";
+
 import PackingList from "./pages/PackingList.jsx";
+import Measurement from "./pages/Measurement.jsx";
 
 //Languages
 import "../src/lang/i18n";
@@ -80,10 +83,25 @@ import QAAudit from "./pages/QAAudit.jsx";
 import QC2UploadData from "./pages/QC2UploadData.jsx";
 import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
+import QCWashingPage from "./pages/QCWashing.jsx";
+import AfterIroning from "./pages/AfterIroning.jsx";
+import LaundryWashingMachineTest from "./pages/LaundryWashingMachineTest.jsx";
+
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
 import SubConQADataFullReport from "./components/inspection/sub-con-qc1/SubConQADataFullReport.jsx";
 
+import YPivotQASections from "./pages/YPivotQASections.jsx";
+import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
+import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
+import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
+import P88Legacy from "./pages/P88Legacy.jsx";
+import InspectionReportPage from "./components/inspection/PivotY/P88Legacy/InspectionReportPage.jsx";
+
+import QCOutput from "./pages/QCOutput.jsx";
+import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
+
+import CoverPage from "./pages/coverPage.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -286,7 +304,7 @@ function AppContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen  bg-gray-50">
       <Toaster 
         position="bottom-right"
         toastOptions={toastConfig}
@@ -449,15 +467,23 @@ function AppContent() {
               />
 
               <Route
+                path="/anf-washing/buyer-style-full-report/:moNo"
+                element={<ANFBuyerStyleViewFullReport />}
+              />
+
+              <Route
                 path="/anf-washing-ver2"
                 element={<ANFMeasurementVer2 />}
               />
+              <Route path="/qc-output" element={<QCOutput />} />
+              <Route path="/qc-output/full-report" element={<QCFullReport />} />
               <Route path="/supplier-issues" element={<SupplierIssues />} />
-              <Route path="/master-list" element={<CEMasterList />} />
+              <Route path="/master-list" element={<CESystem />} />
               <Route path="/qa-yorksys" element={<UploadYorksysOrders />} />
               <Route path="/training" element={<YQMSTrainingSchedule />} />
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
+              <Route path="/laundry-washing-machine-test" element={<LaundryWashingMachineTest />} />
               <Route path="/sub-con-qc1" element={<SubConQC />} />
               <Route
                 path="/subcon-qa-inspection/view-report/:reportId"
@@ -469,7 +495,26 @@ function AppContent() {
                 path="/qc2-washing-upload"
                 element={<QC2WashingUpload />}
               />
+              <Route path="/afterIroning" element={<AfterIroning />} />
               <Route path="/packing-list" element={<PackingList />} />
+              <Route path="/measurement" element={<Measurement />} />
+              <Route path="/qa-sections" element={<YPivotQASections />} />
+              <Route
+                path="/qa-measurements"
+                element={<YPivotQAMeasurements />}
+              />
+              <Route path="/qa-templates" element={<YPivotQATemplates />} />
+              <Route
+                path="/fincheck-inspection"
+                element={<YPivotQAInspection />}
+              />
+              <Route path="/P88Legacy" element={<P88Legacy />} />
+              <Route
+                path="/inspection-report/:id"
+                element={<InspectionReportPage />}
+              />
+
+              <Route path="/production-Sheet" element={<CoverPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

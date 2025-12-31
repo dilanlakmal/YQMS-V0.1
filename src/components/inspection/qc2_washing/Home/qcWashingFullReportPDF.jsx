@@ -12,7 +12,6 @@ import {
   getToleranceAsFraction,
   decimalToFraction
 } from "../Home/fractionConverter";
-import { API_BASE_URL } from "../../../../../config";
 
 // --- FONT REGISTRATION ---
 Font.register({
@@ -193,18 +192,6 @@ const SafeText = ({ children, style, ...props }) => {
   );
 };
 
-// --- FIXED HELPER FUNCTION TO NORMALIZE IMAGE KEYS ---
-const normalizeImageKey = (src) => {
-  if (typeof src === "string") {
-    return src.trim();
-  } else if (typeof src === "object" && src !== null) {
-    return (
-      src.originalUrl || src.url || src.src || src.path || JSON.stringify(src)
-    );
-  }
-  return JSON.stringify(src);
-};
-
 // --- REUSABLE PDF COMPONENTS ---
 const PdfHeader = ({ orderNo, beforeAfterWash }) => (
   <View style={styles.docHeader} fixed>
@@ -222,8 +209,6 @@ const PdfHeader = ({ orderNo, beforeAfterWash }) => (
 );
 
 const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
-  // Debug logging to see what data we're receiving;
-
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Order Information</Text>
@@ -288,7 +273,7 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
           </View>
         </View>
 
-        {/* Right side - Inspector Details - SMALLER */}
+        {/* Right side - Inspector Details */}
         <View
           style={{
             width: "15%",
@@ -307,7 +292,6 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
             Inspector
           </Text>
 
-          {/* FIXED: Improved conditional rendering */}
           {inspectorDetails && Object.keys(inspectorDetails).length > 0 ? (
             <View style={{ alignItems: "center" }}>
               {/* Inspector Photo */}
@@ -343,52 +327,45 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
                 </View>
               )}
 
-              {/* Inspector ID */}
+              {/* Inspector ID and Name */}
               <View style={{ marginBottom: 2, alignItems: "center" }}>
                 <Text
                   style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}
                 >
                   ID:
                 </Text>
-                <SafeText
+                <Text
                   style={{
                     fontSize: 7,
                     fontWeight: "bold",
                     textAlign: "center"
                   }}
                 >
-                  {safeString(
-                    inspectorDetails.emp_id ||
-                      inspectorDetails.id ||
-                      inspectorDetails.inspector_id ||
-                      inspectorDetails.userId ||
-                      inspectorDetails._id
-                  )}
-                </SafeText>
+                  {inspectorDetails.emp_id ||
+                    inspectorDetails.id ||
+                    inspectorDetails.userId ||
+                    "N/A"}
+                </Text>
               </View>
 
-              {/* Inspector Name */}
               <View style={{ alignItems: "center" }}>
                 <Text
                   style={{ fontSize: 6, color: "#6b7280", textAlign: "center" }}
                 >
                   Name:
                 </Text>
-                <SafeText
+                <Text
                   style={{
                     fontSize: 7,
                     fontWeight: "bold",
                     textAlign: "center"
                   }}
                 >
-                  {safeString(
-                    inspectorDetails.eng_name ||
-                      inspectorDetails.name ||
-                      inspectorDetails.inspector_name ||
-                      inspectorDetails.fullName ||
-                      inspectorDetails.username
-                  )}
-                </SafeText>
+                  {inspectorDetails.eng_name ||
+                    inspectorDetails.name ||
+                    inspectorDetails.username ||
+                    "N/A"}
+                </Text>
               </View>
             </View>
           ) : (
@@ -491,7 +468,7 @@ const DefectAnalysisTable = ({
                   style={[
                     styles.tableColHeader,
                     styles.textLeft,
-                    { width: "20%" }
+                    { width: "25%" }
                   ]}
                 >
                   Defect Name
@@ -499,14 +476,15 @@ const DefectAnalysisTable = ({
                 <Text style={[styles.tableColHeader, { width: "10%" }]}>
                   Count
                 </Text>
-                <Text style={[styles.tableColHeader, { width: "70%" }]}>
+                <Text style={[styles.tableColHeader, { width: "65%" }]}>
                   Images
                 </Text>
               </View>
+
               {pcDefect.pcDefects.map((defect, defectIndex) => (
                 <View key={defectIndex} style={styles.tableRow}>
                   <Text
-                    style={[styles.tableCol, styles.textLeft, { width: "20%" }]}
+                    style={[styles.tableCol, styles.textLeft, { width: "25%" }]}
                   >
                     {safeString(defect.defectName)}
                   </Text>
@@ -517,7 +495,7 @@ const DefectAnalysisTable = ({
                     style={[
                       styles.tableCol,
                       {
-                        width: "70%",
+                        width: "65%",
                         flexDirection: "row",
                         flexWrap: "wrap",
                         alignItems: "flex-start",
@@ -554,8 +532,7 @@ const DefectAnalysisTable = ({
                             alignItems: "flex-start"
                           }}
                         >
-                          {/* All Images */}
-                          {allImages.map((img, imgIndex) => {
+                          {allImages.slice(0, 6).map((img, imgIndex) => {
                             const isCaptured = imgIndex < capturedImages.length;
                             const displayIndex = isCaptured
                               ? imgIndex + 1
@@ -564,21 +541,21 @@ const DefectAnalysisTable = ({
                             return (
                               <View
                                 key={`image-${imgIndex}`}
-                                style={{ margin: 3, alignItems: "center" }}
+                                style={{ margin: 2, alignItems: "center" }}
                               >
                                 <SafeImage
-                                  src={img}
-                                  style={styles.defectImage}
+                                  src={img} // Use the larger inspectionImage style
+                                  style={styles.inspectionImage}
                                   alt={`Defect ${defect.defectName} - ${
                                     isCaptured ? "Captured" : "Uploaded"
                                   } Image ${displayIndex}`}
                                 />
                                 <Text
                                   style={{
-                                    fontSize: 6,
+                                    fontSize: 5,
                                     color: isCaptured ? "#16a34a" : "#2563eb",
                                     textAlign: "center",
-                                    marginTop: 2,
+                                    marginTop: 1,
                                     fontWeight: "bold"
                                   }}
                                 >
@@ -589,6 +566,18 @@ const DefectAnalysisTable = ({
                               </View>
                             );
                           })}
+                          {allImages.length > 6 && (
+                            <Text
+                              style={{
+                                fontSize: 6,
+                                color: "#6b7280",
+                                alignSelf: "center",
+                                marginLeft: 4
+                              }}
+                            >
+                              +{allImages.length - 6} more
+                            </Text>
+                          )}
                         </View>
                       );
                     })()}
@@ -604,7 +593,7 @@ const DefectAnalysisTable = ({
         </View>
       ))}
 
-      {/* Additional Images */}
+      {/* Additional Images Section */}
       {additionalImages && additionalImages.length > 0 && (
         <View
           style={{
@@ -619,10 +608,6 @@ const DefectAnalysisTable = ({
           >
             Additional Images ({additionalImages.length})
           </Text>
-          <Text style={{ fontSize: 6, color: "#6b7280", marginBottom: 5 }}>
-            These are supplementary images captured during the inspection
-            process.
-          </Text>
           <View
             style={{
               flexDirection: "row",
@@ -630,30 +615,32 @@ const DefectAnalysisTable = ({
               alignItems: "flex-start"
             }}
           >
-            {additionalImages.map((img, imgIndex) => {
-              return (
-                <View
-                  key={imgIndex}
-                  style={{ margin: 4, alignItems: "center" }}
+            {additionalImages.slice(0, 8).map((img, imgIndex) => (
+              <View key={imgIndex} style={{ margin: 3, alignItems: "center" }}>
+                <SafeImage
+                  src={img} // Use the larger inspectionImage style
+                  style={styles.inspectionImage}
+                  alt={`Additional Image ${imgIndex + 1}`}
+                />
+                <Text
+                  style={{
+                    fontSize: 5,
+                    color: "#6b7280",
+                    textAlign: "center",
+                    marginTop: 1
+                  }}
                 >
-                  <SafeImage
-                    src={img}
-                    style={[styles.defectImage, { width: 120, height: 90 }]}
-                    alt={`Additional Image ${imgIndex + 1}`}
-                  />
-                  <Text
-                    style={{
-                      fontSize: 6,
-                      color: "#6b7280",
-                      textAlign: "center",
-                      marginTop: 2
-                    }}
-                  >
-                    Add {imgIndex + 1}
-                  </Text>
-                </View>
-              );
-            })}
+                  Add {imgIndex + 1}
+                </Text>
+              </View>
+            ))}
+            {additionalImages.length > 8 && (
+              <Text
+                style={{ fontSize: 6, color: "#6b7280", alignSelf: "center" }}
+              >
+                +{additionalImages.length - 8} more
+              </Text>
+            )}
           </View>
         </View>
       )}
@@ -1514,14 +1501,10 @@ const NewInspectionDetailsSection = ({
 
                         // ENSURE NO EMPTY STRINGS - CRITICAL FIX
                         const displayName =
-                          rawSubPointName && rawSubPointName.toString().trim()
-                            ? rawSubPointName.toString().trim()
-                            : `Sub-point ${subIndex + 1}`;
-
+                          (rawSubPointName || "").toString().trim() ||
+                          `Sub-point ${subIndex + 1}`;
                         const displayOption =
-                          rawOptionName && rawOptionName.toString().trim()
-                            ? rawOptionName.toString().trim()
-                            : "N/A";
+                          (rawOptionName || "").toString().trim() || "N/A";
 
                         return (
                           <View
@@ -2501,16 +2484,17 @@ const QcWashingFullReportPDF = ({
   comparisonData = null,
   API_BASE_URL,
   checkpointDefinitions = [],
-  inspectorDetails = null
+  inspectorDetails = null,
+  preloadedImages = {},
+  isLoading = false,
+  skipImageLoading = false
 }) => {
   const [fetchedInspectorDetails, setFetchedInspectorDetails] =
     React.useState(null);
-  const [loading, setLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchInspectorDetails = async () => {
       if (inspectorDetails || !recordData?.userId) {
-        setLoading(false);
         return;
       }
       try {
@@ -2520,8 +2504,6 @@ const QcWashingFullReportPDF = ({
         if (response.ok) setFetchedInspectorDetails(await response.json());
       } catch (error) {
         console.error("Error fetching inspector details:", error);
-      } finally {
-        setLoading(false);
       }
     };
     fetchInspectorDetails();
@@ -2580,10 +2562,13 @@ const QcWashingFullReportPDF = ({
     </View>
   );
 
-  // Simplified SafeImage component to build full URL
+  // Updated SafeImage component
+  // In your PDF component, update the SafeImage function
   const SafeImage = ({ src, style, alt }) => {
-    const getFullUrl = (imgSrc) => {
-      if (!imgSrc) return null;
+    const getImageSource = (imgSrc) => {
+      if (!imgSrc) {
+        return null;
+      }
 
       let url = "";
       if (typeof imgSrc === "string") {
@@ -2593,66 +2578,105 @@ const QcWashingFullReportPDF = ({
           imgSrc.originalUrl || imgSrc.url || imgSrc.src || imgSrc.path || "";
       }
 
-      if (url.startsWith("data:")) return url;
-      if (!url) return null;
-
-      // If the URL is external (starts with http), use the proxy.
-      if (url.startsWith("http")) {
-        // This creates a URL like: /api/image-proxy?url=https://ym.kottrahr.com/...
-        return `${API_BASE_URL}/api/image-proxy?url=${encodeURIComponent(url)}`;
+      // If already base64, return as-is
+      if (url.startsWith("data:")) {
+        return url;
       }
 
-      // If it's a local/relative URL, construct the absolute path.
-      // This handles paths like /Uploads/Images/...
-      return `${API_BASE_URL}${url.startsWith("/") ? "" : "/"}${url.trim()}`;
+      if (!url) {
+        return null;
+      }
+
+      // Check if we have preloaded base64 data with exact match
+      if (preloadedImages && preloadedImages[url]) {
+        return preloadedImages[url];
+      }
+
+      // Try different URL variations, especially for inspector images
+      const urlVariations = [
+        url,
+        url.replace("./public/", "/"),
+        url.replace("./public", ""),
+        url.startsWith("/") ? url.substring(1) : "/" + url,
+        url.replace(/^\/+/, "/"),
+        // Add variations for inspector images
+        url.includes("/uploads/") ? url : "/uploads/" + url.split("/").pop(),
+        url.includes("/storage/") ? url : "/storage/" + url.split("/").pop(),
+        // Add more variations for defect images
+        url.includes("/qc_washing_images/")
+          ? url
+          : "/storage/qc_washing_images/defect/" + url.split("/").pop()
+      ];
+
+      for (const variation of urlVariations) {
+        if (preloadedImages[variation]) {
+          return preloadedImages[variation];
+        }
+      }
+
+      return null;
     };
 
-    const imageUrl = getFullUrl(src);
-
+    const imageUrl = getImageSource(src);
     if (!imageUrl) {
       return (
         <ImagePlaceholder
           style={style}
-          text="No Source"
-          subtext={alt || "Missing URL"}
+          text="No Image"
+          subtext={alt || "Missing"}
         />
       );
     }
 
     try {
-      // Let @react-pdf/renderer handle the image fetching
       return <Image src={imageUrl} style={style} />;
     } catch (error) {
+      console.error("Image render error for", alt, ":", error);
       return (
         <ImagePlaceholder
           style={style}
-          text="Render Error"
+          text="Load Error"
           subtext={error.message}
         />
       );
     }
   };
 
-  if (loading) {
-    if (typeof src === "string") {
-      return (
-        <Document>
-          <Page style={styles.page}>
-            <Text>Loading report...</Text>
-          </Page>
-        </Document>
-      );
-    }
-  }
-
-  if (!recordData)
+  if (isLoading) {
     return (
       <Document>
         <Page style={styles.page}>
-          <Text>No report data available.</Text>
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <Text style={{ fontSize: 16, color: "#666" }}>
+              Loading report...
+            </Text>
+          </View>
         </Page>
       </Document>
     );
+  }
+
+  if (!recordData || !recordData._id) {
+    return (
+      <Document>
+        <Page style={styles.page}>
+          <View
+            style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
+          >
+            <Text style={{ fontSize: 16, color: "#ff0000" }}>
+              Error: No report data available
+            </Text>
+            <Text style={{ fontSize: 12, color: "#666", marginTop: 10 }}>
+              Please ensure the record data is properly loaded before generating
+              the PDF.
+            </Text>
+          </View>
+        </Page>
+      </Document>
+    );
+  }
 
   // Detect which data structure we're dealing with
   const hasNewInspectionStructure =

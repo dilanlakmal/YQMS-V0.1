@@ -4,6 +4,7 @@ import {
   getYorksysOrderFilterOptions,
   getYorksysOrdersPagination,
   getYorksysOrder,
+  getYorksysOrderByStyle,
   updateYorksysOrderProductType,
   previewBulkUpdateProductType,
   bulkUpdateProductTypeFromCutting,
@@ -20,6 +21,11 @@ router.get("/api/yorksys-orders/filters", getYorksysOrderFilterOptions);
 // Route to get all orders with pagination
 router.get("/api/yorksys-orders", getYorksysOrdersPagination);
 
+// Route to get order by Style (YM Style) - for LaundryWashingMachineTest module
+// Must come before /:moNo route to avoid route conflicts
+router.get("/api/yorksys-orders/by-style/:style", getYorksysOrderByStyle);
+
+// Route to get order by MO Number
 router.get("/api/yorksys-orders/:moNo", getYorksysOrder);
 
 // ROUTE: To update the product type of a specific order by its ID
