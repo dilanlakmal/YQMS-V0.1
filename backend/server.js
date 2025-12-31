@@ -308,6 +308,11 @@ import ceMasterRoutes from "./modules/CESystem/Routes/CEMasterRoutes.js";
 import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes.js";
 
 /* -----------------------------
+ Humidity
+------------------------------ */
+import huminityRoutes from "./routes/huminity/huminityRoutes.js";
+
+/* -----------------------------
   User Routes
 ------------------------------ */
 app.use(auth);
@@ -608,6 +613,11 @@ app.use(ceTargetMasterRoutes);
 app.use(CoverPage);
 /* -----------Sketch Technical-----------------*/
 app.use(sketchTechnical);
+
+/* -----------------------------
+ Humidity Imports
+------------------------------ */
+app.use(huminityRoutes);
 
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {

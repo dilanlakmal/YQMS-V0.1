@@ -126,6 +126,9 @@ import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 /*------------- Cover page ----------------*/
 import createCoverPageSchema from "../../models/YDT/coverPage.js";
 
+//Humidity Models
+import createHumidityModel from "../../models/huminity/HumidityReport.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   process.env.MongoDB_URI_ym_prod
@@ -303,6 +306,9 @@ export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
 //YDT Exported Models
 /*------------- Cover page ----------------*/
 export const CoverPage = createCoverPageSchema(ymProdConnection);
+
+//Humidity Exported Models
+export const HumidityReport = createHumidityModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

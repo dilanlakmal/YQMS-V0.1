@@ -100,6 +100,9 @@ import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
 
 import CoverPage from "./pages/coverPage.jsx";
 
+//Hummidity Report
+import HumidityReportPage from "./pages/HumidityReport.jsx";
+
 export const BluetoothContext = createContext(null);
 
 function AppContent() {
@@ -507,6 +510,7 @@ function AppContent() {
               />
 
               <Route path="/production-Sheet" element={<CoverPage />} />
+              <Route path="/humidity-report" element={<HumidityReportPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />
