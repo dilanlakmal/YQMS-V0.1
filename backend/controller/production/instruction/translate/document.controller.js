@@ -22,6 +22,14 @@ const createDocument = async (file, filePath, type, customer) => {
         filename: filename,
         filePath: filePath,
         pageCount: pageCount,
+        images: Array.from({length: pageCount}, (_, i) => ({
+            pageNumber: i+1,
+            pdfPath: "",
+            imageCount: 0,
+            imagePaths: [
+                ""
+            ]
+        })),
         status: "created"
     }
     const doc = await document.create(documentSchema);
