@@ -1,5 +1,5 @@
 // Export all components for easier imports
-export { default as ImageViewerModal } from '../ImageViewerModal';
+export { default as ImageViewerModal } from '../washing-modal/ImageViewerModal';
 export { useImageViewer } from '../hooks/useImageViewer';
 export * from '../utils';
 
@@ -8,11 +8,11 @@ export { default as FormSection } from '../FormSection';
 export { default as ReportsList } from '../ReportsList';
 export { default as ReportCard } from '../ReportCard';
 export { default as ReportTimeline } from '../ReportTimeline';
-export { default as ReceivedModal } from '../ReceivedModal';
-export { default as CompletionModal } from '../CompletionModal';
-export { default as EditReportModal } from '../EditReportModal';
-export { default as QRCodeModal } from '../QRCodeModal';
-export { default as QRScannerModal } from '../QRScannerModal';
+export { default as ReceivedModal } from '../washing-modal/ReceivedModal';
+export { default as CompletionModal } from '../washing-modal/CompletionModal';
+export { default as EditReportModal } from '../washing-modal/EditReportModal';
+export { default as QRCodeModal } from '../washing-modal/QRCodeModal';
+export { default as QRScannerModal } from '../washing-modal/QRScannerModal';
 
 // Export custom hooks
 export { useOrderData } from '../hooks/useOrderData';

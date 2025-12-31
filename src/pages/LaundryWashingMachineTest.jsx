@@ -43,9 +43,25 @@ const LaundryWashingMachineTest = () => {
 
   // Get the base URL for QR codes - use computer's network IP so phones can access
   const getQRCodeBaseURL = () => {
+    const currentProtocol = window.location.protocol; // Get current protocol (http: or https:)
+    
     if (QR_CODE_BASE_URL) {
-      return QR_CODE_BASE_URL;
+      // This ensures QR codes use the same protocol as the current page (HTTP/HTTPS)
+      try {
+        const url = new URL(QR_CODE_BASE_URL);
+        url.protocol = currentProtocol;
+        return url.toString().replace(/\/$/, ''); // Remove trailing slash if present
+      } catch (error) {
+        // If URL parsing fails, try simple string replacement
+        const protocolMatch = QR_CODE_BASE_URL.match(/^https?:\/\//);
+        if (protocolMatch) {
+          return QR_CODE_BASE_URL.replace(/^https?:\/\//, `${currentProtocol}//`);
+        }
+        // Fallback: prepend protocol if missing
+        return `${currentProtocol}//${QR_CODE_BASE_URL.replace(/^\/\//, '')}`;
+      }
     }
+    
     const origin = window.location.origin;
     const hostname = window.location.hostname;
     if (hostname === "localhost" || hostname === "127.0.0.1") {
@@ -3933,4 +3949,3 @@ const LaundryWashingMachineTest = () => {
 };
 
 export default LaundryWashingMachineTest;
-

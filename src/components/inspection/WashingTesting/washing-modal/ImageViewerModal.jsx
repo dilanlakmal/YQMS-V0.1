@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { X, RotateCcw, Download, ChevronLeft, ChevronRight } from "lucide-react";
-import showToast from "../../../utils/toast";
+import showToast from "../../../../utils/toast";
 
 const ImageViewerModal = ({
   isOpen,

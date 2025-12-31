@@ -15,18 +15,17 @@ export default defineConfig({
     include: ["jspdf", "jspdf-autotable"]
   },
   server: {
-    // allowedHosts: ["https://3c418b8c2cf0.ngrok-free.app"],
     host: "0.0.0.0",
     port: 3001,
     open: true,
-    // https: {
-    //   key: fs.readFileSync(
-    //     "./backend/Config/192.167.6.207-key.pem"
-    //   ),
-    //   cert: fs.readFileSync(
-    //     "./backend/Config/192.167.6.207.pem"
-    //   )
-    // }
+    https: {
+      key: fs.readFileSync(
+        "./backend/Config/192.167.6.207-key.pem"
+      ),
+      cert: fs.readFileSync(
+        "./backend/Config/192.167.6.207.pem"
+      )
+    }
   },
   build: {
     //minify: false, // Use esbuild for minification

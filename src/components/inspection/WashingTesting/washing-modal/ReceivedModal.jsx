@@ -1,6 +1,6 @@
 import React from "react";
 import { X, Camera, Upload, RotateCw, Save } from "lucide-react";
-import showToast from "../../../utils/toast";
+import showToast from "../../../../utils/toast";
 
 const ReceivedModal = ({
   isOpen,
