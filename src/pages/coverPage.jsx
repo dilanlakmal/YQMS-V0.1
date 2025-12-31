@@ -5,6 +5,7 @@ import {
   User,
   FileText,
   FileImage,
+  File,
   Upload,
   Search,
   Settings
@@ -14,6 +15,7 @@ import { useAuth } from "../components/authentication/AuthContext";
 // Import your separated components
 import OrderSpecificationSheet from "../components/inspection/YDT/OrderSpecificationSheet";
 import SketchTechnicalSheet from "../components/inspection/YDT/sketchTechnicalSheet";
+import OverView from "../components/inspection/YDT/overView";
 
 const CoverPage = () => {
   const { user } = useAuth();
@@ -22,8 +24,9 @@ const CoverPage = () => {
   // FIXED: Move component creation outside of useMemo to prevent recreation
   const orderSpecificationComponent = useMemo(() => <OrderSpecificationSheet />, []);
   const sketchTechnicalComponent = useMemo(() => <SketchTechnicalSheet />, []);
+  const overViewComponent = useMemo(() => <OverView />, []);
 
-  // Tab configuration
+  // Tab configuration  
   const tabs = useMemo(() => [
     {
       id: "specification-sheet",
@@ -39,7 +42,14 @@ const CoverPage = () => {
       component: sketchTechnicalComponent, // Use the memoized component
       description: "Create Sketch Technical Documents"
     },
-  ], [orderSpecificationComponent, sketchTechnicalComponent]); // Add as dependency
+    {
+      id: "overView",
+      label: "Overview",
+      icon: <File size={20} />,
+      component: overViewComponent,
+      description: "Create Sketch Technical Documents"
+    },
+  ], [orderSpecificationComponent, sketchTechnicalComponent, overViewComponent]); // Add as dependency
 
   const activeTabData = useMemo(() => {
     return tabs.find((tab) => tab.id === activeTab);
