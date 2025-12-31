@@ -19,8 +19,21 @@ const documentSchema = new mongoose.Schema({
     pageCount: {
         type: Number
     },
+    images: [
+        {
+            pageNumber: {
+                type: Number, default: null
+            },
+            pdfPath: String,
+            imageCount: {
+                type: Number, default: null
+            },
+            imagePaths: [String]
+        }
+    ],
     status: {
-        type: String
+        type: String,
+        enum: ["created", "splitted", "imageExtracted", "contentExtracted"]
     }
 })
 
