@@ -95,6 +95,8 @@ import YPivotQASections from "./pages/YPivotQASections.jsx";
 import YPivotQAMeasurements from "./pages/YPivotQAMeasurements.jsx";
 import YPivotQATemplates from "./pages/YPivotQATemplates.jsx";
 import YPivotQAInspection from "./pages/YPivotQAInspection.jsx";
+import YPivotQAReport from "./pages/YPivotQAReport";
+import YPivotQAReportFullView from "./components/inspection/PivotY/QAReports/YPivotQAReportFullView";
 import P88Legacy from "./pages/P88Legacy.jsx";
 import InspectionReportPage from "./components/inspection/PivotY/P88Legacy/InspectionReportPage.jsx";
 
@@ -102,6 +104,9 @@ import QCOutput from "./pages/QCOutput.jsx";
 import QCFullReport from "./components/inspection/qcOutput/QCFullReport.jsx";
 
 import CoverPage from "./pages/coverPage.jsx";
+
+//Hummidity Report
+import HumidityReportPage from "./pages/HumidityReport.jsx";
 
 export const BluetoothContext = createContext(null);
 
@@ -508,6 +513,11 @@ function AppContent() {
                 path="/fincheck-inspection"
                 element={<YPivotQAInspection />}
               />
+              <Route path="/fincheck-reports" element={<YPivotQAReport />} />
+              <Route
+                path="/fincheck-reports/view/:reportId"
+                element={<YPivotQAReportFullView />}
+              />
               <Route path="/P88Legacy" element={<P88Legacy />} />
               <Route
                 path="/inspection-report/:id"
@@ -515,6 +525,7 @@ function AppContent() {
               />
 
               <Route path="/production-Sheet" element={<CoverPage />} />
+              <Route path="/humidity-report" element={<HumidityReportPage />} />
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -64,7 +64,8 @@ const YPivotQAInspectionPhotoDataSave = ({
   reportData,
   onUpdatePhotoData,
   reportId,
-  isReportSaved
+  isReportSaved,
+  onSaveSuccess
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -153,10 +154,13 @@ const YPivotQAInspectionPhotoDataSave = ({
             });
           });
 
-          onUpdatePhotoData({
-            remarks: newRemarks,
-            capturedImages: newCapturedImages
-          });
+          onUpdatePhotoData(
+            {
+              remarks: newRemarks,
+              capturedImages: newCapturedImages
+            },
+            { isFromBackend: true }
+          );
         }
       } catch (error) {
         console.error("Error fetching existing photo data:", error);
@@ -280,6 +284,9 @@ const YPivotQAInspectionPhotoDataSave = ({
 
       if (res.data.success) {
         setIsUpdateMode(true);
+        if (onSaveSuccess) {
+          onSaveSuccess();
+        }
         setStatusModal({
           isOpen: true,
           type: "success",
@@ -373,6 +380,7 @@ const YPivotQAInspectionPhotoDataSave = ({
       <YPivotQATemplatesPhotos
         allowedSectionIds={allowedSectionIds}
         reportData={reportData}
+        reportId={reportId}
         onUpdatePhotoData={onUpdatePhotoData}
       />
 

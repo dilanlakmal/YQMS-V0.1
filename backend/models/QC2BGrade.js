@@ -5,7 +5,7 @@ const defectDetailSchema = new mongoose.Schema(
   {
     defectName: { type: String, required: true },
     defectCount: { type: Number, required: true },
-    status: { type: String, required: true, enum: ["B Grade", "Pass", "OK"] } // Status of this specific defect
+    status: { type: String, required: true, enum: ["B Grade", "Pass"] } // Status of this specific defect
   },
   { _id: false }
 );
@@ -41,8 +41,6 @@ const qc2BGradeSchema = new mongoose.Schema(
     sub_con: { type: String },
     sub_con_factory: { type: String },
     defect_print_id: { type: String, required: true }, // The original defect card ID
-    // ADDED: The random_id of the main inspection document for easy linking.
-    bundle_random_id: { type: String, required: true },
     totalBgradeQty: {
       type: Number,
       default: 0,

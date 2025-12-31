@@ -270,9 +270,16 @@ function Home() {
             roles: ["Printing"],
             image: "assets/Home/qc2.png",
             title: "Print QR",
-            description: "Sewing Worker QR Code",
+            description: "Sewing Worker QR Code"
           },
-        ],
+          {
+            path: "/humidity-report",
+            roles: ["QA"],
+            image: "assets/Home/Humidity.jpg",
+            title: "Humidity Report",
+            description: "View Humidity Report"
+          }
+        ]
       },
       {
         id: "y-pivot",
@@ -284,9 +291,9 @@ function Home() {
             path: "/qa-sections",
             //pageId: "qa-sections",
             roles: ["Fincheck Config"],
-            image: "assets/Home/FinCheck.png",
+            image: "assets/Home/Fincheck_Setting.png",
             title: t("home.qa_sections"),
-            description: "Fin Check Configuration"
+            description: "Configuration"
           },
           {
             path: "/qa-measurements",
@@ -294,23 +301,31 @@ function Home() {
             roles: ["Fincheck Measurement"],
             image: "assets/Home/FinCheck_Measurements.png",
             title: t("home.qa_measurements"),
-            description: "Fin Check Measurements"
+            description: "Upload/Measurement Settings"
           },
           {
             path: "/qa-templates",
             //pageId: "qa-templates",
             roles: ["Fincheck Templates"],
-            image: "assets/Home/qatemplates.png",
+            image: "assets/Home/Fincheck_Templates.png",
             title: t("home.qa_templates"),
-            description: "QA Inspection Templates"
+            description: "..."
           },
           {
             path: "/fincheck-inspection",
             //pageId: "y-pivot-inspection",
             roles: ["Fincheck Inspections"],
-            image: "assets/Home/yPivotInspection.png",
+            image: "assets/Home/Fincheck_Inspection.png",
             title: t("home.y_pivot_inspection"),
-            description: "Pivot Y Inspections"
+            description: "..."
+          },
+          {
+            path: "/fincheck-reports",
+            //pageId: "y-pivot-inspection",
+            roles: ["Fincheck Reports"],
+            image: "assets/Home/Fincheck_Reports.png",
+            title: t("home.y_pivot_report"),
+            description: "..."
           },
           {
             path: "/P88Legacy",
@@ -318,7 +333,7 @@ function Home() {
             roles: ["P88"],
             image: "assets/Home/p88Legacy.png",
             title: t("home.p88_Legacy"),
-            description: "P88 Legacy Data",
+            description: "Historical Data",
             version: "0"
           }
         ]

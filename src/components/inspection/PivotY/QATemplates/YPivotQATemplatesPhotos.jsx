@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef
+} from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
@@ -14,7 +20,8 @@ import {
   MessageSquare,
   Trash2,
   Save,
-  Images
+  Images,
+  Check
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor";
@@ -99,6 +106,7 @@ const RemarkModal = ({ isOpen, onClose, onSave, initialText, title }) => {
 const YPivotQATemplatesPhotos = ({
   allowedSectionIds = [],
   reportData,
+  reportId,
   onUpdatePhotoData
 }) => {
   // Access saved state from parent
@@ -128,6 +136,12 @@ const YPivotQATemplatesPhotos = ({
     title: ""
   });
 
+  // NEW: Track save operations
+  const saveInProgressRef = useRef(false);
+  const scrollPositionRef = useRef(0);
+  const lastEditedItemRef = useRef(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState(null); // 'saving' | 'success' | 'error' | null
+
   // Sync Helper
   const updateParent = (updates) => {
     if (onUpdatePhotoData) {
@@ -138,6 +152,98 @@ const YPivotQATemplatesPhotos = ({
       });
     }
   };
+
+  // NEW: Auto-save images to server when Image Editor completes
+  const autoSaveImagesToServer = useCallback(
+    async (sectionId, itemNo, imagesToSave, sectionName, itemName) => {
+      // Check if report exists using the prop
+      if (!reportId) {
+        console.log("📷 Report not saved yet, skipping auto-save");
+        return { success: false, reason: "no_report" };
+      }
+
+      if (saveInProgressRef.current) {
+        console.log("📷 Save already in progress");
+        return { success: false, reason: "in_progress" };
+      }
+
+      if (!imagesToSave || imagesToSave.length === 0) {
+        return { success: false, reason: "no_images" };
+      }
+
+      saveInProgressRef.current = true;
+      setAutoSaveStatus("saving");
+
+      try {
+        const imagesPayload = imagesToSave.map((img, idx) => ({
+          id: img.id || `${sectionId}_${itemNo}_${idx}_${Date.now()}`,
+          imgSrc: img.editedImgSrc || img.imgSrc || img.url,
+          index: idx
+        }));
+
+        const response = await axios.post(
+          `${API_BASE_URL}/api/fincheck-inspection/upload-photo-batch`,
+          {
+            reportId: reportId,
+            sectionId,
+            sectionName,
+            itemNo: parseInt(itemNo),
+            itemName,
+            images: imagesPayload,
+            remarks: remarks[`${sectionId}_${itemNo}`] || ""
+          }
+        );
+
+        if (response.data.success) {
+          console.log("✅ Auto-save successful:", response.data.message);
+          setAutoSaveStatus("success");
+
+          const serverImages = response.data.data.savedImages;
+          const newCapturedImages = { ...capturedImages };
+
+          Object.keys(newCapturedImages).forEach((key) => {
+            if (key.startsWith(`${sectionId}_${itemNo}_`)) {
+              delete newCapturedImages[key];
+            }
+          });
+
+          serverImages.forEach((img, idx) => {
+            const key = `${sectionId}_${itemNo}_${idx}`;
+            let displayUrl = img.imageURL;
+            if (
+              displayUrl &&
+              !displayUrl.startsWith("http") &&
+              !displayUrl.startsWith("data:")
+            ) {
+              displayUrl = `${API_BASE_URL}${displayUrl}`;
+            }
+            newCapturedImages[key] = {
+              id: img.imageId,
+              url: displayUrl,
+              imgSrc: displayUrl,
+              history: []
+            };
+          });
+
+          setCapturedImages(newCapturedImages);
+          updateParent({ capturedImages: newCapturedImages });
+
+          setTimeout(() => setAutoSaveStatus(null), 2000);
+          return { success: true, savedImages: serverImages };
+        } else {
+          throw new Error(response.data.message);
+        }
+      } catch (error) {
+        console.error("❌ Auto-save error:", error);
+        setAutoSaveStatus("error");
+        setTimeout(() => setAutoSaveStatus(null), 3000);
+        return { success: false, reason: error.message };
+      } finally {
+        saveInProgressRef.current = false;
+      }
+    },
+    [reportId, capturedImages, remarks, updateParent]
+  );
 
   // Device detection
   useEffect(() => {
@@ -247,16 +353,40 @@ const YPivotQATemplatesPhotos = ({
       return;
     }
 
+    // NEW: Save current scroll position and item reference
+    scrollPositionRef.current = window.scrollY;
+    lastEditedItemRef.current = { sectionId, itemNo };
+
     setCurrentEditContext({
       mode,
       sectionId,
       itemNo,
       isEditing: false,
-      maxImages: Math.min(availableSlots, 7), // Editor max is 7
+      maxImages: availableSlots,
+      maxCount: maxCount,
       existingData: null
     });
     setShowImageEditor(true);
   };
+
+  // const openImageEditorForNew = (mode, sectionId, itemNo, maxCount) => {
+  //   const availableSlots = getAvailableSlots(sectionId, itemNo, maxCount);
+
+  //   if (availableSlots <= 0) {
+  //     alert("Maximum images reached for this item!");
+  //     return;
+  //   }
+
+  //   setCurrentEditContext({
+  //     mode,
+  //     sectionId,
+  //     itemNo,
+  //     isEditing: false,
+  //     maxImages: Math.min(availableSlots, 7), // Editor max is 7
+  //     existingData: null
+  //   });
+  //   setShowImageEditor(true);
+  // };
 
   // Open image editor for EDITING existing image
   const openImageEditorForEdit = (sectionId, itemNo, imageIndex) => {
@@ -264,6 +394,10 @@ const YPivotQATemplatesPhotos = ({
     const imageData = capturedImages[key];
 
     if (imageData) {
+      // NEW: Save current scroll position and item reference
+      scrollPositionRef.current = window.scrollY;
+      lastEditedItemRef.current = { sectionId, itemNo };
+
       setCurrentEditContext({
         mode: "edit",
         sectionId,
@@ -282,37 +416,94 @@ const YPivotQATemplatesPhotos = ({
     }
   };
 
+  // const openImageEditorForEdit = (sectionId, itemNo, imageIndex) => {
+  //   const key = `${sectionId}_${itemNo}_${imageIndex}`;
+  //   const imageData = capturedImages[key];
+
+  //   if (imageData) {
+  //     setCurrentEditContext({
+  //       mode: "edit",
+  //       sectionId,
+  //       itemNo,
+  //       imageIndex,
+  //       isEditing: true,
+  //       maxImages: 1,
+  //       existingData: [
+  //         {
+  //           imgSrc: imageData.imgSrc || imageData.url,
+  //           history: imageData.history || []
+  //         }
+  //       ]
+  //     });
+  //     setShowImageEditor(true);
+  //   }
+  // };
+
   const handleImageEditorClose = () => {
+    const editedItem = lastEditedItemRef.current;
+
     setShowImageEditor(false);
     setCurrentEditContext(null);
+
+    // NEW: Restore scroll position after render
+    requestAnimationFrame(() => {
+      // First, ensure the section is still expanded
+      if (editedItem) {
+        setExpandedSections((prev) => {
+          const newSet = new Set(prev);
+          newSet.add(editedItem.sectionId);
+          return newSet;
+        });
+      }
+
+      // Then restore scroll position
+      setTimeout(() => {
+        window.scrollTo({
+          top: scrollPositionRef.current,
+          behavior: "instant" // Use 'instant' to avoid animation delay
+        });
+      }, 50);
+    });
   };
 
+  // const handleImageEditorClose = () => {
+  //   setShowImageEditor(false);
+  //   setCurrentEditContext(null);
+  // };
+
   // NEW: Handle multiple images save from editor
-  const handleImagesSave = (savedImages) => {
+  const handleImagesSave = async (savedImages) => {
     if (!currentEditContext || !savedImages || savedImages.length === 0) {
       handleImageEditorClose();
       return;
     }
 
     const { sectionId, itemNo, isEditing, imageIndex } = currentEditContext;
-    let newImages = { ...capturedImages };
+
+    const section = sections.find((s) => s._id === sectionId);
+    const sectionName = section?.sectionName || "Unknown Section";
+    const item = section?.itemList.find((i) => i.no === itemNo);
+    const itemName = item?.itemName || `Item ${itemNo}`;
+
+    let newCapturedImages = { ...capturedImages };
 
     if (isEditing && imageIndex !== undefined) {
-      // Editing single existing image
       const img = savedImages[0];
       const key = `${sectionId}_${itemNo}_${imageIndex}`;
-      newImages[key] = {
+      newCapturedImages[key] = {
+        id:
+          newCapturedImages[key]?.id ||
+          `${sectionId}_${itemNo}_${imageIndex}_${Date.now()}`,
         url: img.editedImgSrc,
         imgSrc: img.imgSrc,
         history: img.history || []
       };
     } else {
-      // Adding new images - fill consecutive slots
       let nextIndex = getNextImageIndex(sectionId, itemNo);
-
       savedImages.forEach((img) => {
         const key = `${sectionId}_${itemNo}_${nextIndex}`;
-        newImages[key] = {
+        newCapturedImages[key] = {
+          id: `${sectionId}_${itemNo}_${nextIndex}_${Date.now()}`,
           url: img.editedImgSrc,
           imgSrc: img.imgSrc,
           history: img.history || []
@@ -321,23 +512,86 @@ const YPivotQATemplatesPhotos = ({
       });
     }
 
-    setCapturedImages(newImages);
-    updateParent({ capturedImages: newImages });
+    setCapturedImages(newCapturedImages);
+    updateParent({ capturedImages: newCapturedImages });
     handleImageEditorClose();
+
+    // Collect ALL images for this item
+    const allItemImages = [];
+    let idx = 0;
+    while (idx < 20) {
+      const key = `${sectionId}_${itemNo}_${idx}`;
+      if (newCapturedImages[key]) {
+        allItemImages.push({
+          id: newCapturedImages[key].id,
+          imgSrc: newCapturedImages[key].url,
+          url: newCapturedImages[key].url,
+          editedImgSrc: newCapturedImages[key].url,
+          index: idx
+        });
+      }
+      idx++;
+    }
+
+    // AUTO-SAVE to server
+    if (reportId && allItemImages.length > 0) {
+      await autoSaveImagesToServer(
+        sectionId,
+        itemNo,
+        allItemImages,
+        sectionName,
+        itemName
+      );
+    }
   };
 
-  const removeImage = (sectionId, itemNo, imageIndex, e) => {
-    if (e) e.stopPropagation();
+  // const handleImagesSave = (savedImages) => {
+  //   if (!currentEditContext || !savedImages || savedImages.length === 0) {
+  //     handleImageEditorClose();
+  //     return;
+  //   }
 
+  //   const { sectionId, itemNo, isEditing, imageIndex } = currentEditContext;
+  //   let newImages = { ...capturedImages };
+
+  //   if (isEditing && imageIndex !== undefined) {
+  //     // Editing single existing image
+  //     const img = savedImages[0];
+  //     const key = `${sectionId}_${itemNo}_${imageIndex}`;
+  //     newImages[key] = {
+  //       url: img.editedImgSrc,
+  //       imgSrc: img.imgSrc,
+  //       history: img.history || []
+  //     };
+  //   } else {
+  //     // Adding new images - fill consecutive slots
+  //     let nextIndex = getNextImageIndex(sectionId, itemNo);
+
+  //     savedImages.forEach((img) => {
+  //       const key = `${sectionId}_${itemNo}_${nextIndex}`;
+  //       newImages[key] = {
+  //         url: img.editedImgSrc,
+  //         imgSrc: img.imgSrc,
+  //         history: img.history || []
+  //       };
+  //       nextIndex++;
+  //     });
+  //   }
+
+  //   setCapturedImages(newImages);
+  //   updateParent({ capturedImages: newImages });
+  //   handleImageEditorClose();
+  // };
+
+  const removeImage = async (sectionId, itemNo, imageIndex, e) => {
+    if (e) e.stopPropagation();
     if (!window.confirm("Remove this image?")) return;
 
-    const newImages = { ...capturedImages };
-
-    // Remove the image at index
     const keyToRemove = `${sectionId}_${itemNo}_${imageIndex}`;
-    delete newImages[keyToRemove];
+    const imageToRemove = capturedImages[keyToRemove];
+    const imageId = imageToRemove?.id;
 
-    // Re-index remaining images to fill gaps
+    const newImages = { ...capturedImages };
     const remainingImages = [];
     let idx = 0;
     while (idx < 20) {
@@ -348,21 +602,75 @@ const YPivotQATemplatesPhotos = ({
       idx++;
     }
 
-    // Clear all old keys for this item
     Object.keys(newImages).forEach((key) => {
       if (key.startsWith(`${sectionId}_${itemNo}_`)) {
         delete newImages[key];
       }
     });
 
-    // Re-add with sequential indices
     remainingImages.forEach((img, i) => {
       newImages[`${sectionId}_${itemNo}_${i}`] = img;
     });
 
     setCapturedImages(newImages);
     updateParent({ capturedImages: newImages });
+
+    // Delete from server
+    if (reportId && imageId) {
+      try {
+        await axios.post(
+          `${API_BASE_URL}/api/fincheck-inspection/delete-photo`,
+          {
+            reportId: reportId,
+            sectionId,
+            itemNo: parseInt(itemNo),
+            imageId
+          }
+        );
+        console.log("✅ Image deleted from server");
+      } catch (error) {
+        console.error("Failed to delete from server:", error);
+      }
+    }
   };
+
+  // const removeImage = (sectionId, itemNo, imageIndex, e) => {
+  //   if (e) e.stopPropagation();
+
+  //   if (!window.confirm("Remove this image?")) return;
+
+  //   const newImages = { ...capturedImages };
+
+  //   // Remove the image at index
+  //   const keyToRemove = `${sectionId}_${itemNo}_${imageIndex}`;
+  //   delete newImages[keyToRemove];
+
+  //   // Re-index remaining images to fill gaps
+  //   const remainingImages = [];
+  //   let idx = 0;
+  //   while (idx < 20) {
+  //     const key = `${sectionId}_${itemNo}_${idx}`;
+  //     if (idx !== imageIndex && capturedImages[key]) {
+  //       remainingImages.push(capturedImages[key]);
+  //     }
+  //     idx++;
+  //   }
+
+  //   // Clear all old keys for this item
+  //   Object.keys(newImages).forEach((key) => {
+  //     if (key.startsWith(`${sectionId}_${itemNo}_`)) {
+  //       delete newImages[key];
+  //     }
+  //   });
+
+  //   // Re-add with sequential indices
+  //   remainingImages.forEach((img, i) => {
+  //     newImages[`${sectionId}_${itemNo}_${i}`] = img;
+  //   });
+
+  //   setCapturedImages(newImages);
+  //   updateParent({ capturedImages: newImages });
+  // };
 
   const editExistingImage = (e, sectionId, itemNo, imageIndex) => {
     e.stopPropagation();
@@ -379,15 +687,49 @@ const YPivotQATemplatesPhotos = ({
     });
   };
 
-  const handleSaveRemark = (text) => {
+  const handleSaveRemark = async (text) => {
     const { key } = remarkModal;
     if (key) {
       const newRemarks = { ...remarks, [key]: text };
       setRemarks(newRemarks);
       updateParent({ remarks: newRemarks });
+
+      if (reportId) {
+        const [sectionId, itemNoStr] = key.split("_");
+        const itemNo = parseInt(itemNoStr);
+        const section = sections.find((s) => s._id === sectionId);
+        const item = section?.itemList.find((i) => i.no === itemNo);
+
+        try {
+          await axios.post(
+            `${API_BASE_URL}/api/fincheck-inspection/update-photo-remark`,
+            {
+              reportId: reportId,
+              sectionId,
+              sectionName: section?.sectionName,
+              itemNo,
+              itemName: item?.itemName,
+              remarks: text
+            }
+          );
+          console.log("✅ Remark saved to server");
+        } catch (error) {
+          console.error("Failed to save remark:", error);
+        }
+      }
     }
     setRemarkModal({ isOpen: false, key: null, title: "" });
   };
+
+  // const handleSaveRemark = (text) => {
+  //   const { key } = remarkModal;
+  //   if (key) {
+  //     const newRemarks = { ...remarks, [key]: text };
+  //     setRemarks(newRemarks);
+  //     updateParent({ remarks: newRemarks });
+  //   }
+  //   setRemarkModal({ isOpen: false, key: null, title: "" });
+  // };
 
   const clearRemark = (sectionId, itemNo) => {
     if (window.confirm("Clear this remark?")) {
@@ -467,6 +809,38 @@ const YPivotQATemplatesPhotos = ({
           )}
         </div>
       </div>
+
+      {/* Auto-Save Status Indicator */}
+      {autoSaveStatus && (
+        <div
+          className={`fixed top-20 right-4 z-50 px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 text-sm font-medium animate-fadeIn ${
+            autoSaveStatus === "saving"
+              ? "bg-blue-500 text-white"
+              : autoSaveStatus === "success"
+              ? "bg-green-500 text-white"
+              : "bg-red-500 text-white"
+          }`}
+        >
+          {autoSaveStatus === "saving" && (
+            <>
+              <Loader className="w-4 h-4 animate-spin" />
+              <span>Saving images...</span>
+            </>
+          )}
+          {autoSaveStatus === "success" && (
+            <>
+              <Check className="w-4 h-4" />
+              <span>Images saved!</span>
+            </>
+          )}
+          {autoSaveStatus === "error" && (
+            <>
+              <X className="w-4 h-4" />
+              <span>Save failed</span>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Sections List */}
       {filteredSections.length > 0 ? (

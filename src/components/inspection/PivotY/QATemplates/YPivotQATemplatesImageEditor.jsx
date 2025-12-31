@@ -57,7 +57,7 @@ import {
   AdjustToolbarPanel
 } from "./YPivotQATemplatesImageAdjust";
 
-const MAX_IMAGES = 7;
+const MAX_IMAGES = 20;
 
 const YPivotQATemplatesImageEditor = ({
   autoStartMode = null,

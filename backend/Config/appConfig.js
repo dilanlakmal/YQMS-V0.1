@@ -158,8 +158,8 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Body parser configuration
-app.use(bodyParser.json({ limit: "50mb" }));
-app.use(bodyParser.urlencoded({ limit: "50mb", extended: true }));
+app.use(bodyParser.json({ limit: "1000mb" }));
+app.use(bodyParser.urlencoded({ limit: "1000mb", extended: true }));
 app.use(express.json());
 
 // Static file serving with simplified CORS

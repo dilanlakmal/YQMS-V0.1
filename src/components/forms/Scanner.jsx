@@ -10,7 +10,6 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
 
   // --- START OF THE FIX ---
   // We will now explicitly find and set the back camera as the default.
-
   const selectDefaultCamera = useCallback((devices) => {
     if (devices && devices.length > 0) {
       // 1. Look for a camera with "back" or "environment" in its label. This is a common pattern.
@@ -79,7 +78,6 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
     }
 
     setScanning(true);
-
     try {
       await html5QrCode.start(
         selectedCameraId, // Directly use the pre-selected camera ID
@@ -117,11 +115,11 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
   };
 
   return (
-    <div>
+    <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-lg border dark:border-gray-700 transition-colors duration-300">
       {/* The qr-reader div is where the video feed will be rendered */}
       <div
         id="qr-reader"
-        className="mb-6 rounded-lg overflow-hidden border-2 border-gray-300 min-h-[250px]"
+        className="mb-6 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600 min-h-[250px] bg-gray-100 dark:bg-gray-700 transition-colors duration-300"
       ></div>
 
       {/* Manual camera selection dropdown */}
@@ -130,11 +128,15 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
           <select
             value={selectedCameraId || ""}
             onChange={(e) => setSelectedCameraId(e.target.value)}
-            className="px-4 py-2 border rounded-lg text-sm bg-white"
+            className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-blue-500 dark:focus:border-blue-400 transition-colors duration-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={scanning}
           >
             {cameras.map((camera) => (
-              <option key={camera.id} value={camera.id}>
+              <option
+                key={camera.id}
+                value={camera.id}
+                className="bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
+              >
                 {camera.label || `Camera ${cameras.indexOf(camera) + 1}`}
               </option>
             ))}
@@ -147,7 +149,7 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
           <button
             onClick={startScanning}
             disabled={!html5QrCode || !selectedCameraId}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400"
+            className="bg-blue-600 dark:bg-blue-700 text-white px-6 py-3 rounded-lg hover:bg-blue-700 dark:hover:bg-blue-800 flex items-center gap-2 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-all duration-300 shadow-md hover:shadow-lg font-medium"
           >
             <Camera className="w-5 h-5" />
             Start Scanner
@@ -155,7 +157,7 @@ const Scanner = ({ onScanSuccess, onScanError }) => {
         ) : (
           <button
             onClick={stopScanning}
-            className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 flex items-center gap-2"
+            className="bg-red-600 dark:bg-red-700 text-white px-6 py-3 rounded-lg hover:bg-red-700 dark:hover:bg-red-800 flex items-center gap-2 transition-all duration-300 shadow-md hover:shadow-lg font-medium"
           >
             <X className="w-5 h-5" />
             Stop Scanner
