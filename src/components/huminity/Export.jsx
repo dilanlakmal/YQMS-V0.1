@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { API_BASE_URL } from '../../../config';
 import PaperPreview from './PaperPreview';
+import HistoryModal from './HistoryModal';
 import { useAuth } from '../authentication/AuthContext';
 
 export default function ExportPanel() {
@@ -15,8 +16,12 @@ export default function ExportPanel() {
     const [ordersRaw, setOrdersRaw] = useState([]);
     const [docsRaw, setDocsRaw] = useState([]);
     const [displayedReports, setDisplayedReports] = useState([]);
-    const [expandedRows, setExpandedRows] = useState({});
     const [currentPage, setCurrentPage] = useState(1);
+
+    // Modal state
+    const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+    const [selectedReportForHistory, setSelectedReportForHistory] = useState(null);
+
     const itemsPerPage = 10;
 
     useEffect(() => {
@@ -80,11 +85,9 @@ export default function ExportPanel() {
         setCurrentPage(1); // Reset to page 1 when filters change
     }, [factoryStyleFilter, ordersRaw]);
 
-    const toggleRowExpansion = (reportId) => {
-        setExpandedRows(prev => ({
-            ...prev,
-            [reportId]: !prev[reportId]
-        }));
+    const openHistoryModal = (report) => {
+        setSelectedReportForHistory(report);
+        setIsHistoryModalOpen(true);
     };
 
     const handleExport = async () => {
@@ -408,7 +411,6 @@ export default function ExportPanel() {
                             <tbody className="divide-y divide-gray-200">
                                 {currentPageReports.map((report, idx) => {
                                     const reportId = report._id || idx;
-                                    const isExpanded = expandedRows[reportId];
                                     const history = report.history || [];
                                     const latestDate = report.updatedAt || report.createdAt || '';
                                     const isSupervisor = user && user.roles && user.roles.includes('supervisor');
@@ -445,25 +447,14 @@ export default function ExportPanel() {
                                                     <div className="flex items-center justify-center gap-2">
                                                         {history.length > 0 && (
                                                             <button
-                                                                onClick={() => toggleRowExpansion(reportId)}
+                                                                onClick={() => openHistoryModal(report)}
                                                                 className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
                                                             >
-                                                                {isExpanded ? (
-                                                                    <>
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-                                                                        </svg>
-                                                                        Hide
-                                                                    </>
-                                                                ) : (
-                                                                    <>
-                                                                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                                        </svg>
-                                                                        View
-                                                                    </>
-                                                                )}
+                                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                                                </svg>
+                                                                View
                                                             </button>
                                                         )}
                                                         {isSupervisor && !isApproved && (
@@ -482,117 +473,6 @@ export default function ExportPanel() {
                                                 </td>
                                             </tr>
 
-                                            {isExpanded && history.length > 0 && (
-                                                <tr>
-                                                    <td colSpan="8" className="px-4 py-4 bg-gray-50">
-                                                        <div className="space-y-3">
-                                                            <h4 className="text-sm font-semibold text-gray-700 mb-3">Inspection History</h4>
-                                                            <div className="overflow-x-auto rounded-lg">
-                                                                <table className="w-full text-sm border">
-                                                                    <thead className="bg-gray-100">
-                                                                        <tr>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>Check #</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>Date</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>Before Dry</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" rowSpan={2}>After Dry</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" colSpan="3">Top</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" colSpan="3">Middle</th>
-                                                                            <th className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200" colSpan="3">Bottom</th>
-                                                                        </tr>
-                                                                        <tr>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">Body</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">Body</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">Body</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
-                                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody className="bg-white divide-y divide-gray-200">
-                                                                        {history.map((check, checkIdx) => (
-                                                                            <tr key={checkIdx} className="hover:bg-gray-50">
-                                                                                <td className="px-3 py-2 text-center font-medium text-gray-700">{checkIdx + 1}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">{formatDate(check.date)}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">{formatTime(check.beforeDryRoom || check.beforeDryRoomTime)}</td>
-                                                                                <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">{formatTime(check.afterDryRoom || check.afterDryRoomTime)}</td>
-                                                                                {/* Top Section */}
-                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.top?.body || 'N/A'}</td>
-                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.top?.ribs || 'N/A'}</td>
-                                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                                                                    {check.top?.status === 'pass' ? (
-                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
-                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                                            </svg>
-                                                                                            Pass
-                                                                                        </span>
-                                                                                    ) : check.top?.status === 'fail' ? (
-                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
-                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                                            </svg>
-                                                                                            Fail
-                                                                                        </span>
-                                                                                    ) : 'N/A'}
-                                                                                </td>
-                                                                                {/* Middle Section */}
-                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middle?.body || 'N/A'}</td>
-                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middle?.ribs || 'N/A'}</td>
-                                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                                                                    {check.middle?.status === 'pass' ? (
-                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
-                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                                            </svg>
-                                                                                            Pass
-                                                                                        </span>
-                                                                                    ) : check.middle?.status === 'fail' ? (
-                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
-                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                                            </svg>
-                                                                                            Fail
-                                                                                        </span>
-                                                                                    ) : 'N/A'}
-                                                                                </td>
-                                                                                {/* Bottom Section */}
-                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottom?.body || 'N/A'}</td>
-                                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottom?.ribs || 'N/A'}</td>
-                                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                                                                    {check.bottom?.status === 'pass' ? (
-                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
-                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                                            </svg>
-                                                                                            Pass
-                                                                                        </span>
-                                                                                    ) : check.bottom?.status === 'fail' ? (
-                                                                                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
-                                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                                            </svg>
-                                                                                            Fail
-                                                                                        </span>
-                                                                                    ) : 'N/A'}
-                                                                                </td>
-                                                                            </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                            </div>
-                                                            {history[history.length - 1]?.generalRemark && (
-                                                                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                                                                    <p className="text-xs font-semibold text-gray-700 mb-1">Latest Remark:</p>
-                                                                    <p className="text-sm text-gray-600">{history[history.length - 1].generalRemark}</p>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )}
                                         </React.Fragment>
                                     );
                                 })}
@@ -673,6 +553,14 @@ export default function ExportPanel() {
                     </div>
                 )}
             </div>
-        </div>
+
+            <HistoryModal
+                open={isHistoryModalOpen}
+                onCancel={() => setIsHistoryModalOpen(false)}
+                report={selectedReportForHistory}
+                formatDate={formatDate}
+                formatTime={formatTime}
+            />
+        </div >
     );
 }
