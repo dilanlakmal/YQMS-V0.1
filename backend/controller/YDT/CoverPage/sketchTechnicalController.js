@@ -75,7 +75,8 @@ export const saveSketchTechnical = async (req, res) => {
       selectedOrderData,
       availableSizes,
       createdBy,
-      userInfo
+      userInfo,
+      status = 'draft'
     } = req.body;
 
     // Validate required fields
@@ -173,6 +174,7 @@ export const saveSketchTechnical = async (req, res) => {
       vendor3d,
       styleStatus,
       longDescription,
+      status,
       finalFitApproval,
       sizeRange: processedSizeRange,
       targetCost,
@@ -354,6 +356,7 @@ export const updateSketchTechnical = async (req, res) => {
           'sketchTechnical.$.vendor3d': updateData.vendor3d,
           'sketchTechnical.$.styleStatus': updateData.styleStatus,
           'sketchTechnical.$.longDescription': updateData.longDescription,
+          'sketchTechnical.$.status': updateData.status,
           'sketchTechnical.$.finalFitApproval': updateData.finalFitApproval,
           'sketchTechnical.$.sizeRange': updateData.sizeRange,
           'sketchTechnical.$.targetCost': updateData.targetCost,

@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Shield,
-  Sparkles,
   User,
   Upload,
   Save,
@@ -17,7 +16,6 @@ import {
   CheckCircle,
   AlertTriangle,
   Info,
-  Eye,
   Settings,
   Image as ImageIcon,
   X
@@ -27,13 +25,13 @@ import RichTextEditor from '../YDT/RichTextEditor.jsx';
 import Swal from 'sweetalert2';
 
 // Enhanced ColorDropdown with better styling
-const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrderColors }) => {
+const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrderColors, viewMode = false }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [availableColors, setAvailableColors] = useState([]);
 
   useEffect(() => {
     const loadColors = async () => {
-      if (orderNo) {
+      if (orderNo && !viewMode) {
         setIsLoading(true);
         try {
           const colors = await fetchOrderColors(orderNo);
@@ -50,7 +48,11 @@ const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrd
     };
 
     loadColors();
-  }, [orderNo, fetchOrderColors]);
+  }, [orderNo, fetchOrderColors, viewMode]);
+
+  if (viewMode) {
+    return null; // Don't show dropdown in view mode
+  }
 
   const unselectedColors = availableColors.filter(color => !selectedColors.includes(color));
 
@@ -81,8 +83,12 @@ const ColorDropdown = ({ rowIndex, orderNo, selectedColors, onColorAdd, fetchOrd
   );
 };
 
-const OrderSpecificationSheet = () => {
-  // State management (keeping existing state logic)
+const OrderSpecificationSheet = ({ 
+  viewMode = false, 
+  initialData = null, 
+  onClose = null 
+}) => {
+  // State management
   const [orderSearchTerm, setOrderSearchTerm] = useState("");
   const [orderSuggestions, setOrderSuggestions] = useState([]);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -91,6 +97,7 @@ const OrderSpecificationSheet = () => {
   const [uploadedImage, setUploadedImage] = useState(null);
   const [justSelected, setJustSelected] = useState(false);
   const [orderColors, setOrderColors] = useState({});
+  const [currentStatus, setCurrentStatus] = useState('draft');
   
   const [formData, setFormData] = useState({
     customerStyle: "",
@@ -121,7 +128,52 @@ const OrderSpecificationSheet = () => {
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Keep all existing functions (fetchOrderColors, fetchOrderSuggestions, etc.)
+  // Add effect to load initial data in view mode
+  useEffect(() => {
+    if (viewMode && initialData) {
+      // Load the data into the component state
+      const coverData = initialData;
+      
+      setFormData({
+        customerStyle: coverData.customerStyle || "",
+        orderNo: coverData.orderNo || "",
+        poNumber: coverData.poNumber || "",
+        quantity: coverData.quantity || "",
+        retailSingle: coverData.retailSingle || "",
+        majorPoints: coverData.majorPoints || "",
+        testInstructions: coverData.testInstructions || ""
+      });
+
+      if (coverData.styleTable) {
+        setStyleTable(coverData.styleTable);
+      }
+
+      if (coverData.sizeTable) {
+        setSizeTable(coverData.sizeTable);
+      }
+
+      if (coverData.stampData) {
+        setStampData(coverData.stampData);
+      }
+
+      if (coverData.uploadedImage) {
+        setUploadedImage(coverData.uploadedImage);
+      }
+
+      if (coverData.status) {
+        setCurrentStatus(coverData.status);
+      }
+
+      // Set as selected order for size table display
+      if (coverData.sizeTable && coverData.sizeTable.length > 0) {
+        setSelectedOrder({
+          sizes: coverData.sizeTable[0].sizes || []
+        });
+      }
+    }
+  }, [viewMode, initialData]);
+
+  // Keep all existing functions
   const fetchOrderColors = useCallback(async (orderNo) => {
     if (!orderNo) {
       return [];
@@ -132,7 +184,6 @@ const OrderSpecificationSheet = () => {
           resolve(currentOrderColors[orderNo]);
           return currentOrderColors;
         }
-
         (async () => {
           try {
             const response = await fetch(`${API_BASE_URL}/api/coverPage/orders/${encodeURIComponent(orderNo)}`);
@@ -263,13 +314,13 @@ const OrderSpecificationSheet = () => {
   };
 
   useEffect(() => {
-    if (orderSearchTerm && !justSelected) { 
+    if (orderSearchTerm && !justSelected && !viewMode) { 
       debouncedSearch(orderSearchTerm);
     } else if (!orderSearchTerm) {
       setOrderSuggestions([]);
       setShowSuggestions(false);
     }
-  }, [orderSearchTerm, debouncedSearch, justSelected]);
+  }, [orderSearchTerm, debouncedSearch, justSelected, viewMode]);
 
   const handleOrderSelect = useCallback(async (orderNo) => {
     setJustSelected(true); 
@@ -285,14 +336,12 @@ const OrderSpecificationSheet = () => {
       orderNo: orderData.orderNo || orderNo,
       quantity: orderData.quantity || ""
     }));
-
     setAvailableColors(orderData.colors || []);
     
     setOrderColors(prev => ({
       ...prev,
       [orderNo]: orderData.colors || []
     }));
-
     setStyleTable([{
       orderNo: orderData.orderNo || orderNo,
       customerStyle: orderData.customerStyle || orderData.customer_style || "",
@@ -301,7 +350,6 @@ const OrderSpecificationSheet = () => {
       quantity: 5,
       remarks: ""
     }]);
-
     if (orderData.sizes) {
       const sizeTableData = [{
         orderTotalQty: orderData.quantity || 0,
@@ -314,11 +362,11 @@ const OrderSpecificationSheet = () => {
   }, [formData.poNumber]);
 
   const handlePONumberChange = (newPONumber) => {
+    if (viewMode) return;
     setFormData(prev => ({
       ...prev,
       poNumber: newPONumber
     }));
-
     setStyleTable(prevTable => 
       prevTable.map(row => ({
         ...row,
@@ -328,6 +376,7 @@ const OrderSpecificationSheet = () => {
   };
 
   const handleImageUpload = (event) => {
+    if (viewMode) return;
     const file = event.target.files[0];
     if (file) {
       const reader = new FileReader();
@@ -337,6 +386,7 @@ const OrderSpecificationSheet = () => {
   };
 
   const addStyleRow = () => {
+    if (viewMode) return;
     setStyleTable([...styleTable, {
       orderNo: formData.orderNo,
       customerStyle: formData.customerStyle,
@@ -348,6 +398,7 @@ const OrderSpecificationSheet = () => {
   };
 
   const removeStyleRow = (index) => {
+    if (viewMode) return;
     if (styleTable.length > 1) {
       const newData = styleTable.filter((_, i) => i !== index);
       setStyleTable(newData);
@@ -355,6 +406,7 @@ const OrderSpecificationSheet = () => {
   };
 
   const addColorToRow = (rowIndex, color) => {
+    if (viewMode) return;
     const newData = [...styleTable];
     if (!newData[rowIndex].colors.includes(color)) {
       newData[rowIndex].colors.push(color);
@@ -363,6 +415,7 @@ const OrderSpecificationSheet = () => {
   };
 
   const removeColorFromRow = (rowIndex, colorIndex) => {
+    if (viewMode) return;
     const newData = [...styleTable];
     newData[rowIndex].colors.splice(colorIndex, 1);
     setStyleTable(newData);
@@ -370,7 +423,28 @@ const OrderSpecificationSheet = () => {
 
   const styleTableTotal = styleTable.reduce((sum, row) => sum + (parseInt(row.quantity) || 0), 0);
 
-  const handleSave = async () => {
+  const cleanDataForJSON = (obj) => {
+    const cleaned = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value === null || value === undefined) {
+        cleaned[key] = '';
+      } else if (typeof value === 'object' && !Array.isArray(value)) {
+        cleaned[key] = cleanDataForJSON(value);
+      } else if (Array.isArray(value)) {
+        cleaned[key] = value.map(item => 
+          typeof item === 'object' && item !== null ? cleanDataForJSON(item) : item
+        );
+      } else if (typeof value === 'string') {
+        cleaned[key] = value;
+      } else {
+        cleaned[key] = String(value);
+      }
+    }
+    return cleaned;
+  };
+
+  const handleSave = async (status = 'draft') => {
+    if (viewMode) return;
     try {
       setLoading(true);
       let empId = 'unknown_user';
@@ -397,21 +471,29 @@ const OrderSpecificationSheet = () => {
         ? styleTable.filter(row => row.orderNo || row.customerStyle)
         : [];
 
-      const dataToSave = {
+      const cleanTestInstructions = typeof formData.testInstructions === 'string' 
+        ? formData.testInstructions 
+        : String(formData.testInstructions || '');
+
+      const dataToSave = cleanDataForJSON({
         orderNo: formData.orderNo,
         customerStyle: formData.customerStyle,
         poNumber: formData.poNumber,
         quantity: formData.quantity,
         retailSingle: formData.retailSingle,
         majorPoints: formData.majorPoints,
-        testInstructions: formData.testInstructions,
-        testInstructionsHTML: formData.testInstructions,
+        testInstructions: cleanTestInstructions,
+        testInstructionsHTML: cleanTestInstructions,
         uploadedImage: uploadedImage,
         styleTable: preparedStyleTable,
         sizeTable: preparedSizeTable,
-        stampData: stampData,
-        createdBy: empId
-      };
+        stampData: {
+          name: stampData.name || '',
+          date: stampData.date || new Date().toISOString().split('T')[0]
+        },
+        createdBy: empId,
+        status: status
+      });
 
       const response = await fetch(`${API_BASE_URL}/api/coverPage/save`, {
         method: 'POST',
@@ -426,19 +508,25 @@ const OrderSpecificationSheet = () => {
       }
 
       const result = await response.json();
-
       if (result.success) {
+        setCurrentStatus(status);
+        
+        const message = status === 'submitted' 
+          ? 'Order specification sheet submitted successfully!' 
+          : 'Order specification sheet saved as draft!';
+          
+        const icon = status === 'submitted' ? 'success' : 'info';
+        
         await Swal.fire({
-          icon: 'success',
-          title: 'Success!',
-          text: 'Order specification sheet saved successfully!',
+          icon: icon,
+          title: status === 'submitted' ? 'Submitted!' : 'Saved!',
+          text: message,
           showConfirmButton: false,
           timer: 2000,
           timerProgressBar: true,
           position: 'top-end',
           toast: true
         });
-        console.log('Saved cover page:', result.data);
       } else {
         throw new Error(result.message || 'Failed to save cover page');
       }
@@ -486,73 +574,117 @@ const OrderSpecificationSheet = () => {
             </div>
           </div>
           <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            Order Specification Sheet
+            {viewMode ? 'Order Specification Sheet - View Mode' : 'Order Specification Sheet'}
           </h1>
           <p className="text-lg text-gray-600 dark:text-gray-300">
-            Create comprehensive product specifications and quality requirements
+            {viewMode 
+              ? 'Complete overview of saved product specifications and quality requirements'
+              : 'Create comprehensive product specifications and quality requirements'
+            }
           </p>
+          {viewMode && onClose && (
+            <button
+              onClick={onClose}
+              className="mt-4 px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors duration-200"
+            >
+              ← Back to Overview
+            </button>
+          )}
         </div>
 
         {/* Main Content Card */}
         <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
           
-          {/* Order Search Section */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <div className="flex items-center space-x-3">
-              <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
-                <Search className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Information</h3>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Search and select manufacturing order</p>
-              </div>
-            </div>
-            
-            <div className="mt-4 relative">
+          {/* Order Search Section - Hide in view mode */}
+          {!viewMode && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-center space-x-3">
-                <input
-                  type="text"
-                  value={orderSearchTerm}
-                  onChange={(e) => {
-                    setOrderSearchTerm(e.target.value);
-                    if (justSelected) {
-                      setJustSelected(false);
-                    }
-                  }}
-                  placeholder="Enter Order Number to search..."
-                  className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                />
-                {loading && <Loader className="animate-spin h-5 w-5 text-blue-600" />}
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                  <Search className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Information</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Search and select manufacturing order</p>
+                </div>
               </div>
               
-              {/* Order Suggestions Dropdown */}
-              {showSuggestions && orderSuggestions.length > 0 && !justSelected && (
-                <div className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto mt-2">
-                  {orderSuggestions.map((order, index) => (
-                    <div
-                      key={index}
-                      onClick={() => handleOrderSelect(order.orderNo)}
-                      className="p-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors duration-200"
-                    >
-                      <div className="font-semibold text-gray-900 dark:text-white">{order.orderNo}</div>
-                      <div className="text-sm text-gray-600 dark:text-gray-400">
-                        {order.customerStyle || order.customer_style}
-                      </div>
-                      <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                        Qty: {order.quantity} | Colors: {order.colors?.length || 0}
-                      </div>
-                    </div>
-                  ))}
+              <div className="mt-4 relative">
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="text"
+                    value={orderSearchTerm}
+                    onChange={(e) => {
+                      setOrderSearchTerm(e.target.value);
+                      if (justSelected) {
+                        setJustSelected(false);
+                      }
+                    }}
+                    placeholder="Enter Order Number to search..."
+                    className="flex-1 px-4 py-3 border-2 border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                  />
+                  {loading && <Loader className="animate-spin h-5 w-5 text-blue-600" />}
                 </div>
-              )}
+                
+                {/* Order Suggestions Dropdown */}
+                {showSuggestions && orderSuggestions.length > 0 && !justSelected && (
+                  <div className="absolute top-full left-0 right-0 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-xl shadow-lg z-10 max-h-60 overflow-y-auto mt-2">
+                    {orderSuggestions.map((order, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleOrderSelect(order.orderNo)}
+                        className="p-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer border-b border-gray-100 dark:border-gray-700 last:border-b-0 transition-colors duration-200"
+                      >
+                        <div className="font-semibold text-gray-900 dark:text-white">{order.orderNo}</div>
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          {order.customerStyle || order.customer_style}
+                        </div>
+                        <div className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                          Qty: {order.quantity} | Colors: {order.colors?.length || 0}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Show order info in view mode */}
+          {viewMode && (
+            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-100 dark:bg-blue-900/30 p-2 rounded-lg">
+                  <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Order Information - View Mode</h3>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Saved order specifications and details</p>
+                </div>
+                {/* Status Indicator */}
+                {currentStatus && (
+                  <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${
+                    currentStatus === 'submitted' 
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                      : currentStatus === 'draft'
+                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${
+                      currentStatus === 'submitted' ? 'bg-green-500' : 
+                      currentStatus === 'draft' ? 'bg-yellow-500' : 'bg-gray-500'
+                    }`}></div>
+                    <span>Status: {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Product Information Grid */}
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
               
-              {/* Left Column - Image Upload */}
+              {/* Left Column - Image Upload/Display */}
               <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <ImageIcon className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
@@ -565,29 +697,37 @@ const OrderSpecificationSheet = () => {
                       <img 
                         src={uploadedImage} 
                         alt="Product" 
-                        className="w-full h-64 object-contain bg-white rounded-lg border-2 border-gray-200 dark:border-gray-600" 
+                        className="w-full h-64 object-contain bg-white dark:bg-gray-800 rounded-lg border-2 border-gray-200 dark:border-gray-600" 
                       />
-                      <button
-                        onClick={() => setUploadedImage(null)}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
+                      {!viewMode && (
+                        <button
+                          onClick={() => setUploadedImage(null)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-8 text-center hover:border-blue-400 dark:hover:border-blue-500 transition-colors duration-200">
                       <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-                      <p className="text-gray-600 dark:text-gray-400 mb-2">Upload Product Image</p>
-                      <p className="text-sm text-gray-500 dark:text-gray-500">PNG, JPG up to 10MB</p>
+                      <p className="text-gray-600 dark:text-gray-400 mb-2">
+                        {viewMode ? 'No Product Image' : 'Upload Product Image'}
+                      </p>
+                      <p className="text-sm text-gray-500 dark:text-gray-500">
+                        {viewMode ? 'Image not uploaded' : 'PNG, JPG up to 10MB'}
+                      </p>
                     </div>
                   )}
                   
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  />
+                  {!viewMode && (
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    />
+                  )}
                 </div>
               </div>
 
@@ -609,7 +749,7 @@ const OrderSpecificationSheet = () => {
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         Order Number
                       </label>
                       <div className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
@@ -623,13 +763,19 @@ const OrderSpecificationSheet = () => {
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                         PO Number
                       </label>
-                      <input
-                        type="text"
-                        value={formData.poNumber}
-                        onChange={(e) => handlePONumberChange(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter PO Number"
-                      />
+                      {viewMode ? (
+                        <div className="px-3 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white">
+                          {formData.poNumber || 'Not specified'}
+                        </div>
+                      ) : (
+                        <input
+                          type="text"
+                          value={formData.poNumber}
+                          onChange={(e) => handlePONumberChange(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Enter PO Number"
+                        />
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -651,27 +797,38 @@ const OrderSpecificationSheet = () => {
                   <AlertTriangle className="h-5 w-5 mr-2 text-yellow-600 dark:text-yellow-400" />
                   Major Points
                 </h3>
-                <textarea
-                  value={formData.majorPoints}
-                  onChange={(e) => setFormData(prev => ({...prev, majorPoints: e.target.value}))}
-                  className="w-full px-4 py-3 border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
-                  rows={4}
-                  placeholder="Enter critical quality points and requirements..."
-                />
+                {viewMode ? (
+                  <div className="w-full px-4 py-3 border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg min-h-[100px]">
+                    {formData.majorPoints || 'No major points specified'}
+                  </div>
+                ) : (
+                  <textarea
+                    value={formData.majorPoints}
+                    onChange={(e) => setFormData(prev => ({...prev, majorPoints: e.target.value}))}
+                    className="w-full px-4 py-3 border border-yellow-300 dark:border-yellow-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 resize-none"
+                    rows={4}
+                    placeholder="Enter critical quality points and requirements..."
+                  />
+                )}
               </div>
-
               <div className="bg-purple-50 dark:bg-purple-900/20 rounded-xl p-6 border border-purple-200 dark:border-purple-800">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
                   <Settings className="h-5 w-5 mr-2 text-purple-600 dark:text-purple-400" />
                   Retail Single
                 </h3>
-                <textarea
-                  value={formData.retailSingle}
-                  onChange={(e) => setFormData(prev => ({...prev, retailSingle: e.target.value}))}
-                  className="w-full px-4 py-3 border border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                  rows={4}
-                  placeholder="Enter retail specifications..."
-                />
+                {viewMode ? (
+                  <div className="w-full px-4 py-3 border border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg min-h-[100px]">
+                    {formData.retailSingle || 'No retail specifications'}
+                  </div>
+                ) : (
+                  <textarea
+                    value={formData.retailSingle}
+                    onChange={(e) => setFormData(prev => ({...prev, retailSingle: e.target.value}))}
+                    className="w-full px-4 py-3 border border-purple-300 dark:border-purple-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    rows={4}
+                    placeholder="Enter retail specifications..."
+                  />
+                )}
               </div>
             </div>
 
@@ -682,36 +839,134 @@ const OrderSpecificationSheet = () => {
                 Test Instructions
               </h3>
               <div className="bg-white dark:bg-gray-800 rounded-lg border border-blue-300 dark:border-blue-600">
-                <RichTextEditor
-                  value={formData.testInstructions}
-                  onChange={(content) => setFormData(prev => ({...prev, testInstructions: content}))}
-                  placeholder="Enter detailed test instructions and procedures..."
-                  height="300px"
-                  className="w-full"
-                />
+                {viewMode ? (
+                  <div className="p-4 min-h-[200px]">
+                    {formData.testInstructions ? (
+                      <div 
+                        className="
+                          text-gray-800 dark:text-gray-200 leading-relaxed font-sans
+                          [&>*:first-child]:mt-0 [&>*:last-child]:mb-0
+                          
+                          [&_h1]:text-3xl [&_h1]:font-bold [&_h1]:text-gray-900 [&_h1]:dark:text-gray-100 [&_h1]:mt-8 [&_h1]:mb-4 [&_h1]:leading-tight
+                          [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:text-gray-900 [&_h2]:dark:text-gray-100 [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:leading-tight
+                          [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:text-gray-900 [&_h3]:dark:text-gray-100 [&_h3]:mt-6 [&_h3]:mb-3 [&_h3]:leading-tight
+                          [&_h4]:text-lg [&_h4]:font-semibold [&_h4]:text-gray-900 [&_h4]:dark:text-gray-100 [&_h4]:mt-4 [&_h4]:mb-2 [&_h4]:leading-tight
+                          [&_h5]:text-base [&_h5]:font-semibold [&_h5]:text-gray-900 [&_h5]:dark:text-gray-100 [&_h5]:mt-4 [&_h5]:mb-2 [&_h5]:leading-tight
+                          [&_h6]:text-sm [&_h6]:font-semibold [&_h6]:text-gray-900 [&_h6]:dark:text-gray-100 [&_h6]:mt-4 [&_h6]:mb-2 [&_h6]:leading-tight
+                          
+                          [&_p]:mb-4 [&_p]:leading-7 [&_p]:text-gray-800 [&_p]:dark:text-gray-200
+                          
+                          [&_ul]:list-disc [&_ul]:pl-6 [&_ul]:mb-4 [&_ul]:mt-2 [&_ul]:space-y-1
+                          [&_ol]:list-decimal [&_ol]:pl-6 [&_ol]:mb-4 [&_ol]:mt-2 [&_ol]:space-y-1
+                          [&_li]:leading-7 [&_li]:text-gray-800 [&_li]:dark:text-gray-200
+                          
+                          [&_ul_ul]:list-[circle] [&_ul_ul]:mt-2 [&_ul_ul]:mb-2
+                          [&_ol_ol]:list-[lower-alpha] [&_ol_ol]:mt-2 [&_ol_ol]:mb-2
+                          [&_ul_ul_ul]:list-[square]
+                          [&_ol_ol_ol]:list-[lower-roman]
+                          
+                          [&_strong]:font-semibold [&_strong]:text-gray-900 [&_strong]:dark:text-gray-100
+                          [&_b]:font-semibold [&_b]:text-gray-900 [&_b]:dark:text-gray-100
+                          [&_em]:italic [&_em]:text-gray-800 [&_em]:dark:text-gray-200
+                          [&_i]:italic [&_i]:text-gray-800 [&_i]:dark:text-gray-200
+                          [&_u]:underline
+                          
+                          [&_a]:text-blue-600 [&_a]:dark:text-blue-400 [&_a]:underline [&_a]:decoration-blue-600 [&_a]:dark:decoration-blue-400
+                          [&_a:hover]:text-blue-800 [&_a:hover]:dark:text-blue-300 [&_a:hover]:decoration-blue-800 [&_a:hover]:dark:decoration-blue-300
+                          
+                          [&_blockquote]:border-l-4 [&_blockquote]:border-blue-500 [&_blockquote]:pl-4 [&_blockquote]:py-2 [&_blockquote]:my-4 
+                          [&_blockquote]:italic [&_blockquote]:text-gray-700 [&_blockquote]:dark:text-gray-300 [&_blockquote]:bg-gray-50 [&_blockquote]:dark:bg-gray-800/50
+                          
+                          [&_code]:bg-gray-100 [&_code]:dark:bg-gray-700 [&_code]:text-red-600 [&_code]:dark:text-red-400 
+                          [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-sm [&_code]:font-mono [&_code]:font-medium
+                          
+                          [&_pre]:bg-gray-100 [&_pre]:dark:bg-gray-700 [&_pre]:text-gray-900 [&_pre]:dark:text-gray-100 
+                          [&_pre]:p-4 [&_pre]:rounded-lg [&_pre]:overflow-x-auto [&_pre]:my-4 [&_pre]:font-mono [&_pre]:text-sm [&_pre]:leading-6
+                          [&_pre_code]:bg-transparent [&_pre_code]:text-inherit [&_pre_code]:p-0
+                          
+                          [&_table]:w-full [&_table]:border-collapse [&_table]:my-4 [&_table]:text-sm
+                          [&_th]:border [&_th]:border-gray-300 [&_th]:dark:border-gray-600 [&_th]:bg-gray-50 [&_th]:dark:bg-gray-700 
+                          [&_th]:px-4 [&_th]:py-3 [&_th]:text-left [&_th]:font-semibold [&_th]:text-gray-900 [&_th]:dark:text-gray-100
+                          [&_td]:border [&_td]:border-gray-300 [&_td]:dark:border-gray-600 [&_td]:px-4 [&_td]:py-3 
+                          [&_td]:text-gray-800 [&_td]:dark:text-gray-200
+                          
+                          [&_hr]:border-0 [&_hr]:border-t [&_hr]:border-gray-300 [&_hr]:dark:border-gray-600 [&_hr]:my-8
+                          
+                          [&_div]:my-1
+                          [&_div>ul:first-child]:mt-0 [&_div>ul:last-child]:mb-0
+                          [&_div>ol:first-child]:mt-0 [&_div>ol:last-child]:mb-0
+                          [&_div>p:first-child]:mt-0 [&_div>p:last-child]:mb-0
+                          
+                          [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4 [&_img]:shadow-sm
+                          
+                          [&_mark]:bg-yellow-200 [&_mark]:dark:bg-yellow-800 [&_mark]:px-1 [&_mark]:rounded
+                          
+                          [&_sub]:text-xs [&_sub]:align-sub
+                          [&_sup]:text-xs [&_sup]:align-super
+                          
+                          [&_del]:line-through [&_del]:text-gray-500 [&_del]:dark:text-gray-400
+                          [&_ins]:underline [&_ins]:text-green-600 [&_ins]:dark:text-green-400 [&_ins]:no-underline [&_ins]:bg-green-100 [&_ins]:dark:bg-green-900/30
+                          
+                          [&_kbd]:bg-gray-100 [&_kbd]:dark:bg-gray-700 [&_kbd]:border [&_kbd]:border-gray-300 [&_kbd]:dark:border-gray-600 
+                          [&_kbd]:rounded [&_kbd]:px-2 [&_kbd]:py-1 [&_kbd]:text-xs [&_kbd]:font-mono [&_kbd]:shadow-sm
+                          
+                          [&_small]:text-sm [&_small]:text-gray-600 [&_small]:dark:text-gray-400
+                          
+                          [&_abbr]:underline [&_abbr]:decoration-dotted [&_abbr]:cursor-help
+                          
+                          [&_details]:my-4 [&_details]:border [&_details]:border-gray-200 [&_details]:dark:border-gray-700 [&_details]:rounded-lg [&_details]:p-4
+                          [&_summary]:font-semibold [&_summary]:cursor-pointer [&_summary]:text-gray-900 [&_summary]:dark:text-gray-100 [&_summary]:mb-2
+                          
+                          [&_figure]:my-6 [&_figure]:text-center
+                          [&_figcaption]:text-sm [&_figcaption]:text-gray-600 [&_figcaption]:dark:text-gray-400 [&_figcaption]:mt-2 [&_figcaption]:italic
+                          
+                          [&_dl]:my-4
+                          [&_dt]:font-semibold [&_dt]:text-gray-900 [&_dt]:dark:text-gray-100 [&_dt]:mt-4 [&_dt]:first:mt-0
+                          [&_dd]:ml-4 [&_dd]:mt-1 [&_dd]:text-gray-800 [&_dd]:dark:text-gray-200
+                        "
+                        dangerouslySetInnerHTML={{ __html: formData.testInstructions }} 
+                      />
+                    ) : (
+                      <p className="text-gray-500 dark:text-gray-400 italic">No test instructions provided</p>
+                    )}
+                  </div>
+                ) : (
+                  <RichTextEditor
+                    value={formData.testInstructions}
+                    onChange={(content) => {
+                      const cleanContent = typeof content === 'string' ? content : String(content || '');
+                      setFormData(prev => ({...prev, testInstructions: cleanContent}));
+                    }}
+                    placeholder="Enter detailed test instructions and procedures..."
+                    height="300px"
+                    className="w-full"
+                  />
+                )}
               </div>
             </div>
+
 
             {/* Style Table */}
             <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-6 border border-gray-200 dark:border-gray-600 mb-8">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
                   <Palette className="h-5 w-5 mr-2 text-indigo-600 dark:text-indigo-400" />
-                  Style Configuration
+                  Style Configuration {styleTable.length > 0 && `(${styleTable.length} entries)`}
                 </h3>
-                <button
-                  onClick={addStyleRow}
-                  className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Row</span>
-                </button>
+                {!viewMode && (
+                  <button
+                    onClick={addStyleRow}
+                    className="flex items-center space-x-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Row</span>
+                  </button>
+                )}
               </div>
-
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse">
                   <thead>
-                                        <tr className="bg-gray-100 dark:bg-gray-700">
+                    <tr className="bg-gray-100 dark:bg-gray-700">
                       <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
                         Style Information
                       </th>
@@ -724,9 +979,11 @@ const OrderSpecificationSheet = () => {
                       <th className="border border-gray-300 dark:border-gray-600 p-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
                         Remarks
                       </th>
-                      <th className="border border-gray-300 dark:border-gray-600 p-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
-                        Actions
-                      </th>
+                      {!viewMode && (
+                        <th className="border border-gray-300 dark:border-gray-600 p-3 text-center text-sm font-semibold text-gray-900 dark:text-white">
+                          Actions
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody>
@@ -738,45 +995,53 @@ const OrderSpecificationSheet = () => {
                               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                 Order Number
                               </label>
-                              <input
-                                type="text"
-                                value={row.orderNo}
-                                onChange={(e) => {
-                                  const newData = [...styleTable];
-                                  newData[index].orderNo = e.target.value;
-                                  setStyleTable(newData);
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                placeholder="Order Number"
-                              />
+                              {viewMode ? (
+                                <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-sm">
+                                  {row.orderNo || 'Not specified'}
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={row.orderNo}
+                                  onChange={(e) => {
+                                    const newData = [...styleTable];
+                                    newData[index].orderNo = e.target.value;
+                                    setStyleTable(newData);
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  placeholder="Order Number"
+                                />
+                              )}
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                 Customer Style
                               </label>
-                              <input
-                                type="text"
-                                value={row.customerStyle}
-                                onChange={(e) => {
-                                  const newData = [...styleTable];
-                                  newData[index].customerStyle = e.target.value;
-                                  setStyleTable(newData);
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                                placeholder="Customer Style"
-                              />
+                              {viewMode ? (
+                                <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-sm">
+                                  {row.customerStyle || 'Not specified'}
+                                </div>
+                              ) : (
+                                <input
+                                  type="text"
+                                  value={row.customerStyle}
+                                  onChange={(e) => {
+                                    const newData = [...styleTable];
+                                    newData[index].customerStyle = e.target.value;
+                                    setStyleTable(newData);
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                                  placeholder="Customer Style"
+                                />
+                              )}
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
                                 PO Number
                               </label>
-                              <input
-                                type="text"
-                                value={row.poNumber}
-                                readOnly
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm cursor-not-allowed"
-                                placeholder="PO Number"
-                              />
+                              <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm cursor-not-allowed">
+                                {row.poNumber || 'Not specified'}
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -784,20 +1049,24 @@ const OrderSpecificationSheet = () => {
                         <td className="border border-gray-300 dark:border-gray-600 p-3">
                           <div className="space-y-3">
                             <div className="flex flex-wrap gap-2">
-                              {row.colors.map((color, colorIndex) => (
+                              {row.colors && row.colors.length > 0 ? row.colors.map((color, colorIndex) => (
                                 <span
                                   key={colorIndex}
                                   className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-sm rounded-full border border-blue-200 dark:border-blue-700"
                                 >
                                   {color}
-                                  <button
-                                    onClick={() => removeColorFromRow(index, colorIndex)}
-                                    className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
+                                  {!viewMode && (
+                                    <button
+                                      onClick={() => removeColorFromRow(index, colorIndex)}
+                                      className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  )}
                                 </span>
-                              ))}
+                              )) : (
+                                <span className="text-gray-500 dark:text-gray-400 text-sm italic">No colors specified</span>
+                              )}
                             </div>
                             
                             <ColorDropdown 
@@ -806,51 +1075,66 @@ const OrderSpecificationSheet = () => {
                               selectedColors={row.colors}
                               onColorAdd={(color) => addColorToRow(index, color)}
                               fetchOrderColors={fetchOrderColors}
+                              viewMode={viewMode}
                             />
                           </div>
                         </td>
                         
                         <td className="border border-gray-300 dark:border-gray-600 p-3 text-center">
                           <div className="flex items-center justify-center space-x-2">
-                            <input
-                              type="number"
-                              value={row.quantity}
-                              onChange={(e) => {
-                                const newData = [...styleTable];
-                                newData[index].quantity = parseInt(e.target.value) || 0;
-                                setStyleTable(newData);
-                              }}
-                              className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
-                            />
+                            {viewMode ? (
+                              <div className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-center">
+                                {row.quantity || 0}
+                              </div>
+                            ) : (
+                              <input
+                                type="number"
+                                value={row.quantity}
+                                onChange={(e) => {
+                                  const newData = [...styleTable];
+                                  newData[index].quantity = parseInt(e.target.value) || 0;
+                                  setStyleTable(newData);
+                                }}
+                                className="w-20 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
+                              />
+                            )}
                             <span className="text-sm text-gray-600 dark:text-gray-400">pcs</span>
                           </div>
                         </td>
                         
                         <td className="border border-gray-300 dark:border-gray-600 p-3">
-                          <textarea
-                            value={row.remarks}
-                            onChange={(e) => {
-                              const newData = [...styleTable];
-                              newData[index].remarks = e.target.value;
-                              setStyleTable(newData);
-                            }}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                            rows={4}
-                            placeholder="Enter remarks..."
-                          />
-                        </td>
-                        
-                        <td className="border border-gray-300 dark:border-gray-600 p-3 text-center">
-                          {styleTable.length > 1 && (
-                            <button
-                              onClick={() => removeStyleRow(index)}
-                              className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
-                              title="Remove Row"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                          {viewMode ? (
+                            <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-sm min-h-[100px]">
+                              {row.remarks || 'No remarks'}
+                            </div>
+                          ) : (
+                            <textarea
+                              value={row.remarks}
+                              onChange={(e) => {
+                                const newData = [...styleTable];
+                                newData[index].remarks = e.target.value;
+                                setStyleTable(newData);
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                              rows={4}
+                              placeholder="Enter remarks..."
+                            />
                           )}
                         </td>
+                        
+                        {!viewMode && (
+                          <td className="border border-gray-300 dark:border-gray-600 p-3 text-center">
+                            {styleTable.length > 1 && (
+                              <button
+                                onClick={() => removeStyleRow(index)}
+                                className="p-2 text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200"
+                                title="Remove Row"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
+                          </td>
+                        )}
                       </tr>
                     ))}
                     
@@ -862,7 +1146,7 @@ const OrderSpecificationSheet = () => {
                       <td className="border border-gray-300 dark:border-gray-600 p-3 text-center text-blue-600 dark:text-blue-400 font-bold">
                         {styleTableTotal} pcs
                       </td>
-                      <td colSpan={2} className="border border-gray-300 dark:border-gray-600 p-3"></td>
+                      <td colSpan={viewMode ? 1 : 2} className="border border-gray-300 dark:border-gray-600 p-3"></td>
                     </tr>
                   </tbody>
                 </table>
@@ -876,7 +1160,6 @@ const OrderSpecificationSheet = () => {
                   <Hash className="h-5 w-5 mr-2 text-green-600 dark:text-green-400" />
                   Size Breakdown & Details
                 </h3>
-
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse">
                     <thead>
@@ -903,19 +1186,19 @@ const OrderSpecificationSheet = () => {
                               <div className="flex items-center space-x-2">
                                 <Package className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                 <span className="text-sm font-medium text-gray-900 dark:text-white">
-                                  {formData.orderNo}
+                                  {formData.orderNo || 'Not specified'}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
                                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                                  {formData.customerStyle}
+                                  {formData.customerStyle || 'Not specified'}
                                 </span>
                               </div>
                               <div className="flex items-center space-x-2">
                                 <Hash className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                                 <span className="text-sm text-gray-700 dark:text-gray-300">
-                                  PO: {formData.poNumber}
+                                  PO: {formData.poNumber || 'Not specified'}
                                 </span>
                               </div>
                             </div>
@@ -923,14 +1206,16 @@ const OrderSpecificationSheet = () => {
                           
                           <td className="border border-gray-300 dark:border-gray-600 p-3">
                             <div className="flex flex-wrap gap-2">
-                              {styleTable.flatMap(styleRow => styleRow.colors).map((color, idx) => (
+                              {row.colors && row.colors.length > 0 ? row.colors.map((color, idx) => (
                                 <span 
                                   key={idx} 
                                   className="inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-sm rounded-full border border-blue-200 dark:border-blue-700"
                                 >
                                   {color}
                                 </span>
-                              ))}
+                              )) : (
+                                <span className="text-gray-500 dark:text-gray-400 text-sm italic">No colors specified</span>
+                              )}
                             </div>
                           </td>
                           
@@ -948,17 +1233,23 @@ const OrderSpecificationSheet = () => {
                               <div className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Available Sizes: {selectedOrder.sizes.join(', ')}
                               </div>
-                              <textarea
-                                value={row.sizeDetails || ''}
-                                onChange={(e) => {
-                                  const newData = [...sizeTable];
-                                  newData[rowIndex].sizeDetails = e.target.value;
-                                  setSizeTable(newData);
-                                }}
-                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                                rows={6}
-                                placeholder="Enter size breakdown, measurements, or special notes..."
-                              />
+                              {viewMode ? (
+                                <div className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg text-sm min-h-[150px]">
+                                  {row.sizeDetails || 'No size details provided'}
+                                </div>
+                              ) : (
+                                <textarea
+                                  value={row.sizeDetails || ''}
+                                  onChange={(e) => {
+                                    const newData = [...sizeTable];
+                                    newData[rowIndex].sizeDetails = e.target.value;
+                                    setSizeTable(newData);
+                                  }}
+                                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                                  rows={6}
+                                  placeholder="Enter size breakdown, measurements, or special notes..."
+                                />
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -987,23 +1278,35 @@ const OrderSpecificationSheet = () => {
                       <div className="flex items-center space-x-2">
                         <User className="h-4 w-4 text-red-600 dark:text-red-400" />
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Name:</span>
-                        <input
-                          type="text"
-                          value={stampData.name}
-                          onChange={(e) => setStampData(prev => ({...prev, name: e.target.value}))}
-                          className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-24 focus:outline-none focus:border-red-600 dark:focus:border-red-400 text-gray-900 dark:text-white"
-                          placeholder="Inspector"
-                        />
+                        {viewMode ? (
+                          <div className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-24 text-gray-900 dark:text-white px-2 py-1">
+                            {stampData.name || 'Not specified'}
+                          </div>
+                        ) : (
+                          <input
+                            type="text"
+                            value={stampData.name}
+                            onChange={(e) => setStampData(prev => ({...prev, name: e.target.value}))}
+                            className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-24 focus:outline-none focus:border-red-600 dark:focus:border-red-400 text-gray-900 dark:text-white"
+                            placeholder="Inspector"
+                          />
+                        )}
                       </div>
                       <div className="flex items-center space-x-2">
                         <Calendar className="h-4 w-4 text-red-600 dark:text-red-400" />
                         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Date:</span>
-                        <input
-                          type="date"
-                          value={stampData.date}
-                          onChange={(e) => setStampData(prev => ({...prev, date: e.target.value}))}
-                          className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-32 focus:outline-none focus:border-red-600 dark:focus:border-red-400 text-gray-900 dark:text-white"
-                        />
+                        {viewMode ? (
+                          <div className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-32 text-gray-900 dark:text-white px-2 py-1">
+                            {stampData.date ? new Date(stampData.date).toLocaleDateString() : 'Not specified'}
+                          </div>
+                        ) : (
+                          <input
+                            type="date"
+                            value={stampData.date}
+                            onChange={(e) => setStampData(prev => ({...prev, date: e.target.value}))}
+                            className="border-b-2 border-red-400 dark:border-red-600 bg-transparent text-sm w-32 focus:outline-none focus:border-red-600 dark:focus:border-red-400 text-gray-900 dark:text-white"
+                          />
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1011,36 +1314,105 @@ const OrderSpecificationSheet = () => {
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
-              <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                <Info className="h-4 w-4" />
-                <span>All information will be saved to the specification sheet</span>
+            {/* Action Buttons - Hide in view mode */}
+            {!viewMode && (
+              <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                    <Info className="h-4 w-4" />
+                    <span>All information will be saved to the specification sheet</span>
+                  </div>
+                  
+                  {/* Status Indicator */}
+                  {currentStatus && (
+                    <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-medium ${
+                      currentStatus === 'submitted' 
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                        : currentStatus === 'draft'
+                                                ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                        : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                    }`}>
+                      <div className={`w-2 h-2 rounded-full ${
+                        currentStatus === 'submitted' ? 'bg-green-500' : 
+                        currentStatus === 'draft' ? 'bg-yellow-500' : 'bg-gray-500'
+                      }`}></div>
+                      <span>Status: {currentStatus.charAt(0).toUpperCase() + currentStatus.slice(1)}</span>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center space-x-3">
+                  {/* Save as Draft Button */}
+                  <button 
+                    onClick={() => handleSave('draft')}
+                    disabled={loading}
+                    className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-xl hover:from-gray-600 hover:to-gray-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl font-medium"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        <span>Saving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="h-4 w-4" />
+                        <span>Save as Draft</span>
+                      </>
+                    )}
+                  </button>
+                  {/* Submit Button */}
+                  <button 
+                    onClick={() => handleSave('submitted')}
+                    disabled={loading}
+                    className="flex items-center space-x-2 px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        <span>Submitting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Submit</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
-              
-              <button 
-                onClick={handleSave}
-                disabled={loading}
-                className="flex items-center space-x-3 px-8 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl hover:from-green-700 hover:to-emerald-700 disabled:from-gray-400 disabled:to-gray-500 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl font-semibold"
-              >
-                {loading ? (
-                  <>
-                    <Loader className="h-5 w-5 animate-spin" />
-                    <span>Saving...</span>
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-5 w-5" />
-                    <span>Save Specification Sheet</span>
-                  </>
-                )}
-              </button>
-            </div>
+            )}
+
+            {/* Metadata in view mode */}
+            {viewMode && initialData && (
+              <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                    <Info className="h-4 w-4" />
+                    <span>Specification sheet saved and viewable</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                    <User className="h-4 w-4" />
+                    <span>Created by: {initialData.createdBy || 'Unknown'}</span>
+                  </div>
+                  <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                    <Calendar className="h-4 w-4" />
+                    <span>Created: {initialData.createdAt ? new Date(initialData.createdAt).toLocaleDateString() : 'Unknown'}</span>
+                  </div>
+                  {initialData.updatedAt && (
+                    <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
+                      <Calendar className="h-4 w-4" />
+                      <span>Updated: {new Date(initialData.updatedAt).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Status Indicators */}
-        <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-5 gap-4">
           <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
             formData.orderNo 
               ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
@@ -1048,7 +1420,7 @@ const OrderSpecificationSheet = () => {
           }`}>
             <div className="flex items-center space-x-2">
               <div className={`w-3 h-3 rounded-full ${formData.orderNo ? 'bg-green-500' : 'bg-gray-300'}`}></div>
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Selected</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Order Info</span>
             </div>
           </div>
           
@@ -1064,12 +1436,12 @@ const OrderSpecificationSheet = () => {
           </div>
           
           <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
-            styleTable.some(row => row.colors.length > 0) 
+            styleTable.some(row => row.colors && row.colors.length > 0) 
               ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
               : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
           }`}>
             <div className="flex items-center space-x-2">
-              <div className={`w-3 h-3 rounded-full ${styleTable.some(row => row.colors.length > 0) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <div className={`w-3 h-3 rounded-full ${styleTable.some(row => row.colors && row.colors.length > 0) ? 'bg-green-500' : 'bg-gray-300'}`}></div>
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Colors Added</span>
             </div>
           </div>
@@ -1084,6 +1456,25 @@ const OrderSpecificationSheet = () => {
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">QC Approval</span>
             </div>
           </div>
+
+          <div className={`p-4 rounded-xl border-2 transition-all duration-200 ${
+            currentStatus === 'submitted'
+              ? 'border-green-200 bg-green-50 dark:bg-green-900/20 dark:border-green-800' 
+              : currentStatus === 'draft'
+              ? 'border-yellow-200 bg-yellow-50 dark:bg-yellow-900/20 dark:border-yellow-800'
+              : 'border-gray-200 bg-gray-50 dark:bg-gray-700/50 dark:border-gray-600'
+          }`}>
+            <div className="flex items-center space-x-2">
+              <div className={`w-3 h-3 rounded-full ${
+                currentStatus === 'submitted' ? 'bg-green-500' : 
+                currentStatus === 'draft' ? 'bg-yellow-500' : 'bg-gray-300'
+              }`}></div>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {currentStatus === 'submitted' ? 'Submitted' : 
+                 currentStatus === 'draft' ? 'Draft' : 'Not Saved'}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -1091,4 +1482,5 @@ const OrderSpecificationSheet = () => {
 };
 
 export default OrderSpecificationSheet;
+
 

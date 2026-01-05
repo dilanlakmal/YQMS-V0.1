@@ -295,7 +295,8 @@ export const saveCoverPageData = async (req, res) => {
       styleTable,
       sizeTable,
       stampData,
-      createdBy
+      createdBy,
+      status = 'draft'
     } = req.body;
 
     // Validation - only require essential fields
@@ -303,6 +304,15 @@ export const saveCoverPageData = async (req, res) => {
       return res.status(400).json({
         error: 'Missing required fields',
         message: 'Order No, Customer Style, and PO Number are required'
+      });
+    }
+
+    // Validate status if provided
+    const validStatuses = ['draft', 'submitted', 'approved', 'rejected'];
+    if (status && !validStatuses.includes(status)) {
+      return res.status(400).json({
+        error: 'Invalid status',
+        message: `Status must be one of: ${validStatuses.join(', ')}`
       });
     }
 
@@ -397,8 +407,9 @@ export const saveCoverPageData = async (req, res) => {
       testInstructions: testInstructions || '', 
       testInstructionsHtml: testInstructions || '', 
       uploadedImage: savedImagePath,
-      styleTable: processedStyleTable, // Can be empty array
-      sizeTable: processedSizeTable,   // Can be empty array
+      status: status,
+      styleTable: processedStyleTable, 
+      sizeTable: processedSizeTable,  
       stampData: {
         name: stampData?.name || '',
         date: stampData?.date ? new Date(stampData.date) : new Date()
@@ -451,7 +462,7 @@ export const saveCoverPageData = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Cover page saved successfully',
+      message: `Cover page ${status === 'submitted' ? 'submitted' : 'saved'} successfully`,
       data: {
         orderNo: orderRecord.orderNo,
         totalCoverPages: orderRecord.coverPages.length,

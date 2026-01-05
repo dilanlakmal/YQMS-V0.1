@@ -53,7 +53,7 @@ function Home() {
   const [accessMap, setAccessMap] = useState({});
   const sectionRefs = useRef({});
 
-  const backgroundImageUrl = "assets/Home/background.avif"; 
+  // const backgroundImageUrl = "assets/Home/background.avif"; 
 
   const allSections = useMemo(
     () => [
@@ -675,17 +675,19 @@ function Home() {
   return (
     <div className="min-h-screen relative">
       {/* Fixed Background Image */}
-      <div 
+      {/* <div 
         className="fixed inset-0 z-0 bg-cover bg-center bg-no-repeat"
         style={{
           backgroundImage: `url(${backgroundImageUrl})`,
           backgroundAttachment: 'fixed'
         }}
-      />
+      /> */}
       
       {/* Content Overlay */}
-      <div className="relative z-10 min-h-screen">
-        <header className="fixed top-16 w-full z-40 bg-white/60 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm">
+      {/* <div className="relative z-10 min-h-screen"> */}
+       <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
+        {/* <header className="fixed top-16 w-full z-40 bg-white/60 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm"> */}
+         <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
           <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto">

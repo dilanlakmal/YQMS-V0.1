@@ -1,26 +1,28 @@
 // components/DrawingCanvas.jsx
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
 import {
   MousePointer, Hand, Pencil, Eraser, Minus, ArrowRight, Square, Circle, Triangle,
   Type, Undo, Redo, Trash2, Download, Upload, Save, Eye, EyeOff, Plus,
   Move, RotateCcw, Copy, Scissors, Palette, ZoomIn, ZoomOut, RotateCw,
-  Grid3X3, Maximize, Target, Settings, Info, X, Check, AlertCircle
+  Grid3X3, Maximize, Target, Settings, Info, X, Check, AlertCircle, CheckCircle
 } from 'lucide-react';
 
-const DrawingCanvas = ({ 
+const DrawingCanvas = forwardRef(({ 
   backgroundImage, 
   onSave, 
   width = 900, 
   height = 900,
-  className = '' 
-}) => {
+  className = '',
+  viewMode = false,
+  initialCanvasData = null
+}, ref) => {
   const canvasRef = useRef(null);
   const containerRef = useRef(null);
   
   // Drawing states
   const [isDrawing, setIsDrawing] = useState(false);
   const [isPanning, setIsPanning] = useState(false);
-  const [tool, setTool] = useState('select');
+  const [tool, setTool] = useState(viewMode ? 'select' : 'select');
   const [strokeColor, setStrokeColor] = useState('#000000');
   const [fillColor, setFillColor] = useState('transparent');
   const [strokeWidth, setStrokeWidth] = useState(2);
@@ -48,6 +50,9 @@ const DrawingCanvas = ({
   const [isDraggingObjects, setIsDraggingObjects] = useState(false);
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
   const [objectIdCounter, setObjectIdCounter] = useState(0);
+  
+  // Canvas data loading state
+  const [canvasDataLoaded, setCanvasDataLoaded] = useState(false);
   
   // Enhanced interaction states
   const [panStartPoint, setPanStartPoint] = useState({ x: 0, y: 0 });
@@ -84,6 +89,65 @@ const DrawingCanvas = ({
     '#FF00FF', '#00FFFF', '#800000', '#008000', '#000080', '#808000',
     '#800080', '#008080', '#C0C0C0', '#808080'
   ];
+
+  // Expose methods to parent component
+
+  useImperativeHandle(ref, () => ({
+    getCanvasData: () => {
+      console.log('Getting canvas data, current objects:', drawnObjects);
+      // Return a deep copy of the drawn objects to avoid reference issues
+      return JSON.parse(JSON.stringify(drawnObjects));
+    },
+    loadCanvasData: (data) => {
+      if (data && Array.isArray(data)) {
+        console.log('Loading canvas data:', data);
+        setDrawnObjects(data);
+        setCanvasDataLoaded(true);
+        
+        // Update object counter to prevent ID conflicts
+        const maxId = data.reduce((max, obj) => {
+          const idMatch = obj.id.match(/obj_(\d+)_/);
+          if (idMatch) {
+            return Math.max(max, parseInt(idMatch[1]));
+          }
+          return max;
+        }, 0);
+        setObjectIdCounter(maxId + 1);
+        
+        // Force redraw after a short delay
+        setTimeout(() => {
+          redrawCanvas();
+        }, 100);
+      }
+    },
+    saveCanvasImage: () => {
+      const canvas = canvasRef.current;
+      if (canvas) {
+        return canvas.toDataURL('image/png');
+      }
+      return null;
+    }
+  }));
+
+
+  // Load initial canvas data when component mounts
+  useEffect(() => {
+    if (initialCanvasData && !canvasDataLoaded) {
+      console.log('Initial canvas data received:', initialCanvasData);
+      setDrawnObjects(initialCanvasData);
+      setCanvasDataLoaded(true);
+      
+      // Update object counter
+      const maxId = initialCanvasData.reduce((max, obj) => {
+        const idMatch = obj.id.match(/obj_(\d+)_/);
+        if (idMatch) {
+          return Math.max(max, parseInt(idMatch[1]));
+        }
+        return max;
+      }, 0);
+      setObjectIdCounter(maxId + 1);
+    }
+  }, [initialCanvasData, canvasDataLoaded]);
 
   // Object creation helper with enhanced properties
   const createDrawnObject = (type, data) => {
@@ -281,6 +345,8 @@ const DrawingCanvas = ({
 
   // Get resize handle at point
   const getResizeHandleAtPoint = (point, object) => {
+    if (viewMode) return null; // Disable resize handles in view mode
+    
     const { bounds } = object;
     const handleSize = 16; // Larger handle size
     const tolerance = 8; // More tolerance for easier clicking
@@ -311,6 +377,8 @@ const DrawingCanvas = ({
 
   // Get rotation handle at point
   const getRotationHandleAtPoint = (point, object) => {
+    if (viewMode) return false; // Disable rotation handles in view mode
+    
     const { bounds } = object;
     const handleSize = 8;
     const rotationHandle = {
@@ -376,11 +444,14 @@ const DrawingCanvas = ({
       }
     });
     
-    drawnObjects.forEach(obj => {
-      if (obj.visible && selectedObjects.includes(obj.id)) {
-        drawSelectionHandles(ctx, obj);
-      }
-    });
+    // Only draw selection handles if not in view mode
+    if (!viewMode) {
+      drawnObjects.forEach(obj => {
+        if (obj.visible && selectedObjects.includes(obj.id)) {
+          drawSelectionHandles(ctx, obj);
+        }
+      });
+    }
     
     ctx.restore();
   };
@@ -405,7 +476,7 @@ const DrawingCanvas = ({
 
   // Draw preview shape
   const drawPreviewShape = (ctx) => {
-    if (!previewShape) return;
+    if (!previewShape || viewMode) return; // Don't show preview in view mode
     
     ctx.save();
     ctx.strokeStyle = strokeColor;
@@ -504,6 +575,8 @@ const DrawingCanvas = ({
 
   // Enhanced selection handles with resize and rotation handles
   const drawSelectionHandles = (ctx, obj) => {
+    if (viewMode) return; // Don't draw selection handles in view mode
+    
     const { bounds } = obj;
     const handleSize = obj.type === 'text' ? 8 : 10; // Smaller handles for text
     
@@ -645,6 +718,8 @@ const DrawingCanvas = ({
 
   // Save to history
   const saveToHistory = useCallback(() => {
+    if (viewMode) return; // Don't save history in view mode
+    
     const historyState = {
       objects: JSON.parse(JSON.stringify(drawnObjects)),
       timestamp: Date.now()
@@ -655,25 +730,30 @@ const DrawingCanvas = ({
     setHistory(newHistory);
     setIsDirty(true); // Mark canvas as dirty when history is saved
     setHistoryIndex(newHistory.length - 1);
-  }, [drawnObjects, history, historyIndex]);
+  }, [drawnObjects, history, historyIndex, viewMode]);
 
   // Object manipulation functions
   const deleteSelectedObjects = () => {
+    if (viewMode) return;
     setDrawnObjects(prev => prev.filter(obj => !selectedObjects.includes(obj.id)));
     setSelectedObjects([]);
     saveToHistory();
   };
 
   const selectAllObjects = () => {
+    if (viewMode) return;
     setSelectedObjects(drawnObjects.map(obj => obj.id));
   };
 
   const copySelectedObjects = () => {
+    if (viewMode) return;
     console.log('Copy selected objects:', selectedObjects);
   };
 
   // Separate function to finish text editing
   const finishTextEditing = () => {
+    if (viewMode) return;
+    
     if (!textInput.text.trim()) {
       // If text is empty, remove the object if editing, or just cancel if new
       if (editingId) {
@@ -687,7 +767,7 @@ const DrawingCanvas = ({
           if (obj.id === editingId) {
             const newObj = {
               ...obj,
-              data: { 
+                            data: { 
                 ...obj.data, 
                 text: textInput.text,
                 fontSize: fontSize,
@@ -742,6 +822,8 @@ const DrawingCanvas = ({
 
   // Handle the text editing
   const handleDoubleClick = (e) => {
+    if (viewMode) return; // Disable double click in view mode
+    
     e.preventDefault();
     e.stopPropagation();
     
@@ -766,7 +848,7 @@ const DrawingCanvas = ({
         setTextInput({
           show: true,
           x: targetObj.data.x,
-                   y: targetObj.data.y,
+          y: targetObj.data.y,
           text: targetObj.data.text || '',
           screenX: screenX,
           screenY: screenY - 35 // Position above the text
@@ -785,6 +867,8 @@ const DrawingCanvas = ({
 
   // Enhanced move function
   const moveSelectedObjects = (deltaX, deltaY) => {
+    if (viewMode) return;
+    
     setDrawnObjects(prev => prev.map(obj => {
       if (selectedObjects.includes(obj.id)) {
         const newObj = { ...obj };
@@ -853,7 +937,7 @@ const DrawingCanvas = ({
 
   // Resize selected objects with improved UX
   const resizeSelectedObjects = (handle, startPos, currentPos, proportional = false) => {
-    if (!initialObjectState) return;
+    if (viewMode || !initialObjectState) return;
     
     setDrawnObjects(prev => prev.map(obj => {
       if (selectedObjects.includes(obj.id)) {
@@ -973,6 +1057,8 @@ const DrawingCanvas = ({
 
   // Rotate selected objects
   const rotateSelectedObjects = (angle) => {
+    if (viewMode) return;
+    
     setDrawnObjects(prev => prev.map(obj => {
       if (selectedObjects.includes(obj.id)) {
         const newObj = { ...obj };
@@ -984,21 +1070,21 @@ const DrawingCanvas = ({
   };
 
   const undo = () => {
-    if (historyIndex > 0) {
-      const prevState = history[historyIndex - 1];
-      setDrawnObjects(prevState.objects);
-      setSelectedObjects([]);
-      setHistoryIndex(historyIndex - 1);
-    }
+    if (viewMode || historyIndex <= 0) return;
+    
+    const prevState = history[historyIndex - 1];
+    setDrawnObjects(prevState.objects);
+    setSelectedObjects([]);
+    setHistoryIndex(historyIndex - 1);
   };
 
   const redo = () => {
-    if (historyIndex < history.length - 1) {
-      const nextState = history[historyIndex + 1];
-      setDrawnObjects(nextState.objects);
-      setSelectedObjects([]);
-      setHistoryIndex(historyIndex + 1);
-    }
+    if (viewMode || historyIndex >= history.length - 1) return;
+    
+    const nextState = history[historyIndex + 1];
+    setDrawnObjects(nextState.objects);
+    setSelectedObjects([]);
+    setHistoryIndex(historyIndex + 1);
   };
 
   // Get mouse coordinates
@@ -1061,7 +1147,7 @@ const DrawingCanvas = ({
       }
       
       // If we're in select mode or clicked on an already selected object, handle transforms
-      if (tool === 'select' || selectedObjects.includes(topObject.id)) {
+      if ((tool === 'select' || selectedObjects.includes(topObject.id)) && !viewMode) {
         // Check for resize handle first
         const resizeHandleType = getResizeHandleAtPoint(canvasPos, topObject);
         if (resizeHandleType && selectedObjects.includes(topObject.id)) {
@@ -1108,7 +1194,9 @@ const DrawingCanvas = ({
       }
     }
     
-    // Handle tool-specific behavior only if no object was clicked
+    // Handle tool-specific behavior only if no object was clicked and not in view mode
+    if (viewMode) return;
+    
     if (tool === 'pan') {
       setIsPanning(true);
       setIsDragging(true);
@@ -1158,7 +1246,7 @@ const DrawingCanvas = ({
     
     // Update cursor for better UX
     const canvas = canvasRef.current;
-    if (canvas && tool === 'select') {
+    if (canvas && tool === 'select' && !viewMode) {
       const objectsAtPoint = findObjectsAtPoint(canvasPos);
       if (objectsAtPoint.length > 0) {
         const topObject = objectsAtPoint[0];
@@ -1183,6 +1271,8 @@ const DrawingCanvas = ({
       } else {
         canvas.style.cursor = 'default';
       }
+    } else if (viewMode) {
+      canvas.style.cursor = 'default';
     }
     
     // Handle panning
@@ -1198,7 +1288,7 @@ const DrawingCanvas = ({
     }
     
     // Handle resizing with smooth feedback
-    if (isResizing && selectedObjects.length > 0 && transformStartPos) {
+    if (isResizing && selectedObjects.length > 0 && transformStartPos && !viewMode) {
       const deltaX = canvasPos.x - transformStartPos.x;
       const deltaY = canvasPos.y - transformStartPos.y;
       
@@ -1213,7 +1303,7 @@ const DrawingCanvas = ({
     }
     
     // Handle rotation
-    if (isRotating && selectedObjects.length > 0) {
+    if (isRotating && selectedObjects.length > 0 && !viewMode) {
       const currentAngle = Math.atan2(
         canvasPos.y - rotationCenter.y,
         canvasPos.x - rotationCenter.x
@@ -1226,7 +1316,7 @@ const DrawingCanvas = ({
     }
     
     // Handle object dragging
-    if (isDraggingObjects && selectedObjects.length > 0) {
+    if (isDraggingObjects && selectedObjects.length > 0 && !viewMode) {
       const deltaX = canvasPos.x - dragStartPos.x;
       const deltaY = canvasPos.y - dragStartPos.y;
       
@@ -1236,7 +1326,7 @@ const DrawingCanvas = ({
     }
     
     // Handle selection box
-    if (isSelecting && selectionBox) {
+    if (isSelecting && selectionBox && !viewMode) {
       const newSelectionBox = {
         x: Math.min(selectionBox.x, canvasPos.x),
         y: Math.min(selectionBox.y, canvasPos.y),
@@ -1248,7 +1338,7 @@ const DrawingCanvas = ({
     }
     
     // Handle drawing preview
-    if (isDrawing && !['pen', 'highlighter', 'eraser'].includes(tool)) {
+    if (isDrawing && !['pen', 'highlighter', 'eraser'].includes(tool) && !viewMode) {
       let preview = null;
       
       switch (tool) {
@@ -1317,7 +1407,7 @@ const DrawingCanvas = ({
       return;
     }
 
-    if (isDrawing && ['pen', 'highlighter', 'eraser'].includes(tool)) {
+    if (isDrawing && ['pen', 'highlighter', 'eraser'].includes(tool) && !viewMode) {
       setCurrentPath(prev => [...prev, canvasPos]);
     }
   };
@@ -1341,26 +1431,26 @@ const DrawingCanvas = ({
       setResizeHandle(null);
       setInitialObjectState(null);
       setIsProportionalResize(false);
-      saveToHistory();
+      if (!viewMode) saveToHistory();
       return;
     }
     
     if (isRotating) {
       setIsRotating(false);
-      saveToHistory();
+      if (!viewMode) saveToHistory();
       return;
     }
     
     if (isDraggingObjects) {
       setIsDraggingObjects(false);
-      saveToHistory();
+      if (!viewMode) saveToHistory();
       return;
     }
     
     if (isSelecting) {
       setIsSelecting(false);
       
-      if (selectionBox && (selectionBox.width > 5 || selectionBox.height > 5)) {
+      if (selectionBox && (selectionBox.width > 5 || selectionBox.height > 5) && !viewMode) {
         const selectedIds = drawnObjects
           .filter(obj => {
             const bounds = obj.bounds;
@@ -1383,7 +1473,8 @@ const DrawingCanvas = ({
     }
     
     // Handle drawing completion
-    if (!isDrawing) return;
+    if (!isDrawing || viewMode) return;
+    
     let newObject = null;
     const minDistance = 5;
     
@@ -1448,6 +1539,7 @@ const DrawingCanvas = ({
       setDrawnObjects(prev => [...prev, newObject]);
       saveToHistory();
     }
+
     setIsDrawing(false);
     setCurrentPath([]);
   };
@@ -1481,6 +1573,7 @@ const DrawingCanvas = ({
 
   // Clear canvas
   const clearCanvas = () => {
+    if (viewMode) return;
     setDrawnObjects([]);
     setSelectedObjects([]);
     saveToHistory();
@@ -1523,8 +1616,7 @@ const DrawingCanvas = ({
     
     const centerX = (containerRect.width / 2 - imageX * scale) / scale;
     const centerY = (containerRect.height / 2 - imageY * scale) / scale;
-    
-    setPan({ x: centerX, y: centerY });
+        setPan({ x: centerX, y: centerY });
   };
 
   // Center canvas
@@ -1560,6 +1652,8 @@ const DrawingCanvas = ({
   // Enhanced keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
+      if (viewMode) return; // Disable keyboard shortcuts in view mode
+      
       // ESC key - unselect all objects and cancel current operations
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -1624,7 +1718,7 @@ const DrawingCanvas = ({
         if (e.key === 'v' || e.key === 'V') {
           setTool('select');
         }
-               if (e.key === 'h' || e.key === 'H') {
+        if (e.key === 'h' || e.key === 'H') {
           setTool('pan');
         }
         if (e.key === 'p' || e.key === 'P') {
@@ -1646,11 +1740,13 @@ const DrawingCanvas = ({
     
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedObjects, isInlineEditing, textInput.show, isResizing, isRotating, isDraggingObjects]);
+  }, [selectedObjects, isInlineEditing, textInput.show, isResizing, isRotating, isDraggingObjects, viewMode]);
 
   // Tool button component with enhanced styling
-  const ToolButton = ({ toolName, icon: Icon, title, active = false, size = 18, variant = 'default' }) => {
+  const ToolButton = ({ toolName, icon: Icon, title, active = false, size = 18, variant = 'default', disabled = false }) => {
     const handleToolChange = () => {
+      if (disabled || viewMode) return;
+      
       if (['pen', 'rectangle', 'circle', 'line', 'arrow', 'triangle', 'text', 'eraser'].includes(toolName)) {
         if (selectedObjects.length > 0) {
           setSelectedObjects([]);
@@ -1660,6 +1756,10 @@ const DrawingCanvas = ({
     };
 
     const getVariantClasses = () => {
+      if (disabled || viewMode) {
+        return 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200';
+      }
+      
       switch (variant) {
         case 'primary':
           return active 
@@ -1684,6 +1784,7 @@ const DrawingCanvas = ({
       <button
         onClick={handleToolChange}
         title={title}
+        disabled={disabled || viewMode}
         className={`p-3 rounded-xl border-2 transition-all duration-200 transform hover:scale-105 ${getVariantClasses()}`}
       >
         <Icon size={size} />
@@ -1692,11 +1793,16 @@ const DrawingCanvas = ({
   };
 
   // Color button component with enhanced styling
-  const ColorButton = ({ color, active = false, onClick }) => (
+  const ColorButton = ({ color, active = false, onClick, disabled = false }) => (
     <button
-      onClick={() => onClick(color)}
+      onClick={() => !disabled && !viewMode && onClick(color)}
+      disabled={disabled || viewMode}
       className={`w-8 h-8 rounded-lg border-2 transition-all duration-200 transform hover:scale-110 ${
-        active ? 'border-blue-500 shadow-lg ring-2 ring-blue-200' : 'border-gray-300 hover:border-gray-400'
+        disabled || viewMode 
+          ? 'border-gray-300 cursor-not-allowed opacity-50'
+          : active 
+            ? 'border-blue-500 shadow-lg ring-2 ring-blue-200' 
+            : 'border-gray-300 hover:border-gray-400'
       }`}
       style={{ backgroundColor: color }}
       title={`Color: ${color}`}
@@ -1705,6 +1811,17 @@ const DrawingCanvas = ({
 
   return (
     <div className={`drawing-canvas-container ${className} bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen`}>
+      {/* View Mode Indicator */}
+      {viewMode && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-blue-600 text-white px-6 py-3 rounded-full shadow-lg flex items-center space-x-2">
+            <Eye className="h-5 w-5" />
+            <span className="font-medium">View Only Mode</span>
+            <span className="text-blue-200 text-sm">• Editing disabled</span>
+          </div>
+        </div>
+      )}
+
       {/* Modern Header */}
       <div className="bg-white shadow-lg border-b border-gray-200">
         {/* Top Navigation Bar */}
@@ -1714,8 +1831,15 @@ const DrawingCanvas = ({
               <Pencil className="h-6 w-6 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Drawing Canvas</h2>
-              <p className="text-sm text-gray-500">Professional sketching and annotation tool</p>
+              <h2 className="text-xl font-bold text-gray-900">
+                Drawing Canvas {viewMode && '(View Mode)'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {viewMode 
+                  ? 'Viewing saved technical sketch and annotations'
+                  : 'Professional sketching and annotation tool'
+                }
+              </p>
             </div>
           </div>
           
@@ -1728,24 +1852,28 @@ const DrawingCanvas = ({
                 Selected: {selectedObjects.length}
               </div>
             )}
-            <button
-              onClick={downloadCanvas}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
-            >
-              <Download size={16} />
-              <span>Export</span>
-            </button>
-            <button
-              onClick={saveCanvas}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
-            >
-              <Save size={16} />
-              <span>Save</span>
-            </button>
+            {!viewMode && (
+              <>
+                <button
+                  onClick={downloadCanvas}
+                  className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200"
+                >
+                  <Download size={16} />
+                  <span>Export</span>
+                </button>
+                <button
+                  onClick={saveCanvas}
+                  className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                >
+                  <Save size={16} />
+                  <span>Save</span>
+                </button>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Tool Palette */}
+        {/* Tool Palette - Hide most tools in view mode */}
         <div className="px-6 py-4">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             
@@ -1753,13 +1881,13 @@ const DrawingCanvas = ({
             <div className="bg-gray-50 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                 <MousePointer className="h-4 w-4 mr-2" />
-                Selection Tools
+                {viewMode ? 'View Controls' : 'Selection Tools'}
               </h3>
               <div className="flex items-center space-x-2">
                 <ToolButton 
                   toolName="select" 
                   icon={MousePointer} 
-                  title="Select Tool (V) - Move, Resize, Rotate" 
+                  title={viewMode ? "View Tool" : "Select Tool (V) - Move, Resize, Rotate"} 
                   active={tool === 'select'}
                   variant="primary"
                 />
@@ -1770,7 +1898,7 @@ const DrawingCanvas = ({
                   active={tool === 'pan'}
                   variant="primary"
                 />
-                {selectedObjects.length > 0 && (
+                {selectedObjects.length > 0 && !viewMode && (
                   <button
                     onClick={() => setSelectedObjects([])}
                     title="Unselect All (ESC)"
@@ -1782,254 +1910,271 @@ const DrawingCanvas = ({
               </div>
             </div>
 
-            {/* Drawing Tools */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                <Pencil className="h-4 w-4 mr-2" />
-                Drawing Tools
-              </h3>
-              <div className="grid grid-cols-4 gap-2">
-                <ToolButton toolName="pen" icon={Pencil} title="Pen Tool (P)" active={tool === 'pen'} />
-                <ToolButton toolName="eraser" icon={Eraser} title="Eraser Tool" active={tool === 'eraser'} variant="danger" />
-                <ToolButton toolName="line" icon={Minus} title="Line Tool" active={tool === 'line'} />
-                <ToolButton toolName="arrow" icon={ArrowRight} title="Arrow Tool" active={tool === 'arrow'} />
-                <ToolButton toolName="rectangle" icon={Square} title="Rectangle Tool (R)" active={tool === 'rectangle'} />
-                <ToolButton toolName="circle" icon={Circle} title="Circle Tool (C)" active={tool === 'circle'} />
-                <ToolButton toolName="triangle" icon={Triangle} title="Triangle Tool" active={tool === 'triangle'} />
-                <ToolButton toolName="text" icon={Type} title="Text Tool (T)" active={tool === 'text'} variant="success" />
+            {/* Drawing Tools - Hide in view mode */}
+            {!viewMode && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Drawing Tools
+                </h3>
+                <div className="grid grid-cols-4 gap-2">
+                  <ToolButton toolName="pen" icon={Pencil} title="Pen Tool (P)" active={tool === 'pen'} />
+                  <ToolButton toolName="eraser" icon={Eraser} title="Eraser Tool" active={tool === 'eraser'} variant="danger" />
+                  <ToolButton toolName="line" icon={Minus} title="Line Tool" active={tool === 'line'} />
+                  <ToolButton toolName="arrow" icon={ArrowRight} title="Arrow Tool" active={tool === 'arrow'} />
+                  <ToolButton toolName="rectangle" icon={Square} title="Rectangle Tool (R)" active={tool === 'rectangle'} />
+                  <ToolButton toolName="circle" icon={Circle} title="Circle Tool (C)" active={tool === 'circle'} />
+                  <ToolButton toolName="triangle" icon={Triangle} title="Triangle Tool" active={tool === 'triangle'} />
+                  <ToolButton toolName="text" icon={Type} title="Text Tool (T)" active={tool === 'text'} variant="success" />
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Action Tools */}
             <div className="bg-gray-50 rounded-xl p-4">
               <h3 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
                 <Settings className="h-4 w-4 mr-2" />
-                Actions
+                {viewMode ? 'View Actions' : 'Actions'}
               </h3>
               <div className="flex items-center space-x-2">
-                <button 
-                  onClick={undo} 
-                  title="Undo (Ctrl+Z)" 
-                  className="p-3 rounded-xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  disabled={historyIndex <= 0}
-                >
-                  <Undo size={18} />
-                </button>
-                <button 
-                  onClick={redo} 
-                  title="Redo (Ctrl+Y)" 
-                  className="p-3 rounded-xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
-                  disabled={historyIndex >= history.length - 1}
-                >
-                  <Redo size={18} />
-                </button>
-                <button 
-                  onClick={deleteSelectedObjects} 
-                  title="Delete Selected (Del)" 
-                  className="p-3 rounded-xl bg-white hover:bg-red-50 border-2 border-gray-200 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-red-600"
-                  disabled={selectedObjects.length === 0}
-                >
-                  <Trash2 size={18} />
-                </button>
-                <button 
-                  onClick={copySelectedObjects} 
-                  title="Copy Selected (Ctrl+C)" 
-                  className="p-3 rounded-xl bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-blue-600"
-                  disabled={selectedObjects.length === 0}
-                >
-                  <Copy size={18} />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Properties Panel */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-            
-            {/* Stroke Properties */}
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                <Palette className="h-4 w-4 mr-2" />
-                Stroke
-              </h4>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <div 
-                    className="w-10 h-10 rounded-lg border-2 border-gray-300 cursor-pointer shadow-sm"
-                    style={{ backgroundColor: strokeColor }}
-                    onClick={() => document.getElementById('stroke-color-picker').click()}
-                  />
-                  <input
-                    id="stroke-color-picker"
-                    type="color"
-                    value={strokeColor}
-                    onChange={(e) => setStrokeColor(e.target.value)}
-                    className="hidden"
-                  />
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Width</label>
-                    <input
-                      type="range"
-                      min="1"
-                      max="20"
-                      value={strokeWidth}
-                      onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="text-xs text-gray-500 text-center mt-1">{strokeWidth}px</div>
-                  </div>
-                </div>
-                <div className="grid grid-cols-8 gap-1">
-                  {strokeColors.map(color => (
-                    <ColorButton
-                      key={color}
-                      color={color}
-                      active={strokeColor === color}
-                      onClick={setStrokeColor}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {/* Text Properties */}
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                <Type className="h-4 w-4 mr-2" />
-                Text
-              </h4>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Font Size</label>
-                  <select
-                    value={fontSize}
-                    onChange={(e) => setFontSize(parseInt(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64].map(size => (
-                      <option key={size} value={size}>{size}px</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Font Family</label>
-                  <select
-                    value={fontFamily}
-                    onChange={(e) => setFontFamily(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  >
-                    <option value="Arial">Arial</option>
-                    <option value="Times New Roman">Times New Roman</option>
-                    <option value="Courier New">Courier New</option>
-                    <option value="Helvetica">Helvetica</option>
-                    <option value="Georgia">Georgia</option>
-                    <option value="Verdana">Verdana</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* View Controls */}
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                <Eye className="h-4 w-4 mr-2" />
-                View
-              </h4>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setZoom(Math.max(0.1, zoom - 0.1))}
-                    className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
-                    title="Zoom Out"
-                  >
-                    <ZoomOut size={16} />
-                  </button>
-                  <div className="flex-1 text-center">
-                    <div className="text-sm font-medium">{Math.round(zoom * 100)}%</div>
-                    <input
-                      type="range"
-                      min="10"
-                      max="300"
-                      value={zoom * 100}
-                      onChange={(e) => setZoom(e.target.value / 100)}
-                      className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-1"
-                    />
-                  </div>
-                  <button
-                    onClick={() => setZoom(Math.min(3, zoom + 0.1))}
-                    className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
-                    title="Zoom In"
-                  >
-                    <ZoomIn size={16} />
-                  </button>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={fitToScreen}
-                    className="px-3 py-2 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors duration-200"
-                    title="Fit All"
-                  >
-                    Fit All
-                  </button>
-                  <button
-                    onClick={focusOnImage}
-                    className="px-3 py-2 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors duration-200"
-                    title="Focus Image"
-                  >
-                    Focus
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Grid & Options */}
-            <div className="bg-white rounded-lg p-4 shadow-sm">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
-                <Grid3X3 className="h-4 w-4 mr-2" />
-                Options
-              </h4>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">Show Grid</span>
-                  <button
-                    onClick={() => setShowGrid(!showGrid)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
-                      showGrid ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
-                        showGrid ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
-                  </button>
-                </div>
-                {showGrid && (
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Grid Size</label>
-                    <input
-                      type="range"
-                      min="10"
-                      max="50"
-                      value={gridSize}
-                      onChange={(e) => setGridSize(parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                    />
-                    <div className="text-xs text-gray-500 text-center mt-1">{gridSize}px</div>
-                  </div>
+                {!viewMode && (
+                  <>
+                    <button 
+                      onClick={undo} 
+                      title="Undo (Ctrl+Z)" 
+                      className="p-3 rounded-xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      disabled={historyIndex <= 0}
+                    >
+                      <Undo size={18} />
+                    </button>
+                    <button 
+                      onClick={redo} 
+                      title="Redo (Ctrl+Y)" 
+                      className="p-3 rounded-xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                      disabled={historyIndex >= history.length - 1}
+                    >
+                      <Redo size={18} />
+                    </button>
+                    <button 
+                      onClick={deleteSelectedObjects} 
+                      title="Delete Selected (Del)" 
+                      className="p-3 rounded-xl bg-white hover:bg-red-50 border-2 border-gray-200 hover:border-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-red-600"
+                      disabled={selectedObjects.length === 0}
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <button 
+                      onClick={copySelectedObjects} 
+                      title="Copy Selected (Ctrl+C)" 
+                      className="p-3 rounded-xl bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-300 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 text-blue-600"
+                      disabled={selectedObjects.length === 0}
+                    >
+                      <Copy size={18} />
+                    </button>
+                  </>
                 )}
                 <button
-                  onClick={clearCanvas}
-                  className="w-full px-3 py-2 text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors duration-200"
+                  onClick={resetView}
+                  title="Reset View"
+                  className="p-3 rounded-xl bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-gray-300 transition-all duration-200"
                 >
-                  Clear Canvas
+                  <Target size={18} />
                 </button>
               </div>
             </div>
           </div>
         </div>
+
+        {/* Properties Panel - Hide most properties in view mode */}
+        {!viewMode && (
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              
+              {/* Stroke Properties */}
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Palette className="h-4 w-4 mr-2" />
+                  Stroke
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <div 
+                      className="w-10 h-10 rounded-lg border-2 border-gray-300 cursor-pointer shadow-sm"
+                      style={{ backgroundColor: strokeColor }}
+                      onClick={() => document.getElementById('stroke-color-picker').click()}
+                    />
+                    <input
+                      id="stroke-color-picker"
+                      type="color"
+                      value={strokeColor}
+                      onChange={(e) => setStrokeColor(e.target.value)}
+                      className="hidden"
+                    />
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Width</label>
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        value={strokeWidth}
+                        onChange={(e) => setStrokeWidth(parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="text-xs text-gray-500 text-center mt-1">{strokeWidth}px</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-8 gap-1">
+                    {strokeColors.map(color => (
+                      <ColorButton
+                        key={color}
+                        color={color}
+                        active={strokeColor === color}
+                        onClick={setStrokeColor}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Text Properties */}
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Type className="h-4 w-4 mr-2" />
+                  Text
+                </h4>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Font Size</label>
+                    <select
+                      value={fontSize}
+                      onChange={(e) => setFontSize(parseInt(e.target.value))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      {[8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64].map(size => (
+                        <option key={size} value={size}>{size}px</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Font Family</label>
+                    <select
+                      value={fontFamily}
+                      onChange={(e) => setFontFamily(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                    >
+                      <option value="Arial">Arial</option>
+                      <option value="Times New Roman">Times New Roman</option>
+                      <option value="Courier New">Courier New</option>
+                      <option value="Helvetica">Helvetica</option>
+                      <option value="Georgia">Georgia</option>
+                      <option value="Verdana">Verdana</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* View Controls */}
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Eye className="h-4 w-4 mr-2" />
+                  View
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <button
+                      onClick={() => setZoom(Math.max(0.1, zoom - 0.1))}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
+                      title="Zoom Out"
+                    >
+                      <ZoomOut size={16} />
+                    </button>
+                    <div className="flex-1 text-center">
+                      <div className="text-sm font-medium">{Math.round(zoom * 100)}%</div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="300"
+                        value={zoom * 100}
+                        onChange={(e) => setZoom(e.target.value / 100)}
+                        className="w-full h-1 bg-gray-200 rounded-lg appearance-none cursor-pointer mt-1"
+                      />
+                    </div>
+                    <button
+                      onClick={() => setZoom(Math.min(3, zoom + 0.1))}
+                      className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors duration-200"
+                      title="Zoom In"
+                    >
+                      <ZoomIn size={16} />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={fitToScreen}
+                      className="px-3 py-2 text-xs rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors duration-200"
+                      title="Fit All"
+                    >
+                      Fit All
+                    </button>
+                    <button
+                      onClick={focusOnImage}
+                      className="px-3 py-2 text-xs rounded-lg bg-green-100 text-green-700 hover:bg-green-200 transition-colors duration-200"
+                      title="Focus Image"
+                    >
+                      Focus
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Grid & Options */}
+              <div className="bg-white rounded-lg p-4 shadow-sm">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <Grid3X3 className="h-4 w-4 mr-2" />
+                  Options
+                </h4>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Show Grid</span>
+                    <button
+                      onClick={() => setShowGrid(!showGrid)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${
+                        showGrid ? 'bg-blue-600' : 'bg-gray-200'
+                      }`}
+                    >
+                      <span
+                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                          showGrid ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
+                  {showGrid && (
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Grid Size</label>
+                      <input
+                        type="range"
+                        min="10"
+                        max="50"
+                        value={gridSize}
+                        onChange={(e) => setGridSize(parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="text-xs text-gray-500 text-center mt-1">{gridSize}px</div>
+                    </div>
+                  )}
+                  {!viewMode && (
+                    <button
+                      onClick={clearCanvas}
+                      className="w-full px-3 py-2 text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200 transition-colors duration-200"
+                    >
+                      Clear Canvas
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Status Bar */}
         <div className="px-6 py-3 bg-gradient-to-r from-blue-50 to-indigo-50 border-t border-gray-200">
@@ -2038,7 +2183,12 @@ const DrawingCanvas = ({
               <div className="flex items-center space-x-2">
                 <div className={`w-3 h-3 rounded-full ${tool === 'select' ? 'bg-green-500' : 'bg-gray-400'}`}></div>
                 <span className="font-medium text-gray-700">
-                  {tool === 'select' ? 'Transform Mode' : `${tool.charAt(0).toUpperCase() + tool.slice(1)} Tool`}
+                  {viewMode 
+                    ? 'View Mode Active'
+                    : tool === 'select' 
+                      ? 'Transform Mode' 
+                      : `${tool.charAt(0).toUpperCase() + tool.slice(1)} Tool`
+                  }
                 </span>
               </div>
               {selectedObjects.length > 0 && (
@@ -2052,6 +2202,7 @@ const DrawingCanvas = ({
               <span>Canvas: {canvasWidth}×{canvasHeight}</span>
               <span>Zoom: {Math.round(zoom * 100)}%</span>
               <span>Objects: {drawnObjects.length}</span>
+              {viewMode && <span className="text-blue-600 font-medium">• VIEW ONLY</span>}
             </div>
           </div>
         </div>
@@ -2072,15 +2223,16 @@ const DrawingCanvas = ({
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseLeave}
           onDoubleClick={handleDoubleClick}
-          className="cursor-crosshair shadow-lg"
+          className={viewMode ? "cursor-default" : "cursor-crosshair shadow-lg"}
           style={{
             transform: `scale(${zoom}) translate(${pan.x}px, ${pan.y}px)`,
-            transformOrigin: 'top left'
+            transformOrigin: 'top left',
+            pointerEvents: viewMode ? 'auto' : 'auto' // Allow panning in view mode
           }}
         />
 
-        {/* Selection box overlay */}
-        {selectionBox && (
+        {/* Selection box overlay - Hide in view mode */}
+        {selectionBox && !viewMode && (
           <div
             className="absolute border-2 border-blue-500 bg-blue-100 bg-opacity-20 pointer-events-none rounded"
             style={{
@@ -2109,9 +2261,6 @@ const DrawingCanvas = ({
           />
         )}
 
-        {/* Rest of the JSX remains the same as in the previous response... */}
-        {/* Including floating action buttons, status indicators, mode indicators, transform feedback overlays, text input modal, quick help panel, progress indicators, and save status indicator */}
-
         {/* Floating Action Buttons */}
         <div className="absolute top-6 right-6 flex flex-col space-y-3">
           <button
@@ -2138,14 +2287,14 @@ const DrawingCanvas = ({
           <button
             onClick={focusOnImage}
             className="w-12 h-12 bg-blue-600 bg-opacity-95 hover:bg-opacity-100 text-white rounded-full shadow-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-            title="Focus on Image"
+                        title="Focus on Image"
           >
             <Target size={20} />
           </button>
         </div>
 
-        {/* Enhanced Text Input Modal */}
-        {textInput.show && (
+        {/* Enhanced Text Input Modal - Hide in view mode */}
+        {textInput.show && !viewMode && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md mx-4">
               {/* Header */}
@@ -2218,7 +2367,6 @@ const DrawingCanvas = ({
                       ))}
                     </select>
                   </div>
-
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Font Family
@@ -2259,7 +2407,7 @@ const DrawingCanvas = ({
                     <div className="flex-1">
                       <div className="text-sm text-gray-600">Current: {strokeColor}</div>
                       <div className="grid grid-cols-8 gap-1 mt-2">
-                                                {strokeColors.slice(0, 8).map(color => (
+                        {strokeColors.slice(0, 8).map(color => (
                           <button
                             key={color}
                             onClick={() => setStrokeColor(color)}
@@ -2325,16 +2473,22 @@ const DrawingCanvas = ({
                 </div>
               </>
             )}
-            {isResizing && (
+            {isResizing && !viewMode && (
               <div>
                 <div className="text-green-300">Mode</div>
                 <div className="font-semibold text-green-400">Resizing</div>
               </div>
             )}
-            {isRotating && (
+            {isRotating && !viewMode && (
               <div>
                 <div className="text-purple-300">Mode</div>
                 <div className="font-semibold text-purple-400">Rotating</div>
+              </div>
+            )}
+            {viewMode && (
+              <div>
+                <div className="text-blue-300">Mode</div>
+                <div className="font-semibold text-blue-400">View Only</div>
               </div>
             )}
           </div>
@@ -2342,7 +2496,7 @@ const DrawingCanvas = ({
 
         {/* Mode Indicators */}
         <div className="absolute top-6 left-6 space-y-2">
-          {tool === 'select' && selectedObjects.length > 0 && (
+          {tool === 'select' && selectedObjects.length > 0 && !viewMode && (
             <div className="bg-blue-600 bg-opacity-95 text-white px-4 py-3 rounded-xl shadow-lg max-w-xs">
               <div className="font-semibold mb-2 flex items-center">
                 <MousePointer className="h-4 w-4 mr-2" />
@@ -2358,7 +2512,7 @@ const DrawingCanvas = ({
             </div>
           )}
 
-          {isInlineEditing && (
+          {isInlineEditing && !viewMode && (
             <div className="bg-green-600 bg-opacity-95 text-white px-4 py-2 rounded-xl shadow-lg flex items-center space-x-2">
               <Type className="h-4 w-4" />
               <span className="text-sm font-medium">Text Editing Mode</span>
@@ -2366,7 +2520,7 @@ const DrawingCanvas = ({
             </div>
           )}
 
-          {tool !== 'select' && !isInlineEditing && (
+          {tool !== 'select' && !isInlineEditing && !viewMode && (
             <div className="bg-gray-800 bg-opacity-95 text-white px-4 py-2 rounded-xl shadow-lg flex items-center space-x-2">
               <Pencil className="h-4 w-4" />
               <span className="text-sm font-medium">
@@ -2374,10 +2528,25 @@ const DrawingCanvas = ({
               </span>
             </div>
           )}
+
+          {viewMode && selectedObjects.length > 0 && (
+            <div className="bg-blue-600 bg-opacity-95 text-white px-4 py-3 rounded-xl shadow-lg max-w-xs">
+              <div className="font-semibold mb-2 flex items-center">
+                <Eye className="h-4 w-4 mr-2" />
+                Viewing Selected Objects
+              </div>
+              <div className="text-sm space-y-1 text-blue-100">
+                <div>• {selectedObjects.length} object(s) selected</div>
+                <div>• <strong>Pan</strong> to navigate</div>
+                <div>• <strong>Zoom</strong> to inspect details</div>
+                <div>• Editing is disabled in view mode</div>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Transform Feedback Overlays */}
-        {isResizing && resizeInfo && (
+        {/* Transform Feedback Overlays - Hide in view mode */}
+        {isResizing && resizeInfo && !viewMode && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-blue-600 bg-opacity-95 text-white px-6 py-4 rounded-xl shadow-lg pointer-events-none">
             <div className="text-center">
               <div className="font-semibold text-lg">Resizing</div>
@@ -2398,7 +2567,7 @@ const DrawingCanvas = ({
           </div>
         )}
 
-        {isRotating && (
+        {isRotating && !viewMode && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-purple-600 bg-opacity-95 text-white px-6 py-4 rounded-xl shadow-lg pointer-events-none">
             <div className="text-center">
               <div className="font-semibold text-lg flex items-center justify-center">
@@ -2412,7 +2581,7 @@ const DrawingCanvas = ({
           </div>
         )}
 
-        {isDraggingObjects && (
+        {isDraggingObjects && !viewMode && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-green-600 bg-opacity-95 text-white px-6 py-4 rounded-xl shadow-lg pointer-events-none">
             <div className="text-center">
               <div className="font-semibold text-lg flex items-center justify-center">
@@ -2430,42 +2599,67 @@ const DrawingCanvas = ({
         <div className="absolute bottom-6 right-6 bg-white bg-opacity-95 rounded-xl shadow-lg p-4 max-w-xs">
           <div className="flex items-center space-x-2 mb-3">
             <Info className="h-4 w-4 text-blue-600" />
-            <span className="text-sm font-semibold text-gray-700">Quick Shortcuts</span>
+            <span className="text-sm font-semibold text-gray-700">
+              {viewMode ? 'View Controls' : 'Quick Shortcuts'}
+            </span>
           </div>
           <div className="space-y-1 text-xs text-gray-600">
-            <div className="flex justify-between">
-              <span>Select Tool:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">V</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>Pan Tool:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">H</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>Pen Tool:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">P</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>Text Tool:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">T</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>Undo:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Ctrl+Z</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>Delete:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Del</kbd>
-            </div>
-            <div className="flex justify-between">
-              <span>Unselect:</span>
-              <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd>
-            </div>
+            {viewMode ? (
+              <>
+                <div className="flex justify-between">
+                  <span>Pan View:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">H + Drag</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Zoom In/Out:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Mouse Wheel</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Reset View:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">1:1 Button</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Focus Image:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Target Button</kbd>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <span>Select Tool:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">V</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pan Tool:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">H</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pen Tool:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">P</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Text Tool:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">T</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Undo:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Ctrl+Z</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delete:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Del</kbd>
+                </div>
+                <div className="flex justify-between">
+                  <span>Unselect:</span>
+                  <kbd className="px-2 py-1 bg-gray-100 rounded text-xs">Esc</kbd>
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Progress Indicators */}
-        {(isResizing || isRotating || isDraggingObjects) && (
+        {/* Progress Indicators - Hide in view mode */}
+        {(isResizing || isRotating || isDraggingObjects) && !viewMode && (
           <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-40">
             <div className="bg-white rounded-full shadow-lg px-6 py-3 flex items-center space-x-3">
               <div className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></div>
@@ -2478,8 +2672,8 @@ const DrawingCanvas = ({
           </div>
         )}
 
-        {/* Save Status Indicator */}
-        {isDirty && (
+        {/* Save Status Indicator - Hide in view mode */}
+        {isDirty && !viewMode && (
           <div className="fixed top-4 right-4 z-40">
             <div className="bg-yellow-100 border border-yellow-300 rounded-lg px-4 py-2 flex items-center space-x-2">
               <AlertCircle className="h-4 w-4 text-yellow-600" />
@@ -2487,10 +2681,24 @@ const DrawingCanvas = ({
             </div>
           </div>
         )}
+
+        {/* Canvas Data Loaded Indicator */}
+        {canvasDataLoaded && viewMode && (
+          <div className="fixed top-16 left-1/2 transform -translate-x-1/2 z-40">
+            <div className="bg-green-100 border border-green-300 rounded-lg px-4 py-2 flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <span className="text-sm font-medium text-green-800">
+                Canvas data loaded • {drawnObjects.length} objects restored
+              </span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
-};
+});
+
+DrawingCanvas.displayName = 'DrawingCanvas';
 
 export default DrawingCanvas;
 

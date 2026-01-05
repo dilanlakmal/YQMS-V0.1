@@ -15,6 +15,12 @@ const createCoverPageSchema = (connection) => {
     // Style details
     styleStatus: { type: String, default: 'In Work' },
     longDescription: { type: String, default: '' },
+
+     status: {
+      type: String,
+      enum: ['draft', 'submitted', 'approved', 'rejected'],
+      default: 'draft'
+    },
     
     // Approval and sizing
     finalFitApproval: { type: String, default: '' },
@@ -86,6 +92,11 @@ const createCoverPageSchema = (connection) => {
     uploadedImage: {
       type: String,
       default: null
+    },
+    status: {
+      type: String,
+      enum: ['draft', 'submitted', 'approved', 'rejected'],
+      default: 'draft'
     },
     styleTable: [{
       orderNo: {

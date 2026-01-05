@@ -94,6 +94,7 @@
     "node-fetch": "^2.7.0",
     "nodemon": "^3.1.11",
     "papaparse": "^5.5.3",
+    "pdfkit": "^0.17.2",
     "postcss": "^8.4.35",
     "prop-types": "^15.8.1",
     "punycode": "^2.3.1",
