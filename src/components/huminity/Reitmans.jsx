@@ -1,4 +1,5 @@
 import React from 'react';
+import { API_BASE_URL } from '../../../config';
 import { Package, Calendar, Users, MessageSquare, Image as ImageIcon, Clock, MapPin, Mail, Phone, Check, X, UploadCloud } from 'lucide-react';
 
 const ReitmansForm = ({
@@ -28,6 +29,10 @@ const ReitmansForm = ({
   // Lightweight helpers to avoid errors if props missing
   const safeSet = (key, value) => setFormData && setFormData(prev => ({ ...prev, [key]: value }));
   const dropdownRef = React.useRef(null);
+  const [primaryFabric, setPrimaryFabric] = React.useState(null);
+  const [secondaryFabric, setSecondaryFabric] = React.useState(null);
+  const [fabricLoading, setFabricLoading] = React.useState(false);
+  const [rhRaw, setRhRaw] = React.useState(null);
 
   const setCurrentTimeIfEmpty = (field) => {
     if (!formData[field]) {
@@ -48,12 +53,184 @@ const ReitmansForm = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [setShowOrderNoDropdown]);
 
+  // fetch primary/secondary fabric info when a factory style is selected
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchFabrics = async (moNo) => {
+      try {
+        setFabricLoading(true);
+        const base = API_BASE_URL && API_BASE_URL !== '' ? API_BASE_URL.replace(/\/$/, '') : '';
+        const url = `${base}/api/humidity-data/${encodeURIComponent(moNo)}/summary`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const json = await res.json();
+        const fabrics = (json && json.data && json.data.fabrics) ? json.data.fabrics : [];
+        const orderInfo = json && json.data ? json.data : {};
+
+        if (!mounted) return;
+        setPrimaryFabric(fabrics[0] || null);
+        setSecondaryFabric(fabrics[1] || null);
+
+        // Update basic form data from orderInfo
+        if (setFormData) {
+          setFormData(prev => ({
+            ...prev,
+            fabrication: orderInfo.product || prev.fabrication,
+            poLine: orderInfo.purchaseOrder || orderInfo.poLine || prev.poLine,
+          }));
+        }
+
+        // Try to fetch reitmans_humidity doc for this style to prefer its primary/secondary
+        try {
+          const rhRes = await fetch(`${base}/api/reitmans-humidity/${encodeURIComponent(moNo)}`);
+          if (rhRes && rhRes.ok) {
+            const rhJson = await rhRes.json();
+            const rhData = rhJson && rhJson.data ? rhJson.data : null;
+            if (rhData) {
+              const docObj = rhData.doc || rhData;
+              // ReitmansName may be an array of entries; find the one that matches our fabric
+              if (Array.isArray(rhData.ReitmansName) && rhData.ReitmansName.length) {
+                const normalize = s => (s || '').toString().trim().toLowerCase();
+                const firstFab = normalize(fabrics[0]?.fabricName || fabrics[0]?.name || '');
+                const secFab = normalize(fabrics[1]?.fabricName || fabrics[1]?.name || '');
+
+                // Priority 1: Match both primary and secondary
+                let chosen = rhData.ReitmansName.find(r =>
+                  normalize(r.primary) === firstFab && normalize(r.secondary) === secFab
+                );
+
+                // Priority 2: Match just primary (common for single-fabric styles)
+                if (!chosen) {
+                  chosen = rhData.ReitmansName.find(r => normalize(r.primary) === firstFab);
+                }
+
+                // Priority 3: Any entry that matches secondary (unlikely but possible)
+                if (!chosen && secFab) {
+                  chosen = rhData.ReitmansName.find(r => normalize(r.secondary) === secFab || normalize(r.primary) === secFab);
+                }
+
+                // Fallback: Use the first entry
+                if (!chosen) {
+                  chosen = rhData.ReitmansName[0];
+                }
+
+                if (chosen) {
+                  const pName = chosen.primary || '';
+                  const pPct = chosen.value && !chosen['primary%'] ? chosen.value : (chosen['primary%'] || chosen.primaryPercent || '');
+                  const sName = chosen.secondary || '';
+                  const sPct = sName ? (chosen['secondary%'] || chosen.secondaryPercent || '') : '';
+
+                  setPrimaryFabric({ fabricName: pName, percentage: pPct });
+                  setSecondaryFabric(sName ? { fabricName: sName, percentage: sPct } : null);
+
+                  if (setFormData) {
+                    setFormData(prev => ({
+                      ...prev,
+                      primaryFabric: pName,
+                      primaryPercentage: pPct,
+                      secondaryFabric: sName || prev.secondaryFabric,
+                      secondaryPercentage: sPct || prev.secondaryPercentage,
+                      composition: `${pName}${pPct ? ' ' + pPct + '%' : ''}${sName ? ' / ' + sName + (sPct ? ' ' + sPct + '%' : '') : ''}`,
+                      // Map DB 'value' to 'upperCentisimalIndex' - prioritze chosen.value then top-level
+                      upperCentisimalIndex: chosen.value || docObj.upperCentisimalIndex || prev.upperCentisimalIndex,
+                      aquaboySpec: docObj.aquaboySpec || docObj.spec || prev.aquaboySpec,
+                      timeChecked: docObj.timeChecked || prev.timeChecked,
+                      moistureRateBeforeDehumidify: docObj.moistureRateBeforeDehumidify || docObj.moistureRateBefore || prev.moistureRateBeforeDehumidify,
+                      noPcChecked: docObj.noPcChecked || prev.noPcChecked,
+                      timeIn: docObj.timeIn || prev.timeIn,
+                      timeOut: docObj.timeOut || prev.timeOut,
+                      moistureRateAfter: docObj.moistureRateAfter || prev.moistureRateAfter,
+                    }));
+                  }
+                }
+              } else {
+                // top-level primary/secondary fields
+                const pName = rhData.primary || docObj.primary || '';
+                const pPct = rhData['primary%'] || docObj.primaryPercent || '';
+                const sName = rhData.secondary || docObj.secondary || '';
+                const sPct = sName ? (rhData['secondary%'] || docObj.secondaryPercent || '') : '';
+
+                if (pName) setPrimaryFabric({ fabricName: pName, percentage: pPct });
+                if (sName) setSecondaryFabric({ fabricName: sName, percentage: sPct });
+
+                if (setFormData) {
+                  setFormData(prev => ({
+                    ...prev,
+                    primaryFabric: pName || prev.primaryFabric,
+                    primaryPercentage: pPct || prev.primaryPercentage,
+                    secondaryFabric: sName || prev.secondaryFabric,
+                    secondaryPercentage: sPct || prev.secondaryPercentage,
+                    composition: `${pName}${pPct ? ' ' + pPct + '%' : ''}${sName ? ' / ' + sName + (sPct ? ' ' + sPct + '%' : '') : ''}`,
+                    upperCentisimalIndex: rhData.value || docObj.upperCentisimalIndex || docObj.value || prev.upperCentisimalIndex,
+                    aquaboySpec: docObj.aquaboySpec || docObj.spec || prev.aquaboySpec,
+                    timeChecked: docObj.timeChecked || prev.timeChecked,
+                    moistureRateBeforeDehumidify: docObj.moistureRateBeforeDehumidify || docObj.moistureRateBefore || prev.moistureRateBeforeDehumidify,
+                    noPcChecked: docObj.noPcChecked || prev.noPcChecked,
+                    timeIn: docObj.timeIn || prev.timeIn,
+                    timeOut: docObj.timeOut || prev.timeOut,
+                    moistureRateAfter: docObj.moistureRateAfter || prev.moistureRateAfter,
+                  }));
+                }
+              }
+            }
+          }
+        } catch (rhErr) {
+          // ignore if reitmans_humidity not available
+        }
+      } catch (err) {
+        console.warn('Could not fetch fabric summary for Reitmans style:', err);
+        if (mounted) {
+          setPrimaryFabric(null);
+          setSecondaryFabric(null);
+        }
+      } finally {
+        if (mounted) setFabricLoading(false);
+      }
+    };
+
+    const mo = formData && (formData.factoryStyleNo || formData.moNo || formData.style);
+    if (mo) fetchFabrics(mo);
+    else {
+      setPrimaryFabric(null);
+      setSecondaryFabric(null);
+    }
+
+    return () => { mounted = false; };
+  }, [formData.factoryStyleNo]);
+
+  const fetchRhRaw = async (moNo) => {
+    if (!moNo) return;
+    try {
+      const base = API_BASE_URL && API_BASE_URL !== '' ? API_BASE_URL.replace(/\/$/, '') : '';
+      const rhRes = await fetch(`${base}/api/reitmans-humidity/${encodeURIComponent(moNo)}`);
+      if (!rhRes.ok) {
+        setRhRaw({ error: `No reitmans_humidity record (${rhRes.status})` });
+        return;
+      }
+      const rhJson = await rhRes.json();
+      setRhRaw(rhJson && rhJson.data ? rhJson.data : rhJson || null);
+    } catch (e) {
+      setRhRaw({ error: e.message || String(e) });
+    }
+  };
+
   return (
     <div className="max-w-[1500px] mx-auto p-6 bg-pink-50">
 
       {/* Beige header like the mock */}
       <div className="rounded-lg bg-white p-6 shadow-lg border">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Primary / Secondary fabric result */}
+          <div className="md:col-span-3 mt-2">
+            {fabricLoading ? (
+              <div className="text-sm text-gray-500">Checking fabrics...</div>
+            ) : (primaryFabric || secondaryFabric) ? (
+              <div className="text-sm text-gray-700">
+                <div><strong>Primary:</strong> {primaryFabric ? `${primaryFabric.fabricName || primaryFabric.name || primaryFabric.fabricName} (${primaryFabric.percentage || primaryFabric.percentage === 0 ? primaryFabric.percentage + '%' : ''})` : 'N/A'}</div>
+                <div><strong>Secondary:</strong> {secondaryFabric ? `${secondaryFabric.fabricName || secondaryFabric.name || secondaryFabric.fabricName} (${secondaryFabric.percentage || secondaryFabric.percentage === 0 ? secondaryFabric.percentage + '%' : ''})` : 'N/A'}</div>
+              </div>
+            ) : null}
+          </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Style #</label>
             <div className="relative" ref={dropdownRef}>
@@ -116,6 +293,7 @@ const ReitmansForm = ({
               <p className="text-red-500 text-[11px] mt-1 font-bold italic">{errors.factoryStyleNo}</p>
             )}
           </div>
+
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1">Composition:</label>
             <input

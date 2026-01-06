@@ -124,7 +124,7 @@ const FormPage = () => {
             setIsLoadingOrderData(true);
             addCalcStep('Started fetchOrderNoSuggestions; preparing to fetch orders');
             try {
-                const response = await fetch(`http://localhost:5001/api/yorksys-orders?limit=0`);
+                const response = await fetch(`${API_BASE_URL || 'http://localhost:5001'}/api/yorksys-orders?limit=0`);
                 const result = await response.json();
                 const orders = result && result.data ? result.data : (Array.isArray(result) ? result : []);
                 console.log('api/yorksys-orders response:', result);
@@ -431,6 +431,7 @@ const FormPage = () => {
 
         try {
             const response = await fetch(`${API_BASE_URL || 'http://localhost:5001'}/api/humidity-reports?factoryStyleNo=${encodeURIComponent(factoryStyleNo)}`);
+            //  alert(`Using API Base URL: ${API_BASE_URL}`);
             const result = await response.json();
 
             if (response.ok && result) {
@@ -1485,18 +1486,29 @@ const FormPage = () => {
                                             Aquaboy Reading Spec
                                             <span className="text-red-500 ml-1">*</span>
                                         </label>
-                                        <input
-                                            type="text"
-                                            value={formData.aquaboySpec}
-                                            onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpec: e.target.value }))}
-                                            className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ${errors.aquaboySpec ? 'border-red-500' : 'border-gray-300'
-                                                }`}
-                                            placeholder=""
-                                            required
-                                            aria-required="true"
-                                            disabled={!formData.factoryStyleNo}
-                                        />
-                                        {errors.aquaboySpec && <p className="text-red-500 text-sm mt-1">{errors.aquaboySpec}</p>}
+                                        <div className="relative">
+                                            <label className="sr-only">Aquaboy Reading Spec</label>
+                                            <div className={`w-full rounded-lg p-1 border ${errors.aquaboySpec ? 'border-blue-300 bg-red-50' : 'border-blue-200 bg-gradient-to-r from-blue-50/60 to-white'} shadow-inner`}>
+                                                <div className="relative">
+                                                    <input
+                                                        type="text"
+                                                        value={formData.aquaboySpec}
+                                                        onChange={(e) => setFormData(prev => ({ ...prev, aquaboySpec: e.target.value }))}
+                                                        className={`w-full px-4 py-1 bg-transparent rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400 transition-colors ${errors.aquaboySpec ? 'text-blue-700' : 'text-blue-900'}`}
+                                                        placeholder=""
+                                                        required
+                                                        aria-required="true"
+                                                        disabled
+                                                    />
+                                                    <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none">
+                                                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12h3l3-8 4 16 3-8h3" />
+                                                        </svg>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {errors.aquaboySpec && <p className="text-red-500 text-sm mt-1">{errors.aquaboySpec}</p>}
+                                        </div>
                                     </div>
 
                                     {/* Before Dry Room shown for all types */}

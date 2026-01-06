@@ -188,6 +188,57 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
   }
 };
 
+// GET /api/reitmans-humidity/:moNo
+export const getReitmansHumidityByMoNo = async (req, res) => {
+  try {
+    const moNo = req.params.moNo || req.query.moNo;
+    const col = ymProdConnection.db.collection("reitmans_humidity");
+
+    // If no moNo provided, return recent docs for debugging/testing
+    if (!moNo) {
+      const docs = await col.find({}).sort({ _id: -1 }).limit(200).toArray();
+      return res.json({ success: true, data: docs });
+    }
+
+    // try exact match on common fields
+    const exactQuery = {
+      $or: [{ factoryStyleNo: moNo }, { moNo: moNo }, { style: moNo }]
+    };
+    let doc = await col.findOne(exactQuery);
+
+    // fallback to regex search
+    if (!doc) {
+      const regex = new RegExp(moNo, "i");
+      doc = await col.findOne({
+        $or: [
+          { factoryStyleNo: { $regex: regex } },
+          { moNo: { $regex: regex } },
+          { style: { $regex: regex } }
+        ]
+      });
+    }
+
+    if (!doc) return res.status(404).json({ success: false, message: "No reitmans_humidity record found for this moNo" });
+
+    // return full doc and try to extract common primary/secondary
+    let primary = doc.primary || doc.primaryFabric || doc.fabricPrimary || null;
+    let secondary = doc.secondary || doc.secondaryFabric || doc.fabricSecondary || null;
+    // if ReitmansName array exists, pick first entry that has primary/secondary
+    if ((!primary || !secondary) && Array.isArray(doc.ReitmansName)) {
+      const entry = doc.ReitmansName.find(e => e.primary && e.secondary) || doc.ReitmansName[0];
+      if (entry) {
+        primary = primary || entry.primary;
+        secondary = secondary || entry.secondary;
+      }
+    }
+
+    return res.json({ success: true, data: { primary, secondary, doc } });
+  } catch (err) {
+    console.error("Error fetching reitmans_humidity by moNo:", err);
+    return res.status(500).json({ success: false, message: "Failed to fetch reitmans_humidity" });
+  }
+};
+
 // GET /api/humidity-reports
 export const getHumidityReports = async (req, res) => {
   try {
