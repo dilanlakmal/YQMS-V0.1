@@ -308,6 +308,97 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
                 })()}
               </Text>
             </View>
+            {/* NEW: Inspection Date */}
+            <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Inspection Date:</Text>
+              <Text style={styles.infoValue}>
+                {(() => {
+                  // Try multiple possible date fields
+                  const inspectionDate = 
+                    recordData.date
+                    
+                  if (!inspectionDate) return 'N/A';
+                  
+                  try {
+                    let dateObj;
+                    let dateString = inspectionDate;
+                    
+                    // Handle MongoDB's extended JSON format for dates
+                    if (typeof inspectionDate === 'object' && inspectionDate !== null && inspectionDate.$date) {
+                      dateString = inspectionDate.$date;
+                    }
+                    
+                    // Create a date object
+                    dateObj = new Date(dateString);
+                    
+                    if (isNaN(dateObj.getTime())) {
+                      console.warn('Invalid inspection date:', inspectionDate);
+                      return 'Invalid Date';
+                    }
+                    
+                    // Format the date
+                    const formattedDate = dateObj.toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit',
+                      timeZone: 'UTC'
+                    });
+                    
+                    return formattedDate;
+                  } catch (error) {
+                    console.error('Date parsing error:', error, 'for value:', inspectionDate);
+                    return 'Error parsing date';
+                  }
+                })()}
+              </Text>
+            </View>
+            {/* NEW: Inspection Time (optional) */}
+            {/* <View style={styles.infoBlock}>
+              <Text style={styles.infoLabel}>Inspection Time:</Text>
+              <Text style={styles.infoValue}>
+                {(() => {
+                  // Try multiple possible time fields
+                  const inspectionTime = 
+                    recordData.inspectionTime || 
+                    recordData.inspection_time ||
+                    recordData.createdAt ||
+                    recordData.created_at;
+                    
+                  if (!inspectionTime) return 'N/A';
+                  
+                  try {
+                    let dateObj;
+                    let dateString = inspectionTime;
+                    
+                    // Handle MongoDB's extended JSON format for dates
+                    if (typeof inspectionTime === 'object' && inspectionTime !== null && inspectionTime.$date) {
+                      dateString = inspectionTime.$date;
+                    }
+                    
+                    // Create a date object
+                    dateObj = new Date(dateString);
+                    
+                    if (isNaN(dateObj.getTime())) {
+                      console.warn('Invalid inspection time:', inspectionTime);
+                      return 'Invalid Time';
+                    }
+                    
+                    // Format the time
+                    const formattedTime = dateObj.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                      timeZone: 'UTC'
+                    });
+                    
+                    return formattedTime;
+                  } catch (error) {
+                    console.error('Time parsing error:', error, 'for value:', inspectionTime);
+                    return 'Error parsing time';
+                  }
+                })()}
+              </Text>
+            </View> */}
           </View>
         </View>
 
