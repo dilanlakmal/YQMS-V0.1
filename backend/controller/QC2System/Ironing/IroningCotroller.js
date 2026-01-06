@@ -1,6 +1,7 @@
 import {
  Ironing,
  QC2InspectionPassBundle,
+ IEWorkerTask,
 } from "../../MongoDB/dbConnectionController.js";
 
 /* ------------------------------
@@ -175,5 +176,39 @@ export const getIroningFilterOptions = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch distinct ironing filter options" });
+  }
+};
+
+// Get assigned task for a user
+export const getAssignedTask = async (req, res) => {
+  try {
+    const { emp_id } = req.params; // Changed from empId to emp_id
+
+    const workerTask = await IEWorkerTask.findOne({ emp_id: emp_id });
+
+    if (!workerTask) {
+      return res.status(404).json({ message: "Assigned task not found" });
+    }
+
+    // Check if the document has a tasks array or single task_no
+    let assignedTasks = [];
+    
+    if (workerTask.tasks && Array.isArray(workerTask.tasks)) {
+      assignedTasks = workerTask.tasks;
+    } else if (workerTask.task_no) {
+      assignedTasks = [workerTask.task_no];
+    }
+
+    // Check only for Ironing tasks (53, 85)
+    const hasIroningAccess = assignedTasks.some(task => [53, 85].includes(parseInt(task)));
+
+    res.json({ 
+      tasks: assignedTasks,
+      task_no: workerTask.task_no, // Keep for backward compatibility
+      hasIroningAccess: hasIroningAccess
+    });
+  } catch (error) {
+    console.error("Error fetching assigned task:", error);
+    res.status(500).json({ message: "Failed to fetch assigned task" });
   }
 };

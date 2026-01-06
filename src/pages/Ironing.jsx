@@ -13,7 +13,8 @@ import {
   Database,
   Zap,
   Camera,
-  Upload
+  Upload,
+  Lock
 } from "lucide-react";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { API_BASE_URL } from "../../config";
@@ -50,6 +51,7 @@ const IroningPage = () => {
     department: "",
     lineNo: ""
   });
+  const [isAuthorized, setIsAuthorized] = useState(null);
 
   // Define tabs with modern icons
   const tabs = useMemo(() => [
@@ -83,6 +85,46 @@ const IroningPage = () => {
       }));
     }
   }, [user]);
+
+  useEffect(() => {
+  const checkTaskAssignment = async () => {
+    if (user && user.emp_id) {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/get-assigned-task/${user.emp_id}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Check if user has ironing tasks (53 or 85)
+          let hasIroningAccess = false;
+          
+          if (data.hasIroningAccess !== undefined) {
+            // Use the backend-calculated value if available
+            hasIroningAccess = data.hasIroningAccess;
+          } else if (data.tasks && Array.isArray(data.tasks)) {
+            // Check tasks array
+            hasIroningAccess = data.tasks.some(task => [53, 85].includes(parseInt(task)));
+          } else if (data.task_no) {
+            // Check single task_no (fallback)
+            hasIroningAccess = [53, 85].includes(parseInt(data.task_no));
+          }
+          
+          setIsAuthorized(hasIroningAccess);
+        } else {
+          setIsAuthorized(false);
+        }
+      } catch (err) {
+        console.error("Error checking task assignment:", err);
+        setIsAuthorized(false);
+      }
+    }
+  };
+
+  if (!loading && user) {
+    checkTaskAssignment();
+  }
+}, [user, loading]);
 
   useEffect(() => {
     const fetchInitialRecordId = async () => {
@@ -465,6 +507,36 @@ const IroningPage = () => {
   }, [ironingRecords, user, loading]);
 
   const DAY_TARGET = 500;
+
+  if (isAuthorized === false) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 transition-colors duration-300">
+        <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center text-center max-w-md mx-4 border border-gray-200 dark:border-gray-700">
+          <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
+            <Lock className="w-8 h-8 text-red-600 dark:text-red-400" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Access Restricted
+          </h2>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Your assigned task does not match the requirements for this page.
+            <br />
+            <span className="text-sm text-gray-500 mt-2 block">
+              Required: Task 53 or 85
+            </span>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isAuthorized === null && user && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 transition-colors duration-300">
@@ -1098,4 +1170,3 @@ const IroningPage = () => {
 };
 
 export default IroningPage;
-

@@ -1,5 +1,6 @@
 import express from 'express';
 import {
+  getAssignedTask,
   getIroningId,
   getLastIroningId,
   getDefectCardData,
@@ -10,6 +11,7 @@ import {
 
 const router = express.Router();
 
+router.get('/api/get-assigned-task/:emp_id', getAssignedTask);
 router.get('/api/check-ironing-exists/:bundleId', getIroningId);
 router.get('/api/last-ironing-record-id/:emp_id', getLastIroningId);
 router.get('/api/check-defect-card/:defectPrintId', getDefectCardData);

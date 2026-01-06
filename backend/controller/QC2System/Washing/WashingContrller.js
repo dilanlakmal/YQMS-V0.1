@@ -1,7 +1,8 @@
 import {
 //  QC2OrderData, 
  Washing,
- QC2InspectionPassBundle,               
+ QC2InspectionPassBundle, 
+ IEWorkerTask,              
 } from "../../MongoDB/dbConnectionController.js";
 
 /* ------------------------------
@@ -196,5 +197,38 @@ export const getWashingFilterOptions = async (req, res) => {
     res
       .status(500)
       .json({ message: "Failed to fetch distinct filter options" });
+  }
+};
+
+export const getWashingTaskAccess = async (req, res) => {
+  try {
+    const { emp_id } = req.params;
+
+    const workerTask = await IEWorkerTask.findOne({ emp_id: emp_id });
+
+    if (!workerTask) {
+      return res.status(404).json({ message: "Assigned task not found" });
+    }
+
+    // Check if the document has a tasks array or single task_no
+    let assignedTasks = [];
+    
+    if (workerTask.tasks && Array.isArray(workerTask.tasks)) {
+      assignedTasks = workerTask.tasks;
+    } else if (workerTask.task_no) {
+      assignedTasks = [workerTask.task_no];
+    }
+
+    // Check only for Washing tasks (52, 101)
+    const hasWashingAccess = assignedTasks.some(task => [52, 101].includes(parseInt(task)));
+
+    res.json({ 
+      tasks: assignedTasks,
+      task_no: workerTask.task_no, // Keep for backward compatibility
+      hasWashingAccess: hasWashingAccess
+    });
+  } catch (error) {
+    console.error("Error fetching assigned task:", error);
+    res.status(500).json({ message: "Failed to fetch assigned task" });
   }
 };
