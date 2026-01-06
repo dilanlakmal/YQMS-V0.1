@@ -17,6 +17,7 @@ import {
   Upload,
   Lock
 } from "lucide-react";
+
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { API_BASE_URL } from "../../config";
 import { useAuth } from "../components/authentication/AuthContext";
@@ -78,7 +79,33 @@ const WashingPage = () => {
     setActiveTab(tabName);
   };
 
-  // ... (keeping all your existing useEffect hooks and functions unchanged)
+  // Authorization check useEffect
+  useEffect(() => {
+    const checkTaskAssignment = async () => {
+      if (user && user.emp_id) {
+        try {
+          const response = await fetch(
+            `${API_BASE_URL}/api/get-washing-task-access/${user.emp_id}`
+          );
+          if (response.ok) {
+            const data = await response.json();
+            setIsAuthorized(data.hasWashingAccess || false);
+          } else {
+            setIsAuthorized(false);
+          }
+        } catch (err) {
+          console.error("Error checking task assignment:", err);
+          setIsAuthorized(false);
+        }
+      }
+    };
+
+    if (!loading && user) {
+      checkTaskAssignment();
+    }
+  }, [user, loading]);
+
+  // All your existing useEffect hooks and functions remain the same...
   useEffect(() => {
     if (user && user.emp_id) {
       setFilters((prevFilters) => ({
@@ -105,52 +132,31 @@ const WashingPage = () => {
         }
       }
     };
+
     fetchInitialRecordId();
   }, [user]);
-
-   useEffect(() => {
-    const checkTaskAssignment = async () => {
-      if (user && user.emp_id) {
-        try {
-          const response = await fetch(
-            `${API_BASE_URL}/api/get-washing-task-access/${user.emp_id}`
-          );
-          if (response.ok) {
-            const data = await response.json();
-            setIsAuthorized(data.hasWashingAccess || false);
-          } else {
-            setIsAuthorized(false);
-          }
-        } catch (err) {
-          console.error("Error checking task assignment:", err);
-          setIsAuthorized(false);
-        }
-      }
-    };
-
-    if (!loading && user) {
-      checkTaskAssignment();
-    }
-  }, [user, loading]);
-
 
   const fetchBundleData = async (randomId) => {
     try {
       const trimmedId = randomId.trim();
       setLoadingData(true);
       setIsDefectCard(false);
+
       let response = await fetch(
         `${API_BASE_URL}/api/bundle-by-random-id/${trimmedId}`
       );
+
       if (response.ok) {
         const data = await response.json();
         const orderExistsResponse = await fetch(
           `${API_BASE_URL}/api/check-washing-exists/${data.bundle_id}-55`
         );
         const orderExistsData = await orderExistsResponse.json();
+
         if (orderExistsData.exists) {
           throw new Error("This order data already exists in washing");
         }
+
         setScannedData({ ...data, bundle_random_id: trimmedId });
         setPassQtyWash(data.count);
       } else {
@@ -158,20 +164,24 @@ const WashingPage = () => {
           `${API_BASE_URL}/api/check-defect-card-washing/${trimmedId}`
         );
         const defectResponseText = await defectResponse.text();
+
         if (!defectResponse.ok) {
           const errorData = defectResponseText
             ? JSON.parse(defectResponseText)
             : {};
           throw new Error(errorData.message || "Defect card not found");
         }
+
         const defectData = JSON.parse(defectResponseText);
         const existsResponse = await fetch(
           `${API_BASE_URL}/api/check-washing-exists/${trimmedId}-86`
         );
         const existsData = await existsResponse.json();
+
         if (existsData.exists) {
           throw new Error("This defect card already scanned");
         }
+
         const formattedData = {
           defect_print_id: defectData.defect_print_id,
           totalRejectGarmentCount: defectData.totalRejectGarmentCount,
@@ -196,10 +206,12 @@ const WashingPage = () => {
           bundle_id: defectData.bundle_id,
           bundle_random_id: defectData.bundle_random_id
         };
+
         setScannedData(formattedData);
         setPassQtyWash(defectData.totalRejectGarmentCount);
         setIsDefectCard(true);
       }
+
       setIsAdding(true);
       setCountdown(5);
       setError(null);
@@ -217,6 +229,7 @@ const WashingPage = () => {
     try {
       const now = new Date();
       const taskNoWashing = isDefectCard ? 101 : 52;
+
       const newRecord = {
         washing_record_id: isDefectCard ? 0 : washingRecordId,
         task_no_washing: taskNoWashing,
@@ -244,12 +257,15 @@ const WashingPage = () => {
         dept_name_washing: user.dept_name,
         sect_name_washing: user.sect_name
       };
+
       const response = await fetch(`${API_BASE_URL}/api/save-washing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newRecord)
       });
+
       if (!response.ok) throw new Error("Failed to save washing record");
+
       const inspectionType = isDefectCard ? "defect" : "first";
       const updateData = {
         inspectionType,
@@ -268,6 +284,7 @@ const WashingPage = () => {
           ...(isDefectCard && { defect_print_id: scannedData.defect_print_id })
         }
       };
+
       const updateResponse = await fetch(
         `${API_BASE_URL}/api/update-qc2-orderdata/${scannedData.bundle_id}`,
         {
@@ -276,7 +293,9 @@ const WashingPage = () => {
           body: JSON.stringify(updateData)
         }
       );
+
       if (!updateResponse.ok) throw new Error("Failed to update qc2_orderdata");
+
       setWashingRecords((prev) => [...prev, newRecord]);
       setScannedData(null);
       setIsAdding(false);
@@ -353,9 +372,11 @@ const WashingPage = () => {
 
   const filteredWashingRecords = useMemo(() => {
     if (!washingRecords) return [];
+
     const parseToLocalDate = (dateStr) => {
       if (!dateStr) return null;
       let year, month, day;
+
       if (dateStr.includes("-")) {
         [year, month, day] = dateStr.split("-").map(Number);
       } else if (dateStr.includes("/")) {
@@ -366,14 +387,18 @@ const WashingPage = () => {
       } else {
         return null;
       }
+
       if (isNaN(year) || isNaN(month) || isNaN(day)) return null;
       return new Date(year, month - 1, day);
     };
+
     const filterDateSelected = filters.filterDate
       ? parseToLocalDate(filters.filterDate)
       : null;
+
     return washingRecords.filter((record) => {
       const recordDate = parseToLocalDate(record.washing_updated_date);
+
       if (filters.filterDate) {
         if (
           !recordDate ||
@@ -383,6 +408,7 @@ const WashingPage = () => {
           return false;
         }
       }
+
       if (
         filters.qcId &&
         String(record.emp_id_washing ?? "").toLowerCase() !==
@@ -390,6 +416,7 @@ const WashingPage = () => {
       ) {
         return false;
       }
+
       if (
         filters.packageNo !== undefined &&
         filters.packageNo !== null &&
@@ -399,6 +426,7 @@ const WashingPage = () => {
         const recordValue = String(record.package_no ?? "").toLowerCase();
         if (recordValue !== filterValue) return false;
       }
+
       if (
         filters.moNo !== undefined &&
         filters.moNo !== null &&
@@ -410,6 +438,7 @@ const WashingPage = () => {
         ).toLowerCase();
         if (recordValue !== filterValue) return false;
       }
+
       if (
         filters.taskNo !== undefined &&
         filters.taskNo !== null &&
@@ -419,6 +448,7 @@ const WashingPage = () => {
         const recordValue = String(record.task_no_washing ?? "").toLowerCase();
         if (recordValue !== filterValue) return false;
       }
+
       if (
         filters.department !== undefined &&
         filters.department !== null &&
@@ -428,6 +458,7 @@ const WashingPage = () => {
         const recordValue = String(record.department ?? "").toLowerCase();
         if (recordValue !== filterValue) return false;
       }
+
       if (
         filters.lineNo !== undefined &&
         filters.lineNo !== null &&
@@ -437,6 +468,7 @@ const WashingPage = () => {
         const recordValue = String(record.lineNo ?? "").toLowerCase();
         if (recordValue !== filterValue) return false;
       }
+
       return true;
     });
   }, [washingRecords, filters, user]);
@@ -451,22 +483,27 @@ const WashingPage = () => {
         task101Garments: 0
       };
     }
+
     let totalGarments = 0;
     const uniqueStyles = new Set();
     let task52Garments = 0;
     let task101Garments = 0;
+
     filteredWashingRecords.forEach((record) => {
       const qty = Number(record.passQtyWash) || 0;
       totalGarments += qty;
+
       if (record.custStyle) {
         uniqueStyles.add(record.custStyle);
       }
+
       if (String(record.task_no_washing) === "52") {
         task52Garments += qty;
       } else if (String(record.task_no_washing) === "101") {
         task101Garments += qty;
       }
     });
+
     return {
       totalGarmentsWashed: totalGarments,
       totalBundlesProcessed: filteredWashingRecords.length,
@@ -480,14 +517,17 @@ const WashingPage = () => {
     if (loading || !user || !user.emp_id) {
       return { task52: 0, task101: 0, total: 0 };
     }
+
     const today = new Date().toLocaleDateString("en-US", {
       month: "2-digit",
       day: "2-digit",
       year: "numeric"
     });
+
     let task52Count = 0;
     let task101Count = 0;
     let totalCount = 0;
+
     washingRecords.forEach((record) => {
       if (
         record.emp_id_washing === user.emp_id &&
@@ -495,6 +535,7 @@ const WashingPage = () => {
       ) {
         const qty = Number(record.passQtyWash) || 0;
         totalCount += qty;
+
         if (String(record.task_no_washing) === "52") {
           task52Count += qty;
         } else if (String(record.task_no_washing) === "101") {
@@ -502,13 +543,25 @@ const WashingPage = () => {
         }
       }
     });
+
     return { task52: task52Count, task101: task101Count, total: totalCount };
   }, [washingRecords, user, loading]);
 
-  const DAY_TARGET = 500;
+  // FIXED: Proper loading state handling
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-4 border-blue-200 border-t-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
-if (isAuthorized === false) {
-   return (
+  // FIXED: Check authorization after loading is complete
+  if (isAuthorized === false) {
+    return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 transition-colors duration-300">
         <div className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl flex flex-col items-center text-center max-w-md mx-4 border border-gray-200 dark:border-gray-700">
           <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mb-4">
@@ -529,7 +582,19 @@ if (isAuthorized === false) {
     );
   }
 
+  // FIXED: Show loading while checking authorization
   if (isAuthorized === null && user && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 dark:border-indigo-400 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400 text-lg font-medium">Checking permissions...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // FIXED: Main component render - only when authorized
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 transition-colors duration-300">
       {/* Background Effects */}
@@ -574,6 +639,7 @@ if (isAuthorized === false) {
                   </div>
                 </div>
               </div>
+
               {user && (
                 <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-lg px-2.5 py-1.5 shadow-xl flex-shrink-0">
                   <div className="flex items-center justify-center w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-md shadow-lg">
@@ -590,6 +656,7 @@ if (isAuthorized === false) {
                 </div>
               )}
             </div>
+
             <div className="flex items-center justify-center gap-4 text-white/80 dark:text-gray-300 text-xs">
               <div className="flex items-center gap-1">
                 <CalendarDays size={14} />
@@ -600,6 +667,7 @@ if (isAuthorized === false) {
                 <span>{currentTime.toLocaleTimeString()}</span>
               </div>
             </div>
+
             <div className="overflow-x-auto scrollbar-hide -mx-4 px-4">
               <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl p-1.5 min-w-max">
                 {tabs.map((tab) => {
@@ -651,7 +719,7 @@ if (isAuthorized === false) {
                       <h1 className="text-2xl font-black text-white dark:text-gray-100 tracking-tight">
                         {t("wash.header")}
                       </h1>
-                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-full">
+                                            <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 dark:bg-gray-700/50 backdrop-blur-sm rounded-full">
                         <Sparkles size={12} className="text-yellow-300 dark:text-yellow-400" />
                         <span className="text-xs font-bold text-white dark:text-gray-200">
                           QC
@@ -663,6 +731,7 @@ if (isAuthorized === false) {
                     </p>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-4 text-white/80 dark:text-gray-300 text-sm">
                   <div className="flex items-center gap-2">
                     <CalendarDays size={16} />
@@ -673,6 +742,7 @@ if (isAuthorized === false) {
                     <span>{currentTime.toLocaleTimeString()}</span>
                   </div>
                 </div>
+
                 <div className="flex items-center gap-3">
                   <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl p-2">
                     {tabs.map((tab) => {
@@ -710,13 +780,14 @@ if (isAuthorized === false) {
                       );
                     })}
                   </div>
+
                   <div className="flex items-center gap-2 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5">
                     <div className="relative flex h-2.5 w-2.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 dark:bg-green-500 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-400 dark:bg-green-500"></span>
                     </div>
                     <div>
-                        <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
+                      <p className="text-white dark:text-gray-100 font-bold text-sm leading-tight">
                         {activeTabData?.label}
                       </p>
                       <p className="text-indigo-200 dark:text-gray-300 text-xs font-medium leading-tight">
@@ -726,6 +797,7 @@ if (isAuthorized === false) {
                   </div>
                 </div>
               </div>
+
               {user && (
                 <div className="flex items-center gap-3 bg-white/10 dark:bg-gray-700/30 backdrop-blur-md border border-white/20 dark:border-gray-600/30 rounded-xl px-4 py-2.5 shadow-xl">
                   <div className="flex items-center justify-center w-10 h-10 bg-gradient-to-br from-yellow-400 to-orange-500 dark:from-yellow-500 dark:to-orange-600 rounded-lg shadow-lg">
@@ -1156,7 +1228,6 @@ if (isAuthorized === false) {
       `}</style>
     </div>
   );
-}
 };
 
 export default WashingPage;
