@@ -80,69 +80,85 @@ const InspectionDataSection = ({
   const [previewImage, setPreviewImage] = useState(null);
   const [isSaved, setIsSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(true);
-  const { t, i18n  } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const [referenceSampleApproveDate, setReferenceSampleApproveDate] = useState(
+    () => {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0); // Set to 00:00:00.000
+      return now.toISOString().split("T")[0];
+    }
+  );
   const getCurrentLanguageCode = (i18n) => {
-  return i18n?.language || 'en';
-};
-// Helper function to get remark in current language from database
-const getRemarkInCurrentLanguage = (remarkObject, i18n) => {
-  if (!remarkObject) return '';
-  
-  const currentLang = getCurrentLanguageCode(i18n);
-  
-  switch (currentLang) {
-    case 'kh': // Khmer (your code)
-      return remarkObject.khmer || remarkObject.english || '';
-    case 'ch': // Chinese (your code)
-      return remarkObject.chinese || remarkObject.english || '';
-    case 'en': // English
-    default:
-      return remarkObject.english || '';
-  }
-};
-// Helper function to get English remark for saving
-const getEnglishRemark = (currentRemark, checkpointInspectionData, itemIndex) => {
-    if (!currentRemark || !checkpointInspectionData[itemIndex]) return currentRemark;
-    
+    return i18n?.language || "en";
+  };
+  // Helper function to get remark in current language from database
+  const getRemarkInCurrentLanguage = (remarkObject, i18n) => {
+    if (!remarkObject) return "";
+
+    const currentLang = getCurrentLanguageCode(i18n);
+
+    switch (currentLang) {
+      case "kh": // Khmer (your code)
+        return remarkObject.khmer || remarkObject.english || "";
+      case "ch": // Chinese (your code)
+        return remarkObject.chinese || remarkObject.english || "";
+      case "en": // English
+      default:
+        return remarkObject.english || "";
+    }
+  };
+  // Helper function to get English remark for saving
+  const getEnglishRemark = (
+    currentRemark,
+    checkpointInspectionData,
+    itemIndex
+  ) => {
+    if (!currentRemark || !checkpointInspectionData[itemIndex])
+      return currentRemark;
+
     const item = checkpointInspectionData[itemIndex];
-    const selectedOption = item.options.find(opt => opt.name === item.decision);
-    
+    const selectedOption = item.options.find(
+      (opt) => opt.name === item.decision
+    );
+
     // If we have the option with remark object, return English version
     if (selectedOption?.remark?.english) {
       return selectedOption.remark.english;
     }
-    
+
     return currentRemark;
   };
 
-// Helper function to get current language code
+  // Helper function to get current language code
 
-
-
-// Helper function to check failure impact and determine main point decision
-const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
+  // Helper function to check failure impact and determine main point decision
+  const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
     if (!checkpoint?.subPoints || checkpoint.subPoints.length === 0) {
       return null; // No sub-points, no auto-change needed
     }
-    
-    const failureImpact = checkpoint.failureImpact || 'any';
-    const failedSubPoints = subPointDecisions.filter(decision => {
+
+    const failureImpact = checkpoint.failureImpact || "any";
+    const failedSubPoints = subPointDecisions.filter((decision) => {
       const option = checkpoint.subPoints
-        .flatMap(sp => sp.options)
-        .find(opt => opt.name === decision);
+        .flatMap((sp) => sp.options)
+        .find((opt) => opt.name === decision);
       return option && option.isFail;
     });
-    
+
     switch (failureImpact) {
-      case 'any':
+      case "any":
         // If any sub-point fails, main point should fail
-        return failedSubPoints.length > 0 ? 'fail' : 'pass';
-      case 'all':
+        return failedSubPoints.length > 0 ? "fail" : "pass";
+      case "all":
         // Only if all sub-points fail, main point should fail
-        return failedSubPoints.length === checkpoint.subPoints.length ? 'fail' : 'pass';
-      case 'majority':
+        return failedSubPoints.length === checkpoint.subPoints.length
+          ? "fail"
+          : "pass";
+      case "majority":
         // If majority of sub-points fail, main point should fail
-        return failedSubPoints.length > checkpoint.subPoints.length / 2 ? 'fail' : 'pass';
+        return failedSubPoints.length > checkpoint.subPoints.length / 2
+          ? "fail"
+          : "pass";
       default:
         return null;
     }
@@ -151,15 +167,22 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
   // Update remarks when language changes - only for items with multilingual remarks
   useEffect(() => {
     if (!i18n?.language || checkpointInspectionData.length === 0) return;
-    
-    setCheckpointInspectionData(prev =>
-      prev.map(item => {
+
+    setCheckpointInspectionData((prev) =>
+      prev.map((item) => {
         if (item.decision) {
-          const selectedOption = item.options.find(opt => opt.name === item.decision);
+          const selectedOption = item.options.find(
+            (opt) => opt.name === item.decision
+          );
           // Only update if the option has a multilingual remark object
-          if (selectedOption?.hasRemark && selectedOption?.remark && 
-              typeof selectedOption.remark === 'object' && 
-              (selectedOption.remark.english || selectedOption.remark.khmer || selectedOption.remark.chinese)) {
+          if (
+            selectedOption?.hasRemark &&
+            selectedOption?.remark &&
+            typeof selectedOption.remark === "object" &&
+            (selectedOption.remark.english ||
+              selectedOption.remark.khmer ||
+              selectedOption.remark.chinese)
+          ) {
             return {
               ...item,
               remark: getRemarkInCurrentLanguage(selectedOption.remark, i18n)
@@ -173,13 +196,20 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
 
   // This useEffect handles translation for hardcoded inspection points like "Fiber"
   useEffect(() => {
-    setInspectionData(prevData =>
-      prevData.map(item => {
-        if (item.checkedList === CHECKED_LIST_FIBER && item.decision && ["1", "2", "3"].includes(item.decision)) {
+    setInspectionData((prevData) =>
+      prevData.map((item) => {
+        if (
+          item.checkedList === CHECKED_LIST_FIBER &&
+          item.decision &&
+          ["1", "2", "3"].includes(item.decision)
+        ) {
           // First, get the canonical English remark based on the decision
           const englishRemark = getFiberRemarkInEnglish(item.decision);
           // Then, translate that English remark to the current language
-          return { ...item, remark: convertEnglishToCurrentLanguage(englishRemark, t) };
+          return {
+            ...item,
+            remark: convertEnglishToCurrentLanguage(englishRemark, t)
+          };
         }
         return item;
       })
@@ -191,10 +221,14 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
     const fetchStandardValues = async () => {
       if (!washType) return; // Exit if no washType is selected
       try {
-        const response = await fetch(`${API_BASE_URL}/api/qc-washing/standards`);
+        const response = await fetch(
+          `${API_BASE_URL}/api/qc-washing/standards`
+        );
         const data = await response.json();
         if (data.success) {
-          const standardRecord = data.data.find(record => record.washType === washType);
+          const standardRecord = data.data.find(
+            (record) => record.washType === washType
+          );
           if (standardRecord) {
             const washingMachineValues = { ...standardRecord.washingMachine };
             const tumbleDryValues = { ...standardRecord.tumbleDry };
@@ -204,7 +238,7 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
               "Washing Machine": washingMachineValues,
               "Tumble Dry": tumbleDryValues
             });
-            
+
             // Only set actual values to standard if it's a new record (no recordId)
             // This prevents overwriting loaded data for existing records.
             if (!recordId) {
@@ -254,7 +288,8 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
         item.parameter === PARAM_APPEARANCE
           ? {
               ...item,
-              checkedQty: item.checkedQty && item.checkedQty !== 0 ? item.checkedQty : qty
+              checkedQty:
+                item.checkedQty && item.checkedQty !== 0 ? item.checkedQty : qty
             }
           : item
       )
@@ -263,11 +298,13 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
 
   useEffect(() => {
     if (recordId && inspectionData.length > 0) {
-      const hasEmptyDecisions = inspectionData.every(item => !item.decision || item.decision === "");
-      
+      const hasEmptyDecisions = inspectionData.every(
+        (item) => !item.decision || item.decision === ""
+      );
+
       if (hasEmptyDecisions) {
-        setInspectionData(prev => 
-          prev.map(item => ({
+        setInspectionData((prev) =>
+          prev.map((item) => ({
             ...item,
             decision: "ok"
           }))
@@ -278,11 +315,12 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
 
   useEffect(() => {
     if (recordId) {
-      const hasAnyStatus = Object.keys(machineStatus).length > 0 && 
-        Object.values(machineStatus).some(machine => 
-          Object.keys(machine).length > 0
+      const hasAnyStatus =
+        Object.keys(machineStatus).length > 0 &&
+        Object.values(machineStatus).some(
+          (machine) => Object.keys(machine).length > 0
         );
-      
+
       if (!hasAnyStatus) {
         setMachineStatus({
           "Washing Machine": {
@@ -302,71 +340,90 @@ const evaluateFailureImpact = (checkpoint, subPointDecisions) => {
   }, [recordId]);
 
   // Checkpoint-specific handlers
-const handleCheckpointDecisionChange = (index, value) => {
-    setCheckpointInspectionData(prev => {
+  const handleCheckpointDecisionChange = (index, value) => {
+    setCheckpointInspectionData((prev) => {
       const newData = [...prev];
       const currentItem = newData[index];
 
       // If the user tries to change a main point that is auto-calculated, do nothing.
-      if (currentItem.type === 'main') {
-        const mainCheckpointDef = checkpointDefinitions.find(cp => cp._id === currentItem.checkpointId);
-        if (mainCheckpointDef && mainCheckpointDef.failureImpact !== 'customize') {
+      if (currentItem.type === "main") {
+        const mainCheckpointDef = checkpointDefinitions.find(
+          (cp) => cp._id === currentItem.checkpointId
+        );
+        if (
+          mainCheckpointDef &&
+          mainCheckpointDef.failureImpact !== "customize"
+        ) {
           return prev; // Abort state update for non-customizable main points
         }
       }
-      
+
       // Find the selected option to get its remark
-      const selectedOption = currentItem.options.find(opt => opt.name === value);
-      
+      const selectedOption = currentItem.options.find(
+        (opt) => opt.name === value
+      );
+
       // Get remark in current language
-      let remarkText = '';
+      let remarkText = "";
       if (selectedOption?.hasRemark && selectedOption?.remark) {
         remarkText = getRemarkInCurrentLanguage(selectedOption.remark, i18n);
       }
-      
+
       // Update the current item
       newData[index] = {
         ...currentItem,
         decision: value,
         remark: remarkText
       };
-      
+
       // If this is a sub-point, check if we need to update the main point
-      if (currentItem.type === 'sub') {
-        const mainPointIndex = newData.findIndex(item => 
-          item.type === 'main' && item.checkpointId === currentItem.checkpointId
+      if (currentItem.type === "sub") {
+        const mainPointIndex = newData.findIndex(
+          (item) =>
+            item.type === "main" &&
+            item.checkpointId === currentItem.checkpointId
         );
-        
+
         if (mainPointIndex !== -1) {
           const mainPoint = newData[mainPointIndex];
-          const checkpoint = checkpointDefinitions.find(cp => cp._id === currentItem.checkpointId);
-          
+          const checkpoint = checkpointDefinitions.find(
+            (cp) => cp._id === currentItem.checkpointId
+          );
+
           if (checkpoint) {
             // Get all sub-point decisions for this checkpoint
             const subPointDecisions = newData
-              .filter(item => 
-                item.type === 'sub' && 
-                item.checkpointId === currentItem.checkpointId
+              .filter(
+                (item) =>
+                  item.type === "sub" &&
+                  item.checkpointId === currentItem.checkpointId
               )
-              .map(item => item.decision);
-            
+              .map((item) => item.decision);
+
             // Evaluate failure impact
-            const autoDecision = evaluateFailureImpact(checkpoint, subPointDecisions);
-            
+            const autoDecision = evaluateFailureImpact(
+              checkpoint,
+              subPointDecisions
+            );
+
             if (autoDecision) {
               // Find the appropriate option for the main point
-              const targetOption = mainPoint.options.find(opt => 
-                (autoDecision === 'fail' && opt.isFail) || 
-                (autoDecision === 'pass' && !opt.isFail)
+              const targetOption = mainPoint.options.find(
+                (opt) =>
+                  (autoDecision === "fail" && opt.isFail) ||
+                  (autoDecision === "pass" && !opt.isFail)
               );
-              
+
               if (targetOption) {
                 // Get main point remark in current language
-                let mainRemarkText = '';
+                let mainRemarkText = "";
                 if (targetOption.hasRemark && targetOption.remark) {
-                  mainRemarkText = getRemarkInCurrentLanguage(targetOption.remark, i18n);
+                  mainRemarkText = getRemarkInCurrentLanguage(
+                    targetOption.remark,
+                    i18n
+                  );
                 }
-                
+
                 newData[mainPointIndex] = {
                   ...mainPoint,
                   decision: targetOption.name,
@@ -377,16 +434,14 @@ const handleCheckpointDecisionChange = (index, value) => {
           }
         }
       }
-      
+
       return newData;
     });
   };
 
   const handleCheckpointRemarkChange = (index, value) => {
-    setCheckpointInspectionData(prev =>
-      prev.map((item, i) =>
-        i === index ? { ...item, remark: value } : item
-      )
+    setCheckpointInspectionData((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, remark: value } : item))
     );
   };
 
@@ -398,7 +453,7 @@ const handleCheckpointDecisionChange = (index, value) => {
       name: file.name
     }));
 
-    setCheckpointInspectionData(prev =>
+    setCheckpointInspectionData((prev) =>
       prev.map((item, i) =>
         i === index
           ? {
@@ -414,7 +469,7 @@ const handleCheckpointDecisionChange = (index, value) => {
   };
 
   const handleCheckpointRemoveImage = (index, imgIdx) => {
-    setCheckpointInspectionData(prev =>
+    setCheckpointInspectionData((prev) =>
       prev.map((item, i) =>
         i === index
           ? {
@@ -427,8 +482,6 @@ const handleCheckpointDecisionChange = (index, value) => {
       )
     );
   };
-
-
 
   // Existing handlers remain the same...
   const handleParamInputChange = (rowIdx, field, value) => {
@@ -481,7 +534,7 @@ const handleCheckpointDecisionChange = (index, value) => {
       (d) => d.parameter && d.parameter.startsWith(PARAM_COLOR_SHADE)
     );
     const nextIndex = colorShadeRows.length;
-    
+
     setDefectData((prev) => {
       const newRows = [
         ...prev,
@@ -589,28 +642,28 @@ const handleCheckpointDecisionChange = (index, value) => {
   };
 
   const evaluateExpression = (expression) => {
-    if (!expression || typeof expression !== 'string') return null;
-    
+    if (!expression || typeof expression !== "string") return null;
+
     try {
       const cleaned = expression.trim();
       if (/^\d+(\.\d+)?$/.test(cleaned)) {
         return parseFloat(cleaned);
       }
-      
+
       const match = cleaned.match(/^$([^)]+)$$/);
       if (match) {
         const innerExpression = match[1];
         if (/^[\d+\-\s\.]+$/.test(innerExpression)) {
-          const sanitized = innerExpression.replace(/\s/g, '');
-          return Function('"use strict"; return (' + sanitized + ')')();
+          const sanitized = innerExpression.replace(/\s/g, "");
+          return Function('"use strict"; return (' + sanitized + ")")();
         }
       }
-      
+
       if (/^[\d+\-\s\.]+$/.test(cleaned)) {
-        const sanitized = cleaned.replace(/\s/g, '');
-        return Function('"use strict"; return (' + sanitized + ')')();
+        const sanitized = cleaned.replace(/\s/g, "");
+        return Function('"use strict"; return (' + sanitized + ")")();
       }
-      
+
       return null;
     } catch (error) {
       return null;
@@ -639,10 +692,14 @@ const handleCheckpointDecisionChange = (index, value) => {
     const actualStr =
       value === null || value === undefined ? "" : String(value).trim();
 
-    if ((param === "timeCool" || param === "timeHot") && actualStr !== "" && standardStr !== "") {
+    if (
+      (param === "timeCool" || param === "timeHot") &&
+      actualStr !== "" &&
+      standardStr !== ""
+    ) {
       const standardNum = parseFloat(standardStr);
       let actualNum = evaluateExpression(actualStr);
-      
+
       if (actualNum === null) {
         actualNum = parseFloat(actualStr);
       }
@@ -758,7 +815,7 @@ const handleCheckpointDecisionChange = (index, value) => {
     }
   };
 
-const handleSaveInspection = async () => {
+  const handleSaveInspection = async () => {
     if (!recordId) {
       alert("Order details must be saved first!");
       return;
@@ -814,7 +871,9 @@ const handleSaveInspection = async () => {
       const checkpointDataForSave = checkpointInspectionData.map((item) => {
         // If the item has a selected option with remark object, use English version
         if (item.decision) {
-          const selectedOption = item.options.find(opt => opt.name === item.decision);
+          const selectedOption = item.options.find(
+            (opt) => opt.name === item.decision
+          );
           if (selectedOption?.hasRemark && selectedOption?.remark?.english) {
             return {
               ...item,
@@ -834,7 +893,10 @@ const handleSaveInspection = async () => {
       formData.append("standardValues", JSON.stringify(standardValues));
       formData.append("actualValues", JSON.stringify(processedActualValues));
       formData.append("machineStatus", JSON.stringify(machineStatus));
-      formData.append("checkpointInspectionData", JSON.stringify(checkpointDataForSave));
+      formData.append(
+        "checkpointInspectionData",
+        JSON.stringify(checkpointDataForSave)
+      );
       formData.append("timeCoolEnabled", JSON.stringify(timeCoolEnabled));
       formData.append("timeHotEnabled", JSON.stringify(timeHotEnabled));
 
@@ -912,7 +974,7 @@ const handleSaveInspection = async () => {
         setIsSaved(true);
         setIsEditing(false);
         if (activateNextSection) activateNextSection();
-        
+
         // After saving, reload the data to ensure the UI is in sync with the database
         if (onLoadSavedDataById && recordId) {
           await onLoadSavedDataById(recordId);
@@ -1002,14 +1064,17 @@ const handleSaveInspection = async () => {
       formData.append("standardValues", JSON.stringify(standardValues));
       formData.append("actualValues", JSON.stringify(processedActualValues));
       formData.append("machineStatus", JSON.stringify(machineStatus));
-      formData.append("checkpointInspectionData", JSON.stringify(checkpointInspectionData));
+      formData.append(
+        "checkpointInspectionData",
+        JSON.stringify(checkpointInspectionData)
+      );
       formData.append("timeCoolEnabled", JSON.stringify(timeCoolEnabled));
       formData.append("timeHotEnabled", JSON.stringify(timeHotEnabled));
 
       inspectionData.forEach((item, idx) => {
         (item.comparisonImages || []).forEach((img, imgIdx) => {
           if (img.file) {
-                       formData.append(`comparisonImages_${idx}_${imgIdx}`, img.file);
+            formData.append(`comparisonImages_${idx}_${imgIdx}`, img.file);
           }
         });
       });
@@ -1363,16 +1428,34 @@ const handleSaveInspection = async () => {
                   </thead>
                   <tbody>
                     {checkpointInspectionData.map((item, idx) => {
-                      const checkpointDefinition = checkpointDefinitions.find(cp => cp._id === item.checkpointId);
-                      const isMainPointAuto = item.type === 'main' && checkpointDefinition && checkpointDefinition.failureImpact !== 'customize';
-                      
+                      const checkpointDefinition = checkpointDefinitions.find(
+                        (cp) => cp._id === item.checkpointId
+                      );
+                      const isMainPointAuto =
+                        item.type === "main" &&
+                        checkpointDefinition &&
+                        checkpointDefinition.failureImpact !== "customize";
+
                       return (
-                        <tr key={item.id} className={item.type === 'sub' ? 'bg-gray-50 dark:bg-gray-700' : ''}>
+                        <tr
+                          key={item.id}
+                          className={
+                            item.type === "sub"
+                              ? "bg-gray-50 dark:bg-gray-700"
+                              : ""
+                          }
+                        >
                           <td className="border px-4 py-2 dark:text-white">
-                            <div className={`${item.type === 'sub' ? 'ml-6 text-sm text-gray-600 dark:text-gray-300' : 'font-medium'}`}>
-                              {item.type === 'sub' && '└─ '}
+                            <div
+                              className={`${
+                                item.type === "sub"
+                                  ? "ml-6 text-sm text-gray-600 dark:text-gray-300"
+                                  : "font-medium"
+                              }`}
+                            >
+                              {item.type === "sub" && "└─ "}
                               {item.name}
-                              {item.type === 'sub' && (
+                              {item.type === "sub" && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                                   {/* (under {item.parentName}) */}
                                 </span>
@@ -1385,41 +1468,58 @@ const handleSaveInspection = async () => {
                               <div className="flex items-center justify-center px-2 py-1">
                                 {item.decision ? (
                                   (() => {
-                                    const selectedOption = item.options.find(opt => opt.name === item.decision);
-                                    const textColorClass = selectedOption?.isFail 
-                                      ? 'text-red-600 dark:text-red-400' 
-                                      : 'text-green-600 dark:text-green-400';
+                                    const selectedOption = item.options.find(
+                                      (opt) => opt.name === item.decision
+                                    );
+                                    const textColorClass =
+                                      selectedOption?.isFail
+                                        ? "text-red-600 dark:text-red-400"
+                                        : "text-green-600 dark:text-green-400";
                                     return (
-                                      <span className={`font-bold text-sm ${textColorClass}`}>
+                                      <span
+                                        className={`font-bold text-sm ${textColorClass}`}
+                                      >
                                         {item.decision}
                                       </span>
                                     );
                                   })()
                                 ) : (
-                                  <span className="text-sm text-gray-500 italic">Auto</span>
+                                  <span className="text-sm text-gray-500 italic">
+                                    Auto
+                                  </span>
                                 )}
                               </div>
                             ) : (
                               <div className="flex flex-wrap gap-4 justify-left">
                                 {item.options.map((option) => (
-                                  <label key={option.id} className="flex items-center space-x-1 cursor-pointer">
-                                    <input 
-                                      type="checkbox" 
-                                      name={`checkpoint-decision-${idx}`} 
-                                      checked={item.decision === option.name} 
-                                      onChange={() => handleCheckpointDecisionChange(idx, option.name)} 
-                                      disabled={!isEditing} 
+                                  <label
+                                    key={option.id}
+                                    className="flex items-center space-x-1 cursor-pointer"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      name={`checkpoint-decision-${idx}`}
+                                      checked={item.decision === option.name}
+                                      onChange={() =>
+                                        handleCheckpointDecisionChange(
+                                          idx,
+                                          option.name
+                                        )
+                                      }
+                                      disabled={!isEditing}
                                       className={`w-4 h-4 rounded focus:ring-2 ${
-                                        option.isFail 
-                                          ? 'text-red-600 focus:ring-red-500' 
-                                          : 'text-green-600 focus:ring-green-500'
-                                      }`} 
+                                        option.isFail
+                                          ? "text-red-600 focus:ring-red-500"
+                                          : "text-green-600 focus:ring-green-500"
+                                      }`}
                                     />
-                                    <span className={`text-sm font-medium ${
-                                      option.isFail 
-                                        ? 'text-red-600 dark:text-red-400' 
-                                        : 'text-green-600 dark:text-green-400'
-                                    }`}>
+                                    <span
+                                      className={`text-sm font-medium ${
+                                        option.isFail
+                                          ? "text-red-600 dark:text-red-400"
+                                          : "text-green-600 dark:text-green-400"
+                                      }`}
+                                    >
                                       {option.name}
                                     </span>
                                   </label>
@@ -1435,20 +1535,29 @@ const handleSaveInspection = async () => {
                                 type="button"
                                 className="flex items-center justify-center px-2 py-1 bg-blue-500 text-white rounded mr-2 disabled:bg-gray-400"
                                 onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*';
+                                  const input = document.createElement("input");
+                                  input.type = "file";
+                                  input.accept = "image/*";
                                   input.multiple = true;
                                   input.onchange = (e) => {
-                                    if (e.target.files && e.target.files.length > 0) {
-                                      handleCheckpointImageChange(idx, e.target.files, 'upload');
+                                    if (
+                                      e.target.files &&
+                                      e.target.files.length > 0
+                                    ) {
+                                      handleCheckpointImageChange(
+                                        idx,
+                                        e.target.files,
+                                        "upload"
+                                      );
                                     }
                                   };
                                   input.click();
                                 }}
                                 disabled={
                                   !isEditing ||
-                                  (item.comparisonImages || []).filter(img => img.source === 'upload').length >= 5
+                                  (item.comparisonImages || []).filter(
+                                    (img) => img.source === "upload"
+                                  ).length >= 5
                                 }
                                 title="Upload"
                               >
@@ -1461,48 +1570,68 @@ const handleSaveInspection = async () => {
                                 type="button"
                                 className="flex items-center justify-center px-2 py-1 bg-green-500 text-white rounded disabled:bg-gray-400"
                                 onClick={() => {
-                                  const input = document.createElement('input');
-                                  input.type = 'file';
-                                  input.accept = 'image/*';
-                                  input.capture = 'environment';
+                                  const input = document.createElement("input");
+                                  input.type = "file";
+                                  input.accept = "image/*";
+                                  input.capture = "environment";
                                   input.onchange = (e) => {
-                                    if (e.target.files && e.target.files.length > 0) {
-                                      handleCheckpointImageChange(idx, e.target.files, 'capture');
+                                    if (
+                                      e.target.files &&
+                                      e.target.files.length > 0
+                                    ) {
+                                      handleCheckpointImageChange(
+                                        idx,
+                                        e.target.files,
+                                        "capture"
+                                      );
                                     }
                                   };
                                   input.click();
                                 }}
                                 disabled={
                                   !isEditing ||
-                                  (item.comparisonImages || []).filter(img => img.source === 'capture').length >= 5
+                                  (item.comparisonImages || []).filter(
+                                    (img) => img.source === "capture"
+                                  ).length >= 5
                                 }
                                 title="Capture"
                               >
                                 <FaCamera className="mr-1" />
-                                <span className="hidden sm:inline">Capture</span>
+                                <span className="hidden sm:inline">
+                                  Capture
+                                </span>
                               </button>
 
                               {/* Thumbnails */}
                               <div className="flex mt-1 col-span-2">
-                                {(item.comparisonImages || []).map((img, imgIdx) => (
-                                  <div key={imgIdx} className="relative mr-2">
-                                    <img
-                                      src={img.preview}
-                                      alt="comparison"
-                                      width={50}
-                                      className="border cursor-pointer"
-                                      onClick={() => setPreviewImage(img.preview)}
-                                    />
-                                    <button
-                                      type="button"
-                                      disabled={!isEditing}
-                                      onClick={() => handleCheckpointRemoveImage(idx, imgIdx)}
-                                      className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center disabled:bg-gray-400"
-                                    >
-                                      ×
-                                    </button>
-                                  </div>
-                                ))}
+                                {(item.comparisonImages || []).map(
+                                  (img, imgIdx) => (
+                                    <div key={imgIdx} className="relative mr-2">
+                                      <img
+                                        src={img.preview}
+                                        alt="comparison"
+                                        width={50}
+                                        className="border cursor-pointer"
+                                        onClick={() =>
+                                          setPreviewImage(img.preview)
+                                        }
+                                      />
+                                      <button
+                                        type="button"
+                                        disabled={!isEditing}
+                                        onClick={() =>
+                                          handleCheckpointRemoveImage(
+                                            idx,
+                                            imgIdx
+                                          )
+                                        }
+                                        className="absolute top-0 right-0 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center disabled:bg-gray-400"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                  )
+                                )}
                               </div>
                             </div>
                           </td>
@@ -1511,12 +1640,22 @@ const handleSaveInspection = async () => {
                             <input
                               type="text"
                               value={item.remark}
-                              onChange={(e) => handleCheckpointRemarkChange(idx, e.target.value)}
+                              onChange={(e) =>
+                                handleCheckpointRemarkChange(
+                                  idx,
+                                  e.target.value
+                                )
+                              }
                               className="w-full px-2 py-1 border rounded dark:bg-gray-700 dark:text-white dark:border-gray-600 disabled:bg-gray-400"
                               disabled={!isEditing}
                               placeholder={
-                                item.decision && item.options.find(opt => opt.name === item.decision)?.hasRemark
-                                  ? `Auto-filled (${getCurrentLanguageCode(i18n).toUpperCase()})...`
+                                item.decision &&
+                                item.options.find(
+                                  (opt) => opt.name === item.decision
+                                )?.hasRemark
+                                  ? `Auto-filled (${getCurrentLanguageCode(
+                                      i18n
+                                    ).toUpperCase()})...`
                                   : ""
                               }
                             />
@@ -1584,14 +1723,20 @@ const handleSaveInspection = async () => {
                               <span className="font-medium dark:text-white">
                                 {param.label}
                               </span>
-                              {(param.key === "timeCool" || param.key === "timeHot") && (
+                              {(param.key === "timeCool" ||
+                                param.key === "timeHot") && (
                                 <button
                                   type="button"
                                   onClick={() => {
-                                    const isCurrentlyEnabled = param.key === "timeCool" ? timeCoolEnabled : timeHotEnabled;
+                                    const isCurrentlyEnabled =
+                                      param.key === "timeCool"
+                                        ? timeCoolEnabled
+                                        : timeHotEnabled;
                                     const newEnabledState = !isCurrentlyEnabled;
-                                    const standardVal = standardValues[type.value]?.[param.key] || "";
-                                    
+                                    const standardVal =
+                                      standardValues[type.value]?.[param.key] ||
+                                      "";
+
                                     // Update the parent state for the switch itself
                                     if (param.key === "timeCool") {
                                       setTimeCoolEnabled(newEnabledState);
@@ -1599,9 +1744,10 @@ const handleSaveInspection = async () => {
                                       setTimeHotEnabled(newEnabledState);
                                     }
 
-                                    if (newEnabledState) { // --- Turning ON ---
+                                    if (newEnabledState) {
+                                      // --- Turning ON ---
                                       // Set actual value to standard value
-                                      setActualValues(prev => ({
+                                      setActualValues((prev) => ({
                                         ...prev,
                                         [type.value]: {
                                           ...prev[type.value],
@@ -1609,14 +1755,17 @@ const handleSaveInspection = async () => {
                                         }
                                       }));
                                       // Set status to OK since actual now matches standard
-                                      setMachineStatus(prev => ({
+                                      setMachineStatus((prev) => ({
                                         ...prev,
-                                        [type.value]: { ...prev[type.value], [param.key]: { ok: true, no: false } }
+                                        [type.value]: {
+                                          ...prev[type.value],
+                                          [param.key]: { ok: true, no: false }
+                                        }
                                       }));
                                     } else {
                                       // --- Turning OFF ---
                                       // Clear the actual value
-                                      setActualValues(prev => ({
+                                      setActualValues((prev) => ({
                                         ...prev,
                                         [type.value]: {
                                           ...prev[type.value],
@@ -1624,20 +1773,33 @@ const handleSaveInspection = async () => {
                                         }
                                       }));
                                       // Reset status to neutral (neither OK nor No)
-                                      setMachineStatus(prev => ({
+                                      setMachineStatus((prev) => ({
                                         ...prev,
-                                        [type.value]: { ...prev[type.value], [param.key]: { ok: false, no: false } }
+                                        [type.value]: {
+                                          ...prev[type.value],
+                                          [param.key]: { ok: false, no: false }
+                                        }
                                       }));
                                     }
                                   }}
                                   disabled={!isEditing}
                                   className={`ml-2 px-2 py-1 text-xs rounded ${
-                                    (param.key === "timeCool" ? timeCoolEnabled : timeHotEnabled)
+                                    (
+                                      param.key === "timeCool"
+                                        ? timeCoolEnabled
+                                        : timeHotEnabled
+                                    )
                                       ? "bg-green-500 text-white"
                                       : "bg-blue-300 text-gray-700 dark:bg-gray-600 dark:text-gray-300"
                                   } disabled:opacity-50`}
                                 >
-                                  {(param.key === "timeCool" ? timeCoolEnabled : timeHotEnabled) ? "ON" : "OFF"}
+                                  {(
+                                    param.key === "timeCool"
+                                      ? timeCoolEnabled
+                                      : timeHotEnabled
+                                  )
+                                    ? "ON"
+                                    : "OFF"}
                                 </button>
                               )}
                             </div>
@@ -1679,8 +1841,9 @@ const handleSaveInspection = async () => {
                                   )
                                 }
                                 disabled={
-                                  !isEditing || 
-                                  (param.key === "timeCool" && !timeCoolEnabled) ||
+                                  !isEditing ||
+                                  (param.key === "timeCool" &&
+                                    !timeCoolEnabled) ||
                                   (param.key === "timeHot" && !timeHotEnabled)
                                 }
                                 className="w-full px-3 py-2 text-sm border rounded text-center font-mono dark:bg-gray-600 dark:text-white dark:border-gray-500 disabled:bg-gray-200 dark:disabled:bg-gray-700"
@@ -1707,8 +1870,10 @@ const handleSaveInspection = async () => {
                                     }
                                     disabled={
                                       !isEditing ||
-                                      (param.key === "timeCool" && !timeCoolEnabled) ||
-                                      (param.key === "timeHot" && !timeHotEnabled)
+                                      (param.key === "timeCool" &&
+                                        !timeCoolEnabled) ||
+                                      (param.key === "timeHot" &&
+                                        !timeHotEnabled)
                                     }
                                     className="mr-1 text-green-500"
                                   />
@@ -1730,8 +1895,10 @@ const handleSaveInspection = async () => {
                                     }
                                     disabled={
                                       !isEditing ||
-                                      (param.key === "timeCool" && !timeCoolEnabled) ||
-                                      (param.key === "timeHot" && !timeHotEnabled)
+                                      (param.key === "timeCool" &&
+                                        !timeCoolEnabled) ||
+                                      (param.key === "timeHot" &&
+                                        !timeHotEnabled)
                                     }
                                     className="mr-1 text-red-500"
                                   />
@@ -1960,6 +2127,29 @@ const handleSaveInspection = async () => {
               </div>
             </div>
 
+            {/* Reference Sample Approve Date Section - NEW SECTION */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
+                Reference Sample
+              </h3>
+              <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-4 space-y-2 sm:space-y-0">
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    Approve Date:
+                  </label>
+                  <input
+                    type="date"
+                    value={referenceSampleApproveDate}
+                    onChange={(e) =>
+                      setReferenceSampleApproveDate(e.target.value)
+                    }
+                    className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 dark:bg-gray-600 dark:text-white disabled:bg-gray-200 dark:disabled:bg-gray-700"
+                    disabled={!isEditing}
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Save/Edit Buttons */}
             <div className="flex justify-end mt-6">
               <button
@@ -2018,10 +2208,7 @@ InspectionDataSection.propTypes = {
   setTimeCoolEnabled: PropTypes.func.isRequired,
   timeHotEnabled: PropTypes.bool.isRequired,
   setTimeHotEnabled: PropTypes.func.isRequired,
-  checkpointDefinitions: PropTypes.array.isRequired,
+  checkpointDefinitions: PropTypes.array.isRequired
 };
 
 export default InspectionDataSection;
-
-
- 

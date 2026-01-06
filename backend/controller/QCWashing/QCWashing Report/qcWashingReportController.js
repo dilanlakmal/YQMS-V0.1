@@ -26,9 +26,9 @@ export const getAllQCWashingSubmittedData = async (req, res) => {
     const submittedData = await QCWashing.find({
       status: { $in: ["submitted", "processing", "auto-saved"] }
     })
-      .select(
-        "date orderNo before_after_wash checkedQty washQty totalCheckedPoint totalPass totalFail passRate totalCheckedPcs rejectedDefectPcs totalDefectCount defectRate defectRatio overallFinalResult orderQty colorOrderQty color washType reportType buyer factoryName aql inspectionDetails defectDetails measurementDetails isAutoSave userId status createdAt updatedAt submittedAt inspector actualWashQty actualAQLValue editedActualWashQty lastEditedAt"
-      )
+      // .select(
+      //   "date orderNo before_after_wash checkedQty washQty totalCheckedPoint totalPass totalFail passRate totalCheckedPcs rejectedDefectPcs totalDefectCount defectRate defectRatio overallFinalResult orderQty colorOrderQty color washType reportType buyer factoryName aql inspectionDetails defectDetails measurementDetails isAutoSave userId status createdAt updatedAt submittedAt inspector actualWashQty actualAQLValue editedActualWashQty lastEditedAt"
+      // )
       .sort({ createdAt: -1 });
 
     res.json({
