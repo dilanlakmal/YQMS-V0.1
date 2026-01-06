@@ -409,12 +409,7 @@ const getImageUrl = (imagePath) => {
                         {(() => {
                           // Try multiple possible date fields
                           const inspectionDate = 
-                            processedReportData.inspectionDate || 
-                            processedReportData.inspection_date ||
-                            processedReportData.createdAt ||
-                            processedReportData.created_at ||
-                            processedReportData.updatedAt ||
-                            processedReportData.updated_at;
+                            processedReportData.date
                             
                           if (!inspectionDate) return 'N/A';
                           
