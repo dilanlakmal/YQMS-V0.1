@@ -571,6 +571,7 @@ export default function RoleManagement() {
     "Fincheck Measurement",
     "Fincheck Templates",
     "Fincheck Inspections",
+    "Fincheck Reports",
     "P88",
     "QC Ironing"
   ].sort();
