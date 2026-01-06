@@ -269,136 +269,6 @@ const OrderInfoSection = ({ recordData, inspectorDetails, SafeImage }) => {
                 {safeString(recordData.washQty)}
               </Text>
             </View>
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Approve Date:</Text>
-              <Text style={styles.infoValue}>
-                {(() => {
-                  const approveDate = recordData.inspectionDetails?.referenceSampleApproveDate;
-                  if (!approveDate) return 'N/A';
-                  try {
-                    let dateObj;
-                    let dateString = approveDate;
-                    
-                    // Handle MongoDB's extended JSON format for dates
-                    if (typeof approveDate === 'object' && approveDate !== null && approveDate.$date) {
-                      dateString = approveDate.$date;
-                    }
-                    
-                    // Create a date object. The string is assumed to be in UTC format.
-                    dateObj = new Date(dateString);
-                    
-                    if (isNaN(dateObj.getTime())) {
-                      console.warn('Invalid approve date:', approveDate);
-                      return 'Invalid Date';
-                    }
-                    
-                    // Format the date using UTC parts to avoid timezone shifts.
-                    const formattedDate = dateObj.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      timeZone: 'UTC' // Important: interpret the date in UTC
-                    });
-                    
-                    return formattedDate;
-                  } catch (error) {
-                    console.error('Date parsing error:', error, 'for value:', approveDate);
-                    return 'Error parsing date';
-                  }
-                })()}
-              </Text>
-            </View>
-            {/* NEW: Inspection Date */}
-            <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Inspection Date:</Text>
-              <Text style={styles.infoValue}>
-                {(() => {
-                  // Try multiple possible date fields
-                  const inspectionDate = 
-                    recordData.date
-                    
-                  if (!inspectionDate) return 'N/A';
-                  
-                  try {
-                    let dateObj;
-                    let dateString = inspectionDate;
-                    
-                    // Handle MongoDB's extended JSON format for dates
-                    if (typeof inspectionDate === 'object' && inspectionDate !== null && inspectionDate.$date) {
-                      dateString = inspectionDate.$date;
-                    }
-                    
-                    // Create a date object
-                    dateObj = new Date(dateString);
-                    
-                    if (isNaN(dateObj.getTime())) {
-                      console.warn('Invalid inspection date:', inspectionDate);
-                      return 'Invalid Date';
-                    }
-                    
-                    // Format the date
-                    const formattedDate = dateObj.toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: '2-digit',
-                      day: '2-digit',
-                      timeZone: 'UTC'
-                    });
-                    
-                    return formattedDate;
-                  } catch (error) {
-                    console.error('Date parsing error:', error, 'for value:', inspectionDate);
-                    return 'Error parsing date';
-                  }
-                })()}
-              </Text>
-            </View>
-            {/* NEW: Inspection Time (optional) */}
-            {/* <View style={styles.infoBlock}>
-              <Text style={styles.infoLabel}>Inspection Time:</Text>
-              <Text style={styles.infoValue}>
-                {(() => {
-                  // Try multiple possible time fields
-                  const inspectionTime = 
-                    recordData.inspectionTime || 
-                    recordData.inspection_time ||
-                    recordData.createdAt ||
-                    recordData.created_at;
-                    
-                  if (!inspectionTime) return 'N/A';
-                  
-                  try {
-                    let dateObj;
-                    let dateString = inspectionTime;
-                    
-                    // Handle MongoDB's extended JSON format for dates
-                    if (typeof inspectionTime === 'object' && inspectionTime !== null && inspectionTime.$date) {
-                      dateString = inspectionTime.$date;
-                    }
-                    
-                    // Create a date object
-                    dateObj = new Date(dateString);
-                    
-                    if (isNaN(dateObj.getTime())) {
-                      console.warn('Invalid inspection time:', inspectionTime);
-                      return 'Invalid Time';
-                    }
-                    
-                    // Format the time
-                    const formattedTime = dateObj.toLocaleTimeString('en-US', {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                      hour12: true,
-                      timeZone: 'UTC'
-                    });
-                    
-                    return formattedTime;
-                  } catch (error) {
-                    console.error('Time parsing error:', error, 'for value:', inspectionTime);
-                    return 'Error parsing time';
-                  }
-                })()}
-              </Text>
-            </View> */}
           </View>
         </View>
 
@@ -1250,9 +1120,123 @@ const InspectionDetailsSection = ({ inspectionDetails, SafeImage }) => {
                   </View>
                 )}
 
-                {/* Additional machine parameters... */}
-                {/* (continuing with timeHot, timeCool, silicon, softener as in original) */}
+                {/* Time Hot Row */}
+                {machine.timeHot &&
+                  machine.timeHot.actualValue !== undefined &&
+                  machine.timeHot.actualValue !== null &&
+                  machine.timeHot.actualValue !== "" && (
+                    <View style={styles.tableRow}>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        Time Hot
+                      </Text>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        {safeString(machine.timeHot.standardValue)}
+                      </Text>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        {safeString(machine.timeHot.actualValue)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCol,
+                          { width: "20%" },
+                          machine.timeHot.status?.ok
+                            ? styles.passGreen
+                            : styles.failRed
+                        ]}
+                      >
+                        {machine.timeHot.status?.ok ? "OK" : "NO"}
+                      </Text>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        min
+                      </Text>
+                    </View>
+                  )}
 
+                {/* Time Cool Row */}
+                {machine.timeCool &&
+                  machine.timeCool.actualValue !== undefined &&
+                  machine.timeCool.actualValue !== null &&
+                  machine.timeCool.actualValue !== "" && (
+                    <View style={styles.tableRow}>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        Time Cool
+                      </Text>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        {safeString(machine.timeCool.standardValue)}
+                      </Text>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        {safeString(machine.timeCool.actualValue)}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.tableCol,
+                          { width: "20%" },
+                          machine.timeCool.status?.ok
+                            ? styles.passGreen
+                            : styles.failRed
+                        ]}
+                      >
+                        {machine.timeCool.status?.ok ? "OK" : "NO"}
+                      </Text>
+                      <Text style={[styles.tableCol, { width: "20%" }]}>
+                        min
+                      </Text>
+                    </View>
+                  )}
+
+                {/* Silicon Row */}
+                {machine.silicon?.actualValue && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      Silicon
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.silicon.standardValue)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.silicon.actualValue)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCol,
+                        { width: "20%" },
+                        machine.silicon.status?.ok
+                          ? styles.passGreen
+                          : styles.failRed
+                      ]}
+                    >
+                      {machine.silicon.status?.ok ? "OK" : "NO"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
+                  </View>
+                )}
+
+                {/* Softener Row */}
+                {machine.softener?.actualValue && (
+                  <View style={styles.tableRow}>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      Softener
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.softener.standardValue)}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>
+                      {safeString(machine.softener.actualValue)}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.tableCol,
+                        { width: "20%" },
+                        machine.softener.status?.ok
+                          ? styles.passGreen
+                          : styles.failRed
+                      ]}
+                    >
+                      {machine.softener.status?.ok ? "OK" : "NO"}
+                    </Text>
+                    <Text style={[styles.tableCol, { width: "20%" }]}>g</Text>
+                  </View>
+                )}
               </View>
 
               {/* Machine Image */}
@@ -1394,7 +1378,7 @@ const NewInspectionDetailsSection = ({
                         const isFail = subPointOption?.isFail === true;
 
                         const displayName =
-                          (subPointDef?.name || subPoint.name || "").toString().trim() ||
+                          (rawSubPointName || "").toString().trim() ||
                           `Sub-point ${subIndex + 1}`;
                         const displayOption =
                           (subPoint.decision || "").toString().trim() || "N/A";
@@ -1682,13 +1666,17 @@ const QcWashingFullReportPDF = ({
       // Try different URL variations
       const urlVariations = [
         url,
-        url.replace('./public/', '/'),
-        url.replace('./public', ''),
-        url.startsWith('/') ? url.substring(1) : '/' + url,
-        url.replace(/^\/+/, '/'),
-        url.includes('/uploads/') ? url : '/uploads/' + url.split('/').pop(),
-        url.includes('/storage/') ? url : '/storage/' + url.split('/').pop(),
-        url.includes('/qc_washing_images/') ? url : '/storage/qc_washing_images/defect/' + url.split('/').pop(),
+        url.replace("./public/", "/"),
+        url.replace("./public", ""),
+        url.startsWith("/") ? url.substring(1) : "/" + url,
+        url.replace(/^\/+/, "/"),
+        // Add variations for inspector images
+        url.includes("/uploads/") ? url : "/uploads/" + url.split("/").pop(),
+        url.includes("/storage/") ? url : "/storage/" + url.split("/").pop(),
+        // Add more variations for defect images
+        url.includes("/qc_washing_images/")
+          ? url
+          : "/storage/qc_washing_images/defect/" + url.split("/").pop()
       ];
 
       for (const variation of urlVariations) {
