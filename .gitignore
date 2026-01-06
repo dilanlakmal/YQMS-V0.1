@@ -41,7 +41,7 @@ public/storage/
 
 backend/.env
 .env
-
+uploads
 # ==================================
 #      AI Service API
 # ==================================
