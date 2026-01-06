@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
-import { X, FileText, Palette, Building, User, Hash, Droplets, ClipboardCheck, Package, Target, CheckCircle, XCircle, TrendingUp, BarChart3, AlertTriangle, Ruler, Thermometer, Clock, Zap, Beaker, ShoppingCart, Factory, Eye, Camera, MessageSquare, Award, Activity, ArrowLeftRight } from "lucide-react";
+import { X, FileText, Palette, Building, User, Hash, Droplets, ClipboardCheck, Package, Target, CheckCircle, XCircle, TrendingUp, BarChart3, AlertTriangle, Ruler, Thermometer, Clock, Zap, Beaker, ShoppingCart, Factory, Eye, Camera, MessageSquare, Award, Activity, ArrowLeftRight,
+  CalendarDays
+ } from "lucide-react";
 import axios from "axios";
 
 import { API_BASE_URL } from "../../../../../config";
@@ -396,7 +398,61 @@ const getImageUrl = (imagePath) => {
                       </div>
                     </div>
                   </div> 
-
+                  <div className="bg-gradient-to-br from-violet-50 to-violet-100 dark:from-violet-900/20 dark:to-violet-800/20 rounded-xl p-4 border border-violet-200 dark:border-violet-800">
+                  <div className="flex items-center">
+                    <div className="bg-violet-500 p-2 rounded-lg">
+                      <CalendarDays className="w-5 h-5 text-white" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-xs font-medium text-violet-600 dark:text-violet-300 uppercase tracking-wide">Inspection Date</p>
+                      <p className="text-lg font-bold text-violet-900 dark:text-violet-100">
+                        {(() => {
+                          // Try multiple possible date fields
+                          const inspectionDate = 
+                            processedReportData.inspectionDate || 
+                            processedReportData.inspection_date ||
+                            processedReportData.createdAt ||
+                            processedReportData.created_at ||
+                            processedReportData.updatedAt ||
+                            processedReportData.updated_at;
+                            
+                          if (!inspectionDate) return 'N/A';
+                          
+                          try {
+                            let dateObj;
+                            let dateString = inspectionDate;
+                            
+                            // Handle MongoDB's extended JSON format for dates
+                            if (typeof inspectionDate === 'object' && inspectionDate !== null && inspectionDate.$date) {
+                              dateString = inspectionDate.$date;
+                            }
+                            
+                            // Create a date object
+                            dateObj = new Date(dateString);
+                            
+                            if (isNaN(dateObj.getTime())) {
+                              console.warn('Invalid inspection date:', inspectionDate);
+                              return 'Invalid Date';
+                            }
+                            
+                            // Format the date
+                            const formattedDate = dateObj.toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: '2-digit',
+                              day: '2-digit',
+                              timeZone: 'UTC'
+                            });
+                            
+                            return formattedDate;
+                          } catch (error) {
+                            console.error('Date parsing error:', error, 'for value:', inspectionDate);
+                            return 'Error parsing date';
+                          }
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
                 </div>
               </div>
 
