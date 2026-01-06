@@ -294,18 +294,8 @@ export const saveQCWashingOrderData = async (req, res) => {
 
 export const saveQCWashingInspectionData = async (req, res) => {
   const standardValues = JSON.parse(req.body.standardValues || "{}");
-    const actualValues = JSON.parse(req.body.actualValues || "{}");
-    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
-    
-    try {
-      const { recordId } = req.body;
-      const inspectionData = JSON.parse(req.body.inspectionData || "[]");
-      const processData = JSON.parse(req.body.processData || "{}");
-      const defectData = JSON.parse(req.body.defectData || "[]");
-      const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
-      const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
-      const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
-      const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
+  const actualValues = JSON.parse(req.body.actualValues || "{}");
+  const machineStatus = JSON.parse(req.body.machineStatus || "{}");
 
   try {
     const { recordId } = req.body;
@@ -426,43 +416,8 @@ export const saveQCWashingInspectionData = async (req, res) => {
               return newImageUrl;
             }
             return normalizeInspectionImagePath(img);
-          }),
-          remark: item.remark
-        })),
-        // Use grouped checkpoint data instead of flat array
-        checkpointInspectionData: groupedCheckpointData,
-        machineProcesses: machineProcesses,
-        parameters: (defectData || []).map((item) => ({
-          parameterName: item.parameter,
-          checkedQty: item.checkedQty,
-          defectQty: item.failedQty,
-          passRate: item.passRate,
-          result: item.result,
-          remark: item.remark
-        })),
-        // Add machine settings
-        timeCoolEnabled,
-        timeHotEnabled,
-        referenceSampleApproveDate: referenceSampleApproveDate ? (() => {
-        const date = new Date(referenceSampleApproveDate);
-        date.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
-        return date;
-      })() : (() => {
-        const now = new Date();
-        now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
-        return now;
-      })()
-      };
-
-      record.savedAt = new Date();
-      record.status = "processing";
-
-      await record.save();
-
-      res.json({
-        success: true,
-        message: "Inspection data saved",
-        data: record
+          });
+        }
       });
     }
 
@@ -566,18 +521,8 @@ export const getqcwashingSavedColor = async (req, res) => {
 // Updated inspection-update endpoint
 export const updateQCWashingInspectionData = async (req, res) => {
   const standardValues = JSON.parse(req.body.standardValues || "{}");
-    const actualValues = JSON.parse(req.body.actualValues || "{}");
-    const machineStatus = JSON.parse(req.body.machineStatus || "{}");
-    
-    try {
-      const { recordId } = req.body;
-      const inspectionData = JSON.parse(req.body.inspectionData || "[]");
-      const processData = JSON.parse(req.body.processData || "{}");
-      const defectData = JSON.parse(req.body.defectData || "[]");
-      const checkpointInspectionData = JSON.parse(req.body.checkpointInspectionData || "[]");
-      const timeCoolEnabled = JSON.parse(req.body.timeCoolEnabled || "false");
-      const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
-       const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
+  const actualValues = JSON.parse(req.body.actualValues || "{}");
+  const machineStatus = JSON.parse(req.body.machineStatus || "{}");
 
   try {
     const { recordId } = req.body;
@@ -591,149 +536,10 @@ export const updateQCWashingInspectionData = async (req, res) => {
     const timeHotEnabled = JSON.parse(req.body.timeHotEnabled || "false");
     const referenceSampleApproveDate = req.body.referenceSampleApproveDate;
 
-      // Get server base URL
-      const serverBaseUrl = getServerBaseUrl(req);
-
-      // Handle file uploads
-      const uploadDir = path.join( 
-        __backendDir,
-        "./public/storage/qc_washing_images/inspection"
-      );
-      const fileMap = {};
-      
-      for (const file of req.files || []) {
-        const fileExtension = path.extname(file.originalname);
-        const newFilename = `inspection-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
-        const fullFilePath = path.join(uploadDir, newFilename);
-        await fs.promises.writeFile(fullFilePath, file.buffer);
-        fileMap[
-          file.fieldname
-        ] = `${serverBaseUrl}/storage/qc_washing_images/inspection/${newFilename}`;
-      }
-
-      // Find the record
-      let record = await QCWashing.findById(recordId);
-      if (!record) {
-        return res
-          .status(404)
-          .json({ success: false, message: "Record not found for update" });
-      }
-
-      // Build machine processes with the new structure
-      const machineProcesses = [];
-      const machineTypes = {
-        "Washing Machine": ["temperature", "time", "silicon", "softener"],
-        "Tumble Dry": ["temperature", "timeCool", "timeHot"]
-      };
-
-      Object.entries(machineTypes).forEach(([machineType, parameters]) => {
-        const machineProcess = { machineType };
-        parameters.forEach((param) => {
-          const actualVal = actualValues[machineType]?.[param];
-          const standardVal = standardValues[machineType]?.[param];
-          machineProcess[param] = {
-            actualValue:
-              actualVal === null || actualVal === undefined ? "" : actualVal,
-            standardValue:
-              standardVal === null || standardVal === undefined
-                ? ""
-                : standardVal,
-            status: {
-              ok: machineStatus[machineType]?.[param]?.ok || false,
-              no: machineStatus[machineType]?.[param]?.no || false
-            }
-          };
-        });
-        machineProcesses.push(machineProcess);
-      });
-
-      // Handle inspection images with full server URLs (same logic as save)
-      if (inspectionData) {
-        inspectionData.forEach((item, idx) => {
-          if (item.comparisonImages) {
-            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-              const newImageUrl = fileMap[`comparisonImages_${idx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
-              }
-              return img;
-            });
-          }
-        });
-      }
-
-      // Handle checkpoint images
-      if (checkpointInspectionData) {
-        checkpointInspectionData.forEach((item, idx) => {
-          if (item.comparisonImages) {
-            item.comparisonImages = item.comparisonImages.map((img, imgIdx) => {
-              const newImageUrl = fileMap[`checkpointImages_${idx}_${imgIdx}`];
-              if (newImageUrl) {
-                return newImageUrl;
-              }
-              return img;
-            });
-          }
-        });
-      }
-
-      // Group checkpoint data with sub-points nested under main checkpoints
-      const groupedCheckpointData = groupCheckpointData(checkpointInspectionData);
-
-      // Build the inspection details
-      record.inspectionDetails = {
-        ...record.inspectionDetails,
-        checkedPoints: (inspectionData || []).map((item, idx) => {
-          const images = (item.comparisonImages || []).map((img, imgIdx) => {
-            if (fileMap[`comparisonImages_${idx}_${imgIdx}`]) {
-              return fileMap[`comparisonImages_${idx}_${imgIdx}`];
-            }
-            return normalizeInspectionImagePath(img);
-          });
-
-          return {
-            pointName: item.checkedList,
-            decision: item.decision,
-            comparison: images,
-            remark: item.remark
-          };
-        }),
-        // Use grouped checkpoint data instead of flat array
-        checkpointInspectionData: groupedCheckpointData,
-        machineProcesses: machineProcesses,
-        parameters: (defectData || []).map((item) => ({
-          parameterName: item.parameter,
-          checkedQty: item.checkedQty,
-          defectQty: item.failedQty,
-          passRate: item.passRate,
-          result: item.result,
-          remark: item.remark
-        })),
-        // Update machine settings
-        timeCoolEnabled,
-        timeHotEnabled,
-       referenceSampleApproveDate: referenceSampleApproveDate ? (() => {
-        const date = new Date(referenceSampleApproveDate);
-        date.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
-        return date;
-      })() : (() => {
-        const now = new Date();
-        now.setHours(0, 0, 0, 0); // Set time to 00:00:00.000
-        return now;
-      })()
-      };
-
-      record.savedAt = new Date();
-      await record.save();
-
-      res.json({
-        success: true,
-        message: "Inspection data updated",
-        data: record
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ success: false, message: "Server error" });
+    if (!recordId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "recordId is required" });
     }
 
     // Get server base URL
