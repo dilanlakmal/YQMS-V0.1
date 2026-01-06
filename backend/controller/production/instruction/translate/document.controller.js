@@ -6,12 +6,21 @@ import { PDFDocument } from "pdf-lib";
 
 import documentModel from "../../../../models/production/instruction/translation/document.model.js";
 
+const document = documentModel(ymEcoConnection);
 
 
-const createDocument = async (file, filePath, type, customer) => {
-    const document = documentModel(ymEcoConnection);
+const createDocument = async (filename, filePath, type, customer) => {
+    const existingDoc = await document.findOne({
+        customer,
+        type,
+        filename,
+        filePath
+    });
 
-    const filename = file.originalname;
+    if (existingDoc) {
+        // If it exists, just return the existing ID
+        return existingDoc._id;
+    }
     const pdfBytes = fs.readFileSync(filePath);
     const pdfDoc = await PDFDocument.load(pdfBytes);
     const pageCount = pdfDoc.getPageCount();
@@ -22,7 +31,7 @@ const createDocument = async (file, filePath, type, customer) => {
         filename: filename,
         filePath: filePath,
         pageCount: pageCount,
-        images: Array.from({length: pageCount}, (_, i) => ({
+        pages: Array.from({length: pageCount}, (_, i) => ({
             pageNumber: i+1,
             pdfPath: "",
             imageCount: 0,
@@ -51,7 +60,7 @@ const documentController = async (req, res) => {
         console.log("Input file path:", filePath);
 
         fs.rename(filePath, updateFilePath)
-        const id = await createDocument(req.file, updateFilePath, type, customer);
+        const id = await createDocument(req.file.originalname, updateFilePath, type, customer);
         return res.status(200).json({ message: "File received", documentId: id });
     } catch (err) {
         console.error(err);
@@ -60,3 +69,4 @@ const documentController = async (req, res) => {
 }
 
 export default documentController;
+export {createDocument};
