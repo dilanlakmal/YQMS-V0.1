@@ -1,7 +1,4 @@
-import {
-  ymProdConnection,
-  HumidityReport
-} from "../../controller/MongoDB/dbConnectionController.js";
+import { ymProdConnection, HumidityReport } from "../MongoDB/dbConnectionController.js";
 import ExcelJS from "exceljs";
 
 // GET /api/humidity-data
@@ -11,14 +8,14 @@ export const getHumidityData = async (req, res) => {
     const col = ymProdConnection.db.collection("humidity_data");
     const query = q
       ? {
-          $or: [
-            { factoryStyleNo: { $regex: q, $options: "i" } },
-            { buyerStyle: { $regex: q, $options: "i" } },
-            { customer: { $regex: q, $options: "i" } },
-            { moNo: { $regex: q, $options: "i" } },
-            { style: { $regex: q, $options: "i" } }
-          ]
-        }
+        $or: [
+          { factoryStyleNo: { $regex: q, $options: "i" } },
+          { buyerStyle: { $regex: q, $options: "i" } },
+          { customer: { $regex: q, $options: "i" } },
+          { moNo: { $regex: q, $options: "i" } },
+          { style: { $regex: q, $options: "i" } }
+        ]
+      }
       : {};
 
     const cursor = col.find(query).sort({ createdAt: -1 });
@@ -27,9 +24,7 @@ export const getHumidityData = async (req, res) => {
     return res.json({ success: true, data: docs });
   } catch (err) {
     console.error("Error fetching humidity_data:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch humidity data" });
+    return res.status(500).json({ success: false, message: "Failed to fetch humidity data" });
   }
 };
 
@@ -37,19 +32,11 @@ export const getHumidityData = async (req, res) => {
 export const getHumidityDataByMoNo = async (req, res) => {
   try {
     const { moNo } = req.params;
-    if (!moNo)
-      return res
-        .status(400)
-        .json({ success: false, message: "moNo is required" });
+    if (!moNo) return res.status(400).json({ success: false, message: "moNo is required" });
 
     const col = ymProdConnection.db.collection("humidity_data");
     const exactQuery = {
-      $or: [
-        { moNo: moNo },
-        { factoryStyleNo: moNo },
-        { style: moNo },
-        { buyerStyle: moNo }
-      ]
+      $or: [{ moNo: moNo }, { factoryStyleNo: moNo }, { style: moNo }, { buyerStyle: moNo }]
     };
 
     let doc = await col.findOne(exactQuery);
@@ -74,30 +61,20 @@ export const getHumidityDataByMoNo = async (req, res) => {
         if (order) {
           return res.json({
             success: true,
-            data: {
-              fallbackOrder: order,
-              note: "humidity_data not found — returned yorksys_orders fallback"
-            }
+            data: { fallbackOrder: order, note: "humidity_data not found — returned yorksys_orders fallback" }
           });
         }
       } catch (errOrder) {
         console.error("Error fetching yorksys_orders fallback:", errOrder);
       }
 
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No humidity data found for this moNo"
-        });
+      return res.status(404).json({ success: false, message: "No humidity data found for this moNo" });
     }
 
     return res.json({ success: true, data: doc });
   } catch (err) {
     console.error("Error fetching humidity data by moNo:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch humidity data" });
+    return res.status(500).json({ success: false, message: "Failed to fetch humidity data" });
   }
 };
 
@@ -105,20 +82,12 @@ export const getHumidityDataByMoNo = async (req, res) => {
 export const getHumiditySummaryByMoNo = async (req, res) => {
   try {
     const { moNo } = req.params;
-    if (!moNo)
-      return res
-        .status(400)
-        .json({ success: false, message: "moNo is required" });
+    if (!moNo) return res.status(400).json({ success: false, message: "moNo is required" });
     const col = ymProdConnection.db.collection("humidity_data");
     // find humidity doc
     const regex = new RegExp(`^${moNo}$`, "i");
     let doc = await col.findOne({
-      $or: [
-        { moNo: moNo },
-        { factoryStyleNo: moNo },
-        { style: moNo },
-        { buyerStyle: moNo }
-      ]
+      $or: [{ moNo: moNo }, { factoryStyleNo: moNo }, { style: moNo }, { buyerStyle: moNo }]
     });
     if (!doc) {
       doc = await col.findOne({
@@ -133,9 +102,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
 
     // fetch order to get FabricContent and total qty
     const ordersCol = ymProdConnection.db.collection("yorksys_orders");
-    const order = await ordersCol.findOne({
-      $or: [{ moNo: moNo }, { style: moNo }]
-    });
+    const order = await ordersCol.findOne({ $or: [{ moNo: moNo }, { style: moNo }] });
 
     // determine totalQty
     let totalQty = 0;
@@ -146,13 +113,12 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     }
 
     // fabric allocations (from order if present)
-    const fabricsDef =
-      order && Array.isArray(order.FabricContent) ? order.FabricContent : [];
-    const fabrics = fabricsDef.map((f) => {
+    const fabricsDef = (order && Array.isArray(order.FabricContent) ? order.FabricContent : []);
+    const fabrics = fabricsDef.map(f => {
       const pct = Number(f.percentageValue) || 0;
       const decimal = (totalQty * pct) / 100;
       return {
-        fabricName: f.fabricName || f.fabric || "",
+        fabricName: f.fabricName || f.fabric || '',
         percentage: pct,
         allocatedDecimal: decimal,
         allocatedRounded: Math.round(decimal),
@@ -161,15 +127,14 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     });
 
     // inspections summary from humidity doc (if present)
-    const inspectionRecords =
-      doc && Array.isArray(doc.inspectionRecords) ? doc.inspectionRecords : [];
+    const inspectionRecords = doc && Array.isArray(doc.inspectionRecords) ? doc.inspectionRecords : [];
     const totalInspections = inspectionRecords.length;
     const sectionPass = { top: 0, middle: 0, bottom: 0 };
     const sectionFail = { top: 0, middle: 0, bottom: 0 };
     let recordPassAll = 0;
     let recordFailAny = 0;
 
-    inspectionRecords.forEach((r) => {
+    inspectionRecords.forEach(r => {
       const top = r.top || {};
       const middle = r.middle || {};
       const bottom = r.bottom || {};
@@ -185,7 +150,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     });
 
     // allocate record-pass counts to fabrics proportionally
-    const recordPassAllocation = fabrics.map((f) => {
+    const recordPassAllocation = fabrics.map(f => {
       const proportion = f.percentage / 100;
       const passDecimal = recordPassAll * proportion;
       return {
@@ -198,9 +163,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     });
 
     // If no humidity doc and no inspections, include note
-    const note = !doc
-      ? "No humidity_data found — summary derived from yorksys_orders (no inspections available)"
-      : undefined;
+    const note = !doc ? "No humidity_data found — summary derived from yorksys_orders (no inspections available)" : undefined;
 
     return res.json({
       success: true,
@@ -221,9 +184,7 @@ export const getHumiditySummaryByMoNo = async (req, res) => {
     });
   } catch (err) {
     console.error("Error computing humidity summary:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to compute humidity summary" });
+    return res.status(500).json({ success: false, message: "Failed to compute humidity summary" });
   }
 };
 
@@ -257,23 +218,14 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
       });
     }
 
-    if (!doc)
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No reitmans_humidity record found for this moNo"
-        });
+    if (!doc) return res.status(404).json({ success: false, message: "No reitmans_humidity record found for this moNo" });
 
     // return full doc and try to extract common primary/secondary
     let primary = doc.primary || doc.primaryFabric || doc.fabricPrimary || null;
-    let secondary =
-      doc.secondary || doc.secondaryFabric || doc.fabricSecondary || null;
+    let secondary = doc.secondary || doc.secondaryFabric || doc.fabricSecondary || null;
     // if ReitmansName array exists, pick first entry that has primary/secondary
     if ((!primary || !secondary) && Array.isArray(doc.ReitmansName)) {
-      const entry =
-        doc.ReitmansName.find((e) => e.primary && e.secondary) ||
-        doc.ReitmansName[0];
+      const entry = doc.ReitmansName.find(e => e.primary && e.secondary) || doc.ReitmansName[0];
       if (entry) {
         primary = primary || entry.primary;
         secondary = secondary || entry.secondary;
@@ -283,17 +235,14 @@ export const getReitmansHumidityByMoNo = async (req, res) => {
     return res.json({ success: true, data: { primary, secondary, doc } });
   } catch (err) {
     console.error("Error fetching reitmans_humidity by moNo:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch reitmans_humidity" });
+    return res.status(500).json({ success: false, message: "Failed to fetch reitmans_humidity" });
   }
 };
 
 // GET /api/humidity-reports
 export const getHumidityReports = async (req, res) => {
   try {
-    const { limit, start, end, factoryStyleNo, customer, buyerStyle } =
-      req.query;
+    const { limit, start, end, factoryStyleNo, customer, buyerStyle } = req.query;
     const model = HumidityReport;
     const query = {};
 
@@ -329,9 +278,7 @@ export const getHumidityReports = async (req, res) => {
     return res.json({ success: true, data: docs });
   } catch (err) {
     console.error("Error fetching humidity reports:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to fetch humidity reports" });
+    return res.status(500).json({ success: false, message: "Failed to fetch humidity reports" });
   }
 };
 
@@ -342,8 +289,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     const model = HumidityReport;
     const query = {};
 
-    if (factoryStyleNo)
-      query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
+    if (factoryStyleNo) query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
     if (customer) query.customer = { $regex: customer, $options: "i" };
     if (buyerStyle) query.buyerStyle = { $regex: buyerStyle, $options: "i" };
 
@@ -368,7 +314,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     workbook.creator = "YQMS";
     workbook.created = new Date();
     const sheet = workbook.addWorksheet("Humidity Reports", {
-      views: [{ state: "frozen", ySplit: 6 }]
+      views: [{ state: "frozen", ySplit: 6 }],
     });
 
     // page setup
@@ -377,14 +323,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     sheet.pageSetup.horizontalCentered = true;
     sheet.pageSetup.fitToPage = true;
     sheet.pageSetup.fitToWidth = 1;
-    sheet.pageMargins = {
-      left: 0.3,
-      right: 0.3,
-      top: 0.3,
-      bottom: 0.3,
-      header: 0.3,
-      footer: 0
-    };
+    sheet.pageMargins = { left: 0.3, right: 0.3, top: 0.3, bottom: 0.3, header: 0.3, footer: 0 };
 
     // add logo if exists (look in public/img/header.png)
     try {
@@ -393,7 +332,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       if (fs.existsSync(logoPath)) {
         const imageId = workbook.addImage({
           filename: logoPath,
-          extension: "png"
+          extension: "png",
         });
         sheet.addImage(imageId, "B1:D5");
       }
@@ -405,8 +344,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
     // Title header (merge)
     sheet.mergeCells("B1:R2");
     const titleCell = sheet.getCell("B1");
-    titleCell.value =
-      "YORKMARS (CAMBODIA) GARMENTS MFG CO.,LTD - Humidity Inspection Record";
+    titleCell.value = "YORKMARS (CAMBODIA) GARMENTS MFG CO.,LTD - Humidity Inspection Record";
     titleCell.alignment = { horizontal: "center", vertical: "middle" };
     titleCell.font = { size: 14, bold: true };
 
@@ -427,37 +365,34 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       { header: "inspectorSignature", key: "inspectorSignature", width: 18 },
       { header: "qamSignature", key: "qamSignature", width: 18 },
       { header: "createdAt", key: "createdAt", width: 18 },
-      { header: "inspectionRecords", key: "inspectionRecords", width: 60 }
+      { header: "inspectionRecords", key: "inspectionRecords", width: 60 },
     ];
 
     sheet.columns = columns;
 
     // header styling row (row 6-ish)
     const headerRow = sheet.getRow(6);
-    headerRow.values = columns.map((c) => c.header);
+    headerRow.values = columns.map(c => c.header);
     headerRow.font = { bold: true };
     headerRow.alignment = { horizontal: "center", vertical: "middle" };
-    headerRow.eachCell((cell) => {
+    headerRow.eachCell(cell => {
       cell.fill = {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FFE5E7EB" }
+        fgColor: { argb: "FFE5E7EB" },
       };
       cell.border = {
         top: { style: "thin" },
         left: { style: "thin" },
         bottom: { style: "thin" },
-        right: { style: "thin" }
+        right: { style: "thin" },
       };
     });
 
     // start writing data after header row (row 7)
     let rowIndex = 7;
     for (const d of docs) {
-      const inspections =
-        Array.isArray(d.inspectionRecords) && d.inspectionRecords.length > 0
-          ? d.inspectionRecords
-          : [{}];
+      const inspections = Array.isArray(d.inspectionRecords) && d.inspectionRecords.length > 0 ? d.inspectionRecords : [{}];
       for (const rec of inspections) {
         const top = rec.top || {};
         const middle = rec.middle || {};
@@ -479,18 +414,16 @@ export const exportHumidityReportsXlsx = async (req, res) => {
           d.generalRemark || "",
           d.inspectorSignature || "",
           d.qamSignature || "",
-          d.createdAt
-            ? d.createdAt.toISOString().slice(0, 19).replace("T", " ")
-            : "",
+          d.createdAt ? d.createdAt.toISOString().slice(0, 19).replace("T", " ") : "",
           top.body || "",
           top.ribs || "",
-          top.fail ? "Fail" : top.pass ? "Pass" : "",
+          top.fail ? "Fail" : (top.pass ? "Pass" : ""),
           middle.body || "",
           middle.ribs || "",
-          middle.fail ? "Fail" : middle.pass ? "Pass" : "",
+          middle.fail ? "Fail" : (middle.pass ? "Pass" : ""),
           bottom.body || "",
           bottom.ribs || "",
-          bottom.fail ? "Fail" : bottom.pass ? "Pass" : ""
+          bottom.fail ? "Fail" : (bottom.pass ? "Pass" : ""),
         ];
 
         row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
@@ -498,13 +431,9 @@ export const exportHumidityReportsXlsx = async (req, res) => {
             top: { style: "thin" },
             left: { style: "thin" },
             bottom: { style: "thin" },
-            right: { style: "thin" }
+            right: { style: "thin" },
           };
-          cell.alignment = {
-            vertical: "middle",
-            horizontal: "center",
-            wrapText: true
-          };
+          cell.alignment = { vertical: "middle", horizontal: "center", wrapText: true };
 
           const colIdx = colNumber;
           if ([18, 21, 24].includes(colIdx)) {
@@ -513,7 +442,7 @@ export const exportHumidityReportsXlsx = async (req, res) => {
               cell.fill = {
                 type: "pattern",
                 pattern: "solid",
-                fgColor: { argb: "FFFDECEA" }
+                fgColor: { argb: "FFFDECEA" },
               };
               cell.font = { color: { argb: "FFB02020" }, bold: true };
             }
@@ -522,34 +451,25 @@ export const exportHumidityReportsXlsx = async (req, res) => {
       }
     }
 
-    res.setHeader(
-      "Content-Type",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    );
-    const filename = `humidity-reports-${new Date()
-      .toISOString()
-      .slice(0, 10)}.xlsx`;
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    const filename = `humidity-reports-${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
     console.error("Error exporting humidity reports to XLSX:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to export humidity reports" });
+    return res.status(500).json({ success: false, message: "Failed to export humidity reports" });
   }
 };
 
 // GET /api/humidity-reports/export-paper
 export const exportHumidityReportsPaper = async (req, res) => {
   try {
-    const { type, date, month, factoryStyleNo, customer, buyerStyle } =
-      req.query;
+    const { type, date, month, factoryStyleNo, customer, buyerStyle } = req.query;
     const model = HumidityReport;
     const query = {};
 
-    if (factoryStyleNo)
-      query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
+    if (factoryStyleNo) query.factoryStyleNo = { $regex: factoryStyleNo, $options: "i" };
     if (customer) query.customer = { $regex: customer, $options: "i" };
     if (buyerStyle) query.buyerStyle = { $regex: buyerStyle, $options: "i" };
 
@@ -574,28 +494,20 @@ export const exportHumidityReportsPaper = async (req, res) => {
 
     // simple HTML generator per report (similar to frontend preview)
     const renderReportHtml = (data) => {
-      const recs = Array.isArray(data.inspectionRecords)
-        ? data.inspectionRecords
-        : [];
-      const rows =
-        recs
-          .map((r) => {
-            const dateVal = r.date || data.date || "";
-            const color = r.colorName || data.colorName || "";
-            const before = r.beforeDryRoom || r.beforeDryRoomTime || "";
-            const after = r.afterDryRoom || r.afterDryRoomTime || "";
-            const sec = (s) => {
-              const secObj = r[s] || {};
-              const body = secObj.body || "";
-              const ribs = secObj.ribs || "";
-              const status = secObj.fail
-                ? `<span style="color:#b02020;font-weight:600;border:2px solid #d9534f;padding:4px;display:inline-block;min-width:40px;">Fail</span>`
-                : secObj.pass
-                ? "Pass"
-                : "";
-              return `<td>${body}</td><td>${ribs}</td><td>${status}</td>`;
-            };
-            return `<tr>
+      const recs = Array.isArray(data.inspectionRecords) ? data.inspectionRecords : [];
+      const rows = recs.map(r => {
+        const dateVal = r.date || data.date || "";
+        const color = r.colorName || data.colorName || "";
+        const before = r.beforeDryRoom || r.beforeDryRoomTime || "";
+        const after = r.afterDryRoom || r.afterDryRoomTime || "";
+        const sec = (s) => {
+          const secObj = r[s] || {};
+          const body = secObj.body || "";
+          const ribs = secObj.ribs || "";
+          const status = secObj.fail ? `<span style="color:#b02020;font-weight:600;border:2px solid #d9534f;padding:4px;display:inline-block;min-width:40px;">Fail</span>` : (secObj.pass ? "Pass" : "");
+          return `<td>${body}</td><td>${ribs}</td><td>${status}</td>`;
+        };
+        return `<tr>
           <td>${dateVal}</td>
           <td style="text-align:left">${color}</td>
           <td>${before}</td>
@@ -604,8 +516,7 @@ export const exportHumidityReportsPaper = async (req, res) => {
           ${sec("middle")}
           ${sec("bottom")}
         </tr>`;
-          })
-          .join("\n") || '<tr><td colspan="14">No inspection records</td></tr>';
+      }).join("\n") || '<tr><td colspan="14">No inspection records</td></tr>';
 
       return `
         <div style="page-break-after:always;margin-bottom:12px;">
@@ -614,19 +525,13 @@ export const exportHumidityReportsPaper = async (req, res) => {
           <div style="display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px;">
             <div style="width:48%;">
               <div><strong>Buyer style#:</strong> ${data.buyerStyle || ""}</div>
-              <div><strong>Factory style no:</strong> ${
-                data.factoryStyleNo || ""
-              }</div>
+              <div><strong>Factory style no:</strong> ${data.factoryStyleNo || ""}</div>
               <div><strong>Fabrication:</strong> ${data.fabrication || ""}</div>
-              <div><strong>Aquaboy spec:</strong> ${
-                data.aquaboySpec || ""
-              }</div>
+              <div><strong>Aquaboy spec:</strong> ${data.aquaboySpec || ""}</div>
             </div>
             <div style="width:48%;text-align:right;">
               <div><strong>Customer:</strong> ${data.customer || ""}</div>
-              <div><strong>Inspection Type:</strong> ${
-                data.inspectionType || ""
-              }</div>
+              <div><strong>Inspection Type:</strong> ${data.inspectionType || ""}</div>
               <div><strong>Date:</strong> ${data.date || ""}</div>
               <div><strong>Color:</strong> ${data.colorName || ""}</div>
             </div>
@@ -651,32 +556,23 @@ export const exportHumidityReportsPaper = async (req, res) => {
             </thead>
             <tbody>${rows}</tbody>
           </table>
-          <div style="margin-top:12px;border-top:1px solid #444;padding-top:8px;"><strong>Remark:</strong> <div style="min-height:40px;margin-top:6px;">${
-            data.generalRemark || ""
-          }</div></div>
+          <div style="margin-top:12px;border-top:1px solid #444;padding-top:8px;"><strong>Remark:</strong> <div style="min-height:40px;margin-top:6px;">${data.generalRemark || ""}</div></div>
           <div style="display:flex;justify-content:space-between;margin-top:28px;"><div style="width:45%;border-top:1px solid #444;padding-top:6px;text-align:center;">Inspector</div><div style="width:45%;border-top:1px solid #444;padding-top:6px;text-align:center;">QAM / Supervisor</div></div>
         </div>
       `;
     };
     const allHtml = `
       <html><head><meta charset="utf-8"><title>Exported Humidity Reports</title></head><body>
-        ${docs.map((d) => renderReportHtml(d)).join("\n")}
+        ${docs.map(d => renderReportHtml(d)).join("\n")}
       </body></html>
     `;
 
     res.setHeader("Content-Type", "text/html");
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename="humidity-reports-${new Date()
-        .toISOString()
-        .slice(0, 10)}.html"`
-    );
+    res.setHeader("Content-Disposition", `attachment; filename="humidity-reports-${new Date().toISOString().slice(0, 10)}.html"`);
     return res.send(allHtml);
   } catch (err) {
     console.error("Error exporting humidity reports (paper):", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to export reports" });
+    return res.status(500).json({ success: false, message: "Failed to export reports" });
   }
 };
 
@@ -685,76 +581,70 @@ export const createHumidityReport = async (req, res) => {
   try {
     const payload = req.body;
     if (!payload || typeof payload !== "object") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid payload" });
+      return res.status(400).json({ success: false, message: "Invalid payload" });
     }
 
     // Validate required field
     if (!payload.factoryStyleNo) {
-      return res
-        .status(400)
-        .json({ success: false, message: "factoryStyleNo is required" });
+      return res.status(400).json({ success: false, message: "factoryStyleNo is required" });
     }
 
     // Transform inspectionRecords into history entry format
     const historyEntry = {};
-    if (
-      Array.isArray(payload.inspectionRecords) &&
-      payload.inspectionRecords.length > 0
-    ) {
+    if (Array.isArray(payload.inspectionRecords) && payload.inspectionRecords.length > 0) {
       const record = payload.inspectionRecords[0]; // Take first record
 
       // Add date and dry room times to each history entry
       historyEntry.date = payload.date || new Date().toISOString();
-      historyEntry.beforeDryRoom = payload.beforeDryRoom || "";
-      historyEntry.afterDryRoom = payload.afterDryRoom || "";
-      historyEntry.colorName = payload.colorName || "";
+      historyEntry.beforeDryRoom = payload.beforeDryRoom || '';
+      historyEntry.afterDryRoom = payload.afterDryRoom || '';
+      historyEntry.colorName = payload.colorName || '';
 
       historyEntry.top = {
-        body: record.top?.body || "",
-        ribs: record.top?.ribs || "",
-        status: record.top?.pass ? "pass" : record.top?.fail ? "fail" : ""
+        body: record.top?.body || '',
+        ribs: record.top?.ribs || '',
+        status: record.top?.pass ? 'pass' : (record.top?.fail ? 'fail' : '')
       };
       historyEntry.middle = {
-        body: record.middle?.body || "",
-        ribs: record.middle?.ribs || "",
-        status: record.middle?.pass ? "pass" : record.middle?.fail ? "fail" : ""
+        body: record.middle?.body || '',
+        ribs: record.middle?.ribs || '',
+        status: record.middle?.pass ? 'pass' : (record.middle?.fail ? 'fail' : '')
       };
       historyEntry.bottom = {
-        body: record.bottom?.body || "",
-        ribs: record.bottom?.ribs || "",
-        status: record.bottom?.pass ? "pass" : record.bottom?.fail ? "fail" : ""
+        body: record.bottom?.body || '',
+        ribs: record.bottom?.ribs || '',
+        status: record.bottom?.pass ? 'pass' : (record.bottom?.fail ? 'fail' : '')
       };
 
       historyEntry.images = Array.isArray(record.images) ? record.images : [];
-      historyEntry.generalRemark = payload.generalRemark || "";
+      historyEntry.generalRemark = payload.generalRemark || '';
 
       // Capture the exact time of the save action
       const now = new Date();
-      historyEntry.saveTime = now.toLocaleTimeString("en-US", {
+      historyEntry.saveTime = now.toLocaleTimeString('en-US', {
         hour12: true,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
       });
     }
 
     const model = HumidityReport;
-    const existingDoc = await model
-      .findOne({
-        factoryStyleNo: payload.factoryStyleNo,
-        $or: [{ status: "in_progress" }, { status: { $exists: false } }]
-      })
-      .sort({ createdAt: -1 });
+    const existingDoc = await model.findOne({
+      factoryStyleNo: payload.factoryStyleNo,
+      $or: [
+        { status: 'in_progress' },
+        { status: { $exists: false } }
+      ]
+    }).sort({ createdAt: -1 });
 
     let doc;
-    const shouldCreateNew = !existingDoc || existingDoc.status === "completed";
+    const shouldCreateNew = !existingDoc || existingDoc.status === 'completed';
 
     if (shouldCreateNew) {
       doc = new model({
         ...payload,
-        status: "in_progress",
+        status: 'in_progress',
         history: [historyEntry]
       });
       await doc.save();
@@ -772,11 +662,9 @@ export const createHumidityReport = async (req, res) => {
             beforeDryRoom: payload.beforeDryRoom || existingDoc.beforeDryRoom,
             afterDryRoom: payload.afterDryRoom || existingDoc.afterDryRoom,
             date: payload.date || existingDoc.date,
-            inspectionType:
-              payload.inspectionType || existingDoc.inspectionType,
+            inspectionType: payload.inspectionType || existingDoc.inspectionType,
             generalRemark: payload.generalRemark || existingDoc.generalRemark,
-            inspectorSignature:
-              payload.inspectorSignature || existingDoc.inspectorSignature,
+            inspectorSignature: payload.inspectorSignature || existingDoc.inspectorSignature,
             qamSignature: payload.qamSignature || existingDoc.qamSignature
           }
         },
@@ -784,12 +672,8 @@ export const createHumidityReport = async (req, res) => {
       );
 
       const latest = doc.history[doc.history.length - 1];
-      if (
-        latest.top?.status === "pass" &&
-        latest.middle?.status === "pass" &&
-        latest.bottom?.status === "pass"
-      ) {
-        doc.status = "completed";
+      if (latest.top?.status === 'pass' && latest.middle?.status === 'pass' && latest.bottom?.status === 'pass') {
+        doc.status = 'completed';
         await doc.save();
       }
     }
@@ -797,9 +681,7 @@ export const createHumidityReport = async (req, res) => {
     return res.status(201).json({ success: true, data: doc });
   } catch (err) {
     console.error("Error saving humidity report:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to save humidity report" });
+    return res.status(500).json({ success: false, message: "Failed to save humidity report" });
   }
 };
 
@@ -807,10 +689,7 @@ export const createHumidityReport = async (req, res) => {
 export const getAggregatedByCustomers = async (req, res) => {
   try {
     const customersParam = req.query.customers || "Costco,MWW,ANF,Aritzia";
-    const customers = customersParam
-      .split(",")
-      .map((c) => c.trim())
-      .filter(Boolean);
+    const customers = customersParam.split(",").map((c) => c.trim()).filter(Boolean);
 
     const ordersCol = ymProdConnection.db.collection("yorksys_orders");
     const humidityCol = ymProdConnection.db.collection("humidity_data");
@@ -824,58 +703,35 @@ export const getAggregatedByCustomers = async (req, res) => {
       const fabricAgg = await ordersCol
         .aggregate([
           { $match: { buyer: { $regex: `^${cust}$`, $options: "i" } } },
-          {
-            $unwind: {
-              path: "$FabricContent",
-              preserveNullAndEmptyArrays: false
-            }
-          },
+          { $unwind: { path: "$FabricContent", preserveNullAndEmptyArrays: false } },
           {
             $group: {
               _id: {
-                $ifNull: [
-                  "$FabricContent.fabricName",
-                  "$FabricContent.fabric",
-                  ""
-                ]
+                $ifNull: ["$FabricContent.fabricName", "$FabricContent.fabric", ""]
               },
               count: { $sum: 1 }
             }
           },
-          {
-            $project: { name: "$_id", value: { $toString: "$count" }, _id: 0 }
-          },
+          { $project: { name: "$_id", value: { $toString: "$count" }, _id: 0 } },
           { $sort: { value: -1 } }
         ])
         .toArray();
 
       // Body / ribs counts from humidity_data
-      const docs = await humidityCol
-        .find({ customer: { $regex: `^${cust}$`, $options: "i" } })
-        .toArray();
+      const docs = await humidityCol.find({ customer: { $regex: `^${cust}$`, $options: "i" } }).toArray();
       const bodyCounts = { top: 0, middle: 0, bottom: 0, total: 0 };
       const ribsCounts = { top: 0, middle: 0, bottom: 0, total: 0 };
 
       docs.forEach((doc) => {
-        const inspectionRecords = Array.isArray(doc.inspectionRecords)
-          ? doc.inspectionRecords
-          : [];
+        const inspectionRecords = Array.isArray(doc.inspectionRecords) ? doc.inspectionRecords : [];
         inspectionRecords.forEach((r) => {
           ["top", "middle", "bottom"].forEach((section) => {
             const sec = r[section] || {};
-            if (
-              sec.body !== undefined &&
-              sec.body !== null &&
-              String(sec.body).trim() !== ""
-            ) {
+            if (sec.body !== undefined && sec.body !== null && String(sec.body).trim() !== "") {
               bodyCounts[section]++;
               bodyCounts.total++;
             }
-            if (
-              sec.ribs !== undefined &&
-              sec.ribs !== null &&
-              String(sec.ribs).trim() !== ""
-            ) {
+            if (sec.ribs !== undefined && sec.ribs !== null && String(sec.ribs).trim() !== "") {
               ribsCounts[section]++;
               ribsCounts.total++;
             }
@@ -890,15 +746,10 @@ export const getAggregatedByCustomers = async (req, res) => {
       };
     }
 
-    return res.json({
-      success: true,
-      data: [{ _id: new Date().toISOString(), ...resultObj }]
-    });
+    return res.json({ success: true, data: [{ _id: new Date().toISOString(), ...resultObj }] });
   } catch (err) {
     console.error("Error aggregating customer data:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to aggregate customer data" });
+    return res.status(500).json({ success: false, message: "Failed to aggregate customer data" });
   }
 };
 
@@ -913,27 +764,17 @@ export const getFabricValuesByBuyer = async (req, res) => {
     let buyerName = buyer ? String(buyer).trim() : null;
 
     if (moNo) {
-      const order = await ordersCol.findOne({
-        $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }]
-      });
-      if (!order)
-        return res
-          .status(404)
-          .json({ success: false, message: "Order not found for moNo" });
-      buyerName =
-        buyerName || (order.buyer ? String(order.buyer).trim() : null);
+      const order = await ordersCol.findOne({ $or: [{ moNo: moNo }, { style: moNo }, { factoryStyleNo: moNo }] });
+      if (!order) return res.status(404).json({ success: false, message: "Order not found for moNo" });
+      buyerName = buyerName || (order.buyer ? String(order.buyer).trim() : null);
       if (Array.isArray(order.FabricContent)) {
-        fabricNames = order.FabricContent.map((f) =>
-          (f.fabricName || f.fabric || "").trim()
-        ).filter(Boolean);
+        fabricNames = order.FabricContent.map(f => (f.fabricName || f.fabric || "").trim()).filter(Boolean);
       }
     } else if (buyerName) {
-      const orders = await ordersCol
-        .find({ buyer: { $regex: `^${buyerName}$`, $options: "i" } })
-        .toArray();
-      orders.forEach((o) => {
+      const orders = await ordersCol.find({ buyer: { $regex: `^${buyerName}$`, $options: "i" } }).toArray();
+      orders.forEach(o => {
         if (Array.isArray(o.FabricContent)) {
-          o.FabricContent.forEach((f) => {
+          o.FabricContent.forEach(f => {
             const name = (f.fabricName || f.fabric || "").trim();
             if (name) fabricNames.push(name);
           });
@@ -941,12 +782,7 @@ export const getFabricValuesByBuyer = async (req, res) => {
       });
       fabricNames = [...new Set(fabricNames)];
     } else {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Provide either buyer or moNo query param"
-        });
+      return res.status(400).json({ success: false, message: "Provide either buyer or moNo query param" });
     }
 
     // lowercase buyer for matching
@@ -954,14 +790,9 @@ export const getFabricValuesByBuyer = async (req, res) => {
 
     const results = [];
     for (const fname of fabricNames) {
-      const regex = new RegExp(
-        fname.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"),
-        "i"
-      );
+      const regex = new RegExp(fname.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&"), "i");
       const query = {
-        ...(buyerMatch
-          ? { customer: { $regex: `^${buyerMatch}$`, $options: "i" } }
-          : {}),
+        ...(buyerMatch ? { customer: { $regex: `^${buyerMatch}$`, $options: "i" } } : {}),
         fabrication: { $regex: regex }
       };
       const count = await humidityCol.countDocuments(query);
@@ -971,9 +802,7 @@ export const getFabricValuesByBuyer = async (req, res) => {
     return res.json({ success: true, data: results });
   } catch (err) {
     console.error("Error computing fabric values by buyer:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to compute fabric values" });
+    return res.status(500).json({ success: false, message: "Failed to compute fabric values" });
   }
 };
 
@@ -984,49 +813,36 @@ export const approveHumidityReport = async (req, res) => {
     const { empId, engName } = req.body;
 
     if (!id) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Report ID is required" });
+      return res.status(400).json({ success: false, message: "Report ID is required" });
     }
 
     if (!empId || !engName) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Approver information is required" });
+      return res.status(400).json({ success: false, message: "Approver information is required" });
     }
 
     const model = HumidityReport;
     const report = await model.findById(id);
 
     if (!report) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Report not found" });
+      return res.status(404).json({ success: false, message: "Report not found" });
     }
 
     // Check if already approved
-    if (report.approvalStatus === "approved") {
-      return res
-        .status(400)
-        .json({ success: false, message: "Report is already approved" });
+    if (report.approvalStatus === 'approved') {
+      return res.status(400).json({ success: false, message: "Report is already approved" });
     }
 
     // Update the report with approval details
-    report.approvalStatus = "approved";
+    report.approvalStatus = 'approved';
     report.approvedBy = { empId, engName };
     report.approvedAt = new Date();
 
     await report.save();
 
-    return res.json({
-      success: true,
-      data: report,
-      message: "Report approved successfully"
-    });
+    return res.json({ success: true, data: report, message: "Report approved successfully" });
   } catch (err) {
     console.error("Error approving humidity report:", err);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to approve report" });
+    return res.status(500).json({ success: false, message: "Failed to approve report" });
   }
 };
+

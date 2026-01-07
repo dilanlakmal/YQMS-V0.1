@@ -264,7 +264,7 @@ const OverView = () => {
                     <FileText className="w-8 h-8 text-white" />
                   </div>
                   <div>
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
                       Cover Page Management
                     </h1>
                     <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">
@@ -517,7 +517,7 @@ const OverView = () => {
               <div className="flex items-center space-x-3 mb-4">
                 <button
                   onClick={() => setSelectedOrderId(null)}
-                  className="flex items-center space-x-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200 bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-2xl"
+                  className="flex items-center space-x-2 text-blue-600 dark:text-white hover:text-blue-800 dark:hover:text-blue-300 transition-colors duration-200 bg-blue-50 dark:bg-blue-200/20 px-4 py-2 rounded-xl  border-4"
                 >
                   <ArrowLeft className="w-4 h-4" />
                   <span className="font-medium">Back to Orders</span>
@@ -528,7 +528,7 @@ const OverView = () => {
                   <FileText className="w-8 h-8 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-4xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
+                  <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
                     Cover Page Overview
                   </h1>
                   <p className="text-xl text-gray-600 dark:text-gray-400 mt-1">
@@ -540,7 +540,7 @@ const OverView = () => {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-6 py-4 rounded-2xl shadow-lg">
+              <div className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white px-4 py-2 rounded-2xl shadow-lg">
                 <div className="text-sm text-blue-100">Overall Progress</div>
                 <div className="text-3xl font-bold">{getOverallProgress()}%</div>
               </div>
@@ -548,7 +548,7 @@ const OverView = () => {
               <div className="flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() => setShowFullCoverSheet(true)}
-                  className="flex items-center justify-center space-x-2 px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-2xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                  className="flex items-center justify-center space-x-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white rounded-2xl hover:from-emerald-700 hover:to-emerald-800 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
                 >
                   <FileText className="w-5 h-5" />
                   <span className="font-medium">Full Cover Sheet</span>

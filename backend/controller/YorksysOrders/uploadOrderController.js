@@ -1,6 +1,4 @@
-import { 
-  YorksysOrders,
- } from "../MongoDB/dbConnectionController.js";
+import { YorksysOrders } from "../MongoDB/dbConnectionController.js";
 
 //Saves Yorksys order data to MongoDB
 export const saveYorksysOrderData = async (req, res) => {
@@ -15,9 +13,7 @@ export const saveYorksysOrderData = async (req, res) => {
       });
     }
 
-    // ============================================================
-    // 🆕 MODIFIED: Use findOneAndUpdate with upsert to replace existing record
-    // ============================================================
+    // Use findOneAndUpdate with upsert to replace existing record
     const updatedOrder = await YorksysOrders.findOneAndUpdate(
       {
         moNo: orderPayload.moNo,
@@ -43,7 +39,6 @@ export const saveYorksysOrderData = async (req, res) => {
         : `Order ${orderPayload.moNo} updated successfully!`,
       data: updatedOrder
     });
-    // ============================================================
   } catch (error) {
     console.error("Error saving Yorksys order:", error);
 

@@ -1,4 +1,4 @@
-import express from 'express';
+import express from "express";
 import {
   saveYorksysOrderData,
   getYorksysOrderFilterOptions,
@@ -12,8 +12,15 @@ import {
 
 const router = express.Router();
 
-router.post('/api/yorksys-orders/save', saveYorksysOrderData);
-router.get('/api/yorksys-orders/:moNo', getYorksysOrder);
+router.post("/api/yorksys-orders/save", saveYorksysOrderData);
+
+// Route to get unique values for filter dropdowns
+router.get("/api/yorksys-orders/filters", getYorksysOrderFilterOptions);
+
+// Route to get all orders with pagination
+router.get("/api/yorksys-orders", getYorksysOrdersPagination);
+
+router.get("/api/yorksys-orders/:moNo", getYorksysOrder);
 
 // ROUTE: To update the product type of a specific order by its ID
 router.put(
