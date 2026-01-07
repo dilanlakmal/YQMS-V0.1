@@ -13,6 +13,8 @@ export { default as CompletionModal } from '../washing-modal/CompletionModal';
 export { default as EditReportModal } from '../washing-modal/EditReportModal';
 export { default as QRCodeModal } from '../washing-modal/QRCodeModal';
 export { default as QRScannerModal } from '../washing-modal/QRScannerModal';
+export { default as DeleteConfirmationModal } from '../washing-modal/DeleteConfirmationModal';
+export { default as EditImagesModal } from '../washing-modal/EditImagesModal';
 
 // Export custom hooks
 export { useOrderData } from '../hooks/useOrderData';

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef } from "react";
 import { X, Camera, Upload, RotateCw, CheckCircle } from "lucide-react";
 
 const CompletionModal = ({
@@ -15,6 +15,8 @@ const CompletionModal = ({
   completionImageRotations,
   setCompletionImageRotations,
 }) => {
+  const uploadInputRef = useRef(null);
+
   if (!isOpen) return null;
 
   return (
@@ -84,14 +86,7 @@ const CompletionModal = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
-                    input.multiple = true;
-                    input.onchange = (e) => handleCompletionImageUpload(e.target.files);
-                    input.click();
-                  }}
+                  onClick={() => uploadInputRef.current?.click()}
                   className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
                 >
                   <Upload size={18} className="mr-2" />
@@ -102,13 +97,25 @@ const CompletionModal = ({
                 ref={completionImageInputRef}
                 type="file"
                 className="hidden"
-                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
+                accept="image/*;capture=camera"
                 capture="environment"
-                multiple
                 onChange={(e) => {
                   handleCompletionImageUpload(e.target.files);
                   if (completionImageInputRef.current) {
                     completionImageInputRef.current.value = "";
+                  }
+                }}
+              />
+              <input
+                ref={uploadInputRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  handleCompletionImageUpload(e.target.files);
+                  if (uploadInputRef.current) {
+                    uploadInputRef.current.value = "";
                   }
                 }}
               />

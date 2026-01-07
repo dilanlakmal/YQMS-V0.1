@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+﻿import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useSearchParams } from "react-router-dom";
@@ -19,6 +19,8 @@ import {
   ReportsList,
   ReceivedModal,
   CompletionModal,
+  DeleteConfirmationModal,
+  EditImagesModal,
   EditReportModal,
   QRCodeModal,
   QRScannerModal,
@@ -44,7 +46,7 @@ const LaundryWashingMachineTest = () => {
   // Get the base URL for QR codes - use computer's network IP so phones can access
   const getQRCodeBaseURL = () => {
     const currentProtocol = window.location.protocol; // Get current protocol (http: or https:)
-    
+
     if (QR_CODE_BASE_URL) {
       // This ensures QR codes use the same protocol as the current page (HTTP/HTTPS)
       try {
@@ -61,7 +63,7 @@ const LaundryWashingMachineTest = () => {
         return `${currentProtocol}//${QR_CODE_BASE_URL.replace(/^\/\//, '')}`;
       }
     }
-    
+
     const origin = window.location.origin;
     const hostname = window.location.hostname;
     if (hostname === "localhost" || hostname === "127.0.0.1") {
@@ -84,7 +86,7 @@ const LaundryWashingMachineTest = () => {
   };
 
   const { formData, setFormData, handleInputChange: handleFormInputChange, resetForm } = useFormState(initialFormData);
-  
+
   const {
     reports,
     isLoadingReports,
@@ -213,10 +215,7 @@ const LaundryWashingMachineTest = () => {
   const [showEditColorDropdown, setShowEditColorDropdown] = useState(false);
   const [showEditPODropdown, setShowEditPODropdown] = useState(false);
   const [showEditETDDropdown, setShowEditETDDropdown] = useState(false);
-  const editImageInputRef = useRef(null);
-  const editInitialImagesInputRef = useRef(null);
-  const editReceivedImagesInputRef = useRef(null);
-  const editCompletionImagesInputRef = useRef(null);
+
 
   // Tab state
   const [activeTab, setActiveTab] = useState("form"); // "form" or "reports"
@@ -227,7 +226,7 @@ const LaundryWashingMachineTest = () => {
   const [orderNoSuggestions, setOrderNoSuggestions] = useState([]);
   const [showOrderNoSuggestions, setShowOrderNoSuggestions] = useState(false);
   const [isSearchingOrderNo, setIsSearchingOrderNo] = useState(false);
-  
+
   // Debounce timer for auto-fetching colors when typing
   const colorFetchTimerRef = useRef(null);
 
@@ -255,22 +254,22 @@ const LaundryWashingMachineTest = () => {
     // If Order_No field is being changed, search for suggestions
     if (field === "ymStyle" && value.length >= 2) {
       searchOrderNo(value);
-      
+
       // Clear any existing timer
       if (colorFetchTimerRef.current) {
         clearTimeout(colorFetchTimerRef.current);
         colorFetchTimerRef.current = null;
       }
-      
+
       // Auto-fetch colors when user stops typing (debounced)
       // Only fetch if it looks like a complete YM Style (min 4 chars, starts with letters)
       // Also check that value doesn't contain invalid characters like colons
       const trimmedValue = value.trim();
-      if (trimmedValue.length >= 4 && /^[A-Za-z]{2,}/.test(trimmedValue) && !trimmedValue.includes(':')) {
+      if (trimmedValue.length >= 3 && /^[A-Za-z]/.test(trimmedValue) && !trimmedValue.includes(':')) {
         colorFetchTimerRef.current = setTimeout(() => {
           // Double-check the value hasn't changed while waiting
           // The trimmedValue is captured in closure, so we can safely use it
-          if (trimmedValue.length >= 4 && !trimmedValue.includes(':')) {
+          if (trimmedValue.length >= 3 && !trimmedValue.includes(':')) {
             fetchOrderColors(trimmedValue, setFormData);
             fetchYorksysOrderETD(trimmedValue);
           }
@@ -280,7 +279,7 @@ const LaundryWashingMachineTest = () => {
       setOrderNoSuggestions([]);
       setShowOrderNoSuggestions(false);
       resetOrderData();
-      
+
       // Clear timer if user deletes the value
       if (colorFetchTimerRef.current) {
         clearTimeout(colorFetchTimerRef.current);
@@ -300,7 +299,7 @@ const LaundryWashingMachineTest = () => {
     setIsSearchingOrderNo(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/search-mono?term=${encodeURIComponent(searchTerm)}`
+        `${API_BASE_URL}/api/washing/search-mono?term=${encodeURIComponent(searchTerm)}`
       );
       if (response.ok) {
         const suggestions = await response.json();
@@ -321,13 +320,30 @@ const LaundryWashingMachineTest = () => {
 
   // Handle Order_No selection from suggestions
   const handleOrderNoSelect = async (orderNo) => {
-    // Clear any pending color fetch timer since we're selecting from dropdown
+    // Clear any pending color fetch timer since we're handling the fetch now
     if (colorFetchTimerRef.current) {
       clearTimeout(colorFetchTimerRef.current);
       colorFetchTimerRef.current = null;
     }
-    
-    // Clear color, PO, and ETD when Order_No changes
+
+    // Use case-insensitive comparison to see if we're just confirming what's already typed
+    const currentStyle = (formData.ymStyle || "").trim().toUpperCase();
+    const selectedStyle = (orderNo || "").trim().toUpperCase();
+
+    // If the selected order is the same as typed (even different casing),
+    // just update casing and close suggestions without resetting data
+    if (selectedStyle === currentStyle) {
+      setFormData(prev => ({ ...prev, ymStyle: orderNo }));
+      setShowOrderNoSuggestions(false);
+      setOrderNoSuggestions([]);
+
+      // Still trigger fetches (hook handles duplicate suppression case-insensitively now)
+      fetchOrderColors(orderNo, setFormData);
+      fetchYorksysOrderETD(orderNo);
+      return;
+    }
+
+    // Truly new style selected: Clear color, PO, and ETD
     setFormData((prev) => ({
       ...prev,
       ymStyle: orderNo,
@@ -339,10 +355,8 @@ const LaundryWashingMachineTest = () => {
     setOrderNoSuggestions([]);
     resetOrderData();
 
-    // Fetch colors from dt_orders when Order_No is selected
+    // Fetch colors and ETD for the new style
     await fetchOrderColors(orderNo, setFormData);
-
-    // Check if Order_No == moNo to get access to SKUData and fetch ETD
     await fetchYorksysOrderETD(orderNo);
   };
 
@@ -407,7 +421,10 @@ const LaundryWashingMachineTest = () => {
     handleRemoveImage(
       index,
       formData.images,
-      (prev) => setFormData((prevData) => ({ ...prevData, images: prev })),
+      (updater) => setFormData((prevData) => ({
+        ...prevData,
+        images: typeof updater === 'function' ? updater(prevData.images) : updater
+      })),
       imageRotations,
       setImageRotations
     );
@@ -419,8 +436,8 @@ const LaundryWashingMachineTest = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const success = await submitReport(formData, () => {
-      // Switch to reports tab to show the newly submitted report
-      setActiveTab("reports");
+      // Keep on the form tab for faster subsequent entries
+      // setActiveTab("reports"); // Removed per request
       // Reset form
       resetForm({
         color: [],
@@ -499,7 +516,7 @@ const LaundryWashingMachineTest = () => {
       // Fetch colors
       try {
         const colorResponse = await fetch(
-          `${API_BASE_URL}/api/order-details/${encodeURIComponent(report.ymStyle)}`
+          `${API_BASE_URL}/api/washing/order-details/${encodeURIComponent(report.ymStyle)}`
         );
         if (colorResponse.ok) {
           const orderData = await colorResponse.json();
@@ -846,13 +863,13 @@ const LaundryWashingMachineTest = () => {
       // Use Html5Qrcode to scan QR code from file
       const html5QrCode = new Html5Qrcode('temp-qr-file-scanner');
       let decodedText;
-      
+
       try {
         decodedText = await html5QrCode.scanFile(file, false);
       } catch (scanError) {
         // Clean up temporary container
         document.body.removeChild(tempContainer);
-        
+
         // Check if it's a QR code scanning error
         if (scanError && scanError.message) {
           if (scanError.message.includes("No QR code found") || scanError.message.includes("QR code parse error")) {
@@ -866,7 +883,7 @@ const LaundryWashingMachineTest = () => {
         event.target.value = "";
         return;
       }
-      
+
       // Clean up temporary container
       document.body.removeChild(tempContainer);
 
@@ -964,7 +981,7 @@ const LaundryWashingMachineTest = () => {
       }
     } catch (error) {
       console.error("Error scanning QR code from file:", error);
-      
+
       // Provide more specific error messages based on error type
       if (error.message && error.message.includes("No QR code")) {
         showToast.error("No QR code found in the image. Please make sure the image contains a valid QR code and try again.");
@@ -973,7 +990,7 @@ const LaundryWashingMachineTest = () => {
       } else {
         showToast.error("Failed to scan QR code from file. Please make sure it's a valid QR code image file (PNG, JPG, JPEG) and try again.");
       }
-      
+
       // Clean up temporary container if it exists
       const tempContainer = document.getElementById('temp-qr-file-scanner');
       if (tempContainer) {
@@ -1036,7 +1053,7 @@ const LaundryWashingMachineTest = () => {
 
             // If status changed, close the QR modal and refresh
             if (newStatus !== currentKnownStatus) {
-              console.log(`[QR Polling] ✓ Status changed from ${currentKnownStatus} to ${newStatus} - closing QR modal`);
+              console.log(`[QR Polling] âœ“ Status changed from ${currentKnownStatus} to ${newStatus} - closing QR modal`);
 
               // Clear interval first
               if (statusCheckIntervalRef.current) {
@@ -1049,7 +1066,7 @@ const LaundryWashingMachineTest = () => {
               setShowReportDateScanner(null);
 
               // Show notification
-              showToast.success(`✓ QR Scanned! Report status updated to "${newStatus}"`);
+              showToast.success(`âœ“ QR Scanned! Report status updated to "${newStatus}"`);
 
               // Refresh reports
               await fetchReports();
@@ -1160,7 +1177,7 @@ const LaundryWashingMachineTest = () => {
         // 4. Switch to Reports tab
         setActiveTab("reports");
 
-        showToast.success(`✓ QR Scan Success! Please add images and notes, then save to update status to "Received".`);
+        showToast.success(`âœ“ QR Scan Success! Please add images and notes, then save to update status to "Received".`);
       } else if (currentStatus === "received") {
         // Second scan - Open completion modal
         // 1. Close QR code modal
@@ -1397,10 +1414,10 @@ const LaundryWashingMachineTest = () => {
       const formDataToSubmit = new FormData();
 
       // Determine which field name to use based on type
-      const fieldName = editingImageType === 'initial' 
-        ? 'images' 
-        : editingImageType === 'received' 
-          ? 'receivedImages' 
+      const fieldName = editingImageType === 'initial'
+        ? 'images'
+        : editingImageType === 'received'
+          ? 'receivedImages'
           : 'completionImages';
 
       // Separate new File objects from existing URLs
@@ -1447,7 +1464,7 @@ const LaundryWashingMachineTest = () => {
 
       if (response.ok && result.success) {
         showToast.success("Images updated successfully!");
-        
+
         // Close modal
         setShowEditInitialImagesModal(false);
         setShowEditReceivedImagesModal(false);
@@ -1546,7 +1563,7 @@ const LaundryWashingMachineTest = () => {
       const qrCodeValue = `${getQRCodeBaseURL()}/laundry-washing-machine-test?scan=${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
-      const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} />).toBlob();
+      const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} savedImageRotations={savedImageRotations} />).toBlob();
       const url = URL.createObjectURL(blob);
 
       // Clean up any existing print iframes first
@@ -1691,7 +1708,7 @@ const LaundryWashingMachineTest = () => {
       const qrCodeValue = `REPORT_DATE_SCAN:${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
-      const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} />).toBlob();
+      const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} savedImageRotations={savedImageRotations} />).toBlob();
 
       // Create download link
       const url = URL.createObjectURL(blob);
@@ -1715,7 +1732,7 @@ const LaundryWashingMachineTest = () => {
   // Handle Export Excel for single report
   const handleExportExcel = async (report) => {
     try {
-      await generateWashingMachineTestExcel(report);
+      await generateWashingMachineTestExcel(report, API_BASE_URL);
       showToast.success("Excel file downloaded successfully!");
     } catch (error) {
       console.error("Error exporting Excel:", error);
@@ -1753,7 +1770,7 @@ const LaundryWashingMachineTest = () => {
 
     fetchFactories();
     fetchReports(); // Fetch reports on component mount
-    
+
     // Cleanup timer on unmount
     return () => {
       if (colorFetchTimerRef.current) {
@@ -1893,7 +1910,7 @@ const LaundryWashingMachineTest = () => {
               handleCameraInputChange={handleCameraInputChange}
               triggerFileInput={triggerFileInput}
               triggerCameraInput={triggerCameraInput}
-              handleRemoveImage={handleRemoveImage}
+              handleRemoveImage={handleRemoveImageWrapper}
               fileInputRef={fileInputRef}
               cameraInputRef={cameraInputRef}
               imageRotations={imageRotations}
@@ -1926,661 +1943,9 @@ const LaundryWashingMachineTest = () => {
             />
           )}
 
-          {/* Old Reports Section - Removed */}
-          {false && activeTab === "reports" && (
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                Form Report
-              </h2>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-
-                  {/* YM Style */}
-                  <div className="relative">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      YM Style
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.ymStyle}
-                      onChange={(e) => handleInputChange("ymStyle", e.target.value)}
-                      onFocus={() => {
-                        if (formData.ymStyle.length >= 2) {
-                          searchOrderNo(formData.ymStyle);
-                        }
-                      }}
-                      onBlur={() => {
-                        // Delay hiding suggestions to allow click on suggestion
-                        setTimeout(() => {
-                          setShowOrderNoSuggestions(false);
-                          // Fetch colors if Order_No is entered and looks like a valid style
-                          // Only fetch if it looks like a complete YM Style (starts with letters, min 4 chars)
-                          if (formData.ymStyle && formData.ymStyle.trim().length >= 4) {
-                            const trimmedStyle = formData.ymStyle.trim();
-                            // Only make API calls if it looks like a valid YM Style format
-                            if (/^[A-Za-z]{2,}/.test(trimmedStyle)) {
-                              fetchOrderColors(trimmedStyle);
-                              // Also fetch ETD from yorksys_orders if Order_No == moNo
-                              // Note: Browser console may show 404 errors if style doesn't exist in yorksys_orders
-                              // This is normal browser behavior and cannot be prevented
-                              fetchYorksysOrderETD(trimmedStyle);
-                            }
-                          }
-                        }, 200);
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      required
-                      placeholder="Search from Yorksys"
-                    />
-                    {isSearchingOrderNo && (
-                      <div className="absolute right-3 top-9 text-gray-400">
-                        <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                      </div>
-                    )}
-                    {showOrderNoSuggestions && orderNoSuggestions.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                        {orderNoSuggestions.map((orderNo, index) => (
-                          <div
-                            key={index}
-                            onClick={() => handleOrderNoSelect(orderNo)}
-                            className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-900 dark:text-white"
-                          >
-                            {orderNo}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* COLOR - Multi-Select */}
-                  <div className="relative color-dropdown-container">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      COLOR
-                    </label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowColorDropdown(!showColorDropdown)}
-                        disabled={isLoadingColors || !formData.ymStyle || availableColors.length === 0}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span className="truncate">
-                          {isLoadingColors
-                            ? "Loading colors..."
-                            : !formData.ymStyle
-                              ? "Select Order_No first"
-                              : availableColors.length === 0
-                                ? "No colors available"
-                                : formData.color.length === 0
-                                  ? "Select Color(s)"
-                                  : formData.color.length === availableColors.length
-                                    ? "All colors selected"
-                                    : `${formData.color.length} color(s) selected`}
-                        </span>
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showColorDropdown ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-
-                      {showColorDropdown && availableColors.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                          <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  color: [...availableColors],
-                                }));
-                              }}
-                              className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                            >
-                              Select All
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  color: [],
-                                }));
-                              }}
-                              className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                            >
-                              Clear All
-                            </button>
-                          </div>
-                          <div className="p-2">
-                            <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                              Available Colors:
-                            </div>
-                            <div className="space-y-1">
-                              {availableColors.map((color, index) => (
-                                <label
-                                  key={index}
-                                  className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                >
-                                  <input
-                                    type="checkbox"
-                                    checked={formData.color.includes(color)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          color: [...prev.color, color],
-                                        }));
-                                      } else {
-                                        setFormData((prev) => ({
-                                          ...prev,
-                                          color: prev.color.filter((c) => c !== color),
-                                        }));
-                                      }
-                                    }}
-                                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                  />
-                                  <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                    {color}
-                                  </span>
-                                </label>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    {formData.ymStyle && availableColors.length > 0 && (
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {availableColors.length} color(s) available
-                      </p>
-                    )}
-                  </div>
-
-
-                  {/* Buyer Style */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Buyer Style <span className="text-gray-400 text-xs">(Optional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.buyerStyle}
-                      readOnly
-                      placeholder="Select YM Style first"
-                      className="w-full px-3 py-2 border border-gray-300  rounded-md  cursor-not-allowed"
-                    />
-                  </div>
-
-                  {/* PO - Multi-Select */}
-                  <div className="relative po-dropdown-container">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      PO <span className="text-gray-400 text-xs">(Optional)</span>
-                    </label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowPODropdown(!showPODropdown)}
-                        disabled={!formData.ymStyle}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span className="truncate">
-                          {!formData.ymStyle
-                            ? "Select YM Style first"
-                            : availablePOs.length === 0
-                              ? "No PO available (Optional)"
-                              : formData.po.length === 0
-                                ? "Select PO(s) (Optional)"
-                                : formData.po.length === availablePOs.length
-                                  ? "All PO(s) selected"
-                                  : `${formData.po.length} PO(s) selected`}
-                        </span>
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showPODropdown ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-
-                      {showPODropdown && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                          {availablePOs.length > 0 ? (
-                            <>
-                              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      po: [...availablePOs],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                >
-                                  Select All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      po: [],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                              <div className="p-2">
-                                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                  Available PO(s):
-                                </div>
-                                <div className="space-y-1">
-                                  {availablePOs.map((po, index) => (
-                                    <label
-                                      key={index}
-                                      className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={formData.po.includes(po)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setFormData((prev) => ({
-                                              ...prev,
-                                              po: [...prev.po, po],
-                                            }));
-                                          } else {
-                                            setFormData((prev) => ({
-                                              ...prev,
-                                              po: prev.po.filter((p) => p !== po),
-                                            }));
-                                          }
-                                        }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                      />
-                                      <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                        {po}
-                                      </span>
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                              No PO available. This field is optional.
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {formData.ymStyle && availablePOs.length > 0 && (
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {availablePOs.length} PO(s) available
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Ex Fty Date - Multi-Select */}
-                  <div className="relative etd-dropdown-container">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Ex Fty Date <span className="text-gray-400 text-xs">(Optional)</span>
-                    </label>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowETDDropdown(!showETDDropdown)}
-                        disabled={!formData.ymStyle}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <span className="truncate">
-                          {!formData.ymStyle
-                            ? "Select YM Style first"
-                            : availableETDs.length === 0
-                              ? "No ETD dates available (Optional)"
-                              : formData.exFtyDate.length === 0
-                                ? "Select ETD Date(s) (Optional)"
-                                : formData.exFtyDate.length === availableETDs.length
-                                  ? "All ETD dates selected"
-                                  : `${formData.exFtyDate.length} date(s) selected`}
-                        </span>
-                        <svg
-                          className={`w-4 h-4 transition-transform ${showETDDropdown ? 'rotate-180' : ''}`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      </button>
-
-                      {showETDDropdown && (
-                        <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                          {availableETDs.length > 0 ? (
-                            <>
-                              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      exFtyDate: [...availableETDs],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                >
-                                  Select All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setFormData((prev) => ({
-                                      ...prev,
-                                      exFtyDate: [],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                              <div className="p-2">
-                                <div className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                  Available ETD Dates:
-                                </div>
-                                <div className="space-y-1">
-                                  {availableETDs.map((etd, index) => (
-                                    <label
-                                      key={index}
-                                      className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        checked={formData.exFtyDate.includes(etd)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setFormData((prev) => ({
-                                              ...prev,
-                                              exFtyDate: [...prev.exFtyDate, etd],
-                                            }));
-                                          } else {
-                                            setFormData((prev) => ({
-                                              ...prev,
-                                              exFtyDate: prev.exFtyDate.filter((d) => d !== etd),
-                                            }));
-                                          }
-                                        }}
-                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                      />
-                                      <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                        {etd}
-                                      </span>
-                                    </label>
-                                  ))}
-                                </div>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">
-                              No ETD dates available. This field is optional.
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                    {formData.ymStyle && availableETDs.length > 0 && (
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        {availableETDs.length} ETD date(s) available
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Factory */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Factory
-                    </label>
-                    <Select
-                      value={formData.factory ? { value: formData.factory, label: formData.factory } : null}
-                      onChange={(selectedOption) => {
-                        handleInputChange("factory", selectedOption ? selectedOption.value : "");
-                      }}
-                      options={factories.map((factory) => ({
-                        value: factory.factory,
-                        label: factory.factory
-                      }))}
-                      placeholder="Select Factory"
-                      isSearchable={true}
-                      isClearable={true}
-                      isLoading={isLoadingFactories}
-                      isDisabled={isLoadingFactories}
-                      className="react-select-container"
-                      classNamePrefix="react-select"
-                      styles={{
-                        control: (baseStyles, state) => ({
-                          ...baseStyles,
-                          borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-                          boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
-                          minHeight: '42px',
-                          backgroundColor: '#ffffff',
-                          cursor: 'pointer',
-                          '&:hover': {
-                            borderColor: '#3b82f6',
-                          },
-                        }),
-                        menu: (baseStyles) => ({
-                          ...baseStyles,
-                          zIndex: 9999,
-                        }),
-                        option: (baseStyles, state) => ({
-                          ...baseStyles,
-                          backgroundColor: state.isSelected
-                            ? '#3b82f6'
-                            : state.isFocused
-                              ? '#eff6ff'
-                              : '#ffffff',
-                          color: state.isSelected ? '#ffffff' : '#1f2937',
-                          cursor: 'pointer',
-                          '&:active': {
-                            backgroundColor: '#3b82f6',
-                            color: '#ffffff',
-                          },
-                        }),
-                        indicatorSeparator: () => ({
-                          display: 'none',
-                        }),
-                        dropdownIndicator: (baseStyles) => ({
-                          ...baseStyles,
-                          cursor: 'pointer',
-                        }),
-                        clearIndicator: (baseStyles) => ({
-                          ...baseStyles,
-                          cursor: 'pointer',
-                        }),
-                      }}
-                      theme={(theme) => ({
-                        ...theme,
-                        colors: {
-                          ...theme.colors,
-                          primary: '#3b82f6',
-                          primary25: '#eff6ff',
-                          primary50: '#dbeafe',
-                          primary75: '#93c5fd',
-                        },
-                      })}
-                    />
-                    {isLoadingFactories && (
-                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        Loading factories...
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Report Date */}
-                  {/* SEND To Home Washing Date */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      SEND To Home Washing Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.sendToHomeWashingDate}
-                      onChange={(e) => handleInputChange("sendToHomeWashingDate", e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      required
-                    />
-                  </div>
 
 
 
-
-
-                  {/* Image Upload */}
-                  <div className="md:col-span-2 lg:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Images
-                    </label>
-                    <div className="mt-1 space-y-4">
-                      {/* Image Preview Area */}
-                      {formData.images.length > 0 ? (
-                        <div className="space-y-4">
-                          {formData.images.map((imageFile, index) => {
-                            // Create preview URL from File object
-                            const imageUrl = URL.createObjectURL(imageFile);
-                            return (
-                              <div
-                                key={index}
-                                className="relative border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-3"
-                              >
-                                {/* Image Container */}
-                                <div className="relative w-full flex items-center justify-center bg-gray-50 dark:bg-gray-900 rounded-md overflow-hidden">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Preview ${index + 1}`}
-                                    className="max-w-xs max-h-64 object-contain rounded-md"
-                                    onLoad={() => {
-                                      // Clean up the object URL after image loads (optional, for memory management)
-                                      // URL.revokeObjectURL(imageUrl);
-                                    }}
-                                  />
-                                  {/* Control Buttons - Top Right */}
-                                  <div className="absolute top-2 right-2 flex gap-2 z-10">
-                                    {/* Remove Button - Red Circular X */}
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        URL.revokeObjectURL(imageUrl); // Clean up object URL
-                                        handleRemoveImage(index);
-                                      }}
-                                      className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1.5 shadow-lg transition-colors"
-                                      aria-label="Remove image"
-                                      title="Remove"
-                                    >
-                                      <X size={18} />
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        <div className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 p-8">
-                          <div className="text-center text-gray-500 dark:text-gray-400">
-                            <Upload size={40} className="mx-auto mb-2" />
-                            <p>No image selected</p>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Capture and Upload Buttons */}
-                      <div className="flex justify-center space-x-2">
-                        <button
-                          type="button"
-                          onClick={triggerCameraInput}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Camera size={18} className="mr-2" />
-                          Capture
-                        </button>
-                        <button
-                          type="button"
-                          onClick={triggerFileInput}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Upload size={18} className="mr-2" />
-                          Upload
-                        </button>
-                      </div>
-
-                      {/* Hidden File Inputs */}
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        multiple
-                        onChange={handleFileInputChange}
-                      />
-                      <input
-                        ref={cameraInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        capture="environment"
-                        onChange={handleCameraInputChange}
-                      />
-                    </div>
-                  </div>
-
-                 
-
-                  {/* Notes Field */}
-                  <div className="md:col-span-2 lg:col-span-3">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Notes
-                    </label>
-                    <textarea
-                      value={formData.notes}
-                      onChange={(e) => handleInputChange("notes", e.target.value)}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white resize-vertical"
-                      placeholder="Add any additional notes or comments about this report..."
-                    />
-                  </div>
-                </div>
-
-                {/* Submit Button */}
-                <div className="flex justify-end pt-4">
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <RotateCw className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    {isSubmitting ? "Submitting..." : "Submit Report"}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-        
 
           {/* Modals */}
           <ReceivedModal
@@ -2660,43 +2025,14 @@ const LaundryWashingMachineTest = () => {
             onSubmit={handleEditSubmit}
           />
 
-          {/* Delete Confirmation Modal */}
-          {showDeleteConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full">
-                <div className="p-6">
-                  <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 rounded-full bg-red-100 dark:bg-red-900/20">
-                    <Trash2 className="w-6 h-6 text-red-600 dark:text-red-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white text-center mb-2">
-                    Delete Report
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 text-center mb-6">
-                    Are you sure you want to delete this report?
-                  </p>
-                  <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowDeleteConfirm(false);
-                        setReportToDelete(null);
-                      }}
-                      className="flex-1 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={confirmDelete}
-                      className="flex-1 px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 rounded-md transition-colors"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <DeleteConfirmationModal
+            isOpen={showDeleteConfirm}
+            onClose={() => {
+              setShowDeleteConfirm(false);
+              setReportToDelete(null);
+            }}
+            onConfirm={confirmDelete}
+          />
 
           <QRCodeModal
             isOpen={!!showReportDateQR}
@@ -2718,1205 +2054,60 @@ const LaundryWashingMachineTest = () => {
             scannerElementId={showReportDateScanner ? `report-date-scanner-${showReportDateScanner}` : ""}
           />
 
-          {/* Old Received Modal - Removed */}
-          {false && showReceivedModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    Received Report
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Please upload images and add notes for this received report.
-                  </p>
-
-                  {/* Received Images */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Received Images
-                    </label>
-                    <div className="space-y-4">
-                      {receivedImages.length > 0 && (
-                        <div className="flex flex-row gap-2 overflow-x-auto">
-                          {receivedImages.map((imageFile, index) => {
-                            const imageUrl = URL.createObjectURL(imageFile);
-                            const rotation = receivedImageRotations[index] || 0;
-                            return (
-                              <div key={index} className="relative w-32 h-32 flex-shrink-0 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Received ${index + 1}`}
-                                    className="max-w-full max-h-full object-contain transition-transform duration-300"
-                                    style={{ transform: `rotate(${rotation}deg)` }}
-                                  />
-                                </div>
-                                {/* Control Buttons */}
-                                <div className="absolute top-1 right-1 flex flex-col gap-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      URL.revokeObjectURL(imageUrl);
-                                      setReceivedImages((prev) => prev.filter((_, i) => i !== index));
-                                      setReceivedImageRotations((prev) => {
-                                        const newRotations = { ...prev };
-                                        delete newRotations[index];
-                                        return newRotations;
-                                      });
-                                    }}
-                                    className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-                                    title="Remove"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => receivedImageInputRef.current?.click()}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Camera size={18} className="mr-2" />
-                          Capture
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
-                            input.multiple = true;
-                            input.onchange = (e) => handleReceivedImageUpload(e.target.files);
-                            input.click();
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Upload size={18} className="mr-2" />
-                          Upload
-                        </button>
-                      </div>
-                      <input
-                        ref={receivedImageInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => {
-                          handleReceivedImageUpload(e.target.files);
-                          if (receivedImageInputRef.current) {
-                            receivedImageInputRef.current.value = "";
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Received Notes */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={receivedNotes}
-                      onChange={(e) => setReceivedNotes(e.target.value)}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      placeholder="Enter received notes..."
-                    />
-                  </div>
-
-                  {/* Modal Actions */}
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowReceivedModal(false);
-                        setReceivedReportId(null);
-                        setReceivedImages([]);
-                        setReceivedNotes("");
-                        setShouldUpdateReceivedStatus(false); // Clear the flag when canceling
-                        setReceivedImageRotations({}); // Clear received image rotations
-                      }}
-                      className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleReceivedSubmit}
-                      disabled={isSavingReceived}
-                      className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isSavingReceived ? (
-                        <RotateCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      {isSavingReceived ? "Saving..." : "Save Received Details"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Completion Modal */}
-          {showCompletionModal && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    Complete Report
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                    Please upload images and add notes to complete this report.
-                  </p>
-
-                  {/* Completion Images */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Completion Images
-                    </label>
-                    <div className="space-y-4">
-                      {completionImages.length > 0 && (
-                        <div className="flex flex-row gap-2 overflow-x-auto">
-                          {completionImages.map((imageFile, index) => {
-                            const imageUrl = URL.createObjectURL(imageFile);
-                            const rotation = completionImageRotations[index] || 0;
-                            return (
-                              <div key={index} className="relative w-32 h-32 flex-shrink-0 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Completion ${index + 1}`}
-                                    className="max-w-full max-h-full object-contain transition-transform duration-300"
-                                    style={{ transform: `rotate(${rotation}deg)` }}
-                                  />
-                                </div>
-                                {/* Control Buttons */}
-                                <div className="absolute top-1 right-1 flex flex-col gap-1">
-                                  
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      URL.revokeObjectURL(imageUrl);
-                                      setCompletionImages((prev) => prev.filter((_, i) => i !== index));
-                                      setCompletionImageRotations((prev) => {
-                                        const newRotations = { ...prev };
-                                        delete newRotations[index];
-                                        return newRotations;
-                                      });
-                                    }}
-                                    className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-                                    title="Remove"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => completionImageInputRef.current?.click()}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Camera size={18} className="mr-2" />
-                          Capture
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
-                            input.multiple = true;
-                            input.onchange = (e) => handleCompletionImageUpload(e.target.files);
-                            input.click();
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Upload size={18} className="mr-2" />
-                          Upload
-                        </button>
-                      </div>
-                      <input
-                        ref={completionImageInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => {
-                          handleCompletionImageUpload(e.target.files);
-                          if (completionImageInputRef.current) {
-                            completionImageInputRef.current.value = "";
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Completion Notes */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Notes
-                    </label>
-                    <textarea
-                      value={completionNotes}
-                      onChange={(e) => setCompletionNotes(e.target.value)}
-                      rows={4}
-                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                      placeholder="Enter completion notes..."
-                    />
-                  </div>
-
-                  {/* Modal Actions */}
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowCompletionModal(false);
-                        setCompletionReportId(null);
-                        setCompletionImages([]);
-                        setCompletionNotes("");
-                        setCompletionImageRotations({}); // Clear completion image rotations
-                      }}
-                      className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCompletionSubmit}
-                      disabled={isSavingCompletion}
-                      className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isSavingCompletion ? (
-                        <RotateCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <CheckCircle className="w-4 h-4" />
-                      )}
-                      {isSavingCompletion ? "Completing..." : "Complete Report"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Edit Report Modal */}
-          {showEditModal && editingReport && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
-              onClick={() => {
-                setShowEditModal(false);
-                setEditingReport(null);
-              }}
-            >
-              <div
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full my-8"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    Edit Report - {editingReport.ymStyle || "N/A"}
-                  </h3>
-
-                  <form onSubmit={handleEditSubmit} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Buyer Style - Read Only */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Buyer Style
-                        </label>
-                        <input
-                          type="text"
-                          value={editFormData.buyerStyle}
-                          readOnly
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md cursor-not-allowed bg-gray-100 dark:bg-gray-700"
-                        />
-                      </div>
-
-                      {/* Color - Multi-Select */}
-                      <div className="relative color-dropdown-container">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          COLOR <span className="text-red-500">*</span>
-                        </label>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditColorDropdown(!showEditColorDropdown)}
-                            disabled={editAvailableColors.length === 0}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <span className="truncate">
-                              {editAvailableColors.length === 0
-                                ? "No colors available"
-                                : editFormData.color.length === 0
-                                  ? "Select Color(s)"
-                                  : editFormData.color.length === editAvailableColors.length
-                                    ? "All colors selected"
-                                    : `${editFormData.color.length} color(s) selected`}
-                            </span>
-                            <svg
-                              className={`w-4 h-4 transition-transform ${showEditColorDropdown ? 'rotate-180' : ''}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          {showEditColorDropdown && editAvailableColors.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditFormData((prev) => ({
-                                      ...prev,
-                                      color: [...editAvailableColors],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                >
-                                  Select All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditFormData((prev) => ({
-                                      ...prev,
-                                      color: [],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                              <div className="p-2">
-                                {editAvailableColors.map((color, index) => (
-                                  <label
-                                    key={index}
-                                    className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={editFormData.color.includes(color)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setEditFormData((prev) => ({
-                                            ...prev,
-                                            color: [...prev.color, color],
-                                          }));
-                                        } else {
-                                          setEditFormData((prev) => ({
-                                            ...prev,
-                                            color: prev.color.filter((c) => c !== color),
-                                          }));
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                      {color}
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* PO - Multi-Select */}
-                      <div className="relative po-dropdown-container">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          PO <span className="text-gray-400 text-xs">(Optional)</span>
-                        </label>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditPODropdown(!showEditPODropdown)}
-                            disabled={editAvailablePOs.length === 0}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <span className="truncate">
-                              {editAvailablePOs.length === 0
-                                ? "No PO available (Optional)"
-                                : editFormData.po.length === 0
-                                  ? "Select PO(s) (Optional)"
-                                  : editFormData.po.length === editAvailablePOs.length
-                                    ? "All PO(s) selected"
-                                    : `${editFormData.po.length} PO(s) selected`}
-                            </span>
-                            <svg
-                              className={`w-4 h-4 transition-transform ${showEditPODropdown ? 'rotate-180' : ''}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          {showEditPODropdown && editAvailablePOs.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditFormData((prev) => ({
-                                      ...prev,
-                                      po: [...editAvailablePOs],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                >
-                                  Select All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditFormData((prev) => ({
-                                      ...prev,
-                                      po: [],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                              <div className="p-2">
-                                {editAvailablePOs.map((po, index) => (
-                                  <label
-                                    key={index}
-                                    className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={editFormData.po.includes(po)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setEditFormData((prev) => ({
-                                            ...prev,
-                                            po: [...prev.po, po],
-                                          }));
-                                        } else {
-                                          setEditFormData((prev) => ({
-                                            ...prev,
-                                            po: prev.po.filter((p) => p !== po),
-                                          }));
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                      {po}
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Ex Fty Date - Multi-Select */}
-                      <div className="relative etd-dropdown-container">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Ex Fty Date <span className="text-gray-400 text-xs">(Optional)</span>
-                        </label>
-                        <div className="relative">
-                          <button
-                            type="button"
-                            onClick={() => setShowEditETDDropdown(!showEditETDDropdown)}
-                            disabled={editAvailableETDs.length === 0}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white text-left flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <span className="truncate">
-                              {editAvailableETDs.length === 0
-                                ? "No ETD dates available (Optional)"
-                                : editFormData.exFtyDate.length === 0
-                                  ? "Select ETD Date(s) (Optional)"
-                                  : editFormData.exFtyDate.length === editAvailableETDs.length
-                                    ? "All ETD dates selected"
-                                    : `${editFormData.exFtyDate.length} date(s) selected`}
-                            </span>
-                            <svg
-                              className={`w-4 h-4 transition-transform ${showEditETDDropdown ? 'rotate-180' : ''}`}
-                              fill="none"
-                              stroke="currentColor"
-                              viewBox="0 0 24 24"
-                            >
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          </button>
-
-                          {showEditETDDropdown && editAvailableETDs.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                              <div className="p-2 border-b border-gray-200 dark:border-gray-700 flex gap-2 sticky top-0 bg-white dark:bg-gray-800 z-10">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditFormData((prev) => ({
-                                      ...prev,
-                                      exFtyDate: [...editAvailableETDs],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-                                >
-                                  Select All
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditFormData((prev) => ({
-                                      ...prev,
-                                      exFtyDate: [],
-                                    }));
-                                  }}
-                                  className="px-3 py-1 text-xs bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                              <div className="p-2">
-                                {editAvailableETDs.map((etd, index) => (
-                                  <label
-                                    key={index}
-                                    className="flex items-center p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded cursor-pointer"
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={editFormData.exFtyDate.includes(etd)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setEditFormData((prev) => ({
-                                            ...prev,
-                                            exFtyDate: [...prev.exFtyDate, etd],
-                                          }));
-                                        } else {
-                                          setEditFormData((prev) => ({
-                                            ...prev,
-                                            exFtyDate: prev.exFtyDate.filter((d) => d !== etd),
-                                          }));
-                                        }
-                                      }}
-                                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                                    />
-                                    <span className="ml-2 text-sm text-gray-900 dark:text-white">
-                                      {etd}
-                                    </span>
-                                  </label>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Factory */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Factory
-                        </label>
-                        <Select
-                          value={editFormData.factory ? { value: editFormData.factory, label: editFormData.factory } : null}
-                          onChange={(selectedOption) => {
-                            setEditFormData((prev) => ({
-                              ...prev,
-                              factory: selectedOption ? selectedOption.value : "",
-                            }));
-                          }}
-                          options={factories.map((factory) => ({
-                            value: factory.factory,
-                            label: factory.factory
-                          }))}
-                          placeholder="Select Factory"
-                          isSearchable={true}
-                          isClearable={true}
-                          isLoading={isLoadingFactories}
-                          isDisabled={isLoadingFactories}
-                          className="react-select-container"
-                          classNamePrefix="react-select"
-                          styles={{
-                            control: (baseStyles, state) => ({
-                              ...baseStyles,
-                              borderColor: state.isFocused ? '#3b82f6' : '#d1d5db',
-                              boxShadow: state.isFocused ? '0 0 0 2px rgba(59, 130, 246, 0.2)' : 'none',
-                              minHeight: '42px',
-                              backgroundColor: '#ffffff',
-                              cursor: 'pointer',
-                              '&:hover': {
-                                borderColor: '#3b82f6',
-                              },
-                            }),
-                            menu: (baseStyles) => ({
-                              ...baseStyles,
-                              zIndex: 9999,
-                            }),
-                            option: (baseStyles, state) => ({
-                              ...baseStyles,
-                              backgroundColor: state.isSelected
-                                ? '#3b82f6'
-                                : state.isFocused
-                                  ? '#eff6ff'
-                                  : '#ffffff',
-                              color: state.isSelected ? '#ffffff' : '#1f2937',
-                              cursor: 'pointer',
-                              '&:active': {
-                                backgroundColor: '#3b82f6',
-                                color: '#ffffff',
-                              },
-                            }),
-                            indicatorSeparator: () => ({
-                              display: 'none',
-                            }),
-                            dropdownIndicator: (baseStyles) => ({
-                              ...baseStyles,
-                              cursor: 'pointer',
-                            }),
-                            clearIndicator: (baseStyles) => ({
-                              ...baseStyles,
-                              cursor: 'pointer',
-                            }),
-                          }}
-                          theme={(theme) => ({
-                            ...theme,
-                            colors: {
-                              ...theme.colors,
-                              primary: '#3b82f6',
-                              primary25: '#eff6ff',
-                              primary50: '#dbeafe',
-                              primary75: '#93c5fd',
-                            },
-                          })}
-                        />
-                      </div>
-
-                      {/* Send To Home Washing Date */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          SEND To Home Washing Date
-                        </label>
-                        <input
-                          type="date"
-                          value={editFormData.sendToHomeWashingDate}
-                          onChange={(e) => setEditFormData((prev) => ({
-                            ...prev,
-                            sendToHomeWashingDate: e.target.value,
-                          }))}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    {/* Modal Actions */}
-                    <div className="flex justify-end gap-3 mt-6">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowEditModal(false);
-                          setEditingReport(null);
-                          setEditFormData({
-                            color: [],
-                            buyerStyle: "",
-                            po: [],
-                            exFtyDate: [],
-                            factory: "",
-                            sendToHomeWashingDate: "",
-                          });
-                          setEditAvailableColors([]);
-                          setEditAvailablePOs([]);
-                          setEditAvailableETDs([]);
-                        }}
-                        className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        type="submit"
-                        className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-                      >
-                        Update Report
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* QR Code Modal */}
-          {showReportDateQR && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-              onClick={() => setShowReportDateQR(null)}
-            >
-              <div
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full relative"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Close button in top right */}
-                <button
-                  type="button"
-                  onClick={() => setShowReportDateQR(null)}
-                  className="absolute top-0 right-0 m-0 p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-tl-lg rounded-br-lg transition-colors"
-                  aria-label="Close"
-                >
-                  <X size={20} />
-                </button>
-                
-                <div className="p-6">
-                  <div className="flex flex-col items-center">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                      Scan this QR code to set Report Date
-                    </h3>
-                    <div 
-                      id={`qr-code-${showReportDateQR}`}
-                      className="bg-white p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-4 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
-                      onClick={() => downloadQRCode(showReportDateQR)}
-                      title="Click to download QR code"
-                    >
-                      <QRCode
-                        value={`${getQRCodeBaseURL()}/laundry-washing-machine-test?scan=${showReportDateQR}`}
-                        size={256}
-                        style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                      />
-                    </div>
-                    <div className="w-full">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        ref={fileInputRef}
-                        onChange={(e) => handleQRCodeFileUpload(e, showReportDateQR)}
-                        className="hidden"
-                        id={`qr-upload-${showReportDateQR}`}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const input = document.getElementById(`qr-upload-${showReportDateQR}`);
-                          if (input) input.click();
-                        }}
-                        className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Upload size={16} />
-                        Upload QR Code to Scan
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* QR Code Scanner Modal */}
-          {showReportDateScanner && (
-            <div
-              className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-              onClick={() => {
-                stopScanner();
-                setShowReportDateScanner(null);
-              }}
-            >
-              <div
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <div className="p-6">
-                  <div className="flex flex-col items-center">
-                    <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-                      Scan QR code to capture Report Date
-                    </h3>
-                    <div
-                      id={`report-date-scanner-${showReportDateScanner}`}
-                      className="w-full max-w-md mb-4"
-                      style={{ minHeight: "300px" }}
-                    ></div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        stopScanner();
-                        setShowReportDateScanner(null);
-                      }}
-                      className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      Close Scanner
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* Edit Initial Images Modal */}
-          {showEditInitialImagesModal && editingImageReport && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    Edit Initial Images - {editingImageReport.ymStyle || "N/A"}
-                  </h3>
-                  
-                  {/* Current Images */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Images ({editingImages.length})
-                    </label>
-                    <div className="space-y-4">
-                      {editingImages.length > 0 && (
-                        <div className="flex flex-row flex-wrap gap-2">
-                          {editingImages.map((image, index) => {
-                            const imageUrl = image instanceof File ? URL.createObjectURL(image) : normalizeImageUrl(image);
-                            return (
-                              <div key={index} className="relative w-32 h-32 flex-shrink-0 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Image ${index + 1}`}
-                                    className="max-w-full max-h-full object-contain"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEditImage(index)}
-                                  className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-                                  title="Remove"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => editInitialImagesInputRef.current?.click()}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Camera size={18} className="mr-2" />
-                          Capture
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
-                            input.multiple = true;
-                            input.onchange = (e) => handleEditImageUpload(e.target.files, 'initial');
-                            input.click();
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Upload size={18} className="mr-2" />
-                          Upload
-                        </button>
-                      </div>
-                      <input
-                        ref={editInitialImagesInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => {
-                          handleEditImageUpload(e.target.files, 'initial');
-                          if (editInitialImagesInputRef.current) {
-                            editInitialImagesInputRef.current.value = "";
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Modal Actions */}
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowEditInitialImagesModal(false);
-                        setEditingImageReport(null);
-                        setEditingImageType(null);
-                        setEditingImages([]);
-                      }}
-                      className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleUpdateImages}
-                      disabled={isUpdatingImages}
-                      className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isUpdatingImages ? (
-                        <RotateCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      {isUpdatingImages ? "Updating..." : "Update Images"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <EditImagesModal
+            isOpen={showEditInitialImagesModal}
+            onClose={() => {
+              setShowEditInitialImagesModal(false);
+              setEditingImageReport(null);
+              setEditingImageType(null);
+              setEditingImages([]);
+            }}
+            title={`Edit Initial Images - ${editingImageReport?.ymStyle || "N/A"}`}
+            images={editingImages}
+            onRemoveImage={handleRemoveEditImage}
+            onUploadImage={(files) => handleEditImageUpload(files, 'initial')}
+            onSave={handleUpdateImages}
+            isSaving={isUpdatingImages}
+            saveButtonColor="blue"
+          />
 
           {/* Edit Received Images Modal */}
-          {showEditReceivedImagesModal && editingImageReport && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    Edit Received Images - {editingImageReport.ymStyle || "N/A"}
-                  </h3>
-                  
-                  {/* Current Images */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Images ({editingImages.length})
-                    </label>
-                    <div className="space-y-4">
-                      {editingImages.length > 0 && (
-                        <div className="flex flex-row flex-wrap gap-2">
-                          {editingImages.map((image, index) => {
-                            const imageUrl = image instanceof File ? URL.createObjectURL(image) : normalizeImageUrl(image);
-                            return (
-                              <div key={index} className="relative w-32 h-32 flex-shrink-0 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Image ${index + 1}`}
-                                    className="max-w-full max-h-full object-contain"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEditImage(index)}
-                                  className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-                                  title="Remove"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => editReceivedImagesInputRef.current?.click()}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Camera size={18} className="mr-2" />
-                          Capture
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
-                            input.multiple = true;
-                            input.onchange = (e) => handleEditImageUpload(e.target.files, 'received');
-                            input.click();
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Upload size={18} className="mr-2" />
-                          Upload
-                        </button>
-                      </div>
-                      <input
-                        ref={editReceivedImagesInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => {
-                          handleEditImageUpload(e.target.files, 'received');
-                          if (editReceivedImagesInputRef.current) {
-                            editReceivedImagesInputRef.current.value = "";
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Modal Actions */}
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowEditReceivedImagesModal(false);
-                        setEditingImageReport(null);
-                        setEditingImageType(null);
-                        setEditingImages([]);
-                      }}
-                      className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleUpdateImages}
-                      disabled={isUpdatingImages}
-                      className="px-4 py-2 text-sm bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isUpdatingImages ? (
-                        <RotateCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      {isUpdatingImages ? "Updating..." : "Update Images"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <EditImagesModal
+            isOpen={showEditReceivedImagesModal}
+            onClose={() => {
+              setShowEditReceivedImagesModal(false);
+              setEditingImageReport(null);
+              setEditingImageType(null);
+              setEditingImages([]);
+            }}
+            title={`Edit Received Images - ${editingImageReport?.ymStyle || "N/A"}`}
+            images={editingImages}
+            onRemoveImage={handleRemoveEditImage}
+            onUploadImage={(files) => handleEditImageUpload(files, 'received')}
+            onSave={handleUpdateImages}
+            isSaving={isUpdatingImages}
+            saveButtonColor="yellow"
+          />
 
           {/* Edit Completion Images Modal */}
-          {showEditCompletionImagesModal && editingImageReport && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                <div className="p-6">
-                  <h3 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">
-                    Edit Completion Images - {editingImageReport.ymStyle || "N/A"}
-                  </h3>
-                  
-                  {/* Current Images */}
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Images ({editingImages.length})
-                    </label>
-                    <div className="space-y-4">
-                      {editingImages.length > 0 && (
-                        <div className="flex flex-row flex-wrap gap-2">
-                          {editingImages.map((image, index) => {
-                            const imageUrl = image instanceof File ? URL.createObjectURL(image) : normalizeImageUrl(image);
-                            return (
-                              <div key={index} className="relative w-32 h-32 flex-shrink-0 rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-700">
-                                <div className="w-full h-full flex items-center justify-center">
-                                  <img
-                                    src={imageUrl}
-                                    alt={`Image ${index + 1}`}
-                                    className="max-w-full max-h-full object-contain"
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveEditImage(index)}
-                                  className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-lg transition-colors"
-                                  title="Remove"
-                                >
-                                  <X size={12} />
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => editCompletionImagesInputRef.current?.click()}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Camera size={18} className="mr-2" />
-                          Capture
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const input = document.createElement("input");
-                            input.type = "file";
-                            input.accept = "image/jpeg,image/jpg,image/png,image/gif,image/webp";
-                            input.multiple = true;
-                            input.onchange = (e) => handleEditImageUpload(e.target.files, 'completion');
-                            input.click();
-                          }}
-                          className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
-                        >
-                          <Upload size={18} className="mr-2" />
-                          Upload
-                        </button>
-                      </div>
-                      <input
-                        ref={editCompletionImagesInputRef}
-                        type="file"
-                        className="hidden"
-                        accept="image/jpeg,image/jpg,image/png,image/gif,image/webp"
-                        capture="environment"
-                        multiple
-                        onChange={(e) => {
-                          handleEditImageUpload(e.target.files, 'completion');
-                          if (editCompletionImagesInputRef.current) {
-                            editCompletionImagesInputRef.current.value = "";
-                          }
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Modal Actions */}
-                  <div className="flex justify-end gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowEditCompletionImagesModal(false);
-                        setEditingImageReport(null);
-                        setEditingImageType(null);
-                        setEditingImages([]);
-                      }}
-                      className="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors flex items-center gap-2"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleUpdateImages}
-                      disabled={isUpdatingImages}
-                      className="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                      {isUpdatingImages ? (
-                        <RotateCw className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                      {isUpdatingImages ? "Updating..." : "Update Images"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
+          <EditImagesModal
+            isOpen={showEditCompletionImagesModal}
+            onClose={() => {
+              setShowEditCompletionImagesModal(false);
+              setEditingImageReport(null);
+              setEditingImageType(null);
+              setEditingImages([]);
+            }}
+            title={`Edit Completion Images - ${editingImageReport?.ymStyle || "N/A"}`}
+            images={editingImages}
+            onRemoveImage={handleRemoveEditImage}
+            onUploadImage={(files) => handleEditImageUpload(files, 'completion')}
+            onSave={handleUpdateImages}
+            isSaving={isUpdatingImages}
+            saveButtonColor="green"
+          />
 
           {/* Image Viewer Modal */}
           <ImageViewerModal

@@ -67,26 +67,65 @@ const styles = StyleSheet.create({
     width: 150,
     height: 150,
     objectFit: "contain"
+  },
+  imagesRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10
+  },
+  imageColumn: {
+    width: "32%"
   }
 });
 
-const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }) => {
+const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, savedImageRotations = {} }) => {
+  // Helper to get rotation for an image URL
+  const getImageRotation = (imageUrl) => {
+    if (!imageUrl || !savedImageRotations) return 0;
+
+    // Use a basic normalization to match the keys in savedImageRotations
+    // This should match the logic in WashingTesting/utils.js
+    const getBaseNormalizedUrl = (url) => {
+      if (!url) return "";
+      if (url.startsWith("data:")) return url;
+
+      let filename = "";
+      if (url.includes("/washing_machine_test/")) {
+        filename = url.split("/washing_machine_test/")[1];
+      } else if (url.includes("washing-test-")) {
+        filename = url.split("/").pop();
+      }
+
+      if (filename) return `${apiBaseUrl}/api/report-washing/image/${filename}`;
+      if (url.startsWith("http://") || url.startsWith("https://")) return url;
+      if (url.startsWith("/storage/")) return `${apiBaseUrl}${url}`;
+      if (url.startsWith("storage/")) return `${apiBaseUrl}/${url}`;
+      if (url.includes(apiBaseUrl)) return url;
+
+      const cleanPath = url.startsWith("/") ? url : `/${url}`;
+      return `${apiBaseUrl}${cleanPath}`;
+    };
+
+    const key = getBaseNormalizedUrl(imageUrl);
+    return savedImageRotations[key] || 0;
+  };
+
   // Normalize image URL for PDF rendering - use image-proxy for better compatibility
   const normalizeImageUrl = (imageUrl) => {
     if (!imageUrl || typeof imageUrl !== 'string') return null;
-    
+
     // If it's a data URL (base64), return as is
     if (imageUrl.startsWith("data:")) {
       return imageUrl;
     }
-    
+
     // Build the full URL first
     let fullUrl = imageUrl;
-    
+
     // If already a full URL, use it
     if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
       fullUrl = imageUrl;
-    } 
+    }
     // Extract filename from URL if it contains washing_machine_test
     else if (imageUrl.includes("/washing_machine_test/")) {
       const filename = imageUrl.split("/washing_machine_test/")[1];
@@ -108,15 +147,19 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }
     else if (apiBaseUrl) {
       fullUrl = `${apiBaseUrl}/storage/washing_machine_test/${imageUrl}`;
     }
-    
+
     // Use image-proxy endpoint for better compatibility with @react-pdf/renderer
     // This helps with CORS and ensures images load properly
     if (apiBaseUrl && fullUrl) {
       return `${apiBaseUrl}/api/image-proxy?url=${encodeURIComponent(fullUrl)}`;
     }
-    
+
     return fullUrl;
   };
+
+  const useCompactLayout = (report.images?.length || 0) <= 1 &&
+    (report.receivedImages?.length || 0) <= 1 &&
+    (report.completionImages?.length || 0) <= 1;
 
   return (
     <Document>
@@ -124,8 +167,8 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }
         <Text style={styles.companyName}>
           Yorkmars (Cambodia) Garment MFG Co., LTD
         </Text>
-        <Text style={styles.title}>Laundry Washing Machine Test Report</Text>
-        
+        <Text style={styles.title}>Launch Washing Machine Test Report</Text>
+
         <View style={styles.section}>
           <View style={styles.row}>
             <View style={styles.col}>
@@ -137,7 +180,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }
               <Text style={styles.value}>{report.buyerStyle || "N/A"}</Text>
             </View>
           </View>
-          
+
           <View style={styles.row}>
             <View style={styles.col}>
               <Text style={styles.label}>Factory:</Text>
@@ -146,19 +189,19 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }
             <View style={styles.col}>
               <Text style={styles.label}>Report Date:</Text>
               <Text style={styles.value}>
-                {report.reportDate 
-                  ? new Date(report.reportDate).toLocaleDateString() 
+                {report.reportDate
+                  ? new Date(report.reportDate).toLocaleDateString()
                   : "N/A"}
               </Text>
             </View>
           </View>
-          
+
           <View style={styles.row}>
             <View style={styles.col}>
               <Text style={styles.label}>Send To Home Washing Date:</Text>
               <Text style={styles.value}>
-                {report.sendToHomeWashingDate 
-                  ? new Date(report.sendToHomeWashingDate).toLocaleDateString() 
+                {report.sendToHomeWashingDate
+                  ? new Date(report.sendToHomeWashingDate).toLocaleDateString()
                   : "N/A"}
               </Text>
             </View>
@@ -167,16 +210,16 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }
               <Text style={styles.value}>{report.engName || report.userName || report.userId || "N/A"}</Text>
             </View>
           </View>
-          
+
           <View style={styles.row}>
             <View style={styles.col}>
               <Text style={styles.label}>Submitted At:</Text>
               <Text style={styles.value}>
-                {report.createdAt 
-                  ? new Date(report.createdAt).toLocaleString() 
-                  : report.submittedAt 
-                  ? new Date(report.submittedAt).toLocaleString()
-                  : "N/A"}
+                {report.createdAt
+                  ? new Date(report.createdAt).toLocaleString()
+                  : report.submittedAt
+                    ? new Date(report.submittedAt).toLocaleString()
+                    : "N/A"}
               </Text>
             </View>
           </View>
@@ -264,63 +307,207 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null }
           </View>
         </View>
 
-        {report.images && report.images.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.label}>Initial Images ({report.images.length}):</Text>
-            <View style={styles.imagesGrid}>
-              {report.images.map((url, idx) => {
-                const normalizedUrl = normalizeImageUrl(url);
-                if (!normalizedUrl) {
-                  return (
-                    <View key={idx} style={styles.imageWrapper}>
-                      <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                    </View>
-                  );
-                }
-                return (
-                  <View key={idx} style={styles.imageWrapper}>
-                    <Image
-                      src={normalizedUrl}
-                      style={styles.image}
-                      cache={false}
-                    />
+        {useCompactLayout ? (
+          <View style={styles.imagesRow}>
+            <View style={styles.imageColumn}>
+              {report.images && report.images.length > 0 && (
+                <>
+                  <Text style={styles.label}>Initial Images ({report.images.length}):</Text>
+                  <View style={styles.imagesGrid}>
+                    {report.images.map((url, idx) => {
+                      const normalizedUrl = normalizeImageUrl(url);
+                      if (!normalizedUrl) {
+                        return (
+                          <View key={idx} style={styles.imageWrapper}>
+                            <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
+                          </View>
+                        );
+                      }
+                      const rotation = getImageRotation(url);
+                      return (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Image
+                            src={normalizedUrl}
+                            style={{
+                              ...styles.image,
+                              transform: rotation ? `rotate(${rotation}deg)` : undefined
+                            }}
+                            cache={false}
+                          />
+                        </View>
+                      );
+                    })}
                   </View>
-                );
-              })}
+                </>
+              )}
             </View>
-          </View>
-        )}
 
-        {report.completionImages && report.completionImages.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.label}>Completion Images ({report.completionImages.length}):</Text>
-            <View style={styles.imagesGrid}>
-              {report.completionImages.map((url, idx) => {
-                const normalizedUrl = normalizeImageUrl(url);
-                if (!normalizedUrl) {
-                  return (
-                    <View key={idx} style={styles.imageWrapper}>
-                      <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                    </View>
-                  );
-                }
-                return (
-                  <View key={idx} style={styles.imageWrapper}>
-                    <Image
-                      src={normalizedUrl}
-                      style={styles.image}
-                      cache={false}
-                    />
+            <View style={styles.imageColumn}>
+              {report.receivedImages && report.receivedImages.length > 0 && (
+                <>
+                  <Text style={styles.label}>Received Images ({report.receivedImages.length}):</Text>
+                  <View style={styles.imagesGrid}>
+                    {report.receivedImages.map((url, idx) => {
+                      const normalizedUrl = normalizeImageUrl(url);
+                      if (!normalizedUrl) {
+                        return (
+                          <View key={idx} style={styles.imageWrapper}>
+                            <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
+                          </View>
+                        );
+                      }
+                      const rotation = getImageRotation(url);
+                      return (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Image
+                            src={normalizedUrl}
+                            style={{
+                              ...styles.image,
+                              transform: rotation ? `rotate(${rotation}deg)` : undefined
+                            }}
+                            cache={false}
+                          />
+                        </View>
+                      );
+                    })}
                   </View>
-                );
-              })}
+                </>
+              )}
+            </View>
+
+            <View style={styles.imageColumn}>
+              {report.completionImages && report.completionImages.length > 0 && (
+                <>
+                  <Text style={styles.label}>Completion Images ({report.completionImages.length}):</Text>
+                  <View style={styles.imagesGrid}>
+                    {report.completionImages.map((url, idx) => {
+                      const normalizedUrl = normalizeImageUrl(url);
+                      if (!normalizedUrl) {
+                        return (
+                          <View key={idx} style={styles.imageWrapper}>
+                            <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
+                          </View>
+                        );
+                      }
+                      const rotation = getImageRotation(url);
+                      return (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Image
+                            src={normalizedUrl}
+                            style={{
+                              ...styles.image,
+                              transform: rotation ? `rotate(${rotation}deg)` : undefined
+                            }}
+                            cache={false}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                </>
+              )}
             </View>
           </View>
+        ) : (
+          <>
+            {report.images && report.images.length > 0 && (
+              <View style={styles.section} wrap={false}>
+                <Text style={styles.label}>Initial Images ({report.images.length}):</Text>
+                <View style={styles.imagesGrid}>
+                  {report.images.map((url, idx) => {
+                    const normalizedUrl = normalizeImageUrl(url);
+                    if (!normalizedUrl) {
+                      return (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
+                        </View>
+                      );
+                    }
+                    const rotation = getImageRotation(url);
+                    return (
+                      <View key={idx} style={styles.imageWrapper}>
+                        <Image
+                          src={normalizedUrl}
+                          style={{
+                            ...styles.image,
+                            transform: rotation ? `rotate(${rotation}deg)` : undefined
+                          }}
+                          cache={false}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {report.receivedImages && report.receivedImages.length > 0 && (
+              <View style={styles.section} wrap={false}>
+                <Text style={styles.label}>Received Images ({report.receivedImages.length}):</Text>
+                <View style={styles.imagesGrid}>
+                  {report.receivedImages.map((url, idx) => {
+                    const normalizedUrl = normalizeImageUrl(url);
+                    if (!normalizedUrl) {
+                      return (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
+                        </View>
+                      );
+                    }
+                    const rotation = getImageRotation(url);
+                    return (
+                      <View key={idx} style={styles.imageWrapper}>
+                        <Image
+                          src={normalizedUrl}
+                          style={{
+                            ...styles.image,
+                            transform: rotation ? `rotate(${rotation}deg)` : undefined
+                          }}
+                          cache={false}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {report.completionImages && report.completionImages.length > 0 && (
+              <View style={styles.section} wrap={false}>
+                <Text style={styles.label}>Completion Images ({report.completionImages.length}):</Text>
+                <View style={styles.imagesGrid}>
+                  {report.completionImages.map((url, idx) => {
+                    const normalizedUrl = normalizeImageUrl(url);
+                    if (!normalizedUrl) {
+                      return (
+                        <View key={idx} style={styles.imageWrapper}>
+                          <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
+                        </View>
+                      );
+                    }
+                    const rotation = getImageRotation(url);
+                    return (
+                      <View key={idx} style={styles.imageWrapper}>
+                        <Image
+                          src={normalizedUrl}
+                          style={{
+                            ...styles.image,
+                            transform: rotation ? `rotate(${rotation}deg)` : undefined
+                          }}
+                          cache={false}
+                        />
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+          </>
         )}
 
         {/* QR Code Section for Report Date Scanning */}
         {qrCodeDataURL && (
-          <View style={styles.section}>
+          <View style={styles.section} wrap={false}>
             {/* <Text style={styles.label}>Scan QR Code to Set Report Date:</Text> */}
             <View style={{ alignItems: "center", marginTop: 10 }}>
               <Image

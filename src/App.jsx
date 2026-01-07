@@ -86,6 +86,7 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 import QCWashingPage from "./pages/QCWashing.jsx";
 import AfterIroning from "./pages/AfterIroning.jsx";
 import LaundryWashingMachineTest from "./pages/LaundryWashingMachineTest.jsx";
+// import QRCodeView from "./pages/QRCodeView.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
 import SubConQC from "./pages/SubConQC.jsx";
@@ -489,6 +490,7 @@ function AppContent() {
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
               <Route path="/laundry-washing-machine-test" element={<LaundryWashingMachineTest />} />
+              {/* <Route path="/qr-code/:reportId" element={<QRCodeView />} /> */}
               <Route path="/sub-con-qc1" element={<SubConQC />} />
               <Route
                 path="/subcon-qa-inspection/view-report/:reportId"

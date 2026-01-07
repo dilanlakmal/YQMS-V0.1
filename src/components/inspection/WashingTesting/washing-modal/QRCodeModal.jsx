@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import { X, Upload } from "lucide-react";
 import QRCode from "react-qr-code";
 
@@ -11,6 +11,12 @@ const QRCodeModal = ({
   getQRCodeBaseURL,
   fileInputRef,
 }) => {
+  const qrCodeContainerRef = useRef(null);
+
+  const handleClick = () => {
+    onDownloadQRCode(reportId);
+  };
+
   if (!isOpen || !reportId) return null;
 
   return (
@@ -31,25 +37,35 @@ const QRCodeModal = ({
         >
           <X size={20} />
         </button>
-        
+
         <div className="p-6">
           <div className="flex flex-col items-center">
             <h3 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
               Scan this QR code to set Report Date
             </h3>
-            <div 
+            <div
+              ref={qrCodeContainerRef}
               id={`qr-code-${reportId}`}
               className="bg-white p-4 rounded-lg border border-gray-200 dark:border-gray-600 mb-4 cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
-              onClick={() => onDownloadQRCode(reportId)}
-              title="Click to download QR code"
+              onClick={handleClick}
+              role="button"
+              tabIndex="0"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  handleClick();
+                }
+              }}
+              title="Click to download"
             >
               <QRCode
                 value={`${getQRCodeBaseURL()}/laundry-washing-machine-test?scan=${reportId}`}
                 size={256}
-                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                style={{ height: "auto", maxWidth: "100%", width: "100%", pointerEvents: "none" }}
               />
             </div>
-            <div className="w-full">
+
+            <div className="w-full space-y-3">
+
               <input
                 type="file"
                 accept="image/*"
@@ -64,7 +80,7 @@ const QRCodeModal = ({
                   const input = document.getElementById(`qr-upload-${reportId}`);
                   if (input) input.click();
                 }}
-                className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+                className="w-full px-4 py-2 text-sm bg-white dark:bg-gray-700 text-gray-700 dark:text-white border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors flex items-center justify-center gap-2"
               >
                 <Upload size={16} />
                 Upload QR Code to Scan

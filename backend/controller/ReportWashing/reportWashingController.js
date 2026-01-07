@@ -1,5 +1,5 @@
 import { ReportWashing } from "../MongoDB/dbConnectionController.js";
-import { API_BASE_URL } from "../../Config/appConfig.js";
+import { API_BASE_URL, io } from "../../Config/appConfig.js";
 import { washingMachineTestUploadPath } from "../../helpers/helperFunctions.js";
 import { __backendDir } from "../../Config/appConfig.js";
 import sharp from "sharp";
@@ -114,6 +114,9 @@ export const saveReportWashing = async (req, res) => {
     const reportWashing = new ReportWashing(reportData);
     const savedData = await reportWashing.save();
 
+    // Emit socket event for real-time updates
+    io.emit("washing-report-created", savedData);
+
     res.status(201).json({
       success: true,
       message: "Report Washing data saved successfully",
@@ -127,9 +130,9 @@ export const saveReportWashing = async (req, res) => {
       error: error.message,
       details: error.errors
         ? Object.keys(error.errors).map((key) => ({
-            field: key,
-            message: error.errors[key].message
-          }))
+          field: key,
+          message: error.errors[key].message
+        }))
         : undefined
     });
   }
@@ -139,17 +142,17 @@ export const saveReportWashing = async (req, res) => {
 export const getReportWashing = async (req, res) => {
   try {
     const { ymStyle, factory, startDate, endDate, limit = 100 } = req.query;
-    
+
     let query = {};
-    
+
     if (ymStyle) {
       query.ymStyle = { $regex: ymStyle, $options: "i" };
     }
-    
+
     if (factory) {
       query.factory = { $regex: factory, $options: "i" };
     }
-    
+
     if (startDate || endDate) {
       query.reportDate = {};
       if (startDate) {
@@ -159,12 +162,12 @@ export const getReportWashing = async (req, res) => {
         query.reportDate.$lte = new Date(endDate);
       }
     }
-    
+
     const reports = await ReportWashing.find(query)
       .sort({ reportDate: -1, createdAt: -1 })
       .limit(parseInt(limit))
       .lean();
-    
+
     res.status(200).json({
       success: true,
       data: reports,
@@ -184,16 +187,16 @@ export const getReportWashing = async (req, res) => {
 export const getReportWashingById = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const report = await ReportWashing.findById(id).lean();
-    
+
     if (!report) {
       return res.status(404).json({
         success: false,
         message: "Report Washing not found"
       });
     }
-    
+
     res.status(200).json({
       success: true,
       data: report
@@ -498,6 +501,9 @@ export const updateReportWashing = async (req, res) => {
       });
     }
 
+    // Emit socket event for real-time updates
+    io.emit("washing-report-updated", updatedReport);
+
     res.status(200).json({
       success: true,
       message: "Report Washing updated successfully",
@@ -517,16 +523,19 @@ export const updateReportWashing = async (req, res) => {
 export const deleteReportWashing = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const deletedReport = await ReportWashing.findByIdAndDelete(id);
-    
+
     if (!deletedReport) {
       return res.status(404).json({
         success: false,
         message: "Report Washing not found"
       });
     }
-    
+
+    // Emit socket event for real-time updates
+    io.emit("washing-report-deleted", id);
+
     res.status(200).json({
       success: true,
       message: "Report Washing deleted successfully",
@@ -546,20 +555,20 @@ export const deleteReportWashing = async (req, res) => {
 export const getWashingMachineTestImage = async (req, res) => {
   try {
     const { filename } = req.params;
-    
+
     // Set CORS headers
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     res.header("Cache-Control", "public, max-age=3600");
-    
+
     if (req.method === "OPTIONS") {
       return res.status(200).end();
     }
-    
+
     // Construct file path
     const filePath = path.join(washingMachineTestUploadPath, filename);
-    
+
     // Check if file exists
     if (!fs.existsSync(filePath)) {
       console.error("Image file not found:", filePath);
@@ -568,19 +577,19 @@ export const getWashingMachineTestImage = async (req, res) => {
         message: "Image not found"
       });
     }
-    
+
     // Determine content type
     const ext = path.extname(filename).toLowerCase();
     let contentType = "image/webp";
     if (ext === ".jpg" || ext === ".jpeg") contentType = "image/jpeg";
     if (ext === ".png") contentType = "image/png";
     if (ext === ".gif") contentType = "image/gif";
-    
+
     // Send file
     res.setHeader("Content-Type", contentType);
     const fileStream = fs.createReadStream(filePath);
     fileStream.pipe(res);
-    
+
   } catch (error) {
     console.error("Error serving washing machine test image:", error);
     res.status(500).json({

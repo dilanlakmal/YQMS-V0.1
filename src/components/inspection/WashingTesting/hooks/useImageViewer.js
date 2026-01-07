@@ -38,11 +38,11 @@ export const useImageViewer = () => {
     // Load saved rotation for this image, or default to 0
     const savedRotation = savedImageRotations[normalizedUrl] || 0;
     const title = imageTitle || getImageFilename(normalizedUrl);
-    
+
     // If images array is provided, normalize all URLs
     const normalizedImages = images ? images.map(url => normalizeImageUrl(url)) : [normalizedUrl];
     const index = images ? currentIndex : 0;
-    
+
     setImageViewer({
       isOpen: true,
       imageUrl: normalizedUrl,
@@ -79,12 +79,12 @@ export const useImageViewer = () => {
   const goToNextImage = useCallback(() => {
     setImageViewer((prev) => {
       if (prev.images.length <= 1) return prev;
-      
+
       const nextIndex = (prev.currentIndex + 1) % prev.images.length;
       const nextImageUrl = prev.images[nextIndex];
       const savedRotation = savedImageRotations[nextImageUrl] || 0;
       const title = getImageFilename(nextImageUrl);
-      
+
       return {
         ...prev,
         currentIndex: nextIndex,
@@ -102,12 +102,12 @@ export const useImageViewer = () => {
   const goToPreviousImage = useCallback(() => {
     setImageViewer((prev) => {
       if (prev.images.length <= 1) return prev;
-      
+
       const prevIndex = (prev.currentIndex - 1 + prev.images.length) % prev.images.length;
       const prevImageUrl = prev.images[prevIndex];
       const savedRotation = savedImageRotations[prevImageUrl] || 0;
       const title = getImageFilename(prevImageUrl);
-      
+
       return {
         ...prev,
         currentIndex: prevIndex,
@@ -126,7 +126,7 @@ export const useImageViewer = () => {
     setImageViewer((prev) => {
       const rotationStep = direction === 'cw' ? 90 : -90;
       const newRotation = (prev.rotation + rotationStep) % 360;
-      
+
       // Save rotation for this image URL
       if (prev.imageUrl) {
         setSavedImageRotations((rotations) => {
@@ -134,20 +134,20 @@ export const useImageViewer = () => {
             ...rotations,
             [prev.imageUrl]: newRotation,
           };
-          
+
           // Save to localStorage
           try {
             localStorage.setItem('washingMachineImageRotations', JSON.stringify(updatedRotations));
           } catch (error) {
             console.error("Error saving rotations to localStorage:", error);
           }
-          
+
           return updatedRotations;
         });
       }
-      
-      return { 
-        ...prev, 
+
+      return {
+        ...prev,
         rotation: newRotation,
         zoom: 1,
         panX: 0,
@@ -197,12 +197,12 @@ export const useImageViewer = () => {
     if (imageViewer.isDragging && imageViewer.zoom > 1) {
       const newPanX = e.clientX - imageViewer.dragStart.x;
       const newPanY = e.clientY - imageViewer.dragStart.y;
-      
+
       // Constrain panning to reasonable bounds
       const maxPan = 500;
       const constrainedPanX = Math.max(-maxPan, Math.min(maxPan, newPanX));
       const constrainedPanY = Math.max(-maxPan, Math.min(maxPan, newPanY));
-      
+
       setImageViewer((prev) => ({
         ...prev,
         panX: constrainedPanX,
@@ -231,7 +231,7 @@ export const useImageViewer = () => {
       // Create an image element to load the image
       const img = new Image();
       img.crossOrigin = 'anonymous';
-      
+
       // Wait for image to load
       await new Promise((resolve, reject) => {
         img.onload = resolve;
@@ -242,24 +242,24 @@ export const useImageViewer = () => {
       // Create canvas to convert to JPG
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
-      
+
       // Calculate canvas dimensions based on rotation
       let canvasWidth = img.width;
       let canvasHeight = img.height;
-      
+
       // If rotated 90 or 270 degrees, swap dimensions
       if (imageViewer.rotation === 90 || imageViewer.rotation === 270 || imageViewer.rotation === -90 || imageViewer.rotation === -270) {
         canvasWidth = img.height;
         canvasHeight = img.width;
       }
-      
+
       canvas.width = canvasWidth;
       canvas.height = canvasHeight;
-      
+
       // Fill white background (JPG doesn't support transparency)
       ctx.fillStyle = '#FFFFFF';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      
+
       // Apply rotation if any
       if (imageViewer.rotation !== 0) {
         ctx.save();
@@ -270,33 +270,33 @@ export const useImageViewer = () => {
       } else {
         ctx.drawImage(img, 0, 0);
       }
-      
+
       // Convert canvas to JPG blob
       canvas.toBlob((blob) => {
         if (!blob) {
           showToast.error("Failed to convert image to JPG.");
           return;
         }
-        
+
         // Create download link
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        
+
         // Extract filename from URL and change extension to .jpg
         const urlParts = imageViewer.imageUrl.split('/');
         let filename = urlParts[urlParts.length - 1] || 'image';
         filename = filename.replace(/\.[^/.]+$/, '') + '.jpg';
         link.download = filename;
-        
+
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
-        
+
         showToast.success("Image downloaded as JPG successfully!");
       }, 'image/jpeg', 0.95);
-      
+
     } catch (error) {
       console.error("Error downloading image:", error);
       showToast.error("Failed to download image. Please try again.");

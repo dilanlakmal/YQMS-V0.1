@@ -68,6 +68,7 @@ import buyerSpec from "./routes/Common/DTOrdersBuyerSpecRoutes.js";
 import buyerSpecPacking from "./routes/Common/DTOrdersBuyerSpecPackingRoutes.js";
 /*-------------DT-Orders Imports --------------*/
 import dtOrders from "./routes/Common/DTOrdersRoutes.js";
+import washingOrderRoutes from "./routes/Common/WashingOrdersRoutes.js";
 
 /* -----------------------------
 Measurement Imports
@@ -340,6 +341,7 @@ app.use(buyerSpec);
 app.use(buyerSpecPacking);
 /* ----------- DT_Orders -----------------*/
 app.use(dtOrders);
+app.use(washingOrderRoutes);
 
 /* -----------------------------
 Measurement Routes

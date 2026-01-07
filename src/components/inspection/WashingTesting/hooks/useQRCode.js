@@ -77,20 +77,20 @@ export const useQRCode = (getQRCodeBaseURL) => {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
-      
+
       const size = 512;
       canvas.width = size;
       canvas.height = size;
-      
+
       const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
       const svgUrl = URL.createObjectURL(svgBlob);
-      
+
       img.onload = () => {
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(svgUrl);
-        
+
         canvas.toBlob((blob) => {
           if (!blob) {
             showToast.error("Failed to generate QR code image.");
@@ -107,12 +107,12 @@ export const useQRCode = (getQRCodeBaseURL) => {
           showToast.success("QR code downloaded successfully!");
         }, 'image/png');
       };
-      
+
       img.onerror = () => {
         showToast.error("Failed to load QR code image.");
         URL.revokeObjectURL(svgUrl);
       };
-      
+
       img.src = svgUrl;
     } catch (error) {
       console.error("Error downloading QR code:", error);
@@ -204,12 +204,12 @@ export const useQRCode = (getQRCodeBaseURL) => {
 
       const html5QrCode = new Html5Qrcode('temp-qr-file-scanner');
       let decodedText;
-      
+
       try {
         decodedText = await html5QrCode.scanFile(file, false);
       } catch (scanError) {
         document.body.removeChild(tempContainer);
-        
+
         if (scanError && scanError.message) {
           if (scanError.message.includes("No QR code found") || scanError.message.includes("QR code parse error")) {
             showToast.error("No QR code found in the image. Please make sure the image contains a valid QR code and try again.");
@@ -222,7 +222,7 @@ export const useQRCode = (getQRCodeBaseURL) => {
         event.target.value = "";
         return;
       }
-      
+
       document.body.removeChild(tempContainer);
 
       // Process the scanned QR code
@@ -231,7 +231,7 @@ export const useQRCode = (getQRCodeBaseURL) => {
       }
     } catch (error) {
       console.error("Error scanning QR code from file:", error);
-      
+
       if (error.message && error.message.includes("No QR code")) {
         showToast.error("No QR code found in the image. Please make sure the image contains a valid QR code and try again.");
       } else if (error.message && error.message.includes("parse")) {
@@ -239,7 +239,7 @@ export const useQRCode = (getQRCodeBaseURL) => {
       } else {
         showToast.error("Failed to scan QR code from file. Please make sure it's a valid QR code image file (PNG, JPG, JPEG) and try again.");
       }
-      
+
       const tempContainer = document.getElementById('temp-qr-file-scanner');
       if (tempContainer) {
         document.body.removeChild(tempContainer);

@@ -15,14 +15,14 @@ export const useOrderData = () => {
   // Helper function to validate if order number looks like a valid YM Style
   const isValidStyleFormat = useCallback((orderNo) => {
     if (!orderNo) return false;
-    const trimmed = orderNo.trim();
-    
-    // Minimum length check - YM Styles are typically at least 4-5 characters
-    if (trimmed.length < 4) return false;
-    
+    const trimmed = orderNo.trim().toUpperCase();
+
+    // Minimum length check - YM Styles are typically at least 4 chars
+    if (trimmed.length < 3) return false; // Allowed 3 chars now
+
     // Check if it starts with letters (typical YM Style format)
     if (!/^[A-Za-z]/.test(trimmed)) return false;
-    
+
     return true;
   }, []);
 
@@ -41,15 +41,17 @@ export const useOrderData = () => {
 
     // Prevent duplicate calls for the same style
     const trimmedOrderNo = orderNo.trim();
-    // Check if we're already loading or if this is the same style we just fetched
-    if (isLoadingColors || (lastFetchedStyleRef.current === trimmedOrderNo && availableColors.length > 0)) {
+    const normalizedStyle = trimmedOrderNo.toUpperCase();
+
+    // Check if we're already loading or if this is the same style we just fetched (case-insensitive)
+    if (isLoadingColors || (lastFetchedStyleRef.current?.toUpperCase() === normalizedStyle && availableColors.length > 0)) {
       return; // Already loading or already fetched
     }
 
     setIsLoadingColors(true);
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/order-details/${encodeURIComponent(trimmedOrderNo)}`
+        `${API_BASE_URL}/api/washing/order-details/${encodeURIComponent(trimmedOrderNo)}`
       );
 
       if (response.ok) {
@@ -57,6 +59,12 @@ export const useOrderData = () => {
 
         // Mark this style as fetched
         lastFetchedStyleRef.current = trimmedOrderNo;
+
+        // Handle success: false (new 200 OK instead of 404)
+        if (orderData.success === false) {
+          setAvailableColors([]);
+          return;
+        }
 
         // Extract colors from OrderColors array
         if (orderData.colors && Array.isArray(orderData.colors)) {
@@ -113,7 +121,9 @@ export const useOrderData = () => {
 
     // Prevent duplicate calls for the same style
     const trimmedOrderNo = orderNo.trim();
-    if (lastFetchedStyleRef.current === trimmedOrderNo) {
+    const normalizedStyle = trimmedOrderNo.toUpperCase();
+
+    if (lastFetchedStyleRef.current?.toUpperCase() === normalizedStyle) {
       return; // Already fetched for this style
     }
 
@@ -125,8 +135,15 @@ export const useOrderData = () => {
       if (response.ok) {
         // Mark this style as fetched to prevent duplicate calls
         lastFetchedStyleRef.current = trimmedOrderNo;
-        
+
         const result = await response.json();
+
+        // Check if order exists (handle success: false in 200 response)
+        if (result.success === false) {
+          setAvailablePOs([]);
+          setAvailableETDs([]);
+          return;
+        }
 
         // Check if order exists and has SKUData
         if (result.success && result.data && result.data.SKUData && Array.isArray(result.data.SKUData) && result.data.SKUData.length > 0) {

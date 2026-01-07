@@ -1,4 +1,5 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { io } from "socket.io-client";
 import { API_BASE_URL } from "../../../../../config.js";
 import showToast from "../../../../utils/toast.js";
 
@@ -38,6 +39,47 @@ export const useReports = () => {
     } finally {
       setIsLoadingReports(false);
     }
+  }, []);
+
+  // Socket.IO for real-time updates
+  useEffect(() => {
+    // Connect to Socket.IO server
+    const socket = io(API_BASE_URL);
+
+    socket.on("connect", () => {
+      console.log("✅ Socket connected to:", API_BASE_URL);
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("❌ Socket connection error:", err);
+    });
+
+    // Listen for events
+    socket.on("washing-report-created", (newReport) => {
+      setReports((prev) => {
+        // Prevent duplicate if already added
+        if (prev.some(r => r._id === newReport._id || r.id === newReport._id)) {
+          return prev;
+        }
+        return [newReport, ...prev];
+      });
+    });
+
+    socket.on("washing-report-updated", (updatedReport) => {
+      setReports((prev) => prev.map((report) =>
+        (report._id === updatedReport._id || report.id === updatedReport._id) ? updatedReport : report
+      ));
+    });
+
+    socket.on("washing-report-deleted", (deletedId) => {
+      setReports((prev) => prev.filter((report) =>
+        report._id !== deletedId && report.id !== deletedId
+      ));
+    });
+
+    return () => {
+      socket.disconnect();
+    };
   }, []);
 
   // Delete report

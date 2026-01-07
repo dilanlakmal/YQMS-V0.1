@@ -91,15 +91,17 @@ export const getYorksysOrderByStyle = async (req, res) => {
   try {
     const { style } = req.params;
     const trimmedStyle = style.trim();
-    
+
     // First, try to find in yorksys_orders collection
     // Use case-insensitive regex search to match the style field
     // This handles cases where the style might have different casing or extra spaces
     // Also try exact match first for better performance
     let order = await YorksysOrders.findOne({
       $or: [
-        { style: trimmedStyle }, // Exact match first
-        { style: { $regex: new RegExp(`^${trimmedStyle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } } // Case-insensitive regex
+        { style: trimmedStyle },
+        { moNo: trimmedStyle }, // Search by MO Number as well
+        { style: { $regex: new RegExp(`^${trimmedStyle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } },
+        { moNo: { $regex: new RegExp(`^${trimmedStyle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") } }
       ]
     });
 
@@ -109,12 +111,12 @@ export const getYorksysOrderByStyle = async (req, res) => {
       const allOrders = await YorksysOrders.find({
         style: { $exists: true, $ne: "N/A", $ne: null }
       }).select("style moNo").lean();
-      
+
       // Find order where style matches after trimming
-      const matchingOrder = allOrders.find(o => 
+      const matchingOrder = allOrders.find(o =>
         o.style && o.style.trim().toLowerCase() === trimmedStyle.toLowerCase()
       );
-      
+
       if (matchingOrder) {
         // Fetch the full order document
         order = await YorksysOrders.findOne({ _id: matchingOrder._id });
@@ -133,16 +135,23 @@ export const getYorksysOrderByStyle = async (req, res) => {
     // If not found in yorksys_orders, check dt_orders collection
     // In dt_orders, the Order_No field corresponds to YM Style
     const dtOrdersCollection = ymProdConnection.db.collection("dt_orders");
-    
-    // Try exact match first (case-sensitive)
+
+    // Try exact match first
     let dtOrder = await dtOrdersCollection.findOne({
-      Order_No: trimmedStyle
+      $or: [
+        { Order_No: trimmedStyle },
+        { CustStyle: trimmedStyle }
+      ]
     });
 
     // If not found, try case-insensitive search
     if (!dtOrder) {
+      const regex = new RegExp(`^${trimmedStyle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i");
       dtOrder = await dtOrdersCollection.findOne({
-        Order_No: { $regex: new RegExp(`^${trimmedStyle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, "i") }
+        $or: [
+          { Order_No: { $regex: regex } },
+          { CustStyle: { $regex: regex } }
+        ]
       });
     }
 
@@ -170,15 +179,15 @@ export const getYorksysOrderByStyle = async (req, res) => {
       const similarStyles = await YorksysOrders.find({
         style: { $regex: new RegExp(trimmedStyle.substring(0, Math.min(6, trimmedStyle.length)), "i") }
       }).select("style moNo").limit(5).lean();
-      
+
       if (similarStyles.length > 0) {
-        console.log(`[DEBUG] Order "${trimmedStyle}" not found. Similar styles in yorksys_orders:`, 
+        console.log(`[DEBUG] Order "${trimmedStyle}" not found. Similar styles in yorksys_orders:`,
           similarStyles.map(s => ({ style: s.style, moNo: s.moNo }))
         );
       }
     }
-    
-    return res.status(404).json({
+
+    return res.status(200).json({
       success: false,
       message: `Order with style "${trimmedStyle}" not found in either yorksys_orders or dt_orders collection.`
     });
