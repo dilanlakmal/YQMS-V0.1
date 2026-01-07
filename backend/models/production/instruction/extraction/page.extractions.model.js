@@ -14,9 +14,10 @@ const extractionSchema = new mongoose.Schema({
     originLang: {type: String},
     pdfData: {type: Buffer, require: true},
     pdfContentType: {type: String, default: "application/pdf"},
-    images: {type: [imageSchema], default: []}
+    images: {type: [imageSchema], default: []},
+    status: {type: String, default: "created"}
 }, {timestamps: true})
 
-export default function createConversationModel(connection) {
+export default function createPageExtractionModel(connection) {
     return connection.model("pt_page_extractions", extractionSchema);
 }   

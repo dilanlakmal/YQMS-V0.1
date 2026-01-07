@@ -4,6 +4,7 @@ import customerSchema from "./customer.schema.js";
 import factorySchema from "./factory.schema.js";
 
 export const productionSchema = new mongoose.Schema({
+    documentId: {type:String, unique: true},
     title: titleSchema,
     customer: customerSchema,
     factory: factorySchema

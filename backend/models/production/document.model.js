@@ -19,7 +19,7 @@ const documentSchema = new mongoose.Schema({
     pageCount: {
         type: Number
     },
-    images: [
+    pages: [
         {
             pageNumber: {
                 type: Number, default: null
