@@ -1,4 +1,4 @@
-import createProduction from "../production.controller.js";
+import createProduction from "../../../production.controller.js";
 
 const textSchema = (description, originLang = "english", type= "string", ) => {
     const language = {

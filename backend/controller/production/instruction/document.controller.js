@@ -1,10 +1,10 @@
 
-import { ymEcoConnection } from "../../../MongoDB/dbConnectionController.js";
+import { ymEcoConnection } from "../../MongoDB/dbConnectionController.js";
 import fs from "fs";
 import path from "path";
 import { PDFDocument } from "pdf-lib";
 
-import documentModel from "../../../../models/production/instruction/translation/document.model.js";
+import documentModel from "../../../models/production/document.model.js";
 
 const document = documentModel(ymEcoConnection);
 
