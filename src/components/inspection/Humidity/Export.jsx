@@ -122,7 +122,6 @@ export default function ExportPanel() {
         url += `&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(
           endIso
         )}`;
-        console.log("Exporting with date range:", startIso, "to", endIso);
       } else {
         console.log("Exporting all reports (no date filter)");
       }
@@ -130,10 +129,7 @@ export default function ExportPanel() {
       // Add factory style filter if selected
       if (factoryStyleFilter) {
         url += `&factoryStyleNo=${encodeURIComponent(factoryStyleFilter)}`;
-        console.log("Filtering by Factory Style:", factoryStyleFilter);
       }
-
-      console.log("Fetching reports from:", url);
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -142,8 +138,6 @@ export default function ExportPanel() {
       }
       const json = await res.json();
       const docs = json && json.data ? json.data : [];
-
-      console.log("Reports fetched:", docs.length);
 
       if (!Array.isArray(docs) || docs.length === 0) {
         alert("No reports found for the selected period.");

@@ -66,7 +66,6 @@ const FormPage = () => {
     try {
       const ts = new Date().toLocaleTimeString();
       setCalcSteps((prev) => [...prev, `${ts}: ${step}`]);
-      console.log(`CALC STEP - ${ts}:`, step);
     } catch (e) {
       console.error("Error adding calc step", e);
     }
@@ -150,8 +149,6 @@ const FormPage = () => {
             : Array.isArray(result)
             ? result
             : [];
-        console.log("api/yorksys-orders response:", result);
-        console.log("parsed orders array:", orders);
         addCalcStep(
           `Fetched orders: ${Array.isArray(orders) ? orders.length : 0}`
         );
@@ -179,10 +176,7 @@ const FormPage = () => {
           const humJson = await humRes.json();
           const humDocs = humJson && humJson.data ? humJson.data : [];
           setHumidityDocs(humDocs);
-          console.log(
-            "humidity_data docs (fetched with yorksys-orders):",
-            humDocs
-          );
+
           addCalcStep(
             `Fetched humidity_data docs: ${
               Array.isArray(humDocs) ? humDocs.length : 0
@@ -322,7 +316,7 @@ const FormPage = () => {
       );
       const json = await res.json();
       const order = json && json.data ? json.data : json || null;
-      console.log("order by moNo:", json);
+
       addCalcStep(`Fetched order details for "${moNo}"`);
       if (order) {
         let fabricationStr = "";
@@ -560,10 +554,7 @@ const FormPage = () => {
               totalFormatted = String(Math.round(total));
             }
             setFormData((prev) => ({ ...prev, aquaboySpec: totalFormatted }));
-            console.log("FabricContent -> FiberName matches:", matches, {
-              buyerEntry,
-              aquaboySpec: totalFormatted
-            });
+
             addCalcStep(
               `Computed aquaboySpec total raw=${total} rounded="${totalFormatted}"`
             );
@@ -653,12 +644,6 @@ const FormPage = () => {
             const bottomStatus =
               historyEntry.bottom?.status ||
               determineStatus(historyEntry.bottom);
-
-            console.log(
-              `History entry ${index + 1} has ${
-                historyEntry.images?.length || 0
-              } images`
-            );
 
             return {
               checkNumber: index + 1,
@@ -1101,12 +1086,6 @@ const FormPage = () => {
           images: rec.images || [] // Explicitly include images
         }))
       };
-
-      console.log(
-        "Saving payload with images:",
-        payload.inspectionRecords[0]?.images?.length || 0,
-        "images"
-      );
 
       const response = await fetch(
         `${API_BASE_URL || "http://localhost:5001"}/api/humidity-reports`,
