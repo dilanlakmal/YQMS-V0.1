@@ -24,29 +24,19 @@ export const __backendDir = path.resolve(__dirname, "..");
 
 export const API_BASE_URL =
   process.env.API_BASE_URL || "https://192.167.6.207:5001";
-  // process.env.API_BASE_URL || "http://localhost:5001";
-  const options = {
-    key: fs.readFileSync(
-      path.resolve(path.dirname(__filename), "192.167.6.207-key.pem")
-    ),
-    cert: fs.readFileSync(
-      path.resolve(path.dirname(__filename), "192.167.6.207.pem")
-    )
-  };
+// process.env.API_BASE_URL || "http://localhost:5001";
+const options = {
+  key: fs.readFileSync(
+    path.resolve(path.dirname(__filename), "192.167.6.207-key.pem")
+  ),
+  cert: fs.readFileSync(
+    path.resolve(path.dirname(__filename), "192.167.6.207.pem")
+  )
+};
 
-export const server = https.createServer(options,app);
+export const server = https.createServer(options, app);
 
-// Initialize Socket.io
-export const io = new SocketIO(server, {
-  cors: {
-    origin: "https://192.167.6.207:3001",
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true
-  }
-});
-
-// Define allowed origins once
+// Define allowed origins once (MUST be before Socket.io initialization)
 const allowedOrigins = [
   "https://192.167.12.85:3001",
   "http://localhost:3001",
@@ -55,20 +45,20 @@ const allowedOrigins = [
   "https://192.167.6.207:3001",
 ];
 
-//http
-// const allowedOrigins = [
-//   "http://192.167.12.85:3001",
-//   "http://localhost:3001",
-//   "http://localhost:3001",
-//   "http://yqms.yaikh.com",
-//   "http://192.167.6.207:3001",
-// ];
+// Initialize Socket.io
+export const io = new SocketIO(server, {
+  cors: {
+    origin: allowedOrigins,  // Now this works because allowedOrigins is defined above!
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true
+  }
+});
 
 
 // CORS configuration
 const corsOptions = {
 
-  
   origin: (origin, callback) => {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.includes(origin)) {
@@ -108,51 +98,6 @@ const corsOptions = {
   optionsSuccessStatus: 204
 };
 
-// CORS configuration http
-// const corsOptions = {
-//   origin: (origin, callback) => {
-//     // Allow requests with no origin (like mobile apps or curl requests)
-//     if (!origin) {
-//       callback(null, true);
-//       return;
-//     }
-    
-//     // Allow all local network IPs (192.167.x.x, 192.168.x.x, 10.x.x.x, 172.16-31.x.x)
-//     const localNetworkPattern = /^http:\/\/(192\.(167|168)\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+|localhost|127\.0\.0\.1)(:\d+)?$/;
-    
-//     if (allowedOrigins.includes(origin) || localNetworkPattern.test(origin)) {
-//       callback(null, true);
-//     } else {
-//       console.log("CORS blocked origin:", origin);
-//       callback(null, true); // Allow all origins for image proxy
-//     }
-//   },
-//   methods: "GET,POST,PUT,DELETE,OPTIONS,PATCH",
-//   allowedHeaders: [
-//     "Content-Type",
-//     "Authorization",
-//     "Cache-Control",
-//     "Origin",
-//     "X-Requested-With",
-//     "Accept",
-//     "Pragma",
-//     "Expires",
-//     "Last-Modified",
-//     "If-Modified-Since",
-//     "If-None-Match",
-//     "ETag",
-//     "Mode"
-//   ],
-//   exposedHeaders: [
-//     "Content-Length",
-//     "Content-Type",
-//     "Cache-Control",
-//     "Last-Modified",
-//     "ETag"
-//   ],
-//   credentials: true, // Set to false for broader compatibility
-//   optionsSuccessStatus: 204
-// };
 
 // Apply CORS globally
 app.use(cors(corsOptions));
