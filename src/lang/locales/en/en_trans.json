@@ -42,7 +42,15 @@
     "supplier-issues": "Supplier Issues",
     "qc2_upload_data": "QC2 Upload Data",
     "qc2_washing_data": "QC2 Wahing Data Upload",
-    "qc1_subcon_inspection": "Sub Con QC1"
+    "qc1_subcon_inspection": "Sub Con QC1",
+    "Measurement": "Measurement",
+    "qa_sections": "Fin Check | Settings",
+    "qa_templates": "Fin Check | Templates",
+    "qa_measurements": "Fin Check | Upload",
+    "y_pivot_inspection": "Fin Check | Inspection",
+    "y_pivot_report": "Fin Check | Reports",
+    "afterIroning": "After Ironing",
+    "p88_Legacy": "P88 Legacy"
   },
 
   "nav": {
@@ -2006,5 +2014,32 @@
     "fiber 01": "Cleaning must be done by fabric mill.",
     "fiber 02": "YM doing the cleaning, front & back side.",
     "fiber 03": "Randomly 2-3 pcs back side hairly can acceptable."
+  },
+
+  "subConQC1": {
+    "Inspection Date": "Inspection Date",
+    "Factory": "Factory",
+    "Line No": "Line No",
+    "Style (MO No)": "Style (MO No)",
+    "Color": "Color",
+    "Checked Qty": "Checked Qty",
+    "Total Defect Qty": "Total Defect Qty",
+    "Total Defect Rate": "Total Defect Rate",
+    "Prepared By": "Prepared By",
+    "Comments": "Comments",
+    "Search by": "Search by",
+    "Defect Name": "Defect Name",
+    "Defect Code": "Defect Code",
+    "Filter": "Filter",
+    "Preview": "Preview",
+    "Save Inspection": "Save Inspection"
+  },
+  "subcon": {
+    "tabs": {
+      "inspection": "Inspection",
+      "qaSampleData": "QA Sample Data",
+      "report": "Report",
+      "dashboard": "Dashboard"
+    }
   }
 }

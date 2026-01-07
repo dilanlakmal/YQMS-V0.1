@@ -1292,5 +1292,32 @@
     "fiber 01": "布厂处理.",
     "fiber 02": "YM安排用吸毛机里外吹毛.",
     "fiber 03": "零散不规则的2-3毛粒可以接受。"
+  },
+
+  "subConQC1": {
+    "Inspection Date": "检验日期",
+    "Factory": "工厂",
+    "Line No": "组别",
+    "Style (MO No)": "款号",
+    "Color": "颜色",
+    "Checked Qty": "检验数",
+    "Total Defect Qty": "总疵品数",
+    "Total Defect Rate": "总疵品率",
+    "Prepared By": "填表者",
+    "Comments": "评语",
+    "Search by": "搜索者",
+    "Defect Name": "疵品名",
+    "Defect Code": "疵品编号",
+    "Filter": "筛选",
+    "Preview": "查看",
+    "Save Inspection": "保存"
+  },
+  "subcon": {
+    "tabs": {
+      "inspection": "检验",
+      "qaSampleData": "QA样品数据",
+      "report": "报告",
+      "dashboard": "仪表板"
+    }
   }
 }
