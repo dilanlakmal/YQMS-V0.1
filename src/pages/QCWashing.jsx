@@ -541,6 +541,13 @@ const QCWashingPage = () => {
       timeHot: { ok: true, no: false }
     }
   });
+  const [referenceSampleApproveDate, setReferenceSampleApproveDate] = useState(
+    () => {
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+      return now.toISOString().split("T")[0];
+    }
+  );
 
   // Helper function to convert English fiber remarks to current language
   const convertEnglishToCurrentLanguage = (englishRemark, t) => {
@@ -1350,6 +1357,22 @@ const QCWashingPage = () => {
         setTimeHotEnabled(saved.inspectionDetails?.timeHotEnabled || false);
       }
 
+      // Handle reference sample approve date
+      if (saved.inspectionDetails?.referenceSampleApproveDate) {
+        const savedDate = new Date(
+          saved.inspectionDetails.referenceSampleApproveDate
+        );
+        savedDate.setHours(0, 0, 0, 0); // Normalize to midnight
+        setReferenceSampleApproveDate(savedDate.toISOString().split("T")[0]);
+      } else {
+        // Set to current date at midnight
+        const dateAtMidnight = new Date();
+        dateAtMidnight.setHours(0, 0, 0, 0);
+        setReferenceSampleApproveDate(
+          dateAtMidnight.toISOString().split("T")[0]
+        );
+      }
+
       // Handle defect data
       if (
         saved.inspectionDetails?.parameters &&
@@ -1469,6 +1492,7 @@ const QCWashingPage = () => {
         uploadedImages,
         savedSizes,
         defectsByPc,
+        referenceSampleApproveDate,
         formData: {
           washQty: formData.washQty,
           checkedQty: formData.checkedQty,
@@ -2104,6 +2128,8 @@ const QCWashingPage = () => {
       }
     });
 
+    setReferenceSampleApproveDate(new Date().toISOString().split("T")[0]);
+
     // Reset loading state
     setIsDataLoading(false);
 
@@ -2186,6 +2212,9 @@ const QCWashingPage = () => {
       setUploadedImages(cachedData.uploadedImages);
       setSavedSizes(cachedData.savedSizes);
       setDefectsByPc(cachedData.defectsByPc || {});
+      if (cachedData.referenceSampleApproveDate) {
+        setReferenceSampleApproveDate(cachedData.referenceSampleApproveDate);
+      }
       setFormData((prev) => ({
         ...prev,
         ...(cachedData.formData || {})
@@ -2791,6 +2820,10 @@ const QCWashingPage = () => {
                       timeHotEnabled={timeHotEnabled}
                       setTimeHotEnabled={setTimeHotEnabled}
                       checkpointDefinitions={checkpointDefinitions}
+                      referenceSampleApproveDate={referenceSampleApproveDate}
+                      setReferenceSampleApproveDate={
+                        setReferenceSampleApproveDate
+                      }
                     />
                   )}
 

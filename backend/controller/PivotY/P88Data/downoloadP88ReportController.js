@@ -570,6 +570,14 @@ export const downloadBulkReports = async (req, res) => {
       headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
+    // const browser = await puppeteer.launch({
+    //     headless: "new",   // or true
+    //     args: [
+    //         "--no-sandbox",
+    //         "--disable-setuid-sandbox",
+    //         "--disable-dev-shm-usage"
+    //     ]
+    // });
 
     const page = await browser.newPage();
 
@@ -865,6 +873,15 @@ export const saveDownloadParth = async (req, res) => {
       headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
+
+    // const browser = await puppeteer.launch({
+    //     headless: "new",   // or true
+    //     args: [
+    //         "--no-sandbox",
+    //         "--disable-setuid-sandbox",
+    //         "--disable-dev-shm-usage"
+    //     ]
+    // });
 
     const page = await browser.newPage();
 
