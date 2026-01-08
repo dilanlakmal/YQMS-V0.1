@@ -58,17 +58,84 @@ export const getJobTitles = async (req, res) => {
   }
 };
 
+const sanitizeJobTitle = (jobTitle) => {
+  if (!jobTitle) return jobTitle;
+  
+  try {
+    // Decode URL-encoded characters if present
+    let sanitized = jobTitle.includes('%') ? decodeURIComponent(jobTitle) : jobTitle;
+    
+    // Handle common HTML entities
+    sanitized = sanitized
+      .replace(/&amp;/g, '&')
+      // .replace(/&lt;/g, '<')
+      // .replace(/&gt;/g, '>')
+      // .replace(/&quot;/g, '"')
+      // .replace(/&#39;/g, "'")
+      // .replace(/&nbsp;/g, ' ')
+      // .replace(/（/g, "(")
+      // .replace(/）/g, ")")
+      // .replace(/［/g, "[")
+      // .replace(/］/g, "]")
+      // .replace(/｛/g, "{")
+      // .replace(/｝/g, "}")
+      // .replace(/≤/g, "<=") 
+      // .replace(/≥/g, ">=")
+      // .replace(/≠/g, "!=") 
+      // .replace(/±/g, "+/-") 
+      // .replace(/×/g, "x") 
+      // .replace(/÷/g, "/") 
+      // .replace(/°/g, "deg") 
+      // .replace(/″/g, '"') 
+      // .replace(/′/g, "'")
+      // .replace(/…/g, "...")
+      // .replace(/–/g, "-")
+      // .replace(/—/g, "-") 
+      // .replace(/'/g, "'")
+      // .replace(/'/g, "'") 
+      // .replace(/"/g, '"') 
+      // .replace(/"/g, '"'); 
+    
+    return sanitized.trim();
+  } catch (error) {
+    console.error('Error sanitizing job title:', error);
+    return jobTitle;
+  }
+};
+
 // GET /api/users-by-job-title
 export const getUsersByJobTitle = async (req, res) => {
   try {
-    const { jobTitle } = req.query;
+    let { jobTitle } = req.query;
+    
+    if (!jobTitle) {
+      return res.status(400).json({ message: "Job title is required" });
+    }
+    
+    // Handle the case where job title was split at & character
+    const queryKeys = Object.keys(req.query);
+    const possibleJobTitleParts = queryKeys.filter(key => 
+      key !== 'jobTitle' && 
+      !key.startsWith('_') && 
+      req.query[key] === ''
+    );
+    
+    // Reconstruct the full job title if it was split
+    if (possibleJobTitleParts.length > 0) {
+      jobTitle = jobTitle + '&' + possibleJobTitleParts.join('&');
+    }
+    
+    // Sanitize the job title to handle special characters
+    const sanitizedJobTitle = sanitizeJobTitle(jobTitle);
+    
     const users = await UserMain.find(
       {
-        job_title: jobTitle,
+        job_title: sanitizedJobTitle,
         working_status: "Working"
       },
       "emp_id name eng_name kh_name job_title dept_name sect_name face_photo phone_number working_status"
     );
+
     res.json(users);
   } catch (error) {
     console.error("Error fetching users by job title:", error);
