@@ -1241,59 +1241,63 @@ const processAndSaveImageAsync = (
 ) => {
   return new Promise((resolve) => {
     try {
-      // If already a server URL, just return it
-      if (imgData.imageURL && !imgData.imgSrc) {
-        resolve({
-          imageId:
-            imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-          imageURL: imgData.imageURL
-        });
-        return;
-      }
+      // 1. Identification
+      // imgData might have .imgSrc or .url depending on where it came from
+      const imageDataString = imgData.imgSrc || imgData.url;
 
-      // Check if it's base64
-      const base64Data = imgData.imgSrc || imgData.url;
-      if (!base64Data || !base64Data.startsWith("data:image")) {
-        // Not base64, might be existing URL
-        if (base64Data && base64Data.includes("/storage/")) {
-          resolve({
-            imageId:
-              imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-            imageURL: base64Data.replace(process.env.API_BASE_URL || "", "")
-          });
-        } else {
-          resolve(null);
-        }
-        return;
-      }
+      // 2. Scenario A: It is a Base64 Image (New or Edited)
+      if (imageDataString && imageDataString.startsWith("data:image")) {
+        const matches = imageDataString.match(
+          /^data:([A-Za-z-+\/]+);base64,(.+)$/
+        );
 
-      const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-      if (!matches || matches.length !== 3) {
-        resolve(null);
-        return;
-      }
-
-      const type = matches[1];
-      const data = Buffer.from(matches[2], "base64");
-      const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-
-      const filename = `photo_${reportId}_${sectionId}_${itemNo}_${index}_${Date.now()}.${ext}`;
-      const filepath = path.join(uploadDirPhoto, filename);
-
-      // Use async file write
-      fs.writeFile(filepath, data, (err) => {
-        if (err) {
-          console.error("Error writing file:", err);
+        if (!matches || matches.length !== 3) {
           resolve(null);
           return;
         }
 
+        const type = matches[1];
+        const data = Buffer.from(matches[2], "base64");
+        // Ensure extension is jpg for consistency
+        const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
+
+        const filename = `photo_${reportId}_${sectionId}_${itemNo}_${index}_${Date.now()}.${ext}`;
+        const filepath = path.join(uploadDirPhoto, filename);
+
+        // Save file asynchronously
+        fs.writeFile(filepath, data, (err) => {
+          if (err) {
+            console.error("Error writing file:", err);
+            resolve(null);
+            return;
+          }
+
+          resolve({
+            imageId:
+              imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
+            imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`
+          });
+        });
+        return;
+      }
+
+      // 3. Scenario B: It is an Existing URL (Not edited)
+      if (imageDataString && imageDataString.includes("/storage/")) {
+        // ✅ FIX: Robustly strip domain/IP regardless of what it is
+        // This takes everything starting from "/storage/" to the end
+        const storageIndex = imageDataString.indexOf("/storage/");
+        const relativePath = imageDataString.substring(storageIndex);
+
         resolve({
           imageId:
             imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-          imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`
+          imageURL: relativePath
         });
-      });
+        return;
+      }
+
+      // 4. Scenario C: Invalid or Empty
+      resolve(null);
     } catch (error) {
       console.error("Error processing image:", error);
       resolve(null);
@@ -1302,7 +1306,7 @@ const processAndSaveImageAsync = (
 };
 
 // ============================================================
-// NEW: Upload Photo Batch - Saves images for ONE item at a time
+// MODIFIED: Upload Photo Batch (Multipart Support)
 // ============================================================
 export const uploadPhotoBatch = async (req, res) => {
   try {
@@ -1312,11 +1316,11 @@ export const uploadPhotoBatch = async (req, res) => {
       sectionName,
       itemNo,
       itemName,
-      images, // Array of { id, imgSrc/url, index }
+      images, // Array of { id, imgSrc/url, index } - mixed Base64 and URLs
       remarks // Optional item remark
     } = req.body;
 
-    // Validation
+    // 1. Validation
     if (!reportId || !sectionId || itemNo === undefined) {
       return res.status(400).json({
         success: false,
@@ -1324,21 +1328,15 @@ export const uploadPhotoBatch = async (req, res) => {
       });
     }
 
-    if (!images || !Array.isArray(images) || images.length === 0) {
+    if (!images || !Array.isArray(images)) {
+      // It is possible to save just remarks with empty images, but usually images are expected
       return res.status(400).json({
         success: false,
-        message: "No images provided"
+        message: "Invalid images array"
       });
     }
 
-    // Limit batch size (max 20 per item based on your Image Editor MAX_IMAGES)
-    if (images.length > 20) {
-      return res.status(400).json({
-        success: false,
-        message: "Maximum 20 images per batch"
-      });
-    }
-
+    // 2. Find Report
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
     });
@@ -1350,7 +1348,11 @@ export const uploadPhotoBatch = async (req, res) => {
       });
     }
 
-    // Process all images in parallel
+    // 3. Process Images Parallelly
+    // The frontend now sends compressed Base64 (~300KB), so Node can handle this map efficiently.
+    // processAndSaveImageAsync handles:
+    // - Detecting if it's Base64 (save to disk -> return URL)
+    // - Detecting if it's already a URL (return as is)
     const imagePromises = images.map((img, idx) =>
       processAndSaveImageAsync(
         img,
@@ -1362,21 +1364,18 @@ export const uploadPhotoBatch = async (req, res) => {
     );
 
     const processedImages = await Promise.all(imagePromises);
+
+    // Filter out any nulls (failed saves)
     const savedImages = processedImages.filter((img) => img && img.imageURL);
 
-    if (savedImages.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No images could be processed"
-      });
-    }
+    // 4. Update Database Structure
 
     // Initialize photoData if empty
     if (!report.photoData) {
       report.photoData = [];
     }
 
-    // Find or create section
+    // A. Find or Create Section
     let sectionIndex = report.photoData.findIndex(
       (sec) =>
         sec.sectionId && sec.sectionId.toString() === sectionId.toString()
@@ -1393,12 +1392,13 @@ export const uploadPhotoBatch = async (req, res) => {
 
     const section = report.photoData[sectionIndex];
 
-    // Find or create item
+    // B. Find or Create Item
     let itemIndex = section.items.findIndex(
       (item) => item.itemNo === parseInt(itemNo)
     );
 
     if (itemIndex === -1) {
+      // New Item: Push logic
       section.items.push({
         itemNo: parseInt(itemNo),
         itemName: itemName || `Item ${itemNo}`,
@@ -1406,25 +1406,29 @@ export const uploadPhotoBatch = async (req, res) => {
         images: savedImages
       });
     } else {
-      // Replace all images for this item
+      // Existing Item: Update logic
+      // IMPORTANT: We overwrite the images array.
+      // The frontend sends the *complete* current state of images for this item.
       section.items[itemIndex].images = savedImages;
 
-      // Update remarks if provided
+      // Update remarks if provided (if undefined, keep existing)
       if (remarks !== undefined) {
         section.items[itemIndex].remarks = remarks;
       }
     }
 
+    // 5. Save Changes
     report.markModified("photoData");
     await report.save();
 
+    // 6. Return Success with Saved Data (Urls)
     return res.status(200).json({
       success: true,
-      message: `${savedImages.length} image(s) saved successfully.`,
+      message: `${savedImages.length} image(s) synced successfully.`,
       data: {
         sectionId,
         itemNo,
-        savedImages
+        savedImages // Contains { imageId, imageURL }
       }
     });
   } catch (error) {
@@ -1437,9 +1441,6 @@ export const uploadPhotoBatch = async (req, res) => {
   }
 };
 
-// ============================================================
-// NEW: Delete Single Photo from Item
-// ============================================================
 export const deletePhotoFromItem = async (req, res) => {
   try {
     const { reportId, sectionId, itemNo, imageId } = req.body;

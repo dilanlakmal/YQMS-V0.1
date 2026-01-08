@@ -868,6 +868,9 @@ const YPivotQATemplatesImageEditor = ({
       const ctx = canvas.getContext("2d");
       const img = new Image();
 
+      // ✅ to allow editing external URLs
+      img.crossOrigin = "anonymous";
+
       img.onload = () => {
         const screenW = window.innerWidth;
         const screenH = window.innerHeight;
@@ -910,12 +913,14 @@ const YPivotQATemplatesImageEditor = ({
       };
       img.src = imgSrc;
     }
-  }, [mode, imgSrc, deviceType, images.length]);
+  }, [mode, imgSrc, deviceType]);
 
   // Just make sure it uses the original dimensions
   useEffect(() => {
     if (context && imgSrc && canvasRef.current) {
       const img = new Image();
+      // ✅ this line here as well
+      img.crossOrigin = "anonymous";
       img.onload = () => {
         // ✅ Check if canvas dimensions match the image dimensions
         // If they don't match, it means the main initialization effect hasn't finished resizing yet.
@@ -1410,6 +1415,9 @@ const YPivotQATemplatesImageEditor = ({
   const handleSave = () => {
     if (!onSave) return;
 
+    // NEW: Prevent saving while initial upload processing is happening
+    if (isUploading) return;
+
     // Generate final images with edits
     const savePromises = images.map((img, idx) => {
       return new Promise((resolve) => {
@@ -1421,21 +1429,60 @@ const YPivotQATemplatesImageEditor = ({
           setPan({ x: 0, y: 0 });
 
           setTimeout(() => {
-            const editedImgSrc = canvasRef.current.toDataURL("image/png");
-            setZoom(originalZoom);
-            setPan(originalPan);
+            // ✅ Wrap export in try-catch
+            try {
+              const editedImgSrc = canvasRef.current.toDataURL(
+                "image/jpeg",
+                0.9
+              );
+              setZoom(originalZoom);
+              setPan(originalPan);
+              resolve({
+                id: img.id,
+                imgSrc: img.imgSrc,
+                editedImgSrc,
+                history: img.history
+              });
+            } catch (e) {
+              console.error("Canvas export failed (CORS). Saving original.", e);
+              setZoom(originalZoom);
+              setPan(originalPan);
+              // Fallback: Return original image so button doesn't freeze
+              resolve({
+                id: img.id,
+                imgSrc: img.imgSrc,
+                editedImgSrc: img.imgSrc,
+                history: img.history
+              });
+            }
+            // const editedImgSrc = canvasRef.current.toDataURL("image/png");
+            // setZoom(originalZoom);
+            // setPan(originalPan);
+            // resolve({
+            //   id: img.id,
+            //   imgSrc: img.imgSrc,
+            //   editedImgSrc,
+            //   history: img.history
+            // });
+          }, 100);
+        } else {
+          // OPTIMIZATION: If no history (edits), return original immediately
+          if (!img.history || img.history.length === 0) {
             resolve({
               id: img.id,
               imgSrc: img.imgSrc,
-              editedImgSrc,
-              history: img.history
+              editedImgSrc: img.imgSrc, // Use original as edited
+              history: []
             });
-          }, 100);
-        } else {
+            return;
+          }
           // Generate edited image for other images
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           const image = new Image();
+
+          // ✅ Add this line for background processing
+          image.crossOrigin = "anonymous";
 
           image.onload = () => {
             canvas.width = image.width;
@@ -1490,14 +1537,42 @@ const YPivotQATemplatesImageEditor = ({
                 ctx.fillText(item.text, item.x, item.y);
               }
             });
+            // ✅ FIX 5: Wrap background export in try-catch
+            try {
+              const editedUrl = canvas.toDataURL("image/jpeg", 0.9);
+              resolve({
+                id: img.id,
+                imgSrc: img.imgSrc,
+                editedImgSrc: editedUrl,
+                history: img.history
+              });
+            } catch (e) {
+              console.error("Background export failed (CORS).", e);
+              resolve({
+                id: img.id,
+                imgSrc: img.imgSrc,
+                editedImgSrc: img.imgSrc, // Fallback
+                history: img.history
+              });
+            }
+          };
 
+          image.onerror = () => {
             resolve({
               id: img.id,
               imgSrc: img.imgSrc,
-              editedImgSrc: canvas.toDataURL("image/png"),
-              history: img.history
+              editedImgSrc: img.imgSrc,
+              history: []
             });
           };
+
+          //   resolve({
+          //     id: img.id,
+          //     imgSrc: img.imgSrc,
+          //     editedImgSrc: canvas.toDataURL("image/png"),
+          //     history: img.history
+          //   });
+          // };
           image.src = img.imgSrc;
         }
       });
@@ -1816,11 +1891,27 @@ const YPivotQATemplatesImageEditor = ({
           {mode === "editor" && images.length > 0 && (
             <button
               onClick={handleSave}
-              className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/90 hover:bg-white text-indigo-600 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-95"
+              disabled={isUploading} // Disable button
+              className={`flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-lg ${
+                isUploading
+                  ? "bg-gray-500 text-gray-300 cursor-not-allowed" // Visual feedback
+                  : "bg-white/90 hover:bg-white text-indigo-600 hover:shadow-xl active:scale-95"
+              }`}
             >
-              <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              <span>Save All</span>
+              {isUploading ? (
+                <Loader className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              )}
+              <span>{isUploading ? "Loading..." : "Save All"}</span>
             </button>
+            // <button
+            //   onClick={handleSave}
+            //   className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/90 hover:bg-white text-indigo-600 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-95"
+            // >
+            //   <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+            //   <span>Save All</span>
+            // </button>
           )}
 
           <button

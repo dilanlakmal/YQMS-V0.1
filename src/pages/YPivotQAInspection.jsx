@@ -29,6 +29,7 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../components/authentication/AuthContext";
+import { PhotoUploadProvider } from "../components/inspection/PivotY/QATemplates/PhotoUploadContext";
 import YPivotQAInspectionOrderData from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionOrderData";
 import YPivotQAInspectionSummary from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionSummary";
 import YPivotQAInspectionHeaderDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionHeaderDataSave";
@@ -1276,351 +1277,361 @@ const YPivotQAInspection = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
-      {/* Animated Background Elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-72 h-72 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
-      </div>
+    <PhotoUploadProvider reportId={savedReportData?.reportId}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200">
+        {/* Animated Background Elements */}
+        <div className="fixed inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-72 h-72 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-purple-400/10 dark:bg-purple-600/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        </div>
 
-      {/* FIXED Header with Integrated Tabs */}
-      <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
-        <div className="absolute inset-0 bg-black/10"></div>
-        <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:16px_16px]"></div>
+        {/* FIXED Header with Integrated Tabs */}
+        <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 shadow-xl">
+          <div className="absolute inset-0 bg-black/10"></div>
+          <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:16px_16px]"></div>
 
-        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-2 lg:py-3">
-          {/* MOBILE/TABLET LAYOUT */}
-          <div className="lg:hidden space-y-2">
-            {/* Top Row: Title + YQMS Button + User Info */}
-            <div className="flex items-center justify-between gap-2">
-              {/* Title Section with YQMS Button */}
-              <div className="flex items-center gap-2 flex-1 min-w-0">
-                {/* YQMS Home Button - Mobile */}
-                <button
-                  onClick={handleGoHome}
-                  className="flex-shrink-0 flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-lg shadow-lg transition-all active:scale-95"
-                  title="Go to YQMS Home"
-                >
-                  <Home size={18} className="text-white" />
-                </button>
+          <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 py-2 lg:py-3">
+            {/* MOBILE/TABLET LAYOUT */}
+            <div className="lg:hidden space-y-2">
+              {/* Top Row: Title + YQMS Button + User Info */}
+              <div className="flex items-center justify-between gap-2">
+                {/* Title Section with YQMS Button */}
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {/* YQMS Home Button - Mobile */}
+                  <button
+                    onClick={handleGoHome}
+                    className="flex-shrink-0 flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-lg shadow-lg transition-all active:scale-95"
+                    title="Go to YQMS Home"
+                  >
+                    <Home size={18} className="text-white" />
+                  </button>
 
-                <div className="flex items-center justify-center w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
-                  <Shield size={18} className="text-white" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
-                    <h1 className="text-sm font-black text-white tracking-tight truncate">
-                      Fin Check
-                    </h1>
-                    <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
-                      <Sparkles size={8} className="text-yellow-300" />
-                      <span className="text-[8px] font-bold text-white">
-                        PRO
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => setShowNewConfirm(true)}
-                      className="ml-10 flex items-center justify-center gap-1.5 h-7 px-3 bg-white text-indigo-600 rounded-lg shadow-md active:scale-95 transition-transform"
-                    >
-                      <Plus size={24} strokeWidth={3} />
-                      <span className="text-[12px] font-bold uppercase">
-                        New
-                      </span>
-                    </button>
+                  <div className="flex items-center justify-center w-9 h-9 bg-white/20 backdrop-blur-sm rounded-lg shadow-lg flex-shrink-0">
+                    <Shield size={18} className="text-white" />
                   </div>
-                  {/* Active Tab Indicator - Inline with title */}
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className="relative flex h-1.5 w-1.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
-                    </div>
-                    <p className="text-[10px] text-indigo-100 font-medium truncate">
-                      {activeTabData?.label} • Active
-                      {hasUnsavedChanges && (
-                        <span className="ml-1 text-amber-300">
-                          • Unsaved changes
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1.5">
+                      <h1 className="text-sm font-black text-white tracking-tight truncate">
+                        Fin Check
+                      </h1>
+                      <div className="flex items-center gap-0.5 px-1.5 py-0.5 bg-white/20 backdrop-blur-sm rounded-full flex-shrink-0">
+                        <Sparkles size={8} className="text-yellow-300" />
+                        <span className="text-[8px] font-bold text-white">
+                          PRO
                         </span>
-                      )}
-                    </p>
+                      </div>
+                      <button
+                        onClick={() => setShowNewConfirm(true)}
+                        className="ml-10 flex items-center justify-center gap-1.5 h-7 px-3 bg-white text-indigo-600 rounded-lg shadow-md active:scale-95 transition-transform"
+                      >
+                        <Plus size={24} strokeWidth={3} />
+                        <span className="text-[12px] font-bold uppercase">
+                          New
+                        </span>
+                      </button>
+                    </div>
+                    {/* Active Tab Indicator - Inline with title */}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <div className="relative flex h-1.5 w-1.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-green-400"></span>
+                      </div>
+                      <p className="text-[10px] text-indigo-100 font-medium truncate">
+                        {activeTabData?.label} • Active
+                        {hasUnsavedChanges && (
+                          <span className="ml-1 text-amber-300">
+                            • Unsaved changes
+                          </span>
+                        )}
+                      </p>
+                    </div>
                   </div>
+                </div>
+                {/* User Info */}
+                {user && (
+                  <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2 py-1 shadow-lg flex-shrink-0">
+                    <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow">
+                      <User size={14} className="text-white" />
+                    </div>
+                    <div className="hidden sm:block">
+                      <p className="text-white font-bold text-[10px] leading-tight truncate max-w-[80px]">
+                        {user.job_title || "Operator"}
+                      </p>
+                      <p className="text-indigo-200 text-[9px] font-medium leading-tight">
+                        {user.emp_id}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Tabs - Scrollable */}
+              <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
+                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 min-w-max">
+                  {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    const isLocked = tab.requiresSave && !isReportSaved;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() =>
+                          !isLocked && handleTabChange(tab.id, tab.requiresSave)
+                        }
+                        disabled={isLocked}
+                        className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                          isActive
+                            ? "bg-white shadow-lg scale-105"
+                            : isLocked
+                            ? "bg-transparent opacity-50 cursor-not-allowed"
+                            : "bg-transparent hover:bg-white/20"
+                        }`}
+                        title={
+                          isLocked
+                            ? "Save order data first to access this tab"
+                            : tab.description
+                        }
+                      >
+                        <div
+                          className={`transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {isLocked ? (
+                            <Lock className="w-4 h-4" />
+                          ) : (
+                            React.cloneElement(tab.icon, {
+                              className: "w-4 h-4"
+                            })
+                          )}
+                        </div>
+                        <span
+                          className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {tab.label}
+                        </span>
+                        {isActive && (
+                          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
-              {/* User Info */}
-              {user && (
-                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-lg px-2 py-1 shadow-lg flex-shrink-0">
-                  <div className="flex items-center justify-center w-7 h-7 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-md shadow">
-                    <User size={14} className="text-white" />
+            </div>
+
+            {/* DESKTOP LAYOUT */}
+            <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-4">
+              {/* Left Side */}
+              <div className="flex items-center gap-4 flex-1">
+                {/* YQMS Home Button - Desktop */}
+                <button
+                  onClick={handleGoHome}
+                  className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-xl shadow-lg transition-all hover:shadow-xl hover:scale-105 active:scale-95"
+                  title="Go to YQMS Home"
+                >
+                  <ArrowLeft size={16} className="text-white" />
+                  <span className="text-sm font-bold text-white">YQMS</span>
+                </button>
+
+                {/* Title */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
+                    <Shield size={22} className="text-white" />
                   </div>
-                  <div className="hidden sm:block">
-                    <p className="text-white font-bold text-[10px] leading-tight truncate max-w-[80px]">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-black text-white tracking-tight">
+                        Fin Check | Inspection
+                      </h1>
+                      <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
+                        <Sparkles size={10} className="text-yellow-300" />
+                        <span className="text-[10px] font-bold text-white">
+                          PRO
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-indigo-100 font-medium">
+                      Quality Inspection Data Collection
+                    </p>
+                  </div>
+                </div>
+                {/* Tabs */}
+                <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5">
+                  {tabs.map((tab) => {
+                    const isActive = activeTab === tab.id;
+                    const isLocked = tab.requiresSave && !isReportSaved;
+
+                    return (
+                      <button
+                        key={tab.id}
+                        onClick={() =>
+                          !isLocked && handleTabChange(tab.id, tab.requiresSave)
+                        }
+                        disabled={isLocked}
+                        className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
+                          isActive
+                            ? "bg-white shadow-lg scale-105"
+                            : isLocked
+                            ? "bg-transparent opacity-50 cursor-not-allowed"
+                            : "bg-transparent hover:bg-white/20"
+                        }`}
+                        title={
+                          isLocked
+                            ? "Save order data first to access this tab"
+                            : tab.description
+                        }
+                      >
+                        <div
+                          className={`transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {isLocked ? (
+                            <Lock className="w-4 h-4" />
+                          ) : (
+                            React.cloneElement(tab.icon, {
+                              className: "w-4 h-4"
+                            })
+                          )}
+                        </div>
+                        <span
+                          className={`text-[10px] font-bold transition-colors duration-300 ${
+                            isActive ? "text-indigo-600" : "text-white"
+                          }`}
+                        >
+                          {tab.label}
+                        </span>
+                        {isActive && (
+                          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Active Status */}
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2">
+                  <div className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
+                      {activeTabData?.label}
+                    </p>
+                    <p className="text-indigo-200 text-[10px] font-medium leading-tight">
+                      {hasUnsavedChanges
+                        ? `Unsaved: ${getDirtySectionsList().length}`
+                        : "All Saved"}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowNewConfirm(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group"
+                  title="Start a new inspection report"
+                >
+                  <div className="p-1 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
+                    <Plus
+                      size={16}
+                      strokeWidth={3}
+                      className="text-indigo-600"
+                    />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-xs font-bold uppercase tracking-wider leading-none">
+                      New Inspection
+                    </p>
+                  </div>
+                </button>
+              </div>
+              {/* Right Side - User Info */}
+              {user && (
+                <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 shadow-lg">
+                  <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow">
+                    <User size={18} className="text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm leading-tight">
                       {user.job_title || "Operator"}
                     </p>
-                    <p className="text-indigo-200 text-[9px] font-medium leading-tight">
-                      {user.emp_id}
+                    <p className="text-indigo-200 text-xs font-medium leading-tight">
+                      ID: {user.emp_id}
                     </p>
                   </div>
                 </div>
               )}
             </div>
-            {/* Tabs - Scrollable */}
-            <div className="overflow-x-auto scrollbar-hide -mx-3 px-3">
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1 min-w-max">
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  const isLocked = tab.requiresSave && !isReportSaved;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() =>
-                        !isLocked && handleTabChange(tab.id, tab.requiresSave)
-                      }
-                      disabled={isLocked}
-                      className={`group relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-300 ${
-                        isActive
-                          ? "bg-white shadow-lg scale-105"
-                          : isLocked
-                          ? "bg-transparent opacity-50 cursor-not-allowed"
-                          : "bg-transparent hover:bg-white/20"
-                      }`}
-                      title={
-                        isLocked
-                          ? "Save order data first to access this tab"
-                          : tab.description
-                      }
-                    >
-                      <div
-                        className={`transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {isLocked ? (
-                          <Lock className="w-4 h-4" />
-                        ) : (
-                          React.cloneElement(tab.icon, { className: "w-4 h-4" })
-                        )}
-                      </div>
-                      <span
-                        className={`text-[9px] font-bold transition-colors duration-300 whitespace-nowrap ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {tab.label}
-                      </span>
-                      {isActive && (
-                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {/* DESKTOP LAYOUT */}
-          <div className="hidden lg:flex lg:items-center lg:justify-between lg:gap-4">
-            {/* Left Side */}
-            <div className="flex items-center gap-4 flex-1">
-              {/* YQMS Home Button - Desktop */}
-              <button
-                onClick={handleGoHome}
-                className="flex-shrink-0 flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 rounded-xl shadow-lg transition-all hover:shadow-xl hover:scale-105 active:scale-95"
-                title="Go to YQMS Home"
-              >
-                <ArrowLeft size={16} className="text-white" />
-                <span className="text-sm font-bold text-white">YQMS</span>
-              </button>
-
-              {/* Title */}
-              <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 bg-white/20 backdrop-blur-sm rounded-xl shadow-lg">
-                  <Shield size={22} className="text-white" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h1 className="text-xl font-black text-white tracking-tight">
-                      Fin Check | Inspection
-                    </h1>
-                    <div className="flex items-center gap-1 px-2 py-0.5 bg-white/20 backdrop-blur-sm rounded-full">
-                      <Sparkles size={10} className="text-yellow-300" />
-                      <span className="text-[10px] font-bold text-white">
-                        PRO
-                      </span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-indigo-100 font-medium">
-                    Quality Inspection Data Collection
-                  </p>
-                </div>
-              </div>
-              {/* Tabs */}
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-1.5">
-                {tabs.map((tab) => {
-                  const isActive = activeTab === tab.id;
-                  const isLocked = tab.requiresSave && !isReportSaved;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() =>
-                        !isLocked && handleTabChange(tab.id, tab.requiresSave)
-                      }
-                      disabled={isLocked}
-                      className={`group relative flex flex-col items-center gap-1 px-3 py-1.5 rounded-lg transition-all duration-300 ${
-                        isActive
-                          ? "bg-white shadow-lg scale-105"
-                          : isLocked
-                          ? "bg-transparent opacity-50 cursor-not-allowed"
-                          : "bg-transparent hover:bg-white/20"
-                      }`}
-                      title={
-                        isLocked
-                          ? "Save order data first to access this tab"
-                          : tab.description
-                      }
-                    >
-                      <div
-                        className={`transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {isLocked ? (
-                          <Lock className="w-4 h-4" />
-                        ) : (
-                          React.cloneElement(tab.icon, { className: "w-4 h-4" })
-                        )}
-                      </div>
-                      <span
-                        className={`text-[10px] font-bold transition-colors duration-300 ${
-                          isActive ? "text-indigo-600" : "text-white"
-                        }`}
-                      >
-                        {tab.label}
-                      </span>
-                      {isActive && (
-                        <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-green-400 rounded-full shadow animate-pulse"></div>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* Active Status */}
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2">
-                <div className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
-                </div>
-                <div>
-                  <p className="text-white font-bold text-sm leading-tight">
-                    {activeTabData?.label}
-                  </p>
-                  <p className="text-indigo-200 text-[10px] font-medium leading-tight">
-                    {hasUnsavedChanges
-                      ? `Unsaved: ${getDirtySectionsList().length}`
-                      : "All Saved"}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowNewConfirm(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-white hover:bg-gray-50 text-indigo-600 rounded-xl shadow-lg transition-all hover:scale-105 active:scale-95 group"
-                title="Start a new inspection report"
-              >
-                <div className="p-1 bg-indigo-100 rounded-lg group-hover:bg-indigo-200 transition-colors">
-                  <Plus size={16} strokeWidth={3} className="text-indigo-600" />
-                </div>
-                <div className="text-left">
-                  <p className="text-xs font-bold uppercase tracking-wider leading-none">
-                    New Inspection
-                  </p>
-                </div>
-              </button>
-            </div>
-            {/* Right Side - User Info */}
-            {user && (
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-3 py-2 shadow-lg">
-                <div className="flex items-center justify-center w-9 h-9 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-lg shadow">
-                  <User size={18} className="text-white" />
-                </div>
-                <div>
-                  <p className="text-white font-bold text-sm leading-tight">
-                    {user.job_title || "Operator"}
-                  </p>
-                  <p className="text-indigo-200 text-xs font-medium leading-tight">
-                    ID: {user.emp_id}
-                  </p>
-                </div>
-              </div>
-            )}
           </div>
         </div>
-      </div>
 
-      {/* Content Container - Reduced padding-top */}
-      <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-6 pt-[100px] lg:pt-[72px]">
-        <div className="animate-fadeIn">
-          <div className="transform transition-all duration-500 ease-out">
-            {activeComponent}
+        {/* Content Container - Reduced padding-top */}
+        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-6 pt-[100px] lg:pt-[72px]">
+          <div className="animate-fadeIn">
+            <div className="transform transition-all duration-500 ease-out">
+              {activeComponent}
+            </div>
           </div>
         </div>
+
+        <StatusModal
+          isOpen={statusModal.isOpen}
+          onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+          type={statusModal.type}
+          title={statusModal.title}
+          message={statusModal.message}
+          subMessage={statusModal.subMessage}
+        />
+
+        <ConfirmationModal
+          isOpen={showNewConfirm}
+          onClose={() => setShowNewConfirm(false)}
+          onConfirm={handleStartNewInspection}
+          title="Start New Inspection?"
+          message="Are you sure you want to start a new report? Any unsaved changes in the current session will be lost. Please ensure you have saved your work."
+        />
+
+        {/* Styles */}
+        <style jsx>{`
+          .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+          }
+          .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+          }
+          @keyframes fadeIn {
+            from {
+              opacity: 0;
+              transform: translateY(10px);
+            }
+            to {
+              opacity: 1;
+              transform: translateY(0);
+            }
+          }
+          .animate-fadeIn {
+            animation: fadeIn 0.4s ease-out;
+          }
+          .bg-grid-white {
+            background-image: linear-gradient(
+                to right,
+                rgba(255, 255, 255, 0.1) 1px,
+                transparent 1px
+              ),
+              linear-gradient(
+                to bottom,
+                rgba(255, 255, 255, 0.1) 1px,
+                transparent 1px
+              );
+          }
+          .delay-1000 {
+            animation-delay: 1s;
+          }
+        `}</style>
       </div>
-
-      <StatusModal
-        isOpen={statusModal.isOpen}
-        onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
-        type={statusModal.type}
-        title={statusModal.title}
-        message={statusModal.message}
-        subMessage={statusModal.subMessage}
-      />
-
-      <ConfirmationModal
-        isOpen={showNewConfirm}
-        onClose={() => setShowNewConfirm(false)}
-        onConfirm={handleStartNewInspection}
-        title="Start New Inspection?"
-        message="Are you sure you want to start a new report? Any unsaved changes in the current session will be lost. Please ensure you have saved your work."
-      />
-
-      {/* Styles */}
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.4s ease-out;
-        }
-        .bg-grid-white {
-          background-image: linear-gradient(
-              to right,
-              rgba(255, 255, 255, 0.1) 1px,
-              transparent 1px
-            ),
-            linear-gradient(
-              to bottom,
-              rgba(255, 255, 255, 0.1) 1px,
-              transparent 1px
-            );
-        }
-        .delay-1000 {
-          animation-delay: 1s;
-        }
-      `}</style>
-    </div>
+    </PhotoUploadProvider>
   );
 };
 
