@@ -57,11 +57,10 @@ import {
   AdjustToolbarPanel
 } from "./YPivotQATemplatesImageAdjust";
 
-const MAX_IMAGES = 20;
-
 const YPivotQATemplatesImageEditor = ({
   autoStartMode = null,
   existingData = null,
+  maxImages = 20,
   onSave = null,
   onCancel = null
 }) => {
@@ -235,6 +234,20 @@ const YPivotQATemplatesImageEditor = ({
     },
     [canvasSize.width]
   );
+
+  // ==========================================
+  // MEMORY LEAK CLEANUP
+  // ==========================================
+  useEffect(() => {
+    // Cleanup Blob URLs when component unmounts to free memory
+    return () => {
+      images.forEach((img) => {
+        if (img.imgSrc && img.imgSrc.startsWith("blob:")) {
+          URL.revokeObjectURL(img.imgSrc);
+        }
+      });
+    };
+  }, []); // Run once on unmount (closure captures initial empty, but we rely on browser GC mostly)
 
   // Sync history when image changes
   useEffect(() => {
@@ -714,8 +727,8 @@ const YPivotQATemplatesImageEditor = ({
   // Capture without stopping camera, add to images array
   const captureImage = () => {
     if (!videoRef.current) return;
-    if (images.length >= MAX_IMAGES) {
-      alert(`Maximum ${MAX_IMAGES} images allowed!`);
+    if (images.length >= maxImages) {
+      alert(`Maximum ${maxImages} images allowed!`);
       return;
     }
 
@@ -785,75 +798,47 @@ const YPivotQATemplatesImageEditor = ({
     const files = Array.from(e.target.files);
 
     if (files.length === 0) {
-      // User cancelled file selection
-      if (autoStartMode === "upload" && images.length === 0) {
-        // Auto-upload was cancelled - close modal
-        handleCancel();
-      } else if (images.length === 0) {
-        // Manual upload cancelled - go back to initial screen
-        setMode("initial");
-        setIsInitializing(false);
+      if (images.length === 0) {
+        if (autoStartMode === "upload") handleCancel();
+        else setMode("initial");
       }
-      // Reset initializing state
       setIsInitializing(false);
       return;
     }
 
-    const remainingSlots = MAX_IMAGES - images.length;
+    const remainingSlots = maxImages - images.length;
     const filesToProcess = files.slice(0, remainingSlots);
 
-    if (files.length > remainingSlots) {
-      alert(
-        `Only ${remainingSlots} more image(s) can be added. Maximum is ${MAX_IMAGES}.`
-      );
-    }
-
-    // ✅ IMMEDIATELY show loading state and switch to editor
     setIsUploading(true);
     setUploadProgress(0);
     setUploadTotal(filesToProcess.length);
     setMode("editor");
 
-    let loadedCount = 0;
-    const startIndex = images.length;
+    // Process immediately - Blob creation is synchronous and fast
+    const newImages = filesToProcess.map((file) => ({
+      id: generateId(),
+      imgSrc: URL.createObjectURL(file), // ✅ ZERO RAM USAGE vs Base64
+      file: file, // ✅ Keep raw file for upload
+      history: [],
+      editedImgSrc: null,
+      isRawFile: true // Flag to identify this hasn't been rasterized yet
+    }));
 
-    // ✅ Process each file and add to images IMMEDIATELY as it loads
-    filesToProcess.forEach((file, index) => {
-      const reader = new FileReader();
+    setImages((prev) => [...prev, ...newImages]);
 
-      reader.onload = (event) => {
-        const newImage = {
-          id: generateId(),
-          imgSrc: event.target.result,
-          history: [],
-          editedImgSrc: null
-        };
+    // Set current index if this is the first batch
+    if (images.length === 0 && newImages.length > 0) {
+      setCurrentImageIndex(0);
+    }
 
-        // ✅ Add image IMMEDIATELY (don't wait for others)
-        setImages((prev) => [...prev, newImage]);
+    // Simulate progress for UI feedback (since createObjectURL is instant)
+    setUploadProgress(filesToProcess.length);
+    setTimeout(() => {
+      setIsUploading(false);
+      setUploadProgress(0);
+      setUploadTotal(0);
+    }, 500);
 
-        // ✅ Set as current if it's the first one
-        if (index === 0 && loadedCount === 0) {
-          setCurrentImageIndex(startIndex);
-        }
-
-        loadedCount++;
-        setUploadProgress(loadedCount);
-
-        // ✅ Hide loading when all done
-        if (loadedCount === filesToProcess.length) {
-          setTimeout(() => {
-            setIsUploading(false);
-            setUploadProgress(0);
-            setUploadTotal(0);
-          }, 300);
-        }
-      };
-
-      reader.readAsDataURL(file);
-    });
-
-    // Reset file input
     e.target.value = "";
   };
 
@@ -1412,101 +1397,112 @@ const YPivotQATemplatesImageEditor = ({
     }
   };
 
+  // ==========================================
+  // OPTIMIZED SAVE (Return Blobs/Files)
+  // ==========================================
   const handleSave = () => {
     if (!onSave) return;
-
-    // NEW: Prevent saving while initial upload processing is happening
     if (isUploading) return;
 
-    // Generate final images with edits
     const savePromises = images.map((img, idx) => {
       return new Promise((resolve) => {
+        // CASE A: Raw File, No Edits, Not Current Canvas
+        // Optimization: Return the original file directly. No canvas processing needed.
+        if (
+          img.isRawFile &&
+          (!img.history || img.history.length === 0) &&
+          idx !== currentImageIndex
+        ) {
+          resolve({
+            id: img.id,
+            imgSrc: img.imgSrc, // This is a blob: URL
+            file: img.file, // ✅ The raw File object
+            isRaw: true,
+            history: []
+          });
+          return;
+        }
+
+        // CASE B: Image is currently on Canvas (Grab visible state)
         if (idx === currentImageIndex && canvasRef.current) {
-          // Current image - get from canvas
           const originalZoom = zoom;
           const originalPan = { ...pan };
+
+          // Reset view to capture full image
           setZoom(1);
           setPan({ x: 0, y: 0 });
 
           setTimeout(() => {
-            // ✅ Wrap export in try-catch
             try {
-              const editedImgSrc = canvasRef.current.toDataURL(
+              // Convert Canvas to Blob (Binary) instead of Base64
+              canvasRef.current.toBlob(
+                (blob) => {
+                  // Restore view
+                  setZoom(originalZoom);
+                  setPan(originalPan);
+
+                  resolve({
+                    id: img.id,
+                    imgSrc: img.imgSrc, // Keep original preview
+                    file: blob, // ✅ Edited image as Blob
+                    isEdited: true,
+                    history: img.history
+                  });
+                },
                 "image/jpeg",
                 0.9
-              );
-              setZoom(originalZoom);
-              setPan(originalPan);
-              resolve({
-                id: img.id,
-                imgSrc: img.imgSrc,
-                editedImgSrc,
-                history: img.history
-              });
+              ); // 90% Quality
             } catch (e) {
               console.error("Canvas export failed (CORS). Saving original.", e);
               setZoom(originalZoom);
               setPan(originalPan);
-              // Fallback: Return original image so button doesn't freeze
+              // Fallback to original if CORS fails
               resolve({
                 id: img.id,
                 imgSrc: img.imgSrc,
-                editedImgSrc: img.imgSrc,
-                history: img.history
+                file: img.file,
+                history: []
               });
             }
-            // const editedImgSrc = canvasRef.current.toDataURL("image/png");
-            // setZoom(originalZoom);
-            // setPan(originalPan);
-            // resolve({
-            //   id: img.id,
-            //   imgSrc: img.imgSrc,
-            //   editedImgSrc,
-            //   history: img.history
-            // });
-          }, 100);
-        } else {
-          // OPTIMIZATION: If no history (edits), return original immediately
-          if (!img.history || img.history.length === 0) {
-            resolve({
-              id: img.id,
-              imgSrc: img.imgSrc,
-              editedImgSrc: img.imgSrc, // Use original as edited
-              history: []
-            });
-            return;
-          }
-          // Generate edited image for other images
+          }, 50); // Small delay to allow react render cycle to reset zoom
+        }
+        // CASE C: Image has edits but is not currently displayed
+        // We must recreate the canvas in memory
+        else if (img.history && img.history.length > 0) {
           const canvas = document.createElement("canvas");
           const ctx = canvas.getContext("2d");
           const image = new Image();
 
-          // ✅ Add this line for background processing
+          // Important for existing server URLs
           image.crossOrigin = "anonymous";
 
           image.onload = () => {
             canvas.width = image.width;
             canvas.height = image.height;
+
+            // 1. Draw original image
             ctx.drawImage(image, 0, 0);
 
-            // ✅ ADD: Calculate scale factor
+            // 2. Re-apply history
             const scaleFactor = Math.max(1, image.width / 1000);
 
-            (img.history || []).forEach((item) => {
+            img.history.forEach((item) => {
               ctx.strokeStyle = item.color;
-              //  Scale line width
               ctx.lineWidth = item.width * scaleFactor;
               ctx.lineCap = "round";
               ctx.lineJoin = "round";
               ctx.fillStyle = item.color;
 
-              if (item.type === "pen" && item.points?.length > 1) {
+              if (
+                item.type === "pen" &&
+                item.points &&
+                item.points.length > 1
+              ) {
                 ctx.beginPath();
                 ctx.moveTo(item.points[0].x, item.points[0].y);
                 item.points.forEach((p) => ctx.lineTo(p.x, p.y));
                 ctx.stroke();
               } else if (item.type === "arrow") {
-                //  Pass scaled width
                 drawArrow(
                   ctx,
                   item.x,
@@ -1516,6 +1512,7 @@ const YPivotQATemplatesImageEditor = ({
                   item.width * scaleFactor
                 );
               } else if (item.type === "rect") {
+                ctx.beginPath();
                 ctx.strokeRect(item.x, item.y, item.w, item.h);
               } else if (item.type === "circle") {
                 ctx.beginPath();
@@ -1530,50 +1527,62 @@ const YPivotQATemplatesImageEditor = ({
                 );
                 ctx.stroke();
               } else if (item.type === "text") {
-                //  Scale font size
-                const fontSize = Math.round(24 * scaleFactor);
+                // Calculate font size roughly same as display
+                const fontSize = Math.round(
+                  (deviceType === "mobile" ? 20 : 24) * scaleFactor
+                );
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.textBaseline = "middle";
                 ctx.fillText(item.text, item.x, item.y);
               }
             });
-            // ✅ FIX 5: Wrap background export in try-catch
+
+            // 3. Export to Blob
             try {
-              const editedUrl = canvas.toDataURL("image/jpeg", 0.9);
-              resolve({
-                id: img.id,
-                imgSrc: img.imgSrc,
-                editedImgSrc: editedUrl,
-                history: img.history
-              });
+              canvas.toBlob(
+                (blob) => {
+                  resolve({
+                    id: img.id,
+                    imgSrc: img.imgSrc,
+                    file: blob, // ✅ Edited Blob
+                    isEdited: true,
+                    history: img.history
+                  });
+                },
+                "image/jpeg",
+                0.9
+              );
             } catch (e) {
-              console.error("Background export failed (CORS).", e);
+              console.error("Background export failed", e);
               resolve({
                 id: img.id,
                 imgSrc: img.imgSrc,
-                editedImgSrc: img.imgSrc, // Fallback
-                history: img.history
+                file: img.file || null,
+                history: []
               });
             }
           };
 
+          // Error loading image
           image.onerror = () => {
             resolve({
               id: img.id,
               imgSrc: img.imgSrc,
-              editedImgSrc: img.imgSrc,
+              file: img.file || null,
               history: []
             });
           };
 
-          //   resolve({
-          //     id: img.id,
-          //     imgSrc: img.imgSrc,
-          //     editedImgSrc: canvas.toDataURL("image/png"),
-          //     history: img.history
-          //   });
-          // };
           image.src = img.imgSrc;
+        }
+        // CASE D: Fallback (Existing URL, no edits)
+        else {
+          resolve({
+            id: img.id,
+            imgSrc: img.imgSrc,
+            file: img.file || null, // Might be null if it was an existing URL image
+            history: []
+          });
         }
       });
     });
@@ -1878,7 +1887,7 @@ const YPivotQATemplatesImageEditor = ({
             <div className="flex items-center gap-2">
               <p className="text-[10px] text-indigo-100 hidden sm:block">
                 {images.length > 0
-                  ? `${images.length}/${MAX_IMAGES} images`
+                  ? `${images.length}/${maxImages} images`
                   : "Professional QA Annotation Tool"}
               </p>
               {/* NEW: Model status indicator */}
@@ -1994,7 +2003,7 @@ const YPivotQATemplatesImageEditor = ({
                   </div>
                 )}
 
-                <p className="text-gray-500 text-sm">Max {MAX_IMAGES} images</p>
+                <p className="text-gray-500 text-sm">Max {maxImages} images</p>
               </>
             )}
           </div>
@@ -2066,11 +2075,11 @@ const YPivotQATemplatesImageEditor = ({
                 <div className="flex flex-col items-center">
                   <button
                     onClick={captureImage}
-                    disabled={images.length >= MAX_IMAGES || isCameraLoading} // ✅ Disable while loading
+                    disabled={images.length >= maxImages || isCameraLoading} // ✅ Disable while loading
                     className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-full border-4 border-indigo-500 shadow-[0_0_20px_rgba(99,102,241,0.5)] hover:scale-105 transition-transform active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <span className="text-white text-xs mt-1">
-                    {images.length}/{MAX_IMAGES}
+                    {images.length}/{maxImages}
                   </span>
                 </div>
 
@@ -2333,7 +2342,7 @@ const YPivotQATemplatesImageEditor = ({
             ))}
 
             {/* Add More Button */}
-            {images.length < MAX_IMAGES && (
+            {images.length < maxImages && (
               <button
                 onClick={addMoreImages}
                 className="flex-shrink-0 w-14 h-14 sm:w-16 sm:h-16 rounded-lg border-2 border-dashed border-gray-600 hover:border-indigo-500 flex items-center justify-center text-gray-500 hover:text-indigo-400 transition-colors"

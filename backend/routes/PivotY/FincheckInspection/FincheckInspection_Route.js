@@ -1,3 +1,7 @@
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+import { fileURLToPath } from "url";
 import express from "express";
 import {
   getInspectionOrderDetails,
@@ -27,6 +31,28 @@ import {
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Controller.js";
 
 const router = express.Router();
+
+// Configure Multer
+
+// Define Storage Path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// We save to a temporary folder first. The controller will move files to the final destination.
+const tempUploadDir = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/temp_uploads"
+);
+
+// Ensure temp directory exists
+if (!fs.existsSync(tempUploadDir)) {
+  fs.mkdirSync(tempUploadDir, { recursive: true });
+}
+
+const upload = multer({
+  dest: tempUploadDir,
+  limits: { fileSize: 50 * 1024 * 1024 } // Optional: Limit to 50MB per file
+});
 
 // Search orders for inspection (supports mode: single, multi)
 router.get("/api/fincheck-inspection/search-orders", searchInspectionOrders);
@@ -92,7 +118,12 @@ router.post(
 router.post("/api/fincheck-inspection/update-header-data", updateHeaderData);
 
 // NEW: Batch Upload Photos (Incremental - per item)
-router.post("/api/fincheck-inspection/upload-photo-batch", uploadPhotoBatch);
+router.post(
+  "/api/fincheck-inspection/upload-photo-batch",
+  upload.array("images"),
+  uploadPhotoBatch
+);
+//router.post("/api/fincheck-inspection/upload-photo-batch", uploadPhotoBatch);
 
 // NEW: Delete Single Photo
 router.post("/api/fincheck-inspection/delete-photo", deletePhotoFromItem);

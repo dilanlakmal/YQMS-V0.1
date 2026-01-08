@@ -10,7 +10,6 @@ import {
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import crypto from "crypto";
 
 // ============================================================
 // Helper: Extract base order number (common part)
@@ -1075,6 +1074,7 @@ export const checkExistingReport = async (req, res) => {
 // Define Storage Path
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
 const uploadDirHeader = path.join(
   __dirname,
   "../../../storage/PivotY/Fincheck/HeaderData"
@@ -1230,152 +1230,87 @@ const savePhotoBase64Image = (
 };
 
 // ============================================================
-// Helper: Process and Save Single Image (Async)
-// ============================================================
-const processAndSaveImageAsync = (
-  imgData,
-  reportId,
-  sectionId,
-  itemNo,
-  index
-) => {
-  return new Promise((resolve) => {
-    try {
-      // 1. Identification
-      // imgData might have .imgSrc or .url depending on where it came from
-      const imageDataString = imgData.imgSrc || imgData.url;
-
-      // 2. Scenario A: It is a Base64 Image (New or Edited)
-      if (imageDataString && imageDataString.startsWith("data:image")) {
-        const matches = imageDataString.match(
-          /^data:([A-Za-z-+\/]+);base64,(.+)$/
-        );
-
-        if (!matches || matches.length !== 3) {
-          resolve(null);
-          return;
-        }
-
-        const type = matches[1];
-        const data = Buffer.from(matches[2], "base64");
-        // Ensure extension is jpg for consistency
-        const ext = type.split("/")[1]?.replace("jpeg", "jpg") || "jpg";
-
-        const filename = `photo_${reportId}_${sectionId}_${itemNo}_${index}_${Date.now()}.${ext}`;
-        const filepath = path.join(uploadDirPhoto, filename);
-
-        // Save file asynchronously
-        fs.writeFile(filepath, data, (err) => {
-          if (err) {
-            console.error("Error writing file:", err);
-            resolve(null);
-            return;
-          }
-
-          resolve({
-            imageId:
-              imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-            imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`
-          });
-        });
-        return;
-      }
-
-      // 3. Scenario B: It is an Existing URL (Not edited)
-      if (imageDataString && imageDataString.includes("/storage/")) {
-        // ✅ FIX: Robustly strip domain/IP regardless of what it is
-        // This takes everything starting from "/storage/" to the end
-        const storageIndex = imageDataString.indexOf("/storage/");
-        const relativePath = imageDataString.substring(storageIndex);
-
-        resolve({
-          imageId:
-            imgData.id || `${sectionId}_${itemNo}_${index}_${Date.now()}`,
-          imageURL: relativePath
-        });
-        return;
-      }
-
-      // 4. Scenario C: Invalid or Empty
-      resolve(null);
-    } catch (error) {
-      console.error("Error processing image:", error);
-      resolve(null);
-    }
-  });
-};
-
-// ============================================================
 // MODIFIED: Upload Photo Batch (Multipart Support)
 // ============================================================
+
 export const uploadPhotoBatch = async (req, res) => {
   try {
-    const {
-      reportId,
-      sectionId,
-      sectionName,
-      itemNo,
-      itemName,
-      images, // Array of { id, imgSrc/url, index } - mixed Base64 and URLs
-      remarks // Optional item remark
-    } = req.body;
+    const { reportId, sectionId, sectionName, itemNo, itemName, remarks } =
+      req.body;
 
-    // 1. Validation
     if (!reportId || !sectionId || itemNo === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: reportId, sectionId, itemNo"
-      });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing required fields" });
     }
 
-    if (!images || !Array.isArray(images)) {
-      // It is possible to save just remarks with empty images, but usually images are expected
-      return res.status(400).json({
-        success: false,
-        message: "Invalid images array"
-      });
-    }
-
-    // 2. Find Report
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
     });
-
     if (!report) {
-      return res.status(404).json({
-        success: false,
-        message: "Report not found."
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
     }
 
-    // 3. Process Images Parallelly
-    // The frontend now sends compressed Base64 (~300KB), so Node can handle this map efficiently.
-    // processAndSaveImageAsync handles:
-    // - Detecting if it's Base64 (save to disk -> return URL)
-    // - Detecting if it's already a URL (return as is)
-    const imagePromises = images.map((img, idx) =>
-      processAndSaveImageAsync(
-        img,
-        reportId,
-        sectionId,
-        itemNo,
-        img.index ?? idx
-      )
-    );
-
-    const processedImages = await Promise.all(imagePromises);
-
-    // Filter out any nulls (failed saves)
-    const savedImages = processedImages.filter((img) => img && img.imageURL);
-
-    // 4. Update Database Structure
-
-    // Initialize photoData if empty
-    if (!report.photoData) {
-      report.photoData = [];
+    // 1. Parse Metadata Blueprint
+    let imageMetadata = [];
+    if (req.body.imageMetadata) {
+      try {
+        imageMetadata = JSON.parse(req.body.imageMetadata);
+      } catch (e) {
+        console.error("Error parsing metadata", e);
+      }
     }
 
-    // A. Find or Create Section
+    // 2. Reconstruct the Image Array
+    const savedImages = [];
+    let fileIndex = 0; // Tracks which file from req.files we are using
+
+    // We iterate the metadata because it represents the desired final order
+    for (let i = 0; i < imageMetadata.length; i++) {
+      const meta = imageMetadata[i];
+
+      // A. It is a NEW/EDITED File
+      if (meta.type === "file") {
+        if (req.files && req.files[fileIndex]) {
+          const file = req.files[fileIndex];
+          fileIndex++;
+
+          const ext = path.extname(file.originalname) || ".jpg";
+          // Timestamp ensures browser cache busting
+          const filename = `photo_${reportId}_${sectionId}_${itemNo}_${i}_${Date.now()}${ext}`;
+          const targetPath = path.join(uploadDirPhoto, filename);
+
+          fs.writeFileSync(targetPath, fs.readFileSync(file.path));
+          fs.unlinkSync(file.path);
+
+          savedImages.push({
+            imageId: meta.id || `${sectionId}_${itemNo}_${i}_${Date.now()}`,
+            imageURL: `/storage/PivotY/Fincheck/PhotoData/${filename}`,
+            uploadedAt: new Date()
+          });
+        }
+      }
+      // B. It is an EXISTING URL (Unchanged)
+      else if (meta.type === "url") {
+        // Ensure we only store the relative path
+        let cleanUrl = meta.imageURL;
+        if (cleanUrl.includes("/storage/")) {
+          cleanUrl = cleanUrl.substring(cleanUrl.indexOf("/storage/"));
+        }
+
+        savedImages.push({
+          imageId: meta.id,
+          imageURL: cleanUrl,
+          uploadedAt: new Date()
+        });
+      }
+    }
+
+    // 3. Update Database
+    if (!report.photoData) report.photoData = [];
+
     let sectionIndex = report.photoData.findIndex(
       (sec) =>
         sec.sectionId && sec.sectionId.toString() === sectionId.toString()
@@ -1391,14 +1326,11 @@ export const uploadPhotoBatch = async (req, res) => {
     }
 
     const section = report.photoData[sectionIndex];
-
-    // B. Find or Create Item
     let itemIndex = section.items.findIndex(
       (item) => item.itemNo === parseInt(itemNo)
     );
 
     if (itemIndex === -1) {
-      // New Item: Push logic
       section.items.push({
         itemNo: parseInt(itemNo),
         itemName: itemName || `Item ${itemNo}`,
@@ -1406,30 +1338,37 @@ export const uploadPhotoBatch = async (req, res) => {
         images: savedImages
       });
     } else {
-      // Existing Item: Update logic
-      // IMPORTANT: We overwrite the images array.
-      // The frontend sends the *complete* current state of images for this item.
-      section.items[itemIndex].images = savedImages;
+      // ✅ Delete old files that are no longer in savedImages
+      // Use this if you want to clean up disk space (prevents "Saved Twice" file clutter)
+      const oldImages = section.items[itemIndex].images;
+      oldImages.forEach((old) => {
+        const isKept = savedImages.find(
+          (newImg) => newImg.imageURL === old.imageURL
+        );
+        if (!isKept && old.imageURL) {
+          try {
+            const filePath = path.join(__dirname, "../../..", old.imageURL);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          } catch (e) {
+            /* ignore */
+          }
+        }
+      });
 
-      // Update remarks if provided (if undefined, keep existing)
+      // ✅ Completely replace the array with the new reconstructed list
+      section.items[itemIndex].images = savedImages;
       if (remarks !== undefined) {
         section.items[itemIndex].remarks = remarks;
       }
     }
 
-    // 5. Save Changes
     report.markModified("photoData");
     await report.save();
 
-    // 6. Return Success with Saved Data (Urls)
     return res.status(200).json({
       success: true,
       message: `${savedImages.length} image(s) synced successfully.`,
-      data: {
-        sectionId,
-        itemNo,
-        savedImages // Contains { imageId, imageURL }
-      }
+      data: { sectionId, itemNo, savedImages }
     });
   } catch (error) {
     console.error("Error uploading photo batch:", error);
@@ -1599,14 +1538,43 @@ export const updatePhotoData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
+    // --- HELPER: Find existing URL in the current DB document ---
+    // This recovers the valid /storage/... path if the frontend sent a blob: URL
+    const findExistingValidUrl = (imgId) => {
+      if (!report.photoData) return null;
+
+      for (const section of report.photoData) {
+        if (section.items) {
+          for (const item of section.items) {
+            if (item.images) {
+              const found = item.images.find((img) => img.imageId === imgId);
+              // Only return if it's a valid relative path, not a blob
+              if (
+                found &&
+                found.imageURL &&
+                !found.imageURL.startsWith("blob:")
+              ) {
+                return found.imageURL;
+              }
+            }
+          }
+        }
+      }
+      return null;
+    };
+
     // Process nested structure: Sections -> Items -> Images
     const processedPhotoData = photoData.map((section) => {
       const processedItems = (section.items || []).map((item) => {
         const processedImages = (item.images || [])
           .map((img, idx) => {
             let finalUrl = img.imageURL;
+            const imgId =
+              img.id ||
+              img.imageId ||
+              `${section.sectionId}_${item.itemNo}_${idx}_${Date.now()}`;
 
-            // If it's a new Base64 image, save it
+            // 1. Handle New Base64 (Data URI) - Legacy/Offline support
             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
               const savedPath = savePhotoBase64Image(
                 img.imgSrc,
@@ -1618,14 +1586,36 @@ export const updatePhotoData = async (req, res) => {
               if (savedPath) finalUrl = savedPath;
             }
 
+            // 2. ✅ BLOB URL SAFEGUARD (The Fix)
+            // If the URL is a local blob (e.g., blob:https://...), it means
+            // the frontend state hasn't updated yet. DO NOT SAVE THIS.
+            // Instead, look for the file we already uploaded in the DB.
+            else if (finalUrl && finalUrl.startsWith("blob:")) {
+              const recoveredUrl = findExistingValidUrl(imgId);
+
+              if (recoveredUrl) {
+                finalUrl = recoveredUrl; // Use the valid /storage/ path
+              } else {
+                // If we can't find it in DB and it's a blob, it means
+                // the upload failed or is still in progress.
+                // We skip saving this image to prevent broken links.
+                console.warn(
+                  `Skipping image with blob URL (upload pending/failed): ${imgId}`
+                );
+                return null;
+              }
+            }
+
+            // 3. Ensure we have a valid URL before returning
+            if (!finalUrl) return null;
+
             return {
-              imageId:
-                img.id ||
-                `${section.sectionId}_${item.itemNo}_${idx}_${Date.now()}`,
-              imageURL: finalUrl
+              imageId: imgId,
+              imageURL: finalUrl,
+              uploadedAt: new Date() // Refreshed timestamp
             };
           })
-          .filter((img) => img.imageURL); // Remove invalid images
+          .filter((img) => img !== null); // Remove invalid/dropped images
 
         return {
           itemNo: item.itemNo,
