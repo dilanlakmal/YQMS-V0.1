@@ -400,6 +400,14 @@ const downloadSingleReport = async (page, inspectionNumber, targetDownloadDir, r
             throw new Error(`Print button not found for inspection ${inspectionNumber}. Page may not have loaded correctly.`);
         }
 
+        // Remove target="_blank" to prevent opening in new window so download path is respected
+        await page.evaluate(() => {
+            const link = document.querySelector('#page-wrapper a');
+            if (link) {
+                link.removeAttribute('target');
+            }
+        });
+
         // Click print button
         await page.click('#page-wrapper a');
 
@@ -530,7 +538,7 @@ export const downloadBulkReports = async (req, res) => {
 
         // Launch browser for downloading
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
         // const browser = await puppeteer.launch({
@@ -825,7 +833,7 @@ export const saveDownloadParth = async (req, res) => {
         }
 
         const browser = await puppeteer.launch({
-            headless: false,
+            headless: true,
             args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
 
@@ -878,6 +886,14 @@ export const saveDownloadParth = async (req, res) => {
         const defaultInspectionNumber = "1528972"; // You can make this dynamic
         await page.goto(`${CONFIG.BASE_REPORT_URL}${defaultInspectionNumber}`);
         await page.waitForSelector('#page-wrapper a');
+
+        // Remove target="_blank" to prevent opening in new window so download path is respected
+        await page.evaluate(() => {
+            const link = document.querySelector('#page-wrapper a');
+            if (link) {
+                link.removeAttribute('target');
+            }
+        });
 
         // Click print button
         await page.click('#page-wrapper a');
@@ -1085,4 +1101,3 @@ export const getDateFilteredStats = async (req, res) => {
         });
     }
 }
-
