@@ -509,9 +509,14 @@ const FormSection = ({
 
           {/* Image Upload */}
           <div className="md:col-span-2 lg:col-span-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Images
-            </label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Images
+              </label>
+              <span className={`text-xs font-medium ${formData.images.length >= 5 ? 'text-red-500' : 'text-gray-500'}`}>
+                {formData.images.length}/5 images
+              </span>
+            </div>
             <div className="mt-1 space-y-4">
               {/* Image Preview Area */}
               {formData.images.length > 0 ? (
@@ -562,7 +567,8 @@ const FormSection = ({
                 <button
                   type="button"
                   onClick={triggerCameraInput}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
+                  disabled={formData.images.length >= 5}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera size={18} className="mr-2" />
                   Capture
@@ -570,7 +576,8 @@ const FormSection = ({
                 <button
                   type="button"
                   onClick={triggerFileInput}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
+                  disabled={formData.images.length >= 5}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Upload size={18} className="mr-2" />
                   Upload

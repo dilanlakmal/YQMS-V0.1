@@ -219,20 +219,20 @@ function Home() {
             description: "Supplier Issues Sub-Con Fty",
           },
           // EMB + Printing
-          {
-            path: "/emb-printing",
-            roles: ["EMB", "Printing"],
-            image: "assets/Home/stitches.png",
-            title: t("Emb-Print"),
-            description: "EMB + Printing Inspection",
-          },
+          // {
+          //   path: "/emb-printing",
+          //   roles: ["EMB", "Printing"],
+          //   image: "assets/Home/stitches.png",
+          //   title: t("Emb-Print"),
+          //   description: "EMB + Printing Inspection",
+          // },
           
           {
-            path: "/laundry-washing-machine-test",
+            path: "/Launch-washing-machine-test",
             roles: ["QC Washing", "QA"],
-            image: "assets/Home/laundry-washing-machine-test.png",
-            title: "Laundry Washing Machine Test",
-            description: "Laundry Washing Machine Test",
+            image: "assets/Home/Launch-washing-machine-test.png",
+            title: "Launch Washing Machine Test",
+            description: "Launch Washing Machine Test",
             imageSize: "large", // Custom flag for larger image
           },
 

@@ -3,8 +3,8 @@ import { Document, Page, Text, View, StyleSheet, Image } from "@react-pdf/render
 
 const styles = StyleSheet.create({
   page: {
-    padding: 30,
-    fontSize: 10,
+    padding: 20,
+    fontSize: 9,
     fontFamily: "Helvetica"
   },
   title: {
@@ -14,13 +14,14 @@ const styles = StyleSheet.create({
     textAlign: "center"
   },
   companyName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: 10,
     textAlign: "center"
   },
   section: {
-    marginBottom: 15
+    marginBottom: 10,
+    marginTop: 2
   },
   label: {
     fontSize: 9,
@@ -38,7 +39,7 @@ const styles = StyleSheet.create({
   },
   col: {
     width: "50%",
-    paddingRight: 10
+    paddingRight: 5
   },
   badge: {
     backgroundColor: "#E3F2FD",
@@ -64,8 +65,8 @@ const styles = StyleSheet.create({
     padding: 5
   },
   image: {
-    width: 150,
-    height: 150,
+    width: 120,
+    height: 120,
     objectFit: "contain"
   },
   imagesRow: {
@@ -75,6 +76,75 @@ const styles = StyleSheet.create({
   },
   imageColumn: {
     width: "32%"
+  },
+  qrCodeContainer: {
+    position: "absolute",
+    top: 30,
+    right: 30,
+    alignItems: "center",
+    width: 75
+  },
+  qrCodeImage: {
+    width: 65,
+    height: 65,
+    border: "1px solid #eee",
+    padding: 3
+  },
+  qrCodeLabel: {
+    fontSize: 6,
+    color: "#888",
+    marginTop: 2,
+    textAlign: "center"
+  },
+  notesBox: {
+    padding: 6,
+    borderRadius: 4,
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  notesLabel: {
+    fontSize: 8,
+    fontWeight: "bold",
+    marginBottom: 2,
+  },
+  notesContent: {
+    fontSize: 9,
+    lineHeight: 1.2,
+  },
+  initialNotesBox: {
+    backgroundColor: "#E3F2FD",
+    border: "1px solid #BBDEFB",
+  },
+  initialNotesLabel: {
+    color: "#1976D2",
+  },
+  receivedNotesBox: {
+    backgroundColor: "#FFF9C4",
+    border: "1px solid #FFF176",
+  },
+  receivedNotesLabel: {
+    color: "#FBC02D",
+  },
+  completionNotesLabel: {
+    color: "#388E3C",
+  },
+  stepHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 5,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    paddingBottom: 2
+  },
+  stepTitle: {
+    fontSize: 8.5,
+    fontWeight: "bold",
+    color: "#333"
+  },
+  stepDate: {
+    fontSize: 7.5,
+    color: "#666"
   }
 });
 
@@ -171,104 +241,68 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
 
         <View style={styles.section}>
           <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>YM Style:</Text>
-              <Text style={styles.value}>{report.ymStyle || "N/A"}</Text>
+            <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+              <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>YM Style:</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>{report.ymStyle || "N/A"}</Text>
             </View>
-            <View style={styles.col}>
-              <Text style={styles.label}>Buyer Style:</Text>
-              <Text style={styles.value}>{report.buyerStyle || "N/A"}</Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Factory:</Text>
-              <Text style={styles.value}>{report.factory || "N/A"}</Text>
-            </View>
-            <View style={styles.col}>
-              <Text style={styles.label}>Report Date:</Text>
-              <Text style={styles.value}>
-                {report.reportDate
-                  ? new Date(report.reportDate).toLocaleDateString()
-                  : "N/A"}
-              </Text>
+            <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+              <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Buyer Style:</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>{report.buyerStyle || "N/A"}</Text>
             </View>
           </View>
 
           <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Send To Home Washing Date:</Text>
-              <Text style={styles.value}>
-                {report.sendToHomeWashingDate
-                  ? new Date(report.sendToHomeWashingDate).toLocaleDateString()
-                  : "N/A"}
-              </Text>
-            </View>
-            <View style={styles.col}>
-              <Text style={styles.label}>Submitted By:</Text>
-              <Text style={styles.value}>{report.engName || report.userName || report.userId || "N/A"}</Text>
+            <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+              <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Factory:</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>{report.factory || "N/A"}</Text>
             </View>
           </View>
 
           <View style={styles.row}>
-            <View style={styles.col}>
-              <Text style={styles.label}>Submitted At:</Text>
-              <Text style={styles.value}>
+            <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+              <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Submitted By:</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>{report.engName || report.userName || report.userId || "N/A"}</Text>
+            </View>
+            <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+              <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Submitted At:</Text>
+              <Text style={[styles.value, { marginBottom: 0 }]}>
                 {report.createdAt
-                  ? new Date(report.createdAt).toLocaleString()
+                  ? new Date(report.createdAt).toLocaleString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
                   : report.submittedAt
-                    ? new Date(report.submittedAt).toLocaleString()
+                    ? new Date(report.submittedAt).toLocaleString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })
                     : "N/A"}
               </Text>
             </View>
           </View>
 
-          {/* Status Information */}
-          {/* {(report.status || report.receivedDate || report.completedDate) && (
-            <View style={styles.section}>
-              <Text style={styles.label}>Status Information:</Text>
-              <View style={styles.row}>
-                {report.status && (
-                  <View style={styles.col}>
-                    <Text style={styles.label}>Status:</Text>
-                    <Text style={styles.value}>
-                      {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
-                    </Text>
-                  </View>
-                )}
-                {report.receivedDate && (
-                  <View style={styles.col}>
-                    <Text style={styles.label}>Received Date:</Text>
-                    <Text style={styles.value}>
-                      {report.receivedAt
-                        ? new Date(report.receivedAt).toLocaleString()
-                        : report.receivedDate}
-                    </Text>
-                  </View>
-                )}
-                {report.completedDate && (
-                  <View style={styles.col}>
-                    <Text style={styles.label}>Completed Date:</Text>
-                    <Text style={styles.value}>
-                      {report.completedAt
-                        ? new Date(report.completedAt).toLocaleString()
-                        : report.completedDate}
-                    </Text>
-                  </View>
-                )}
+          {report.status && (
+            <View style={styles.row}>
+              <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
+                <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Status:</Text>
+                <Text style={{
+                  fontSize: 10,
+                  fontWeight: 'bold',
+                  color: report.status === 'completed' ? '#2e7d32' : report.status === 'received' ? '#1976d2' : '#ed6c02',
+                  marginBottom: 0
+                }}>
+                  {report.status.charAt(0).toUpperCase() + report.status.slice(1)}
+                </Text>
               </View>
-              {report.completionNotes && (
-                <View style={styles.section}>
-                  <Text style={styles.label}>Completion Notes:</Text>
-                  <Text style={styles.value}>{report.completionNotes}</Text>
-                </View>
-              )}
             </View>
-          )} */}
+          )}
         </View>
 
-        <View style={styles.section}>
+        {qrCodeDataURL && (
+          <View style={styles.qrCodeContainer}>
+            <Image
+              src={qrCodeDataURL}
+              style={styles.qrCodeImage}
+            />
+            <Text style={styles.qrCodeLabel}>Scan to Set Date</Text>
+          </View>
+        )}
+
+        <View style={[styles.section, { marginTop: 5 }]}>
           <Text style={styles.label}>Colors:</Text>
           <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
             {report.color && report.color.length > 0 ? (
@@ -309,20 +343,168 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
 
         {useCompactLayout ? (
           <View style={styles.imagesRow}>
+            {/* Step 1 Column */}
             <View style={styles.imageColumn}>
-              {report.images && report.images.length > 0 && (
+              {((report.images && report.images.length > 0) || report.notes) && (
                 <>
-                  <Text style={styles.label}>Initial Images ({report.images.length}):</Text>
+                  <View style={styles.stepHeader}>
+                    <Text style={styles.stepTitle}>Step 1: Sent To Wash ({report.images?.length || 0} imgs)</Text>
+                    <Text style={styles.stepDate}>
+                      {report.createdAt
+                        ? new Date(report.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' })
+                        : report.submittedAt
+                          ? new Date(report.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' })
+                          : "N/A"}
+                    </Text>
+                  </View>
+                  {report.images && report.images.length > 0 && (
+                    <View style={styles.imagesGrid}>
+                      {report.images.map((url, idx) => {
+                        const normalizedUrl = normalizeImageUrl(url);
+                        if (!normalizedUrl) return null;
+                        const rotation = getImageRotation(url);
+                        return (
+                          <View key={idx} style={styles.imageWrapper}>
+                            <Image
+                              src={normalizedUrl}
+                              style={{
+                                ...styles.image,
+                                transform: rotation ? `rotate(${rotation}deg)` : undefined
+                              }}
+                              cache={false}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {report.notes && (
+                    <View style={[styles.notesBox, styles.initialNotesBox]}>
+                      <Text style={[styles.notesLabel, styles.initialNotesLabel]}>Notes:</Text>
+                      <Text style={styles.notesContent}>{report.notes}</Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* Step 2 Column */}
+            <View style={styles.imageColumn}>
+              {((report.receivedImages && report.receivedImages.length > 0) || report.receivedNotes) && (
+                <>
+                  <View style={styles.stepHeader}>
+                    <Text style={styles.stepTitle}>Step 2: Received ({report.receivedImages?.length || 0} imgs)</Text>
+                    <Text style={styles.stepDate}>
+                      {report.receivedAt
+                        ? new Date(report.receivedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' })
+                        : "N/A"}
+                    </Text>
+                  </View>
+                  {report.receivedImages && report.receivedImages.length > 0 && (
+                    <View style={styles.imagesGrid}>
+                      {report.receivedImages.map((url, idx) => {
+                        const normalizedUrl = normalizeImageUrl(url);
+                        if (!normalizedUrl) return null;
+                        const rotation = getImageRotation(url);
+                        return (
+                          <View key={idx} style={styles.imageWrapper}>
+                            <Image
+                              src={normalizedUrl}
+                              style={{
+                                ...styles.image,
+                                transform: rotation ? `rotate(${rotation}deg)` : undefined
+                              }}
+                              cache={false}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {report.receivedNotes && (
+                    <View style={[styles.notesBox, styles.receivedNotesBox]}>
+                      <Text style={[styles.notesLabel, styles.receivedNotesLabel]}>Notes:</Text>
+                      <Text style={styles.notesContent}>{report.receivedNotes}</Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+
+            {/* Step 3 Column */}
+            <View style={styles.imageColumn}>
+              {((report.completionImages && report.completionImages.length > 0) || report.completionNotes) && (
+                <>
+                  <View style={styles.stepHeader}>
+                    <Text style={styles.stepTitle}>Step 3: Done ({report.completionImages?.length || 0} imgs)</Text>
+                    <Text style={styles.stepDate}>
+                      {report.completedAt
+                        ? new Date(report.completedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'numeric', year: 'numeric' })
+                        : "N/A"}
+                    </Text>
+                  </View>
+                  {report.completionImages && report.completionImages.length > 0 && (
+                    <View style={styles.imagesGrid}>
+                      {report.completionImages.map((url, idx) => {
+                        const normalizedUrl = normalizeImageUrl(url);
+                        if (!normalizedUrl) return null;
+                        const rotation = getImageRotation(url);
+                        return (
+                          <View key={idx} style={styles.imageWrapper}>
+                            <Image
+                              src={normalizedUrl}
+                              style={{
+                                ...styles.image,
+                                transform: rotation ? `rotate(${rotation}deg)` : undefined
+                              }}
+                              cache={false}
+                            />
+                          </View>
+                        );
+                      })}
+                    </View>
+                  )}
+                  {report.completionNotes && (
+                    <View style={[styles.notesBox, styles.completionNotesBox]}>
+                      <Text style={[styles.notesLabel, styles.completionNotesLabel]}>Notes:</Text>
+                      <Text style={styles.notesContent}>{report.completionNotes}</Text>
+                    </View>
+                  )}
+                </>
+              )}
+            </View>
+          </View >
+        ) : (
+          <>
+            {/* Regular Layout - Stacked Sections */}
+            {((report.images && report.images.length > 0) || report.notes) && (
+              <View style={[styles.section, { marginTop: 10 }]} wrap={false}>
+                <View style={styles.stepHeader}>
+                  <Text style={styles.stepTitle}>Step 1: Sent To Home Washing ({report.images?.length || 0} images)</Text>
+                  <Text style={styles.stepDate}>
+                    {(report.createdAt || report.submittedAt)
+                      ? new Date(report.createdAt || report.submittedAt).toLocaleString('en-GB', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })
+                      : report.sendToHomeWashingDate
+                        ? new Date(report.sendToHomeWashingDate).toLocaleDateString('en-GB', {
+                          day: 'numeric',
+                          month: 'numeric',
+                          year: 'numeric'
+                        })
+                        : "N/A"}
+                  </Text>
+                </View>
+                {report.images && report.images.length > 0 && (
                   <View style={styles.imagesGrid}>
                     {report.images.map((url, idx) => {
                       const normalizedUrl = normalizeImageUrl(url);
-                      if (!normalizedUrl) {
-                        return (
-                          <View key={idx} style={styles.imageWrapper}>
-                            <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                          </View>
-                        );
-                      }
+                      if (!normalizedUrl) return null;
                       const rotation = getImageRotation(url);
                       return (
                         <View key={idx} style={styles.imageWrapper}>
@@ -338,24 +520,38 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                       );
                     })}
                   </View>
-                </>
-              )}
-            </View>
+                )}
+                {report.notes && (
+                  <View style={[styles.notesBox, styles.initialNotesBox]}>
+                    <Text style={[styles.notesLabel, styles.initialNotesLabel]}>Notes:</Text>
+                    <Text style={styles.notesContent}>{report.notes}</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
-            <View style={styles.imageColumn}>
-              {report.receivedImages && report.receivedImages.length > 0 && (
-                <>
-                  <Text style={styles.label}>Received Images ({report.receivedImages.length}):</Text>
+            {((report.receivedImages && report.receivedImages.length > 0) || report.receivedNotes) && (
+              <View style={styles.section} wrap={false}>
+                <View style={styles.stepHeader}>
+                  <Text style={styles.stepTitle}>Step 2: Received ({report.receivedImages?.length || 0} images)</Text>
+                  <Text style={styles.stepDate}>
+                    {report.receivedAt
+                      ? new Date(report.receivedAt).toLocaleString('en-GB', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })
+                      : "Not yet received"}
+                  </Text>
+                </View>
+                {report.receivedImages && report.receivedImages.length > 0 && (
                   <View style={styles.imagesGrid}>
                     {report.receivedImages.map((url, idx) => {
                       const normalizedUrl = normalizeImageUrl(url);
-                      if (!normalizedUrl) {
-                        return (
-                          <View key={idx} style={styles.imageWrapper}>
-                            <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                          </View>
-                        );
-                      }
+                      if (!normalizedUrl) return null;
                       const rotation = getImageRotation(url);
                       return (
                         <View key={idx} style={styles.imageWrapper}>
@@ -371,24 +567,38 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                       );
                     })}
                   </View>
-                </>
-              )}
-            </View>
+                )}
+                {report.receivedNotes && (
+                  <View style={[styles.notesBox, styles.receivedNotesBox]}>
+                    <Text style={[styles.notesLabel, styles.receivedNotesLabel]}>Notes:</Text>
+                    <Text style={styles.notesContent}>{report.receivedNotes}</Text>
+                  </View>
+                )}
+              </View>
+            )}
 
-            <View style={styles.imageColumn}>
-              {report.completionImages && report.completionImages.length > 0 && (
-                <>
-                  <Text style={styles.label}>Completion Images ({report.completionImages.length}):</Text>
+            {((report.completionImages && report.completionImages.length > 0) || report.completionNotes) && (
+              <View style={styles.section} wrap={false}>
+                <View style={styles.stepHeader}>
+                  <Text style={styles.stepTitle}>Step 3: Completed ({report.completionImages?.length || 0} images)</Text>
+                  <Text style={styles.stepDate}>
+                    {report.completedAt
+                      ? new Date(report.completedAt).toLocaleString('en-GB', {
+                        day: 'numeric',
+                        month: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })
+                      : "Not yet completed"}
+                  </Text>
+                </View>
+                {report.completionImages && report.completionImages.length > 0 && (
                   <View style={styles.imagesGrid}>
                     {report.completionImages.map((url, idx) => {
                       const normalizedUrl = normalizeImageUrl(url);
-                      if (!normalizedUrl) {
-                        return (
-                          <View key={idx} style={styles.imageWrapper}>
-                            <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                          </View>
-                        );
-                      }
+                      if (!normalizedUrl) return null;
                       const rotation = getImageRotation(url);
                       return (
                         <View key={idx} style={styles.imageWrapper}>
@@ -404,131 +614,20 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                       );
                     })}
                   </View>
-                </>
-              )}
-            </View>
-          </View>
-        ) : (
-          <>
-            {report.images && report.images.length > 0 && (
-              <View style={styles.section} wrap={false}>
-                <Text style={styles.label}>Initial Images ({report.images.length}):</Text>
-                <View style={styles.imagesGrid}>
-                  {report.images.map((url, idx) => {
-                    const normalizedUrl = normalizeImageUrl(url);
-                    if (!normalizedUrl) {
-                      return (
-                        <View key={idx} style={styles.imageWrapper}>
-                          <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                        </View>
-                      );
-                    }
-                    const rotation = getImageRotation(url);
-                    return (
-                      <View key={idx} style={styles.imageWrapper}>
-                        <Image
-                          src={normalizedUrl}
-                          style={{
-                            ...styles.image,
-                            transform: rotation ? `rotate(${rotation}deg)` : undefined
-                          }}
-                          cache={false}
-                        />
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {report.receivedImages && report.receivedImages.length > 0 && (
-              <View style={styles.section} wrap={false}>
-                <Text style={styles.label}>Received Images ({report.receivedImages.length}):</Text>
-                <View style={styles.imagesGrid}>
-                  {report.receivedImages.map((url, idx) => {
-                    const normalizedUrl = normalizeImageUrl(url);
-                    if (!normalizedUrl) {
-                      return (
-                        <View key={idx} style={styles.imageWrapper}>
-                          <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                        </View>
-                      );
-                    }
-                    const rotation = getImageRotation(url);
-                    return (
-                      <View key={idx} style={styles.imageWrapper}>
-                        <Image
-                          src={normalizedUrl}
-                          style={{
-                            ...styles.image,
-                            transform: rotation ? `rotate(${rotation}deg)` : undefined
-                          }}
-                          cache={false}
-                        />
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-            )}
-
-            {report.completionImages && report.completionImages.length > 0 && (
-              <View style={styles.section} wrap={false}>
-                <Text style={styles.label}>Completion Images ({report.completionImages.length}):</Text>
-                <View style={styles.imagesGrid}>
-                  {report.completionImages.map((url, idx) => {
-                    const normalizedUrl = normalizeImageUrl(url);
-                    if (!normalizedUrl) {
-                      return (
-                        <View key={idx} style={styles.imageWrapper}>
-                          <Text style={styles.value}>Image {idx + 1}: Invalid URL</Text>
-                        </View>
-                      );
-                    }
-                    const rotation = getImageRotation(url);
-                    return (
-                      <View key={idx} style={styles.imageWrapper}>
-                        <Image
-                          src={normalizedUrl}
-                          style={{
-                            ...styles.image,
-                            transform: rotation ? `rotate(${rotation}deg)` : undefined
-                          }}
-                          cache={false}
-                        />
-                      </View>
-                    );
-                  })}
-                </View>
+                )}
+                {report.completionNotes && (
+                  <View style={[styles.notesBox, styles.completionNotesBox]}>
+                    <Text style={[styles.notesLabel, styles.completionNotesLabel]}>Notes:</Text>
+                    <Text style={styles.notesContent}>{report.completionNotes}</Text>
+                  </View>
+                )}
               </View>
             )}
           </>
         )}
-
-        {/* QR Code Section for Report Date Scanning */}
-        {qrCodeDataURL && (
-          <View style={styles.section} wrap={false}>
-            {/* <Text style={styles.label}>Scan QR Code to Set Report Date:</Text> */}
-            <View style={{ alignItems: "center", marginTop: 10 }}>
-              <Image
-                src={qrCodeDataURL}
-                style={{
-                  width: 100,
-                  height: 100,
-                  border: "1px solid #ddd",
-                  padding: 5
-                }}
-              />
-              {/* <Text style={{ ...styles.value, textAlign: "center", marginTop: 5, fontSize: 8 }}>
-                Scan this QR code to automatically set the report date
-              </Text> */}
-            </View>
-          </View>
-        )}
-      </Page>
-    </Document>
+      </Page >
+    </Document >
   );
 };
 
 export default WashingMachineTestPDF;
-

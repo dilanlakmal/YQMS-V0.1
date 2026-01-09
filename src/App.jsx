@@ -85,7 +85,7 @@ import QC2WashingUpload from "./pages/QC2WashingUpload.jsx";
 
 import QCWashingPage from "./pages/QCWashing.jsx";
 import AfterIroning from "./pages/AfterIroning.jsx";
-import LaundryWashingMachineTest from "./pages/LaundryWashingMachineTest.jsx";
+import LaundryWashingMachineTest from "./pages/LaunchWashingMachineTest.jsx";
 // import QRCodeView from "./pages/QRCodeView.jsx";
 
 import SupplierIssues from "./pages/SupplierIssues.jsx";
@@ -311,7 +311,7 @@ function AppContent() {
 
   return (
     <div className="min-h-screen  bg-gray-50">
-      <Toaster 
+      <Toaster
         position="bottom-right"
         toastOptions={toastConfig}
       />
@@ -489,7 +489,7 @@ function AppContent() {
               <Route path="/training" element={<YQMSTrainingSchedule />} />
               <Route path="/exam" element={<YQMSExam />} />
               <Route path="/cutting-inline" element={<CuttingInline />} />
-              <Route path="/laundry-washing-machine-test" element={<LaundryWashingMachineTest />} />
+              <Route path="/Launch-washing-machine-test" element={<LaundryWashingMachineTest />} />
               {/* <Route path="/qr-code/:reportId" element={<QRCodeView />} /> */}
               <Route path="/sub-con-qc1" element={<SubConQC />} />
               <Route

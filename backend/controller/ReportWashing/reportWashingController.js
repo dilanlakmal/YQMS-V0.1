@@ -141,7 +141,8 @@ export const saveReportWashing = async (req, res) => {
 // Get all Report Washing data
 export const getReportWashing = async (req, res) => {
   try {
-    const { ymStyle, factory, startDate, endDate, limit = 100 } = req.query;
+    const { ymStyle, factory, startDate, endDate, limit = 10, page = 1 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
     let query = {};
 
@@ -153,25 +154,48 @@ export const getReportWashing = async (req, res) => {
       query.factory = { $regex: factory, $options: "i" };
     }
 
+    if (req.query.color) {
+      query.color = { $regex: req.query.color, $options: "i" };
+    }
+
+    if (req.query.status) {
+      query.status = req.query.status;
+    }
+
     if (startDate || endDate) {
       query.reportDate = {};
       if (startDate) {
-        query.reportDate.$gte = new Date(startDate);
+        // Start of the day
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        query.reportDate.$gte = start;
       }
       if (endDate) {
-        query.reportDate.$lte = new Date(endDate);
+        // End of the day (23:59:59.999)
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.reportDate.$lte = end;
       }
     }
 
+    // Get total count for pagination
+    const totalRecords = await ReportWashing.countDocuments(query);
+
     const reports = await ReportWashing.find(query)
       .sort({ reportDate: -1, createdAt: -1 })
+      .skip(skip)
       .limit(parseInt(limit))
       .lean();
 
     res.status(200).json({
       success: true,
       data: reports,
-      count: reports.length
+      pagination: {
+        totalRecords,
+        totalPages: Math.ceil(totalRecords / parseInt(limit)),
+        currentPage: parseInt(page),
+        limit: parseInt(limit)
+      }
     });
   } catch (error) {
     console.error("Error fetching Report Washing data:", error);
@@ -524,21 +548,55 @@ export const deleteReportWashing = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const deletedReport = await ReportWashing.findByIdAndDelete(id);
+    // Find the report first to get image paths
+    const reportToDelete = await ReportWashing.findById(id);
 
-    if (!deletedReport) {
+    if (!reportToDelete) {
       return res.status(404).json({
         success: false,
         message: "Report Washing not found"
       });
     }
 
+    // Collect all image URLs from different status fields
+    const allImages = [
+      ...(reportToDelete.images || []),
+      ...(reportToDelete.receivedImages || []),
+      ...(reportToDelete.completionImages || [])
+    ];
+
+    // Delete associated files from filesystem
+    if (allImages.length > 0) {
+      for (const imageUrl of allImages) {
+        try {
+          // Extract filename from URL (assumes format: .../filename.ext)
+          const filename = imageUrl.split('/').pop();
+
+          if (filename) {
+            const filePath = path.join(washingMachineTestUploadPath, filename);
+
+            // Check if file exists and delete it
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+              console.log(`Deleted file: ${filePath}`);
+            }
+          }
+        } catch (fileError) {
+          // Log error but continue deleting other files and the report record
+          console.error(`Error deleting file for image ${imageUrl}:`, fileError);
+        }
+      }
+    }
+
+    // Now delete the report from database
+    const deletedReport = await ReportWashing.findByIdAndDelete(id);
+
     // Emit socket event for real-time updates
     io.emit("washing-report-deleted", id);
 
     res.status(200).json({
       success: true,
-      message: "Report Washing deleted successfully",
+      message: "Report Washing and associated files deleted successfully",
       data: deletedReport
     });
   } catch (error) {
@@ -600,3 +658,66 @@ export const getWashingMachineTestImage = async (req, res) => {
   }
 };
 
+// Get unique styles for autocomplete
+export const getUniqueStyles = async (req, res) => {
+  try {
+    const { search = "" } = req.query;
+
+    // Get distinct ymStyle values that match the search term
+    const styles = await ReportWashing.distinct("ymStyle", {
+      ymStyle: { $regex: search, $options: "i" }
+    });
+
+    // Limit to 10 suggestions
+    const suggestions = styles.slice(0, 10);
+
+    res.status(200).json({
+      success: true,
+      data: suggestions
+    });
+  } catch (error) {
+    console.error("Error fetching unique styles:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch styles",
+      error: error.message
+    });
+  }
+};
+
+// Get unique colors for autocomplete
+export const getUniqueColors = async (req, res) => {
+  try {
+    const { search = "" } = req.query;
+
+    // Get all reports and extract unique colors from the color arrays
+    const reports = await ReportWashing.find(
+      search ? { color: { $regex: search, $options: "i" } } : {},
+      { color: 1 }
+    ).lean();
+
+    // Flatten all color arrays and get unique values
+    const allColors = reports.flatMap(r => r.color || []);
+    const uniqueColors = [...new Set(allColors)];
+
+    // Filter by search term if provided
+    const filteredColors = search
+      ? uniqueColors.filter(c => c.toLowerCase().includes(search.toLowerCase()))
+      : uniqueColors;
+
+    // Limit to 10 suggestions
+    const suggestions = filteredColors.slice(0, 10);
+
+    res.status(200).json({
+      success: true,
+      data: suggestions
+    });
+  } catch (error) {
+    console.error("Error fetching unique colors:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch colors",
+      error: error.message
+    });
+  }
+};

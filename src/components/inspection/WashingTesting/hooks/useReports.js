@@ -11,16 +11,37 @@ export const useReports = () => {
   const [isLoadingReports, setIsLoadingReports] = useState(false);
   const [expandedReports, setExpandedReports] = useState(new Set());
   const [printingReportId, setPrintingReportId] = useState(null);
+  const [pagination, setPagination] = useState({
+    totalRecords: 0,
+    totalPages: 0,
+    currentPage: 1,
+    limit: 10
+  });
 
   // Fetch reports from backend
-  const fetchReports = useCallback(async () => {
+  const fetchReports = useCallback(async (filters = {}) => {
     setIsLoadingReports(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/report-washing?limit=50`);
+      // Build query string from filters
+      const queryParams = new URLSearchParams();
+      queryParams.append("limit", filters.limit || 10);
+      queryParams.append("page", filters.page || 1);
+
+      if (filters.search) queryParams.append("ymStyle", filters.search);
+      if (filters.factory) queryParams.append("factory", filters.factory);
+      if (filters.color) queryParams.append("color", filters.color);
+      if (filters.status) queryParams.append("status", filters.status);
+      if (filters.startDate) queryParams.append("startDate", filters.startDate);
+      if (filters.endDate) queryParams.append("endDate", filters.endDate);
+
+      const response = await fetch(`${API_BASE_URL}/api/report-washing?${queryParams.toString()}`);
       if (response.ok) {
         const result = await response.json();
         if (result.success) {
           setReports(result.data || []);
+          if (result.pagination) {
+            setPagination(result.pagination);
+          }
         } else {
           console.error("Failed to fetch reports:", result.message);
           showToast.error("Failed to load reports. Please check your connection.");
@@ -129,6 +150,7 @@ export const useReports = () => {
     fetchReports,
     deleteReport,
     toggleReport,
+    pagination,
   };
 };
 

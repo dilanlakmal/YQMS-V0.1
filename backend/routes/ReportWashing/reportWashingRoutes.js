@@ -5,7 +5,9 @@ import {
   getReportWashingById,
   updateReportWashing,
   deleteReportWashing,
-  getWashingMachineTestImage
+  getWashingMachineTestImage,
+  getUniqueStyles,
+  getUniqueColors
 } from "../../controller/ReportWashing/reportWashingController.js";
 import { uploadWashingMachineTestImage } from "../../helpers/helperFunctions.js";
 
@@ -31,6 +33,10 @@ router.delete("/api/report-washing/:id", deleteReportWashing);
 
 // Route to serve washing machine test images
 router.get("/api/report-washing/image/:filename", getWashingMachineTestImage);
+
+// Autocomplete routes
+router.get("/api/report-washing/autocomplete/styles", getUniqueStyles);
+router.get("/api/report-washing/autocomplete/colors", getUniqueColors);
 
 export default router;
 

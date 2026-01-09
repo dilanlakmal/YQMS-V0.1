@@ -2,12 +2,12 @@
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useSearchParams } from "react-router-dom";
-import { Upload, X, Camera, ChevronDown, ChevronUp, FileText, FileSpreadsheet, Printer, QrCode, Scan, Pencil, CheckCircle, RotateCw, RotateCcw, Download, Trash2, Save, RefreshCw, Send } from "lucide-react";
+import { Upload, X, Camera, ChevronDown, ChevronUp, FileText, FileSpreadsheet, Printer, QrCode, Scan, Pencil, CheckCircle, RotateCw, RotateCcw, Download, Trash2, Save, RefreshCw, Send, Search, ClipboardList } from "lucide-react";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../config.js";
 import Select from "react-select";
 import { pdf } from "@react-pdf/renderer";
-import QRCode from "react-qr-code";
 import { Html5Qrcode } from "html5-qrcode";
+import { QRCodeCanvas } from "qrcode.react";
 import WashingMachineTestPDF from "../components/inspection/WashingTesting/WashingMachineTestPDF";
 import generateWashingMachineTestExcel from "../components/inspection/WashingTesting/WashingMachineTestExcel";
 import {
@@ -96,6 +96,7 @@ const LaundryWashingMachineTest = () => {
     fetchReports,
     deleteReport,
     toggleReport,
+    pagination,
   } = useReports();
 
   const {
@@ -234,6 +235,38 @@ const LaundryWashingMachineTest = () => {
   const [factories, setFactories] = useState([]);
   const [isLoadingFactories, setIsLoadingFactories] = useState(false);
 
+  // Filter states
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterColor, setFilterColor] = useState("");
+  const [filterFactory, setFilterFactory] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterPage, setFilterPage] = useState(1);
+  const [filterLimit, setFilterLimit] = useState(10);
+
+  // Reset page to 1 when filters (except page) change
+  useEffect(() => {
+    setFilterPage(1);
+  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterLimit]);
+
+  // Fetch reports when filters or page change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchReports({
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+        search: filterSearch,
+        color: filterColor,
+        factory: filterFactory,
+        status: filterStatus,
+        page: filterPage,
+        limit: filterLimit
+      });
+    }, 500); // Debounce
+    return () => clearTimeout(timer);
+  }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterPage, filterLimit, fetchReports]);
+
   // Dropdown states
   const [showColorDropdown, setShowColorDropdown] = useState(false);
   const [showPODropdown, setShowPODropdown] = useState(false);
@@ -371,7 +404,23 @@ const LaundryWashingMachineTest = () => {
   // Handle file input change
   const handleFileInputChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
-      const validFiles = Array.from(e.target.files).filter(f => validateImageFile(f));
+      const currentCount = formData.images?.length || 0;
+      const filesToHandle = Array.from(e.target.files);
+
+      if (currentCount >= 5) {
+        showToast.warning("Maximum of 5 images allowed per section.");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        return;
+      }
+
+      const availableSlots = 5 - currentCount;
+      const filesToAdd = filesToHandle.slice(0, availableSlots);
+
+      if (filesToHandle.length > availableSlots) {
+        showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+      }
+
+      const validFiles = filesToAdd.filter(f => validateImageFile(f));
       if (validFiles.length > 0) {
         setFormData((prev) => ({
           ...prev,
@@ -387,11 +436,26 @@ const LaundryWashingMachineTest = () => {
   // Handle camera input change
   const handleCameraInputChange = (e) => {
     if (e.target.files && e.target.files.length > 0) {
+      const currentCount = formData.images?.length || 0;
+      if (currentCount >= 5) {
+        showToast.warning("Maximum of 5 images allowed per section.");
+        if (cameraInputRef.current) cameraInputRef.current.value = "";
+        return;
+      }
+
       const validFiles = Array.from(e.target.files).filter(f => validateImageFile(f));
       if (validFiles.length > 0) {
+        // Since camera is usually one by one, we just check if it exceeds after adding
+        if (currentCount + validFiles.length > 5) {
+          showToast.warning("Total images exceed limit of 5. Only the first ones were added.");
+        }
+
+        const availableSlots = 5 - currentCount;
+        const filesToAdd = validFiles.slice(0, availableSlots);
+
         setFormData((prev) => ({
           ...prev,
-          images: [...prev.images, ...validFiles],
+          images: [...prev.images, ...filesToAdd],
         }));
       }
     }
@@ -402,6 +466,10 @@ const LaundryWashingMachineTest = () => {
 
   // Trigger file input
   const triggerFileInput = () => {
+    if ((formData.images?.length || 0) >= 5) {
+      showToast.warning("Maximum of 5 images allowed (Initial Step).");
+      return;
+    }
     if (fileInputRef.current) {
       fileInputRef.current.removeAttribute("capture");
       fileInputRef.current.click();
@@ -410,6 +478,10 @@ const LaundryWashingMachineTest = () => {
 
   // Trigger camera input
   const triggerCameraInput = () => {
+    if ((formData.images?.length || 0) >= 5) {
+      showToast.warning("Maximum of 5 images allowed (Initial Step).");
+      return;
+    }
     if (cameraInputRef.current) {
       cameraInputRef.current.setAttribute("capture", "environment");
       cameraInputRef.current.click();
@@ -1246,9 +1318,22 @@ const LaundryWashingMachineTest = () => {
   const handleReceivedImageUpload = (files) => {
     if (!files || files.length === 0) return;
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const currentCount = receivedImages.length;
+    if (currentCount >= 5) {
+      showToast.warning("Maximum of 5 images allowed per section.");
+      return;
+    }
 
-    Array.from(files).forEach((file) => {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const filesArray = Array.from(files);
+    const availableSlots = 5 - currentCount;
+    const filesToProcess = filesArray.slice(0, availableSlots);
+
+    if (filesArray.length > availableSlots) {
+      showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+    }
+
+    filesToProcess.forEach((file) => {
       const isValidType = allowedTypes.includes(file.type.toLowerCase());
       if (!isValidType) {
         showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
@@ -1305,9 +1390,22 @@ const LaundryWashingMachineTest = () => {
   const handleCompletionImageUpload = (files) => {
     if (!files || files.length === 0) return;
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const currentCount = completionImages.length;
+    if (currentCount >= 5) {
+      showToast.warning("Maximum of 5 images allowed per section.");
+      return;
+    }
 
-    Array.from(files).forEach((file) => {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const filesArray = Array.from(files);
+    const availableSlots = 5 - currentCount;
+    const filesToProcess = filesArray.slice(0, availableSlots);
+
+    if (filesArray.length > availableSlots) {
+      showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+    }
+
+    filesToProcess.forEach((file) => {
       const isValidType = allowedTypes.includes(file.type.toLowerCase());
       if (!isValidType) {
         showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
@@ -1386,9 +1484,22 @@ const LaundryWashingMachineTest = () => {
   const handleEditImageUpload = (files, type) => {
     if (!files || files.length === 0) return;
 
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const currentCount = editingImages.length;
+    if (currentCount >= 5) {
+      showToast.warning("Maximum of 5 images allowed per section.");
+      return;
+    }
 
-    Array.from(files).forEach((file) => {
+    const allowedTypes = ["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    const filesArray = Array.from(files);
+    const availableSlots = 5 - currentCount;
+    const filesToProcess = filesArray.slice(0, availableSlots);
+
+    if (filesArray.length > availableSlots) {
+      showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
+    }
+
+    filesToProcess.forEach((file) => {
       const isValidType = allowedTypes.includes(file.type.toLowerCase());
       if (!isValidType) {
         showToast.error(`Invalid file type: ${file.name}. Only JPEG, PNG, GIF, and WebP images are allowed.`);
@@ -1496,14 +1607,17 @@ const LaundryWashingMachineTest = () => {
 
   // Legacy function - now uses hook
   const generateQRCodeDataURLLegacy = async (value, size = 100) => {
+    // Increase resolution for the data URL to ensure it's sharp in PDF/Print
+    const highResSize = 1024;
+
     return new Promise((resolve) => {
       try {
         // Create a temporary container
         const container = document.createElement("div");
         container.style.position = "absolute";
         container.style.left = "-9999px";
-        container.style.width = `${size}px`;
-        container.style.height = `${size}px`;
+        container.style.width = `${highResSize}px`;
+        container.style.height = `${highResSize}px`;
         container.style.background = "white";
         document.body.appendChild(container);
 
@@ -1513,9 +1627,17 @@ const LaundryWashingMachineTest = () => {
           root.render(
             React.createElement(QRCodeCanvas, {
               value: value,
-              size: size,
+              size: highResSize,
               level: "H",
-              includeMargin: true
+              includeMargin: true,
+              imageSettings: {
+                src: "/assets/Home/YQMSLogoEdit.png",
+                x: undefined,
+                y: undefined,
+                height: highResSize * 0.2,
+                width: highResSize * 0.2,
+                excavate: true,
+              }
             })
           );
 
@@ -1560,7 +1682,7 @@ const LaundryWashingMachineTest = () => {
 
     try {
       // Generate QR code data URL for the report - use URL format for mobile compatibility
-      const qrCodeValue = `${getQRCodeBaseURL()}/laundry-washing-machine-test?scan=${reportId}`;
+      const qrCodeValue = `${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
       const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} savedImageRotations={savedImageRotations} />).toBlob();
@@ -1769,7 +1891,8 @@ const LaundryWashingMachineTest = () => {
     };
 
     fetchFactories();
-    fetchReports(); // Fetch reports on component mount
+    fetchFactories();
+    // fetchReports(); // Handled by filter useEffect
 
     // Cleanup timer on unmount
     return () => {
@@ -1870,10 +1993,8 @@ const LaundryWashingMachineTest = () => {
                   }`}
               >
                 <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                  Reports ({reports.length})
+                  <ClipboardList className="w-5 h-5" />
+                  Reports ({pagination.totalRecords})
                 </span>
               </button>
             </nav>
@@ -1924,7 +2045,16 @@ const LaundryWashingMachineTest = () => {
             <ReportsList
               reports={reports}
               isLoadingReports={isLoadingReports}
-              onRefresh={fetchReports}
+              onRefresh={() => fetchReports({
+                startDate: filterStartDate,
+                endDate: filterEndDate,
+                search: filterSearch,
+                color: filterColor,
+                factory: filterFactory,
+                status: filterStatus,
+                page: filterPage,
+                limit: 10
+              })}
               expandedReports={expandedReports}
               onToggleReport={toggleReport}
               onPrintPDF={handlePrintPDF}
@@ -1940,6 +2070,25 @@ const LaundryWashingMachineTest = () => {
               onEditInitialImages={handleEditInitialImages}
               onEditReceivedImages={handleEditReceivedImages}
               onEditCompletionImages={handleEditCompletionImages}
+              // Filter props
+              filterStartDate={filterStartDate}
+              setFilterStartDate={setFilterStartDate}
+              filterEndDate={filterEndDate}
+              setFilterEndDate={setFilterEndDate}
+              filterSearch={filterSearch}
+              setFilterSearch={setFilterSearch}
+              filterColor={filterColor}
+              setFilterColor={setFilterColor}
+              filterFactory={filterFactory}
+              setFilterFactory={setFilterFactory}
+              filterStatus={filterStatus}
+              setFilterStatus={setFilterStatus}
+              filterPage={filterPage}
+              setFilterPage={setFilterPage}
+              filterLimit={filterLimit}
+              setFilterLimit={setFilterLimit}
+              pagination={pagination}
+              factories={factories}
             />
           )}
 

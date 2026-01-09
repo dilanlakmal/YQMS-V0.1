@@ -63,205 +63,288 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
     const worksheet = workbook.addWorksheet("Report Detail");
 
     // --- Column Setup ---
+    // We use a 4-column layout for a balanced "PDF-like" look
     worksheet.columns = [
-      { header: "Field", key: "field", width: 25 },
-      { header: "Value", key: "value", width: 45 },
-      { header: "Notes", key: "notes", width: 40 },
+      { key: "label1", width: 18 },
+      { key: "value1", width: 30 },
+      { key: "label2", width: 18 },
+      { key: "value2", width: 30 },
     ];
 
     // --- Styles ---
     const titleStyle = {
-      font: { bold: true, size: 18, color: { argb: "FF1E3A8A" } },
+      font: { bold: true, size: 16, color: { argb: "FF1E3A8A" } },
       alignment: { horizontal: "center", vertical: "middle" }
     };
 
-    const sectionHeaderStyle = {
-      font: { bold: true, size: 12, color: { argb: "FFFFFFFF" } },
+    const sectionHeaderStyle = (color = "FF3B82F6") => ({
+      font: { bold: true, size: 11, color: { argb: "FFFFFFFF" } },
       fill: {
         type: "pattern",
         pattern: "solid",
-        fgColor: { argb: "FF3B82F6" }
+        fgColor: { argb: color }
+      },
+      alignment: { vertical: "middle", horizontal: "left" },
+      border: {
+        bottom: { style: "medium", color: { argb: "FFFFFFFF" } }
+      }
+    });
+
+    const labelStyle = {
+      font: { bold: true, size: 10, color: { argb: "FF4B5563" } },
+      fill: {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF9FAFB" }
       },
       alignment: { vertical: "middle" },
       border: {
-        bottom: { style: "medium" }
+        bottom: { style: "thin", color: { argb: "FFE5E7EB" } },
+        right: { style: "thin", color: { argb: "FFE5E7EB" } }
       }
     };
 
-    const labelStyle = {
-      font: { bold: true, color: { argb: "FF374151" } },
-      fill: {
-        type: "pattern",
-        pattern: "solid",
-        fgColor: { argb: "FFF3F4F6" }
-      },
-      alignment: { vertical: "top" },
+    const valueStyle = {
+      font: { size: 10, color: { argb: "FF111827" } },
+      alignment: { vertical: "middle", wrapText: true },
       border: {
-        bottom: { style: "thin", color: { argb: "FFD1D5DB" } }
+        bottom: { style: "thin", color: { argb: "FFE5E7EB" } }
       }
     };
 
-    const cellBorderStyle = {
-      border: {
-        bottom: { style: "thin", color: { argb: "FFD1D5DB" } }
-      },
-      alignment: { vertical: "top", wrapText: true }
+    // Status Styling
+    const getStatusStyle = (status) => {
+      let color = "FF6B7280"; // Default gray
+      if (status === "completed") color = "FF059669"; // Green
+      if (status === "received") color = "FFD97706"; // Yellow/Orange
+
+      return {
+        font: { bold: true, size: 10, color: { argb: color } },
+        alignment: { vertical: "middle" },
+        border: {
+          bottom: { style: "thin", color: { argb: "FFE5E7EB" } }
+        }
+      };
     };
 
     // --- Company Header ---
-    worksheet.mergeCells("A1:C1");
+    worksheet.mergeCells("A1:D1");
     const companyCell = worksheet.getCell("A1");
     companyCell.value = "Yorkmars (Cambodia) Garment MFG Co., LTD";
     companyCell.style = titleStyle;
-    worksheet.getRow(1).height = 40;
+    worksheet.getRow(1).height = 30;
 
-    worksheet.mergeCells("A2:C2");
+    worksheet.mergeCells("A2:D2");
     const subTitleCell = worksheet.getCell("A2");
     subTitleCell.value = "Launch Washing Machine Test Report";
     subTitleCell.style = {
-      font: { bold: true, size: 14, color: { argb: "FF374151" } },
+      font: { bold: true, size: 13, color: { argb: "FF374151" } },
       alignment: { horizontal: "center", vertical: "middle" }
     };
     worksheet.getRow(2).height = 25;
 
     let currentRow = 4;
 
-    // --- Basic Info Section ---
-    const addSectionHeader = (title) => {
-      worksheet.mergeCells(`A${currentRow}:C${currentRow}`);
+    // --- Helpers ---
+    const addSectionHeader = (title, color = "FF3B82F6") => {
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
       const cell = worksheet.getCell(`A${currentRow}`);
-      cell.value = title;
-      cell.style = sectionHeaderStyle;
+      cell.value = "  " + title;
+      cell.style = sectionHeaderStyle(color);
       worksheet.getRow(currentRow).height = 22;
       currentRow++;
     };
 
-    const addDataRow = (label, value) => {
+    const addInfoRow = (l1, v1, l2, v2, isStatus = false) => {
       const row = worksheet.getRow(currentRow);
-      row.getCell(1).value = label;
+
+      // Col 1 & 2
+      row.getCell(1).value = l1;
       row.getCell(1).style = labelStyle;
-      row.getCell(2).value = value;
-      row.getCell(2).style = cellBorderStyle;
-      worksheet.mergeCells(`B${currentRow}:C${currentRow}`);
+      row.getCell(2).value = v1;
+      row.getCell(2).style = valueStyle;
+
+      // Col 3 & 4
+      if (l2) {
+        row.getCell(3).value = l2;
+        row.getCell(3).style = labelStyle;
+        row.getCell(4).value = v2;
+        if (isStatus && l2 === "Status") {
+          row.getCell(4).style = getStatusStyle(report.status);
+          row.getCell(4).value = v2.toUpperCase();
+        } else {
+          row.getCell(4).style = valueStyle;
+        }
+      } else {
+        worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
+      }
+
+      row.height = 20;
       currentRow++;
     };
 
-    addSectionHeader("General Information");
-    addDataRow("YM Style", report.ymStyle || "N/A");
-    addDataRow("Buyer Style", report.buyerStyle || "N/A");
-    addDataRow("Factory", report.factory || "N/A");
-    addDataRow("Report Date", report.reportDate ? new Date(report.reportDate).toLocaleDateString() : "N/A");
-    addDataRow("Status", report.status ? report.status.toUpperCase() : "N/A");
-    addDataRow("Submitted By", report.engName || report.userName || report.userId || "N/A");
-    addDataRow("Submitted At", report.createdAt ? new Date(report.createdAt).toLocaleString() : (report.submittedAt ? new Date(report.submittedAt).toLocaleString() : "N/A"));
+    // --- General Info Section (2-Column Grid) ---
+    addSectionHeader("GENERAL INFORMATION");
+    addInfoRow("YM Style:", report.ymStyle || "N/A", "Buyer Style:", report.buyerStyle || "N/A");
+    addInfoRow("Factory:", report.factory || "N/A", "Status:", report.status || "N/A", true);
+
+    const submittedAt = report.createdAt
+      ? new Date(report.createdAt).toLocaleString('en-GB', { hour12: true })
+      : (report.submittedAt ? new Date(report.submittedAt).toLocaleString('en-GB', { hour12: true }) : "N/A");
+
+    addInfoRow("Submitted By:", report.engName || report.userName || report.userId || "N/A", "Submitted At:", submittedAt);
 
     currentRow++;
-    addSectionHeader("Order Details");
-    addDataRow("Colors", report.color && report.color.length > 0 ? report.color.join(", ") : "N/A");
-    addDataRow("PO", report.po && report.po.length > 0 ? report.po.join(", ") : "N/A");
-    addDataRow("Ex Fty Date", report.exFtyDate && report.exFtyDate.length > 0 ? report.exFtyDate.join(", ") : "N/A");
+
+    // --- Order Details Section ---
+    addSectionHeader("ORDER DETAILS");
+    addInfoRow("Colors:", report.color && report.color.length > 0 ? report.color.join(", ") : "N/A");
+    addInfoRow("PO:", report.po && report.po.length > 0 ? report.po.join(", ") : "N/A");
+    addInfoRow("Ex Fty Date:", report.exFtyDate && report.exFtyDate.length > 0 ? report.exFtyDate.join(", ") : "N/A");
 
     currentRow++;
-    addSectionHeader("Test Timeline");
 
-    // --- Step 1: Submission ---
-    const step1Date = report.sendToHomeWashingDate ? new Date(report.sendToHomeWashingDate).toLocaleString() : (report.submittedAt ? new Date(report.submittedAt).toLocaleString() : "N/A");
-    addDataRow("Step 1: Sent To Washing", step1Date);
-    worksheet.getRow(currentRow - 1).height = 20;
+    // --- Timeline Section ---
+    addSectionHeader("TEST TIMELINE", "FF1E40AF"); // Darker blue
 
-    if (report.notes) {
-      addDataRow("Step 1 Notes", report.notes);
-    }
-
-    // --- Step 2: Received ---
-    if (report.receivedDate || report.receivedAt) {
-      const step2Date = report.receivedAt ? new Date(report.receivedAt).toLocaleString() : (report.receivedDate ? new Date(report.receivedDate).toLocaleString() : "N/A");
-      addDataRow("Step 2: Received", step2Date);
-      if (report.receivedNotes) {
-        addDataRow("Step 2 Notes", report.receivedNotes);
-      }
-    }
-
-    // --- Step 3: Completed ---
-    if (report.completedDate || report.completedAt) {
-      const step3Date = report.completedAt ? new Date(report.completedAt).toLocaleString() : (report.completedDate ? new Date(report.completedDate).toLocaleString() : "N/A");
-      addDataRow("Step 3: Completed", step3Date);
-      if (report.completionNotes) {
-        addDataRow("Step 3 Notes", report.completionNotes);
-      }
-    }
-
-    // --- Images Section ---
-    currentRow++;
-    addSectionHeader("Images Gallery");
-
-    // Function to add images to worksheet
-    const addImagesToWorksheet = async (title, images, startRow) => {
-      if (!images || images.length === 0) return startRow;
-
-      const headerRow = worksheet.getRow(startRow);
-      headerRow.getCell(1).value = title;
-      headerRow.getCell(1).style = { font: { bold: true }, border: { bottom: { style: "thin" } } };
-      worksheet.mergeCells(`A${startRow}:C${startRow}`);
-
-      let imageRow = startRow + 1;
-
-      for (let i = 0; i < images.length; i++) {
-        const imageUrl = normalizeUrl(images[i], apiBaseUrl);
-        const buffer = await fetchImageBuffer(imageUrl);
-
-        if (buffer) {
-          try {
-            const imageId = workbook.addImage({
-              buffer: buffer,
-              extension: 'jpeg',
-            });
-
-            // Set row height for image
-            worksheet.getRow(imageRow).height = 120;
-
-            worksheet.addImage(imageId, {
-              tl: { col: 0.2, row: imageRow - 0.8 },
-              ext: { width: 140, height: 140 }
-            });
-
-            worksheet.getRow(imageRow).getCell(2).value = `Image ${i + 1}`;
-            worksheet.getRow(imageRow).getCell(2).alignment = { vertical: 'middle' };
-
-            imageRow++;
-          } catch (imgErr) {
-            console.error("Error adding image to excel:", imgErr);
-            worksheet.getRow(imageRow).getCell(1).value = `(Failed to load image ${i + 1})`;
-            imageRow++;
-          }
-        } else {
-          worksheet.getRow(imageRow).getCell(1).value = `(Image ${i + 1} not found)`;
-          imageRow++;
-        }
-      }
-
-      return imageRow + 1;
+    // Helper for Step Blocks
+    const addStepHeader = (title, date, color) => {
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const cell = worksheet.getCell(`A${currentRow}`);
+      cell.value = `  ${title}  -  [ ${date} ]`;
+      cell.style = {
+        font: { bold: true, size: 10, color: { argb: "FF1F2937" } },
+        fill: { type: "pattern", pattern: "solid", fgColor: { argb: color } },
+        alignment: { vertical: "middle" },
+        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+      };
+      worksheet.getRow(currentRow).height = 20;
+      currentRow++;
     };
 
-    let nextImageRow = currentRow;
+    const addNotesBlock = (notes, color) => {
+      if (!notes) return;
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const cell = worksheet.getCell(`A${currentRow}`);
+      cell.value = `Notes: ${notes}`;
+      cell.style = {
+        font: { italic: true, size: 9, color: { argb: "FF374151" } },
+        fill: { type: "pattern", pattern: "solid", fgColor: { argb: color } },
+        alignment: { vertical: "top", wrapText: true, indent: 2 },
+        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+      };
+      // Auto-height for notes
+      const lineCount = (notes.match(/\n/g) || []).length + 2;
+      worksheet.getRow(currentRow).height = Math.max(25, lineCount * 14);
+      currentRow++;
+    };
+
+    // Step 1: Sent To Washing
+    const step1Date = report.createdAt
+      ? new Date(report.createdAt).toLocaleString('en-GB', { hour12: true })
+      : (report.submittedAt ? new Date(report.submittedAt).toLocaleString('en-GB', { hour12: true }) : "N/A");
+
+    addStepHeader("Step 1: Sent To Home Washing", step1Date, "FFE3F2FD");
+    if (report.notes) addNotesBlock(report.notes, "FFF0F9FF");
+
+    // Step 2: Received
+    if (report.receivedDate || report.receivedAt) {
+      const step2Date = report.receivedAt
+        ? new Date(report.receivedAt).toLocaleString('en-GB', { hour12: true })
+        : (report.receivedDate ? new Date(report.receivedDate).toLocaleString('en-GB', { hour12: true }) : "N/A");
+      addStepHeader("Step 2: Received", step2Date, "FFFFF9C4");
+      if (report.receivedNotes) addNotesBlock(report.receivedNotes, "FFFFFDE7");
+    }
+
+    // Step 3: Completed
+    if (report.completedDate || report.completedAt) {
+      const step3Date = report.completedAt
+        ? new Date(report.completedAt).toLocaleString('en-GB', { hour12: true })
+        : (report.completedDate ? new Date(report.completedAt || report.completedDate).toLocaleString('en-GB', { hour12: true }) : "N/A");
+      addStepHeader("Step 3: Completed", step3Date, "FFE8F5E9");
+      if (report.completionNotes) addNotesBlock(report.completionNotes, "FFF1F8F1");
+    }
+
+    currentRow += 2;
+
+    // --- Images Section ---
+    addSectionHeader("IMAGE GALLERY", "FF111827"); // Black/Dark Gray
+
+    const addImagesToWorksheet = async (title, images, sectionColor) => {
+      if (!images || images.length === 0) return;
+
+      worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+      const headerCell = worksheet.getCell(`A${currentRow}`);
+      headerCell.value = `  ${title} (${images.length})`;
+      headerCell.style = {
+        font: { bold: true, size: 10, color: { argb: "FF4B5563" } },
+        fill: { type: "pattern", pattern: "solid", fgColor: { argb: sectionColor } },
+        border: { bottom: { style: "thin", color: { argb: "FFD1D5DB" } } }
+      };
+      worksheet.getRow(currentRow).height = 18;
+      currentRow++;
+
+      // We'll place images 2 per row
+      for (let i = 0; i < images.length; i += 2) {
+        const rowNum = currentRow;
+        worksheet.getRow(rowNum).height = 140;
+
+        for (let j = 0; j < 2; j++) {
+          const idx = i + j;
+          if (idx >= images.length) break;
+
+          const imageUrl = normalizeUrl(images[idx], apiBaseUrl);
+          const buffer = await fetchImageBuffer(imageUrl);
+
+          if (buffer) {
+            try {
+              const imageId = workbook.addImage({
+                buffer: buffer,
+                extension: 'jpeg',
+              });
+
+              const colOffset = j === 0 ? 0.2 : 2.2;
+              worksheet.addImage(imageId, {
+                tl: { col: colOffset, row: rowNum - 0.9 },
+                ext: { width: 140, height: 140 },
+                editAs: 'oneCell'
+              });
+
+              const cell = worksheet.getRow(rowNum).getCell(j === 0 ? 2 : 4);
+              cell.value = ` Image ${idx + 1}`;
+              cell.alignment = { vertical: 'bottom', horizontal: 'right' };
+              cell.font = { size: 8, color: { argb: "FF9CA3AF" } };
+            } catch (err) {
+              console.error("Error adding image:", err);
+            }
+          }
+        }
+        currentRow++;
+      }
+      currentRow++;
+    };
+
     if (report.images && report.images.length > 0) {
-      nextImageRow = await addImagesToWorksheet("Initial Images", report.images, nextImageRow);
+      await addImagesToWorksheet("Step 1 Images", report.images, "FFF0F9FF");
     }
 
     if (report.receivedImages && report.receivedImages.length > 0) {
-      nextImageRow = await addImagesToWorksheet("Received Images", report.receivedImages, nextImageRow);
+      await addImagesToWorksheet("Step 2 Images", report.receivedImages, "FFFFFDE7");
     }
 
     if (report.completionImages && report.completionImages.length > 0) {
-      nextImageRow = await addImagesToWorksheet("Completion Images", report.completionImages, nextImageRow);
+      await addImagesToWorksheet("Step 3 Images", report.completionImages, "FFF1F8F1");
     }
 
     // --- Footer ---
-    const footerRow = nextImageRow + 2;
-    worksheet.mergeCells(`A${footerRow}:C${footerRow}`);
-    const footerCell = worksheet.getCell(`A${footerRow}`);
-    footerCell.value = `Report Generated on ${new Date().toLocaleString()}`;
-    footerCell.style = { font: { italic: true, size: 9, color: { argb: "FF6B7280" } }, alignment: { horizontal: "right" } };
+    currentRow += 2;
+    worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
+    const footerCell = worksheet.getCell(`A${currentRow}`);
+    footerCell.value = `Report Generated on ${new Date().toLocaleString('en-GB', { hour12: true })}`;
+    footerCell.style = {
+      font: { italic: true, size: 9, color: { argb: "FF6B7280" } },
+      alignment: { horizontal: "right" }
+    };
 
     // --- Finalize and Save ---
     const buffer = await workbook.xlsx.writeBuffer();
@@ -280,5 +363,3 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
 };
 
 export default generateWashingMachineTestExcel;
-
-

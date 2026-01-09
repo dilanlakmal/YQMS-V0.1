@@ -15,21 +15,21 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
               Step 1: Sent To Home Washing
             </h4>
             <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-              {report.sendToHomeWashingDate
-                ? new Date(report.sendToHomeWashingDate).toLocaleDateString('en-US', {
-                  month: 'short',
+              {(report.createdAt || report.submittedAt)
+                ? new Date(report.createdAt || report.submittedAt).toLocaleString('en-GB', {
                   day: 'numeric',
+                  month: 'numeric',
                   year: 'numeric',
                   hour: '2-digit',
-                  minute: '2-digit'
-                })
-                : report.submittedAt
-                  ? new Date(report.submittedAt).toLocaleDateString('en-US', {
-                    month: 'short',
+                  minute: '2-digit',
+                  second: '2-digit',
+                  hour12: true
+                }).replace(/\//g, '/')
+                : report.sendToHomeWashingDate
+                  ? new Date(report.sendToHomeWashingDate).toLocaleDateString('en-GB', {
                     day: 'numeric',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
+                    month: 'numeric',
+                    year: 'numeric'
                   })
                   : "N/A"}
             </span>
@@ -122,17 +122,18 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
               </h4>
               <span className="text-xs text-yellow-600 dark:text-yellow-400 font-medium">
                 {report.receivedAt
-                  ? new Date(report.receivedAt).toLocaleDateString('en-US', {
-                    month: 'short',
+                  ? new Date(report.receivedAt).toLocaleString('en-GB', {
                     day: 'numeric',
+                    month: 'numeric',
                     year: 'numeric',
                     hour: '2-digit',
-                    minute: '2-digit'
+                    minute: '2-digit',
+                    hour12: true
                   })
                   : report.receivedDate
-                    ? new Date(report.receivedDate).toLocaleDateString('en-US', {
-                      month: 'short',
+                    ? new Date(report.receivedDate).toLocaleDateString('en-GB', {
                       day: 'numeric',
+                      month: 'numeric',
                       year: 'numeric'
                     })
                     : "Not yet received"}
@@ -223,17 +224,18 @@ const ReportTimeline = ({ report, savedImageRotations, openImageViewer, onEditIn
               </h4>
               <span className="text-xs text-green-600 dark:text-green-400 font-medium">
                 {report.completedAt
-                  ? new Date(report.completedAt).toLocaleDateString('en-US', {
-                    month: 'short',
+                  ? new Date(report.completedAt).toLocaleString('en-GB', {
                     day: 'numeric',
+                    month: 'numeric',
                     year: 'numeric',
                     hour: '2-digit',
-                    minute: '2-digit'
+                    minute: '2-digit',
+                    hour12: true
                   })
                   : report.completedDate
-                    ? new Date(report.completedDate).toLocaleDateString('en-US', {
-                      month: 'short',
+                    ? new Date(report.completedDate).toLocaleDateString('en-GB', {
                       day: 'numeric',
+                      month: 'numeric',
                       year: 'numeric'
                     })
                     : "Not yet completed"}

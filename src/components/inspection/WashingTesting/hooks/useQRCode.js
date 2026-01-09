@@ -16,13 +16,16 @@ export const useQRCode = (getQRCodeBaseURL) => {
 
   // Generate QR code as data URL for PDF using QRCodeCanvas
   const generateQRCodeDataURL = useCallback(async (value, size = 100) => {
+    // Increase resolution for the data URL to ensure it's sharp in PDF/Print
+    const highResSize = 1024;
+
     return new Promise((resolve) => {
       try {
         const container = document.createElement("div");
         container.style.position = "absolute";
         container.style.left = "-9999px";
-        container.style.width = `${size}px`;
-        container.style.height = `${size}px`;
+        container.style.width = `${highResSize}px`;
+        container.style.height = `${highResSize}px`;
         container.style.background = "white";
         document.body.appendChild(container);
 
@@ -31,9 +34,17 @@ export const useQRCode = (getQRCodeBaseURL) => {
           root.render(
             React.createElement(QRCodeCanvas, {
               value: value,
-              size: size,
+              size: highResSize,
               level: "H",
-              includeMargin: true
+              includeMargin: true,
+              imageSettings: {
+                src: "/assets/Home/yqms.png",
+                x: undefined,
+                y: undefined,
+                height: highResSize * 0.2, // Proportional logo size
+                width: highResSize * 0.2,
+                excavate: true,
+              }
             })
           );
 
@@ -66,6 +77,32 @@ export const useQRCode = (getQRCodeBaseURL) => {
 
   // Download QR code as image
   const downloadQRCode = useCallback((reportId) => {
+    // Try to find the canvas directly first (more reliable for logo inclusion)
+    let canvas = document.querySelector(`#qr-canvas-${reportId}`);
+
+    // Fallback to searching inside the container if it's not found by ID
+    if (!canvas) {
+      canvas = document.querySelector(`#qr-code-${reportId} canvas`);
+    }
+
+    if (canvas) {
+      // Direct download from canvas (easiest and most reliable way to get the logo)
+      try {
+        const downloadUrl = canvas.toDataURL("image/png");
+        const link = document.createElement('a');
+        link.href = downloadUrl;
+        link.download = `QR-Code-Report-${reportId}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showToast.success("QR code downloaded successfully!");
+        return;
+      } catch (e) {
+        console.error("Canvas download failed, falling back to SVG method", e);
+      }
+    }
+
+    // Fallback: If no canvas is found (e.g., if we were still using SVG), try SVG conversion
     const svg = document.querySelector(`#qr-code-${reportId} svg`);
     if (!svg) {
       showToast.error("QR code not found. Please try again.");
@@ -74,24 +111,24 @@ export const useQRCode = (getQRCodeBaseURL) => {
 
     try {
       const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
+      const tempCanvas = document.createElement('canvas');
+      const ctx = tempCanvas.getContext('2d');
       const img = new Image();
 
       const size = 512;
-      canvas.width = size;
-      canvas.height = size;
+      tempCanvas.width = size;
+      tempCanvas.height = size;
 
       const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
       const svgUrl = URL.createObjectURL(svgBlob);
 
       img.onload = () => {
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        ctx.drawImage(img, 0, 0, tempCanvas.width, tempCanvas.height);
         URL.revokeObjectURL(svgUrl);
 
-        canvas.toBlob((blob) => {
+        tempCanvas.toBlob((blob) => {
           if (!blob) {
             showToast.error("Failed to generate QR code image.");
             return;

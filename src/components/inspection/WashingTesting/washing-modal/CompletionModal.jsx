@@ -32,9 +32,14 @@ const CompletionModal = ({
 
           {/* Completion Images */}
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Completion Images
-            </label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Completion Images
+              </label>
+              <span className={`text-xs font-medium ${completionImages.length >= 5 ? 'text-red-500' : 'text-gray-500'}`}>
+                {completionImages.length}/5 images
+              </span>
+            </div>
             <div className="space-y-4">
               {completionImages.length > 0 && (
                 <div className="flex flex-row gap-2 overflow-x-auto">
@@ -79,7 +84,8 @@ const CompletionModal = ({
                 <button
                   type="button"
                   onClick={() => completionImageInputRef.current?.click()}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
+                  disabled={completionImages.length >= 5}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Camera size={18} className="mr-2" />
                   Capture
@@ -87,7 +93,8 @@ const CompletionModal = ({
                 <button
                   type="button"
                   onClick={() => uploadInputRef.current?.click()}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
+                  disabled={completionImages.length >= 5}
+                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Upload size={18} className="mr-2" />
                   Upload

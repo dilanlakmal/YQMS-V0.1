@@ -56,9 +56,9 @@ const ReportCard = ({
             </div>
             <p className="text-xs md:text-sm text-gray-500 dark:text-gray-400 mt-1">
               Submitted: {report.createdAt
-                ? new Date(report.createdAt).toLocaleString()
+                ? new Date(report.createdAt).toLocaleString('en-GB', { hour12: true })
                 : report.submittedAt
-                  ? new Date(report.submittedAt).toLocaleString()
+                  ? new Date(report.submittedAt).toLocaleString('en-GB', { hour12: true })
                   : "N/A"}
             </p>
           </div>

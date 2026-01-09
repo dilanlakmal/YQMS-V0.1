@@ -42,9 +42,14 @@ const EditImagesModal = ({
                     </h3>
 
                     <div className="mb-4">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                            Images ({images.length})
-                        </label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Images
+                            </label>
+                            <span className={`text-xs font-medium ${images.length >= 5 ? 'text-red-500' : 'text-gray-500'}`}>
+                                {images.length}/5 images
+                            </span>
+                        </div>
                         <div className="space-y-4">
                             {images.length > 0 && (
                                 <div className="flex flex-row flex-wrap gap-2">
@@ -76,7 +81,8 @@ const EditImagesModal = ({
                                 <button
                                     type="button"
                                     onClick={() => localCameraInputRef.current?.click()}
-                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
+                                    disabled={images.length >= 5}
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Camera size={18} className="mr-2" />
                                     Capture
@@ -86,7 +92,8 @@ const EditImagesModal = ({
                                     onClick={() => {
                                         localFileInputRef.current?.click();
                                     }}
-                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors"
+                                    disabled={images.length >= 5}
+                                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 flex items-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
                                     <Upload size={18} className="mr-2" />
                                     Upload
