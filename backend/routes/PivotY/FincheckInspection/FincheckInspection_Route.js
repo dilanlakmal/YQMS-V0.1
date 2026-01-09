@@ -23,6 +23,7 @@ import {
   updatePhotoItemRemark,
   updatePhotoData,
   updateInspectionConfig,
+  clearInspectionConfig,
   updateMeasurementData,
   updateDefectData,
   updatePPSheetData,
@@ -141,6 +142,12 @@ router.post("/api/fincheck-inspection/update-photo-data", updatePhotoData);
 router.post(
   "/api/fincheck-inspection/update-inspection-config",
   updateInspectionConfig
+);
+
+// Clear Inspection Config (Remove All)
+router.post(
+  "/api/fincheck-inspection/clear-inspection-config",
+  clearInspectionConfig
 );
 
 // Save Measurement Data (Measurement Tab)

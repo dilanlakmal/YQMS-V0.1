@@ -190,6 +190,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
   onSetActiveGroup,
   activeGroup,
   onSaveWithData,
+  onClearAll,
   lockTrigger
 }) => {
   const { selectedTemplate, config } = reportData;
@@ -399,6 +400,10 @@ const YPivotQAInspectionLineTableColorConfig = ({
     const updated = [...groups, ...newGroups];
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
+    // Trigger Auto-Save immediately
+    if (onSaveWithData) {
+      onSaveWithData(updated);
+    }
     Swal.fire("Added", `${newGroups.length} color groups added.`, "success");
   };
 
@@ -453,6 +458,22 @@ const YPivotQAInspectionLineTableColorConfig = ({
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
 
+    // --- AUTO-SAVE TRIGGER ---
+    // Check if this specific group is now complete
+    const currentGroup = updated[idx];
+    const isComplete =
+      (!showLine || currentGroup.line) &&
+      (!showTable || config?.isSubCon || currentGroup.table) &&
+      (!showColors || currentGroup.color) &&
+      (!showQC || currentGroup.assignments.every((a) => a.qcUser));
+
+    // If complete, trigger immediate save via parent callback
+    if (isComplete && onSaveWithData) {
+      // Small delay to ensure state is settled or to debounce slightly if needed
+      // But direct call is usually fine for dropdowns
+      onSaveWithData(updated);
+    }
+
     if (activeGroup?.id === updated[idx].id) {
       onSetActiveGroup({
         ...updated[idx],
@@ -485,6 +506,8 @@ const YPivotQAInspectionLineTableColorConfig = ({
     updated[gIdx].assignments.push({ id: Date.now(), qcUser, qty: defaultQty });
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
+    // --- Trigger Auto Save if group is complete ---
+    if (onSaveWithData) onSaveWithData(updated);
   };
 
   const handleRemoveAssignment = (gIdx, aIdx) => {
@@ -492,6 +515,8 @@ const YPivotQAInspectionLineTableColorConfig = ({
     updated[gIdx].assignments.splice(aIdx, 1);
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
+    // --- Trigger Auto Save ---
+    if (onSaveWithData) onSaveWithData(updated);
   };
 
   const handleUpdateAssignment = (gIdx, aIdx, field, value) => {
@@ -508,6 +533,8 @@ const YPivotQAInspectionLineTableColorConfig = ({
     updated[gIdx].assignments[aIdx][field] = value;
     setGroups(updated);
     onUpdate({ lineTableConfig: updated });
+    // --- Trigger Auto Save ---
+    if (onSaveWithData) onSaveWithData(updated);
   };
 
   const handleQCSelect = (user, gIdx) => {
@@ -579,7 +606,7 @@ const YPivotQAInspectionLineTableColorConfig = ({
   };
 
   const handleToggleEdit = (targetId) => {
-    if (editingGroupId !== null) {
+    if (editingGroupId !== null && editingGroupId === targetId) {
       const current = groups.find((g) => g.id === editingGroupId);
       if (current) {
         const missing = [];
@@ -595,9 +622,45 @@ const YPivotQAInspectionLineTableColorConfig = ({
           return;
         }
       }
+      // If validation passes and we are closing edit mode:
+      if (onSaveWithData) {
+        onSaveWithData(groups); // Trigger backend save
+      }
     }
 
     setEditingGroupId(editingGroupId === targetId ? null : targetId);
+  };
+
+  // ✅ Handle Remove All Button Click
+  const handleRemoveAllGroups = async () => {
+    if (groups.length === 0) {
+      Swal.fire("Empty", "No configurations to remove.", "info");
+      return;
+    }
+
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This will remove ALL configuration groups permanently from the database.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, Remove All"
+    });
+
+    if (result.isConfirmed) {
+      // 1. Clear Local State
+      setGroups([]);
+      setEditingGroupId(null);
+
+      // 2. Clear Parent State (Visual)
+      onUpdate({ lineTableConfig: [] });
+
+      // 3. Trigger Backend Clear (If prop exists)
+      if (onClearAll) {
+        onClearAll();
+      }
+    }
   };
 
   if (!selectedTemplate) return null;
@@ -992,6 +1055,17 @@ const YPivotQAInspectionLineTableColorConfig = ({
             >
               <CopyPlus className="w-5 h-5" />
               Add All Colors ({orderColors.length})
+            </button>
+          )}
+
+          {/* ✅ Remove All Button (Only show if groups exist) */}
+          {groups.length > 0 && (
+            <button
+              onClick={handleRemoveAllGroups}
+              className="py-3 bg-white dark:bg-gray-700 border-2 border-red-100 dark:border-red-900/30 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-sm"
+            >
+              <Trash2 className="w-5 h-5" />
+              Remove All Config
             </button>
           )}
         </div>
