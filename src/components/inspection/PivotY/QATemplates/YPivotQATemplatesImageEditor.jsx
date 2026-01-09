@@ -68,6 +68,13 @@ const YPivotQATemplatesImageEditor = ({
   const [deviceType, setDeviceType] = useState("desktop");
   const [isInitializing, setIsInitializing] = useState(false);
 
+  // ✅ ADD: Size-based canvas load limit (in MB)
+  const CANVAS_SIZE_LIMIT_MB = deviceType === "desktop" ? 100 : 10;
+
+  // ✅ ADD: Track total size of loaded images
+  const [totalImageSizeMB, setTotalImageSizeMB] = useState(0);
+  const [canvasDisabled, setCanvasDisabled] = useState(false);
+
   useEffect(() => {
     const detectDevice = () => {
       const width = window.innerWidth;
@@ -158,6 +165,32 @@ const YPivotQATemplatesImageEditor = ({
   // --- Background Removal State ---
   const [showBgColorPicker, setShowBgColorPicker] = useState(false);
   const [bgRemovalColor, setBgRemovalColor] = useState("#FFFFFF");
+
+  // ==========================================
+  // HELPER: Calculate total size of images
+  // ==========================================
+  const calculateTotalSize = useCallback((imagesList) => {
+    let totalBytes = 0;
+
+    imagesList.forEach((img) => {
+      // Try to get size from File object
+      if (img.file && img.file.size) {
+        totalBytes += img.file.size;
+      }
+      // Estimate from data URL (base64)
+      else if (img.imgSrc && img.imgSrc.startsWith("data:")) {
+        const base64Length = img.imgSrc.length - (img.imgSrc.indexOf(",") + 1);
+        const estimatedBytes = (base64Length * 3) / 4;
+        totalBytes += estimatedBytes;
+      }
+      // Estimate from blob URL (rough estimate: 2MB per image)
+      else if (img.imgSrc && img.imgSrc.startsWith("blob:")) {
+        totalBytes += 2 * 1024 * 1024; // Estimate 2MB
+      }
+    });
+
+    return totalBytes / 1024 / 1024; // Convert to MB
+  }, []);
 
   // 2. ADD useEffect TO CHECK CACHE ON MOUNT (add after other useEffects)
   useEffect(() => {
@@ -261,6 +294,23 @@ const YPivotQATemplatesImageEditor = ({
     setZoom(1);
     setPan({ x: 0, y: 0 });
   }, [currentImageIndex, currentImage?.id, images.length]);
+
+  // ✅ ADD: Calculate total size and check if canvas should be disabled
+  useEffect(() => {
+    const totalSizeMB = calculateTotalSize(images);
+    setTotalImageSizeMB(totalSizeMB);
+
+    const shouldDisable = totalSizeMB > CANVAS_SIZE_LIMIT_MB;
+    setCanvasDisabled(shouldDisable);
+
+    if (shouldDisable) {
+      console.warn(
+        `⚠️ Canvas disabled: Total size ${totalSizeMB.toFixed(
+          2
+        )}MB exceeds ${CANVAS_SIZE_LIMIT_MB}MB limit for ${deviceType}`
+      );
+    }
+  }, [images, CANVAS_SIZE_LIMIT_MB, deviceType, calculateTotalSize]);
 
   // Update images array when history changes
   const updateCurrentImageHistory = useCallback(
@@ -848,7 +898,7 @@ const YPivotQATemplatesImageEditor = ({
 
   // Keep full resolution, use CSS for display
   useEffect(() => {
-    if (mode === "editor" && imgSrc && canvasRef.current) {
+    if (mode === "editor" && imgSrc && canvasRef.current && !canvasDisabled) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
       const img = new Image();
@@ -902,7 +952,7 @@ const YPivotQATemplatesImageEditor = ({
 
   // Just make sure it uses the original dimensions
   useEffect(() => {
-    if (context && imgSrc && canvasRef.current) {
+    if (context && imgSrc && canvasRef.current && !canvasDisabled) {
       const img = new Image();
       // ✅ this line here as well
       img.crossOrigin = "anonymous";
@@ -932,7 +982,8 @@ const YPivotQATemplatesImageEditor = ({
     selectedElementId,
     hoveredElementId,
     imgSrc,
-    canvasSize
+    canvasSize,
+    canvasDisabled
   ]);
 
   const redrawCanvas = (ctx, img, width, height) => {
@@ -1424,7 +1475,7 @@ const YPivotQATemplatesImageEditor = ({
         }
 
         // CASE B: Image is currently on Canvas (Grab visible state)
-        if (idx === currentImageIndex && canvasRef.current) {
+        if (idx === currentImageIndex && canvasRef.current && !canvasDisabled) {
           const originalZoom = zoom;
           const originalPan = { ...pan };
 
@@ -1466,6 +1517,17 @@ const YPivotQATemplatesImageEditor = ({
             }
           }, 50); // Small delay to allow react render cycle to reset zoom
         }
+        // ✅ ADD: CASE B2: Current image but canvas is disabled - save as raw
+        else if (idx === currentImageIndex && canvasDisabled) {
+          resolve({
+            id: img.id,
+            imgSrc: img.imgSrc,
+            file: img.file, // Original file
+            isRaw: true,
+            history: []
+          });
+        }
+
         // CASE C: Image has edits but is not currently displayed
         // We must recreate the canvas in memory
         else if (img.history && img.history.length > 0) {
@@ -2154,8 +2216,72 @@ const YPivotQATemplatesImageEditor = ({
               </div>
             )}
 
+            {/* ✅ CANVAS DISABLED WARNING */}
+            {imgSrc && canvasDisabled && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-gray-900/95 z-40 p-6">
+                <div className="max-w-md text-center space-y-4">
+                  <div className="w-16 h-16 mx-auto bg-amber-500/20 rounded-full flex items-center justify-center">
+                    <Camera className="w-8 h-8 text-amber-500" />
+                  </div>
+
+                  <h3 className="text-xl font-bold text-white">
+                    Canvas Editing Disabled
+                  </h3>
+
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                    <p className="text-sm text-amber-200 mb-2">
+                      Total image size:{" "}
+                      <span className="font-bold">
+                        {totalImageSizeMB.toFixed(2)} MB
+                      </span>
+                    </p>
+                    <p className="text-sm text-amber-200">
+                      Limit for {deviceType}:{" "}
+                      <span className="font-bold">
+                        {CANVAS_SIZE_LIMIT_MB} MB
+                      </span>
+                    </p>
+                  </div>
+
+                  <div className="text-gray-300 text-sm space-y-2">
+                    <p>
+                      To prevent browser crashes, canvas editing is disabled
+                      when total image size is too large.
+                    </p>
+                    <p className="text-amber-400 font-medium">
+                      ✓ You can still save all {images.length} image(s)
+                    </p>
+                    <p className="text-gray-400 text-xs">
+                      Tip: Edit images individually or use smaller file sizes
+                    </p>
+                  </div>
+
+                  {/* Show image thumbnails */}
+                  <div className="flex flex-wrap justify-center gap-2 mt-4">
+                    {images.slice(0, 5).map((img, idx) => (
+                      <div key={img.id} className="relative w-16 h-16">
+                        <img
+                          src={img.imgSrc}
+                          alt={`Image ${idx + 1}`}
+                          className="w-full h-full object-cover rounded-lg border-2 border-gray-600"
+                        />
+                        <span className="absolute -top-2 -right-2 w-5 h-5 bg-indigo-500 text-white text-xs rounded-full flex items-center justify-center">
+                          {idx + 1}
+                        </span>
+                      </div>
+                    ))}
+                    {images.length > 5 && (
+                      <div className="w-16 h-16 rounded-lg border-2 border-dashed border-gray-600 flex items-center justify-center text-gray-400 text-xs">
+                        +{images.length - 5}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* ✅ CANVAS & CONTROLS - Only show when image exists */}
-            {imgSrc && (
+            {imgSrc && !canvasDisabled && (
               <>
                 {/* Upload Progress Indicator (compact, when adding more images) */}
                 {isUploading && (
@@ -2311,6 +2437,18 @@ const YPivotQATemplatesImageEditor = ({
       {/* IMAGE THUMBNAILS (Editor Only) */}
       {mode === "editor" && images.length > 0 && (
         <div className="bg-gray-900 border-t border-gray-700 p-2 flex-shrink-0 z-40">
+          {/* ✅ ADD: Size indicator header */}
+          <div className="flex items-center justify-between px-2 mb-2">
+            <p className="text-xs text-gray-400">{images.length} image(s)</p>
+            <p
+              className={`text-xs font-bold ${
+                canvasDisabled ? "text-amber-400" : "text-gray-400"
+              }`}
+            >
+              Total: {totalImageSizeMB.toFixed(2)} MB / {CANVAS_SIZE_LIMIT_MB}{" "}
+              MB
+            </p>
+          </div>
           <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide px-2">
             {images.map((img, idx) => (
               <div
@@ -2320,7 +2458,12 @@ const YPivotQATemplatesImageEditor = ({
                   idx === currentImageIndex
                     ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-900"
                     : "opacity-70 hover:opacity-100"
-                }`}
+                } ${canvasDisabled ? "cursor-not-allowed opacity-50" : ""}`}
+                // className={`relative flex-shrink-0 cursor-pointer transition-all ${
+                //   idx === currentImageIndex
+                //     ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-900"
+                //     : "opacity-70 hover:opacity-100"
+                // }`}
               >
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden bg-gray-800">
                   <img
@@ -2332,6 +2475,14 @@ const YPivotQATemplatesImageEditor = ({
                 <span className="absolute -top-2 -left-2 w-5 h-5 bg-indigo-600 text-white text-xs font-bold rounded-full flex items-center justify-center">
                   {idx + 1}
                 </span>
+
+                {/* ✅ ADD: Size badge */}
+                {img.file?.size && (
+                  <span className="absolute -bottom-1 left-0 right-0 bg-black/80 text-white text-[8px] text-center py-0.5 backdrop-blur-sm">
+                    {(img.file.size / 1024 / 1024).toFixed(1)}MB
+                  </span>
+                )}
+
                 <button
                   onClick={(e) => removeImage(idx, e)}
                   className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-400 transition-colors"
@@ -2357,8 +2508,19 @@ const YPivotQATemplatesImageEditor = ({
       {/* TOOLBAR (Editor Only) */}
       {mode === "editor" && (
         <div className="bg-gray-800 border-t border-gray-700 flex-shrink-0 safe-area-bottom z-50 relative">
+          {/* ✅ ADD: Canvas Disabled Warning Banner */}
+          {canvasDisabled && (
+            <div className="p-2 bg-amber-500/10 border-b border-amber-500/30 flex items-center justify-center gap-2">
+              <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></div>
+              <p className="text-xs text-amber-200 font-medium">
+                Editing disabled ({totalImageSizeMB.toFixed(1)}MB exceeds{" "}
+                {CANVAS_SIZE_LIMIT_MB}MB limit)
+              </p>
+            </div>
+          )}
+
           {/* Settings Panel */}
-          {showSettings && (
+          {showSettings && !canvasDisabled && (
             <div className="p-3 border-b border-gray-700 bg-gray-900/50">
               <div className="flex flex-wrap items-center justify-center gap-4">
                 <div className="flex gap-2 items-center">
