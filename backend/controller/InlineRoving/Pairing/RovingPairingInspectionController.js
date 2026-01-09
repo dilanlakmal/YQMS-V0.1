@@ -166,6 +166,8 @@ export const saveRovingPairingData = async (req, res) => {
 
 export const saveQCRovingPairingData = async (req, res) => {
   try {
+    console.log('Received data:', JSON.stringify(req.body, null, 2));
+    
     const {
       inspection_date,
       moNo,
@@ -181,7 +183,7 @@ export const saveQCRovingPairingData = async (req, res) => {
 
     // --- Basic Validation ---
     if (!inspection_date || !moNo || !lineNo || !pairingDataItem || !emp_id) {
-      return res.status(400).json({ message: "Missing required fields." });
+      return res.status(400).json({ success: false, message: "Missing required fields." });
     }
 
     if (
@@ -189,54 +191,17 @@ export const saveQCRovingPairingData = async (req, res) => {
       !pairingDataItem.inspection_rep_name
     ) {
       return res.status(400).json({
+        success: false,
         message: "pairingDataItem is malformed or missing inspection_rep_name."
       });
     }
 
-    // ---------------------------------------------------------------------
-
-    if (
-      pairingDataItem.accessoryComplete === "No" &&
-      !Array.isArray(pairingDataItem.accessoryIssues)
-    ) {
-      return res.status(400).json({
-        message:
-          "Accessory status is 'No' but the list of accessory issues is missing or not an array."
-      });
-    }
-    // If accessory is complete, ensure the issues array is empty.
-    if (pairingDataItem.accessoryComplete === "Yes") {
-      pairingDataItem.accessoryIssues = [];
-    }
-
-    // --- NEW: Sanitize image arrays to ensure they are saved ---
-    // Sanitize accessory issues images
-    if (pairingDataItem.accessoryIssues) {
-      pairingDataItem.accessoryIssues.forEach((issue) => {
-        issue.images = issue.images || [];
-      });
-    }
-    // Sanitize measurement images
-    if (pairingDataItem.measurementData) {
-      pairingDataItem.measurementData.forEach((part) => {
-        part.measurements.forEach((m) => (m.images = m.images || []));
-      });
-    }
-    // Sanitize defect images
-    if (pairingDataItem.defectSummary?.defectDetails) {
-      pairingDataItem.defectSummary.defectDetails.forEach((part) => {
-        part.defectsForPart.forEach((dfp) => {
-          dfp.defects.forEach((d) => (d.images = d.images || []));
-        });
-      });
-    }
-    // ---------------------------------------------------------------------
-
-    //Add the current server timestamp to the object from the frontend
+    // Add timestamp
     pairingDataItem.inspectionTime = new Date();
 
     // --- Find or Create Document ---
     let doc = await QCRovingPairing.findOne({ inspection_date, moNo, lineNo });
+    console.log('Found existing document:', !!doc);
 
     if (doc) {
       // Document exists, update it
@@ -245,35 +210,27 @@ export const saveQCRovingPairingData = async (req, res) => {
       );
 
       if (existingRepIndex !== -1) {
-        // This inspection repetition already exists, so we overwrite it.
         doc.pairingData[existingRepIndex] = pairingDataItem;
       } else {
-        // This is a new inspection repetition for this document, add it.
         doc.pairingData.push(pairingDataItem);
       }
 
-      // Sort pairingData by inspection_rep_name (e.g., "1st", "2nd")
-      doc.pairingData.sort((a, b) => {
-        const numA = parseInt(a.inspection_rep_name, 10);
-        const numB = parseInt(b.inspection_rep_name, 10);
-        return numA - numB;
-      });
-
-      await doc.save();
+      const savedDoc = await doc.save();
+      console.log('Document updated successfully, saved doc ID:', savedDoc._id);
+      console.log('PairingData length:', savedDoc.pairingData.length);
+      
       res.status(200).json({
+        success: true,
         message: "QC Roving Pairing data updated successfully.",
-        data: doc
+        data: savedDoc
       });
     } else {
-      // Document does not exist, create a new one
+      // Create new document - generate pairing_id
       const lastDoc = await QCRovingPairing.findOne().sort({ pairing_id: -1 });
-      const newId =
-        lastDoc && typeof lastDoc.pairing_id === "number"
-          ? lastDoc.pairing_id + 1
-          : 1;
-
+      const newPairingId = lastDoc ? lastDoc.pairing_id + 1 : 1;
+      
       const newDoc = new QCRovingPairing({
-        pairing_id: newId,
+        pairing_id: newPairingId,
         report_name,
         inspection_date,
         moNo,
@@ -283,18 +240,22 @@ export const saveQCRovingPairingData = async (req, res) => {
         operationNo,
         operationName,
         operationName_kh,
-        pairingData: [pairingDataItem] // Start with the first item
+        pairingData: [pairingDataItem]
       });
 
-      await newDoc.save();
+      const savedDoc = await newDoc.save();
+      console.log('New document created successfully');
+      
       res.status(201).json({
+        success: true,
         message: "New QC Roving Pairing record created successfully.",
-        data: newDoc
+        data: savedDoc
       });
     }
   } catch (error) {
     console.error("Error saving QC Roving Pairing data:", error);
     res.status(500).json({
+      success: false,
       message: "Failed to save QC Roving Pairing data.",
       error: error.message
     });
