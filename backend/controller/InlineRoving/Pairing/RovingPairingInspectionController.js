@@ -6,7 +6,7 @@ import {
   saveCompressedImage } from "../../../Utils/imageCompression.js";
 import {
   API_BASE_URL
-} from "../../../Config/appConfig.js";
+} from "../../../../config.js";
 
 
 // Upload images for defects
