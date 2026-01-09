@@ -1,18 +1,33 @@
-import express from 'express';
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
 import { execSync } from 'child_process';
 import { p88LegacyData } from '../../MongoDB/dbConnectionController.js'; 
+import os from 'os';
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
 
+const getDefaultDownloadPath = () => {
+    const homeDir = os.homedir();
+    
+    switch (process.platform) {
+        case 'win32':
+            return path.join(homeDir, 'Downloads', 'Pivot88Reports');
+        case 'darwin': // macOS
+            return path.join(homeDir, 'Downloads', 'Pivot88Reports');
+        case 'linux':
+            return path.join(homeDir, 'Downloads', 'Pivot88Reports');
+        default:
+            return path.join(os.tmpdir(), 'pivot88_downloads');
+    }
+};
+
 const CONFIG = {
     LOGIN_URL: "https://yw.pivot88.com/login",
     BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
-    DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
+    DEFAULT_DOWNLOAD_DIR: getDefaultDownloadPath(),
     TIMEOUT: 15000,
     DELAY_BETWEEN_DOWNLOADS: 3000 
 };
@@ -505,9 +520,15 @@ export const downloadBulkReports = async (req, res) => {
             factoryName
         } = req.body;
         
-        const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        // const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
-        // ... existing validation code ...
+        let targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        // Ensure path is absolute so it doesn't save inside project folder if relative path is given
+        targetDownloadDir = path.resolve(targetDownloadDir);
+
+        if (!fs.existsSync(targetDownloadDir)) {
+            fs.mkdirSync(targetDownloadDir, { recursive: true });
+        }
 
         // Get inspection records from database with date and factory filters
         const records = await getInspectionRecords(
@@ -741,7 +762,10 @@ export const checkBulkSpace = async (req, res) => {
             factoryName
         } = req.body;
 
-         const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        //  const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+
+        let targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        targetDir = path.resolve(targetDir);
 
         if (!fs.existsSync(targetDir)) {
             fs.mkdirSync(targetDir, { recursive: true });
@@ -825,7 +849,9 @@ export const checkBulkSpace = async (req, res) => {
 export const saveDownloadParth = async (req, res) => {
     try {
         const { downloadPath } = req.body;
-        const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        // const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        let targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        targetDownloadDir = path.resolve(targetDownloadDir);
 
         // Ensure download directory exists
         if (!fs.existsSync(targetDownloadDir)) {
@@ -951,7 +977,10 @@ export const saveDownloadParth = async (req, res) => {
 export const checkSpace = async (req, res) => {
     try {
         const { downloadPath } = req.body;
-        const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        // const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+
+        let targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        targetDir = path.resolve(targetDir);
         
         // Ensure directory exists for space check
         if (!fs.existsSync(targetDir)) {
