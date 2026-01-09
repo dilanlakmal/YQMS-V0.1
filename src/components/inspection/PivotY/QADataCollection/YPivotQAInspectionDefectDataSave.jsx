@@ -13,6 +13,18 @@ import {
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionDefectConfig from "./YPivotQAInspectionDefectConfig";
 
+// helper function to convert blob URL to File object
+const blobUrlToFile = async (blobUrl, filename = "image.jpg") => {
+  try {
+    const response = await fetch(blobUrl);
+    const blob = await response.blob();
+    return new File([blob], filename, { type: blob.type || "image/jpeg" });
+  } catch (error) {
+    console.error("[blobUrlToFile] Failed to convert:", blobUrl, error);
+    return null;
+  }
+};
+
 // ==============================================================================
 // INTERNAL COMPONENT: AUTO-DISMISS STATUS MODAL
 // ==============================================================================
@@ -91,18 +103,30 @@ const transformImageFromBackend = (img) => {
 const transformImageToBackend = (img) => {
   if (!img) return null;
 
-  // Determine if this is a new image (base64) or existing (URL)
-  const isBase64 =
-    img.imgSrc?.startsWith("data:") || img.editedImgSrc?.startsWith("data:");
-  const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+  // Priority order: imageURL (from injectUrl) > imgSrc (if valid path)
+  let finalUrl = img.imageURL;
+
+  // Fallback to imgSrc if it's a valid server path (not blob/data)
+  if (!finalUrl && img.imgSrc) {
+    if (img.imgSrc.startsWith("/") || img.imgSrc.startsWith("http")) {
+      finalUrl = img.imgSrc;
+    }
+  }
+
+  // Must have a valid URL to save
+  if (!finalUrl) {
+    console.warn("[transformImageToBackend] No valid URL:", {
+      id: img.id,
+      imageURL: img.imageURL,
+      imgSrc: img.imgSrc?.substring(0, 50)
+    });
+    return null;
+  }
 
   return {
     id: img.id || img.imageId,
     imageId: img.id || img.imageId,
-    // If we have a new edited image, send it as imgSrc
-    imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
-    // If it's an existing image, keep the relative URL
-    imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null
+    imageURL: finalUrl
   };
 };
 
@@ -488,7 +512,6 @@ const YPivotQAInspectionDefectDataSave = ({
     const savedDefects = reportData?.defectData?.savedDefects || [];
     const manualDataByGroup = reportData?.defectData?.manualDataByGroup || {};
 
-    // Validation: Check if there's anything to save
     if (
       savedDefects.length === 0 &&
       Object.keys(manualDataByGroup).length === 0
@@ -503,36 +526,181 @@ const YPivotQAInspectionDefectDataSave = ({
 
     setSaving(true);
     try {
-      // Transform frontend data to backend format
-      const defectPayload = savedDefects.map(transformDefectToBackend);
-      const manualPayload = transformManualDataToBackend(manualDataByGroup);
+      // =========================================================
+      // STEP 1: COLLECT & UPLOAD IMAGES
+      // =========================================================
+      const imageFiles = [];
+      const imageMap = {};
+
+      const collectImage = async (img, contextPrefix) => {
+        if (!img) return;
+
+        if (!img.id && !img.imageId) {
+          img.id = `${contextPrefix}_${Date.now()}_${Math.random()
+            .toString(36)
+            .substr(2, 9)}`;
+        }
+        const imageId = img.id || img.imageId;
+
+        // Already uploaded?
+        if (img.imageURL && img.imageURL.startsWith("/")) {
+          imageMap[imageId] = img.imageURL;
+          return;
+        }
+
+        // Has File object?
+        if (img.file instanceof File || img.file instanceof Blob) {
+          imageFiles.push({ id: imageId, file: img.file });
+          return;
+        }
+
+        // Has blob URL? Convert it
+        const blobUrl = img.editedImgSrc || img.imgSrc;
+        if (blobUrl && blobUrl.startsWith("blob:")) {
+          const file = await blobUrlToFile(blobUrl, `${imageId}.jpg`);
+          if (file) {
+            img.file = file;
+            imageFiles.push({ id: imageId, file });
+          }
+          return;
+        }
+      };
+
+      // Collect from savedDefects
+      for (const [dIdx, defect] of savedDefects.entries()) {
+        if (defect.isNoLocation) {
+          for (const [iIdx, img] of (defect.images || []).entries()) {
+            await collectImage(img, `noloc_${dIdx}_${iIdx}`);
+          }
+        } else {
+          for (const [lIdx, loc] of (defect.locations || []).entries()) {
+            for (const [pIdx, pos] of (loc.positions || []).entries()) {
+              if (pos.requiredImage) {
+                await collectImage(
+                  pos.requiredImage,
+                  `loc_${dIdx}_${lIdx}_${pIdx}_req`
+                );
+              }
+              for (const [aIdx, addImg] of (
+                pos.additionalImages || []
+              ).entries()) {
+                await collectImage(
+                  addImg,
+                  `loc_${dIdx}_${lIdx}_${pIdx}_add_${aIdx}`
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // Collect from manualData
+      for (const [groupId, group] of Object.entries(manualDataByGroup)) {
+        for (const [iIdx, img] of (group.images || []).entries()) {
+          await collectImage(img, `manual_${groupId}_${iIdx}`);
+        }
+      }
+
+      // Upload
+      if (imageFiles.length > 0) {
+        const formData = new FormData();
+        imageFiles.forEach((item) => {
+          formData.append("images", item.file, `defect_${item.id}.jpg`);
+        });
+
+        const uploadRes = await axios.post(
+          `${API_BASE_URL}/api/fincheck-inspection/upload-defect-images`,
+          formData,
+          { headers: { "Content-Type": "multipart/form-data" } }
+        );
+
+        if (uploadRes.data.success) {
+          const paths = uploadRes.data.data?.paths || [];
+          imageFiles.forEach((item, index) => {
+            if (paths[index]) {
+              imageMap[item.id] = paths[index];
+            }
+          });
+        }
+      }
+
+      // =========================================================
+      // STEP 2: INJECT URLs INTO DATA
+      // =========================================================
+      const injectUrl = (img) => {
+        if (!img) return null;
+        const imageId = img.id || img.imageId;
+
+        if (imageMap[imageId]) {
+          return {
+            ...img,
+            imageURL: imageMap[imageId],
+            imgSrc: imageMap[imageId],
+            file: null,
+            editedImgSrc: null
+          };
+        }
+        return img;
+      };
+
+      // Apply to Defects
+      const defectsWithUrls = savedDefects.map((d) => {
+        if (d.isNoLocation) {
+          return {
+            ...d,
+            images: (d.images || []).map(injectUrl).filter(Boolean)
+          };
+        } else {
+          return {
+            ...d,
+            locations: (d.locations || []).map((loc) => ({
+              ...loc,
+              positions: (loc.positions || []).map((pos) => ({
+                ...pos,
+                requiredImage: injectUrl(pos.requiredImage),
+                additionalImages: (pos.additionalImages || [])
+                  .map(injectUrl)
+                  .filter(Boolean)
+              }))
+            }))
+          };
+        }
+      });
+
+      // Apply to Manual Data
+      const manualDataWithUrls = {};
+      Object.entries(manualDataByGroup).forEach(([groupId, data]) => {
+        manualDataWithUrls[groupId] = {
+          ...data,
+          images: (data.images || []).map(injectUrl).filter(Boolean)
+        };
+      });
+
+      // =========================================================
+      // STEP 3: TRANSFORM & SEND
+      // =========================================================
+      const finalDefects = defectsWithUrls.map(transformDefectToBackend);
+      const finalManualData = transformManualDataToBackend(manualDataWithUrls);
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-defect-data`,
         {
           reportId,
-          defectData: defectPayload,
-          defectManualData: manualPayload
+          defectData: finalDefects,
+          defectManualData: finalManualData
         }
       );
 
       if (res.data.success) {
-        const wasUpdateMode = isUpdateMode;
         setIsUpdateMode(true);
-
-        if (onSaveSuccess) {
-          onSaveSuccess("defectData");
-        }
+        if (onSaveSuccess) onSaveSuccess("defectData");
 
         setStatusModal({
           isOpen: true,
           type: "success",
-          message: wasUpdateMode
-            ? "Defect Data Updated Successfully!"
-            : "Defect Data Saved Successfully!"
+          message: isUpdateMode ? "Defect Data Updated!" : "Defect Data Saved!"
         });
 
-        // Optionally update local state with saved URLs from backend
         if (res.data.data) {
           const updatedDefects = (res.data.data.defectData || []).map(
             transformDefectFromBackend
@@ -540,7 +708,6 @@ const YPivotQAInspectionDefectDataSave = ({
           const updatedManual = transformManualDataFromBackend(
             res.data.data.defectManualData || []
           );
-
           onUpdateDefectData({
             savedDefects: updatedDefects,
             manualDataByGroup: updatedManual
@@ -548,7 +715,7 @@ const YPivotQAInspectionDefectDataSave = ({
         }
       }
     } catch (error) {
-      console.error("Error saving defect data:", error);
+      console.error("Save error:", error);
       setStatusModal({
         isOpen: true,
         type: "error",

@@ -25,6 +25,7 @@ import {
   updateInspectionConfig,
   clearInspectionConfig,
   updateMeasurementData,
+  uploadDefectImages,
   updateDefectData,
   updatePPSheetData,
   submitFullInspectionReport,
@@ -118,18 +119,17 @@ router.post(
 // Save Header Data
 router.post("/api/fincheck-inspection/update-header-data", updateHeaderData);
 
-// NEW: Batch Upload Photos (Incremental - per item)
+// Batch Upload Photos (Incremental - per item)
 router.post(
   "/api/fincheck-inspection/upload-photo-batch",
   upload.array("images"),
   uploadPhotoBatch
 );
-//router.post("/api/fincheck-inspection/upload-photo-batch", uploadPhotoBatch);
 
-// NEW: Delete Single Photo
+// Delete Single Photo
 router.post("/api/fincheck-inspection/delete-photo", deletePhotoFromItem);
 
-// NEW: Update Remark Only
+// Update Remark Only
 router.post(
   "/api/fincheck-inspection/update-photo-remark",
   updatePhotoItemRemark
@@ -154,6 +154,13 @@ router.post(
 router.post(
   "/api/fincheck-inspection/update-measurement-data",
   updateMeasurementData
+);
+
+// Save Defect Images
+router.post(
+  "/api/fincheck-inspection/upload-defect-images",
+  upload.array("images"),
+  uploadDefectImages
 );
 
 // Save Defect Data

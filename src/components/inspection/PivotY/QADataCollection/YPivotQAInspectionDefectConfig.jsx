@@ -40,6 +40,69 @@ import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDeterminatio
 import YPivotQAInspectionDefectSummary from "./YPivotQAInspectionDefectSummary";
 import YPivotQAInspectionManualDefect from "./YPivotQAInspectionManualDefect";
 
+// --- UTILITY: Image Compression ---
+const compressImage = async (source, maxWidth = 1280, quality = 0.8) => {
+  return new Promise((resolve) => {
+    // If it's already a small file, return as is
+    if (source instanceof File && source.size < 500 * 1024) {
+      resolve(source);
+      return;
+    }
+
+    const img = new Image();
+    let src = "";
+    let isObjectUrl = false;
+
+    if (source instanceof Blob || source instanceof File) {
+      src = URL.createObjectURL(source);
+      isObjectUrl = true;
+    } else {
+      src = source; // Base64 or URL
+    }
+
+    img.src = src;
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      let width = img.width;
+      let height = img.height;
+
+      // Maintain aspect ratio
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (isObjectUrl) URL.revokeObjectURL(src);
+          // Return a File object to simulate a real user upload
+          const file = new File([blob], `compressed_${Date.now()}.jpg`, {
+            type: "image/jpeg",
+            lastModified: Date.now()
+          });
+          resolve(file);
+        },
+        "image/jpeg",
+        quality
+      );
+    };
+
+    img.onerror = () => {
+      if (isObjectUrl) URL.revokeObjectURL(src);
+      resolve(source); // Fallback
+    };
+  });
+};
+
 const YPivotQAInspectionDefectConfig = ({
   selectedOrders,
   orderData,
@@ -483,25 +546,6 @@ const YPivotQAInspectionDefectConfig = ({
             ? reconstructedPositions
             : [{ pcsNo: 1, status: defStatus, requiredImage: null }]
       };
-      // // Handle No-Location entries
-      // // Get the most common status or first entry's status
-      // const firstEntry = aggregatedDefect.entries[0];
-      // const totalQty = aggregatedDefect.entries.reduce(
-      //   (sum, e) => sum + (e.qty || 0),
-      //   0
-      // );
-
-      // formData = {
-      //   status: firstEntry?.status || defStatus,
-      //   qty: totalQty,
-      //   locations: [],
-      //   isNoLocation: true,
-      //   additionalRemark: firstEntry?.additionalRemark || "",
-      //   selectedQC: firstEntry?.qcUser || defaultQC,
-      //   availableStatuses: statuses,
-      //   defaultStatus: defStatus,
-      //   existingEntries: aggregatedDefect.entries
-      // };
     } else {
       // Handle Location-based entries
       const combinedLocations = [];
@@ -1453,24 +1497,51 @@ const YPivotQAInspectionDefectConfig = ({
     updateDefectForm(defectId, { noLocationPositions: newPositions });
   };
 
-  const handleImageEditorSave = (savedImages) => {
+  // Image Editor Handlers
+  const handleImageEditorSave = async (savedImages) => {
     if (!savedImages || savedImages.length === 0) {
       setShowImageEditor(false);
       return;
     }
 
-    const image = savedImages[0]; // Take first image
+    const image = savedImages[0];
+
+    // ENSURE ID EXISTS FIRST
+    const imageId =
+      image.id ||
+      `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    let compressedImageObj = {
+      ...image,
+      id: imageId // Always set ID
+    };
+
+    if (image.file) {
+      try {
+        const compressedFile = await compressImage(image.file);
+        const displayUrl = URL.createObjectURL(compressedFile);
+
+        compressedImageObj = {
+          id: imageId, // Preserve ID
+          file: compressedFile,
+          imgSrc: displayUrl,
+          editedImgSrc: displayUrl
+        };
+      } catch (e) {
+        console.error("Compression failed", e);
+      }
+    }
+
+    console.log(`[handleImageEditorSave] Saving image with ID: ${imageId}`);
 
     if (imageEditorContext?.type === "noLoc") {
-      // Saving to a No Location piece
       updateNoLocationPiece(
         imageEditorContext.defectId,
         imageEditorContext.index,
         "requiredImage",
-        image
+        compressedImageObj
       );
     }
-    // If you had logic for location-based images here, add it, otherwise:
 
     setShowImageEditor(false);
     setImageEditorContext(null);

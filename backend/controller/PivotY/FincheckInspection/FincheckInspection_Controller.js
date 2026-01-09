@@ -1900,56 +1900,92 @@ if (!fs.existsSync(uploadDirDefectManual)) {
 }
 
 // Helper: Generic Base64 Image Saver
-const saveBase64ImageToPath = (base64String, directory, filenamePrefix) => {
+// const saveBase64ImageToPath = (base64String, directory, filenamePrefix) => {
+//   try {
+//     if (!base64String || typeof base64String !== "string") return null;
+
+//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+//     if (!matches || matches.length !== 3) return null;
+
+//     const type = matches[1];
+//     const data = Buffer.from(matches[2], "base64");
+//     const ext = type.split("/")[1] || "jpg";
+
+//     const filename = `${filenamePrefix}_${Date.now()}.${ext}`;
+//     const filepath = path.join(directory, filename);
+
+//     fs.writeFileSync(filepath, data);
+
+//     // Return relative URL based on directory
+//     const relativePath = directory.includes("DefectManualData")
+//       ? `/storage/PivotY/Fincheck/DefectManualData/${filename}`
+//       : `/storage/PivotY/Fincheck/DefectData/${filename}`;
+
+//     return relativePath;
+//   } catch (error) {
+//     console.error("Error saving base64 image:", error);
+//     return null;
+//   }
+// };
+
+// Defect Image Upload Endpoint
+export const uploadDefectImages = async (req, res) => {
   try {
-    if (!base64String || typeof base64String !== "string") return null;
+    if (!req.files || req.files.length === 0) {
+      return res.status(200).json({ success: true, data: { paths: [] } });
+    }
 
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    const savedPaths = [];
 
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+    // Process uploaded files
+    for (const file of req.files) {
+      // Define final destination (Ensure uploadDirDefect is defined/created at top of file)
+      const targetDir = uploadDirDefect;
+      const uniqueName = `def_img_${Date.now()}_${Math.round(
+        Math.random() * 1000
+      )}${path.extname(file.originalname)}`;
+      const targetPath = path.join(targetDir, uniqueName);
 
-    const filename = `${filenamePrefix}_${Date.now()}.${ext}`;
-    const filepath = path.join(directory, filename);
+      // Move file from temp to final folder
+      fs.renameSync(file.path, targetPath);
 
-    fs.writeFileSync(filepath, data);
+      // Push the relative path that the frontend needs
+      savedPaths.push(`/storage/PivotY/Fincheck/DefectData/${uniqueName}`);
+    }
 
-    // Return relative URL based on directory
-    const relativePath = directory.includes("DefectManualData")
-      ? `/storage/PivotY/Fincheck/DefectManualData/${filename}`
-      : `/storage/PivotY/Fincheck/DefectData/${filename}`;
-
-    return relativePath;
+    return res.status(200).json({
+      success: true,
+      data: {
+        paths: savedPaths
+      }
+    });
   } catch (error) {
-    console.error("Error saving base64 image:", error);
-    return null;
+    console.error("Defect image upload error:", error);
+    return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
 // Helper: Process single image object from frontend
-const processImageObject = (imgObj, directory, filenamePrefix, index) => {
+const processImageObject = (imgObj, filenamePrefix, index) => {
   if (!imgObj) return null;
 
-  let finalUrl = imgObj.imageURL || null;
+  // Get the URL - check multiple possible sources
+  const finalUrl = imgObj.imageURL || imgObj.imgSrc;
 
-  // Check for base64 data in various possible fields
-  const base64Data =
-    imgObj.editedImgSrc || imgObj.imgSrc || imgObj.base64 || null;
-
-  if (base64Data && base64Data.startsWith("data:image")) {
-    const savedPath = saveBase64ImageToPath(
-      base64Data,
-      directory,
-      `${filenamePrefix}_${index}`
-    );
-    if (savedPath) {
-      finalUrl = savedPath;
-    }
+  // Validation: Skip blob URLs or missing URLs
+  if (
+    !finalUrl ||
+    finalUrl.startsWith("blob:") ||
+    finalUrl.startsWith("data:")
+  ) {
+    console.warn(`[processImageObject] Invalid/missing URL for image:`, {
+      id: imgObj.id || imgObj.imageId,
+      hasImageURL: !!imgObj.imageURL,
+      hasImgSrc: !!imgObj.imgSrc,
+      prefix: filenamePrefix
+    });
+    return null;
   }
-
-  if (!finalUrl) return null;
 
   return {
     imageId:
@@ -1968,28 +2004,21 @@ const processDefectPosition = (
   posIndex
 ) => {
   const filenameBase = `def_pos_${reportId}_${defectCode}_${locationId}_pcs${position.pcsNo}`;
-
-  // Process required image
+  // 1. Process required image
   let processedRequiredImage = null;
   if (position.requiredImage) {
     processedRequiredImage = processImageObject(
       position.requiredImage,
-      uploadDirDefect,
       `${filenameBase}_req`,
-      posIndex
+      0
     );
   }
 
-  // Process additional images (up to 5)
+  // 2. Process additional images (up to 5)
   const processedAdditionalImages = [];
   if (Array.isArray(position.additionalImages)) {
     position.additionalImages.slice(0, 5).forEach((img, imgIdx) => {
-      const processed = processImageObject(
-        img,
-        uploadDirDefect,
-        `${filenameBase}_add`,
-        imgIdx
-      );
+      const processed = processImageObject(img, `${filenameBase}_add`, imgIdx);
       if (processed) {
         processedAdditionalImages.push(processed);
       }
@@ -2002,7 +2031,6 @@ const processDefectPosition = (
     requiredImage: processedRequiredImage,
     additionalRemark: (position.additionalRemark || "").slice(0, 250),
     additionalImages: processedAdditionalImages,
-    // Legacy fields
     position: position.position || "Outside",
     comment: position.comment || "",
     qcUser: position.qcUser || null
@@ -2011,6 +2039,7 @@ const processDefectPosition = (
 
 // Helper: Process Location
 const processDefectLocation = (location, reportId, defectCode) => {
+  // Map over the positions array
   const processedPositions = (location.positions || []).map((pos, posIdx) =>
     processDefectPosition(
       pos,
@@ -2028,11 +2057,14 @@ const processDefectLocation = (location, reportId, defectCode) => {
     locationName: location.locationName,
     view: location.view,
     qty: location.qty || processedPositions.length || 1,
-    positions: processedPositions
+    positions: processedPositions // <--- The positions contain the images
   };
 };
 
-// Main Controller
+// ============================================================
+// Update Defect Data
+// ============================================================
+
 export const updateDefectData = async (req, res) => {
   try {
     const { reportId, defectData, defectManualData } = req.body;
@@ -2053,21 +2085,19 @@ export const updateDefectData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // A. Process Standard Defects
+    // --- A. Process Standard Defects ---
     if (Array.isArray(defectData)) {
       const processedDefectData = defectData.map((defect) => {
         const defectCode = defect.defectCode || "unknown";
 
+        // CASE 1: NO-LOCATION MODE (Images at Root)
         if (defect.isNoLocation) {
-          // ========== NO-LOCATION MODE ==========
-          // Images are stored at defect level
           const processedImages = [];
 
           if (Array.isArray(defect.images)) {
             defect.images.forEach((img, imgIdx) => {
               const processed = processImageObject(
                 img,
-                uploadDirDefect,
                 `def_noloc_${reportId}_${defectCode}`,
                 imgIdx
               );
@@ -2096,8 +2126,10 @@ export const updateDefectData = async (req, res) => {
             qcUser: defect.qcUser || null,
             timestamp: defect.timestamp || new Date()
           };
-        } else {
-          // ========== LOCATION-BASED MODE ==========
+        }
+
+        // CASE 2: LOCATION-BASED MODE (Images inside Positions)
+        else {
           const processedLocations = (defect.locations || []).map((loc) =>
             processDefectLocation(loc, reportId, defectCode)
           );
@@ -2114,13 +2146,13 @@ export const updateDefectData = async (req, res) => {
             defectName: defect.defectName,
             defectCode: defectCode,
             categoryName: defect.categoryName || "",
-            status: null, // Status is per-position for location-based
+            status: null,
             qty: totalQty || defect.qty || 1,
             determinedBuyer: defect.determinedBuyer || "Unknown",
             additionalRemark: (defect.additionalRemark || "").slice(0, 250),
             isNoLocation: false,
             locations: processedLocations,
-            images: [], // No top-level images for location-based
+            images: [],
             lineName: defect.lineName || "",
             tableName: defect.tableName || "",
             colorName: defect.colorName || "",
@@ -2133,7 +2165,7 @@ export const updateDefectData = async (req, res) => {
       report.defectData = processedDefectData;
     }
 
-    // B. Process Manual Defect Data
+    // --- B. Process Manual Defect Data ---
     if (Array.isArray(defectManualData)) {
       const processedManualData = defectManualData.map((manualItem) => {
         const groupId = manualItem.groupId || 0;
@@ -2143,7 +2175,6 @@ export const updateDefectData = async (req, res) => {
           manualItem.images.forEach((img, idx) => {
             const processed = processImageObject(
               img,
-              uploadDirDefectManual,
               `def_man_${reportId}_${groupId}`,
               idx
             );
