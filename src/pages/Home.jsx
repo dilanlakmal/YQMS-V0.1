@@ -500,6 +500,23 @@ function Home() {
             version: "0"
           }
         ]
+      },
+
+      // System Translator
+      {
+        id: "ai-system",
+        title: "AI System",
+        icon: <Layers className="w-5 h-5 mr-2" />,
+        bgColor: "bg-green-50 dark:bg-green-900/20",
+        items: [
+          {
+          path: "/system-translator",
+          roles: ["Admin","Translator"],
+          image: "assets/Home/translator.png",
+          title: "System Translator",
+          description: "Translate text and files"
+        }
+        ]
       }
     ],
     [t]
