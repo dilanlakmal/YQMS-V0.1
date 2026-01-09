@@ -1707,6 +1707,54 @@ export const updateInspectionConfig = async (req, res) => {
 };
 
 // ============================================================
+// NEW: Clear Inspection Configuration (Remove All Groups)
+// ============================================================
+export const clearInspectionConfig = async (req, res) => {
+  try {
+    const { reportId } = req.body;
+
+    if (!reportId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID required." });
+    }
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found." });
+    }
+
+    // Reset configGroups to empty array and sampleSize to 0
+    if (report.inspectionConfig) {
+      report.inspectionConfig.configGroups = [];
+      report.inspectionConfig.sampleSize = 0;
+      report.inspectionConfig.updatedAt = new Date();
+
+      report.markModified("inspectionConfig");
+      await report.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "All configuration groups removed successfully.",
+      data: []
+    });
+  } catch (error) {
+    console.error("Error clearing inspection config:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error.",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
 // Update Measurement Data
 // ============================================================
 
