@@ -108,7 +108,8 @@ const YPivotQAInspectionDefectConfig = ({
   orderData,
   reportData,
   onUpdateDefectData,
-  activeGroup
+  activeGroup,
+  onDefectsSaved
 }) => {
   // --- Derived Data ---
   const activeProductTypeId = reportData?.config?.productTypeId;
@@ -802,6 +803,12 @@ const YPivotQAInspectionDefectConfig = ({
     setSelectedDefectsForModal([]);
     setDefectForms({});
     setEditingDefectId(null);
+
+    // ADD THIS: Trigger auto-save after modal closes
+    if (onDefectsSaved) {
+      console.log("[DefectConfig] Calling onDefectsSaved...");
+      onDefectsSaved();
+    }
   };
 
   const handleDeleteDefect = (originalIndex) => {

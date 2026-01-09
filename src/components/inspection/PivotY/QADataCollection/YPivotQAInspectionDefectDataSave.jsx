@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback
+} from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
@@ -431,6 +437,11 @@ const YPivotQAInspectionDefectDataSave = ({
     return { total, critical, major, minor };
   }, [reportData?.defectData?.savedDefects]);
 
+  // state to track unsaved changes
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const lastSavedHashRef = useRef(null);
+  const [triggerAutoSave, setTriggerAutoSave] = useState(false);
+
   // --- FETCH EXISTING DATA ON MOUNT ---
   useEffect(() => {
     const fetchExistingDefectData = async () => {
@@ -498,14 +509,108 @@ const YPivotQAInspectionDefectDataSave = ({
     }
   }, [hasDefectData, dataLoaded]);
 
-  // --- SAVE HANDLER ---
-  const handleSaveDefectData = async () => {
-    if (!isReportSaved || !reportId) {
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        message: "Please save Order information first."
+  // ADD this helper function to generate hash of defect data
+  const generateDataHash = (defects, manualData) => {
+    try {
+      // Create a simplified version for comparison (excluding file objects and blob URLs)
+      const simplifiedDefects = (defects || []).map((d) => ({
+        defectId: d.defectId,
+        groupId: d.groupId,
+        isNoLocation: d.isNoLocation,
+        qty: d.qty,
+        status: d.status,
+        locations: (d.locations || []).map((l) => ({
+          uniqueId: l.uniqueId,
+          positions: (l.positions || []).map((p) => ({
+            pcsNo: p.pcsNo,
+            status: p.status,
+            hasImage: !!(p.requiredImage?.imageURL || p.requiredImage?.imgSrc)
+          }))
+        })),
+        imageCount: (d.images || []).length
+      }));
+
+      const simplifiedManual = Object.entries(manualData || {}).map(
+        ([k, v]) => ({
+          groupId: k,
+          remarks: v.remarks,
+          imageCount: (v.images || []).length
+        })
+      );
+
+      return JSON.stringify({
+        defects: simplifiedDefects,
+        manual: simplifiedManual
       });
+    } catch (e) {
+      return Date.now().toString(); // Fallback - always different
+    }
+  };
+
+  // ADD this useEffect to detect changes
+  useEffect(() => {
+    if (!dataLoaded) return;
+
+    const savedDefects = reportData?.defectData?.savedDefects || [];
+    const manualData = reportData?.defectData?.manualDataByGroup || {};
+    const currentHash = generateDataHash(savedDefects, manualData);
+
+    // Compare with last saved hash
+    if (
+      lastSavedHashRef.current !== null &&
+      currentHash !== lastSavedHashRef.current
+    ) {
+      setHasUnsavedChanges(true);
+    }
+  }, [reportData?.defectData, dataLoaded]);
+
+  // ADD this useEffect - triggers save when flag is set AND data has changed
+  useEffect(() => {
+    if (triggerAutoSave && !saving && isReportSaved && reportId) {
+      const savedDefects = reportData?.defectData?.savedDefects || [];
+
+      if (savedDefects.length > 0) {
+        console.log(
+          "[AutoSave] Triggered by flag, defects count:",
+          savedDefects.length
+        );
+
+        // Reset flag first
+        setTriggerAutoSave(false);
+
+        // Then trigger save
+        handleSaveDefectData(true);
+      } else {
+        setTriggerAutoSave(false);
+      }
+    }
+  }, [
+    triggerAutoSave,
+    reportData?.defectData?.savedDefects,
+    saving,
+    isReportSaved,
+    reportId
+  ]);
+
+  // ADD this simple handler to pass to DefectConfig
+  const handleDefectsSaved = useCallback(() => {
+    console.log("[AutoSave] Modal closed, setting trigger flag...");
+    // Use setTimeout to ensure state update from DefectConfig has propagated
+    setTimeout(() => {
+      setTriggerAutoSave(true);
+    }, 100);
+  }, []);
+
+  // --- SAVE HANDLER ---
+  const handleSaveDefectData = async (isAutoSave = false) => {
+    if (!isReportSaved || !reportId) {
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message: "Please save Order information first."
+        });
+      }
       return;
     }
 
@@ -516,11 +621,28 @@ const YPivotQAInspectionDefectDataSave = ({
       savedDefects.length === 0 &&
       Object.keys(manualDataByGroup).length === 0
     ) {
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        message: "No defect data to save. Add defects first."
-      });
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message: "No defect data to save. Add defects first."
+        });
+      }
+      return;
+    }
+
+    // CHECK FOR CHANGES - Skip if no changes
+    const currentHash = generateDataHash(savedDefects, manualDataByGroup);
+
+    if (!hasUnsavedChanges && lastSavedHashRef.current === currentHash) {
+      console.log("[Save] No changes detected, skipping save");
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: "Data already up to date!"
+        });
+      }
       return;
     }
 
@@ -601,7 +723,9 @@ const YPivotQAInspectionDefectDataSave = ({
         }
       }
 
-      // Upload
+      console.log(`[Save] Images to upload: ${imageFiles.length}`);
+
+      // Upload only if there are new files
       if (imageFiles.length > 0) {
         const formData = new FormData();
         imageFiles.forEach((item) => {
@@ -643,7 +767,6 @@ const YPivotQAInspectionDefectDataSave = ({
         return img;
       };
 
-      // Apply to Defects
       const defectsWithUrls = savedDefects.map((d) => {
         if (d.isNoLocation) {
           return {
@@ -667,7 +790,6 @@ const YPivotQAInspectionDefectDataSave = ({
         }
       });
 
-      // Apply to Manual Data
       const manualDataWithUrls = {};
       Object.entries(manualDataByGroup).forEach(([groupId, data]) => {
         manualDataWithUrls[groupId] = {
@@ -692,14 +814,26 @@ const YPivotQAInspectionDefectDataSave = ({
       );
 
       if (res.data.success) {
+        // UPDATE: Store hash and reset change flag
+        const newHash = generateDataHash(savedDefects, manualDataByGroup);
+        lastSavedHashRef.current = newHash;
+        setHasUnsavedChanges(false);
+
         setIsUpdateMode(true);
         if (onSaveSuccess) onSaveSuccess("defectData");
 
-        setStatusModal({
-          isOpen: true,
-          type: "success",
-          message: isUpdateMode ? "Defect Data Updated!" : "Defect Data Saved!"
-        });
+        // Show message only for manual save, not auto-save
+        if (!isAutoSave) {
+          setStatusModal({
+            isOpen: true,
+            type: "success",
+            message: isUpdateMode
+              ? "Defect Data Updated!"
+              : "Defect Data Saved!"
+          });
+        } else {
+          console.log("[AutoSave] Saved successfully");
+        }
 
         if (res.data.data) {
           const updatedDefects = (res.data.data.defectData || []).map(
@@ -712,15 +846,24 @@ const YPivotQAInspectionDefectDataSave = ({
             savedDefects: updatedDefects,
             manualDataByGroup: updatedManual
           });
+
+          // Update hash after server response
+          lastSavedHashRef.current = generateDataHash(
+            updatedDefects,
+            updatedManual
+          );
         }
       }
     } catch (error) {
       console.error("Save error:", error);
-      setStatusModal({
-        isOpen: true,
-        type: "error",
-        message: error.response?.data?.message || "Failed to save defect data."
-      });
+      if (!isAutoSave) {
+        setStatusModal({
+          isOpen: true,
+          type: "error",
+          message:
+            error.response?.data?.message || "Failed to save defect data."
+        });
+      }
     } finally {
       setSaving(false);
     }
@@ -747,6 +890,7 @@ const YPivotQAInspectionDefectDataSave = ({
         reportData={reportData}
         onUpdateDefectData={onUpdateDefectData}
         activeGroup={activeGroup}
+        onDefectsSaved={handleDefectsSaved}
       />
 
       {/* Fixed Bottom Save Button */}
@@ -756,13 +900,20 @@ const YPivotQAInspectionDefectDataSave = ({
           <div className="flex items-center gap-3 flex-wrap">
             {/* Save Status Badge */}
             {isUpdateMode ? (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
-                <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                Data Saved
-              </span>
+              hasUnsavedChanges ? (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full animate-pulse"></span>
+                  Unsaved Changes
+                </span>
+              ) : (
+                <span className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 px-3 py-1.5 rounded-full">
+                  <CheckCircle2 className="w-3 h-3" />
+                  Data Saved
+                </span>
+              )
             ) : (
-              <span className="flex items-center gap-1.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full">
-                <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+              <span className="flex items-center gap-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/20 px-3 py-1.5 rounded-full">
+                <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
                 Not Saved
               </span>
             )}
@@ -797,31 +948,31 @@ const YPivotQAInspectionDefectDataSave = ({
 
           {/* Right Side: Save Button */}
           <button
-            onClick={handleSaveDefectData}
+            onClick={() => handleSaveDefectData(false)}
             disabled={!isReportSaved || saving}
             className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-[0.98] ${
               isReportSaved
-                ? isUpdateMode
+                ? hasUnsavedChanges
+                  ? "bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white"
+                  : isUpdateMode
                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
                   : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
                 : "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
             }`}
-            title={
-              !isReportSaved
-                ? "Save Order Data first"
-                : isUpdateMode
-                ? "Update existing defect data"
-                : "Save new defect data"
-            }
           >
             {saving ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
                 {isUpdateMode ? "Updating..." : "Saving..."}
               </>
+            ) : hasUnsavedChanges ? (
+              <>
+                <Save className="w-5 h-5" />
+                Save New Changes
+              </>
             ) : isUpdateMode ? (
               <>
-                <RefreshCw className="w-5 h-5" />
+                <CheckCircle2 className="w-5 h-5" />
                 Update Defect Data
               </>
             ) : (
