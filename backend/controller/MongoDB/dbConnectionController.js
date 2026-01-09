@@ -131,26 +131,26 @@ import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_prod
+    process.env.MongoDB_URI_ym_prod
 );
 
 export const ymEcoConnection = mongoose.createConnection(
-  process.env.MongoDB_URI_ym_eco_board
+    process.env.MongoDB_URI_ym_eco_board
 );
 
 //Connection status
 ymProdConnection.on("connected", () =>
-  console.log("✅ Connected to ym_prod database...")
+    console.log("✅ Connected to ym_prod database...")
 );
 ymProdConnection.on("error", (err) =>
-  console.error("❌ unexpected error:", err)
+    console.error("❌ unexpected error:", err)
 );
 
 ymEcoConnection.on("connected", () =>
-  console.log("✅ Connected to ym_eco_board database...")
+    console.log("✅ Connected to ym_eco_board database...")
 );
 ymEcoConnection.on("error", (err) =>
-  console.error("❌ unexpected error:", err)
+    console.error("❌ unexpected error:", err)
 );
 
 //Collections
@@ -168,7 +168,7 @@ export const Packing = createPackingModel(ymProdConnection);
 export const RoleManagment = createRoleManagmentModel(ymProdConnection);
 export const QC2DefectPrint = createQC2DefectPrintModel(ymProdConnection);
 export const QC2InspectionPassBundle =
-  createQC2InspectionPassBundleModel(ymProdConnection);
+    createQC2InspectionPassBundleModel(ymProdConnection);
 export const QC2Reworks = createQC2ReworksModel(ymProdConnection);
 export const QC2RepairTracking = createQC2RepairTrackingModel(ymProdConnection);
 export const SubconFactory = createSubconFactoryModel(ymProdConnection);
@@ -186,10 +186,10 @@ export const AccessoryIssue = createAccessoryIssueModel(ymProdConnection);
 export const QCRovingPairing = createQCRovingPairingModel(ymProdConnection);
 export const CuttingInspection = createCuttingInspectionModel(ymProdConnection);
 export const CuttingMeasurementPoint =
-  createCuttingMeasurementPointModel(ymProdConnection);
+    createCuttingMeasurementPointModel(ymProdConnection);
 export const CutPanelOrders = createCutPanelOrdersModel(ymProdConnection);
 export const CuttingFabricDefect =
-  createCuttingFabricDefectModel(ymProdConnection);
+    createCuttingFabricDefectModel(ymProdConnection);
 export const CuttingIssue = createCuttingIssueModel(ymProdConnection);
 export const AQLChart = createAQLChartModel(ymProdConnection);
 
@@ -204,7 +204,7 @@ export const DailyTestingFUQC = createDailyTestingFUQCModel(ymProdConnection);
 export const SCCDefect = createSCCDefectModel(ymProdConnection);
 export const SCCScratchDefect = createSCCScratchDefectModel(ymProdConnection);
 export const HTInspectionReport =
-  createHTInspectionReportModel(ymProdConnection);
+    createHTInspectionReportModel(ymProdConnection);
 export const ElasticReport = createElasticReportModel(ymProdConnection);
 export const EMBDefect = createEMBDefectModel(ymProdConnection);
 export const PrintingDefect = createPrintingDefectModel(ymProdConnection);
@@ -212,90 +212,90 @@ export const EMBReport = createEMBReportModel(ymProdConnection);
 
 export const QADefectsModel = createQADefectsModel(ymProdConnection);
 export const QCAccuracyReportModel =
-  createQCAccuracyReportModel(ymProdConnection);
+    createQCAccuracyReportModel(ymProdConnection);
 export const QAStandardDefectsModel =
-  createQAStandardDefectsModel(ymProdConnection);
+    createQAStandardDefectsModel(ymProdConnection);
 
 export const SCCHTOperator = createSCCHTOperatorModel(ymProdConnection);
 export const SCCFUOperator = createSCCFUOperatorModel(ymProdConnection);
 export const SCCElasticOperator =
-  createSCCElasticOperatorModel(ymProdConnection);
+    createSCCElasticOperatorModel(ymProdConnection);
 
 export const AuditCheckPoint = createAuditCheckPointModel(ymProdConnection);
 
 export const BuyerSpecTemplate = createBuyerSpecTemplateModel(ymProdConnection);
 export const BuyerSpecTemplateM2 =
-  createBuyerSpecTemplateM2Model(ymProdConnection);
+    createBuyerSpecTemplateM2Model(ymProdConnection);
 export const ANFMeasurementReport =
-  createANFMeasurementReportModel(ymProdConnection);
+    createANFMeasurementReportModel(ymProdConnection);
 export const SizeCompletionStatus =
-  createSizeCompletionStatusModel(ymProdConnection);
+    createSizeCompletionStatusModel(ymProdConnection);
 export const ANFMeasurementReportPacking =
-  createANFMeasurementReportPackingModel(ymProdConnection);
+    createANFMeasurementReportPackingModel(ymProdConnection);
 export const SizeCompletionStatusPacking =
-  createSizeCompletionStatusPackingModel(ymProdConnection);
+    createSizeCompletionStatusPackingModel(ymProdConnection);
 
 export const QCWashingDefects = createQCWashingDefectsModel(ymProdConnection);
 export const QCWashingCheckList =
-  createQCWashingCheckpointsModel(ymProdConnection);
+    createQCWashingCheckpointsModel(ymProdConnection);
 export const QCWashingFirstOutput =
-  createQCWashingFirstOutputModel(ymProdConnection);
+    createQCWashingFirstOutputModel(ymProdConnection);
 export const QCWashing = createQCWashingModel(ymProdConnection);
 export const AfterIroning = createAfterIroningModel(ymProdConnection);
 
 export const SupplierIssuesDefect =
-  createSupplierIssuesDefectModel(ymProdConnection);
+    createSupplierIssuesDefectModel(ymProdConnection);
 export const SupplierIssueReport =
-  createSupplierIssueReportModel(ymProdConnection);
+    createSupplierIssueReportModel(ymProdConnection);
 export const SubconSewingQAReport =
-  createSubconSewingQAReportModel(ymProdConnection);
+    createSubconSewingQAReportModel(ymProdConnection);
 export const QCWashingMachineStandard =
-  createQCWashingMachineStandard(ymProdConnection);
+    createQCWashingMachineStandard(ymProdConnection);
 export const QCWashingQtyOld = createQCWashingQtyOldSchema(ymProdConnection);
 export const QC2OlderDefect = createQC2OlderDefectModel(ymProdConnection);
 export const QCWorkers = createQCWorkersModel(ymProdConnection);
 
 export const SubConDefect = createSubConDefectsModel(ymProdConnection);
 export const SubconSewingFactory =
-  createSubconSewingFactoryModel(ymProdConnection);
+    createSubconSewingFactoryModel(ymProdConnection);
 export const SubconSewingQc1Report =
-  createSubconSewingQc1ReportModel(ymProdConnection);
+    createSubconSewingQc1ReportModel(ymProdConnection);
 
 export const CuttingInlineOrders = CuttingInlineOrdersModel(ymProdConnection);
 export const PlanPackingList = createPlanPackingListModel(ymProdConnection);
 export const YorksysOrders = createYorksysOrdersModel(ymProdConnection);
 
 export const QASectionsProductType =
-  createQASectionsProductType(ymProdConnection);
+    createQASectionsProductType(ymProdConnection);
 export const QASectionsHome = createQASectionsHomeModel(ymProdConnection);
 export const QASectionsPhotos = createQASectionsPhotosModel(ymProdConnection);
 export const QASectionsPacking = createQASectionsPackingModel(ymProdConnection);
 export const QASectionsBuyer = createQASectionsBuyerModel(ymProdConnection);
 export const QASectionsDefectCategory =
-  createQASectionsDefectCategoryModel(ymProdConnection);
+    createQASectionsDefectCategoryModel(ymProdConnection);
 export const QASectionsDefectList =
-  createQASectionsDefectListModel(ymProdConnection);
+    createQASectionsDefectListModel(ymProdConnection);
 export const QASectionsProductLocation =
-  createQASectionsProductLocationModel(ymProdConnection);
+    createQASectionsProductLocationModel(ymProdConnection);
 export const QASectionsAqlSampleLetters =
-  createQASectionsAqlSampleLettersModel(ymProdConnection);
+    createQASectionsAqlSampleLettersModel(ymProdConnection);
 export const QASectionsAqlValues =
-  createQASectionsAqlValuesModel(ymProdConnection);
+    createQASectionsAqlValuesModel(ymProdConnection);
 export const QASectionsAqlBuyerConfig =
-  createQASectionsAqlBuyerConfigModel(ymProdConnection);
+    createQASectionsAqlBuyerConfigModel(ymProdConnection);
 export const QASectionsLine = createQASectionsLineModel(ymProdConnection);
 export const QASectionsTable = createQASectionsTableModel(ymProdConnection);
 export const QASectionsShippingStage =
-  createQASectionsShippingStageModel(ymProdConnection);
+    createQASectionsShippingStageModel(ymProdConnection);
 
 export const QASectionsMeasurementSpecs =
-  createQASectionsMeasurementSpecsModel(ymProdConnection);
+    createQASectionsMeasurementSpecsModel(ymProdConnection);
 
 export const QASectionsTemplates =
-  createQASectionsTemplatesModel(ymProdConnection);
+    createQASectionsTemplatesModel(ymProdConnection);
 
 export const FincheckInspectionReports =
-  createFincheckInspectionReportsModel(ymProdConnection);
+    createFincheckInspectionReportsModel(ymProdConnection);
 
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
 
@@ -312,11 +312,11 @@ export const HumidityReport = createHumidityModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {
-  try {
-    await mongoose.disconnect();
-    console.log("MongoDB connections closed.");
-  } catch (error) {
-    console.error("Error disconnecting MongoDB:", error);
-    throw error; // Re-throw to allow calling function to handle
-  }
+    try {
+        await mongoose.disconnect();
+        console.log("MongoDB connections closed.");
+    } catch (error) {
+        console.error("Error disconnecting MongoDB:", error);
+        throw error; // Re-throw to allow calling function to handle
+    }
 }

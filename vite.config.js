@@ -4,37 +4,37 @@ import path from "path";
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  plugins: [react()],
-  assetsInclude: ["**/*.ttf"],
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src")
+    plugins: [react()],
+    assetsInclude: ["**/*.ttf"],
+    resolve: {
+        alias: {
+            "@": path.resolve(__dirname, "./src")
+        }
+    },
+    optimizeDeps: {
+        include: ["jspdf", "jspdf-autotable"]
+    },
+    server: {
+        host: "0.0.0.0",
+        port: 3001,
+        open: true,
+        https: {
+            key: fs.readFileSync(
+                "backend/Config/192.167.6.207-key.pem"
+            ),
+            cert: fs.readFileSync(
+                "backend/Config/192.167.6.207.pem"
+            )
+        }
+    },
+    build: {
+        //minify: false, // Use esbuild for minification
+        sourcemap: true,
+        chunkSizeWarningLimit: 20000,
+        rollupOptions: {
+            manualChunks: {
+                "jspdf-autotable": ["jspdf-autotable"]
+            }
+        }
     }
-  },
-  optimizeDeps: {
-    include: ["jspdf", "jspdf-autotable"]
-  },
-  server: {
-    host: "0.0.0.0",
-    port: 3001,
-    open: true,
-    https: {
-      key: fs.readFileSync(
-        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/backend/Config/192.167.6.207-key.pem"
-      ),
-      cert: fs.readFileSync(
-        "C:/Users/USER/Downloads/YQMS-V0.1-main/YQMS-V0.1-main/backend/Config/192.167.6.207.pem"
-      )
-    }
-  },
-  build: {
-    //minify: false, // Use esbuild for minification
-    sourcemap: true,
-    chunkSizeWarningLimit: 20000,
-    rollupOptions: {
-      manualChunks: {
-        "jspdf-autotable": ["jspdf-autotable"]
-      }
-    }
-  }
 });
