@@ -3,7 +3,7 @@ import {
   generateUniqueFilename,
   saveCompressedImage
 } from "../../../Utils/imageCompression.js";
-import { API_BASE_URL } from "../../../Config/appConfig.js";
+import { API_BASE_URL } from "../../../../config.js";
 
 // Upload images for defects
 export const uploadParingimagers = async (req, res) => {
