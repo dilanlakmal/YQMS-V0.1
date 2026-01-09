@@ -5,9 +5,7 @@ const PrintP88Report = () => {
   const [status, setStatus] = useState({ message: "", type: "" });
   const [showDownloadDialog, setShowDownloadDialog] = useState(false);
   const [downloadInfo, setDownloadInfo] = useState(null);
-  const [selectedPath, setSelectedPath] = useState("");
   const [spaceInfo, setSpaceInfo] = useState(null);
-  const [pathValidation, setPathValidation] = useState(null);
   const [downloadMode, setDownloadMode] = useState("range");
   const [startRange, setStartRange] = useState(1);
   const [endRange, setEndRange] = useState(100);
@@ -81,10 +79,7 @@ const PrintP88Report = () => {
         if (data.totalRecords > 0) {
           setStartRange(1);
           setEndRange(data.totalRecords);
-          checkAvailableSpace(selectedPath, {
-            start: 1,
-            end: data.totalRecords
-          });
+          checkAvailableSpace({ start: 1, end: data.totalRecords });
         }
         setStatus({ message: "", type: "" });
       } else {
@@ -105,13 +100,12 @@ const PrintP88Report = () => {
     }
   };
 
-  const checkAvailableSpace = async (path = "", rangeOverrides = null) => {
+  const checkAvailableSpace = async (rangeOverrides = null) => {
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
       const endpoint = "check-bulk-space";
 
       const body = {
-        downloadPath: path,
         startRange:
           downloadMode === "range" ? rangeOverrides?.start ?? startRange : null,
         endRange:
@@ -170,29 +164,6 @@ const PrintP88Report = () => {
     }
   };
 
-  const validatePath = async (path) => {
-    if (!path) {
-      setPathValidation(null);
-      return;
-    }
-    try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${apiBaseUrl}/api/scraping/validate-path`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ downloadPath: path })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setPathValidation(data);
-      }
-    } catch (error) {
-      console.error("Error validating path:", error);
-    }
-  };
-
   const handlePrintReport = async () => {
     // Validate date range
     if (!startDate || !endDate) {
@@ -227,14 +198,6 @@ const PrintP88Report = () => {
   };
 
   const handleConfirmDownload = async () => {
-    if (pathValidation && !pathValidation.isValid) {
-      setStatus({
-        message: "Please select a valid download path",
-        type: "error"
-      });
-      return;
-    }
-
     if (downloadMode === "range" && (startRange > endRange || startRange < 1)) {
       setStatus({ message: "Please enter a valid range", type: "error" });
       return;
@@ -259,7 +222,6 @@ const PrintP88Report = () => {
       const endpoint = "download-bulk-reports";
 
       const body = {
-        downloadPath: selectedPath,
         startRange: downloadMode === "range" ? startRange : null,
         endRange: downloadMode === "range" ? endRange : null,
         downloadAll: downloadMode === "all",
@@ -310,20 +272,9 @@ const PrintP88Report = () => {
     }
   };
 
-  const handlePathChange = async (e) => {
-    const path = e.target.value;
-    setSelectedPath(path);
-    await validatePath(path);
-    if (path) {
-      await checkAvailableSpace(path);
-    } else {
-      await checkAvailableSpace();
-    }
-  };
-
   const handleModeChange = async (mode) => {
     setDownloadMode(mode);
-    await checkAvailableSpace(selectedPath);
+    await checkAvailableSpace();
   };
 
   return (
@@ -603,7 +554,7 @@ const PrintP88Report = () => {
                     checked={includeDownloaded}
                     onChange={(e) => {
                       setIncludeDownloaded(e.target.checked);
-                      checkAvailableSpace(selectedPath);
+                      checkAvailableSpace();
                     }}
                     className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                   />
@@ -652,7 +603,7 @@ const PrintP88Report = () => {
                       onChange={(e) => {
                         const val = parseInt(e.target.value) || 1;
                         setStartRange(val);
-                        checkAvailableSpace(selectedPath, { start: val });
+                        checkAvailableSpace({ start: val });
                       }}
                       min="1"
                       max={dateFilteredStats.totalRecords}
@@ -688,7 +639,7 @@ const PrintP88Report = () => {
                           val = dateFilteredStats.totalRecords;
                         }
                         setEndRange(val);
-                        checkAvailableSpace(selectedPath, { end: val });
+                        checkAvailableSpace({ end: val });
                       }}
                       min="1"
                       max={dateFilteredStats.totalRecords}
@@ -1156,67 +1107,12 @@ const PrintP88Report = () => {
                 </div>
               )}
 
-              {/* Download Path Input */}
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-900 dark:text-white">
-                  📁 Custom Download Path (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={selectedPath}
-                  onChange={handlePathChange}
-                  placeholder="Leave empty for default path (e.g., C:\Downloads\Reports)"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-
-                {pathValidation && (
-                  <div
-                    className={`p-3 rounded-lg text-sm ${
-                      pathValidation.isValid
-                        ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-                        : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      {pathValidation.isValid ? (
-                        <svg
-                          className="w-4 h-4 text-green-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-4 h-4 text-red-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                      <span>{pathValidation.message}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* Action Buttons */}
               <div className="flex space-x-4 pt-4">
                 <button
                   onClick={() => {
                     setShowDownloadDialog(false);
-                    setSelectedPath("");
                     setSpaceInfo(null);
-                    setPathValidation(null);
                   }}
                   className="flex-1 py-3 px-4 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors font-medium text-gray-700 dark:text-gray-300"
                 >
@@ -1224,11 +1120,9 @@ const PrintP88Report = () => {
                 </button>
                 <button
                   onClick={handleConfirmDownload}
-                  disabled={
-                    loading || (pathValidation && !pathValidation.isValid)
-                  }
+                  disabled={loading}
                   className={`flex-1 py-3 px-4 rounded-lg transition-all duration-200 font-medium ${
-                    loading || (pathValidation && !pathValidation.isValid)
+                    loading
                       ? "bg-gray-400 cursor-not-allowed text-white"
                       : "bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white shadow-lg hover:shadow-xl"
                   }`}

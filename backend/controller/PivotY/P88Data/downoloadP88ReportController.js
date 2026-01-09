@@ -1,18 +1,33 @@
-import express from "express";
 import puppeteer from "puppeteer";
 import path from "path";
 import fs from "fs";
 import { promisify } from "util";
 import { execSync } from "child_process";
 import { p88LegacyData } from "../../MongoDB/dbConnectionController.js";
+import os from "os";
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
 
+const getDefaultDownloadPath = () => {
+  const homeDir = os.homedir();
+
+  switch (process.platform) {
+    case "win32":
+      return path.join(homeDir, "Downloads", "Pivot88Reports");
+    case "darwin": // macOS
+      return path.join(homeDir, "Downloads", "Pivot88Reports");
+    case "linux":
+      return path.join(homeDir, "Downloads", "Pivot88Reports");
+    default:
+      return path.join(os.tmpdir(), "pivot88_downloads");
+  }
+};
+
 const CONFIG = {
   LOGIN_URL: "https://yw.pivot88.com/login",
   BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
-  DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
+  DEFAULT_DOWNLOAD_DIR: getDefaultDownloadPath(),
   TIMEOUT: 15000,
   DELAY_BETWEEN_DOWNLOADS: 3000
 };
@@ -542,9 +557,15 @@ export const downloadBulkReports = async (req, res) => {
       factoryName
     } = req.body;
 
-    const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+    // const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
-    // ... existing validation code ...
+    let targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+    // Ensure path is absolute so it doesn't save inside project folder if relative path is given
+    targetDownloadDir = path.resolve(targetDownloadDir);
+
+    if (!fs.existsSync(targetDownloadDir)) {
+      fs.mkdirSync(targetDownloadDir, { recursive: true });
+    }
 
     // Get inspection records from database with date and factory filters
     const records = await getInspectionRecords(
@@ -784,7 +805,10 @@ export const checkBulkSpace = async (req, res) => {
       factoryName
     } = req.body;
 
-    const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+    //  const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+
+    let targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+    targetDir = path.resolve(targetDir);
 
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
@@ -869,55 +893,18 @@ export const checkBulkSpace = async (req, res) => {
 // Keep existing single download function
 export const saveDownloadParth = async (req, res) => {
   try {
-    const { downloadPath } = req.body;
-    const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
-
-    // Ensure download directory exists
-    if (!fs.existsSync(targetDownloadDir)) {
-      fs.mkdirSync(targetDownloadDir, { recursive: true });
-    }
-
     const browser = await puppeteer.launch({
       headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
-    // const browser = await puppeteer.launch({
-    //     headless: "new",   // or true
-    //     args: [
-    //         "--no-sandbox",
-    //         "--disable-setuid-sandbox",
-    //         "--disable-dev-shm-usage"
-    //     ]
-    // });
-
     const page = await browser.newPage();
 
-    // Set download behavior
+    // Set download behavior to use browser's default download folder
     const client = await page.createCDPSession();
     await client.send("Page.setDownloadBehavior", {
-      behavior: "allow",
-      downloadPath: targetDownloadDir
+      behavior: "allow"
     });
-
-    // Get initial file list and timestamps
-    const getFileList = async () => {
-      if (!fs.existsSync(targetDownloadDir)) return [];
-      const files = await readdir(targetDownloadDir);
-      const fileStats = await Promise.all(
-        files.map(async (file) => {
-          const filePath = path.join(targetDownloadDir, file);
-          const stats = await stat(filePath);
-          return {
-            name: file,
-            mtime: stats.mtime.getTime()
-          };
-        })
-      );
-      return fileStats;
-    };
-
-    const initialFiles = await getFileList();
 
     // Login process
     await page.goto(CONFIG.LOGIN_URL);
@@ -943,46 +930,14 @@ export const saveDownloadParth = async (req, res) => {
     // Click print button
     await page.click("#page-wrapper a");
 
-    // Wait for download to complete - increased wait time
-    await new Promise((resolve) => setTimeout(resolve, 8000));
+    // Wait for download to complete
+    await new Promise((resolve) => setTimeout(resolve, 5000));
 
     await browser.close();
 
-    // Get final file list and identify new files
-    const finalFiles = await getFileList();
-    const newFiles = finalFiles.filter(
-      (finalFile) =>
-        !initialFiles.some(
-          (initialFile) =>
-            initialFile.name === finalFile.name &&
-            initialFile.mtime === finalFile.mtime
-        )
-    );
-
-    let totalSize = 0;
-    const fileDetails = [];
-
-    for (const fileInfo of newFiles) {
-      const filePath = path.join(targetDownloadDir, fileInfo.name);
-      const size = await getFileSize(filePath);
-      totalSize += size;
-      fileDetails.push({
-        name: fileInfo.name,
-        size: formatBytes(size),
-        sizeBytes: size
-      });
-    }
-
     res.json({
       success: true,
-      message: "Report downloaded successfully",
-      downloadInfo: {
-        fileCount: newFiles.length,
-        totalSize: formatBytes(totalSize),
-        totalSizeBytes: totalSize,
-        files: fileDetails,
-        downloadPath: targetDownloadDir
-      }
+      message: "Report downloaded successfully to default download folder"
     });
   } catch (error) {
     console.error("Scraping failed:", error);
@@ -997,7 +952,10 @@ export const saveDownloadParth = async (req, res) => {
 export const checkSpace = async (req, res) => {
   try {
     const { downloadPath } = req.body;
-    const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+    // const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+
+    let targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+    targetDir = path.resolve(targetDir);
 
     // Ensure directory exists for space check
     if (!fs.existsSync(targetDir)) {
