@@ -69,3 +69,13 @@ ai_agent_docs_guide/system_translation_docs.log
 ai_agent_docs_guide/system_translation_docs.aux
 ai_agent_docs_guide/company_logo.jpg
 ai_agent_docs_guide/Logo_team_yai.png
+
+# Ignore font files
+fonts/khmer_fonts/static*
+fonts/english_fonts/static*
+fonts/chinese_fonts/static*
+fonts/khmer_fonts/All-Khmer-Fonts1.1.pdf
+fonts/chinese_fonts/OFL.txt
+fonts/chinese_fonts/README.txt
+fonts/english_fonts/OFL.txt
+fonts/english_fonts/README.txt
