@@ -22,11 +22,20 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
 
   const isProcessingRef = useRef(false);
 
+  // Helper: Small delay to allow UI updates and GC to run
+  const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
   // =========================================================
-  // HELPER: Image Compression (Returns BLOB for low RAM usage)
+  // HELPER: Image Compression (Optimized for Low Memory)
   // =========================================================
   const compressToBlob = async (source, maxWidth = 1920, quality = 0.7) => {
     return new Promise((resolve) => {
+      // Optimization: If source is a File and size is small (< 300KB), skip compression to save RAM
+      if (source instanceof File && source.size < 300 * 1024) {
+        resolve(source);
+        return;
+      }
+
       // Create an image object
       const img = new Image();
 
@@ -54,16 +63,30 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
         }
 
         // Draw to canvas
-        const canvas = document.createElement("canvas");
+        let canvas = document.createElement("canvas");
         canvas.width = width;
         canvas.height = height;
-        const ctx = canvas.getContext("2d");
+        let ctx = canvas.getContext("2d");
+
+        // Image smoothing for better quality
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Export as BLOB (Binary), NOT Base64
+        // Export as BLOB (Binary)
         canvas.toBlob(
           (blob) => {
-            if (isObjectUrl) URL.revokeObjectURL(src); // Cleanup
+            // ✅ CRITICAL MEMORY CLEANUP
+            if (isObjectUrl) URL.revokeObjectURL(src);
+
+            // Clear canvas references to help Garbage Collector
+            ctx = null;
+            canvas.width = 0;
+            canvas.height = 0;
+            canvas = null;
+            img.src = "";
+
             resolve(blob);
           },
           "image/jpeg",
@@ -72,6 +95,7 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
       };
 
       img.onerror = () => {
+        console.warn("Image compression failed, using original");
         if (isObjectUrl) URL.revokeObjectURL(src);
         resolve(source); // Return original if compression fails
       };
@@ -79,37 +103,59 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
   };
 
   // =========================================================
-  // ACTION: Add to Upload Queue
+  // ACTION: Add to Upload Queue (Sequential Processing)
   // =========================================================
   const addToUploadQueue = useCallback(async (payload) => {
     const { sectionId, itemNo, images } = payload;
     const uniqueKey = `${sectionId}_${itemNo}`;
 
-    // 1. Set Status to Compressing
+    // 1. Set Initial Status
     setUploadStatus((prev) => ({
       ...prev,
       [uniqueKey]: { status: "compressing", progress: 0, total: images.length }
     }));
 
-    // 2. Compress Images
-    const processedImages = await Promise.all(
-      images.map(async (img) => {
-        // A. If it's a Raw File or Edited Blob (from ImageEditor) -> Compress it
+    // 2. Process Images SEQUENTIALLY to prevent Memory Crashes
+    const processedImages = [];
+
+    // We use a for loop instead of Promise.all to ensure one finishes before the next starts
+    for (let i = 0; i < images.length; i++) {
+      const img = images[i];
+
+      // Update UI with granular progress (e.g. "Compressing 1/5")
+      setUploadStatus((prev) => ({
+        ...prev,
+        [uniqueKey]: {
+          status: "compressing",
+          progress: i + 1,
+          total: images.length
+        }
+      }));
+
+      // ✅ PAUSE: Give the browser 50ms to breathe and Garbage Collect previous canvas
+      await delay(50);
+
+      try {
+        // A. If it's a Raw File or Edited Blob -> Compress it
         if (img.file instanceof Blob || img.file instanceof File) {
           const compressedBlob = await compressToBlob(img.file);
-          return { ...img, file: compressedBlob };
+          processedImages.push({ ...img, file: compressedBlob });
         }
-
-        // B. If it's a new Base64 string (Legacy/Fallback) -> Compress to Blob
-        if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+        // B. If it's a new Base64 string -> Compress to Blob
+        else if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
           const compressedBlob = await compressToBlob(img.imgSrc);
-          return { ...img, file: compressedBlob };
+          processedImages.push({ ...img, file: compressedBlob });
         }
-
         // C. Existing URL -> Pass through
-        return img;
-      })
-    );
+        else {
+          processedImages.push(img);
+        }
+      } catch (err) {
+        console.error("Compression error for image index " + i, err);
+        // Fallback: push original if compression fails
+        processedImages.push(img);
+      }
+    }
 
     // 3. Add to Queue
     setUploadQueue((prev) => [
@@ -125,7 +171,7 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
   }, []);
 
   // =========================================================
-  // WORKER: Process Queue (Hybrid: Multipart + JSON)
+  // WORKER: Process Queue (Multipart + JSON)
   // =========================================================
 
   useEffect(() => {
@@ -139,7 +185,7 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
         reportId: taskReportId,
         sectionId,
         itemNo,
-        images, // This contains the full list of images for this item
+        images,
         sectionName,
         itemName,
         remarks
@@ -169,10 +215,8 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
 
         const imageMeta = [];
 
-        // ✅ Iterate through ALL images to maintain order
         images.forEach((img, idx) => {
-          // Is this a binary file (New Upload / Edited)?
-          // CASE A: It has a binary file (New Upload or Edit)
+          // CASE A: Binary file
           if (
             img.file &&
             (img.file instanceof Blob || img.file instanceof File)
@@ -182,14 +226,13 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
 
             formData.append("images", img.file, fileName);
 
-            // Tell backend: "Index X is a new file"
             imageMeta.push({
               type: "file",
               id: img.id,
               index: idx
             });
           }
-          // CASE B: It is an existing server URL
+          // CASE B: Existing server URL
           else if (
             img.url &&
             typeof img.url === "string" &&
@@ -202,18 +245,16 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
               index: idx
             });
           }
-          // CASE C: It is a blob string BUT NO FILE (The Error State)
+          // CASE C: Error state (Blob URL without file)
           else if (
             img.url &&
             typeof img.url === "string" &&
             img.url.startsWith("blob:")
           ) {
-            console.error("⚠️ DETECTED BLOB URL WITHOUT FILE:", img);
-            // FAIL SAFE: Do not send this as a URL.
+            console.warn("⚠️ DETECTED BLOB URL WITHOUT FILE - SKIPPING:", img);
           }
         });
 
-        // Send the blueprint
         formData.append("imageMetadata", JSON.stringify(imageMeta));
 
         // --- SEND REQUEST ---
@@ -226,9 +267,11 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
               const percentCompleted = Math.round(
                 (progressEvent.loaded * 100) / progressEvent.total
               );
+              // Calculate visual progress (0-100% of the bar)
               const simulatedItemProgress = Math.floor(
                 (percentCompleted / 100) * images.length
               );
+
               setUploadStatus((prev) => ({
                 ...prev,
                 [uniqueKey]: {
@@ -251,8 +294,7 @@ export const PhotoUploadProvider = ({ children, reportId }) => {
             }
           }));
 
-          // ✅ Trigger the Success Callback if provided
-          // This passes the real server paths back to the component
+          // Trigger Success Callback
           if (
             currentTask.onSuccess &&
             response.data.data &&

@@ -1976,13 +1976,6 @@ const YPivotQATemplatesImageEditor = ({
               )}
               <span>{isUploading ? "Loading..." : "Save All"}</span>
             </button>
-            // <button
-            //   onClick={handleSave}
-            //   className="flex items-center gap-1.5 px-3 sm:px-4 py-1.5 sm:py-2 bg-white/90 hover:bg-white text-indigo-600 rounded-lg text-xs sm:text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-95"
-            // >
-            //   <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-            //   <span>Save All</span>
-            // </button>
           )}
 
           <button
@@ -2459,11 +2452,6 @@ const YPivotQATemplatesImageEditor = ({
                     ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-900"
                     : "opacity-70 hover:opacity-100"
                 } ${canvasDisabled ? "cursor-not-allowed opacity-50" : ""}`}
-                // className={`relative flex-shrink-0 cursor-pointer transition-all ${
-                //   idx === currentImageIndex
-                //     ? "ring-2 ring-indigo-500 ring-offset-2 ring-offset-gray-900"
-                //     : "opacity-70 hover:opacity-100"
-                // }`}
               >
                 <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-lg overflow-hidden bg-gray-800">
                   <img

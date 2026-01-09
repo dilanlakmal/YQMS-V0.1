@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor";
+import MultipleImageUpload from "./MultipleImageUpload"; // ✅ IMPORTED NEW COMPONENT
 import { usePhotoUpload } from "./PhotoUploadContext";
 
 // ==============================================================================
@@ -308,15 +309,113 @@ const YPivotQATemplatesPhotos = ({
     }
   };
 
+  // ✅ NEW HANDLER: Handle Batch Upload directly from MultipleImageUpload
+  const handleDirectBatchUpload = (sectionId, itemNo, newImages) => {
+    if (!newImages || newImages.length === 0) return;
+
+    const section = sections.find((s) => s._id === sectionId);
+    const sectionName = section?.sectionName || "Unknown";
+    const item = section?.itemList.find((i) => i.no === itemNo);
+    const itemName = item?.itemName || `Item ${itemNo}`;
+
+    // 1. Prepare Local State (With Blob URLs for immediate display)
+    let newCapturedImages = { ...capturedImages };
+    let finalImageListForUpload = [];
+    let nextIndex = getNextImageIndex(sectionId, itemNo);
+
+    // Get existing images for upload queue order
+    const imagesForItem = getImagesForItem(sectionId, itemNo);
+    imagesForItem.forEach(({ data }) => {
+      finalImageListForUpload.push({
+        id: data.id,
+        url: data.url,
+        file: null
+      });
+    });
+
+    // Append new images
+    newImages.forEach((img) => {
+      const key = `${sectionId}_${itemNo}_${nextIndex}`;
+
+      // Update Local State
+      newCapturedImages[key] = {
+        id: `${sectionId}_${itemNo}_${nextIndex}_${Date.now()}`,
+        url: img.imgSrc, // Blob URL
+        imgSrc: img.imgSrc,
+        history: []
+      };
+
+      // Add to Upload List (This is where context picks it up for compression)
+      finalImageListForUpload.push({
+        id: newCapturedImages[key].id,
+        url: img.imgSrc,
+        file: img.file // ✅ RAW FILE PASSED HERE
+      });
+
+      nextIndex++;
+    });
+
+    // Update React State
+    setCapturedImages(newCapturedImages);
+    updateParent({ capturedImages: newCapturedImages });
+
+    // Send to Upload Queue (Context handles compression)
+    if (reportId && finalImageListForUpload.length > 0) {
+      addToUploadQueue({
+        reportId,
+        sectionId,
+        sectionName,
+        itemNo: parseInt(itemNo),
+        itemName,
+        images: finalImageListForUpload,
+        remarks: remarks[`${sectionId}_${itemNo}`] || "",
+        // ✅ Callback to replace Blob URLs with Server URLs on success
+        onSuccess: (savedServerImages) => {
+          setCapturedImages((prev) => {
+            const updated = { ...prev };
+            let hasChanges = false;
+
+            savedServerImages.forEach((serverImg) => {
+              const stateKey = Object.keys(updated).find(
+                (key) => updated[key].id === serverImg.imageId
+              );
+
+              if (stateKey) {
+                let fullDisplayUrl = serverImg.imageURL;
+                if (
+                  fullDisplayUrl &&
+                  !fullDisplayUrl.startsWith("http") &&
+                  !fullDisplayUrl.startsWith("blob:")
+                ) {
+                  fullDisplayUrl = `${API_BASE_URL}${fullDisplayUrl}`;
+                }
+
+                updated[stateKey] = {
+                  ...updated[stateKey],
+                  url: fullDisplayUrl,
+                  imgSrc: fullDisplayUrl
+                };
+                hasChanges = true;
+              }
+            });
+
+            if (hasChanges) {
+              updateParent({ capturedImages: updated });
+              return updated;
+            }
+            return prev;
+          });
+        }
+      });
+    }
+  };
+
   const handleImageEditorClose = () => {
     const editedItem = lastEditedItemRef.current;
-
     setShowImageEditor(false);
     setCurrentEditContext(null);
 
-    // Restore scroll position after render
     requestAnimationFrame(() => {
-      // First, ensure the section is still expanded
       if (editedItem) {
         setExpandedSections((prev) => {
           const newSet = new Set(prev);
@@ -324,8 +423,6 @@ const YPivotQATemplatesPhotos = ({
           return newSet;
         });
       }
-
-      // Then restore scroll position
       setTimeout(() => {
         window.scrollTo({
           top: scrollPositionRef.current,
@@ -335,7 +432,7 @@ const YPivotQATemplatesPhotos = ({
     });
   };
 
-  // Handle multiple images save from editor
+  // Handle multiple images save from editor (Camera/Canvas mode)
   const handleImagesSave = async (savedImages) => {
     if (!currentEditContext || !savedImages || savedImages.length === 0) {
       handleImageEditorClose();
@@ -348,14 +445,9 @@ const YPivotQATemplatesPhotos = ({
     const item = section?.itemList.find((i) => i.no === itemNo);
     const itemName = item?.itemName || `Item ${itemNo}`;
 
-    // 1. Prepare data for LOCAL STATE (Visuals only, strings are fine here)
     let newCapturedImages = { ...capturedImages };
-
-    // 2. Prepare data for UPLOAD (Must contain binary FILES)
-    // We reconstruct the ENTIRE list for this item to ensure order is perfect
     const uploadList = [];
 
-    // Helper to get existing images for this item, excluding the one we are editing
     const existingItemImages = [];
     let idx = 0;
     while (idx < 20) {
@@ -369,21 +461,15 @@ const YPivotQATemplatesPhotos = ({
       idx++;
     }
 
-    // MERGE LOGIC: Combine existing + new/edited
     let finalImageListForUpload = [];
 
     if (isEditing) {
-      // EDIT MODE: Insert edited image at specific index, keep others
-      // We map over the 20 slots to rebuild the array in order
       for (let i = 0; i < 20; i++) {
         const key = `${sectionId}_${itemNo}_${i}`;
-
-        // If this is the index we edited
         if (i === imageIndex) {
           const editedImg = savedImages[0];
           const displayUrl = editedImg.editedImgSrc || editedImg.imgSrc;
 
-          // Update State
           newCapturedImages[key] = {
             id:
               newCapturedImages[key]?.id ||
@@ -393,25 +479,20 @@ const YPivotQATemplatesPhotos = ({
             history: editedImg.history || []
           };
 
-          // Add to Upload List (WITH FILE)
           finalImageListForUpload.push({
             id: newCapturedImages[key].id,
-            url: displayUrl, // Blob URL for preview
-            file: editedImg.file // ✅ CRITICAL: The binary blob
+            url: displayUrl,
+            file: editedImg.file
           });
-        }
-        // If this is an existing image
-        else if (newCapturedImages[key]) {
+        } else if (newCapturedImages[key]) {
           finalImageListForUpload.push({
             id: newCapturedImages[key].id,
             url: newCapturedImages[key].url,
-            file: null // No new file, just existing URL
+            file: null
           });
         }
       }
     } else {
-      // ADD MODE: Append new images to the end
-      // First, add existing images to the upload list
       existingItemImages.forEach((img) => {
         finalImageListForUpload.push({
           id: img.id,
@@ -420,14 +501,11 @@ const YPivotQATemplatesPhotos = ({
         });
       });
 
-      // Then append new images
       let nextIndex = getNextImageIndex(sectionId, itemNo);
-
       savedImages.forEach((img) => {
         const key = `${sectionId}_${itemNo}_${nextIndex}`;
         const displayUrl = img.editedImgSrc || img.imgSrc;
 
-        // Update State
         newCapturedImages[key] = {
           id: `${sectionId}_${itemNo}_${nextIndex}_${Date.now()}`,
           url: displayUrl,
@@ -435,23 +513,20 @@ const YPivotQATemplatesPhotos = ({
           history: img.history || []
         };
 
-        // Add to Upload List
         finalImageListForUpload.push({
           id: newCapturedImages[key].id,
           url: displayUrl,
-          file: img.file // ✅ CRITICAL: The binary blob
+          file: img.file
         });
 
         nextIndex++;
       });
     }
 
-    // Update React State (Visuals)
     setCapturedImages(newCapturedImages);
     updateParent({ capturedImages: newCapturedImages });
     handleImageEditorClose();
 
-    // Send to Upload Queue
     if (reportId && finalImageListForUpload.length > 0) {
       addToUploadQueue({
         reportId,
@@ -459,24 +534,18 @@ const YPivotQATemplatesPhotos = ({
         sectionName,
         itemNo: parseInt(itemNo),
         itemName,
-        images: finalImageListForUpload, // This array now definitely has .file properties
+        images: finalImageListForUpload,
         remarks: remarks[`${sectionId}_${itemNo}`] || "",
-        // ✅ NEW: Callback to update state with real URLs after upload
         onSuccess: (savedServerImages) => {
           setCapturedImages((prev) => {
             const updated = { ...prev };
             let hasChanges = false;
-
             savedServerImages.forEach((serverImg) => {
               const stateKey = Object.keys(updated).find(
                 (key) => updated[key].id === serverImg.imageId
               );
-
               if (stateKey) {
-                // 1. Construct the Full URL
                 let fullDisplayUrl = serverImg.imageURL;
-
-                // Only prepend if it's not already a full URL and not a blob
                 if (
                   fullDisplayUrl &&
                   !fullDisplayUrl.startsWith("http") &&
@@ -484,17 +553,14 @@ const YPivotQATemplatesPhotos = ({
                 ) {
                   fullDisplayUrl = `${API_BASE_URL}${fullDisplayUrl}`;
                 }
-
-                // 2. Update State
                 updated[stateKey] = {
                   ...updated[stateKey],
-                  url: fullDisplayUrl, // Used for logic/saving
-                  imgSrc: fullDisplayUrl // Used for display <img> tag
+                  url: fullDisplayUrl,
+                  imgSrc: fullDisplayUrl
                 };
                 hasChanges = true;
               }
             });
-
             if (hasChanges) {
               updateParent({ capturedImages: updated });
               return updated;
@@ -525,14 +591,12 @@ const YPivotQATemplatesPhotos = ({
       idx++;
     }
 
-    // Clean up old keys
     Object.keys(newImages).forEach((key) => {
       if (key.startsWith(`${sectionId}_${itemNo}_`)) {
         delete newImages[key];
       }
     });
 
-    // Re-index remaining
     remainingImages.forEach((img, i) => {
       newImages[`${sectionId}_${itemNo}_${i}`] = img;
     });
@@ -540,7 +604,6 @@ const YPivotQATemplatesPhotos = ({
     setCapturedImages(newImages);
     updateParent({ capturedImages: newImages });
 
-    // Delete from server (Direct Call - usually fast)
     if (reportId && imageId) {
       try {
         await axios.post(
@@ -565,7 +628,6 @@ const YPivotQATemplatesPhotos = ({
   };
 
   // --- Remark Handlers ---
-
   const openRemarkModal = (sectionId, itemNo, itemName) => {
     setRemarkModal({
       isOpen: true,
@@ -599,7 +661,6 @@ const YPivotQATemplatesPhotos = ({
               remarks: text
             }
           );
-          console.log("✅ Remark saved to server");
         } catch (error) {
           console.error("Failed to save remark:", error);
         }
@@ -619,7 +680,6 @@ const YPivotQATemplatesPhotos = ({
   };
 
   // --- Utilities ---
-
   const getImagesForItem = useMemo(() => {
     return (sectionId, itemNo) => {
       const images = [];
@@ -734,8 +794,6 @@ const YPivotQATemplatesPhotos = ({
                       const availableSlots = item.maxCount - images.length;
                       const remarkKey = `${section._id}_${item.no}`;
                       const currentRemark = remarks[remarkKey];
-
-                      // Check upload status from context
                       const statusKey = `${section._id}_${item.no}`;
                       const status = uploadStatus[statusKey];
 
@@ -744,7 +802,7 @@ const YPivotQATemplatesPhotos = ({
                           key={item.no}
                           className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-3 shadow-sm hover:shadow-md transition-shadow"
                         >
-                          {/* Sub-card Title + Remark Button */}
+                          {/* Sub-card Title + Remark */}
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-2 min-w-0 flex-1">
                               <span className="flex-shrink-0 w-6 h-6 flex items-center justify-center bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded text-xs font-bold">
@@ -803,9 +861,7 @@ const YPivotQATemplatesPhotos = ({
                             </span>
                           </div>
 
-                          {/* =========================================================
-                              PROGRESS INDICATOR
-                             ========================================================= */}
+                          {/* Progress Indicator */}
                           {status && (
                             <div className="mb-3 px-1 animate-fadeIn">
                               <div className="flex justify-between items-center text-[10px] text-gray-500 dark:text-gray-400 mb-1">
@@ -908,36 +964,61 @@ const YPivotQATemplatesPhotos = ({
                               </div>
                             ))}
 
+                            {/* ✅ MODIFIED ADD BUTTONS CONTAINER */}
                             {canAddMore && (
-                              <div className="flex-shrink-0 w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-900/30">
-                                <button
-                                  onClick={() =>
-                                    openImageEditorForNew(
-                                      "camera",
-                                      section._id,
-                                      item.no,
-                                      item.maxCount
-                                    )
-                                  }
-                                  className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-300 dark:border-gray-600"
-                                  title={`Take photos (${availableSlots} slots available)`}
-                                >
-                                  <Camera className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors" />
-                                </button>
-                                <button
-                                  onClick={() =>
-                                    openImageEditorForNew(
-                                      "upload",
-                                      section._id,
-                                      item.no,
-                                      item.maxCount
-                                    )
-                                  }
-                                  className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group"
-                                  title={`Upload images (${availableSlots} slots available)`}
-                                >
-                                  <Upload className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
-                                </button>
+                              <div className="flex-shrink-0 w-32 md:w-20 h-20 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg overflow-hidden hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors bg-gray-50 dark:bg-gray-900/30 flex md:flex-col">
+                                {/* LEFT SIDE (Mobile) / TOP SIDE (Desktop) - Contains Camera & Single Upload */}
+                                <div className="flex flex-col w-1/2 md:w-full h-full md:h-2/3 border-r md:border-r-0 md:border-b border-gray-300 dark:border-gray-600">
+                                  {/* 1. Camera Button */}
+                                  <button
+                                    onClick={() =>
+                                      openImageEditorForNew(
+                                        "camera",
+                                        section._id,
+                                        item.no,
+                                        item.maxCount
+                                      )
+                                    }
+                                    className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors group border-b border-gray-300 dark:border-gray-600"
+                                    title={`Take photos (${availableSlots} slots available)`}
+                                  >
+                                    <Camera className="w-4 h-4 text-gray-400 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors" />
+                                  </button>
+
+                                  {/* 2. Editor Upload Button */}
+                                  <button
+                                    onClick={() =>
+                                      openImageEditorForNew(
+                                        "upload",
+                                        section._id,
+                                        item.no,
+                                        item.maxCount
+                                      )
+                                    }
+                                    className="w-full h-1/2 flex flex-col items-center justify-center hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors group"
+                                    title={`Upload & Edit images (${availableSlots} slots available)`}
+                                  >
+                                    <Upload className="w-4 h-4 text-gray-400 group-hover:text-emerald-500 dark:group-hover:text-emerald-400 transition-colors" />
+                                  </button>
+                                </div>
+
+                                {/* RIGHT SIDE (Mobile) / BOTTOM SIDE (Desktop) - Contains Multi Upload */}
+                                <div className="w-1/2 md:w-full h-full md:h-1/3">
+                                  {/* 3. DIRECT BATCH UPLOAD BUTTON */}
+                                  <MultipleImageUpload
+                                    sectionId={section._id}
+                                    itemNo={item.no}
+                                    maxCount={item.maxCount}
+                                    currentCount={images.length}
+                                    onImagesSelected={(files) =>
+                                      handleDirectBatchUpload(
+                                        section._id,
+                                        item.no,
+                                        files
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
                             )}
 
@@ -953,7 +1034,6 @@ const YPivotQATemplatesPhotos = ({
                               )}
                           </div>
 
-                          {/* Multi-image hint for empty state */}
                           {images.length === 0 && (
                             <div className="mt-2 text-center">
                               <p className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center justify-center gap-1">
