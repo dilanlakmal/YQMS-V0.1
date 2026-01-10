@@ -1087,7 +1087,6 @@ export const validateDownloadParth = async (req, res) => {
             });
         }
 
-        // Check if path is valid and accessible
         try {
             const resolvedPath = path.resolve(downloadPath);
             
@@ -1109,11 +1108,16 @@ export const validateDownloadParth = async (req, res) => {
             });
 
         } catch (error) {
+            let errorMessage = 'Path is not accessible';
+            if (error.code === 'EPERM' || error.code === 'EACCES') {
+                errorMessage = 'Permission denied. Please choose a folder you have write access to.';
+            }
+            
             res.json({
                 success: true,
                 isValid: false,
                 path: downloadPath,
-                message: `Path is not accessible: ${error.message}`
+                message: errorMessage
             });
         }
 
