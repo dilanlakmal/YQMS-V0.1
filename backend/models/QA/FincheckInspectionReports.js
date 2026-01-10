@@ -450,13 +450,13 @@ const createFincheckInspectionReportsModel = (connection) => {
       empName: { type: String },
       measurementMethod: {
         type: String,
-        enum: ["Before", "After", "N/A"],
+        enum: ["Before", "After", "N/A", "No"],
         default: "N/A"
       },
       inspectionMethod: {
         type: String,
-        enum: ["Fixed", "AQL", "N/A"],
-        default: "N/A"
+        enum: ["Fixed", "AQL", "N/A", "No"],
+        default: "AQL"
       },
 
       // --- Report ID is a Number ---
