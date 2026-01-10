@@ -37,6 +37,29 @@ const parseGlossaryBlobName = (blobName) => {
   const ext = blobName.split('.').pop();
   const basename = blobName.replace(`.${ext}`, '');
 
+  const simpleParts = basename.split('-');
+
+  const hasTimestamp = /\d{4}-\d{2}-\d{2}/.test(basename);;
+
+  if(!hasTimestamp) {
+
+    const sourceLang = simpleParts[0];
+    const targetLang = simpleParts.slice(1).join('-');
+
+    if (sourceLang && targetLang) {
+      return {
+        sourceLang: sourceLang.toLowerCase(),
+        targetLang: targetLang.toLowerCase(),
+        timestamp: new Date().toISOString(),
+
+        uuid: 'latest',
+        format: ext,
+        originalName: blobName
+     
+      }
+    }
+  }
+
   // Regex to capture: sourceLang - targetLang(with optional -subtags) - timestamp - uuid
   const regex = /^([a-z]{2,})(?:-((?:[a-z0-9]{2,}(?:-[a-z0-9]+)*)))-(\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2})-([0-9a-f]{8})$/i;
   const match = basename.match(regex);
@@ -79,48 +102,54 @@ const parseGlossaryBlobName = (blobName) => {
  * @param {string} storageAccountKey - Storage account key
  * @returns {Promise<{blobName: string, lastModified: Date} | null>} - Found glossary or null
  */
-const findGlossaryByLanguagePair = async (sourceLanguage, targetLanguage, storageAccountName, storageAccountKey) => {
-  try {
-    // List all blobs in glossary container
-    const blobs = await listBlobsInContainer(
-      GLOSSARY_CONTAINER,
-      storageAccountName,
-      storageAccountKey
-    );
+const findGlossaryByLanguagePair = async (source, target) => {
 
-    // Parse metadata and filter by language pair
-    const matchingGlossaries = blobs
-      .map(blob => {
-        const metadata = parseGlossaryBlobName(blob.name);
-        if (!metadata) return null;
+   // Just generate the name and check existence
+    const name = generateGlossaryBlobName(source, target);
 
-        return {
-          blobName: blob.name,
-          sourceLanguage: metadata.sourceLang,
-          targetLanguage: metadata.targetLang,
-          lastModified: blob.lastModified
-        };
-      })
-      .filter(glossary => 
-        glossary &&
-        glossary.sourceLanguage.toLowerCase() === sourceLanguage.toLowerCase() &&
-        glossary.targetLanguage.toLowerCase() === targetLanguage.toLowerCase()
-      )
-      .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)); // Most recent first
+  // try {
+  //   // List all blobs in glossary container
+  //   const blobs = await listBlobsInContainer(
+  //     GLOSSARY_CONTAINER,
+  //     storageAccountName,
+  //     storageAccountKey
+  //   );
 
-    if (matchingGlossaries.length === 0) {
-      return null;
-    }
+  //   // Parse metadata and filter by language pair
+  //   const matchingGlossaries = blobs
+  //     .map(blob => {
+  //       const metadata = parseGlossaryBlobName(blob.name);
+  //       if (!metadata) return null;
 
-    // Return the most recent one
-    return {
-      blobName: matchingGlossaries[0].blobName,
-      lastModified: matchingGlossaries[0].lastModified
-    };
-  } catch (error) {
-    console.error("Error finding glossary by language pair:", error);
-    throw error;
-  }
+  //       return {
+  //         blobName: blob.name,
+  //         sourceLanguage: metadata.sourceLang,
+  //         targetLanguage: metadata.targetLang,
+  //         lastModified: blob.lastModified
+  //       };
+  //     })
+  //     .filter(glossary => 
+  //       glossary &&
+  //       glossary.sourceLanguage.toLowerCase() === sourceLanguage.toLowerCase() &&
+  //       glossary.targetLanguage.toLowerCase() === targetLanguage.toLowerCase()
+  //     )
+  //     .sort((a, b) => new Date(b.lastModified) - new Date(a.lastModified)); // Most recent first
+
+  //   if (matchingGlossaries.length === 0) {
+  //     return null;
+  //   }
+
+  //   // Return the most recent one
+  //   return {
+  //     blobName: matchingGlossaries[0].blobName,
+  //     lastModified: matchingGlossaries[0].lastModified
+  //   };
+  // } catch (error) {
+  //   console.error("Error finding glossary by language pair:", error);
+  //   throw error;
+  // }
+
+  return {blobName: name};
 };
 
 /**
@@ -764,32 +793,33 @@ export const addEntriesToGlossary = async (req, res) => {
         // Download existing glossary
         const existingBuffer = await readBlobContent(
           GLOSSARY_CONTAINER,
-          targetBlobName,
+          blobName,
           storageAccountName,
           storageAccountKey
         );
 
         // Parse existing TSV entries
         existingEntries = await parseGlossaryFile(existingBuffer, 'tsv');
-        console.log(`Found existing glossary with ${existingEntries.length} entries`);
+        console.log(`Found existing glossary ${blobName} with ${existingEntries.length} entries.Merging...`);
       } catch (error) {
-        console.error("Error reading existing glossary:", error);
+        // File doesn't exist yet, that's fine. We will create it.
+        console.log(`Creating new glossary master file: ${blobName}`);
         // If we can't read it, treat as new glossary
-        existingGlossary = null;
-        existingEntries = [];
+        // existingGlossary = null;
+        // existingEntries = [];
       }
     }
 
     // Expand new entries with case variations (includes plural forms)
-    const expandedNewEntries = expandEntriesWithCaseVariations(entries);
-    console.log(`Expanded ${entries.length} new entries to ${expandedNewEntries.length} entries with case variations and plural forms`);
+    const expandedNewEntries = expandEntriesWithCaseVariations(variations.entries);
+    // console.log(`Expanded ${entries.length} new entries to ${expandedNewEntries.length} entries with case variations and plural forms`);
 
     // Merge entries - ignore duplicates, just append all new entries
-    const mergedEntries = [...existingEntries, ...expandedNewEntries];
+    const AlldEntries = [...existingEntries, ...expandedNewEntries];
     const addedVariations = expandedNewEntries;
 
     // Convert merged entries to TSV
-    const tsvContent = mergedEntries
+    const tsvContent = AlldEntries
       .map(e => `${e.source}\t${e.target}`)
       .join('\n');
     const tsvBuffer = Buffer.from(tsvContent, 'utf-8');

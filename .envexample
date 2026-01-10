@@ -4,5 +4,44 @@ MongoDB_URI_ym_prod = mongodb://localhost:27017/
 
 MongoDB_URI_ym_eco_board = mongodb://localhost:27017/
 
+###############################################
+# Azure Translator (Fake Example Values)
+###############################################
+
+AZURE_TRANSLATOR_KEY="your-azure-translator-key"
+AZURE_TRANSLATOR_ENDPOINT="your-azure-translator-endpoint"
+AZURE_TRANSLATOR_REGION="your-azure-translator-region"
+
+AZURE_TRANSLATOR_KEY_FILE="your-azure-translator-key-file"
+AZURE_TRANSLATOR_ENDPOINT_FILE="your-azure-translator-endpoint-file"
+
+
+###############################################
+# Azure Blob Storage (Fake Example Values)
+###############################################
+
+AZURE_STORAGE_ACCOUNT_NAME="your-azure-storage-account-name"
+AZURE_STORAGE_ACCOUNT_KEY="your-azure-storage-account-key"
+
+AZURE_STORAGE_SOURCE_CONTAINER="your-azure-storage-source-container"
+SOURCE_BLOB_SAS_URL="your-azure-storage-source-blob-sas-url"
+
+AZURE_STORAGE_TARGET_CONTAINER="your-azure-storage-target-container"
+TARGET_BLOB_SAS_URL="your-azure-storage-target-blob-sas-url"
+
+# VITE_GEMINI_PUBLIC_KEY=AIzaSyBPCEj5aNwE5xPBhvldQG7yVSVZ8zg3cBw
+# VITE_IMAGE_KIT_ENDPOINT=https://ik.imagekit.io/gytoetw8d
+# VITE_IMAGE_KIT_PUBLIC_KEY=public_oFP6dIClvu3/ZlB7HEFqHNI7SHA=
+# VITE_IMAGE_KIT_PRIVATE_KEY=private_qfqi7EmiRRRX7VdQqS/9NYiO9nc=
+
+VITE_IMAGE_KIT_ENDPOINT=your-imagekit-endpoint
+VITE_IMAGE_KIT_PUBLIC_KEY=your-imagekit-public-key
+VITE_GEMINI_PUBLIC_KEY=your-gemini-public-key
+# VITE_API_BASE_URL=http://localhost:5001
+
+# IMAGEKIT_PUBLIC_KEY=public_oFP6dIClvu3/ZlB7HEFqHNI7SHA=
+IMAGEKIT_PRIVATE_KEY=your-imagekit-private-key
+# IMAGEKIT_ENDPOINT=https://ik.imagekit.io/gytoetw8d
+
 JWT_SECRET = xxxxxxxxx
 JWT_REFRESH_SECRET = xxxxxxxxx

@@ -3,7 +3,7 @@
  * Functions for validating, parsing, and processing glossary files
  */
 
-import { randomUUID } from "crypto";
+// import { randomUUID } from "crypto";
 
 /**
  * Detect glossary file format from file name extension
@@ -269,10 +269,10 @@ export const validateGlossaryFile = async (fileBuffer, fileName) => {
  * @returns {string} - Blob name: {sourceLang}-{targetLang}-{timestamp}-{uuid}.{ext}
  */
 export const generateGlossaryBlobName = (sourceLang, targetLang, format) => {
-  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // YYYY-MM-DDTHH-MM-SS
-  const uuid = randomUUID().slice(0, 8);
+  // const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5); // YYYY-MM-DDTHH-MM-SS
+  // const uuid = randomUUID().slice(0, 8);
   // Always use .tsv extension since Azure only supports TSV
-  return `${sourceLang}-${targetLang}-${timestamp}-${uuid}.tsv`;
+  return `${sourceLang.toLocaleLowerCase()}-${targetLang.toLocaleLowerCase()}.${format}`;
 };
 
 /**
