@@ -288,28 +288,36 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
     const { sectionId, isEditing, imageIndex } = currentEditContext;
     let newImages = { ...capturedImages };
 
-    if (isEditing && imageIndex !== undefined) {
-      // Editing single existing image
-      const img = savedImages[0];
-      const key = `${sectionId}_${imageIndex}`;
-      newImages[key] = {
-        url: img.editedImgSrc,
-        imgSrc: img.imgSrc,
+    // Helper to construct image object
+    const createImageData = (img) => {
+      // Logic: Use editedSrc if available, otherwise original imgSrc
+      // This prevents 'url' from being null
+      const finalUrl = img.editedImgSrc || img.imgSrc;
+
+      return {
+        id: img.id,
+        // CRITICAL FIX: Ensure url is never null. Wrapper needs this string.
+        url: finalUrl,
+        // CRITICAL FIX: Pass the File object so Wrapper doesn't need to fetch blob
+        file: img.file,
+        imgSrc: img.imgSrc, // Keep for editor re-entry
         history: img.history || []
       };
+    };
+
+    if (isEditing && imageIndex !== undefined) {
+      // Editing single existing image
+      const key = `${sectionId}_${imageIndex}`;
+      newImages[key] = createImageData(savedImages[0]);
     } else {
-      // Adding new images - fill consecutive slots
+      // Adding new images
       let nextIndex = getNextImageIndex(sectionId);
       const availableSlots = getAvailableSlots(sectionId);
       const imagesToAdd = savedImages.slice(0, availableSlots);
 
       imagesToAdd.forEach((img) => {
         const key = `${sectionId}_${nextIndex}`;
-        newImages[key] = {
-          url: img.editedImgSrc,
-          imgSrc: img.imgSrc,
-          history: img.history || []
-        };
+        newImages[key] = createImageData(img);
         nextIndex++;
       });
 

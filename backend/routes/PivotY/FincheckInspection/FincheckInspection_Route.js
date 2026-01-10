@@ -17,6 +17,7 @@ import {
   createInspectionReport,
   getInspectionReportById,
   checkExistingReport,
+  uploadHeaderImages,
   updateHeaderData,
   uploadPhotoBatch,
   deletePhotoFromItem,
@@ -114,6 +115,13 @@ router.get(
 router.post(
   "/api/fincheck-inspection/check-existing-report",
   checkExistingReport
+);
+
+// Save Header Images (Multipart)
+router.post(
+  "/api/fincheck-inspection/upload-header-images",
+  upload.array("images"),
+  uploadHeaderImages
 );
 
 // Save Header Data

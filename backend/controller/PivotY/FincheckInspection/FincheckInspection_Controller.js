@@ -1085,32 +1085,46 @@ if (!fs.existsSync(uploadDirHeader)) {
   fs.mkdirSync(uploadDirHeader, { recursive: true });
 }
 
-// Helper: Save Base64 Image to Disk
-const saveBase64Image = (base64String, reportId, sectionId, index) => {
+// ============================================================
+// Upload Header Images (Multipart/FormData)
+// ============================================================
+export const uploadHeaderImages = async (req, res) => {
   try {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    if (!req.files || req.files.length === 0) {
+      return res.status(200).json({ success: true, data: { paths: [] } });
+    }
 
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+    const savedPaths = [];
 
-    // Create unique filename
-    const filename = `header_${reportId}_${sectionId}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirHeader, filename);
+    for (const file of req.files) {
+      // Create a unique filename
+      const uniqueName = `header_img_${Date.now()}_${Math.round(
+        Math.random() * 1000
+      )}${path.extname(file.originalname)}`;
 
-    fs.writeFileSync(filepath, data);
+      const targetPath = path.join(uploadDirHeader, uniqueName);
 
-    // Return relative URL for frontend access
-    return `/storage/PivotY/Fincheck/HeaderData/${filename}`;
+      // Move file from temp to final folder
+      fs.renameSync(file.path, targetPath);
+
+      // Push relative path
+      savedPaths.push(`/storage/PivotY/Fincheck/HeaderData/${uniqueName}`);
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        paths: savedPaths
+      }
+    });
   } catch (error) {
-    console.error("Error saving base64 image:", error);
-    return null;
+    console.error("Header image upload error:", error);
+    return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
 // ============================================================
-// Update Header Data (Selections, Remarks, Images)
+// Update Header Data
 // ============================================================
 export const updateHeaderData = async (req, res) => {
   try {
@@ -1136,6 +1150,7 @@ export const updateHeaderData = async (req, res) => {
         .map((img, idx) => {
           let finalUrl = img.imageURL;
 
+          // Case 1: New Base64 (Legacy fallback)
           if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
             const savedPath = saveBase64Image(
               img.imgSrc,
@@ -1145,9 +1160,10 @@ export const updateHeaderData = async (req, res) => {
             );
             if (savedPath) finalUrl = savedPath;
           }
+          // Case 2: Already a server path (from uploadHeaderImages)
+          // We don't need to do anything, finalUrl is already set correctly by frontend
 
           return {
-            // FIX: Ensure imageId exists. Use provided ID or generate fallback.
             imageId:
               img.id ||
               img.imageId ||
@@ -1155,7 +1171,7 @@ export const updateHeaderData = async (req, res) => {
             imageURL: finalUrl
           };
         })
-        .filter((img) => img.imageURL);
+        .filter((img) => img.imageURL); // Filter out failed saves
 
       return {
         headerId: section.headerId,
@@ -1167,7 +1183,7 @@ export const updateHeaderData = async (req, res) => {
     });
 
     report.headerData = processedHeaderData;
-    await report.save(); // Mongoose validation will now pass because imageId is guaranteed
+    await report.save();
 
     return res.status(200).json({
       success: true,
@@ -1183,6 +1199,81 @@ export const updateHeaderData = async (req, res) => {
     });
   }
 };
+
+// ============================================================
+// Update Header Data (Selections, Remarks, Images)
+// ============================================================
+// export const updateHeaderData = async (req, res) => {
+//   try {
+//     const { reportId, headerData } = req.body;
+
+//     if (!reportId || !headerData || !Array.isArray(headerData)) {
+//       return res
+//         .status(400)
+//         .json({ success: false, message: "Invalid payload." });
+//     }
+
+//     const report = await FincheckInspectionReports.findOne({
+//       reportId: parseInt(reportId)
+//     });
+//     if (!report) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Report not found." });
+//     }
+
+//     const processedHeaderData = headerData.map((section) => {
+//       const processedImages = (section.images || [])
+//         .map((img, idx) => {
+//           let finalUrl = img.imageURL;
+
+//           if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
+//             const savedPath = saveBase64Image(
+//               img.imgSrc,
+//               reportId,
+//               section.headerId,
+//               idx
+//             );
+//             if (savedPath) finalUrl = savedPath;
+//           }
+
+//           return {
+//             // FIX: Ensure imageId exists. Use provided ID or generate fallback.
+//             imageId:
+//               img.id ||
+//               img.imageId ||
+//               `${section.headerId}_${idx}_${Date.now()}`,
+//             imageURL: finalUrl
+//           };
+//         })
+//         .filter((img) => img.imageURL);
+
+//       return {
+//         headerId: section.headerId,
+//         name: section.name,
+//         selectedOption: section.selectedOption,
+//         remarks: section.remarks,
+//         images: processedImages
+//       };
+//     });
+
+//     report.headerData = processedHeaderData;
+//     await report.save(); // Mongoose validation will now pass because imageId is guaranteed
+
+//     return res.status(200).json({
+//       success: true,
+//       message: "Header data saved successfully.",
+//       data: report.headerData
+//     });
+//   } catch (error) {
+//     console.error("Error updating header data:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Internal server error.",
+//       error: error.message
+//     });
+//   }
+// };
 
 // ============================================================
 // Update Photo Data (Images, Remarks)
