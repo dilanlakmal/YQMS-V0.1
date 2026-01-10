@@ -196,6 +196,57 @@ export const getDownloadStatusStats = async (req, res) => {
   }
 };
 
+// Language change function for Puppeteer
+const changeLanguage = async (page, language = 'english') => {
+    try {
+        
+        // Wait for page to load completely
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Try to find the specific language dropdown button
+        try {
+            await page.waitForSelector('#dropdownLanguage', { timeout: 5000 });
+          
+            
+            // Click the language dropdown
+            await page.click('#dropdownLanguage');
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Look for the requested language option in the dropdown
+            const languageOptions = await page.$$('a');
+            for (const option of languageOptions) {
+                try {
+                    const text = await page.evaluate(el => el.textContent?.trim(), option);
+                    const href = await page.evaluate(el => el.href, option);
+                    
+                    let isTargetLanguage = false;
+                    
+                    if (language === 'chinese') {
+                        isTargetLanguage = text && (text.includes('中文') || text.includes('Chinese') || text.includes('CN') || href?.includes('zh'));
+                    } else if (language === 'english') {
+                        isTargetLanguage = text && (text.includes('English') || text.includes('EN') || href?.includes('en'));
+                    }
+                    
+                    if (isTargetLanguage) {
+                        await option.click();
+                        await new Promise(resolve => setTimeout(resolve, 3000));
+                        return true;
+                    }
+                } catch (e) {
+                    // Skip this element
+                }
+            }
+        } catch (e) {
+            console.log('dropdownLanguage button not found, trying alternative methods');
+        }
+        
+        return false;
+    } catch (error) {
+        console.warn('Could not change language automatically:', error.message);
+        return false;
+    }
+};
+
 // Update download status in database
 const updateDownloadStatus = async (recordId, status, downloadedAt = null) => {
     try {
@@ -349,7 +400,7 @@ const renameDownloadedFiles = async (targetDownloadDir, newFiles, customFileName
 };
 
 // Single report download function (updated with status tracking and custom naming)
-const downloadSingleReport = async (page, inspectionNumber, targetDownloadDir, record, includeDownloaded = false) => {
+const downloadSingleReport = async (page, inspectionNumber, targetDownloadDir, record, includeDownloaded = false, language = 'english') => {
     try {
         const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
         
@@ -393,6 +444,17 @@ const downloadSingleReport = async (page, inspectionNumber, targetDownloadDir, r
 
         // Navigate to report
         await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        
+        // Change language if requested - do this BEFORE looking for print button
+        if (language !== 'english' || language === 'english') {
+            const languageChanged = await changeLanguage(page, language);
+            if (languageChanged) {
+                // Wait a bit more for page to fully reload in new language
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            } else {
+                console.warn(`Language change to ${language} failed for inspection ${inspectionNumber}, continuing with default`);
+            }
+        }
         
         // Wait for the print button to be available
         try {
@@ -497,7 +559,8 @@ export const downloadBulkReports = async (req, res) => {
             includeDownloaded = false,
             startDate,
             endDate,
-            factoryName
+            factoryName,
+            language = 'english'
         } = req.body;
         
         const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
@@ -595,8 +658,8 @@ export const downloadBulkReports = async (req, res) => {
             }
 
             try {
-                // Pass includeDownloaded parameter to downloadSingleReport
-                const result = await downloadSingleReport(page, inspectionNumber, targetDownloadDir, record, includeDownloaded);
+                // Pass includeDownloaded and language parameters to downloadSingleReport
+                const result = await downloadSingleReport(page, inspectionNumber, targetDownloadDir, record, includeDownloaded, language);
                 downloadResults.push(result);
 
                 if (result.success) {
@@ -838,7 +901,7 @@ export const checkBulkSpace = async (req, res) => {
 export const saveDownloadParth = async (req, res) => {
     let browser = null;
     try {
-        const { downloadPath } = req.body;
+        const { downloadPath, language = 'english' } = req.body;
         const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
         // Ensure download directory exists
@@ -903,6 +966,12 @@ export const saveDownloadParth = async (req, res) => {
         // Navigate to the default report (you might want to make this configurable)
         const defaultInspectionNumber = "1528972"; // You can make this dynamic
         await page.goto(`${CONFIG.BASE_REPORT_URL}${defaultInspectionNumber}`);
+        
+        // Change language if requested
+        if (language === 'chinese') {
+            await changeLanguage(page, language);
+        }
+        
         await page.waitForSelector('#page-wrapper a');
 
         // Click print button
