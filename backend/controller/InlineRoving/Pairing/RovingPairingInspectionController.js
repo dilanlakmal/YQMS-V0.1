@@ -1,13 +1,15 @@
 import {
   QCRovingPairing,                
 } from "../../MongoDB/dbConnectionController.js";
-import {
-   generateUniqueFilename,
-  saveCompressedImage } from "../../../Utils/imageCompression.js";
-import {
-  API_BASE_URL
-} from "../../../Config/appConfig.js";
+import fsPromises from "fs/promises";
+import path from "path";
+import { __backendDir } from "../../../Config/appConfig.js";
 
+function getServerBaseUrl(req) {
+  const protocol = req.protocol || "http";
+  const host = req.get("host") || "localhost:3000";
+  return `${protocol}://${host}`;
+}
 
 // Upload images for defects
 export const uploadParingimagers = async (req, res) => {
@@ -16,12 +18,18 @@ export const uploadParingimagers = async (req, res) => {
         return res.status(400).json({ success: false, message: 'No images provided' });
       }
   
+      const serverBaseUrl = getServerBaseUrl(req);
+      const uploadDir = path.join(__backendDir, "public", "storage", "roving_pairing", "defect");
+      await fsPromises.mkdir(uploadDir, { recursive: true });
+
       const uploadedImages = [];
       
       for (const file of req.files) {
-        const filename = generateUniqueFilename(file.originalname, 'defect');
-        const imagePath = await saveCompressedImage(file.buffer, filename, 'defect');
-        const imageUrl = `${API_BASE_URL}${imagePath}`;
+        const fileExtension = path.extname(file.originalname) || ".jpg";
+        const newFilename = `defect-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+        const fullFilePath = path.join(uploadDir, newFilename);
+        await fsPromises.writeFile(fullFilePath, file.buffer);
+        const imageUrl = `${serverBaseUrl}/storage/roving_pairing/defect/${newFilename}`;
         uploadedImages.push(imageUrl);
       }
   
@@ -39,12 +47,18 @@ export const uploadMeasurementImages = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No images provided' });
     }
 
+    const serverBaseUrl = getServerBaseUrl(req);
+    const uploadDir = path.join(__backendDir, "public", "storage", "roving_pairing", "measurement");
+    await fsPromises.mkdir(uploadDir, { recursive: true });
+
     const uploadedImages = [];
     
     for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'measurement');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'measurement');
-      const imageUrl = `${API_BASE_URL}${imagePath}`;
+      const fileExtension = path.extname(file.originalname) || ".jpg";
+      const newFilename = `measurement-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      await fsPromises.writeFile(fullFilePath, file.buffer);
+      const imageUrl = `${serverBaseUrl}/storage/roving_pairing/measurement/${newFilename}`;
       uploadedImages.push(imageUrl);
     }
 
@@ -62,12 +76,18 @@ export const uploadAccessoryImages = async (req, res) => {
       return res.status(400).json({ success: false, message: 'No images provided' });
     }
 
+    const serverBaseUrl = getServerBaseUrl(req);
+    const uploadDir = path.join(__backendDir, "public", "storage", "roving_pairing", "accessory");
+    await fsPromises.mkdir(uploadDir, { recursive: true });
+
     const uploadedImages = [];
     
     for (const file of req.files) {
-      const filename = generateUniqueFilename(file.originalname, 'accessory');
-      const imagePath = await saveCompressedImage(file.buffer, filename, 'accessory');
-      const imageUrl = `${API_BASE_URL}${imagePath}`;
+      const fileExtension = path.extname(file.originalname) || ".jpg";
+      const newFilename = `accessory-${Date.now()}-${Math.round(Math.random() * 1e9)}${fileExtension}`;
+      const fullFilePath = path.join(uploadDir, newFilename);
+      await fsPromises.writeFile(fullFilePath, file.buffer);
+      const imageUrl = `${serverBaseUrl}/storage/roving_pairing/accessory/${newFilename}`;
       uploadedImages.push(imageUrl);
     }
 
