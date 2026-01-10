@@ -186,7 +186,6 @@ export const saveRovingPairingData = async (req, res) => {
 
 export const saveQCRovingPairingData = async (req, res) => {
   try {
-    console.log('Received data:', JSON.stringify(req.body, null, 2));
     
     const {
       inspection_date,
@@ -221,7 +220,6 @@ export const saveQCRovingPairingData = async (req, res) => {
 
     // --- Find or Create Document ---
     let doc = await QCRovingPairing.findOne({ inspection_date, moNo, lineNo });
-    console.log('Found existing document:', !!doc);
 
     if (doc) {
       // Document exists, update it
@@ -236,8 +234,6 @@ export const saveQCRovingPairingData = async (req, res) => {
       }
 
       const savedDoc = await doc.save();
-      console.log('Document updated successfully, saved doc ID:', savedDoc._id);
-      console.log('PairingData length:', savedDoc.pairingData.length);
       
       res.status(200).json({
         success: true,
@@ -264,7 +260,6 @@ export const saveQCRovingPairingData = async (req, res) => {
       });
 
       const savedDoc = await newDoc.save();
-      console.log('New document created successfully');
       
       res.status(201).json({
         success: true,
