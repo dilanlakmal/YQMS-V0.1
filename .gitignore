@@ -50,3 +50,16 @@ public/storage/
 # Ignore the .env file inside the ai_service folder and the virtual environment.
 /ai_service/.env
 /ai_service/venv
+
+# Ignore the non-essential files in ai agent sections
+translatedocs.ipynb
+ai_agent_docs_guide/system_translation_docs.ipynb
+ai_agent_docs_guide/system_translation_docs.ipynb
+ai_agent_docs_guide/system_translation_docs.out
+ai_agent_docs_guide/system_translation_docs.pdf
+ai_agent_docs_guide/system_translation_docs.tex
+ai_agent_docs_guide/system_translation_docs.toc
+ai_agent_docs_guide/system_translation_docs.log
+ai_agent_docs_guide/system_translation_docs.aux
+ai_agent_docs_guide/company_logo.jpg
+ai_agent_docs_guide/Logo_team_yai.png
