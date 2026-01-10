@@ -16,7 +16,7 @@ const CONFIG = {
     DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
     TIMEOUT: 15000,
     DELAY_BETWEEN_DOWNLOADS: 3000,
-    HEADLESS: true // Always run headless - no GUI windows
+    // HEADLESS: true // Always run headless - no GUI windows
 };
 
 // Helper functions (keep existing ones)
@@ -595,22 +595,26 @@ export const downloadBulkReports = async (req, res) => {
         }
 
         // Launch browser for downloading
-        browser = await puppeteer.launch({
-            headless: CONFIG.HEADLESS,
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-extensions',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding'
-            ],
-            ignoreDefaultArgs: ['--disable-extensions'],
-            timeout: 60000
+        // browser = await puppeteer.launch({
+        //     headless: CONFIG.HEADLESS,
+        //     args: [
+        //         '--no-sandbox', 
+        //         '--disable-setuid-sandbox',
+        //         '--disable-dev-shm-usage',
+        //         '--disable-gpu',
+        //         '--no-first-run',
+        //         '--no-zygote',
+        //         '--disable-extensions',
+        //         '--disable-background-timer-throttling',
+        //         '--disable-backgrounding-occluded-windows',
+        //         '--disable-renderer-backgrounding'
+        //     ],
+        //     ignoreDefaultArgs: ['--disable-extensions'],
+        //     timeout: 60000
+        // });
+         const browser = await puppeteer.launch({
+            headless: false,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
      
 
@@ -909,22 +913,27 @@ export const saveDownloadParth = async (req, res) => {
             fs.mkdirSync(targetDownloadDir, { recursive: true });
         }
 
-        browser = await puppeteer.launch({
-            headless: CONFIG.HEADLESS,
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-extensions',
-                '--disable-background-timer-throttling',
-                '--disable-backgrounding-occluded-windows',
-                '--disable-renderer-backgrounding'
-            ],
-            ignoreDefaultArgs: ['--disable-extensions'],
-            timeout: 60000
+        // browser = await puppeteer.launch({
+        //     headless: CONFIG.HEADLESS,
+        //     args: [
+        //         '--no-sandbox', 
+        //         '--disable-setuid-sandbox',
+        //         '--disable-dev-shm-usage',
+        //         '--disable-gpu',
+        //         '--no-first-run',
+        //         '--no-zygote',
+        //         '--disable-extensions',
+        //         '--disable-background-timer-throttling',
+        //         '--disable-backgrounding-occluded-windows',
+        //         '--disable-renderer-backgrounding'
+        //     ],
+        //     ignoreDefaultArgs: ['--disable-extensions'],
+        //     timeout: 60000
+        // });
+
+        const browser = await puppeteer.launch({
+            headless: false,
+            args: ['--no-sandbox', '--disable-setuid-sandbox']
         });
         
         const page = await browser.newPage();
