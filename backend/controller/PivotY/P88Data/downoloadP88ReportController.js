@@ -4,18 +4,19 @@ import path from "path";
 import fs from "fs";
 import { promisify } from "util";
 import { execSync } from "child_process";
+import { exec } from "child_process";
 import { p88LegacyData } from "../../MongoDB/dbConnectionController.js";
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
-const isUbuntuServer = process.platform === "linux" && !process.env.DISPLAY;
 
 const CONFIG = {
   LOGIN_URL: "https://yw.pivot88.com/login",
   BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
   DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
   TIMEOUT: 15000,
-  DELAY_BETWEEN_DOWNLOADS: 3000
+  DELAY_BETWEEN_DOWNLOADS: 3000,
+  HEADLESS: true // Always run headless - no GUI windows
 };
 
 // Helper functions (keep existing ones)
@@ -189,6 +190,69 @@ export const getDownloadStatusStats = async (req, res) => {
       success: false,
       error: error.message
     });
+  }
+};
+
+// Language change function for Puppeteer
+const changeLanguage = async (page, language = "english") => {
+  try {
+    // Wait for page to load completely
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Try to find the specific language dropdown button
+    try {
+      await page.waitForSelector("#dropdownLanguage", { timeout: 5000 });
+
+      // Click the language dropdown
+      await page.click("#dropdownLanguage");
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Look for the requested language option in the dropdown
+      const languageOptions = await page.$$("a");
+      for (const option of languageOptions) {
+        try {
+          const text = await page.evaluate(
+            (el) => el.textContent?.trim(),
+            option
+          );
+          const href = await page.evaluate((el) => el.href, option);
+
+          let isTargetLanguage = false;
+
+          if (language === "chinese") {
+            isTargetLanguage =
+              text &&
+              (text.includes("中文") ||
+                text.includes("Chinese") ||
+                text.includes("CN") ||
+                href?.includes("zh"));
+          } else if (language === "english") {
+            isTargetLanguage =
+              text &&
+              (text.includes("English") ||
+                text.includes("EN") ||
+                href?.includes("en"));
+          }
+
+          if (isTargetLanguage) {
+            await option.click();
+            await new Promise((resolve) => setTimeout(resolve, 3000));
+            return true;
+          }
+        } catch (e) {
+          // Skip this element
+        }
+      }
+    } catch (e) {
+      console.log(
+        "dropdownLanguage button not found, trying alternative methods"
+      );
+    }
+
+    return false;
+  } catch (error) {
+    console.warn("Could not change language automatically:", error.message);
+    return false;
   }
 };
 
@@ -375,7 +439,8 @@ const downloadSingleReport = async (
   inspectionNumber,
   targetDownloadDir,
   record,
-  includeDownloaded = false
+  includeDownloaded = false,
+  language = "english"
 ) => {
   try {
     const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
@@ -419,6 +484,19 @@ const downloadSingleReport = async (
 
     // Navigate to report
     await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
+
+    // Change language if requested - do this BEFORE looking for print button
+    if (language !== "english" || language === "english") {
+      const languageChanged = await changeLanguage(page, language);
+      if (languageChanged) {
+        // Wait a bit more for page to fully reload in new language
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        console.warn(
+          `Language change to ${language} failed for inspection ${inspectionNumber}, continuing with default`
+        );
+      }
+    }
 
     // Wait for the print button to be available
     try {
@@ -523,6 +601,7 @@ const downloadSingleReport = async (
 
 // Main bulk download function (updated)
 export const downloadBulkReports = async (req, res) => {
+  let browser = null;
   try {
     const {
       downloadPath,
@@ -532,7 +611,8 @@ export const downloadBulkReports = async (req, res) => {
       includeDownloaded = false,
       startDate,
       endDate,
-      factoryName
+      factoryName,
+      language = "english"
     } = req.body;
 
     const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
@@ -567,27 +647,22 @@ export const downloadBulkReports = async (req, res) => {
     }
 
     // Launch browser for downloading
-    // const browser = await puppeteer.launch({
-    //     headless: false,
-    //     args: ['--no-sandbox', '--disable-setuid-sandbox']
-    // });
-    const browser = await puppeteer.launch({
-      headless: isUbuntuServer ? true : false, // Auto-detect: headless on Ubuntu server, GUI on Windows
-      executablePath: isUbuntuServer
-        ? "/usr/bin/google-chrome-stable"
-        : undefined,
+    browser = await puppeteer.launch({
+      headless: CONFIG.HEADLESS,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        ...(isUbuntuServer
-          ? [
-              "--disable-dev-shm-usage",
-              "--disable-gpu",
-              "--no-first-run",
-              "--disable-background-timer-throttling"
-            ]
-          : [])
-      ]
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-extensions",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding"
+      ],
+      ignoreDefaultArgs: ["--disable-extensions"],
+      timeout: 60000
     });
 
     const page = await browser.newPage();
@@ -633,13 +708,14 @@ export const downloadBulkReports = async (req, res) => {
       }
 
       try {
-        // Pass includeDownloaded parameter to downloadSingleReport
+        // Pass includeDownloaded and language parameters to downloadSingleReport
         const result = await downloadSingleReport(
           page,
           inspectionNumber,
           targetDownloadDir,
           record,
-          includeDownloaded
+          includeDownloaded,
+          language
         );
         downloadResults.push(result);
 
@@ -676,7 +752,9 @@ export const downloadBulkReports = async (req, res) => {
       }
     }
 
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
 
     const summaryMessage = includeDownloaded
       ? `Download completed: ${successfulDownloads} successful (${redownloadedCount} re-downloaded), ${failedDownloads} failed, ${skippedDownloads} skipped`
@@ -700,6 +778,16 @@ export const downloadBulkReports = async (req, res) => {
     });
   } catch (error) {
     console.error("Bulk download failed:", error);
+
+    // Ensure browser is closed on error
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error("Error closing browser:", closeError);
+      }
+    }
+
     res.status(500).json({
       success: false,
       error: error.message
@@ -871,8 +959,9 @@ export const checkBulkSpace = async (req, res) => {
 
 // Keep existing single download function
 export const saveDownloadParth = async (req, res) => {
+  let browser = null;
   try {
-    const { downloadPath } = req.body;
+    const { downloadPath, language = "english" } = req.body;
     const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
     // Ensure download directory exists
@@ -880,28 +969,22 @@ export const saveDownloadParth = async (req, res) => {
       fs.mkdirSync(targetDownloadDir, { recursive: true });
     }
 
-    // const browser = await puppeteer.launch({
-    //     headless: false,
-    //     args: ['--no-sandbox', '--disable-setuid-sandbox']
-    // });
-
-    const browser = await puppeteer.launch({
-      headless: isUbuntuServer ? true : false, // Auto-detect: headless on Ubuntu server, GUI on Windows
-      executablePath: isUbuntuServer
-        ? "/usr/bin/google-chrome-stable"
-        : undefined,
+    browser = await puppeteer.launch({
+      headless: CONFIG.HEADLESS,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        ...(isUbuntuServer
-          ? [
-              "--disable-dev-shm-usage",
-              "--disable-gpu",
-              "--no-first-run",
-              "--disable-background-timer-throttling"
-            ]
-          : [])
-      ]
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-first-run",
+        "--no-zygote",
+        "--disable-extensions",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-renderer-backgrounding"
+      ],
+      ignoreDefaultArgs: ["--disable-extensions"],
+      timeout: 60000
     });
 
     const page = await browser.newPage();
@@ -943,6 +1026,12 @@ export const saveDownloadParth = async (req, res) => {
     // Navigate to the default report (you might want to make this configurable)
     const defaultInspectionNumber = "1528972"; // You can make this dynamic
     await page.goto(`${CONFIG.BASE_REPORT_URL}${defaultInspectionNumber}`);
+
+    // Change language if requested
+    if (language === "chinese") {
+      await changeLanguage(page, language);
+    }
+
     await page.waitForSelector("#page-wrapper a");
 
     // Click print button
@@ -951,7 +1040,9 @@ export const saveDownloadParth = async (req, res) => {
     // Wait for download to complete - increased wait time
     await new Promise((resolve) => setTimeout(resolve, 8000));
 
-    await browser.close();
+    if (browser) {
+      await browser.close();
+    }
 
     // Get final file list and identify new files
     const finalFiles = await getFileList();
@@ -991,6 +1082,16 @@ export const saveDownloadParth = async (req, res) => {
     });
   } catch (error) {
     console.error("Scraping failed:", error);
+
+    // Ensure browser is closed on error
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error("Error closing browser:", closeError);
+      }
+    }
+
     res.status(500).json({
       success: false,
       error: error.message
@@ -1097,6 +1198,50 @@ export const getFactories = async (req, res) => {
     });
   } catch (error) {
     console.error("Error getting factories:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Open download folder in system file explorer
+export const openDownloadFolder = async (req, res) => {
+  try {
+    const { downloadPath } = req.body;
+    const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+
+    // Ensure directory exists
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    let command;
+    if (process.platform === "win32") {
+      command = `explorer "${targetDir}"`;
+    } else if (process.platform === "darwin") {
+      command = `open "${targetDir}"`;
+    } else {
+      command = `xdg-open "${targetDir}"`;
+    }
+
+    exec(command, (error) => {
+      if (error) {
+        console.error("Error opening folder:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to open download folder"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Download folder opened successfully",
+        path: targetDir
+      });
+    });
+  } catch (error) {
+    console.error("Error opening download folder:", error);
     res.status(500).json({
       success: false,
       error: error.message

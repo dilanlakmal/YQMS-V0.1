@@ -21,6 +21,7 @@ const PrintP88Report = () => {
   const [factoryName, setFactoryName] = useState("");
   const [factories, setFactories] = useState([]);
   const [dateFilteredStats, setDateFilteredStats] = useState(null);
+  const [language, setLanguage] = useState("english");
 
   // Fetch available factories on component mount
   useEffect(() => {
@@ -265,7 +266,8 @@ const PrintP88Report = () => {
         startDate: startDate,
         endDate: endDate,
         factoryName: factoryName || null,
-        includeDownloaded: includeDownloaded
+        includeDownloaded: includeDownloaded,
+        language: language
       };
 
       const response = await fetch(`${apiBaseUrl}/api/scraping/${endpoint}`, {
@@ -378,7 +380,7 @@ const PrintP88Report = () => {
                 <span>Filter Criteria</span>
               </h3>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {/* Start Date */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -410,19 +412,34 @@ const PrintP88Report = () => {
                 {/* Factory Selection */}
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                    🏭 Factory Name (Optional)
+                    🏭 Suplier Name (Optional)
                   </label>
                   <select
                     value={factoryName}
                     onChange={(e) => setFactoryName(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
-                    <option value="">All Factories</option>
+                    <option value="">All Suppliers</option>
                     {factories.map((factory, index) => (
                       <option key={index} value={factory}>
                         {factory}
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                {/* Language Selection */}
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                    🌐 Report Language
+                  </label>
+                  <select
+                    value={language}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="english">🇺🇸 English</option>
+                    <option value="chinese">🇨🇳 中文 (Chinese)</option>
                   </select>
                 </div>
               </div>
@@ -1050,6 +1067,14 @@ const PrintP88Report = () => {
                     </div>
                   </div>
                   <div>
+                    <span className="font-medium text-gray-700">Language:</span>
+                    <div className="text-blue-600 font-medium">
+                      {language === "chinese"
+                        ? "🇨🇳 中文 (Chinese)"
+                        : "🇺🇸 English"}
+                    </div>
+                  </div>
+                  <div>
                     <span className="font-medium text-gray-700">Mode:</span>
                     <div className="text-blue-600 font-medium">
                       {downloadMode === "range"
@@ -1058,7 +1083,7 @@ const PrintP88Report = () => {
                     </div>
                   </div>
                   {spaceInfo?.recordCount && (
-                    <div>
+                    <div className="col-span-2">
                       <span className="font-medium text-gray-700">
                         Reports to Download:
                       </span>
