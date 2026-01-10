@@ -245,6 +245,43 @@ const YPivotQAInspectionConfigSave = ({
     saveToBackend(updatedGroups, true);
   };
 
+  // ✅ Handle Clear All Backend Call
+  const handleClearAllConfig = async () => {
+    if (!reportId) return;
+
+    setSaving(true);
+    try {
+      const res = await axios.post(
+        `${API_BASE_URL}/api/fincheck-inspection/clear-inspection-config`,
+        { reportId }
+      );
+
+      if (res.data.success) {
+        // Update local state to empty
+        onUpdate({ lineTableConfig: [] }, { isFromBackend: true });
+
+        // Show success modal
+        setStatusModal({
+          isOpen: true,
+          type: "success",
+          message: "All configurations removed successfully!"
+        });
+
+        // Update UI mode
+        setIsUpdateMode(false); // Reset to not saved/empty state if you prefer
+      }
+    } catch (error) {
+      console.error("Clear error:", error);
+      setStatusModal({
+        isOpen: true,
+        type: "error",
+        message: "Failed to clear configuration."
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loadingData) {
     return (
       <div className="flex flex-col justify-center items-center h-64 gap-3">
@@ -281,6 +318,7 @@ const YPivotQAInspectionConfigSave = ({
         onSetActiveGroup={onSetActiveGroup}
         activeGroup={activeGroup}
         onSaveWithData={handleImmediateSave}
+        onClearAll={handleClearAllConfig}
         lockTrigger={lockTrigger}
       />
 

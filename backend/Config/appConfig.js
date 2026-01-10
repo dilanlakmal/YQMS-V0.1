@@ -23,7 +23,7 @@ export const __backendDir = path.resolve(__dirname, '..');
 
 
 export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://192.167.12.85:5000";
+  process.env.API_BASE_URL;
 
 const options = {
   key: fs.readFileSync(path.resolve(path.dirname(__filename), '192.167.12.85-key.pem')),
