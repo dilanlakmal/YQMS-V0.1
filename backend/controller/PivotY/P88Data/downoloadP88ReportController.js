@@ -4,18 +4,19 @@ import path from 'path';
 import fs from 'fs';
 import { promisify } from 'util';
 import { execSync } from 'child_process';
+import { exec } from 'child_process';
 import { p88LegacyData } from '../../MongoDB/dbConnectionController.js'; 
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
-const isUbuntuServer = process.platform === 'linux' && !process.env.DISPLAY;
 
 const CONFIG = {
     LOGIN_URL: "https://yw.pivot88.com/login",
     BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
     DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
     TIMEOUT: 15000,
-    DELAY_BETWEEN_DOWNLOADS: 3000 
+    DELAY_BETWEEN_DOWNLOADS: 3000,
+    HEADLESS: true // Always run headless - no GUI windows
 };
 
 // Helper functions (keep existing ones)
@@ -486,6 +487,7 @@ const downloadSingleReport = async (page, inspectionNumber, targetDownloadDir, r
 
 // Main bulk download function (updated)
 export const downloadBulkReports = async (req, res) => {
+    let browser = null;
     try {
         const { 
             downloadPath, 
@@ -530,24 +532,24 @@ export const downloadBulkReports = async (req, res) => {
         }
 
         // Launch browser for downloading
-        // const browser = await puppeteer.launch({
-        //     headless: false,
-        //     args: ['--no-sandbox', '--disable-setuid-sandbox']
-        // });
-        const browser = await puppeteer.launch({
-            headless: isUbuntuServer ? true : false, // Auto-detect: headless on Ubuntu server, GUI on Windows
-            executablePath: isUbuntuServer ? '/usr/bin/google-chrome-stable' : undefined,
+        browser = await puppeteer.launch({
+            headless: CONFIG.HEADLESS,
             args: [
-                '--no-sandbox',
+                '--no-sandbox', 
                 '--disable-setuid-sandbox',
-                ...(isUbuntuServer ? [
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--no-first-run',
-                    '--disable-background-timer-throttling'
-                ] : [])
-            ]
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-extensions',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
+            ],
+            ignoreDefaultArgs: ['--disable-extensions'],
+            timeout: 60000
         });
+     
 
         const page = await browser.newPage();
 
@@ -630,7 +632,9 @@ export const downloadBulkReports = async (req, res) => {
             }
         }
 
-        await browser.close();
+        if (browser) {
+            await browser.close();
+        }
 
         const summaryMessage = includeDownloaded 
             ? `Download completed: ${successfulDownloads} successful (${redownloadedCount} re-downloaded), ${failedDownloads} failed, ${skippedDownloads} skipped`
@@ -656,6 +660,16 @@ export const downloadBulkReports = async (req, res) => {
 
     } catch (error) {
         console.error('Bulk download failed:', error);
+        
+        // Ensure browser is closed on error
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('Error closing browser:', closeError);
+            }
+        }
+        
         res.status(500).json({
             success: false,
             error: error.message
@@ -822,6 +836,7 @@ export const checkBulkSpace = async (req, res) => {
 
 // Keep existing single download function
 export const saveDownloadParth = async (req, res) => {
+    let browser = null;
     try {
         const { downloadPath } = req.body;
         const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
@@ -831,26 +846,24 @@ export const saveDownloadParth = async (req, res) => {
             fs.mkdirSync(targetDownloadDir, { recursive: true });
         }
 
-        // const browser = await puppeteer.launch({
-        //     headless: false,
-        //     args: ['--no-sandbox', '--disable-setuid-sandbox']
-        // });
-
-        const browser = await puppeteer.launch({
-            headless: isUbuntuServer ? true : false, // Auto-detect: headless on Ubuntu server, GUI on Windows
-            executablePath: isUbuntuServer ? '/usr/bin/google-chrome-stable' : undefined,
+        browser = await puppeteer.launch({
+            headless: CONFIG.HEADLESS,
             args: [
-                '--no-sandbox',
+                '--no-sandbox', 
                 '--disable-setuid-sandbox',
-                ...(isUbuntuServer ? [
-                    '--disable-dev-shm-usage',
-                    '--disable-gpu',
-                    '--no-first-run',
-                    '--disable-background-timer-throttling'
-                ] : [])
-            ]
+                '--disable-dev-shm-usage',
+                '--disable-gpu',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-extensions',
+                '--disable-background-timer-throttling',
+                '--disable-backgrounding-occluded-windows',
+                '--disable-renderer-backgrounding'
+            ],
+            ignoreDefaultArgs: ['--disable-extensions'],
+            timeout: 60000
         });
-
+        
         const page = await browser.newPage();
 
         // Set download behavior
@@ -898,7 +911,9 @@ export const saveDownloadParth = async (req, res) => {
         // Wait for download to complete - increased wait time
         await new Promise(resolve => setTimeout(resolve, 8000));
 
-        await browser.close();
+        if (browser) {
+            await browser.close();
+        }
 
         // Get final file list and identify new files
         const finalFiles = await getFileList();
@@ -937,6 +952,16 @@ export const saveDownloadParth = async (req, res) => {
 
     } catch (error) {
         console.error('Scraping failed:', error);
+        
+        // Ensure browser is closed on error
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('Error closing browser:', closeError);
+            }
+        }
+        
         res.status(500).json({
             success: false,
             error: error.message
@@ -1043,6 +1068,51 @@ export const getFactories = async (req, res) => {
         });
     } catch (error) {
         console.error('Error getting factories:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+// Open download folder in system file explorer
+export const openDownloadFolder = async (req, res) => {
+    try {
+        const { downloadPath } = req.body;
+        const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        
+        // Ensure directory exists
+        if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+        }
+        
+        let command;
+        if (process.platform === 'win32') {
+            command = `explorer "${targetDir}"`;
+        } else if (process.platform === 'darwin') {
+            command = `open "${targetDir}"`;
+        } else {
+            command = `xdg-open "${targetDir}"`;
+        }
+        
+        exec(command, (error) => {
+            if (error) {
+                console.error('Error opening folder:', error);
+                return res.status(500).json({
+                    success: false,
+                    error: 'Failed to open download folder'
+                });
+            }
+            
+            res.json({
+                success: true,
+                message: 'Download folder opened successfully',
+                path: targetDir
+            });
+        });
+        
+    } catch (error) {
+        console.error('Error opening download folder:', error);
         res.status(500).json({
             success: false,
             error: error.message
