@@ -27,5 +27,4 @@ router.post('/api/scraping/initialize-download-status', initializeDownloadStatus
 router.get('/api/scraping/download-status-stats', getDownloadStatusStats);
 router.post('/api/scraping/reset-download-status', resetDownloadStatus);
 
-
 export default router;
