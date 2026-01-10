@@ -19,7 +19,8 @@ import {
   Shield,
   Sun,
   Moon,
-  ClipboardList
+  ClipboardList,
+  MessageSquareMore
 } from "lucide-react";
 
 // --- Theme Hook for Dark Mode ---
@@ -529,6 +530,22 @@ function Home() {
             version: "0"
           }
         ]
+      },
+      {
+        id: "feedback",
+        title: "Feedback",
+        icon: <MessageSquareMore className="w-5 h-5 mr-2" />,
+        bgColor: "bg-lime-50/80 dark:bg-lime-900/40",
+        items: [
+          {
+            path: "/FEEDBACK",
+            roles: [""],
+            image: "assets/Home/Feedback.png",
+            title: "Feedback",
+            description: "Give the Feedback",
+            version: "0"
+          }
+        ]
       }
     ],
     [t]
@@ -687,7 +704,7 @@ function Home() {
       {/* <div className="relative z-10 min-h-screen"> */}
        <div className="min-h-screen bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200">
         {/* <header className="fixed top-16 w-full z-40 bg-white/60 dark:bg-slate-900/90 backdrop-blur-sm shadow-sm"> */}
-         <header className="sticky top-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-sm">
+         <header className="fixed top-16 w-full z-40 bg-white/60  backdrop-blur-sm shadow-sm">
           <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
               <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto">

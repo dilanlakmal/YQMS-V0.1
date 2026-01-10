@@ -113,6 +113,8 @@ import createHumidityFiberNameModel from "../../models/HumidityFiberName.js";
 //Humidity Models
 import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
+import feedbackModel from "../../models/Feedback/Feedback.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
   // process.env.MongoDB_URI_ym_prod
@@ -267,6 +269,8 @@ export const p88LegacyData = createP88DataSchema(ymProdConnection);
 
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
+
+export const Feedback = feedbackModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

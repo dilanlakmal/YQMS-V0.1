@@ -855,6 +855,14 @@ const YPivotQAReportFullView = () => {
     return "PASS";
   }, [measurementResult.result, defectResult]);
 
+  // const inspectionFactory = useMemo(() => {
+  //   const d = report?.inspectionDetails || {};
+  //   if (d.isSubCon) {
+  //     return d.subConFactory || d.factory || "Unknown";
+  //   }
+  //   return d.factory || "N/A";
+  // }, [report]);
+
   // Scope columns for config table
   const scopeColumns = useMemo(() => {
     if (!selectedTemplate) return [];
@@ -1176,7 +1184,7 @@ const YPivotQAReportFullView = () => {
                   </div>
 
                   {/* The 4 Info Cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                     {/* Card 1: Report ID */}
                     <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30">
                       <p className="text-[10px] text-indigo-500 uppercase font-bold mb-1">
@@ -1223,6 +1231,16 @@ const YPivotQAReportFullView = () => {
                       </p>
                       <p className="text-sm font-black text-purple-700 dark:text-purple-300 truncate">
                         {determinedBuyer}
+                      </p>
+                    </div>
+
+                    {/* Card 5: Factory */}
+                    <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30">
+                      <p className="text-[10px] text-emerald-500 uppercase font-bold mb-1">
+                        Factory
+                      </p>
+                      <p className="text-sm font-black text-emerald-700 dark:text-emerald-300 truncate">
+                        {inspectionFactory}
                       </p>
                     </div>
                   </div>

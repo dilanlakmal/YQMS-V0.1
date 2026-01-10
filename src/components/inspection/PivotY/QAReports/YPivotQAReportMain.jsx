@@ -620,7 +620,8 @@ const YPivotQAReportMain = () => {
                       {/* Factory */}
                       <td className="px-6 py-4 text-gray-600 dark:text-gray-300 text-xs">
                         {isSubCon
-                          ? details.subConFactory || "Unknown"
+                        ? details.subConFactory || "Unknown"
+                          // ? details.subConFactory || details.factory || "Unknown"
                           : details.factory || "N/A"}
                       </td>
 

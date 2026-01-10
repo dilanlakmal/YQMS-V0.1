@@ -285,6 +285,12 @@ import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes
   Humidity
 ------------------------------ */
 import huminityRoutes from "./routes/huminity/huminityRoutes.js";
+
+/* -----------------------------
+  Feedback
+------------------------------ */
+import Feedback from "./routes/Feedback/FeedbackRoutes.js";
+
 /* -----------------------------
    SQL Query Import
 ------------------------------ */
@@ -591,6 +597,11 @@ app.use(ceTargetMasterRoutes);
  Humidity Imports
 ------------------------------ */
 app.use(huminityRoutes);
+
+/* -----------------------------
+ Humidity Imports
+------------------------------ */
+app.use(Feedback);
 
 // process.on("SIGINT", async () => {
 //   try {
