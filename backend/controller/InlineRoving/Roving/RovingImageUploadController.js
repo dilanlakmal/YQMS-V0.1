@@ -4,7 +4,7 @@ import multer from "multer";
 import sharp from "sharp";
 import path from "path";
 import { fileURLToPath } from "url";
-import { API_BASE_URL } from "../../../../config.js";
+import { API_BASE_URL } from "../../../Config/appConfig.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __backendDir = path.dirname(__filename);
