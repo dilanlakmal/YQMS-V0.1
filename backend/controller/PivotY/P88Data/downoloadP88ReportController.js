@@ -8,6 +8,7 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
+const isUbuntuServer = process.platform === 'linux' && !process.env.DISPLAY;
 
 const CONFIG = {
     LOGIN_URL: "https://yw.pivot88.com/login",
@@ -529,9 +530,23 @@ export const downloadBulkReports = async (req, res) => {
         }
 
         // Launch browser for downloading
+        // const browser = await puppeteer.launch({
+        //     headless: false,
+        //     args: ['--no-sandbox', '--disable-setuid-sandbox']
+        // });
         const browser = await puppeteer.launch({
-            headless: false,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: isUbuntuServer ? true : false, // Auto-detect: headless on Ubuntu server, GUI on Windows
+            executablePath: isUbuntuServer ? '/usr/bin/google-chrome-stable' : undefined,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                ...(isUbuntuServer ? [
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--disable-background-timer-throttling'
+                ] : [])
+            ]
         });
 
         const page = await browser.newPage();
@@ -816,9 +831,24 @@ export const saveDownloadParth = async (req, res) => {
             fs.mkdirSync(targetDownloadDir, { recursive: true });
         }
 
+        // const browser = await puppeteer.launch({
+        //     headless: false,
+        //     args: ['--no-sandbox', '--disable-setuid-sandbox']
+        // });
+
         const browser = await puppeteer.launch({
-            headless: false,
-            args: ['--no-sandbox', '--disable-setuid-sandbox']
+            headless: isUbuntuServer ? true : false, // Auto-detect: headless on Ubuntu server, GUI on Windows
+            executablePath: isUbuntuServer ? '/usr/bin/google-chrome-stable' : undefined,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                ...(isUbuntuServer ? [
+                    '--disable-dev-shm-usage',
+                    '--disable-gpu',
+                    '--no-first-run',
+                    '--disable-background-timer-throttling'
+                ] : [])
+            ]
         });
 
         const page = await browser.newPage();
