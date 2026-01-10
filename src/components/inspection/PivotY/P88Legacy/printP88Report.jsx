@@ -28,7 +28,6 @@ const PrintP88Report = () => {
     getRecordStats();
   }, [includeDownloaded]);
 
-  // Update stats when date range or factory changes
   useEffect(() => {
     if (startDate && endDate) {
       getDateFilteredStats();

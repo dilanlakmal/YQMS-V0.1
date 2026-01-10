@@ -434,6 +434,7 @@ const YPivotQATemplatesPhotos = ({
 
   // Handle multiple images save from editor (Camera/Canvas mode)
   const handleImagesSave = async (savedImages) => {
+    // 1. Safety Check
     if (!currentEditContext || !savedImages || savedImages.length === 0) {
       handleImageEditorClose();
       return;
@@ -445,29 +446,64 @@ const YPivotQATemplatesPhotos = ({
     const item = section?.itemList.find((i) => i.no === itemNo);
     const itemName = item?.itemName || `Item ${itemNo}`;
 
+    // 2. Ensure every image has a valid 'file' object
+    // If 'file' is missing but we have a blob URL, fetch it to create the file.
+    const processedSavedImages = await Promise.all(
+      savedImages.map(async (img) => {
+        // If file exists, return as is
+        if (img.file) return img;
+
+        // If no file, but we have a Blob URL (common in first-time camera captures)
+        const src = img.editedImgSrc || img.imgSrc;
+        if (src && src.startsWith("blob:")) {
+          try {
+            const response = await fetch(src);
+            const blob = await response.blob();
+            const rebuiltFile = new File([blob], `captured_${Date.now()}.jpg`, {
+              type: blob.type || "image/jpeg"
+            });
+            return { ...img, file: rebuiltFile };
+          } catch (error) {
+            console.error("Error recovering file from blob:", error);
+            return img;
+          }
+        }
+        return img;
+      })
+    );
+
     let newCapturedImages = { ...capturedImages };
     const uploadList = [];
 
+    // 3. Prepare Upload List
+    let finalImageListForUpload = [];
+
+    // A. Add existing images (that are not being edited)
     const existingItemImages = [];
     let idx = 0;
     while (idx < 20) {
       const key = `${sectionId}_${itemNo}_${idx}`;
       if (newCapturedImages[key] && (!isEditing || idx !== imageIndex)) {
+        // Push to local state helper
         existingItemImages.push({
           ...newCapturedImages[key],
           originalIndex: idx
+        });
+        // Push to upload queue (file: null tells context it's an existing server image)
+        finalImageListForUpload.push({
+          id: newCapturedImages[key].id,
+          url: newCapturedImages[key].url,
+          file: null
         });
       }
       idx++;
     }
 
-    let finalImageListForUpload = [];
-
     if (isEditing) {
       for (let i = 0; i < 20; i++) {
         const key = `${sectionId}_${itemNo}_${i}`;
         if (i === imageIndex) {
-          const editedImg = savedImages[0];
+          const editedImg = processedSavedImages[0]; // Use processed image
           const displayUrl = editedImg.editedImgSrc || editedImg.imgSrc;
 
           newCapturedImages[key] = {
@@ -479,10 +515,11 @@ const YPivotQATemplatesPhotos = ({
             history: editedImg.history || []
           };
 
+          // Add to upload list
           finalImageListForUpload.push({
             id: newCapturedImages[key].id,
             url: displayUrl,
-            file: editedImg.file
+            file: editedImg.file // ✅ Guaranteed to exist now
           });
         } else if (newCapturedImages[key]) {
           finalImageListForUpload.push({
@@ -493,16 +530,10 @@ const YPivotQATemplatesPhotos = ({
         }
       }
     } else {
-      existingItemImages.forEach((img) => {
-        finalImageListForUpload.push({
-          id: img.id,
-          url: img.url,
-          file: null
-        });
-      });
-
+      // C. Process NEW Additions
       let nextIndex = getNextImageIndex(sectionId, itemNo);
-      savedImages.forEach((img) => {
+
+      processedSavedImages.forEach((img) => {
         const key = `${sectionId}_${itemNo}_${nextIndex}`;
         const displayUrl = img.editedImgSrc || img.imgSrc;
 
@@ -516,7 +547,7 @@ const YPivotQATemplatesPhotos = ({
         finalImageListForUpload.push({
           id: newCapturedImages[key].id,
           url: displayUrl,
-          file: img.file
+          file: img.file // ✅ Guaranteed to exist now
         });
 
         nextIndex++;
@@ -527,9 +558,11 @@ const YPivotQATemplatesPhotos = ({
     updateParent({ capturedImages: newCapturedImages });
     handleImageEditorClose();
 
-    if (reportId && finalImageListForUpload.length > 0) {
+    // 5. ✅ FIX: Ensure we have a ReportID (Fallback to reportData if prop is lagging)
+    const activeReportId = reportId || reportData?.reportId;
+    if (activeReportId && finalImageListForUpload.length > 0) {
       addToUploadQueue({
-        reportId,
+        reportId: activeReportId,
         sectionId,
         sectionName,
         itemNo: parseInt(itemNo),
@@ -537,6 +570,7 @@ const YPivotQATemplatesPhotos = ({
         images: finalImageListForUpload,
         remarks: remarks[`${sectionId}_${itemNo}`] || "",
         onSuccess: (savedServerImages) => {
+          // ... (Existing onSuccess logic) ...
           setCapturedImages((prev) => {
             const updated = { ...prev };
             let hasChanges = false;
@@ -569,6 +603,9 @@ const YPivotQATemplatesPhotos = ({
           });
         }
       });
+    } else if (!activeReportId) {
+      // Optional: Alert user if they are trying to save without an Order/Report ID
+      console.warn("Cannot auto-save photo: Report ID is missing.");
     }
   };
 
