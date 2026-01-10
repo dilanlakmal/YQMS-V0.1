@@ -516,9 +516,9 @@ function AppContent() {
               <Route path="/production-Sheet" element={<CoverPage />} />
               <Route path="/humidity-report" element={<HumidityReportPage />} />
 
-              {/* System Translator */}
+              {/* AI System  */}
               <Route path="/system-translator" element={<SystemTranslator />} />
-              
+
             </>
           ) : (
             <Route path="*" element={<Navigate to="/" replace />} />

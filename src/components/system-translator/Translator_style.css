@@ -1,0 +1,193 @@
+.translator-system {
+  /* Design System CSS Variables - Light Theme */
+  --translator-background: #f8f9fc;
+  /* Slightly cooler off-white */
+  --translator-foreground: #1e293b;
+  --translator-card: #ffffff;
+  --translator-card-foreground: #1e293b;
+  --translator-popover: #ffffff;
+  --translator-popover-foreground: #1e293b;
+
+  /* Vibrant Gradient Primary */
+  --translator-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --translator-primary-solid: #6366f1;
+  --translator-primary-foreground: #ffffff;
+
+  --translator-secondary: #f1f5f9;
+  --translator-secondary-foreground: #1e293b;
+  --translator-muted: #f1f5f9;
+  --translator-muted-foreground: #64748b;
+  --translator-accent: #f8fafc;
+  --translator-accent-foreground: #1e293b;
+  --translator-destructive: #ef4444;
+  --translator-destructive-foreground: #ffffff;
+
+  /* Visible Border for Light Mode */
+  --translator-border: #e2e8f0;
+  --translator-input: #ffffff;
+  --translator-ring: #8b5cf6;
+  /* Matching gradient end */
+  --translator-radius: 0.75rem;
+  /* Slightly larger radius */
+
+  /* Shadows */
+  --translator-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --translator-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --translator-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+/* Dark theme support */
+.translator-system.dark,
+.dark .translator-system {
+  --translator-background: #0f172a;
+  /* Richer dark blue-grey */
+  --translator-foreground: #f8fafc;
+  --translator-card: #1e293b;
+  --translator-card-foreground: #f8fafc;
+  --translator-popover: #1e293b;
+  --translator-popover-foreground: #f8fafc;
+
+  /* Keep gradient but maybe slightly adjusted/same */
+  --translator-primary: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  --translator-primary-solid: #818cf8;
+  --translator-primary-foreground: #ffffff;
+
+  --translator-secondary: #334155;
+  --translator-secondary-foreground: #f8fafc;
+  --translator-muted: #334155;
+  --translator-muted-foreground: #94a3b8;
+  --translator-accent: #1e293b;
+  --translator-accent-foreground: #f8fafc;
+  --translator-destructive: #7f1d1d;
+  --translator-destructive-foreground: #fecaca;
+
+  --translator-border: #334155;
+  /* Visible but subtle in dark mode */
+  --translator-input: #0f172a;
+  --translator-ring: #8b5cf6;
+
+  --translator-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --translator-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --translator-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Base styles for translator system */
+.translator-system {
+  background-color: var(--translator-background);
+  color: var(--translator-foreground);
+  padding: 2rem;
+  /* Add breathing room */
+}
+
+/* Scoped component styles */
+.translator-system .translator-header {
+  border-bottom: 1px solid var(--translator-border);
+  background-color: var(--translator-card);
+  box-shadow: var(--translator-shadow-sm);
+}
+
+.translator-system .translator-card {
+  background-color: var(--translator-card);
+  color: var(--translator-card-foreground);
+  border: 1px solid var(--translator-border);
+  box-shadow: var(--translator-shadow);
+  /* Add premium shadow */
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.translator-system .translator-card:hover {
+  box-shadow: var(--translator-shadow-lg);
+  /* Lift on hover slightly (optional) */
+  border-color: #cbd5e1;
+  /* Slightly darker border on hover in light mode */
+}
+
+/* Dark mode specific hover correction */
+.dark .translator-system .translator-card:hover {
+  border-color: #475569;
+}
+
+.translator-system .translator-text-foreground {
+  color: var(--translator-foreground);
+}
+
+.translator-system .translator-muted-foreground {
+  color: var(--translator-muted-foreground);
+}
+
+.translator-system .translator-primary {
+  background: var(--translator-primary);
+  /* Use gradient */
+  color: var(--translator-primary-foreground);
+  box-shadow: 0 4px 6px -1px rgba(99, 102, 241, 0.4);
+  /* Colored shadow for primary buttons */
+}
+
+.translator-system .translator-primary-text {
+  color: var(--translator-primary-solid);
+}
+
+.translator-system .translator-border {
+  border-color: var(--translator-border);
+}
+
+.translator-system .translator-muted {
+  background-color: var(--translator-muted);
+}
+
+.translator-system .translator-muted:hover {
+  background-color: var(--translator-muted-foreground);
+  opacity: 0.1;
+  /* This was existing, might be too low. Let's adjust opacity or approach. */
+  /* Re-doing the hover for muted items to be better */
+  background-color: var(--translator-secondary);
+  opacity: 1;
+  /* Reset opacity */
+  color: var(--translator-foreground);
+  /* Ensure text is visible */
+}
+
+.translator-system .translator-destructive {
+  color: var(--translator-destructive);
+}
+
+.translator-system .translator-destructive-bg {
+  background-color: var(--translator-destructive);
+  color: var(--translator-destructive-foreground);
+}
+
+.translator-system .translator-destructive-bg-light {
+  background-color: var(--translator-destructive);
+  opacity: 0.1;
+}
+
+.translator-system .translator-input {
+  background-color: var(--translator-input);
+  border: 1px solid var(--translator-border);
+  color: var(--translator-foreground);
+  box-shadow: var(--translator-shadow-sm);
+  /* Subtle depth for inputs */
+  transition: all 0.2s ease;
+}
+
+.translator-system .translator-input:focus {
+  outline: none;
+  border-color: var(--translator-primary-solid);
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2);
+}
+
+.translator-system .translator-rounded {
+  border-radius: var(--translator-radius);
+}
+
+.translator-system .translator-rounded-sm {
+  border-radius: calc(var(--translator-radius) - 4px);
+}
+
+.translator-system .translator-rounded-md {
+  border-radius: calc(var(--translator-radius) - 2px);
+}
+
+.translator-system .translator-rounded-lg {
+  border-radius: var(--translator-radius);
+}

@@ -502,7 +502,7 @@ function Home() {
         ]
       },
 
-      // System Translator
+      // AI System 
       {
         id: "ai-system",
         title: "AI System",

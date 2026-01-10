@@ -312,6 +312,13 @@ import ceTargetMasterRoutes from "./modules/CESystem/Routes/CETargetMasterRoutes
 ------------------------------ */
 import huminityRoutes from "./routes/huminity/huminityRoutes.js";
 
+/*------------------------------
+AI system
+-------------------------------*/
+import translateTextRoute from "./routes/translate-text/translateTextRoute.js"
+import translateFileRoute from "./routes/translate-files/translateFilesRoute.js"
+import glossaryRoute from "./routes/glossaries/glossaryRoute.js"
+
 /* -----------------------------
   User Routes
 ------------------------------ */
@@ -619,10 +626,18 @@ app.use(sketchTechnical);
 ------------------------------ */
 app.use(huminityRoutes);
 
+/* -----------------------------
+AI System Route
+------------------------------ */
+
+app.use(translateTextRoute)
+app.use(translateFileRoute)
+app.use(glossaryRoute)
+
 // Set UTF-8 encoding for responses
 app.use((req, res, next) => {
-  res.setHeader("Content-Type", "application/json; charset=utf-8");
-  next();
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    next();
 });
 
 /* ------------------------------
@@ -641,10 +656,10 @@ app.use((req, res, next) => {
 // });
 
 app.get("/api/health", (req, res) => {
-  res.json({ status: "ok" });
+    res.json({ status: "ok" });
 });
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+    console.log(`HTTPS Server is running on https://localhost:${PORT}`);
 });
