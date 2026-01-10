@@ -168,6 +168,9 @@ const createFincheckInspectionReportsModel = (connection) => {
       // Context / Config Link
       groupId: { type: Number, required: true }, // Matches the ID from InspectionConfig
 
+      // Distinguishes between Tab 1 and Tab 2 ***
+      stage: { type: String, enum: ["Before", "After"], default: "Before" },
+
       // Scopes
       line: { type: String, default: "" },
       table: { type: String, default: "" },

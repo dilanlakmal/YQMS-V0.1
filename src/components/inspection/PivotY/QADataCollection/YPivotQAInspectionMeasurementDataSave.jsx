@@ -1,4 +1,1525 @@
-import React, { useState, useEffect } from "react";
+// import React, { useState, useEffect } from "react";
+// import { createPortal } from "react-dom";
+// import axios from "axios";
+// import {
+//   Save,
+//   Loader2,
+//   Ruler,
+//   Edit3,
+//   CheckCircle2,
+//   AlertCircle
+// } from "lucide-react";
+// import { API_BASE_URL } from "../../../../../config";
+// import YPivotQAInspectionMeasurementConfig from "./YPivotQAInspectionMeasurementConfig";
+
+// // --- AUTO DISMISS MODAL COMPONENT HERE ---
+// const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+//   useEffect(() => {
+//     if (isOpen) {
+//       const timer = setTimeout(() => {
+//         onClose();
+//       }, 1200);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [isOpen, onClose]);
+
+//   if (!isOpen) return null;
+
+//   const isSuccess = type === "success";
+
+//   return createPortal(
+//     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+//       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+//         <div
+//           className={`p-3 rounded-full ${
+//             isSuccess
+//               ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+//               : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+//           }`}
+//         >
+//           {isSuccess ? (
+//             <CheckCircle2 className="w-8 h-8" />
+//           ) : (
+//             <AlertCircle className="w-8 h-8" />
+//           )}
+//         </div>
+//         <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+//           {isSuccess ? "Success" : "Error"}
+//         </h3>
+//         <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+//           {message}
+//         </p>
+//       </div>
+//     </div>,
+//     document.body
+//   );
+// };
+
+// const YPivotQAInspectionMeasurementDataSave = ({
+//   selectedOrders,
+//   orderData,
+//   reportData,
+//   onUpdateMeasurementData,
+//   activeGroup,
+//   reportId,
+//   isReportSaved,
+//   onSaveSuccess
+// }) => {
+//   const [saving, setSaving] = useState(false);
+//   const [loadingData, setLoadingData] = useState(false);
+//   const [isUpdateMode, setIsUpdateMode] = useState(false);
+//   const [statusModal, setStatusModal] = useState({
+//     isOpen: false,
+//     type: "success",
+//     message: ""
+//   });
+
+//   // --- FETCH EXISTING DATA ---
+//   useEffect(() => {
+//     const fetchExistingMeasurementData = async () => {
+//       if (!reportId) return;
+
+//       // Check if data already exists AND is properly formatted (Sets, not arrays)
+//       const savedMeasurements =
+//         reportData.measurementData?.savedMeasurements || [];
+//       const hasProperlyFormattedData =
+//         savedMeasurements.length > 0 &&
+//         savedMeasurements[0]?.allEnabledPcs instanceof Set;
+
+//       const hasManualData =
+//         Object.keys(reportData.measurementData?.manualDataByGroup || {})
+//           .length > 0;
+
+//       // If data is already properly formatted (hydrated from parent), skip fetch
+//       if (hasProperlyFormattedData || hasManualData) {
+//         setIsUpdateMode(true);
+//         console.log("Measurement data already hydrated, skipping fetch");
+//         return;
+//       }
+
+//       // Check if we have raw data (arrays, not Sets) - this means parent hydrated but didn't process
+//       const hasRawData =
+//         savedMeasurements.length > 0 &&
+//         Array.isArray(savedMeasurements[0]?.allEnabledPcs);
+
+//       if (hasRawData) {
+//         console.log("Converting raw measurement data to proper format");
+//         // Convert in place
+//         const processedMeasurements = savedMeasurements.map((m) => ({
+//           ...m,
+//           allEnabledPcs: new Set(m.allEnabledPcs || []),
+//           criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+//         }));
+
+//         onUpdateMeasurementData(
+//           {
+//             ...reportData.measurementData,
+//             savedMeasurements: processedMeasurements
+//           },
+//           { isFromBackend: true }
+//         );
+//         setIsUpdateMode(true);
+//         return;
+//       }
+
+//       // No data exists, fetch from backend
+//       setLoadingData(true);
+//       try {
+//         const res = await axios.get(
+//           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
+//         );
+
+//         if (res.data.success && res.data.data.measurementData) {
+//           const backendData = res.data.data.measurementData;
+
+//           if (Array.isArray(backendData) && backendData.length > 0) {
+//             setIsUpdateMode(true);
+//           } else {
+//             setIsUpdateMode(false);
+//           }
+
+//           // Process Standard Measurements
+//           const processedMeasurements = backendData
+//             .filter((m) => m.size !== "Manual_Entry")
+//             .map((m) => ({
+//               ...m,
+//               allEnabledPcs: new Set(m.allEnabledPcs || []),
+//               criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+//             }));
+
+//           // Process Manual Data
+//           const processedManualDataByGroup = {};
+//           backendData.forEach((item) => {
+//             if (item.manualData) {
+//               const groupId = item.groupId;
+//               const processedImages = (item.manualData.images || []).map(
+//                 (img) => {
+//                   let displayUrl = img.imageURL;
+//                   if (
+//                     displayUrl &&
+//                     !displayUrl.startsWith("http") &&
+//                     !displayUrl.startsWith("data:")
+//                   ) {
+//                     displayUrl = `${API_BASE_URL}${displayUrl}`;
+//                   }
+//                   return {
+//                     id: img.imageId,
+//                     url: displayUrl,
+//                     imgSrc: displayUrl,
+//                     editedImgSrc: displayUrl,
+//                     remark: img.remark || "",
+//                     history: []
+//                   };
+//                 }
+//               );
+
+//               processedManualDataByGroup[groupId] = {
+//                 remarks: item.manualData.remarks || "",
+//                 status: item.manualData.status || "Pass",
+//                 images: processedImages
+//               };
+//             }
+//           });
+
+//           onUpdateMeasurementData(
+//             {
+//               savedMeasurements: processedMeasurements,
+//               manualDataByGroup: processedManualDataByGroup,
+//               isConfigured: processedMeasurements.length > 0
+//             },
+//             { isFromBackend: true }
+//           );
+//         }
+//       } catch (error) {
+//         console.error("Error fetching measurement data:", error);
+//       } finally {
+//         setLoadingData(false);
+//       }
+//     };
+
+//     if (reportId) {
+//       fetchExistingMeasurementData();
+//     }
+//   }, [reportId]);
+
+//   // --- SAVE HANDLER ---
+//   const handleSaveData = async () => {
+//     if (!isReportSaved || !reportId) {
+//       setStatusModal({
+//         isOpen: true,
+//         type: "error",
+//         message: "Please save Order information first."
+//       });
+//       return;
+//     }
+
+//     const currentMeasurements =
+//       reportData.measurementData?.savedMeasurements || [];
+//     const manualDataByGroup =
+//       reportData.measurementData?.manualDataByGroup || {};
+
+//     setSaving(true);
+//     try {
+//       const payload = [];
+
+//       // Helper to process Manual Data Images for Upload
+//       const processManualImagesForSave = (images) => {
+//         return (images || []).map((img) => {
+//           let payloadImageURL = null;
+//           let payloadImgSrc = null;
+
+//           // Check for Base64 in editedImgSrc (preferred) or imgSrc
+//           const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+//           if (imageData && imageData.startsWith("data:")) {
+//             // New Image (Base64) -> Send in imgSrc for backend to save
+//             payloadImgSrc = imageData;
+//             payloadImageURL = null;
+//           } else if (imageData && imageData.includes(API_BASE_URL)) {
+//             // Existing Image with Full URL -> Strip API_BASE_URL to save relative path
+//             payloadImageURL = imageData.replace(API_BASE_URL, "");
+//             payloadImgSrc = null;
+//           } else {
+//             // Already relative or other URL
+//             payloadImageURL = imageData;
+//             payloadImgSrc = null;
+//           }
+
+//           return {
+//             id: img.id,
+//             imageId: img.id,
+//             imageURL: payloadImageURL,
+//             imgSrc: payloadImgSrc,
+//             remark: img.remark
+//           };
+//         });
+//       };
+
+//       const measurementsByGroup = {};
+//       currentMeasurements.forEach((m) => {
+//         if (!measurementsByGroup[m.groupId])
+//           measurementsByGroup[m.groupId] = [];
+//         measurementsByGroup[m.groupId].push(m);
+//       });
+
+//       const allGroupIds = new Set([
+//         ...Object.keys(measurementsByGroup).map(Number),
+//         ...Object.keys(manualDataByGroup).map(Number)
+//       ]);
+
+//       allGroupIds.forEach((groupId) => {
+//         const groupMeasurements = measurementsByGroup[groupId] || [];
+//         const groupManualData = manualDataByGroup[groupId];
+
+//         if (groupMeasurements.length > 0) {
+//           groupMeasurements.forEach((m, index) => {
+//             const isFirst = index === 0;
+//             const cleanMeasurement = {
+//               ...m,
+//               allEnabledPcs: Array.from(m.allEnabledPcs || []),
+//               criticalEnabledPcs: Array.from(m.criticalEnabledPcs || [])
+//             };
+
+//             if (isFirst && groupManualData) {
+//               cleanMeasurement.manualData = {
+//                 remarks: groupManualData.remarks,
+//                 status: groupManualData.status,
+//                 images: processManualImagesForSave(groupManualData.images)
+//               };
+//             } else {
+//               cleanMeasurement.manualData = null;
+//             }
+//             payload.push(cleanMeasurement);
+//           });
+//         } else if (groupManualData) {
+//           // Placeholder for Manual-Only Entry
+//           payload.push({
+//             groupId: groupId,
+//             size: "Manual_Entry",
+//             line: "",
+//             table: "",
+//             color: "",
+//             qcUser: null,
+//             allMeasurements: {},
+//             criticalMeasurements: {},
+//             allEnabledPcs: [],
+//             criticalEnabledPcs: [],
+//             inspectorDecision:
+//               groupManualData.status === "Pass" ? "pass" : "fail",
+//             manualData: {
+//               remarks: groupManualData.remarks,
+//               status: groupManualData.status,
+//               images: processManualImagesForSave(groupManualData.images)
+//             }
+//           });
+//         }
+//       });
+
+//       if (payload.length === 0) {
+//         setSaving(false);
+//         setStatusModal({
+//           isOpen: true,
+//           type: "error",
+//           message: "No data to save."
+//         });
+//         return;
+//       }
+
+//       const res = await axios.post(
+//         `${API_BASE_URL}/api/fincheck-inspection/update-measurement-data`,
+//         {
+//           reportId: reportId,
+//           measurementData: payload
+//         }
+//       );
+
+//       if (res.data.success) {
+//         setIsUpdateMode(true);
+//         if (onSaveSuccess) {
+//           onSaveSuccess();
+//         }
+//         setStatusModal({
+//           isOpen: true,
+//           type: "success",
+//           message: isUpdateMode
+//             ? "Measurement Data Updated Successfully!"
+//             : "Measurement Data Saved Successfully!"
+//         });
+//       }
+//     } catch (error) {
+//       console.error("Error saving measurement results:", error);
+//       setStatusModal({
+//         isOpen: true,
+//         type: "error",
+//         message: "Failed to save measurement results."
+//       });
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+
+//   if (loadingData) {
+//     return (
+//       <div className="flex justify-center items-center h-64">
+//         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+//         <span className="ml-3 text-gray-600 font-medium">
+//           Loading existing measurements...
+//         </span>
+//       </div>
+//     );
+//   }
+
+//   if (!reportData?.selectedTemplate) {
+//     return (
+//       <div className="flex flex-col items-center justify-center py-16">
+//         <Ruler className="w-12 h-12 text-gray-300 mb-4" />
+//         <p className="text-gray-500">Please select a Report Type first.</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="relative pb-24">
+//       <YPivotQAInspectionMeasurementConfig
+//         selectedOrders={selectedOrders}
+//         orderData={orderData}
+//         reportData={reportData}
+//         onUpdateMeasurementData={onUpdateMeasurementData}
+//         activeGroup={activeGroup}
+//       />
+
+//       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+//         <div className="max-w-8xl mx-auto flex justify-end px-4">
+//           <button
+//             onClick={handleSaveData}
+//             disabled={!isReportSaved || saving}
+//             className={`
+//               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
+//               ${
+//                 !isReportSaved
+//                   ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+//                   : isUpdateMode
+//                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" // Blue for Update
+//                   : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white" // Green for Save
+//               }
+//             `}
+//             title={
+//               !isReportSaved
+//                 ? "Save Order Data first"
+//                 : isUpdateMode
+//                 ? "Update Measurement Data"
+//                 : "Save Measurement Data"
+//             }
+//           >
+//             {saving ? (
+//               <>
+//                 <Loader2 className="w-5 h-5 animate-spin" />
+//                 {isUpdateMode ? "Updating..." : "Saving..."}
+//               </>
+//             ) : (
+//               <>
+//                 {isUpdateMode ? (
+//                   <Edit3 className="w-5 h-5" />
+//                 ) : (
+//                   <Save className="w-5 h-5" />
+//                 )}
+//                 {isUpdateMode ? "Update Measurements" : "Save Measurements"}
+//               </>
+//             )}
+//           </button>
+//         </div>
+//       </div>
+//       {/* Auto Dismiss Modal */}
+//       <AutoDismissModal
+//         isOpen={statusModal.isOpen}
+//         onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+//         type={statusModal.type}
+//         message={statusModal.message}
+//       />
+//     </div>
+//   );
+// };
+
+// export default YPivotQAInspectionMeasurementDataSave;
+
+// import React, { useState, useEffect, useMemo, useCallback } from "react";
+// import { createPortal } from "react-dom";
+// import axios from "axios";
+// import {
+//   Save,
+//   Loader2,
+//   Ruler,
+//   Edit3,
+//   CheckCircle2,
+//   AlertCircle
+// } from "lucide-react";
+// import { API_BASE_URL } from "../../../../../config";
+// import YPivotQAInspectionMeasurementConfig from "./YPivotQAInspectionMeasurementConfig";
+
+// // --- AUTO DISMISS MODAL COMPONENT ---
+// const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+//   useEffect(() => {
+//     if (isOpen) {
+//       const timer = setTimeout(() => {
+//         onClose();
+//       }, 1200);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [isOpen, onClose]);
+
+//   if (!isOpen) return null;
+
+//   const isSuccess = type === "success";
+
+//   return createPortal(
+//     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+//       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+//         <div
+//           className={`p-3 rounded-full ${
+//             isSuccess
+//               ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+//               : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+//           }`}
+//         >
+//           {isSuccess ? (
+//             <CheckCircle2 className="w-8 h-8" />
+//           ) : (
+//             <AlertCircle className="w-8 h-8" />
+//           )}
+//         </div>
+//         <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+//           {isSuccess ? "Success" : "Error"}
+//         </h3>
+//         <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+//           {message}
+//         </p>
+//       </div>
+//     </div>,
+//     document.body
+//   );
+// };
+
+// const YPivotQAInspectionMeasurementDataSave = ({
+//   selectedOrders,
+//   orderData,
+//   reportData,
+//   onUpdateMeasurementData,
+//   activeGroup,
+//   reportId,
+//   isReportSaved,
+//   onSaveSuccess,
+//   // --- NEW PROPS FOR MULTI-STAGE SUPPORT ---
+//   targetStage = "Before", // "Before" or "After"
+//   displayLabel = null // e.g. "Measurement (Before)"
+// }) => {
+//   const [saving, setSaving] = useState(false);
+//   const [loadingData, setLoadingData] = useState(false);
+//   const [isUpdateMode, setIsUpdateMode] = useState(false);
+//   const [statusModal, setStatusModal] = useState({
+//     isOpen: false,
+//     type: "success",
+//     message: ""
+//   });
+
+//   // --- 1. FILTER DATA FOR SPECIFIC STAGE (VIEW LOGIC) ---
+//   // The child component should only see and edit measurements for the current targetStage.
+//   const stageSpecificReportData = useMemo(() => {
+//     const allMeasurements = reportData.measurementData?.savedMeasurements || [];
+
+//     // Filter measurements:
+//     // 1. Match explicit stage
+//     // 2. Legacy fallback: if no stage is present, assume it belongs to the Template's Primary Measurement type
+//     //    (e.g., if template says "Before", legacy data without stage is "Before")
+//     const filteredMeasurements = allMeasurements.filter((m) => {
+//       if (m.stage) {
+//         return m.stage === targetStage;
+//       }
+//       // Fallback logic for legacy data
+//       const primaryType = reportData.selectedTemplate?.Measurement || "Before";
+//       return primaryType === targetStage;
+//     });
+
+//     return {
+//       ...reportData,
+//       // IMPORTANT: Override the template Measurement type locally so the Config component
+//       // fetches the correct specs (Before specs vs After specs)
+//       selectedTemplate: {
+//         ...reportData.selectedTemplate,
+//         Measurement: targetStage
+//       },
+//       measurementData: {
+//         ...reportData.measurementData,
+//         savedMeasurements: filteredMeasurements
+//       }
+//     };
+//   }, [reportData, targetStage]);
+
+//   // --- 2. MERGE DATA FROM CHILD (UPDATE LOGIC) ---
+//   // When child updates "Before" data, we must not lose "After" data stored in parent.
+//   const handleChildUpdate = useCallback(
+//     (childUpdates, options = {}) => {
+//       // Case A: Full Hydration from Backend (No merging needed, just pass through)
+//       if (options.isFromBackend) {
+//         onUpdateMeasurementData(childUpdates, options);
+//         return;
+//       }
+
+//       // Case B: User Edited Data in Grid
+//       const allMeasurements =
+//         reportData.measurementData?.savedMeasurements || [];
+
+//       // 1. Separate "Other Stages" data (keep as is)
+//       const otherStageMeasurements = allMeasurements.filter((m) => {
+//         if (m.stage) return m.stage !== targetStage;
+//         const primaryType =
+//           reportData.selectedTemplate?.Measurement || "Before";
+//         return primaryType !== targetStage;
+//       });
+
+//       // 2. Process "Current Stage" data (from child)
+//       // Ensure every item has the correct stage tag
+//       const updatedCurrentStageMeasurements = (
+//         childUpdates.savedMeasurements || []
+//       ).map((m) => ({
+//         ...m,
+//         stage: targetStage
+//       }));
+
+//       // 3. Combine back together
+//       const combinedMeasurements = [
+//         ...otherStageMeasurements,
+//         ...updatedCurrentStageMeasurements
+//       ];
+
+//       // 4. Send combined result up
+//       onUpdateMeasurementData({
+//         ...reportData.measurementData,
+//         ...childUpdates, // Pass other config keys (manualData, specs lists, etc.)
+//         savedMeasurements: combinedMeasurements
+//       });
+//     },
+//     [reportData, targetStage, onUpdateMeasurementData]
+//   );
+
+//   // --- FETCH EXISTING DATA ---
+//   useEffect(() => {
+//     const fetchExistingMeasurementData = async () => {
+//       if (!reportId) return;
+
+//       const savedMeasurements =
+//         reportData.measurementData?.savedMeasurements || [];
+//       const hasProperlyFormattedData =
+//         savedMeasurements.length > 0 &&
+//         savedMeasurements[0]?.allEnabledPcs instanceof Set;
+
+//       const hasManualData =
+//         Object.keys(reportData.measurementData?.manualDataByGroup || {})
+//           .length > 0;
+
+//       if (hasProperlyFormattedData || hasManualData) {
+//         setIsUpdateMode(true);
+//         return;
+//       }
+
+//       // Handle Raw Data conversion (Array -> Set)
+//       const hasRawData =
+//         savedMeasurements.length > 0 &&
+//         Array.isArray(savedMeasurements[0]?.allEnabledPcs);
+
+//       if (hasRawData) {
+//         const processedMeasurements = savedMeasurements.map((m) => ({
+//           ...m,
+//           allEnabledPcs: new Set(m.allEnabledPcs || []),
+//           criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+//           // Ensure stage exists on hydration
+//           stage:
+//             m.stage ||
+//             (reportData.selectedTemplate?.Measurement === "After"
+//               ? "After"
+//               : "Before")
+//         }));
+
+//         onUpdateMeasurementData(
+//           {
+//             ...reportData.measurementData,
+//             savedMeasurements: processedMeasurements
+//           },
+//           { isFromBackend: true }
+//         );
+//         setIsUpdateMode(true);
+//         return;
+//       }
+
+//       // Fetch from Backend
+//       setLoadingData(true);
+//       try {
+//         const res = await axios.get(
+//           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
+//         );
+
+//         if (res.data.success && res.data.data.measurementData) {
+//           const backendData = res.data.data.measurementData;
+
+//           if (Array.isArray(backendData) && backendData.length > 0) {
+//             setIsUpdateMode(true);
+//           } else {
+//             setIsUpdateMode(false);
+//           }
+
+//           // Process Standard Measurements
+//           const processedMeasurements = backendData
+//             .filter((m) => m.size !== "Manual_Entry")
+//             .map((m) => ({
+//               ...m,
+//               allEnabledPcs: new Set(m.allEnabledPcs || []),
+//               criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+//               // Ensure stage is set from backend
+//               stage:
+//                 m.stage ||
+//                 (res.data.data.inspectionDetails?.measurementMethod === "After"
+//                   ? "After"
+//                   : "Before")
+//             }));
+
+//           // Process Manual Data
+//           const processedManualDataByGroup = {};
+//           backendData.forEach((item) => {
+//             if (item.manualData) {
+//               const groupId = item.groupId;
+//               // To support multi-stage manual data, we might need a composite key in future
+//               // For now, we assume shared manual remarks per group or key logic handles it
+//               const processedImages = (item.manualData.images || []).map(
+//                 (img) => {
+//                   let displayUrl = img.imageURL;
+//                   if (
+//                     displayUrl &&
+//                     !displayUrl.startsWith("http") &&
+//                     !displayUrl.startsWith("data:")
+//                   ) {
+//                     displayUrl = `${API_BASE_URL}${displayUrl}`;
+//                   }
+//                   return {
+//                     id: img.imageId,
+//                     url: displayUrl,
+//                     imgSrc: displayUrl,
+//                     editedImgSrc: displayUrl,
+//                     remark: img.remark || "",
+//                     history: []
+//                   };
+//                 }
+//               );
+
+//               processedManualDataByGroup[groupId] = {
+//                 remarks: item.manualData.remarks || "",
+//                 status: item.manualData.status || "Pass",
+//                 images: processedImages
+//               };
+//             }
+//           });
+
+//           onUpdateMeasurementData(
+//             {
+//               savedMeasurements: processedMeasurements,
+//               manualDataByGroup: processedManualDataByGroup,
+//               isConfigured: processedMeasurements.length > 0
+//             },
+//             { isFromBackend: true }
+//           );
+//         }
+//       } catch (error) {
+//         console.error("Error fetching measurement data:", error);
+//       } finally {
+//         setLoadingData(false);
+//       }
+//     };
+
+//     if (reportId) {
+//       fetchExistingMeasurementData();
+//     }
+//   }, [reportId]);
+
+//   // --- SAVE HANDLER ---
+//   const handleSaveData = async () => {
+//     if (!isReportSaved || !reportId) {
+//       setStatusModal({
+//         isOpen: true,
+//         type: "error",
+//         message: "Please save Order information first."
+//       });
+//       return;
+//     }
+
+//     // Grab ALL measurements (merged state from parent)
+//     const currentMeasurements =
+//       reportData.measurementData?.savedMeasurements || [];
+//     const manualDataByGroup =
+//       reportData.measurementData?.manualDataByGroup || {};
+
+//     setSaving(true);
+//     try {
+//       const payload = [];
+
+//       // Helper for Images
+//       const processManualImagesForSave = (images) => {
+//         return (images || []).map((img) => {
+//           let payloadImageURL = null;
+//           let payloadImgSrc = null;
+
+//           const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+//           if (imageData && imageData.startsWith("data:")) {
+//             payloadImgSrc = imageData;
+//             payloadImageURL = null;
+//           } else if (imageData && imageData.includes(API_BASE_URL)) {
+//             payloadImageURL = imageData.replace(API_BASE_URL, "");
+//             payloadImgSrc = null;
+//           } else {
+//             payloadImageURL = imageData;
+//             payloadImgSrc = null;
+//           }
+
+//           return {
+//             id: img.id,
+//             imageId: img.id,
+//             imageURL: payloadImageURL,
+//             imgSrc: payloadImgSrc,
+//             remark: img.remark
+//           };
+//         });
+//       };
+
+//       // Group measurements by GroupID AND Stage
+//       const measurementsByGroupAndStage = {};
+
+//       currentMeasurements.forEach((m) => {
+//         // Fallback for stage if missing
+//         const mStage =
+//           m.stage ||
+//           (reportData.selectedTemplate?.Measurement === "After"
+//             ? "After"
+//             : "Before");
+//         const key = `${m.groupId}_${mStage}`;
+
+//         if (!measurementsByGroupAndStage[key]) {
+//           measurementsByGroupAndStage[key] = [];
+//         }
+//         measurementsByGroupAndStage[key].push(m);
+//       });
+
+//       // Construct Payload
+//       // 1. Add standard measurements
+//       Object.keys(measurementsByGroupAndStage).forEach((key) => {
+//         const groupMeasurements = measurementsByGroupAndStage[key];
+//         const [groupIdStr, stageStr] = key.split("_");
+//         const groupId = parseInt(groupIdStr);
+
+//         groupMeasurements.forEach((m, index) => {
+//           const isFirstInGroupStage = index === 0;
+//           const cleanMeasurement = {
+//             ...m,
+//             allEnabledPcs: Array.from(m.allEnabledPcs || []),
+//             criticalEnabledPcs: Array.from(m.criticalEnabledPcs || []),
+//             stage: stageStr // Ensure stage is set explicitly
+//           };
+
+//           // Attach Manual Data to the FIRST item of the group/stage pair
+//           // Note: Currently manualDataByGroup is only by GroupID.
+//           // This means Manual Data is shared between Before/After if they share groupID.
+//           // We attach it to whichever gets saved.
+//           if (isFirstInGroupStage) {
+//             const groupManualData = manualDataByGroup[groupId];
+//             if (groupManualData) {
+//               cleanMeasurement.manualData = {
+//                 remarks: groupManualData.remarks,
+//                 status: groupManualData.status,
+//                 images: processManualImagesForSave(groupManualData.images)
+//               };
+//             }
+//           } else {
+//             cleanMeasurement.manualData = null;
+//           }
+//           payload.push(cleanMeasurement);
+//         });
+//       });
+
+//       // 2. Handle Manual-Only entries (no grid measurements yet)
+//       const allGroupIds = Object.keys(manualDataByGroup).map(Number);
+//       allGroupIds.forEach((groupId) => {
+//         // Check if this group already has measurements in payload
+//         const alreadyHasMeasurements = payload.some(
+//           (p) => p.groupId === groupId
+//         );
+
+//         if (!alreadyHasMeasurements) {
+//           const groupManualData = manualDataByGroup[groupId];
+//           // Placeholder for Manual-Only Entry
+//           payload.push({
+//             groupId: groupId,
+//             size: "Manual_Entry",
+//             stage: targetStage, // Associate with current tab's stage
+//             line: "",
+//             table: "",
+//             color: "",
+//             qcUser: null,
+//             allMeasurements: {},
+//             criticalMeasurements: {},
+//             allEnabledPcs: [],
+//             criticalEnabledPcs: [],
+//             inspectorDecision:
+//               groupManualData.status === "Pass" ? "pass" : "fail",
+//             manualData: {
+//               remarks: groupManualData.remarks,
+//               status: groupManualData.status,
+//               images: processManualImagesForSave(groupManualData.images)
+//             }
+//           });
+//         }
+//       });
+
+//       if (payload.length === 0) {
+//         setSaving(false);
+//         setStatusModal({
+//           isOpen: true,
+//           type: "error",
+//           message: "No data to save."
+//         });
+//         return;
+//       }
+
+//       const res = await axios.post(
+//         `${API_BASE_URL}/api/fincheck-inspection/update-measurement-data`,
+//         {
+//           reportId: reportId,
+//           measurementData: payload
+//         }
+//       );
+
+//       if (res.data.success) {
+//         setIsUpdateMode(true);
+//         if (onSaveSuccess) {
+//           onSaveSuccess();
+//         }
+//         setStatusModal({
+//           isOpen: true,
+//           type: "success",
+//           message: isUpdateMode
+//             ? `Measurements (${displayLabel || targetStage}) Updated!`
+//             : `Measurements (${displayLabel || targetStage}) Saved!`
+//         });
+//       }
+//     } catch (error) {
+//       console.error("Error saving measurement results:", error);
+//       setStatusModal({
+//         isOpen: true,
+//         type: "error",
+//         message: "Failed to save measurement results."
+//       });
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+
+//   if (loadingData) {
+//     return (
+//       <div className="flex justify-center items-center h-64">
+//         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+//         <span className="ml-3 text-gray-600 font-medium">
+//           Loading measurements...
+//         </span>
+//       </div>
+//     );
+//   }
+
+//   if (!reportData?.selectedTemplate) {
+//     return (
+//       <div className="flex flex-col items-center justify-center py-16">
+//         <Ruler className="w-12 h-12 text-gray-300 mb-4" />
+//         <p className="text-gray-500">Please select a Report Type first.</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="relative pb-24">
+//       {/* Pass the Filtered Data and the Merge Handler to the UI */}
+//       <YPivotQAInspectionMeasurementConfig
+//         selectedOrders={selectedOrders}
+//         orderData={orderData}
+//         reportData={stageSpecificReportData}
+//         onUpdateMeasurementData={handleChildUpdate}
+//         activeGroup={activeGroup}
+//         displayLabel={displayLabel} // Pass label for UI header
+//       />
+
+//       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+//         <div className="max-w-8xl mx-auto flex justify-end px-4">
+//           <button
+//             onClick={handleSaveData}
+//             disabled={!isReportSaved || saving}
+//             className={`
+//               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
+//               ${
+//                 !isReportSaved
+//                   ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+//                   : isUpdateMode
+//                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+//                   : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+//               }
+//             `}
+//             title={
+//               !isReportSaved
+//                 ? "Save Order Data first"
+//                 : isUpdateMode
+//                 ? "Update Measurement Data"
+//                 : "Save Measurement Data"
+//             }
+//           >
+//             {saving ? (
+//               <>
+//                 <Loader2 className="w-5 h-5 animate-spin" />
+//                 {isUpdateMode ? "Updating..." : "Saving..."}
+//               </>
+//             ) : (
+//               <>
+//                 {isUpdateMode ? (
+//                   <Edit3 className="w-5 h-5" />
+//                 ) : (
+//                   <Save className="w-5 h-5" />
+//                 )}
+//                 {isUpdateMode
+//                   ? `Update ${displayLabel || "Measurements"}`
+//                   : `Save ${displayLabel || "Measurements"}`}
+//               </>
+//             )}
+//           </button>
+//         </div>
+//       </div>
+//       {/* Auto Dismiss Modal */}
+//       <AutoDismissModal
+//         isOpen={statusModal.isOpen}
+//         onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+//         type={statusModal.type}
+//         message={statusModal.message}
+//       />
+//     </div>
+//   );
+// };
+
+// export default YPivotQAInspectionMeasurementDataSave;
+
+// import React, { useState, useEffect, useMemo, useCallback } from "react";
+// import { createPortal } from "react-dom";
+// import axios from "axios";
+// import {
+//   Save,
+//   Loader2,
+//   Ruler,
+//   Edit3,
+//   CheckCircle2,
+//   AlertCircle
+// } from "lucide-react";
+// import { API_BASE_URL } from "../../../../../config";
+// import YPivotQAInspectionMeasurementConfig from "./YPivotQAInspectionMeasurementConfig";
+
+// // --- AUTO DISMISS MODAL COMPONENT ---
+// const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
+//   useEffect(() => {
+//     if (isOpen) {
+//       const timer = setTimeout(() => {
+//         onClose();
+//       }, 1200);
+//       return () => clearTimeout(timer);
+//     }
+//   }, [isOpen, onClose]);
+
+//   if (!isOpen) return null;
+
+//   const isSuccess = type === "success";
+
+//   return createPortal(
+//     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/20 backdrop-blur-[2px] animate-fadeIn">
+//       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-700 p-6 flex flex-col items-center gap-3 min-w-[250px] transform scale-100 transition-all">
+//         <div
+//           className={`p-3 rounded-full ${
+//             isSuccess
+//               ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400"
+//               : "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400"
+//           }`}
+//         >
+//           {isSuccess ? (
+//             <CheckCircle2 className="w-8 h-8" />
+//           ) : (
+//             <AlertCircle className="w-8 h-8" />
+//           )}
+//         </div>
+//         <h3 className="text-lg font-bold text-gray-800 dark:text-white text-center">
+//           {isSuccess ? "Success" : "Error"}
+//         </h3>
+//         <p className="text-sm font-medium text-gray-600 dark:text-gray-300 text-center">
+//           {message}
+//         </p>
+//       </div>
+//     </div>,
+//     document.body
+//   );
+// };
+
+// const YPivotQAInspectionMeasurementDataSave = ({
+//   selectedOrders,
+//   orderData,
+//   reportData,
+//   onUpdateMeasurementData,
+//   activeGroup,
+//   reportId,
+//   isReportSaved,
+//   onSaveSuccess,
+//   targetStage = "Before",
+//   displayLabel = null
+// }) => {
+//   const [saving, setSaving] = useState(false);
+//   const [loadingData, setLoadingData] = useState(false);
+//   const [isUpdateMode, setIsUpdateMode] = useState(false);
+//   const [statusModal, setStatusModal] = useState({
+//     isOpen: false,
+//     type: "success",
+//     message: ""
+//   });
+
+//   // =================================================================================
+//   // 1. FILTER DATA & UNPACK CONFIG (View Logic)
+//   // =================================================================================
+//   const stageSpecificReportData = useMemo(() => {
+//     const allMeasurements = reportData.measurementData?.savedMeasurements || [];
+
+//     // Filter Measurements by Stage
+//     const filteredMeasurements = allMeasurements.filter((m) => {
+//       if (m.stage) {
+//         return m.stage === targetStage;
+//       }
+//       // Fallback for legacy data
+//       const primaryType = reportData.selectedTemplate?.Measurement || "Before";
+//       return primaryType === targetStage;
+//     });
+
+//     // Unpack Config (Specs List) based on Stage
+//     const configKey = `config${targetStage}`; // e.g. "configBefore"
+//     const specificConfig = reportData.measurementData?.[configKey] || {};
+
+//     return {
+//       ...reportData,
+//       selectedTemplate: {
+//         ...reportData.selectedTemplate,
+//         Measurement: targetStage // Override to trick child component
+//       },
+//       measurementData: {
+//         // --- CRITICAL FIX START ---
+//         // Do NOT spread ...reportData.measurementData here.
+//         // We only want the manualData global, the specific config, and the filtered measurements.
+//         // This prevents "Before" specs from leaking into "After" tab via root properties.
+//         manualDataByGroup: reportData.measurementData?.manualDataByGroup || {},
+//         ...specificConfig,
+//         savedMeasurements: filteredMeasurements
+//         // --- CRITICAL FIX END ---
+//       }
+//     };
+//   }, [reportData, targetStage]);
+
+//   // =================================================================================
+//   // 2. MERGE DATA & PACK CONFIG (Update Logic)
+//   // =================================================================================
+//   const handleChildUpdate = useCallback(
+//     (childUpdates, options = {}) => {
+//       if (options.isFromBackend) {
+//         onUpdateMeasurementData(childUpdates, options);
+//         return;
+//       }
+
+//       const allMeasurements =
+//         reportData.measurementData?.savedMeasurements || [];
+
+//       // A. Merge Measurements (Preserve other stages)
+//       const otherStageMeasurements = allMeasurements.filter((m) => {
+//         if (m.stage) return m.stage !== targetStage;
+//         const primaryType =
+//           reportData.selectedTemplate?.Measurement || "Before";
+//         return primaryType !== targetStage;
+//       });
+
+//       const updatedCurrentStageMeasurements = (
+//         childUpdates.savedMeasurements || []
+//       ).map((m) => ({
+//         ...m,
+//         stage: targetStage
+//       }));
+
+//       const combinedMeasurements = [
+//         ...otherStageMeasurements,
+//         ...updatedCurrentStageMeasurements
+//       ];
+
+//       // B. Pack Configuration Data into Namespaced Key
+//       const { savedMeasurements, ...configFields } = childUpdates;
+//       const configKey = `config${targetStage}`;
+
+//       onUpdateMeasurementData({
+//         ...reportData.measurementData, // Keep global state
+//         savedMeasurements: combinedMeasurements,
+//         [configKey]: {
+//           ...(reportData.measurementData?.[configKey] || {}),
+//           ...configFields // Store specs list in configBefore/configAfter
+//         }
+//       });
+//     },
+//     [reportData, targetStage, onUpdateMeasurementData]
+//   );
+
+//   // --- FETCH EXISTING DATA ---
+//   useEffect(() => {
+//     const fetchExistingMeasurementData = async () => {
+//       if (!reportId) return;
+
+//       const measurementData = reportData.measurementData || {};
+//       const savedMeasurements = measurementData.savedMeasurements || [];
+
+//       // Check if data is already hydrated
+//       const hasProperlyFormattedData =
+//         savedMeasurements.length > 0 &&
+//         savedMeasurements[0]?.allEnabledPcs instanceof Set;
+
+//       // Check if config exists for this session
+//       const hasConfig =
+//         measurementData.configBefore || measurementData.configAfter;
+
+//       if (hasProperlyFormattedData || hasConfig) {
+//         setIsUpdateMode(true);
+//         return;
+//       }
+
+//       setLoadingData(true);
+//       try {
+//         const res = await axios.get(
+//           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
+//         );
+
+//         if (res.data.success && res.data.data.measurementData) {
+//           const backendData = res.data.data.measurementData;
+//           setIsUpdateMode(backendData.length > 0);
+
+//           // Process Measurements (Arrays -> Sets)
+//           const processedMeasurements = backendData
+//             .filter((m) => m.size !== "Manual_Entry")
+//             .map((m) => ({
+//               ...m,
+//               allEnabledPcs: new Set(m.allEnabledPcs || []),
+//               criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+//               stage:
+//                 m.stage ||
+//                 (res.data.data.inspectionDetails?.measurementMethod === "After"
+//                   ? "After"
+//                   : "Before")
+//             }));
+
+//           // Process Manual Data
+//           const processedManualDataByGroup = {};
+//           backendData.forEach((item) => {
+//             if (item.manualData) {
+//               const processedImages = (item.manualData.images || []).map(
+//                 (img) => {
+//                   let displayUrl = img.imageURL;
+//                   if (
+//                     displayUrl &&
+//                     !displayUrl.startsWith("http") &&
+//                     !displayUrl.startsWith("data:")
+//                   ) {
+//                     displayUrl = `${API_BASE_URL}${displayUrl}`;
+//                   }
+//                   return {
+//                     id: img.imageId,
+//                     url: displayUrl,
+//                     imgSrc: displayUrl,
+//                     editedImgSrc: displayUrl,
+//                     remark: img.remark || "",
+//                     history: []
+//                   };
+//                 }
+//               );
+//               processedManualDataByGroup[item.groupId] = {
+//                 remarks: item.manualData.remarks || "",
+//                 status: item.manualData.status || "Pass",
+//                 images: processedImages
+//               };
+//             }
+//           });
+
+//           onUpdateMeasurementData(
+//             {
+//               savedMeasurements: processedMeasurements,
+//               manualDataByGroup: processedManualDataByGroup,
+//               isConfigured: processedMeasurements.length > 0
+//             },
+//             { isFromBackend: true }
+//           );
+//         }
+//       } catch (error) {
+//         console.error("Error fetching measurement data:", error);
+//       } finally {
+//         setLoadingData(false);
+//       }
+//     };
+
+//     if (reportId) {
+//       fetchExistingMeasurementData();
+//     }
+//   }, [reportId]);
+
+//   // --- SAVE HANDLER ---
+//   const handleSaveData = async () => {
+//     if (!isReportSaved || !reportId) {
+//       setStatusModal({
+//         isOpen: true,
+//         type: "error",
+//         message: "Please save Order information first."
+//       });
+//       return;
+//     }
+
+//     const currentMeasurements =
+//       reportData.measurementData?.savedMeasurements || [];
+//     const manualDataByGroup =
+//       reportData.measurementData?.manualDataByGroup || {};
+
+//     setSaving(true);
+//     try {
+//       const payload = [];
+
+//       const processManualImagesForSave = (images) => {
+//         return (images || []).map((img) => {
+//           let payloadImageURL = null;
+//           let payloadImgSrc = null;
+//           const imageData = img.editedImgSrc || img.imgSrc || img.url;
+
+//           if (imageData && imageData.startsWith("data:")) {
+//             payloadImgSrc = imageData;
+//             payloadImageURL = null;
+//           } else if (imageData && imageData.includes(API_BASE_URL)) {
+//             payloadImageURL = imageData.replace(API_BASE_URL, "");
+//             payloadImgSrc = null;
+//           } else {
+//             payloadImageURL = imageData;
+//             payloadImgSrc = null;
+//           }
+
+//           return {
+//             id: img.id,
+//             imageId: img.id,
+//             imageURL: payloadImageURL,
+//             imgSrc: payloadImgSrc,
+//             remark: img.remark
+//           };
+//         });
+//       };
+
+//       const measurementsByGroupAndStage = {};
+
+//       currentMeasurements.forEach((m) => {
+//         const mStage = m.stage || targetStage;
+//         const key = `${m.groupId}_${mStage}`;
+//         if (!measurementsByGroupAndStage[key]) {
+//           measurementsByGroupAndStage[key] = [];
+//         }
+//         measurementsByGroupAndStage[key].push(m);
+//       });
+
+//       Object.keys(measurementsByGroupAndStage).forEach((key) => {
+//         const groupMeasurements = measurementsByGroupAndStage[key];
+//         const [groupIdStr, stageStr] = key.split("_");
+//         const groupId = parseInt(groupIdStr);
+
+//         groupMeasurements.forEach((m, index) => {
+//           const isFirstInGroupStage = index === 0;
+//           const cleanMeasurement = {
+//             ...m,
+//             allEnabledPcs: Array.from(m.allEnabledPcs || []),
+//             criticalEnabledPcs: Array.from(m.criticalEnabledPcs || []),
+//             stage: stageStr
+//           };
+
+//           if (isFirstInGroupStage) {
+//             const groupManualData = manualDataByGroup[groupId];
+//             if (groupManualData) {
+//               cleanMeasurement.manualData = {
+//                 remarks: groupManualData.remarks,
+//                 status: groupManualData.status,
+//                 images: processManualImagesForSave(groupManualData.images)
+//               };
+//             }
+//           } else {
+//             cleanMeasurement.manualData = null;
+//           }
+//           payload.push(cleanMeasurement);
+//         });
+//       });
+
+//       const allGroupIds = Object.keys(manualDataByGroup).map(Number);
+//       allGroupIds.forEach((groupId) => {
+//         const alreadyHasMeasurements = payload.some(
+//           (p) => p.groupId === groupId
+//         );
+//         if (!alreadyHasMeasurements) {
+//           const groupManualData = manualDataByGroup[groupId];
+//           payload.push({
+//             groupId: groupId,
+//             size: "Manual_Entry",
+//             stage: targetStage,
+//             line: "",
+//             table: "",
+//             color: "",
+//             qcUser: null,
+//             allMeasurements: {},
+//             criticalMeasurements: {},
+//             allEnabledPcs: [],
+//             criticalEnabledPcs: [],
+//             inspectorDecision:
+//               groupManualData.status === "Pass" ? "pass" : "fail",
+//             manualData: {
+//               remarks: groupManualData.remarks,
+//               status: groupManualData.status,
+//               images: processManualImagesForSave(groupManualData.images)
+//             }
+//           });
+//         }
+//       });
+
+//       if (payload.length === 0) {
+//         setSaving(false);
+//         setStatusModal({
+//           isOpen: true,
+//           type: "error",
+//           message: "No data to save."
+//         });
+//         return;
+//       }
+
+//       const res = await axios.post(
+//         `${API_BASE_URL}/api/fincheck-inspection/update-measurement-data`,
+//         {
+//           reportId: reportId,
+//           measurementData: payload
+//         }
+//       );
+
+//       if (res.data.success) {
+//         setIsUpdateMode(true);
+//         if (onSaveSuccess) onSaveSuccess();
+//         setStatusModal({
+//           isOpen: true,
+//           type: "success",
+//           message: `${displayLabel || targetStage} Measurements Saved!`
+//         });
+//       }
+//     } catch (error) {
+//       console.error("Error saving measurements:", error);
+//       setStatusModal({
+//         isOpen: true,
+//         type: "error",
+//         message: "Failed to save measurement results."
+//       });
+//     } finally {
+//       setSaving(false);
+//     }
+//   };
+
+//   if (loadingData) {
+//     return (
+//       <div className="flex justify-center items-center h-64">
+//         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+//         <span className="ml-3 text-gray-600 font-medium">
+//           Loading measurements...
+//         </span>
+//       </div>
+//     );
+//   }
+
+//   if (!reportData?.selectedTemplate) {
+//     return (
+//       <div className="flex flex-col items-center justify-center py-16">
+//         <Ruler className="w-12 h-12 text-gray-300 mb-4" />
+//         <p className="text-gray-500">Please select a Report Type first.</p>
+//       </div>
+//     );
+//   }
+
+//   return (
+//     <div className="relative pb-24">
+//       <YPivotQAInspectionMeasurementConfig
+//         // Key is CRITICAL here: It forces a full re-mount of the child component
+//         // when switching tabs (e.g. from Before to After). This ensures
+//         // the useEffect in the child runs immediately to fetch new specs.
+//         key={targetStage}
+//         selectedOrders={selectedOrders}
+//         orderData={orderData}
+//         reportData={stageSpecificReportData}
+//         onUpdateMeasurementData={handleChildUpdate}
+//         activeGroup={activeGroup}
+//         displayLabel={displayLabel}
+//       />
+
+//       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
+//         <div className="max-w-8xl mx-auto flex justify-end px-4">
+//           <button
+//             onClick={handleSaveData}
+//             disabled={!isReportSaved || saving}
+//             className={`
+//               flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-bold shadow-lg transition-all active:scale-95
+//               ${
+//                 !isReportSaved
+//                   ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
+//                   : isUpdateMode
+//                   ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+//                   : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
+//               }
+//             `}
+//           >
+//             {saving ? (
+//               <>
+//                 <Loader2 className="w-5 h-5 animate-spin" />
+//                 {isUpdateMode ? "Updating..." : "Saving..."}
+//               </>
+//             ) : (
+//               <>
+//                 {isUpdateMode ? (
+//                   <Edit3 className="w-5 h-5" />
+//                 ) : (
+//                   <Save className="w-5 h-5" />
+//                 )}
+//                 {isUpdateMode
+//                   ? `Update ${displayLabel || "Data"}`
+//                   : `Save ${displayLabel || "Data"}`}
+//               </>
+//             )}
+//           </button>
+//         </div>
+//       </div>
+
+//       <AutoDismissModal
+//         isOpen={statusModal.isOpen}
+//         onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}
+//         type={statusModal.type}
+//         message={statusModal.message}
+//       />
+//     </div>
+//   );
+// };
+
+// export default YPivotQAInspectionMeasurementDataSave;
+
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef
+} from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
@@ -12,7 +1533,7 @@ import {
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionMeasurementConfig from "./YPivotQAInspectionMeasurementConfig";
 
-// --- AUTO DISMISS MODAL COMPONENT HERE ---
+// --- AUTO DISMISS MODAL COMPONENT ---
 const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
   useEffect(() => {
     if (isOpen) {
@@ -63,7 +1584,9 @@ const YPivotQAInspectionMeasurementDataSave = ({
   activeGroup,
   reportId,
   isReportSaved,
-  onSaveSuccess
+  onSaveSuccess,
+  targetStage = "Before",
+  displayLabel = null
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -74,56 +1597,175 @@ const YPivotQAInspectionMeasurementDataSave = ({
     message: ""
   });
 
-  // --- FETCH EXISTING DATA ---
+  // Ref to track if we've already fetched data for this reportId
+  const fetchedReportIdRef = useRef(null);
+
+  // =================================================================================
+  // 1. FILTER DATA & UNPACK CONFIG (View Logic)
+  // =================================================================================
+  const stageSpecificReportData = useMemo(() => {
+    const allMeasurements = reportData.measurementData?.savedMeasurements || [];
+
+    // Filter Measurements by Stage
+    const filteredMeasurements = allMeasurements.filter((m) => {
+      if (m.stage) {
+        return m.stage === targetStage;
+      }
+      // Fallback for legacy data - use kValue presence to guess
+      // If kValue exists and not empty, likely Before wash
+      if (targetStage === "Before") {
+        return true; // Default legacy data to Before
+      }
+      return false;
+    });
+
+    // Unpack Config (Specs List) based on Stage
+    const configKey = `config${targetStage}`; // e.g. "configBefore"
+    const specificConfig = reportData.measurementData?.[configKey] || {};
+
+    console.log(
+      `[Wrapper ${targetStage}] Filtered ${filteredMeasurements.length} measurements`
+    );
+    console.log(
+      `[Wrapper ${targetStage}] Config:`,
+      Object.keys(specificConfig)
+    );
+
+    return {
+      ...reportData,
+      selectedTemplate: {
+        ...reportData.selectedTemplate,
+        Measurement: targetStage // Override to trick child component
+      },
+      measurementData: {
+        // Include global manual data
+        manualDataByGroup: reportData.measurementData?.manualDataByGroup || {},
+        // Include stage-specific config
+        ...specificConfig,
+        // Include filtered measurements
+        savedMeasurements: filteredMeasurements
+      }
+    };
+  }, [reportData, targetStage]);
+
+  // =================================================================================
+  // 2. MERGE DATA & PACK CONFIG (Update Logic)
+  // =================================================================================
+  const handleChildUpdate = useCallback(
+    (childUpdates, options = {}) => {
+      // If this is data coming from backend fetch, pass it through directly
+      if (options.isFromBackend) {
+        onUpdateMeasurementData(childUpdates, options);
+        return;
+      }
+
+      const allMeasurements =
+        reportData.measurementData?.savedMeasurements || [];
+
+      // A. Merge Measurements (Preserve other stages)
+      const otherStageMeasurements = allMeasurements.filter((m) => {
+        if (m.stage) return m.stage !== targetStage;
+        // Legacy data handling
+        if (targetStage === "Before") return false;
+        return true;
+      });
+
+      const updatedCurrentStageMeasurements = (
+        childUpdates.savedMeasurements || []
+      ).map((m) => ({
+        ...m,
+        stage: targetStage
+      }));
+
+      const combinedMeasurements = [
+        ...otherStageMeasurements,
+        ...updatedCurrentStageMeasurements
+      ];
+
+      // B. Pack Configuration Data into Namespaced Key
+      const { savedMeasurements, manualDataByGroup, ...configFields } =
+        childUpdates;
+      const configKey = `config${targetStage}`;
+
+      // Build the update object
+      const updatePayload = {
+        ...reportData.measurementData, // Keep global state
+        savedMeasurements: combinedMeasurements,
+        [configKey]: {
+          ...(reportData.measurementData?.[configKey] || {}),
+          ...configFields // Store specs list and selections in configBefore/configAfter
+        }
+      };
+
+      // Also update manualDataByGroup if provided
+      if (manualDataByGroup) {
+        updatePayload.manualDataByGroup = {
+          ...(reportData.measurementData?.manualDataByGroup || {}),
+          ...manualDataByGroup
+        };
+      }
+
+      onUpdateMeasurementData(updatePayload);
+    },
+    [reportData, targetStage, onUpdateMeasurementData]
+  );
+
+  // =================================================================================
+  // 3. FETCH EXISTING DATA FROM BACKEND (Only once per reportId)
+  // =================================================================================
   useEffect(() => {
     const fetchExistingMeasurementData = async () => {
       if (!reportId) return;
 
-      // Check if data already exists AND is properly formatted (Sets, not arrays)
-      const savedMeasurements =
-        reportData.measurementData?.savedMeasurements || [];
+      // Skip if we already fetched for this reportId
+      if (fetchedReportIdRef.current === reportId) {
+        return;
+      }
+
+      const measurementData = reportData.measurementData || {};
+      const savedMeasurements = measurementData.savedMeasurements || [];
+
+      // Check if data is already properly hydrated (Sets instead of Arrays)
       const hasProperlyFormattedData =
         savedMeasurements.length > 0 &&
         savedMeasurements[0]?.allEnabledPcs instanceof Set;
 
-      const hasManualData =
-        Object.keys(reportData.measurementData?.manualDataByGroup || {})
-          .length > 0;
+      // Check if config exists for THIS stage
+      const configKey = `config${targetStage}`;
+      const hasConfig = measurementData[configKey]?.fullSpecsList?.length > 0;
 
-      // If data is already properly formatted (hydrated from parent), skip fetch
-      if (hasProperlyFormattedData || hasManualData) {
-        setIsUpdateMode(true);
-        console.log("Measurement data already hydrated, skipping fetch");
-        return;
-      }
-
-      // Check if we have raw data (arrays, not Sets) - this means parent hydrated but didn't process
-      const hasRawData =
-        savedMeasurements.length > 0 &&
-        Array.isArray(savedMeasurements[0]?.allEnabledPcs);
-
-      if (hasRawData) {
-        console.log("Converting raw measurement data to proper format");
-        // Convert in place
-        const processedMeasurements = savedMeasurements.map((m) => ({
-          ...m,
-          allEnabledPcs: new Set(m.allEnabledPcs || []),
-          criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
-        }));
-
-        onUpdateMeasurementData(
-          {
-            ...reportData.measurementData,
-            savedMeasurements: processedMeasurements
-          },
-          { isFromBackend: true }
+      if (hasProperlyFormattedData && hasConfig) {
+        console.log(
+          `[Wrapper ${targetStage}] Data already hydrated, skipping fetch`
         );
-        setIsUpdateMode(true);
+        setIsUpdateMode(savedMeasurements.some((m) => m.stage === targetStage));
+        fetchedReportIdRef.current = reportId;
         return;
       }
 
-      // No data exists, fetch from backend
+      // Check if measurements exist for this stage (even without full hydration)
+      const stageHasMeasurements = savedMeasurements.some(
+        (m) => m.stage === targetStage || (!m.stage && targetStage === "Before")
+      );
+
+      if (stageHasMeasurements) {
+        setIsUpdateMode(true);
+      }
+
+      // If parent already has processed data but just missing specs, skip fetch
+      // The main page's useEffect will fetch specs
+      if (savedMeasurements.length > 0) {
+        console.log(
+          `[Wrapper ${targetStage}] Parent has data, waiting for specs fetch`
+        );
+        fetchedReportIdRef.current = reportId;
+        return;
+      }
+
+      // Only fetch if we have no data at all
       setLoadingData(true);
+      console.log(`[Wrapper ${targetStage}] Fetching data from backend...`);
+
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
@@ -132,26 +1774,28 @@ const YPivotQAInspectionMeasurementDataSave = ({
         if (res.data.success && res.data.data.measurementData) {
           const backendData = res.data.data.measurementData;
 
-          if (Array.isArray(backendData) && backendData.length > 0) {
-            setIsUpdateMode(true);
-          } else {
-            setIsUpdateMode(false);
-          }
+          // Filter for this stage
+          const stageMeasurements = backendData.filter(
+            (m) =>
+              m.stage === targetStage || (!m.stage && targetStage === "Before")
+          );
 
-          // Process Standard Measurements
+          setIsUpdateMode(stageMeasurements.length > 0);
+
+          // Process Measurements (Arrays -> Sets)
           const processedMeasurements = backendData
             .filter((m) => m.size !== "Manual_Entry")
             .map((m) => ({
               ...m,
               allEnabledPcs: new Set(m.allEnabledPcs || []),
-              criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+              criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+              stage: m.stage || "Before"
             }));
 
           // Process Manual Data
           const processedManualDataByGroup = {};
           backendData.forEach((item) => {
             if (item.manualData) {
-              const groupId = item.groupId;
               const processedImages = (item.manualData.images || []).map(
                 (img) => {
                   let displayUrl = img.imageURL;
@@ -172,8 +1816,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
                   };
                 }
               );
-
-              processedManualDataByGroup[groupId] = {
+              processedManualDataByGroup[item.groupId] = {
                 remarks: item.manualData.remarks || "",
                 status: item.manualData.status || "Pass",
                 images: processedImages
@@ -181,17 +1824,53 @@ const YPivotQAInspectionMeasurementDataSave = ({
             }
           });
 
+          // Extract K values used in Before measurements
+          const beforeMeasurements = processedMeasurements.filter(
+            (m) => m.stage === "Before"
+          );
+          const usedKValues = [
+            ...new Set(
+              beforeMeasurements
+                .map((m) => m.kValue)
+                .filter((k) => k && k !== "NA")
+            )
+          ].sort();
+
           onUpdateMeasurementData(
             {
               savedMeasurements: processedMeasurements,
               manualDataByGroup: processedManualDataByGroup,
-              isConfigured: processedMeasurements.length > 0
+              isConfigured: processedMeasurements.length > 0,
+              // Set up stage configs with what we know from saved data
+              configBefore:
+                beforeMeasurements.length > 0
+                  ? {
+                      isConfigured: true,
+                      lastSelectedKValue:
+                        usedKValues.length > 0
+                          ? usedKValues[usedKValues.length - 1]
+                          : "",
+                      usedKValues: usedKValues
+                    }
+                  : undefined,
+              configAfter: processedMeasurements.some(
+                (m) => m.stage === "After"
+              )
+                ? {
+                    isConfigured: true
+                  }
+                : undefined
             },
             { isFromBackend: true }
           );
+
+          fetchedReportIdRef.current = reportId;
         }
       } catch (error) {
-        console.error("Error fetching measurement data:", error);
+        console.error(
+          `[Wrapper ${targetStage}] Error fetching measurement data:`,
+          error
+        );
       } finally {
         setLoadingData(false);
       }
@@ -200,9 +1879,18 @@ const YPivotQAInspectionMeasurementDataSave = ({
     if (reportId) {
       fetchExistingMeasurementData();
     }
+  }, [reportId, targetStage]);
+
+  // Reset fetch ref when reportId changes
+  useEffect(() => {
+    if (reportId !== fetchedReportIdRef.current) {
+      fetchedReportIdRef.current = null;
+    }
   }, [reportId]);
 
-  // --- SAVE HANDLER ---
+  // =================================================================================
+  // 4. SAVE HANDLER
+  // =================================================================================
   const handleSaveData = async () => {
     if (!isReportSaved || !reportId) {
       setStatusModal({
@@ -218,29 +1906,28 @@ const YPivotQAInspectionMeasurementDataSave = ({
     const manualDataByGroup =
       reportData.measurementData?.manualDataByGroup || {};
 
+    // Filter to only save measurements for THIS stage
+    const stageMeasurements = currentMeasurements.filter(
+      (m) => m.stage === targetStage
+    );
+
     setSaving(true);
     try {
       const payload = [];
 
-      // Helper to process Manual Data Images for Upload
       const processManualImagesForSave = (images) => {
         return (images || []).map((img) => {
           let payloadImageURL = null;
           let payloadImgSrc = null;
-
-          // Check for Base64 in editedImgSrc (preferred) or imgSrc
           const imageData = img.editedImgSrc || img.imgSrc || img.url;
 
           if (imageData && imageData.startsWith("data:")) {
-            // New Image (Base64) -> Send in imgSrc for backend to save
             payloadImgSrc = imageData;
             payloadImageURL = null;
           } else if (imageData && imageData.includes(API_BASE_URL)) {
-            // Existing Image with Full URL -> Strip API_BASE_URL to save relative path
             payloadImageURL = imageData.replace(API_BASE_URL, "");
             payloadImgSrc = null;
           } else {
-            // Already relative or other URL
             payloadImageURL = imageData;
             payloadImgSrc = null;
           }
@@ -255,63 +1942,80 @@ const YPivotQAInspectionMeasurementDataSave = ({
         });
       };
 
+      // Group measurements by groupId for this stage
       const measurementsByGroup = {};
-      currentMeasurements.forEach((m) => {
-        if (!measurementsByGroup[m.groupId])
+      stageMeasurements.forEach((m) => {
+        if (!measurementsByGroup[m.groupId]) {
           measurementsByGroup[m.groupId] = [];
+        }
         measurementsByGroup[m.groupId].push(m);
       });
 
-      const allGroupIds = new Set([
-        ...Object.keys(measurementsByGroup).map(Number),
-        ...Object.keys(manualDataByGroup).map(Number)
-      ]);
+      // Process each group
+      Object.keys(measurementsByGroup).forEach((groupIdStr) => {
+        const groupMeasurements = measurementsByGroup[groupIdStr];
+        const groupId = parseInt(groupIdStr);
 
-      allGroupIds.forEach((groupId) => {
-        const groupMeasurements = measurementsByGroup[groupId] || [];
-        const groupManualData = manualDataByGroup[groupId];
+        groupMeasurements.forEach((m, index) => {
+          const isFirstInGroup = index === 0;
+          const cleanMeasurement = {
+            ...m,
+            allEnabledPcs: Array.from(m.allEnabledPcs || []),
+            criticalEnabledPcs: Array.from(m.criticalEnabledPcs || []),
+            stage: targetStage
+          };
 
-        if (groupMeasurements.length > 0) {
-          groupMeasurements.forEach((m, index) => {
-            const isFirst = index === 0;
-            const cleanMeasurement = {
-              ...m,
-              allEnabledPcs: Array.from(m.allEnabledPcs || []),
-              criticalEnabledPcs: Array.from(m.criticalEnabledPcs || [])
-            };
-
-            if (isFirst && groupManualData) {
+          // Attach manual data only to first measurement in group
+          if (isFirstInGroup) {
+            const groupManualData = manualDataByGroup[groupId];
+            if (groupManualData) {
               cleanMeasurement.manualData = {
                 remarks: groupManualData.remarks,
                 status: groupManualData.status,
                 images: processManualImagesForSave(groupManualData.images)
               };
-            } else {
-              cleanMeasurement.manualData = null;
             }
-            payload.push(cleanMeasurement);
-          });
-        } else if (groupManualData) {
-          // Placeholder for Manual-Only Entry
-          payload.push({
-            groupId: groupId,
-            size: "Manual_Entry",
-            line: "",
-            table: "",
-            color: "",
-            qcUser: null,
-            allMeasurements: {},
-            criticalMeasurements: {},
-            allEnabledPcs: [],
-            criticalEnabledPcs: [],
-            inspectorDecision:
-              groupManualData.status === "Pass" ? "pass" : "fail",
-            manualData: {
-              remarks: groupManualData.remarks,
-              status: groupManualData.status,
-              images: processManualImagesForSave(groupManualData.images)
-            }
-          });
+          } else {
+            cleanMeasurement.manualData = null;
+          }
+          payload.push(cleanMeasurement);
+        });
+      });
+
+      // Handle groups with only manual data (no measurements)
+      const allGroupIds = Object.keys(manualDataByGroup).map(Number);
+      const groupsWithMeasurements = new Set(
+        stageMeasurements.map((m) => m.groupId)
+      );
+
+      allGroupIds.forEach((groupId) => {
+        if (!groupsWithMeasurements.has(groupId)) {
+          const groupManualData = manualDataByGroup[groupId];
+          if (
+            groupManualData &&
+            (groupManualData.remarks || groupManualData.images?.length > 0)
+          ) {
+            payload.push({
+              groupId: groupId,
+              size: "Manual_Entry",
+              stage: targetStage,
+              line: "",
+              table: "",
+              color: "",
+              qcUser: null,
+              allMeasurements: {},
+              criticalMeasurements: {},
+              allEnabledPcs: [],
+              criticalEnabledPcs: [],
+              inspectorDecision:
+                groupManualData.status === "Pass" ? "pass" : "fail",
+              manualData: {
+                remarks: groupManualData.remarks,
+                status: groupManualData.status,
+                images: processManualImagesForSave(groupManualData.images)
+              }
+            });
+          }
         }
       });
 
@@ -320,10 +2024,12 @@ const YPivotQAInspectionMeasurementDataSave = ({
         setStatusModal({
           isOpen: true,
           type: "error",
-          message: "No data to save."
+          message: `No ${displayLabel || targetStage} data to save.`
         });
         return;
       }
+
+      console.log(`[Wrapper ${targetStage}] Saving ${payload.length} items`);
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-measurement-data`,
@@ -335,19 +2041,18 @@ const YPivotQAInspectionMeasurementDataSave = ({
 
       if (res.data.success) {
         setIsUpdateMode(true);
-        if (onSaveSuccess) {
-          onSaveSuccess();
-        }
+        if (onSaveSuccess) onSaveSuccess();
         setStatusModal({
           isOpen: true,
           type: "success",
-          message: isUpdateMode
-            ? "Measurement Data Updated Successfully!"
-            : "Measurement Data Saved Successfully!"
+          message: `${displayLabel || targetStage} Measurements Saved!`
         });
       }
     } catch (error) {
-      console.error("Error saving measurement results:", error);
+      console.error(
+        `[Wrapper ${targetStage}] Error saving measurements:`,
+        error
+      );
       setStatusModal({
         isOpen: true,
         type: "error",
@@ -358,12 +2063,15 @@ const YPivotQAInspectionMeasurementDataSave = ({
     }
   };
 
+  // =================================================================================
+  // 5. RENDER
+  // =================================================================================
   if (loadingData) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
         <span className="ml-3 text-gray-600 font-medium">
-          Loading existing measurements...
+          Loading {displayLabel || targetStage} measurements...
         </span>
       </div>
     );
@@ -381,11 +2089,14 @@ const YPivotQAInspectionMeasurementDataSave = ({
   return (
     <div className="relative pb-24">
       <YPivotQAInspectionMeasurementConfig
+        // Key forces re-mount when switching tabs
+        key={`${targetStage}_${reportId || "new"}`}
         selectedOrders={selectedOrders}
         orderData={orderData}
-        reportData={reportData}
-        onUpdateMeasurementData={onUpdateMeasurementData}
+        reportData={stageSpecificReportData}
+        onUpdateMeasurementData={handleChildUpdate}
         activeGroup={activeGroup}
+        displayLabel={displayLabel}
       />
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
@@ -399,17 +2110,10 @@ const YPivotQAInspectionMeasurementDataSave = ({
                 !isReportSaved
                   ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
                   : isUpdateMode
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" // Blue for Update
-                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white" // Green for Save
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
               }
             `}
-            title={
-              !isReportSaved
-                ? "Save Order Data first"
-                : isUpdateMode
-                ? "Update Measurement Data"
-                : "Save Measurement Data"
-            }
           >
             {saving ? (
               <>
@@ -423,13 +2127,15 @@ const YPivotQAInspectionMeasurementDataSave = ({
                 ) : (
                   <Save className="w-5 h-5" />
                 )}
-                {isUpdateMode ? "Update Measurements" : "Save Measurements"}
+                {isUpdateMode
+                  ? `Update ${displayLabel || targetStage}`
+                  : `Save ${displayLabel || targetStage}`}
               </>
             )}
           </button>
         </div>
       </div>
-      {/* Auto Dismiss Modal */}
+
       <AutoDismissModal
         isOpen={statusModal.isOpen}
         onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}

@@ -705,6 +705,27 @@ const YPivotQATemplatesReportType = () => {
                     </select>
                   </div>
 
+                  {/* *** NEW: Additional Measurement *** */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase text-indigo-600">
+                      Meas. Additional (Tab 2)
+                    </label>
+                    <select
+                      value={formData.MeasurementAdditional}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          MeasurementAdditional: e.target.value
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50/50..."
+                    >
+                      <option value="No">No</option>
+                      <option value="Before">Before</option>
+                      <option value="After">After</option>
+                    </select>
+                  </div>
+
                   {/* Inspected Method */}
                   <div>
                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase">
