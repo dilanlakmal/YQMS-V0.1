@@ -28,6 +28,7 @@ import {
   updateMeasurementData,
   uploadDefectImages,
   updateDefectData,
+  uploadPPSheetImages,
   updatePPSheetData,
   submitFullInspectionReport,
   searchPreviousReports
@@ -173,6 +174,13 @@ router.post(
 
 // Save Defect Data
 router.post("/api/fincheck-inspection/update-defect-data", updateDefectData);
+
+// Upload PP Sheet Images (Multipart)
+router.post(
+  "/api/fincheck-inspection/upload-pp-sheet-images",
+  upload.array("images"),
+  uploadPPSheetImages
+);
 
 // Save PP Sheet Data
 router.post("/api/fincheck-inspection/update-pp-sheet-data", updatePPSheetData);

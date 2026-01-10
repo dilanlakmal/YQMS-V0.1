@@ -1071,6 +1071,10 @@ export const checkExistingReport = async (req, res) => {
   }
 };
 
+// ============================================================
+// Upload Header Images (Multipart/FormData)
+// ============================================================
+
 // Define Storage Path
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1085,9 +1089,6 @@ if (!fs.existsSync(uploadDirHeader)) {
   fs.mkdirSync(uploadDirHeader, { recursive: true });
 }
 
-// ============================================================
-// Upload Header Images (Multipart/FormData)
-// ============================================================
 export const uploadHeaderImages = async (req, res) => {
   try {
     if (!req.files || req.files.length === 0) {
@@ -1199,81 +1200,6 @@ export const updateHeaderData = async (req, res) => {
     });
   }
 };
-
-// ============================================================
-// Update Header Data (Selections, Remarks, Images)
-// ============================================================
-// export const updateHeaderData = async (req, res) => {
-//   try {
-//     const { reportId, headerData } = req.body;
-
-//     if (!reportId || !headerData || !Array.isArray(headerData)) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Invalid payload." });
-//     }
-
-//     const report = await FincheckInspectionReports.findOne({
-//       reportId: parseInt(reportId)
-//     });
-//     if (!report) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Report not found." });
-//     }
-
-//     const processedHeaderData = headerData.map((section) => {
-//       const processedImages = (section.images || [])
-//         .map((img, idx) => {
-//           let finalUrl = img.imageURL;
-
-//           if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-//             const savedPath = saveBase64Image(
-//               img.imgSrc,
-//               reportId,
-//               section.headerId,
-//               idx
-//             );
-//             if (savedPath) finalUrl = savedPath;
-//           }
-
-//           return {
-//             // FIX: Ensure imageId exists. Use provided ID or generate fallback.
-//             imageId:
-//               img.id ||
-//               img.imageId ||
-//               `${section.headerId}_${idx}_${Date.now()}`,
-//             imageURL: finalUrl
-//           };
-//         })
-//         .filter((img) => img.imageURL);
-
-//       return {
-//         headerId: section.headerId,
-//         name: section.name,
-//         selectedOption: section.selectedOption,
-//         remarks: section.remarks,
-//         images: processedImages
-//       };
-//     });
-
-//     report.headerData = processedHeaderData;
-//     await report.save(); // Mongoose validation will now pass because imageId is guaranteed
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Header data saved successfully.",
-//       data: report.headerData
-//     });
-//   } catch (error) {
-//     console.error("Error updating header data:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal server error.",
-//       error: error.message
-//     });
-//   }
-// };
 
 // ============================================================
 // Update Photo Data (Images, Remarks)
@@ -1471,6 +1397,7 @@ export const uploadPhotoBatch = async (req, res) => {
   }
 };
 
+// Delete Photo from Item
 export const deletePhotoFromItem = async (req, res) => {
   try {
     const { reportId, sectionId, itemNo, imageId } = req.body;
@@ -1609,6 +1536,7 @@ export const updatePhotoItemRemark = async (req, res) => {
   }
 };
 
+// Manual controller for updating photo data with blob URL safeguard
 export const updatePhotoData = async (req, res) => {
   try {
     const { reportId, photoData } = req.body;
@@ -1990,35 +1918,6 @@ if (!fs.existsSync(uploadDirDefectManual)) {
   fs.mkdirSync(uploadDirDefectManual, { recursive: true });
 }
 
-// Helper: Generic Base64 Image Saver
-// const saveBase64ImageToPath = (base64String, directory, filenamePrefix) => {
-//   try {
-//     if (!base64String || typeof base64String !== "string") return null;
-
-//     const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-//     if (!matches || matches.length !== 3) return null;
-
-//     const type = matches[1];
-//     const data = Buffer.from(matches[2], "base64");
-//     const ext = type.split("/")[1] || "jpg";
-
-//     const filename = `${filenamePrefix}_${Date.now()}.${ext}`;
-//     const filepath = path.join(directory, filename);
-
-//     fs.writeFileSync(filepath, data);
-
-//     // Return relative URL based on directory
-//     const relativePath = directory.includes("DefectManualData")
-//       ? `/storage/PivotY/Fincheck/DefectManualData/${filename}`
-//       : `/storage/PivotY/Fincheck/DefectData/${filename}`;
-
-//     return relativePath;
-//   } catch (error) {
-//     console.error("Error saving base64 image:", error);
-//     return null;
-//   }
-// };
-
 // Defect Image Upload Endpoint
 export const uploadDefectImages = async (req, res) => {
   try {
@@ -2327,30 +2226,42 @@ if (!fs.existsSync(uploadDirPPSheet)) {
   fs.mkdirSync(uploadDirPPSheet, { recursive: true });
 }
 
-// Helper: Save PP Sheet Base64 Image
-const savePPSheetBase64Image = (base64String, reportId, index) => {
+// ============================================================
+// NEW: Upload PP Sheet Images (Multipart/FormData)
+// ============================================================
+export const uploadPPSheetImages = async (req, res) => {
   try {
-    const matches = base64String.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-    if (!matches || matches.length !== 3) return null;
+    if (!req.files || req.files.length === 0) {
+      return res.status(200).json({ success: true, data: { paths: [] } });
+    }
 
-    const type = matches[1];
-    const data = Buffer.from(matches[2], "base64");
-    const ext = type.split("/")[1] || "jpg";
+    const savedPaths = [];
 
-    // Create unique filename
-    const filename = `ppsheet_${reportId}_${index}_${Date.now()}.${ext}`;
-    const filepath = path.join(uploadDirPPSheet, filename);
+    for (const file of req.files) {
+      // Unique filename
+      const uniqueName = `pp_img_${Date.now()}_${Math.round(
+        Math.random() * 1000
+      )}${path.extname(file.originalname)}`;
 
-    fs.writeFileSync(filepath, data);
+      const targetPath = path.join(uploadDirPPSheet, uniqueName);
 
-    // Return relative URL
-    return `/storage/PivotY/Fincheck/PPSheetData/${filename}`;
+      // Move file
+      fs.renameSync(file.path, targetPath);
+
+      // Push relative path
+      savedPaths.push(`/storage/PivotY/Fincheck/PPSheetData/${uniqueName}`);
+    }
+
+    return res.status(200).json({ success: true, data: { paths: savedPaths } });
   } catch (error) {
-    console.error("Error saving PP Sheet base64 image:", error);
-    return null;
+    console.error("PP Sheet image upload error:", error);
+    return res.status(500).json({ success: false, message: "Upload failed" });
   }
 };
 
+// ============================================================
+// MODIFIED: Update PP Sheet Data (No Base64)
+// ============================================================
 export const updatePPSheetData = async (req, res) => {
   try {
     const { reportId, ppSheetData } = req.body;
@@ -2371,23 +2282,18 @@ export const updatePPSheetData = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
-    // Process Images
+    // Process Images - We only save valid server paths now
     const processedImages = (ppSheetData.images || [])
       .map((img, idx) => {
-        let finalUrl = img.imageURL;
-
-        // If new Base64 image, save to disk
-        if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-          const savedPath = savePPSheetBase64Image(img.imgSrc, reportId, idx);
-          if (savedPath) finalUrl = savedPath;
-        }
+        // Frontend must have uploaded it and sent back the path in imageURL
+        if (!img.imageURL) return null;
 
         return {
           imageId: img.id || `pp_${idx}_${Date.now()}`,
-          imageURL: finalUrl
+          imageURL: img.imageURL
         };
       })
-      .filter((img) => img.imageURL); // Remove failed saves
+      .filter((img) => img !== null); // Remove failed saves
 
     // Construct the final object
     const finalData = {

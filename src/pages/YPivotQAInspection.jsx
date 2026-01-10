@@ -236,6 +236,39 @@ const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
 // HELPER FUNCTIONS TO TRANSFORM BACKEND DATA TO COMPONENT FORMAT
 // ==================================================================================
 
+// Transform PP Sheet data from backend (Fix image URLs)
+const transformPPSheetDataFromBackend = (backendData) => {
+  if (!backendData) return null;
+
+  // Create a copy to modify images
+  const processedData = { ...backendData };
+
+  if (processedData.images && Array.isArray(processedData.images)) {
+    processedData.images = processedData.images.map((img) => {
+      let displayUrl = img.imageURL;
+
+      // Prepend API_BASE_URL if it's a relative path
+      if (
+        displayUrl &&
+        !displayUrl.startsWith("http") &&
+        !displayUrl.startsWith("data:")
+      ) {
+        displayUrl = `${API_BASE_URL}${displayUrl}`;
+      }
+
+      return {
+        id: img.imageId || img.id,
+        url: displayUrl, // Used by <img> src
+        imgSrc: displayUrl, // Used by Editor
+        imageURL: img.imageURL, // Keep original relative path
+        history: []
+      };
+    });
+  }
+
+  return processedData;
+};
+
 // Transform header data from backend format to component format
 const transformHeaderDataFromBackend = (backendHeaderData) => {
   if (!backendHeaderData || !Array.isArray(backendHeaderData)) {
@@ -794,7 +827,9 @@ const YPivotQAInspection = () => {
             },
 
             // PP Sheet Data
-            ppSheetData: reportData.ppSheetData || prev.ppSheetData
+            ppSheetData: reportData.ppSheetData
+              ? transformPPSheetDataFromBackend(reportData.ppSheetData)
+              : prev.ppSheetData
           };
 
           return newState;
