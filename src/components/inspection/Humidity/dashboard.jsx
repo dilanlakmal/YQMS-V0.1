@@ -29,46 +29,119 @@ ChartJS.register(
 );
 
 // Enhanced KPI card with gradient and icons
-const KpiCard = ({ title, value, subtitle, icon, gradient, trend }) => (
-  <div
-    className={`relative overflow-hidden rounded-2xl p-6 shadow-lg ${gradient} text-gray-800 transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
-  >
-    <div className="absolute top-0 right-0 opacity-10">
-      <div className="w-32 h-32 transform translate-x-8 -translate-y-8">
-        {icon}
+const KpiCard = ({
+  title,
+  value,
+  subtitle,
+  icon,
+  gradient,
+  trend,
+  percent,
+  cornerIcon,
+  cornerBg
+}) => {
+  const graphUp =
+    trend !== null && trend !== undefined
+      ? Number(trend) > 0
+      : percent !== null && percent !== undefined
+      ? Number(percent) >= 50
+      : true;
+
+  return (
+    <div
+      className={`relative overflow-hidden rounded-2xl p-6 shadow-lg ${gradient} text-gray-800 transform transition-all duration-300 hover:scale-105 hover:shadow-2xl`}
+    >
+      <div className="absolute top-0 right-0 opacity-10">
+        <div className="w-32 h-32 transform translate-x-8 -translate-y-8">
+          {icon}
+        </div>
       </div>
-    </div>
-    <div className="relative z-10">
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-sm font-medium opacity-90">{title}</div>
-        {trend !== null && trend !== undefined && trend !== 0 && (
-          <div
-            className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
-              trend > 0 ? "bg-white/20" : "bg-white/10"
-            }`}
-          >
-            <svg
-              className={`w-3 h-3 ${trend > 0 ? "rotate-0" : "rotate-180"}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+      <div className="relative z-10">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm font-medium opacity-90">{title}</div>
+          {trend !== null && trend !== undefined && trend !== 0 && (
+            <div
+              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                trend > 0 ? "bg-white/20" : "bg-white/10"
+              }`}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-              />
-            </svg>
-            <span>{Math.abs(trend)}%</span>
-          </div>
-        )}
+              <svg
+                className={`w-3 h-3 ${trend > 0 ? "rotate-0" : "rotate-180"}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
+                />
+              </svg>
+              <span>{Math.abs(trend)}%</span>
+            </div>
+          )}
+        </div>
+        <div className="text-4xl font-bold mb-1">{value}</div>
+        {subtitle && <div className="text-xs opacity-80">{subtitle}</div>}
       </div>
-      <div className="text-4xl font-bold mb-1">{value}</div>
-      {subtitle && <div className="text-xs opacity-80">{subtitle}</div>}
+      {cornerIcon && (
+        <div className="absolute top-0 right-0 z-0 pointer-events-none">
+          <div
+            className={`w-24 h-24 rounded-full flex items-center justify-center ${
+              cornerBg || "bg-white/10"
+            } opacity-20 transform translate-x-6 -translate-y-6`}
+          >
+            <div className="w-6 h-6 opacity-60 stroke-current">
+              {cornerIcon}
+            </div>
+          </div>
+        </div>
+      )}
+      {percent !== null && percent !== undefined && (
+        <div className="absolute top-4 right-6 z-20">
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center ${
+              percent >= 50 ? "" : ""
+            } shadow-sm`}
+          >
+            <div className="flex items-center gap-1">
+              <svg
+                className={`w-3 h-3 transform ${
+                  graphUp ? "rotate-0" : "rotate-180"
+                } ${percent >= 50 ? "text-gray-600" : "text-gray-600"}`}
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <polyline
+                  points="3 17 8 12 12 16 21 7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+                <polyline
+                  points="17 7 21 7 21 11"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                />
+              </svg>
+              <span
+                className={`${
+                  percent >= 50 ? "text-gray-600" : "text-gray-600"
+                } text-xs font-semibold`}
+              >
+                {percent}%
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // Stats card for smaller metrics
 const StatsCard = ({ label, value, icon, color = "blue" }) => {
@@ -773,7 +846,7 @@ export default function Dashboard() {
               />
             </svg>
           }
-          color="green"
+          color="orange"
         />
         <StatsCard
           label="Pass Rate"
@@ -794,7 +867,7 @@ export default function Dashboard() {
             </svg>
           }
           color={
-            passPctBody >= 80 ? "green" : passPctBody >= 50 ? "orange" : "red"
+            passPctBody >= 80 ? "green" : passPctBody >= 50 ? "green" : "green"
           }
         />
         <StatsCard
@@ -815,9 +888,7 @@ export default function Dashboard() {
               />
             </svg>
           }
-          color={
-            failPctBody <= 20 ? "green" : failPctBody <= 50 ? "orange" : "red"
-          }
+          color={failPctBody <= 20 ? "red" : failPctBody <= 50 ? "red" : "red"}
         />
       </div>
 
@@ -844,6 +915,28 @@ export default function Dashboard() {
           subtitle="Passed inspection"
           gradient="bg-gray-50 border-2 border-green-300"
           trend={passPctBody > 50 ? passPctBody : null}
+          percent={passPctBody}
+          cornerBg="bg-green-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-green-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
           icon={
             <svg
               className="w-full h-full text-green-400"
@@ -860,6 +953,28 @@ export default function Dashboard() {
           subtitle="Requires attention"
           gradient="bg-gray-50 border-2 border-red-300"
           trend={failPctBody < 50 ? -failPctBody : null}
+          percent={failPctBody}
+          cornerBg="bg-red-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-red-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
           icon={
             <svg
               className="w-full h-full text-red-400"
@@ -896,6 +1011,28 @@ export default function Dashboard() {
           subtitle="Passed inspection"
           gradient="bg-gray-50 border-2 border-teal-300"
           trend={passPct > 50 ? passPct : null}
+          percent={passPct}
+          cornerBg="bg-green-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-teal-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
           icon={
             <svg
               className="w-full h-full text-teal-400"
@@ -912,6 +1049,28 @@ export default function Dashboard() {
           subtitle="Requires attention"
           gradient="bg-gray-50 border-2 border-orange-300"
           trend={failPct < 50 ? -failPct : null}
+          percent={failPct}
+          cornerBg="bg-red-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-orange-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M4 14h3v6H4zM10 10h3v10h-3zM16 6h3v14h-3z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
           icon={
             <svg
               className="w-full h-full text-orange-400"
@@ -932,7 +1091,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Body Chart */}
         <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-2">
             <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center">
               <svg
                 className="w-6 h-6 text-white"
@@ -952,66 +1111,91 @@ export default function Dashboard() {
               Body Performance
             </h3>
           </div>
-          <div
-            className="flex items-center justify-center mt-10 pb-2"
-            style={{ height: 150 }}
-          >
-            <div className="w-full md:w-2/5">
-              <Doughnut
-                data={{
-                  labels: ["Pass", "Fail"],
-                  datasets: [
-                    {
-                      data: [totalBodyPass, totalBodyFail],
-                      backgroundColor: [
-                        "rgba(173, 216, 230, 0.8)",
-                        "rgba(255, 192, 203, 0.8)"
-                      ],
-                      borderColor: [
-                        "rgba(173, 216, 230, 1)",
-                        "rgba(255, 192, 203, 1)"
-                      ],
-                      borderWidth: 2,
-                      hoverOffset: 8
-                    }
-                  ]
-                }}
-                options={{
-                  cutout: "65%",
-                  plugins: {
-                    datalabels: {
-                      display: false
-                    },
-                    legend: {
-                      display: true,
-                      position: "bottom",
-                      labels: {
-                        usePointStyle: true,
-                        pointStyle: "circle",
-                        boxWidth: 10,
-                        boxHeight: 10,
-                        padding: 24,
-                        font: { size: 13, weight: 500 }
+          {totalBodyPass === 0 && totalBodyFail === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+              <svg
+                className="w-16 h-16 mb-4 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={1.5}
+                  d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                />
+              </svg>
+              <p className="font-medium text-gray-700">
+                No Body Data Available
+              </p>
+              <p className="text-sm mt-1 text-center">
+                Enter body readings in your inspection reports to see this chart
+              </p>
+            </div>
+          ) : (
+            <div
+              className="flex items-center justify-center mt-10 pb-4"
+              style={{ height: 200 }}
+            >
+              <div className="w-full md:w-2/5">
+                <Doughnut
+                  data={{
+                    labels: ["Pass", "Fail"],
+                    datasets: [
+                      {
+                        data: [totalBodyPass, totalBodyFail],
+                        backgroundColor: [
+                          "rgba(173, 216, 230, 0.8)",
+                          "rgba(255, 192, 203, 0.8)"
+                        ],
+                        borderColor: [
+                          "rgba(173, 216, 230, 1)",
+                          "rgba(255, 192, 203, 1)"
+                        ],
+                        borderWidth: 2,
+                        hoverOffset: 8
                       }
-                    },
-                    tooltip: {
-                      callbacks: {
-                        label: function (context) {
-                          const label = context.label || "";
-                          const value = context.raw || 0;
-                          const total =
-                            context.chart._metasets[context.datasetIndex].total;
-                          const percentage =
-                            Math.round((value / total) * 100) + "%";
-                          return `${label}: ${value} (${percentage})`;
+                    ]
+                  }}
+                  options={{
+                    cutout: "65%",
+                    plugins: {
+                      datalabels: {
+                        display: false
+                      },
+                      legend: {
+                        display: true,
+                        position: "bottom",
+                        labels: {
+                          usePointStyle: true,
+                          pointStyle: "circle",
+                          boxWidth: 10,
+                          boxHeight: 10,
+                          padding: 24,
+                          font: { size: 13, weight: 500 }
+                        }
+                      },
+                      tooltip: {
+                        callbacks: {
+                          label: function (context) {
+                            const label = context.label || "";
+                            const value = context.raw || 0;
+                            const total =
+                              context.chart._metasets[context.datasetIndex]
+                                .total;
+                            const percentage =
+                              Math.round((value / total) * 100) + "%";
+                            return `${label}: ${value} (${percentage})`;
+                          }
                         }
                       }
                     }
-                  }
-                }}
-              />
+                  }}
+                />
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Ribs Chart */}
@@ -1060,8 +1244,8 @@ export default function Dashboard() {
             </div>
           ) : (
             <div
-              className="flex items-center justify-center mt-4 pb-4"
-              style={{ height: 150 }}
+              className="flex items-center justify-center mt-10 pb-4"
+              style={{ height: 200 }}
             >
               <div className="w-full md:w-2/5">
                 <Doughnut
@@ -1071,13 +1255,10 @@ export default function Dashboard() {
                       {
                         data: [totalRibsPass, totalRibsFail],
                         backgroundColor: [
-                          "rgba(139, 92, 246, 0.8)",
-                          "rgba(249, 115, 22, 0.8)"
+                          "#B5EAD7", // Pastel Mint (Pass)
+                          "#FF9AA2" // Pastel Salmon (Fail)
                         ],
-                        borderColor: [
-                          "rgba(139, 92, 246, 1)",
-                          "rgba(249, 115, 22, 1)"
-                        ],
+                        borderColor: ["#B5EAD7", "#FF9AA2"],
                         borderWidth: 2,
                         hoverOffset: 8
                       }
