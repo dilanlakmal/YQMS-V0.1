@@ -1,19 +1,16 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import {
   Ruler,
   Loader2,
   Maximize2,
-  AlertCircle,
   Settings,
-  BarChart3,
   CheckCircle2,
   Lock,
   Unlock,
   AlertTriangle,
   Play,
   CheckCircle,
-  XCircle,
   FilePenLine
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
@@ -30,35 +27,33 @@ const YPivotQAInspectionMeasurementConfig = ({
   orderData,
   reportData,
   onUpdateMeasurementData,
-  activeGroup
+  activeGroup,
+  displayLabel
 }) => {
   const activeMoNo =
     selectedOrders && selectedOrders.length > 0 ? selectedOrders[0] : null;
   const activeReportTemplate = reportData?.selectedTemplate;
+
+  // This comes from the Parent Wrapper (It overrides selectedTemplate.Measurement for the specific tab)
   const measConfig = activeReportTemplate?.Measurement || "No";
 
+  // This contains the specific config for THIS stage (unpacked by parent)
   const savedState = reportData?.measurementData || {};
 
   const [internalTab, setInternalTab] = useState("specs");
   const [loading, setLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
-  const [fullSpecsList, setFullSpecsList] = useState(
-    savedState.fullSpecsList || []
-  );
-  const [selectedSpecsList, setSelectedSpecsList] = useState(
-    savedState.selectedSpecsList || []
-  );
-  const [sourceType, setSourceType] = useState(savedState.sourceType || "");
-  const [isConfigured, setIsConfigured] = useState(
-    savedState.isConfigured || false
-  );
-  const [savedMeasurements, setSavedMeasurements] = useState(
-    savedState.savedMeasurements || []
-  );
-  const [orderSizes, setOrderSizes] = useState(savedState.orderSizes || []);
-  const [kValuesList, setKValuesList] = useState(savedState.kValuesList || []);
+  // --- STATE VARIABLES ---
+  const [fullSpecsList, setFullSpecsList] = useState([]);
+  const [selectedSpecsList, setSelectedSpecsList] = useState([]);
+  const [sourceType, setSourceType] = useState("");
+  const [isConfigured, setIsConfigured] = useState(false);
+  const [savedMeasurements, setSavedMeasurements] = useState([]);
+  const [orderSizes, setOrderSizes] = useState([]);
+  const [kValuesList, setKValuesList] = useState([]);
 
+  // Initialize from savedState if available
   const [selectedSize, setSelectedSize] = useState("");
   const [selectedKValue, setSelectedKValue] = useState("");
 
@@ -67,7 +62,55 @@ const YPivotQAInspectionMeasurementConfig = ({
   const [editingMeasurementIndex, setEditingMeasurementIndex] = useState(null);
   const [editingMeasurementData, setEditingMeasurementData] = useState(null);
 
-  // --- SCOPED MANUAL DATA LOGIC ---
+  // Ref to prevent infinite update loops
+  const isFetching = useRef(false);
+  const lastSavedStateRef = useRef(null);
+
+  // --- 1. CRITICAL SYNC STATE FROM PROPS ---
+  // Use a single dependency on the stringified savedState to detect changes
+  useEffect(() => {
+    // Create a stable comparison key to prevent unnecessary updates
+    const stateKey = JSON.stringify({
+      fullSpecsCount: savedState.fullSpecsList?.length || 0,
+      selectedSpecsCount: savedState.selectedSpecsList?.length || 0,
+      sourceType: savedState.sourceType,
+      isConfigured: savedState.isConfigured,
+      measurementsCount: savedState.savedMeasurements?.length || 0,
+      sizesCount: savedState.orderSizes?.length || 0,
+      kValuesCount: savedState.kValuesList?.length || 0,
+      lastKValue: savedState.lastSelectedKValue
+    });
+
+    // Skip if nothing changed
+    if (lastSavedStateRef.current === stateKey) {
+      return;
+    }
+    lastSavedStateRef.current = stateKey;
+
+    console.log(`[MeasConfig ${measConfig}] Syncing state from props`, {
+      specs: savedState.fullSpecsList?.length,
+      kValues: savedState.kValuesList,
+      lastK: savedState.lastSelectedKValue
+    });
+
+    setFullSpecsList(savedState.fullSpecsList || []);
+    setSelectedSpecsList(savedState.selectedSpecsList || []);
+    setSourceType(savedState.sourceType || "");
+    setIsConfigured(savedState.isConfigured || false);
+    setSavedMeasurements(savedState.savedMeasurements || []);
+    setOrderSizes(savedState.orderSizes || []);
+    setKValuesList(savedState.kValuesList || []);
+
+    // Restore selected K Value from saved state
+    if (savedState.lastSelectedKValue) {
+      setSelectedKValue(savedState.lastSelectedKValue);
+    } else if (savedState.kValuesList?.length > 0 && !selectedKValue) {
+      // Auto-select first K value if none selected
+      setSelectedKValue(savedState.kValuesList[0]);
+    }
+  }, [savedState, measConfig]);
+
+  // --- MANUAL DATA LOGIC ---
   const currentManualData = useMemo(() => {
     const allManualData = reportData?.measurementData?.manualDataByGroup || {};
     const groupId = activeGroup?.id || "general";
@@ -76,69 +119,76 @@ const YPivotQAInspectionMeasurementConfig = ({
     );
   }, [reportData?.measurementData?.manualDataByGroup, activeGroup]);
 
-  // --- MANUAL DATA UPDATE HANDLER ---
   const handleManualDataUpdate = (newManualData) => {
     if (onUpdateMeasurementData) {
       const groupId = activeGroup?.id || "general";
       const existingManualDataMap =
         reportData?.measurementData?.manualDataByGroup || {};
+      onUpdateMeasurementData({
+        manualDataByGroup: {
+          ...existingManualDataMap,
+          [groupId]: newManualData
+        }
+      });
+    }
+  };
 
-      const updatedMap = {
-        ...existingManualDataMap,
-        [groupId]: newManualData
+  // Enhanced updateParent to persist selection state
+  const updateParent = (updates, options = {}) => {
+    if (onUpdateMeasurementData) {
+      const enhancedUpdates = {
+        ...updates
       };
 
-      // We use spread on existing state to not lose other measurement data
-      onUpdateMeasurementData({
-        ...reportData?.measurementData, // Keep existing standard measurements
-        manualDataByGroup: updatedMap
-      });
+      // Always persist current selection state unless explicitly told not to
+      if (!options.skipSelectionPersist) {
+        enhancedUpdates.lastSelectedKValue = selectedKValue;
+        enhancedUpdates.lastSelectedSize = selectedSize;
+      }
+
+      onUpdateMeasurementData(enhancedUpdates);
     }
   };
 
-  const updateParent = (updates) => {
-    if (onUpdateMeasurementData) {
-      onUpdateMeasurementData({
-        fullSpecsList,
-        selectedSpecsList,
-        sourceType,
-        isConfigured,
-        savedMeasurements,
-        orderSizes,
-        kValuesList,
-        manualDataByGroup: reportData?.measurementData?.manualDataByGroup || {},
-        ...updates
-      });
-    }
-  };
-
+  // --- 2. FETCH SPECS ON MOUNT OR STAGE CHANGE ---
   useEffect(() => {
     if (!activeMoNo || !activeReportTemplate || measConfig === "No") {
       setInitialLoadDone(true);
       return;
     }
 
+    // Only fetch if we don't have specs for this stage yet
     if (savedState.fullSpecsList && savedState.fullSpecsList.length > 0) {
       setInitialLoadDone(true);
       return;
     }
 
     const initData = async () => {
+      if (isFetching.current) return;
+      isFetching.current = true;
+
       const sizes = extractSizesFromOrderData();
       setOrderSizes(sizes);
+
+      // Pass the specific stage (Before or After) to the fetcher
       await fetchMeasurementSpecs(measConfig, activeMoNo, sizes);
+
+      isFetching.current = false;
     };
 
     initData();
-  }, [activeMoNo, activeReportTemplate?._id]);
+  }, [activeMoNo, measConfig]);
 
+  // Only clear size when group changes, NOT kValue
   useEffect(() => {
     setSelectedSize("");
+    // Don't clear kValue here - it should persist across group changes
   }, [activeGroup?.id]);
 
   const extractSizesFromOrderData = () => {
     if (!orderData) return [];
     const allSizes = new Set();
+    // Logic to extract sizes...
     if (orderData.orderBreakdowns && Array.isArray(orderData.orderBreakdowns)) {
       orderData.orderBreakdowns.forEach((breakdown) => {
         if (breakdown.colorSizeBreakdown?.sizeList) {
@@ -155,10 +205,12 @@ const YPivotQAInspectionMeasurementConfig = ({
 
   const fetchMeasurementSpecs = async (type, moNo, currentSizes) => {
     setLoading(true);
+    // Dynamic Endpoint based on type (Before vs After)
     const endpoint =
       type === "Before"
         ? `/api/qa-sections/measurement-specs/${moNo}`
         : `/api/qa-sections/measurement-specs-aw/${moNo}`;
+
     try {
       const res = await axios.get(`${API_BASE_URL}${endpoint}`);
       const { source, data } = res.data;
@@ -168,6 +220,7 @@ const YPivotQAInspectionMeasurementConfig = ({
       let selected = [];
       let newKValues = [];
 
+      // Logic to parse response based on Type
       if (type === "Before") {
         all = data.AllBeforeWashSpecs || [];
         selected = data.selectedBeforeWashSpecs || [];
@@ -176,35 +229,51 @@ const YPivotQAInspectionMeasurementConfig = ({
         );
         newKValues = Array.from(kSet).sort();
       } else {
+        // After Wash Logic
         all = data.AllAfterWashSpecs || [];
         selected = data.selectedAfterWashSpecs || [];
+        newKValues = []; // No K Values for After Wash
       }
+
       const finalList =
         source === "qa_sections" && selected.length > 0 ? selected : all;
 
+      // Update Local State
       setSourceType(newSourceType);
       setIsConfigured(newIsConfigured);
       setFullSpecsList(all);
       setSelectedSpecsList(finalList);
       setKValuesList(newKValues);
 
-      updateParent({
-        sourceType: newSourceType,
-        isConfigured: newIsConfigured,
-        fullSpecsList: all,
-        selectedSpecsList: finalList,
-        kValuesList: newKValues,
-        orderSizes: currentSizes
-      });
+      // Auto-select first K value if available and none selected
+      if (newKValues.length > 0 && !selectedKValue) {
+        setSelectedKValue(newKValues[0]);
+      }
+
+      // Save to Parent (so it persists when switching tabs)
+      updateParent(
+        {
+          sourceType: newSourceType,
+          isConfigured: newIsConfigured,
+          fullSpecsList: all,
+          selectedSpecsList: finalList,
+          kValuesList: newKValues,
+          orderSizes: currentSizes,
+          // Also persist the auto-selected K value
+          lastSelectedKValue:
+            newKValues.length > 0 ? selectedKValue || newKValues[0] : ""
+        },
+        { skipSelectionPersist: true }
+      );
     } catch (error) {
-      console.error("Error fetching specs:", error);
+      console.error(`Error fetching specs for ${type}:`, error);
     } finally {
       setLoading(false);
       setInitialLoadDone(true);
     }
   };
 
-  // Add these useMemo hooks after the kValuesList state
+  // --- FILTERING LOGIC ---
   const filteredFullSpecsList = useMemo(() => {
     if (measConfig === "Before" && selectedKValue) {
       return fullSpecsList.filter(
@@ -223,21 +292,26 @@ const YPivotQAInspectionMeasurementConfig = ({
     return selectedSpecsList;
   }, [selectedSpecsList, selectedKValue, measConfig]);
 
+  // --- SAVE CONFIG HANDLER ---
   const handleSaveConfig = async (selectedIds) => {
     const filtered = fullSpecsList.filter((s) => selectedIds.includes(s.id));
     setSelectedSpecsList(filtered);
     setIsConfigured(true);
     setSourceType("qa_sections");
+
+    // Save to Parent State
     updateParent({
       selectedSpecsList: filtered,
       isConfigured: true,
       sourceType: "qa_sections"
     });
 
+    // Save to DB
     const endpoint =
       measConfig === "Before"
         ? `/api/qa-sections/measurement-specs/save`
         : `/api/qa-sections/measurement-specs-aw/save`;
+
     const payload = {
       moNo: activeMoNo,
       allSpecs: fullSpecsList,
@@ -252,6 +326,7 @@ const YPivotQAInspectionMeasurementConfig = ({
     }
   };
 
+  // Persist K value after saving measurement
   const handleSaveMeasurement = (data) => {
     const enhancedData = {
       ...data,
@@ -262,7 +337,9 @@ const YPivotQAInspectionMeasurementConfig = ({
       lineName: activeGroup?.lineName,
       tableName: activeGroup?.tableName,
       colorName: activeGroup?.colorName,
-      qcUser: activeGroup?.activeQC
+      qcUser: activeGroup?.activeQC,
+      stage: measConfig, // Save stage from current config
+      kValue: measConfig === "Before" ? selectedKValue : "" // Always save kValue for Before
     };
 
     let updatedMeasurements;
@@ -275,9 +352,16 @@ const YPivotQAInspectionMeasurementConfig = ({
       updatedMeasurements = [...savedMeasurements, enhancedData];
     }
     setSavedMeasurements(updatedMeasurements);
-    updateParent({ savedMeasurements: updatedMeasurements });
+
+    // Update parent with measurement AND persist K value
+    updateParent({
+      savedMeasurements: updatedMeasurements,
+      lastSelectedKValue: selectedKValue, // Persist K value
+      triggerAutoSave: true
+    });
+
     if (editingMeasurementIndex === null) {
-      setSelectedSize("");
+      setSelectedSize(""); // Clear size but keep K value
     }
   };
 
@@ -290,13 +374,7 @@ const YPivotQAInspectionMeasurementConfig = ({
   };
 
   const handleDeleteMeasurement = (index) => {
-    if (
-      !window.confirm(
-        "Are you sure you want to delete this measurement? This will remove both All and Critical data for this size."
-      )
-    ) {
-      return;
-    }
+    if (!window.confirm("Delete this measurement?")) return;
     const updatedMeasurements = [...savedMeasurements];
     updatedMeasurements.splice(index, 1);
     setSavedMeasurements(updatedMeasurements);
@@ -309,10 +387,19 @@ const YPivotQAInspectionMeasurementConfig = ({
     setIsGridOpen(true);
   };
 
-  // Check completion status for a size - UPDATED for lock logic
+  // Handle K value change with parent persist
+  const handleKValueChange = (newKValue) => {
+    setSelectedKValue(newKValue);
+    setSelectedSize(""); // Clear size when K changes
+
+    // Persist to parent immediately
+    updateParent({
+      lastSelectedKValue: newKValue
+    });
+  };
+
   const getSizeStatus = useMemo(() => {
     const statusMap = {};
-
     if (!activeGroup) return statusMap;
 
     const contextMeasurements = savedMeasurements.filter(
@@ -321,8 +408,6 @@ const YPivotQAInspectionMeasurementConfig = ({
 
     contextMeasurements.forEach((m) => {
       const key = measConfig === "Before" ? `${m.size}_${m.kValue}` : m.size;
-
-      // FIX: Use .size for Sets, fallback to .length if Array (safety)
       const allCount =
         m.allEnabledPcs instanceof Set
           ? m.allEnabledPcs.size
@@ -331,31 +416,24 @@ const YPivotQAInspectionMeasurementConfig = ({
         m.criticalEnabledPcs instanceof Set
           ? m.criticalEnabledPcs.size
           : m.criticalEnabledPcs?.length || 0;
-
-      const hasAll = allCount > 0;
-      const hasCritical = criticalCount > 0;
+      const isComplete = allCount > 0 || criticalCount > 0;
 
       statusMap[key] = {
-        hasAll,
-        hasCritical,
-        isComplete: hasAll || hasCritical,
+        isComplete,
         inspectorDecision: m.inspectorDecision,
         systemDecision: m.systemDecision
       };
     });
-
     return statusMap;
   }, [savedMeasurements, activeGroup, measConfig]);
 
-  // Check if size is locked (completed and should not be editable)
   const isSizeLocked = (size) => {
     if (!activeGroup) return false;
     const key =
       measConfig === "Before" && selectedKValue
         ? `${size}_${selectedKValue}`
         : size;
-    const status = getSizeStatus[key];
-    return status?.isComplete;
+    return getSizeStatus[key]?.isComplete;
   };
 
   const canSelectSizeAndK = isConfigured || sourceType === "qa_sections";
@@ -369,12 +447,6 @@ const YPivotQAInspectionMeasurementConfig = ({
     return (
       <div className="p-8 text-center bg-white rounded-xl shadow">
         No Order Selected
-      </div>
-    );
-  if (!activeReportTemplate)
-    return (
-      <div className="p-8 text-center bg-white rounded-xl shadow">
-        No Report Type Selected
       </div>
     );
   if (measConfig === "No")
@@ -397,7 +469,8 @@ const YPivotQAInspectionMeasurementConfig = ({
         <div>
           <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
             <Ruler className="w-5 h-5 text-indigo-500" />
-            Measurement: {measConfig} Wash
+            {/* Display correct label (Before or After) */}
+            Measurement: {displayLabel || `${measConfig} Wash`}
           </h3>
           <p className="text-xs text-gray-500 mt-1">
             Order:{" "}
@@ -405,6 +478,12 @@ const YPivotQAInspectionMeasurementConfig = ({
               {activeMoNo}
             </span>{" "}
             • {selectedSpecsList.length} Critical Points
+            {/* Show current K value in header for debugging */}
+            {measConfig === "Before" && selectedKValue && (
+              <span className="ml-2 text-purple-600">
+                • K: {selectedKValue}
+              </span>
+            )}
           </p>
         </div>
 
@@ -414,18 +493,17 @@ const YPivotQAInspectionMeasurementConfig = ({
             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
               internalTab === "manual"
                 ? "bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-300"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                : "text-gray-500 dark:text-gray-400"
             }`}
           >
-            <FilePenLine className="w-3.5 h-3.5" />
-            Manual
+            <FilePenLine className="w-3.5 h-3.5" /> Manual
           </button>
           <button
             onClick={() => setInternalTab("specs")}
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
               internalTab === "specs"
                 ? "bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-300"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                : "text-gray-500 dark:text-gray-400"
             }`}
           >
             Setup & Measure
@@ -435,10 +513,10 @@ const YPivotQAInspectionMeasurementConfig = ({
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ${
               internalTab === "results"
                 ? "bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-300"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                : "text-gray-500 dark:text-gray-400"
             }`}
           >
-            Results
+            Results{" "}
             {savedMeasurements.length > 0 && (
               <span className="bg-indigo-500 text-white text-[9px] px-1.5 rounded-full">
                 {savedMeasurements.length}
@@ -450,7 +528,7 @@ const YPivotQAInspectionMeasurementConfig = ({
             className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
               internalTab === "summary"
                 ? "bg-white dark:bg-gray-600 shadow text-indigo-600 dark:text-indigo-300"
-                : "text-gray-500 dark:text-gray-400 hover:text-gray-700"
+                : "text-gray-500 dark:text-gray-400"
             }`}
           >
             Summary
@@ -458,7 +536,6 @@ const YPivotQAInspectionMeasurementConfig = ({
         </div>
       </div>
 
-      {/* Active Group Display */}
       {activeGroup ? (
         <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 p-3 rounded-xl flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -512,7 +589,6 @@ const YPivotQAInspectionMeasurementConfig = ({
 
       {internalTab === "specs" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Setup Card */}
           <div className="lg:col-span-1 space-y-4">
             <div
               className={`bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 ${
@@ -525,36 +601,35 @@ const YPivotQAInspectionMeasurementConfig = ({
                 </h4>
                 <button
                   onClick={() => setIsConfigModalOpen(true)}
-                  className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors font-medium flex items-center gap-1"
+                  className="text-xs bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 px-2 py-1 rounded-lg hover:bg-indigo-100 transition-colors font-medium flex items-center gap-1"
                 >
                   <Settings className="w-3 h-3" /> Configure
                 </button>
               </div>
 
               <div className="space-y-4">
-                {/* K Value Selection */}
+                {/* K Value Selection - Only if K Values Exist (fetched by type="Before") */}
                 {measConfig === "Before" && kValuesList.length > 0 && (
                   <div>
                     <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center gap-2">
-                      K Value
+                      K Value{" "}
                       {canSelectSizeAndK ? (
                         <Unlock className="w-3 h-3 text-green-500" />
                       ) : (
                         <Lock className="w-3 h-3 text-gray-400" />
                       )}
+                      {/* Show current selection status */}
+                      {selectedKValue && (
+                        <span className="text-purple-500 text-[10px] font-normal">
+                          (Selected: {selectedKValue})
+                        </span>
+                      )}
                     </label>
                     <select
                       value={selectedKValue}
-                      onChange={(e) => {
-                        setSelectedKValue(e.target.value);
-                        setSelectedSize("");
-                      }}
+                      onChange={(e) => handleKValueChange(e.target.value)}
                       disabled={!canSelectSizeAndK}
-                      className={`w-full p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500 text-sm ${
-                        !canSelectSizeAndK
-                          ? "opacity-50 cursor-not-allowed"
-                          : ""
-                      }`}
+                      className="w-full p-2.5 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-sm"
                     >
                       <option value="">-- Select K --</option>
                       {kValuesList.map((k) => (
@@ -566,10 +641,9 @@ const YPivotQAInspectionMeasurementConfig = ({
                   </div>
                 )}
 
-                {/* Size Selection with Status and Lock */}
                 <div>
                   <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1.5 flex items-center gap-2">
-                    Size
+                    Size{" "}
                     {canSelectSizeAndK ? (
                       <Unlock className="w-3 h-3 text-green-500" />
                     ) : (
@@ -583,12 +657,10 @@ const YPivotQAInspectionMeasurementConfig = ({
                           ? `${s}_${selectedKValue}`
                           : s;
                       const status = getSizeStatus[key];
-                      const isComplete = status?.isComplete;
-                      const isLocked = isComplete; // Size is locked after completion
                       const isDisabled =
                         !canSelectSizeAndK ||
                         (needsKValue && !selectedKValue) ||
-                        isLocked; // Add locked check
+                        status?.isComplete;
 
                       return (
                         <button
@@ -598,55 +670,22 @@ const YPivotQAInspectionMeasurementConfig = ({
                           className={`w-full p-3 rounded-xl border-2 transition-all flex items-center justify-between ${
                             selectedSize === s
                               ? "border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30"
-                              : isLocked
-                              ? "border-gray-300 bg-gray-100 dark:bg-gray-700"
-                              : isComplete
+                              : status?.isComplete
                               ? "border-green-300 bg-green-50 dark:bg-green-900/20"
-                              : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800"
+                              : "border-gray-200 dark:border-gray-700"
                           } ${
                             isDisabled
                               ? "opacity-60 cursor-not-allowed"
                               : "hover:border-indigo-300 cursor-pointer"
                           }`}
                         >
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`font-bold ${
-                                isLocked
-                                  ? "text-gray-500"
-                                  : "text-gray-800 dark:text-gray-200"
-                              }`}
-                            >
-                              {s}
+                          <span className="font-bold text-gray-800 dark:text-gray-200">
+                            {s}
+                          </span>
+                          {status?.isComplete && (
+                            <span className="text-[10px] bg-green-500 text-white px-1.5 py-0.5 rounded font-bold">
+                              DONE
                             </span>
-                            {isLocked && (
-                              <Lock className="w-3 h-3 text-gray-400" />
-                            )}
-                            {isComplete && (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                                  status.inspectorDecision === "pass"
-                                    ? "bg-green-500 text-white"
-                                    : "bg-red-500 text-white"
-                                }`}
-                              >
-                                {(
-                                  status.inspectorDecision || "Done"
-                                ).toUpperCase()}
-                              </span>
-                            )}
-                          </div>
-                          {isLocked ? (
-                            <div className="flex items-center gap-1">
-                              <CheckCircle className="w-5 h-5 text-green-500" />
-                              <span className="text-[10px] text-gray-500">
-                                Locked
-                              </span>
-                            </div>
-                          ) : selectedSize === s ? (
-                            <div className="w-5 h-5 rounded-full border-2 border-indigo-500 bg-indigo-500"></div>
-                          ) : (
-                            <div className="w-5 h-5 rounded-full border-2 border-gray-300 dark:border-gray-600"></div>
                           )}
                         </button>
                       );
@@ -665,52 +704,28 @@ const YPivotQAInspectionMeasurementConfig = ({
             </div>
           </div>
 
-          {/* Preview */}
           <div className="lg:col-span-2">
             <div className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 h-full max-h-[500px] flex flex-col">
               <h4 className="font-bold text-sm text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-green-500" />
-                {/* Critical Points Preview ({selectedSpecsList.length}) */}
                 Critical Points Preview ({filteredSelectedSpecsList.length})
               </h4>
-
               <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-                {filteredSelectedSpecsList.length > 0 ? (
-                  filteredSelectedSpecsList.map((spec, idx) => (
-                    <div
-                      key={spec.id || idx}
-                      className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-medium text-gray-800 dark:text-gray-200 break-words whitespace-normal">
-                          {spec.MeasurementPointEngName}
-                        </p>
-                        {spec.MeasurementPointChiName && (
-                          <p className="text-[10px] text-gray-500 dark:text-gray-400 break-words whitespace-normal mt-0.5">
-                            {spec.MeasurementPointChiName}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-                        {spec.kValue && spec.kValue !== "NA" && (
-                          <span className="text-[10px] bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded border border-purple-100 dark:border-purple-800">
-                            K: {spec.kValue}
-                          </span>
-                        )}
-                        {spec.Tolerance && (
-                          <span className="text-[10px] bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-2 py-0.5 rounded">
-                            ±{spec.Tolerance}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="h-32 flex items-center justify-center text-gray-400 text-sm italic">
-                    No critical points configured. Click "Configure" to select
-                    points.
+                {filteredSelectedSpecsList.map((spec, idx) => (
+                  <div
+                    key={spec.id || idx}
+                    className="flex items-center justify-between p-2.5 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-100 dark:border-gray-700"
+                  >
+                    <p className="text-xs font-medium text-gray-800 dark:text-gray-200">
+                      {spec.MeasurementPointEngName}
+                    </p>
+                    {spec.kValue && spec.kValue !== "NA" && (
+                      <span className="text-[10px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded border border-purple-100">
+                        K: {spec.kValue}
+                      </span>
+                    )}
                   </div>
-                )}
+                ))}
               </div>
             </div>
           </div>
@@ -757,8 +772,6 @@ const YPivotQAInspectionMeasurementConfig = ({
           setEditingMeasurementIndex(null);
           setEditingMeasurementData(null);
         }}
-        // specsData={fullSpecsList}
-        // selectedSpecsList={selectedSpecsList}
         specsData={filteredFullSpecsList}
         selectedSpecsList={filteredSelectedSpecsList}
         selectedSize={selectedSize}

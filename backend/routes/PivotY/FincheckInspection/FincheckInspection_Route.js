@@ -17,6 +17,7 @@ import {
   createInspectionReport,
   getInspectionReportById,
   checkExistingReport,
+  uploadHeaderImages,
   updateHeaderData,
   uploadPhotoBatch,
   deletePhotoFromItem,
@@ -27,6 +28,7 @@ import {
   updateMeasurementData,
   uploadDefectImages,
   updateDefectData,
+  uploadPPSheetImages,
   updatePPSheetData,
   submitFullInspectionReport,
   searchPreviousReports
@@ -116,6 +118,13 @@ router.post(
   checkExistingReport
 );
 
+// Save Header Images (Multipart)
+router.post(
+  "/api/fincheck-inspection/upload-header-images",
+  upload.array("images"),
+  uploadHeaderImages
+);
+
 // Save Header Data
 router.post("/api/fincheck-inspection/update-header-data", updateHeaderData);
 
@@ -165,6 +174,13 @@ router.post(
 
 // Save Defect Data
 router.post("/api/fincheck-inspection/update-defect-data", updateDefectData);
+
+// Upload PP Sheet Images (Multipart)
+router.post(
+  "/api/fincheck-inspection/upload-pp-sheet-images",
+  upload.array("images"),
+  uploadPPSheetImages
+);
 
 // Save PP Sheet Data
 router.post("/api/fincheck-inspection/update-pp-sheet-data", updatePPSheetData);

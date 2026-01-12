@@ -168,6 +168,9 @@ const createFincheckInspectionReportsModel = (connection) => {
       // Context / Config Link
       groupId: { type: Number, required: true }, // Matches the ID from InspectionConfig
 
+      // Distinguishes between Tab 1 and Tab 2 ***
+      stage: { type: String, enum: ["Before", "After"], default: "Before" },
+
       // Scopes
       line: { type: String, default: "" },
       table: { type: String, default: "" },
@@ -450,13 +453,13 @@ const createFincheckInspectionReportsModel = (connection) => {
       empName: { type: String },
       measurementMethod: {
         type: String,
-        enum: ["Before", "After", "N/A"],
+        enum: ["Before", "After", "N/A", "No"],
         default: "N/A"
       },
       inspectionMethod: {
         type: String,
-        enum: ["Fixed", "AQL", "N/A"],
-        default: "N/A"
+        enum: ["Fixed", "AQL", "N/A", "No"],
+        default: "AQL"
       },
 
       // --- Report ID is a Number ---

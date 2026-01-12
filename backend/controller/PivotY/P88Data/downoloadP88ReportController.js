@@ -2036,6 +2036,50 @@ export const openDownloadFolder = async (req, res) => {
     }
 };
 
+// Open download folder in system file explorer
+export const openDownloadFolder = async (req, res) => {
+  try {
+    const { downloadPath } = req.body;
+    const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+
+    // Ensure directory exists
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    let command;
+    if (process.platform === "win32") {
+      command = `explorer "${targetDir}"`;
+    } else if (process.platform === "darwin") {
+      command = `open "${targetDir}"`;
+    } else {
+      command = `xdg-open "${targetDir}"`;
+    }
+
+    exec(command, (error) => {
+      if (error) {
+        console.error("Error opening folder:", error);
+        return res.status(500).json({
+          success: false,
+          error: "Failed to open download folder"
+        });
+      }
+
+      res.json({
+        success: true,
+        message: "Download folder opened successfully",
+        path: targetDir
+      });
+    });
+  } catch (error) {
+    console.error("Error opening download folder:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
 // Get date filtered statistics
 export const getDateFilteredStats = async (req, res) => {
     try {

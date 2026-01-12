@@ -45,6 +45,7 @@ const YPivotQATemplatesReportType = () => {
     _id: null,
     ReportType: "",
     Measurement: "No",
+    MeasurementAdditional: "No",
     Header: "Yes",
     Photos: "Yes",
     Line: "Yes",
@@ -201,6 +202,7 @@ const YPivotQATemplatesReportType = () => {
       _id: template._id,
       ReportType: template.ReportType,
       Measurement: template.Measurement,
+      MeasurementAdditional: template.MeasurementAdditional || "No",
       Header: template.Header,
       Photos: template.Photos,
       Line: template.Line || "Yes",
@@ -444,6 +446,7 @@ const YPivotQATemplatesReportType = () => {
                   Report Type
                 </th>
                 <th className={headerClass}>Meas.</th>
+                <th className={headerClass}>Meas 2</th>
                 <th className={headerClass}>Head</th>
                 <th className={headerClass}>Pics</th>
                 <th className="px-4 py-3 min-w-[180px] whitespace-normal break-words leading-tight">
@@ -508,6 +511,9 @@ const YPivotQATemplatesReportType = () => {
                     </td>
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Measurement} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.MeasurementAdditional || "No"} />
                     </td>
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Header} />
@@ -698,6 +704,27 @@ const YPivotQATemplatesReportType = () => {
                         })
                       }
                       className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="No">No</option>
+                      <option value="Before">Before</option>
+                      <option value="After">After</option>
+                    </select>
+                  </div>
+
+                  {/* *** NEW: Additional Measurement *** */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-400 mb-1 uppercase text-indigo-600">
+                      Meas. Additional (Tab 2)
+                    </label>
+                    <select
+                      value={formData.MeasurementAdditional}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          MeasurementAdditional: e.target.value
+                        })
+                      }
+                      className="w-full px-3 py-2 rounded-lg border border-indigo-200 bg-indigo-50/50..."
                     >
                       <option value="No">No</option>
                       <option value="Before">Before</option>

@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef
+} from "react";
 import { createPortal } from "react-dom";
 import axios from "axios";
 import {
@@ -12,7 +18,7 @@ import {
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQAInspectionMeasurementConfig from "./YPivotQAInspectionMeasurementConfig";
 
-// --- AUTO DISMISS MODAL COMPONENT HERE ---
+// --- AUTO DISMISS MODAL COMPONENT ---
 const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
   useEffect(() => {
     if (isOpen) {
@@ -63,7 +69,9 @@ const YPivotQAInspectionMeasurementDataSave = ({
   activeGroup,
   reportId,
   isReportSaved,
-  onSaveSuccess
+  onSaveSuccess,
+  targetStage = "Before",
+  displayLabel = null
 }) => {
   const [saving, setSaving] = useState(false);
   const [loadingData, setLoadingData] = useState(false);
@@ -74,56 +82,190 @@ const YPivotQAInspectionMeasurementDataSave = ({
     message: ""
   });
 
-  // --- FETCH EXISTING DATA ---
+  // Ref to track if we've already fetched data for this reportId
+  const fetchedReportIdRef = useRef(null);
+
+  // =================================================================================
+  // 1. FILTER DATA & UNPACK CONFIG (View Logic)
+  // =================================================================================
+  const stageSpecificReportData = useMemo(() => {
+    const allMeasurements = reportData.measurementData?.savedMeasurements || [];
+
+    // Filter Measurements by Stage
+    const filteredMeasurements = allMeasurements.filter((m) => {
+      if (m.stage) {
+        return m.stage === targetStage;
+      }
+      // Fallback for legacy data - use kValue presence to guess
+      // If kValue exists and not empty, likely Before wash
+      if (targetStage === "Before") {
+        return true; // Default legacy data to Before
+      }
+      return false;
+    });
+
+    // Unpack Config (Specs List) based on Stage
+    const configKey = `config${targetStage}`; // e.g. "configBefore"
+    const specificConfig = reportData.measurementData?.[configKey] || {};
+
+    console.log(
+      `[Wrapper ${targetStage}] Filtered ${filteredMeasurements.length} measurements`
+    );
+    console.log(
+      `[Wrapper ${targetStage}] Config:`,
+      Object.keys(specificConfig)
+    );
+
+    return {
+      ...reportData,
+      selectedTemplate: {
+        ...reportData.selectedTemplate,
+        Measurement: targetStage // Override to trick child component
+      },
+      measurementData: {
+        // Include global manual data
+        manualDataByGroup: reportData.measurementData?.manualDataByGroup || {},
+        // Include stage-specific config
+        ...specificConfig,
+        // Include filtered measurements
+        savedMeasurements: filteredMeasurements
+      }
+    };
+  }, [reportData, targetStage]);
+
+  // =================================================================================
+  // 2. MERGE DATA & PACK CONFIG (Update Logic)
+  // =================================================================================
+  const handleChildUpdate = useCallback(
+    (childUpdates, options = {}) => {
+      // If this is data coming from backend fetch, pass it through directly
+      if (options.isFromBackend) {
+        onUpdateMeasurementData(childUpdates, options);
+        return;
+      }
+
+      const allMeasurements =
+        reportData.measurementData?.savedMeasurements || [];
+
+      // A. Identify measurements from OTHER stages (to preserve them)
+      const otherStageMeasurements = allMeasurements.filter((m) => {
+        if (m.stage) return m.stage !== targetStage;
+        // Legacy data handling
+        if (targetStage === "Before") return false;
+        return true;
+      });
+
+      // --- FIX START: PREVENT DATA WIPE ---
+      // If childUpdates contains new measurements, use them.
+      // If NOT (e.g. during auto-save reset), keep the existing measurements for this stage.
+      let measurementsToProcess = childUpdates.savedMeasurements;
+
+      if (!measurementsToProcess) {
+        measurementsToProcess = allMeasurements.filter(
+          (m) =>
+            m.stage === targetStage || (!m.stage && targetStage === "Before")
+        );
+      }
+
+      const updatedCurrentStageMeasurements = measurementsToProcess.map(
+        (m) => ({
+          ...m,
+          stage: targetStage
+        })
+      );
+      // --- FIX END ---
+
+      const combinedMeasurements = [
+        ...otherStageMeasurements,
+        ...updatedCurrentStageMeasurements
+      ];
+
+      // B. Pack Configuration Data into Namespaced Key
+      // (Remove savedMeasurements from configFields so we don't duplicate it)
+      const { savedMeasurements, manualDataByGroup, ...configFields } =
+        childUpdates;
+
+      const configKey = `config${targetStage}`;
+
+      // Build the update object
+      const updatePayload = {
+        ...reportData.measurementData, // Keep global state
+        savedMeasurements: combinedMeasurements,
+        [configKey]: {
+          ...(reportData.measurementData?.[configKey] || {}),
+          ...configFields // Store specs list and selections
+        }
+      };
+
+      // Also update manualDataByGroup if provided
+      if (manualDataByGroup) {
+        updatePayload.manualDataByGroup = {
+          ...(reportData.measurementData?.manualDataByGroup || {}),
+          ...manualDataByGroup
+        };
+      }
+
+      onUpdateMeasurementData(updatePayload);
+    },
+    [reportData, targetStage, onUpdateMeasurementData]
+  );
+
+  // =================================================================================
+  // 3. FETCH EXISTING DATA FROM BACKEND (Only once per reportId)
+  // =================================================================================
   useEffect(() => {
     const fetchExistingMeasurementData = async () => {
       if (!reportId) return;
 
-      // Check if data already exists AND is properly formatted (Sets, not arrays)
-      const savedMeasurements =
-        reportData.measurementData?.savedMeasurements || [];
+      // Skip if we already fetched for this reportId
+      if (fetchedReportIdRef.current === reportId) {
+        return;
+      }
+
+      const measurementData = reportData.measurementData || {};
+      const savedMeasurements = measurementData.savedMeasurements || [];
+
+      // Check if data is already properly hydrated (Sets instead of Arrays)
       const hasProperlyFormattedData =
         savedMeasurements.length > 0 &&
         savedMeasurements[0]?.allEnabledPcs instanceof Set;
 
-      const hasManualData =
-        Object.keys(reportData.measurementData?.manualDataByGroup || {})
-          .length > 0;
+      // Check if config exists for THIS stage
+      const configKey = `config${targetStage}`;
+      const hasConfig = measurementData[configKey]?.fullSpecsList?.length > 0;
 
-      // If data is already properly formatted (hydrated from parent), skip fetch
-      if (hasProperlyFormattedData || hasManualData) {
-        setIsUpdateMode(true);
-        console.log("Measurement data already hydrated, skipping fetch");
-        return;
-      }
-
-      // Check if we have raw data (arrays, not Sets) - this means parent hydrated but didn't process
-      const hasRawData =
-        savedMeasurements.length > 0 &&
-        Array.isArray(savedMeasurements[0]?.allEnabledPcs);
-
-      if (hasRawData) {
-        console.log("Converting raw measurement data to proper format");
-        // Convert in place
-        const processedMeasurements = savedMeasurements.map((m) => ({
-          ...m,
-          allEnabledPcs: new Set(m.allEnabledPcs || []),
-          criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
-        }));
-
-        onUpdateMeasurementData(
-          {
-            ...reportData.measurementData,
-            savedMeasurements: processedMeasurements
-          },
-          { isFromBackend: true }
+      if (hasProperlyFormattedData && hasConfig) {
+        console.log(
+          `[Wrapper ${targetStage}] Data already hydrated, skipping fetch`
         );
-        setIsUpdateMode(true);
+        setIsUpdateMode(savedMeasurements.some((m) => m.stage === targetStage));
+        fetchedReportIdRef.current = reportId;
         return;
       }
 
-      // No data exists, fetch from backend
+      // Check if measurements exist for this stage (even without full hydration)
+      const stageHasMeasurements = savedMeasurements.some(
+        (m) => m.stage === targetStage || (!m.stage && targetStage === "Before")
+      );
+
+      if (stageHasMeasurements) {
+        setIsUpdateMode(true);
+      }
+
+      // If parent already has processed data but just missing specs, skip fetch
+      // The main page's useEffect will fetch specs
+      if (savedMeasurements.length > 0) {
+        console.log(
+          `[Wrapper ${targetStage}] Parent has data, waiting for specs fetch`
+        );
+        fetchedReportIdRef.current = reportId;
+        return;
+      }
+
+      // Only fetch if we have no data at all
       setLoadingData(true);
+      console.log(`[Wrapper ${targetStage}] Fetching data from backend...`);
+
       try {
         const res = await axios.get(
           `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}`
@@ -132,26 +274,28 @@ const YPivotQAInspectionMeasurementDataSave = ({
         if (res.data.success && res.data.data.measurementData) {
           const backendData = res.data.data.measurementData;
 
-          if (Array.isArray(backendData) && backendData.length > 0) {
-            setIsUpdateMode(true);
-          } else {
-            setIsUpdateMode(false);
-          }
+          // Filter for this stage
+          const stageMeasurements = backendData.filter(
+            (m) =>
+              m.stage === targetStage || (!m.stage && targetStage === "Before")
+          );
 
-          // Process Standard Measurements
+          setIsUpdateMode(stageMeasurements.length > 0);
+
+          // Process Measurements (Arrays -> Sets)
           const processedMeasurements = backendData
             .filter((m) => m.size !== "Manual_Entry")
             .map((m) => ({
               ...m,
               allEnabledPcs: new Set(m.allEnabledPcs || []),
-              criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+              criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+              stage: m.stage || "Before"
             }));
 
           // Process Manual Data
           const processedManualDataByGroup = {};
           backendData.forEach((item) => {
             if (item.manualData) {
-              const groupId = item.groupId;
               const processedImages = (item.manualData.images || []).map(
                 (img) => {
                   let displayUrl = img.imageURL;
@@ -172,8 +316,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
                   };
                 }
               );
-
-              processedManualDataByGroup[groupId] = {
+              processedManualDataByGroup[item.groupId] = {
                 remarks: item.manualData.remarks || "",
                 status: item.manualData.status || "Pass",
                 images: processedImages
@@ -181,17 +324,53 @@ const YPivotQAInspectionMeasurementDataSave = ({
             }
           });
 
+          // Extract K values used in Before measurements
+          const beforeMeasurements = processedMeasurements.filter(
+            (m) => m.stage === "Before"
+          );
+          const usedKValues = [
+            ...new Set(
+              beforeMeasurements
+                .map((m) => m.kValue)
+                .filter((k) => k && k !== "NA")
+            )
+          ].sort();
+
           onUpdateMeasurementData(
             {
               savedMeasurements: processedMeasurements,
               manualDataByGroup: processedManualDataByGroup,
-              isConfigured: processedMeasurements.length > 0
+              isConfigured: processedMeasurements.length > 0,
+              // Set up stage configs with what we know from saved data
+              configBefore:
+                beforeMeasurements.length > 0
+                  ? {
+                      isConfigured: true,
+                      lastSelectedKValue:
+                        usedKValues.length > 0
+                          ? usedKValues[usedKValues.length - 1]
+                          : "",
+                      usedKValues: usedKValues
+                    }
+                  : undefined,
+              configAfter: processedMeasurements.some(
+                (m) => m.stage === "After"
+              )
+                ? {
+                    isConfigured: true
+                  }
+                : undefined
             },
             { isFromBackend: true }
           );
+
+          fetchedReportIdRef.current = reportId;
         }
       } catch (error) {
-        console.error("Error fetching measurement data:", error);
+        console.error(
+          `[Wrapper ${targetStage}] Error fetching measurement data:`,
+          error
+        );
       } finally {
         setLoadingData(false);
       }
@@ -200,9 +379,18 @@ const YPivotQAInspectionMeasurementDataSave = ({
     if (reportId) {
       fetchExistingMeasurementData();
     }
+  }, [reportId, targetStage]);
+
+  // Reset fetch ref when reportId changes
+  useEffect(() => {
+    if (reportId !== fetchedReportIdRef.current) {
+      fetchedReportIdRef.current = null;
+    }
   }, [reportId]);
 
-  // --- SAVE HANDLER ---
+  // =================================================================================
+  // 4. SAVE HANDLER
+  // =================================================================================
   const handleSaveData = async () => {
     if (!isReportSaved || !reportId) {
       setStatusModal({
@@ -218,29 +406,28 @@ const YPivotQAInspectionMeasurementDataSave = ({
     const manualDataByGroup =
       reportData.measurementData?.manualDataByGroup || {};
 
+    // Filter to only save measurements for THIS stage
+    const stageMeasurements = currentMeasurements.filter(
+      (m) => m.stage === targetStage
+    );
+
     setSaving(true);
     try {
       const payload = [];
 
-      // Helper to process Manual Data Images for Upload
       const processManualImagesForSave = (images) => {
         return (images || []).map((img) => {
           let payloadImageURL = null;
           let payloadImgSrc = null;
-
-          // Check for Base64 in editedImgSrc (preferred) or imgSrc
           const imageData = img.editedImgSrc || img.imgSrc || img.url;
 
           if (imageData && imageData.startsWith("data:")) {
-            // New Image (Base64) -> Send in imgSrc for backend to save
             payloadImgSrc = imageData;
             payloadImageURL = null;
           } else if (imageData && imageData.includes(API_BASE_URL)) {
-            // Existing Image with Full URL -> Strip API_BASE_URL to save relative path
             payloadImageURL = imageData.replace(API_BASE_URL, "");
             payloadImgSrc = null;
           } else {
-            // Already relative or other URL
             payloadImageURL = imageData;
             payloadImgSrc = null;
           }
@@ -255,63 +442,80 @@ const YPivotQAInspectionMeasurementDataSave = ({
         });
       };
 
+      // Group measurements by groupId for this stage
       const measurementsByGroup = {};
-      currentMeasurements.forEach((m) => {
-        if (!measurementsByGroup[m.groupId])
+      stageMeasurements.forEach((m) => {
+        if (!measurementsByGroup[m.groupId]) {
           measurementsByGroup[m.groupId] = [];
+        }
         measurementsByGroup[m.groupId].push(m);
       });
 
-      const allGroupIds = new Set([
-        ...Object.keys(measurementsByGroup).map(Number),
-        ...Object.keys(manualDataByGroup).map(Number)
-      ]);
+      // Process each group
+      Object.keys(measurementsByGroup).forEach((groupIdStr) => {
+        const groupMeasurements = measurementsByGroup[groupIdStr];
+        const groupId = parseInt(groupIdStr);
 
-      allGroupIds.forEach((groupId) => {
-        const groupMeasurements = measurementsByGroup[groupId] || [];
-        const groupManualData = manualDataByGroup[groupId];
+        groupMeasurements.forEach((m, index) => {
+          const isFirstInGroup = index === 0;
+          const cleanMeasurement = {
+            ...m,
+            allEnabledPcs: Array.from(m.allEnabledPcs || []),
+            criticalEnabledPcs: Array.from(m.criticalEnabledPcs || []),
+            stage: targetStage
+          };
 
-        if (groupMeasurements.length > 0) {
-          groupMeasurements.forEach((m, index) => {
-            const isFirst = index === 0;
-            const cleanMeasurement = {
-              ...m,
-              allEnabledPcs: Array.from(m.allEnabledPcs || []),
-              criticalEnabledPcs: Array.from(m.criticalEnabledPcs || [])
-            };
-
-            if (isFirst && groupManualData) {
+          // Attach manual data only to first measurement in group
+          if (isFirstInGroup) {
+            const groupManualData = manualDataByGroup[groupId];
+            if (groupManualData) {
               cleanMeasurement.manualData = {
                 remarks: groupManualData.remarks,
                 status: groupManualData.status,
                 images: processManualImagesForSave(groupManualData.images)
               };
-            } else {
-              cleanMeasurement.manualData = null;
             }
-            payload.push(cleanMeasurement);
-          });
-        } else if (groupManualData) {
-          // Placeholder for Manual-Only Entry
-          payload.push({
-            groupId: groupId,
-            size: "Manual_Entry",
-            line: "",
-            table: "",
-            color: "",
-            qcUser: null,
-            allMeasurements: {},
-            criticalMeasurements: {},
-            allEnabledPcs: [],
-            criticalEnabledPcs: [],
-            inspectorDecision:
-              groupManualData.status === "Pass" ? "pass" : "fail",
-            manualData: {
-              remarks: groupManualData.remarks,
-              status: groupManualData.status,
-              images: processManualImagesForSave(groupManualData.images)
-            }
-          });
+          } else {
+            cleanMeasurement.manualData = null;
+          }
+          payload.push(cleanMeasurement);
+        });
+      });
+
+      // Handle groups with only manual data (no measurements)
+      const allGroupIds = Object.keys(manualDataByGroup).map(Number);
+      const groupsWithMeasurements = new Set(
+        stageMeasurements.map((m) => m.groupId)
+      );
+
+      allGroupIds.forEach((groupId) => {
+        if (!groupsWithMeasurements.has(groupId)) {
+          const groupManualData = manualDataByGroup[groupId];
+          if (
+            groupManualData &&
+            (groupManualData.remarks || groupManualData.images?.length > 0)
+          ) {
+            payload.push({
+              groupId: groupId,
+              size: "Manual_Entry",
+              stage: targetStage,
+              line: "",
+              table: "",
+              color: "",
+              qcUser: null,
+              allMeasurements: {},
+              criticalMeasurements: {},
+              allEnabledPcs: [],
+              criticalEnabledPcs: [],
+              inspectorDecision:
+                groupManualData.status === "Pass" ? "pass" : "fail",
+              manualData: {
+                remarks: groupManualData.remarks,
+                status: groupManualData.status,
+                images: processManualImagesForSave(groupManualData.images)
+              }
+            });
+          }
         }
       });
 
@@ -320,10 +524,12 @@ const YPivotQAInspectionMeasurementDataSave = ({
         setStatusModal({
           isOpen: true,
           type: "error",
-          message: "No data to save."
+          message: `No ${displayLabel || targetStage} data to save.`
         });
         return;
       }
+
+      console.log(`[Wrapper ${targetStage}] Saving ${payload.length} items`);
 
       const res = await axios.post(
         `${API_BASE_URL}/api/fincheck-inspection/update-measurement-data`,
@@ -335,19 +541,18 @@ const YPivotQAInspectionMeasurementDataSave = ({
 
       if (res.data.success) {
         setIsUpdateMode(true);
-        if (onSaveSuccess) {
-          onSaveSuccess();
-        }
+        if (onSaveSuccess) onSaveSuccess();
         setStatusModal({
           isOpen: true,
           type: "success",
-          message: isUpdateMode
-            ? "Measurement Data Updated Successfully!"
-            : "Measurement Data Saved Successfully!"
+          message: `${displayLabel || targetStage} Measurements Saved!`
         });
       }
     } catch (error) {
-      console.error("Error saving measurement results:", error);
+      console.error(
+        `[Wrapper ${targetStage}] Error saving measurements:`,
+        error
+      );
       setStatusModal({
         isOpen: true,
         type: "error",
@@ -358,12 +563,37 @@ const YPivotQAInspectionMeasurementDataSave = ({
     }
   };
 
+  // =================================================================================
+  // 5. AUTO-SAVE EFFECT
+  // =================================================================================
+  useEffect(() => {
+    // Check if the trigger flag is present in the unpacked measurement data
+    if (stageSpecificReportData?.measurementData?.triggerAutoSave) {
+      // 1. Trigger the Save
+      handleSaveData();
+
+      // 2. Reset the flag immediately to prevent infinite loops
+      // We use handleChildUpdate to ensure it goes through the same logic path
+      // passing skipSelectionPersist to avoid resetting UI state like K-value
+      handleChildUpdate(
+        { triggerAutoSave: false },
+        { skipSelectionPersist: true }
+      );
+    }
+  }, [
+    stageSpecificReportData?.measurementData?.triggerAutoSave,
+    handleChildUpdate
+  ]);
+
+  // =================================================================================
+  // 6. RENDER
+  // =================================================================================
   if (loadingData) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
         <span className="ml-3 text-gray-600 font-medium">
-          Loading existing measurements...
+          Loading {displayLabel || targetStage} measurements...
         </span>
       </div>
     );
@@ -381,11 +611,14 @@ const YPivotQAInspectionMeasurementDataSave = ({
   return (
     <div className="relative pb-24">
       <YPivotQAInspectionMeasurementConfig
+        // Key forces re-mount when switching tabs
+        key={`${targetStage}_${reportId || "new"}`}
         selectedOrders={selectedOrders}
         orderData={orderData}
-        reportData={reportData}
-        onUpdateMeasurementData={onUpdateMeasurementData}
+        reportData={stageSpecificReportData}
+        onUpdateMeasurementData={handleChildUpdate}
         activeGroup={activeGroup}
+        displayLabel={displayLabel}
       />
 
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-40">
@@ -399,17 +632,10 @@ const YPivotQAInspectionMeasurementDataSave = ({
                 !isReportSaved
                   ? "bg-gray-300 dark:bg-gray-700 text-gray-500 cursor-not-allowed"
                   : isUpdateMode
-                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" // Blue for Update
-                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white" // Green for Save
+                  ? "bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                  : "bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white"
               }
             `}
-            title={
-              !isReportSaved
-                ? "Save Order Data first"
-                : isUpdateMode
-                ? "Update Measurement Data"
-                : "Save Measurement Data"
-            }
           >
             {saving ? (
               <>
@@ -423,13 +649,15 @@ const YPivotQAInspectionMeasurementDataSave = ({
                 ) : (
                   <Save className="w-5 h-5" />
                 )}
-                {isUpdateMode ? "Update Measurements" : "Save Measurements"}
+                {isUpdateMode
+                  ? `Update ${displayLabel || targetStage}`
+                  : `Save ${displayLabel || targetStage}`}
               </>
             )}
           </button>
         </div>
       </div>
-      {/* Auto Dismiss Modal */}
+
       <AutoDismissModal
         isOpen={statusModal.isOpen}
         onClose={() => setStatusModal((prev) => ({ ...prev, isOpen: false }))}

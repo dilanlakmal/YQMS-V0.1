@@ -236,6 +236,39 @@ const StatusModal = ({ isOpen, onClose, type, title, message, subMessage }) => {
 // HELPER FUNCTIONS TO TRANSFORM BACKEND DATA TO COMPONENT FORMAT
 // ==================================================================================
 
+// Transform PP Sheet data from backend (Fix image URLs)
+const transformPPSheetDataFromBackend = (backendData) => {
+  if (!backendData) return null;
+
+  // Create a copy to modify images
+  const processedData = { ...backendData };
+
+  if (processedData.images && Array.isArray(processedData.images)) {
+    processedData.images = processedData.images.map((img) => {
+      let displayUrl = img.imageURL;
+
+      // Prepend API_BASE_URL if it's a relative path
+      if (
+        displayUrl &&
+        !displayUrl.startsWith("http") &&
+        !displayUrl.startsWith("data:")
+      ) {
+        displayUrl = `${API_BASE_URL}${displayUrl}`;
+      }
+
+      return {
+        id: img.imageId || img.id,
+        url: displayUrl, // Used by <img> src
+        imgSrc: displayUrl, // Used by Editor
+        imageURL: img.imageURL, // Keep original relative path
+        history: []
+      };
+    });
+  }
+
+  return processedData;
+};
+
 // Transform header data from backend format to component format
 const transformHeaderDataFromBackend = (backendHeaderData) => {
   if (!backendHeaderData || !Array.isArray(backendHeaderData)) {
@@ -321,7 +354,10 @@ const transformDefectManualData = (backendManualData) => {
 };
 
 // Transform measurement data from backend format to component format
-const transformMeasurementDataFromBackend = (backendMeasurementData) => {
+const transformMeasurementDataFromBackend = (
+  backendMeasurementData,
+  orderSizes = []
+) => {
   if (!backendMeasurementData || !Array.isArray(backendMeasurementData)) {
     return { savedMeasurements: [], manualDataByGroup: {} };
   }
@@ -332,21 +368,18 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
     .map((m) => ({
       ...m,
       allEnabledPcs: new Set(m.allEnabledPcs || []),
-      criticalEnabledPcs: new Set(m.criticalEnabledPcs || [])
+      criticalEnabledPcs: new Set(m.criticalEnabledPcs || []),
+      // Ensure stage is preserved - default to "Before" for legacy data
+      stage: m.stage || "Before"
     }));
 
   // 2. Process Manual Data by Group
   const processedManualDataByGroup = {};
-
   backendMeasurementData.forEach((item) => {
     if (item.manualData) {
       const groupId = item.groupId;
-
-      // Process Images - prepend API_BASE_URL for relative paths
       const processedImages = (item.manualData.images || []).map((img) => {
         let displayUrl = img.imageURL;
-
-        // Prepend API_BASE_URL for display if it's a relative path
         if (
           displayUrl &&
           !displayUrl.startsWith("http") &&
@@ -354,7 +387,6 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
         ) {
           displayUrl = `${API_BASE_URL}${displayUrl}`;
         }
-
         return {
           id: img.imageId || img.id,
           url: displayUrl,
@@ -364,7 +396,6 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
           history: []
         };
       });
-
       processedManualDataByGroup[groupId] = {
         remarks: item.manualData.remarks || "",
         status: item.manualData.status || "Pass",
@@ -373,11 +404,60 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
     }
   });
 
-  return {
+  // 3. Group measurements by stage and extract last selected values
+  const beforeMeasurements = processedMeasurements.filter(
+    (m) => m.stage === "Before"
+  );
+  const afterMeasurements = processedMeasurements.filter(
+    (m) => m.stage === "After"
+  );
+
+  // Extract unique K values from Before measurements
+  const beforeKValues = [
+    ...new Set(
+      beforeMeasurements.map((m) => m.kValue).filter((k) => k && k !== "NA")
+    )
+  ].sort();
+
+  // Get last selected K value (most recently used)
+  const lastBeforeKValue =
+    beforeMeasurements.length > 0
+      ? beforeMeasurements[beforeMeasurements.length - 1].kValue || ""
+      : "";
+
+  // 4. Build stage-specific config stubs
+  const result = {
     savedMeasurements: processedMeasurements,
     manualDataByGroup: processedManualDataByGroup,
     isConfigured: processedMeasurements.length > 0
   };
+
+  // Add configBefore if Before measurements exist
+  if (beforeMeasurements.length > 0) {
+    result.configBefore = {
+      isConfigured: true,
+      lastSelectedKValue: lastBeforeKValue,
+      usedKValues: beforeKValues,
+      orderSizes: orderSizes,
+      // These will be populated when specs are fetched
+      fullSpecsList: [],
+      selectedSpecsList: [],
+      kValuesList: beforeKValues.length > 0 ? beforeKValues : []
+    };
+  }
+
+  // Add configAfter if After measurements exist
+  if (afterMeasurements.length > 0) {
+    result.configAfter = {
+      isConfigured: true,
+      orderSizes: orderSizes,
+      fullSpecsList: [],
+      selectedSpecsList: [],
+      kValuesList: [] // After wash has no K values
+    };
+  }
+
+  return result;
 };
 
 // Helper function to extract sizes from order data
@@ -446,7 +526,7 @@ const YPivotQAInspection = () => {
   const [activeGroup, setActiveGroup] = useState(null);
 
   // ===========================================================================
-  // NEW: DIRTY SECTIONS STATE - Tracks which sections have unsaved changes
+  // DIRTY SECTIONS STATE - Tracks which sections have unsaved changes
   // ===========================================================================
   const [dirtySections, setDirtySections] = useState({
     inspectionDetails: false,
@@ -507,7 +587,7 @@ const YPivotQAInspection = () => {
   }, [dirtySections]);
   // ===========================================================================
 
-  // NEW: State for the Status Modal
+  //  State for the Status Modal
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
     type: "success", // 'success' or 'info'
@@ -516,7 +596,7 @@ const YPivotQAInspection = () => {
     subMessage: ""
   });
 
-  // NEW: State for confirmation modal
+  //  State for confirmation modal
   const [showNewConfirm, setShowNewConfirm] = useState(false);
 
   // ======================================================================
@@ -592,86 +672,124 @@ const YPivotQAInspection = () => {
   // FETCH MEASUREMENT SPECS WHEN REPORT IS LOADED (for Summary to display properly)
   // ==================================================================================
   useEffect(() => {
-    const fetchMeasurementSpecs = async () => {
+    const fetchAllMeasurementSpecs = async () => {
       // Only run if we have a loaded report
       if (!savedReportData || !isReportSaved) return;
 
       const template = sharedReportState.selectedTemplate;
-      const measConfig = template?.Measurement;
-
-      // Skip if no measurement required
-      if (!measConfig || measConfig === "No") return;
-
-      // Skip if specs already loaded
-      if (sharedReportState.measurementData?.fullSpecsList?.length > 0) return;
-
       const moNo = sharedOrderState.selectedOrders?.[0];
       if (!moNo) return;
 
-      console.log(
-        "Fetching measurement specs for loaded report...",
-        moNo,
-        measConfig
-      );
+      const orderSizes = extractOrderSizes(sharedOrderState.orderData);
+      const stagesToFetch = [];
 
-      try {
-        const endpoint =
-          measConfig === "Before"
-            ? `/api/qa-sections/measurement-specs/${moNo}`
-            : `/api/qa-sections/measurement-specs-aw/${moNo}`;
-
-        const res = await axios.get(`${API_BASE_URL}${endpoint}`);
-        const { source, data } = res.data;
-
-        let all = [];
-        let selected = [];
-        let kValues = [];
-
-        if (measConfig === "Before") {
-          all = data.AllBeforeWashSpecs || [];
-          selected = data.selectedBeforeWashSpecs || [];
-          const kSet = new Set(
-            all.map((s) => s.kValue).filter((k) => k && k !== "NA")
-          );
-          kValues = Array.from(kSet).sort();
-        } else {
-          all = data.AllAfterWashSpecs || [];
-          selected = data.selectedAfterWashSpecs || [];
+      // Check primary measurement type
+      const primaryType = template?.Measurement;
+      if (primaryType && primaryType !== "No") {
+        const configKey = `config${primaryType}`;
+        const hasSpecs =
+          sharedReportState.measurementData?.[configKey]?.fullSpecsList
+            ?.length > 0;
+        if (!hasSpecs) {
+          stagesToFetch.push(primaryType);
         }
+      }
 
-        const finalList =
-          source === "qa_sections" && selected.length > 0 ? selected : all;
+      // Check secondary measurement type
+      const secondaryType = template?.MeasurementAdditional;
+      if (secondaryType && secondaryType !== "No") {
+        const configKey = `config${secondaryType}`;
+        const hasSpecs =
+          sharedReportState.measurementData?.[configKey]?.fullSpecsList
+            ?.length > 0;
+        if (!hasSpecs && !stagesToFetch.includes(secondaryType)) {
+          stagesToFetch.push(secondaryType);
+        }
+      }
 
-        // Extract sizes from order data
-        const orderSizes = extractOrderSizes(sharedOrderState.orderData);
+      if (stagesToFetch.length === 0) {
+        console.log("[Main] All specs already loaded");
+        return;
+      }
 
-        // Update measurement data with specs (preserving existing savedMeasurements)
-        setSharedReportState((prev) => ({
-          ...prev,
-          measurementData: {
-            ...prev.measurementData,
-            fullSpecsList: all,
-            selectedSpecsList: finalList,
-            sourceType: source,
-            isConfigured: source === "qa_sections",
-            kValuesList: kValues,
-            orderSizes: orderSizes
+      console.log("[Main] Fetching specs for stages:", stagesToFetch);
+
+      // Fetch specs for each stage
+      for (const stage of stagesToFetch) {
+        try {
+          const endpoint =
+            stage === "Before"
+              ? `/api/qa-sections/measurement-specs/${moNo}`
+              : `/api/qa-sections/measurement-specs-aw/${moNo}`;
+
+          const res = await axios.get(`${API_BASE_URL}${endpoint}`);
+          const { source, data } = res.data;
+
+          let all = [];
+          let selected = [];
+          let kValues = [];
+
+          if (stage === "Before") {
+            all = data.AllBeforeWashSpecs || [];
+            selected = data.selectedBeforeWashSpecs || [];
+            const kSet = new Set(
+              all.map((s) => s.kValue).filter((k) => k && k !== "NA")
+            );
+            kValues = Array.from(kSet).sort();
+          } else {
+            all = data.AllAfterWashSpecs || [];
+            selected = data.selectedAfterWashSpecs || [];
+            kValues = []; // No K values for After wash
           }
-        }));
 
-        console.log("Measurement specs loaded:", all.length, "specs");
-      } catch (error) {
-        console.error("Error fetching measurement specs:", error);
+          const finalList =
+            source === "qa_sections" && selected.length > 0 ? selected : all;
+          const configKey = `config${stage}`;
+
+          // Get existing config for this stage (might have lastSelectedKValue, etc.)
+          const existingConfig =
+            sharedReportState.measurementData?.[configKey] || {};
+
+          // Update state with fetched specs
+          setSharedReportState((prev) => ({
+            ...prev,
+            measurementData: {
+              ...prev.measurementData,
+              [configKey]: {
+                ...existingConfig,
+                fullSpecsList: all,
+                selectedSpecsList: finalList,
+                sourceType: source,
+                isConfigured:
+                  source === "qa_sections" || existingConfig.isConfigured,
+                kValuesList:
+                  kValues.length > 0
+                    ? kValues
+                    : existingConfig.usedKValues || [],
+                orderSizes: orderSizes,
+                // Preserve last selected K value if it exists
+                lastSelectedKValue:
+                  existingConfig.lastSelectedKValue ||
+                  (kValues.length > 0 ? kValues[0] : "")
+              }
+            }
+          }));
+
+          console.log(`[Main] Loaded ${all.length} specs for ${stage} wash`);
+        } catch (error) {
+          console.error(`[Main] Error fetching ${stage} wash specs:`, error);
+        }
       }
     };
 
-    fetchMeasurementSpecs();
+    fetchAllMeasurementSpecs();
   }, [
     savedReportData?._id,
     isReportSaved,
     sharedReportState.selectedTemplate?.Measurement,
+    sharedReportState.selectedTemplate?.MeasurementAdditional,
     sharedOrderState.selectedOrders?.[0],
-    sharedReportState.measurementData?.fullSpecsList?.length // Track if already loaded
+    sharedOrderState.orderData
   ]);
 
   // Handler to update PP Sheet data - MODIFIED to mark dirty
@@ -703,14 +821,16 @@ const YPivotQAInspection = () => {
       markSectionClean("inspectionConfig");
 
       // ========================================================================
-      // NEW: HYDRATE sharedReportState when loading an EXISTING report
+      //  HYDRATE sharedReportState when loading an EXISTING report
       // ========================================================================
       if (!isNew && reportData) {
         console.log("Hydrating state from loaded report:", reportData._id);
 
         // *** PROCESS MEASUREMENT DATA PROPERLY ***
+        const orderSizes = extractOrderSizes(sharedOrderState.orderData);
         const processedMeasurementData = transformMeasurementDataFromBackend(
-          reportData.measurementData
+          reportData.measurementData,
+          orderSizes
         );
 
         // Hydrate sharedReportState from loaded report data
@@ -775,12 +895,15 @@ const YPivotQAInspection = () => {
             measurementData: {
               ...prev.measurementData,
               ...processedMeasurementData,
-              // Keep other measurement config if exists
-              fullSpecsList: prev.measurementData?.fullSpecsList || [],
-              selectedSpecsList: prev.measurementData?.selectedSpecsList || [],
-              sourceType: prev.measurementData?.sourceType || "",
-              orderSizes: prev.measurementData?.orderSizes || [],
-              kValuesList: prev.measurementData?.kValuesList || []
+              // Merge with existing config if present
+              configBefore: {
+                ...(prev.measurementData?.configBefore || {}),
+                ...(processedMeasurementData.configBefore || {})
+              },
+              configAfter: {
+                ...(prev.measurementData?.configAfter || {}),
+                ...(processedMeasurementData.configAfter || {})
+              }
             },
 
             // Defect Data
@@ -794,7 +917,9 @@ const YPivotQAInspection = () => {
             },
 
             // PP Sheet Data
-            ppSheetData: reportData.ppSheetData || prev.ppSheetData
+            ppSheetData: reportData.ppSheetData
+              ? transformPPSheetDataFromBackend(reportData.ppSheetData)
+              : prev.ppSheetData
           };
 
           return newState;
@@ -986,7 +1111,7 @@ const YPivotQAInspection = () => {
   }, [savedReportData, sharedOrderState, sharedReportState, user]);
 
   // ===========================================================================
-  // NEW: Callback for when a section is saved individually (passed to children)
+  //  Callback for when a section is saved individually (passed to children)
   // ===========================================================================
   const handleSectionSaveSuccess = useCallback(
     (sectionName) => {
@@ -1102,26 +1227,83 @@ const YPivotQAInspection = () => {
         description: "Detailed Configuration",
         requiresSave: true
       },
-      {
-        id: "measurement",
-        label: "Measurement",
-        icon: <Ruler size={18} />,
-        component: (
-          <YPivotQAInspectionMeasurementDataSave
-            selectedOrders={sharedOrderState.selectedOrders}
-            orderData={sharedOrderState.orderData}
-            reportData={sharedReportState}
-            onUpdateMeasurementData={handleMeasurementDataUpdate}
-            activeGroup={activeGroup}
-            reportId={savedReportData?.reportId}
-            isReportSaved={isReportSaved}
-            onSaveSuccess={() => handleSectionSaveSuccess("measurementData")}
-          />
-        ),
-        gradient: "from-green-500 to-emerald-500",
-        description: "Measurement data",
-        requiresSave: true
-      },
+      // =================================================================
+      // 1. PRIMARY MEASUREMENT TAB (CONDITIONAL)
+      // =================================================================
+      ...(sharedReportState.selectedTemplate?.Measurement &&
+      sharedReportState.selectedTemplate.Measurement !== "No"
+        ? [
+            {
+              id: "measurement",
+              label:
+                sharedReportState.selectedTemplate.Measurement === "Before"
+                  ? "Meas. (B)"
+                  : "Meas. (A)",
+              icon: <Ruler size={18} />,
+              component: (
+                <YPivotQAInspectionMeasurementDataSave
+                  selectedOrders={sharedOrderState.selectedOrders}
+                  orderData={sharedOrderState.orderData}
+                  reportData={sharedReportState}
+                  onUpdateMeasurementData={handleMeasurementDataUpdate}
+                  activeGroup={activeGroup}
+                  reportId={savedReportData?.reportId}
+                  isReportSaved={isReportSaved}
+                  onSaveSuccess={() =>
+                    handleSectionSaveSuccess("measurementData")
+                  }
+                  // *** NEW PROPS ***
+                  targetStage={sharedReportState.selectedTemplate.Measurement}
+                  displayLabel={`${sharedReportState.selectedTemplate.Measurement} Wash`}
+                />
+              ),
+              gradient: "from-green-500 to-emerald-500",
+              description: "Primary Measurement",
+              requiresSave: true
+            }
+          ]
+        : []),
+
+      // =================================================================
+      // 2. ADDITIONAL MEASUREMENT TAB (CONDITIONAL)
+      // =================================================================
+      ...(sharedReportState.selectedTemplate?.MeasurementAdditional &&
+      sharedReportState.selectedTemplate.MeasurementAdditional !== "No"
+        ? [
+            {
+              id: "measurement_2",
+              label:
+                sharedReportState.selectedTemplate.MeasurementAdditional ===
+                "Before"
+                  ? "Meas. (B)"
+                  : "Meas. (A)",
+              icon: <Ruler size={18} />,
+              component: (
+                <YPivotQAInspectionMeasurementDataSave
+                  selectedOrders={sharedOrderState.selectedOrders}
+                  orderData={sharedOrderState.orderData}
+                  reportData={sharedReportState}
+                  onUpdateMeasurementData={handleMeasurementDataUpdate}
+                  activeGroup={activeGroup}
+                  reportId={savedReportData?.reportId}
+                  isReportSaved={isReportSaved}
+                  onSaveSuccess={() =>
+                    handleSectionSaveSuccess("measurementData")
+                  }
+                  // *** NEW PROPS ***
+                  targetStage={
+                    sharedReportState.selectedTemplate.MeasurementAdditional
+                  }
+                  displayLabel={`${sharedReportState.selectedTemplate.MeasurementAdditional} Wash`}
+                />
+              ),
+              // Use a slightly different gradient to distinguish visually
+              gradient: "from-teal-500 to-emerald-600",
+              description: "Additional Measurement",
+              requiresSave: true
+            }
+          ]
+        : []),
       {
         id: "defects",
         label: "Defects",
@@ -1154,7 +1336,7 @@ const YPivotQAInspection = () => {
             orderData={sharedOrderState}
             reportData={sharedReportState}
             qrData={qrData}
-            // NEW: Pass dirty state props
+            //  Pass dirty state props
             dirtySections={dirtySections}
             getDirtySectionsList={getDirtySectionsList}
             hasUnsavedChanges={hasUnsavedChanges}
@@ -1211,7 +1393,7 @@ const YPivotQAInspection = () => {
     return tabs.find((tab) => tab.id === activeTab);
   }, [activeTab, tabs]);
 
-  // NEW: Function to reset everything
+  //  Function to reset everything
   const handleStartNewInspection = async () => {
     // 1. Clear IndexedDB
     await clearDB();
