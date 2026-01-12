@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { API_BASE_URL } from "../../../../../config";
 import YPivotQATemplatesImageEditor from "./YPivotQATemplatesImageEditor"; // Import Image Editor
+import { createPortal } from "react-dom";
 
 const MAX_IMAGES_PP_SHEET = 10; // Max limit
 
@@ -208,6 +209,46 @@ const DEFAULT_FORM_STATE = {
   images: [] // New Images Array
 };
 
+// Delete Confirmation Modal
+const ConfirmationModal = ({ isOpen, onClose, onConfirm }) => {
+  if (!isOpen) return null;
+  return createPortal(
+    <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200 dark:border-gray-700 transform scale-100 transition-all">
+        <div className="flex flex-col items-center text-center gap-4">
+          <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-full text-red-600 dark:text-red-400">
+            <Trash2 size={32} />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
+              Remove Image?
+            </h3>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+              Are you sure you want to remove this image? This action cannot be
+              undone.
+            </p>
+          </div>
+          <div className="flex gap-3 w-full mt-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl font-bold text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onConfirm}
+              className="flex-1 py-2.5 rounded-xl font-bold text-white bg-red-600 hover:bg-red-700 transition-colors shadow-lg text-sm"
+            >
+              Yes, Remove
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // --- MAIN COMPONENT ---
 const YPivotQATemplatesPPSheet = ({
   prefilledData,
@@ -233,6 +274,12 @@ const YPivotQATemplatesPPSheet = ({
       };
     }
     return DEFAULT_FORM_STATE;
+  });
+
+  // State for delete confirmation
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    index: null
   });
 
   // NEW: Sync with savedState when component remounts
@@ -384,28 +431,37 @@ const YPivotQATemplatesPPSheet = ({
     setFormData((prev) => {
       let newImages = [...prev.images];
 
+      // Helper to construct robust image object
+      const createImageData = (img) => {
+        const finalUrl = img.editedImgSrc || img.imgSrc;
+        return {
+          // Keep existing ID if editing, else generate new
+          id:
+            img.id ||
+            `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          url: finalUrl, // Used for display
+          file: img.file, // Used for upload
+          imgSrc: img.imgSrc, // Used for re-editing
+          history: img.history || [],
+          imageURL: img.imageURL // Preserve backend path if editing existing
+        };
+      };
+
       if (
         imageEditorContext?.isEditing &&
         imageEditorContext?.imageIndex !== undefined
       ) {
         // Editing existing
-        const img = savedImages[0];
-        newImages[imageEditorContext.imageIndex] = {
-          url: img.editedImgSrc,
-          imgSrc: img.imgSrc,
-          history: img.history || []
-        };
+        newImages[imageEditorContext.imageIndex] = createImageData(
+          savedImages[0]
+        );
       } else {
         // Adding new
         const availableSlots = MAX_IMAGES_PP_SHEET - newImages.length;
         const imagesToAdd = savedImages.slice(0, availableSlots);
 
         imagesToAdd.forEach((img) => {
-          newImages.push({
-            url: img.editedImgSrc,
-            imgSrc: img.imgSrc,
-            history: img.history || []
-          });
+          newImages.push(createImageData(img));
         });
 
         if (savedImages.length > availableSlots) {
@@ -424,14 +480,21 @@ const YPivotQATemplatesPPSheet = ({
     setImageEditorContext(null);
   };
 
+  // Just open the modal, don't delete yet
   const removeImage = (index, e) => {
     if (e) e.stopPropagation();
-    if (window.confirm("Remove this image?")) {
+    setDeleteConfirm({ isOpen: true, index });
+  };
+
+  // Actual delete logic (called when user clicks "Yes")
+  const handleConfirmDelete = () => {
+    if (deleteConfirm.index !== null) {
       setFormData((prev) => ({
         ...prev,
-        images: prev.images.filter((_, i) => i !== index)
+        images: prev.images.filter((_, i) => i !== deleteConfirm.index)
       }));
     }
+    setDeleteConfirm({ isOpen: false, index: null });
   };
 
   // --- Render Helpers ---
@@ -962,6 +1025,13 @@ const YPivotQATemplatesPPSheet = ({
           }}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, index: null })}
+        onConfirm={handleConfirmDelete}
+      />
 
       <style jsx>{`
         @keyframes fadeIn {

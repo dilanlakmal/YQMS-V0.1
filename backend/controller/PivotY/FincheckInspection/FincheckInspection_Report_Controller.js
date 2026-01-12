@@ -1,7 +1,8 @@
 import {
   FincheckInspectionReports,
   QASectionsMeasurementSpecs,
-  DtOrder
+  DtOrder,
+  RoleManagment
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -17,7 +18,11 @@ export const getInspectionReports = async (req, res) => {
       orderType,
       orderNo,
       productType,
-      empId
+      empId,
+      subConFactory,
+      custStyle,
+      buyer,
+      supplier
     } = req.query;
 
     let query = {
@@ -64,6 +69,29 @@ export const getInspectionReports = async (req, res) => {
     // 7. QA ID (Emp ID) Filter
     if (empId) {
       query.empId = { $regex: empId, $options: "i" };
+    }
+
+    // 8. Sub-Con Factory Filter (Nested in inspectionDetails)
+    if (subConFactory && subConFactory !== "All") {
+      query["inspectionDetails.subConFactory"] = subConFactory;
+    }
+
+    // 9. Customer Style Filter (Regex Search, Nested)
+    if (custStyle) {
+      query["inspectionDetails.custStyle"] = {
+        $regex: custStyle,
+        $options: "i"
+      };
+    }
+
+    // 10. Buyer Filter (Root level field)
+    if (buyer && buyer !== "All") {
+      query.buyer = buyer;
+    }
+
+    // 11. Supplier Filter (Nested)
+    if (supplier && supplier !== "All") {
+      query["inspectionDetails.supplier"] = supplier;
     }
 
     // Execute Query
@@ -302,5 +330,33 @@ export const getReportMeasurementSpecs = async (req, res) => {
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
     return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// NEW: Check User Permission for UI Visibility
+// ============================================================
+export const checkUserPermission = async (req, res) => {
+  try {
+    const { empId } = req.query;
+
+    if (!empId) {
+      return res.status(200).json({ isAdmin: false });
+    }
+
+    // Check if this Employee ID exists inside the 'users' array
+    // of any document where the role is 'Admin' or 'Super Admin'
+    const roleDoc = await RoleManagment.findOne({
+      role: { $in: ["Admin", "Super Admin"] },
+      "users.emp_id": empId
+    }).select("_id");
+
+    return res.status(200).json({
+      success: true,
+      isAdmin: !!roleDoc // Returns true if document found, false otherwise
+    });
+  } catch (error) {
+    console.error("Permission check error:", error);
+    return res.status(500).json({ success: false, isAdmin: false });
   }
 };

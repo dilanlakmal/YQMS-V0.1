@@ -40,7 +40,11 @@ const createFincheckInspectionReportsModel = (connection) => {
       supplier: { type: String, default: "" },
       isSubCon: { type: Boolean, default: false },
       subConFactory: { type: String, default: "" },
-      subConFactoryId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      subConFactoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+        ref: "SubconSewingFactory"
+      },
       factory: { type: String, default: "" },
 
       inspectedQty: { type: Number, default: null },
@@ -167,6 +171,9 @@ const createFincheckInspectionReportsModel = (connection) => {
     {
       // Context / Config Link
       groupId: { type: Number, required: true }, // Matches the ID from InspectionConfig
+
+      // Distinguishes between Tab 1 and Tab 2 ***
+      stage: { type: String, enum: ["Before", "After"], default: "Before" },
 
       // Scopes
       line: { type: String, default: "" },
