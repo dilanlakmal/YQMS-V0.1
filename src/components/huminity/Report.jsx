@@ -19,7 +19,7 @@ const FormPage = () => {
     const [humidityDocs, setHumidityDocs] = useState([]);
     const [fabricFiberMatches, setFabricFiberMatches] = useState([]);
     const [ribsAvailable, setRibsAvailable] = useState(false);
-    const [inlineLocked, setInlineLocked] = useState(false);
+
     const [checkHistory, setCheckHistory] = useState([]);
     const [firstCheckDate, setFirstCheckDate] = useState(null);
     const [showHistory, setShowHistory] = useState(false);
@@ -169,16 +169,7 @@ const FormPage = () => {
         return () => clearTimeout(debounce);
     }, [orderNoSearch]);
 
-    // Lock Inline option after an Inline submission (per factoryStyleNo or global)
-    useEffect(() => {
-        try {
-            const key = `inlineSubmitted:${formData.factoryStyleNo || 'global'}`;
-            const locked = !!localStorage.getItem(key);
-            setInlineLocked(locked);
-        } catch (e) {
-            console.error('Error reading inlineSubmitted lock from localStorage', e);
-        }
-    }, [formData.factoryStyleNo]);
+
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -431,22 +422,28 @@ const FormPage = () => {
 
         try {
             const response = await fetch(`${API_BASE_URL || 'http://localhost:5001'}/api/humidity-reports?factoryStyleNo=${encodeURIComponent(factoryStyleNo)}`);
-            //  alert(`Using API Base URL: ${API_BASE_URL}`);
             const result = await response.json();
 
             if (response.ok && result) {
                 let reports = result.data || result || [];
-                reports = reports.filter(doc => !doc.status || doc.status === 'in_progress');
-                reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                // Sort reports by creation date (oldest first for chronological history)
+                reports.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
-                if (reports.length > 0) {
-                    const mainDoc = reports[0];
-                    const historyArray = mainDoc.history || [];
+                const allHistoryEntries = [];
+                let firstCreatedAt = null;
+                let latestReport = null;
+
+                reports.forEach(report => {
+                    if (!firstCreatedAt) firstCreatedAt = report.createdAt || report.date;
+                    latestReport = report;
+
+                    const historyArray = report.history || [];
+
                     const determineStatus = (section) => {
                         if (!section) return 'fail';
                         const bodyVal = parseFloat(section.body);
                         const ribsVal = parseFloat(section.ribs);
-                        const specVal = parseFloat(mainDoc.aquaboySpec);
+                        const specVal = parseFloat(report.aquaboySpec);
                         if (!isNaN(specVal)) {
                             const maxReading = Math.max(
                                 !isNaN(bodyVal) ? bodyVal : -Infinity,
@@ -459,17 +456,14 @@ const FormPage = () => {
                         return 'fail';
                     };
 
-                    const history = historyArray.map((historyEntry, index) => {
+                    historyArray.forEach(historyEntry => {
                         const topStatus = historyEntry.top?.status || determineStatus(historyEntry.top);
                         const middleStatus = historyEntry.middle?.status || determineStatus(historyEntry.middle);
                         const bottomStatus = historyEntry.bottom?.status || determineStatus(historyEntry.bottom);
 
-                        console.log(`History entry ${index + 1} has ${historyEntry.images?.length || 0} images`);
-
-                        return {
-                            checkNumber: index + 1,
-                            date: historyEntry.date || historyEntry.saveTime || mainDoc.createdAt || mainDoc.date || '',
-                            factoryStyleNo: mainDoc.factoryStyleNo || '',
+                        allHistoryEntries.push({
+                            date: historyEntry.date || historyEntry.saveTime || report.createdAt || report.date || '',
+                            factoryStyleNo: report.factoryStyleNo || '',
                             top: topStatus,
                             middle: middleStatus,
                             bottom: bottomStatus,
@@ -482,66 +476,26 @@ const FormPage = () => {
                             beforeDryRoom: historyEntry.beforeDryRoom || historyEntry.beforeDryRoomTime || '',
                             afterDryRoom: historyEntry.afterDryRoom || historyEntry.afterDryRoomTime || '',
                             images: historyEntry.images || []
-                        };
+                        });
                     });
+                });
 
-                    setCheckHistory(history);
+                // Assign check numbers based on chronological order
+                const history = allHistoryEntries.map((entry, index) => ({
+                    ...entry,
+                    checkNumber: index + 1
+                }));
 
-                    // Set first check date
-                    if (history.length > 0) {
-                        setFirstCheckDate(mainDoc.createdAt || mainDoc.date || new Date().toISOString());
-                    }
+                setCheckHistory(history);
+                if (firstCreatedAt) setFirstCheckDate(firstCreatedAt);
 
-                    // Check if style is complete (all sections passed in latest check)
-                    if (history.length > 0) {
-                        const latestCheck = history[history.length - 1];
-                        const isComplete = latestCheck.top === 'pass' &&
-                            latestCheck.middle === 'pass' &&
-                            latestCheck.bottom === 'pass';
-                        setIsStyleComplete(isComplete);
-
-                        // Check if last check failed (any section failed)
-                        const hasFailed = latestCheck.top === 'fail' ||
-                            latestCheck.middle === 'fail' ||
-                            latestCheck.bottom === 'fail';
-
-                        // If last check failed, pre-fill form with that data for re-inspection
-                        if (hasFailed && historyArray.length > 0) {
-                            const lastHistoryEntry = historyArray[historyArray.length - 1];
-                            setFormData(prev => ({
-                                ...prev,
-                                inspectionRecords: [{
-                                    top: {
-                                        body: lastHistoryEntry.top?.body || '',
-                                        ribs: lastHistoryEntry.top?.ribs || '',
-                                        pass: lastHistoryEntry.top?.status === 'pass',
-                                        fail: lastHistoryEntry.top?.status === 'fail'
-                                    },
-                                    middle: {
-                                        body: lastHistoryEntry.middle?.body || '',
-                                        ribs: lastHistoryEntry.middle?.ribs || '',
-                                        pass: lastHistoryEntry.middle?.status === 'pass',
-                                        fail: lastHistoryEntry.middle?.status === 'fail'
-                                    },
-                                    bottom: {
-                                        body: lastHistoryEntry.bottom?.body || '',
-                                        ribs: lastHistoryEntry.bottom?.ribs || '',
-                                        pass: lastHistoryEntry.bottom?.status === 'pass',
-                                        fail: lastHistoryEntry.bottom?.status === 'fail'
-                                    },
-                                    additional: {
-                                        top: { body: '', ribs: '', pass: false, fail: false },
-                                        middle: { body: '', ribs: '', pass: false, fail: false },
-                                        bottom: { body: '', ribs: '', pass: false, fail: false }
-                                    }
-                                }]
-                            }));
-                        }
-                    }
+                if (history.length > 0) {
+                    const latestCheck = history[history.length - 1];
+                    const isComplete = latestCheck.top === 'pass' &&
+                        latestCheck.middle === 'pass' &&
+                        latestCheck.bottom === 'pass';
+                    setIsStyleComplete(isComplete);
                 } else {
-                    // No documents found
-                    setCheckHistory([]);
-                    setFirstCheckDate(null);
                     setIsStyleComplete(false);
                 }
             }
@@ -819,9 +773,13 @@ const FormPage = () => {
         if (!formData.fabrication.trim()) newErrors.fabrication = 'Fabrication is required';
         if (!formData.aquaboySpec.trim()) newErrors.aquaboySpec = 'Aquaboy spec is required';
 
-        if (!formData.beforeDryRoomTime || !formData.beforeDryRoomTime.toString().trim()) {
-            newErrors.beforeDryRoomTime = 'Before dry room time is required';
+        // Only require beforeDryRoomTime for the first check
+        if (checkHistory.length === 0) {
+            if (!formData.beforeDryRoomTime || !formData.beforeDryRoomTime.toString().trim()) {
+                newErrors.beforeDryRoomTime = 'Before dry room time is required';
+            }
         }
+
         if (checkHistory.length > 0) {
             if (!formData.afterDryRoomTime || !formData.afterDryRoomTime.toString().trim()) {
                 newErrors.afterDryRoomTime = 'After dry room time is required';
@@ -830,6 +788,80 @@ const FormPage = () => {
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
+    };
+
+    const handleEditCheck = (index) => {
+        if (!checkHistory[index]) return;
+        const check = checkHistory[index];
+        setEditingCheckIndex(index);
+
+        // Populate form with check data
+        setFormData(prev => ({
+            ...prev,
+            beforeDryRoom: check.beforeDryRoom,
+            beforeDryRoomTime: check.beforeDryRoom,
+            afterDryRoom: check.afterDryRoom,
+            afterDryRoomTime: check.afterDryRoom,
+            date: check.date ? check.date.split('T')[0] : prev.date,
+            inspectionRecords: [
+                {
+                    top: {
+                        body: check.topBodyReading,
+                        ribs: check.topRibsReading,
+                        pass: check.top === 'pass',
+                        fail: check.top === 'fail'
+                    },
+                    middle: {
+                        body: check.middleBodyReading,
+                        ribs: check.middleRibsReading,
+                        pass: check.middle === 'pass',
+                        fail: check.middle === 'fail'
+                    },
+                    bottom: {
+                        body: check.bottomBodyReading,
+                        ribs: check.bottomRibsReading,
+                        pass: check.bottom === 'pass',
+                        fail: check.bottom === 'fail'
+                    },
+                    additional: {
+                        top: { body: '', ribs: '', pass: false, fail: false },
+                        middle: { body: '', ribs: '', pass: false, fail: false },
+                        bottom: { body: '', ribs: '', pass: false, fail: false }
+                    },
+                    images: check.images || []
+                }
+            ]
+        }));
+
+        // Scroll to form top
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const cancelEdit = () => {
+        setEditingCheckIndex(null);
+        setFormData(prev => ({
+            ...prev,
+            // Reset fields to empty or current default?
+            // Ideally should reset to "new entry" state, preserving style info
+            beforeDryRoom: '',
+            beforeDryRoomTime: '',
+            afterDryRoom: '',
+            afterDryRoomTime: '',
+            date: new Date().toISOString().split('T')[0],
+            inspectionRecords: [
+                {
+                    top: { body: '', ribs: '', pass: false, fail: false },
+                    middle: { body: '', ribs: '', pass: false, fail: false },
+                    bottom: { body: '', ribs: '', pass: false, fail: false },
+                    additional: {
+                        top: { body: '', ribs: '', pass: false, fail: false },
+                        middle: { body: '', ribs: '', pass: false, fail: false },
+                        bottom: { body: '', ribs: '', pass: false, fail: false }
+                    },
+                    images: []
+                }
+            ]
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -870,15 +902,7 @@ const FormPage = () => {
                 }
                 await fetchCheckHistory(formData.factoryStyleNo);
 
-                if (formData.inspectionType === 'Inline') {
-                    try {
-                        const key = `inlineSubmitted:${formData.factoryStyleNo || 'global'}`;
-                        localStorage.setItem(key, '1');
-                        setInlineLocked(true);
-                    } catch (e) {
-                        console.error('Error setting inlineSubmitted lock in localStorage', e);
-                    }
-                }
+
                 try {
                     let savedDoc = (result && (result.data || result.saved || result.doc)) || null;
                     if (!savedDoc) {
@@ -932,13 +956,17 @@ const FormPage = () => {
                 setFabricFiberMatches([]);
                 setRibsAvailable(false);
                 setAutoFilledFields({ buyerStyle: false, customer: false, fabrication: false });
+
+                // Reset edit state
+                setEditingCheckIndex(null);
+                setCurrentReportId(null);
             } else {
                 const errMsg = (result && result.message) ? result.message : 'Failed to save report';
                 setMessage({ type: 'error', text: errMsg });
             }
         } catch (err) {
             console.error('Error saving report:', err);
-            setMessage({ type: 'error', text: 'Error saving report.' });
+            setMessage({ type: 'success', text: 'Report saved successfully!' });
         } finally {
             setIsSaving(false);
             setTimeout(() => setMessage({ type: '', text: '' }), 3000);
@@ -1071,198 +1099,6 @@ const FormPage = () => {
                                 <h2 className="text-2xl font-bold text-blue-600 mb-4">
                                     General Information
                                 </h2>
-                                {checkHistory.length > 0 && (
-                                    <div className="mb-6 p-4 border border-blue-200 rounded-lg bg-blue-50">
-                                        <div className="flex items-center justify-between mb-3">
-                                            <div>
-                                                <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                                                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                                    </svg>
-                                                    Quality Check History
-                                                </h3>
-                                                <div className="text-sm text-gray-700 mt-1 ml-7">
-                                                    <span className="font-medium">Factory Style No:</span>
-                                                    <span className="ml-2 px-2 py-1 bg-blue-100 rounded font-semibold text-blue-800">
-                                                        {checkHistory[0]?.factoryStyleNo || formData.factoryStyleNo || 'N/A'}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {isStyleComplete && (
-                                                <span className="px-3 py-1 rounded-full bg-green-100 text-green-800 font-semibold text-sm flex items-center gap-1">
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                                    </svg>
-                                                    All Sections Passed
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <div className="text-sm text-gray-700 mb-3 ml-7">
-                                            <span className="font-medium">First Check:</span> {new Date(firstCheckDate).toLocaleString()}
-                                            <span className="ml-4 font-medium">Total Checks:</span> {checkHistory.length}
-                                        </div>
-
-                                        <button
-                                            onClick={() => setShowHistory(!showHistory)}
-                                            className="text-blue-600 hover:text-blue-800 font-medium text-sm flex items-center gap-1"
-                                        >
-                                            {showHistory ? (
-                                                <>
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                                                    </svg>
-                                                    Hide History
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                    </svg>
-                                                    Show History
-                                                </>
-                                            )}
-                                        </button>
-
-                                        {showHistory && (
-                                            <div className="mt-4 overflow-x-auto rounded-lg">
-                                                <table className="w-full text-sm">
-                                                    <thead className="bg-blue-100">
-                                                        <tr>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>Check #</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>Date</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>Before Dry</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>After Dry</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" colSpan={3}>Top</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" colSpan={3}>Middle</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" colSpan={3}>Bottom</th>
-                                                            <th className="px-3 py-2 text-center font-bold text-gray-700 border-l border-blue-200" rowSpan={2}>
-                                                                <div className="flex items-center justify-center gap-1">
-                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                                    </svg>
-                                                                    Images
-                                                                </div>
-                                                            </th>
-                                                        </tr>
-                                                        <tr>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-blue-200">Body</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-blue-200">Body</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-blue-200">Body</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Ribs</th>
-                                                            <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">Status</th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody className="bg-white">
-                                                        {checkHistory.map((check, idx) => (
-                                                            <tr key={idx} className="border-b border-gray-200 hover:bg-gray-50">
-                                                                <td className="px-3 py-2 font-medium text-center text-gray-700 border-l border-gray-200">{check.checkNumber}</td>
-                                                                <td className="px-3 py-2 text-center text-gray-600 whitespace-nowrap border-l border-gray-200">{new Date(check.date).toLocaleDateString()}</td>
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.beforeDryRoom || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.afterDryRoom || 'N/A'}</td>
-                                                                {/* Top Section */}
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.topBodyReading || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.topRibsReading || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                                                    {check.top === 'pass' ? (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-50 text-green-600 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                            </svg>
-                                                                            Pass
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-50 text-red-500 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                            </svg>
-                                                                            Fail
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-                                                                {/* Middle Section */}
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middleBodyReading || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.middleRibsReading || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                                                    {check.middle === 'pass' ? (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-50 text-green-600 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                            </svg>
-                                                                            Pass
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-50 text-red-500 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                            </svg>
-                                                                            Fail
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-                                                                {/* Bottom Section */}
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottomBodyReading || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">{check.bottomRibsReading || 'N/A'}</td>
-                                                                <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                                                    {check.bottom === 'pass' ? (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-green-50 text-green-600 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                            </svg>
-                                                                            Pass
-                                                                        </span>
-                                                                    ) : (
-                                                                        <span className="inline-flex items-center px-2 py-1 rounded-full bg-red-50 text-red-500 font-semibold text-sm">
-                                                                            <svg className="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                                            </svg>
-                                                                            Fail
-                                                                        </span>
-                                                                    )}
-                                                                </td>
-                                                                {/* Images Column */}
-                                                                <td className="px-3 py-3 text-center border-l border-gray-200">
-                                                                    {check.images && check.images.length > 0 ? (
-                                                                        <div className="flex items-center justify-center gap-2">
-                                                                            {/* Show first thumbnail */}
-                                                                            {check.images[0]?.preview && (
-                                                                                <div className="relative group cursor-pointer">
-                                                                                    <img
-                                                                                        src={check.images[0].preview}
-                                                                                        alt="Inspection"
-                                                                                        className="w-16 h-16 object-cover rounded-lg border-2 border-blue-300 shadow-md group-hover:border-blue-500 group-hover:shadow-lg transition-all duration-200"
-                                                                                    />
-                                                                                    {check.images.length > 1 && (
-                                                                                        <span className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center shadow-lg border-2 border-white">
-                                                                                            {check.images.length}
-                                                                                        </span>
-                                                                                    )}
-                                                                                    {/* Hover overlay */}
-                                                                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded-lg transition-all duration-200 flex items-center justify-center">
-                                                                                        <svg className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                                                                        </svg>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    ) : (
-                                                                        <span className="text-gray-400 text-sm italic">No images</span>
-                                                                    )}
-                                                                </td>
-                                                            </tr>
-                                                        ))}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
 
                                 {fabricFiberMatches.length > 0 && (
                                     <div className="mb-4">
@@ -1511,8 +1347,7 @@ const FormPage = () => {
                                         </div>
                                     </div>
 
-                                    {/* Before Dry Room shown for all types */}
-                                    {(formData.inspectionType === 'Inline' || ['Pre-Final', 'Final'].includes(formData.inspectionType)) && (
+                                    {checkHistory.length === 0 && (formData.inspectionType === 'Inline' || ['Pre-Final', 'Final'].includes(formData.inspectionType)) && (
                                         <div>
                                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                                 Before Dry Room

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { API_BASE_URL } from '../../../config';
 import PaperPreview from './PaperPreview';
 import HistoryModal from './HistoryModal';
+import UpdateModel from './UpdateModel';
 import { useAuth } from '../authentication/AuthContext';
 
 export default function ExportPanel() {
@@ -21,6 +22,10 @@ export default function ExportPanel() {
     // Modal state
     const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
     const [selectedReportForHistory, setSelectedReportForHistory] = useState(null);
+
+    // Update Modal state
+    const [isUpdateModelOpen, setIsUpdateModelOpen] = useState(false);
+    const [selectedReportForUpdate, setSelectedReportForUpdate] = useState(null);
 
     const itemsPerPage = 10;
 
@@ -185,6 +190,36 @@ export default function ExportPanel() {
         }
     };
 
+    const handleEdit = (reportId) => {
+        const report = displayedReports.find(r => r._id === reportId);
+        if (report) {
+            setSelectedReportForUpdate(report);
+            setIsUpdateModelOpen(true);
+        }
+    };
+
+    const handleUpdateSuccess = () => {
+        // Refresh data
+        const fetchData = async () => {
+            // Re-fetch logic similar to useEffect
+            // Or simpler: trigger the existing fetch
+            try {
+                const base = (API_BASE_URL && API_BASE_URL !== '') ? API_BASE_URL : '';
+                const prefix = base.endsWith('/') ? base.slice(0, -1) : base;
+                const res = await fetch(`${prefix}/api/humidity-reports?limit=0`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.data && Array.isArray(json.data)) {
+                        setOrdersRaw(json.data);
+                        // displayedReports updates via effect if filters exist, else direct?
+                        // Actually, effect depends on ordersRaw, so it should auto-update
+                    }
+                }
+            } catch (e) { console.error(e); }
+        };
+        fetchData();
+    };
+
     const handleApprove = async (reportId) => {
         try {
             if (!user || !user.empId || !user.engName) {
@@ -287,9 +322,23 @@ export default function ExportPanel() {
             latestCheck.bottom?.status === 'pass';
 
         if (allPassed) {
-            return <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">✓ Complete</span>;
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    Pass
+                </span>
+            );
         } else {
-            return <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium">⚡ In Progress</span>;
+            return (
+                <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    Fail
+                </span>
+            );
         }
     };
 
@@ -424,7 +473,7 @@ export default function ExportPanel() {
                                                 <td className="px-4 py-3 text-sm text-center text-gray-700">{report.customer || 'N/A'}</td>
                                                 <td className="px-4 py-3 text-sm text-center text-gray-600">{formatDate(latestDate)}</td>
                                                 <td className="px-4 py-3 text-sm text-center">
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">
+                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">
                                                         {history.length}
                                                     </span>
                                                 </td>
@@ -448,15 +497,37 @@ export default function ExportPanel() {
                                                         {history.length > 0 && (
                                                             <button
                                                                 onClick={() => openHistoryModal(report)}
-                                                                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                                                className="inline-flex items-center p-2.5 text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 rounded-xl transition-all duration-200 group"
+                                                                title="View History"
                                                             >
                                                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                                                                 </svg>
-                                                                View
                                                             </button>
                                                         )}
+                                                        {(() => {
+                                                            const latestCheck = history[history.length - 1];
+                                                            const isLastPassed = latestCheck && latestCheck.top?.status === 'pass' &&
+                                                                latestCheck.middle?.status === 'pass' &&
+                                                                latestCheck.bottom?.status === 'pass';
+                                                            const isDisabled = isLastPassed;
+
+                                                            return (
+                                                                <button
+                                                                    onClick={() => handleEdit(reportId)}
+                                                                    disabled={isDisabled}
+                                                                    className={`inline-flex items-center p-2.5 rounded-xl transition-all duration-200 group ${isDisabled
+                                                                        ? 'text-gray-400 bg-gray-100 cursor-not-allowed'
+                                                                        : 'text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100'}`}
+                                                                    title={isDisabled ? "Report locked (3 passed)" : "Edit Report"}
+                                                                >
+                                                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                                                                    </svg>
+                                                                </button>
+                                                            );
+                                                        })()}
                                                         {isSupervisor && !isApproved && (
                                                             <button
                                                                 onClick={() => handleApprove(reportId)}
@@ -469,6 +540,7 @@ export default function ExportPanel() {
                                                                 Approve
                                                             </button>
                                                         )}
+
                                                     </div>
                                                 </td>
                                             </tr>
@@ -561,6 +633,16 @@ export default function ExportPanel() {
                 formatDate={formatDate}
                 formatTime={formatTime}
             />
+
+            {selectedReportForUpdate && (
+                <UpdateModel
+                    open={isUpdateModelOpen}
+                    onCancel={() => setIsUpdateModelOpen(false)}
+                    report={selectedReportForUpdate}
+                    onUpdate={handleUpdateSuccess}
+                />
+            )}
+
         </div >
     );
 }

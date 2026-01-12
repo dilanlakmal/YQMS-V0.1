@@ -82,95 +82,37 @@ const ReitmansForm = ({
 
         // Try to fetch reitmans_humidity doc for this style to prefer its primary/secondary
         try {
-          const rhRes = await fetch(`${base}/api/reitmans-humidity/${encodeURIComponent(moNo)}`);
           if (rhRes && rhRes.ok) {
             const rhJson = await rhRes.json();
             const rhData = rhJson && rhJson.data ? rhJson.data : null;
             if (rhData) {
               const docObj = rhData.doc || rhData;
-              // ReitmansName may be an array of entries; find the one that matches our fabric
-              if (Array.isArray(rhData.ReitmansName) && rhData.ReitmansName.length) {
-                const normalize = s => (s || '').toString().trim().toLowerCase();
-                const firstFab = normalize(fabrics[0]?.fabricName || fabrics[0]?.name || '');
-                const secFab = normalize(fabrics[1]?.fabricName || fabrics[1]?.name || '');
+              const pName = rhData.primary || docObj.primary || '';
+              const pPct = rhData['primary%'] || docObj.primaryPercent || '';
+              const sName = rhData.secondary || docObj.secondary || '';
+              const sPct = sName ? (rhData['secondary%'] || docObj.secondaryPercent || '') : '';
 
-                // Priority 1: Match both primary and secondary
-                let chosen = rhData.ReitmansName.find(r =>
-                  normalize(r.primary) === firstFab && normalize(r.secondary) === secFab
-                );
+              if (pName) setPrimaryFabric({ fabricName: pName, percentage: pPct });
+              if (sName) setSecondaryFabric({ fabricName: sName, percentage: sPct });
 
-                // Priority 2: Match just primary (common for single-fabric styles)
-                if (!chosen) {
-                  chosen = rhData.ReitmansName.find(r => normalize(r.primary) === firstFab);
-                }
-
-                // Priority 3: Any entry that matches secondary (unlikely but possible)
-                if (!chosen && secFab) {
-                  chosen = rhData.ReitmansName.find(r => normalize(r.secondary) === secFab || normalize(r.primary) === secFab);
-                }
-
-                // Fallback: Use the first entry
-                if (!chosen) {
-                  chosen = rhData.ReitmansName[0];
-                }
-
-                if (chosen) {
-                  const pName = chosen.primary || '';
-                  const pPct = chosen.value && !chosen['primary%'] ? chosen.value : (chosen['primary%'] || chosen.primaryPercent || '');
-                  const sName = chosen.secondary || '';
-                  const sPct = sName ? (chosen['secondary%'] || chosen.secondaryPercent || '') : '';
-
-                  setPrimaryFabric({ fabricName: pName, percentage: pPct });
-                  setSecondaryFabric(sName ? { fabricName: sName, percentage: sPct } : null);
-
-                  if (setFormData) {
-                    setFormData(prev => ({
-                      ...prev,
-                      primaryFabric: pName,
-                      primaryPercentage: pPct,
-                      secondaryFabric: sName || prev.secondaryFabric,
-                      secondaryPercentage: sPct || prev.secondaryPercentage,
-                      composition: `${pName}${pPct ? ' ' + pPct + '%' : ''}${sName ? ' / ' + sName + (sPct ? ' ' + sPct + '%' : '') : ''}`,
-                      // Map DB 'value' to 'upperCentisimalIndex' - prioritze chosen.value then top-level
-                      upperCentisimalIndex: chosen.value || docObj.upperCentisimalIndex || prev.upperCentisimalIndex,
-                      aquaboySpec: docObj.aquaboySpec || docObj.spec || prev.aquaboySpec,
-                      timeChecked: docObj.timeChecked || prev.timeChecked,
-                      moistureRateBeforeDehumidify: docObj.moistureRateBeforeDehumidify || docObj.moistureRateBefore || prev.moistureRateBeforeDehumidify,
-                      noPcChecked: docObj.noPcChecked || prev.noPcChecked,
-                      timeIn: docObj.timeIn || prev.timeIn,
-                      timeOut: docObj.timeOut || prev.timeOut,
-                      moistureRateAfter: docObj.moistureRateAfter || prev.moistureRateAfter,
-                    }));
-                  }
-                }
-              } else {
-                // top-level primary/secondary fields
-                const pName = rhData.primary || docObj.primary || '';
-                const pPct = rhData['primary%'] || docObj.primaryPercent || '';
-                const sName = rhData.secondary || docObj.secondary || '';
-                const sPct = sName ? (rhData['secondary%'] || docObj.secondaryPercent || '') : '';
-
-                if (pName) setPrimaryFabric({ fabricName: pName, percentage: pPct });
-                if (sName) setSecondaryFabric({ fabricName: sName, percentage: sPct });
-
-                if (setFormData) {
-                  setFormData(prev => ({
-                    ...prev,
-                    primaryFabric: pName || prev.primaryFabric,
-                    primaryPercentage: pPct || prev.primaryPercentage,
-                    secondaryFabric: sName || prev.secondaryFabric,
-                    secondaryPercentage: sPct || prev.secondaryPercentage,
-                    composition: `${pName}${pPct ? ' ' + pPct + '%' : ''}${sName ? ' / ' + sName + (sPct ? ' ' + sPct + '%' : '') : ''}`,
-                    upperCentisimalIndex: rhData.value || docObj.upperCentisimalIndex || docObj.value || prev.upperCentisimalIndex,
-                    aquaboySpec: docObj.aquaboySpec || docObj.spec || prev.aquaboySpec,
-                    timeChecked: docObj.timeChecked || prev.timeChecked,
-                    moistureRateBeforeDehumidify: docObj.moistureRateBeforeDehumidify || docObj.moistureRateBefore || prev.moistureRateBeforeDehumidify,
-                    noPcChecked: docObj.noPcChecked || prev.noPcChecked,
-                    timeIn: docObj.timeIn || prev.timeIn,
-                    timeOut: docObj.timeOut || prev.timeOut,
-                    moistureRateAfter: docObj.moistureRateAfter || prev.moistureRateAfter,
-                  }));
-                }
+              if (setFormData) {
+                setFormData(prev => ({
+                  ...prev,
+                  primaryFabric: pName || prev.primaryFabric,
+                  primaryPercentage: pPct || prev.primaryPercentage,
+                  secondaryFabric: sName || prev.secondaryFabric,
+                  secondaryPercentage: sPct || prev.secondaryPercentage,
+                  composition: `${pName}${pPct ? ' ' + pPct + '%' : ''}${sName ? ' / ' + sName + (sPct ? ' ' + sPct + '%' : '') : ''}`,
+                  // Use the calculating value from the backend (docObj.upperCentisimalIndex)
+                  upperCentisimalIndex: rhData.value || docObj.upperCentisimalIndex || docObj.value || prev.upperCentisimalIndex,
+                  aquaboySpec: rhData.value || docObj.upperCentisimalIndex || docObj.value || docObj.aquaboySpec || docObj.spec || prev.aquaboySpec,
+                  timeChecked: docObj.timeChecked || prev.timeChecked,
+                  moistureRateBeforeDehumidify: docObj.moistureRateBeforeDehumidify || docObj.moistureRateBefore || prev.moistureRateBeforeDehumidify,
+                  noPcChecked: docObj.noPcChecked || prev.noPcChecked,
+                  timeIn: docObj.timeIn || prev.timeIn,
+                  timeOut: docObj.timeOut || prev.timeOut,
+                  moistureRateAfter: docObj.moistureRateAfter || prev.moistureRateAfter,
+                }));
               }
             }
           }
@@ -228,6 +170,7 @@ const ReitmansForm = ({
               <div className="text-sm text-gray-700">
                 <div><strong>Primary:</strong> {primaryFabric ? `${primaryFabric.fabricName || primaryFabric.name || primaryFabric.fabricName} (${primaryFabric.percentage || primaryFabric.percentage === 0 ? primaryFabric.percentage + '%' : ''})` : 'N/A'}</div>
                 <div><strong>Secondary:</strong> {secondaryFabric ? `${secondaryFabric.fabricName || secondaryFabric.name || secondaryFabric.fabricName} (${secondaryFabric.percentage || secondaryFabric.percentage === 0 ? secondaryFabric.percentage + '%' : ''})` : 'N/A'}</div>
+                <div><strong>Upper Centisimal index:</strong> {(formData.upperCentisimalIndex && String(formData.upperCentisimalIndex) !== '0') ? formData.upperCentisimalIndex : (formData.aquaboySpec && String(formData.aquaboySpec) !== '0' ? formData.aquaboySpec : 'N/A')}</div>
               </div>
             ) : null}
           </div>
