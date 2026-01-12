@@ -40,7 +40,11 @@ const createFincheckInspectionReportsModel = (connection) => {
       supplier: { type: String, default: "" },
       isSubCon: { type: Boolean, default: false },
       subConFactory: { type: String, default: "" },
-      subConFactoryId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      subConFactoryId: {
+        type: mongoose.Schema.Types.ObjectId,
+        default: null,
+        ref: "SubconSewingFactory"
+      },
       factory: { type: String, default: "" },
 
       inspectedQty: { type: Number, default: null },

@@ -754,6 +754,18 @@ const YPivotQAInspectionReportType = ({
 
   // Pass data to parent
   useEffect(() => {
+    // 1. Find the name based on the selected ID
+    let selectedFactoryName = "";
+    if (isSubCon && selectedSubConFactory && subConFactories.length > 0) {
+      const factoryObj = subConFactories.find(
+        (f) => f._id === selectedSubConFactory
+      );
+      if (factoryObj) {
+        // Use the same logic as your options label or just the factory name
+        selectedFactoryName = factoryObj.factory;
+      }
+    }
+
     if (onReportDataChange) {
       onReportDataChange({
         selectedTemplate,
@@ -764,6 +776,7 @@ const YPivotQAInspectionReportType = ({
           cartonQty,
           isSubCon,
           selectedSubConFactory,
+          selectedSubConFactoryName: selectedFactoryName,
           shippingStage,
           remarks,
           productTypeId: selectedProductTypeId
@@ -778,6 +791,7 @@ const YPivotQAInspectionReportType = ({
     cartonQty,
     isSubCon,
     selectedSubConFactory,
+    subConFactories,
     shippingStage,
     remarks,
     selectedProductTypeId,
