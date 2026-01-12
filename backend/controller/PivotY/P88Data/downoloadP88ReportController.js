@@ -6,6 +6,9 @@ import { promisify } from 'util';
 import { execSync } from 'child_process';
 import { exec } from 'child_process';
 import { p88LegacyData } from '../../MongoDB/dbConnectionController.js'; 
+import { Builder, Browser, By, until } from 'selenium-webdriver';
+import chrome from 'selenium-webdriver/chrome.js';
+import archiver from 'archiver';
 
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
@@ -23,11 +26,129 @@ if (!fs.existsSync(baseTempDir)) {
 const CONFIG = {
     LOGIN_URL: "https://yw.pivot88.com/login",
     BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
-    DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
+    DEFAULT_DOWNLOAD_DIR: process.platform === 'win32' 
+        ? path.resolve("P:/P88Test") 
+        : path.join(process.env.HOME || '/tmp', 'p88-reports'),
     TIMEOUT: 15000,
     DELAY_BETWEEN_DOWNLOADS: 3000,
     HEADLESS: 'new', // Always run headless - no GUI windows
 };
+
+const UBUNTU_CONFIG = {
+    CHROME_BINARY: '/usr/bin/google-chrome', // or '/usr/bin/chromium-browser'
+    DOWNLOAD_TIMEOUT: 60000, // 60 seconds
+    HEADLESS: true
+};
+
+function ensureDownloadDir(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`📁 Created download directory: ${dir}`);
+    }
+}
+
+async function waitForDownloadComplete(dir, timeout = 60000) {
+    const start = Date.now();
+    let lastFileCount = 0;
+    
+    console.log(`⏳ Waiting for download to complete in: ${dir}`);
+    
+    while (Date.now() - start < timeout) {
+        try {
+            const files = fs.readdirSync(dir);
+            const pdfFiles = files.filter(f => f.endsWith('.pdf') && !f.endsWith('.crdownload'));
+            const tmpFiles = files.filter(f => f.endsWith('.tmp') || f.endsWith('.crdownload'));
+            
+            if (files.length > lastFileCount) {
+                console.log(`📂 Files found: ${files.length} (PDFs: ${pdfFiles.length}, Temp: ${tmpFiles.length})`);
+                lastFileCount = files.length;
+            }
+            
+            // Download complete when we have PDF files and no temp files
+            if (pdfFiles.length > 0 && tmpFiles.length === 0) {
+                console.log(`✅ Download complete: ${pdfFiles.length} PDF files`);
+                return pdfFiles;
+            }
+            
+            await new Promise(r => setTimeout(r, 1000));
+        } catch (error) {
+            console.log(`⚠️ Error checking download directory: ${error.message}`);
+            await new Promise(r => setTimeout(r, 1000));
+        }
+    }
+    
+    throw new Error(`Download timeout after ${timeout}ms`);
+}
+
+function createChromeOptions(downloadDir) {
+    const options = new chrome.Options();
+    
+    // Chrome binary path for Ubuntu
+    if (process.platform === 'linux') {
+        // Try common Chrome/Chromium paths
+        const chromePaths = [
+            '/usr/bin/google-chrome',
+            '/usr/bin/chromium-browser',
+            '/usr/bin/chromium',
+            '/snap/bin/chromium'
+        ];
+        
+        for (const chromePath of chromePaths) {
+            if (fs.existsSync(chromePath)) {
+                options.setChromeBinaryPath(chromePath);
+                console.log(`🌐 Using Chrome binary: ${chromePath}`);
+                break;
+            }
+        }
+    }
+    
+    // Chrome arguments for server environment
+    options.addArguments(
+        '--headless',
+        '--no-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--window-size=1920,1080',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-images', // Speed up loading
+        '--disable-javascript', // Only if the site works without JS
+        `--user-data-dir=/tmp/chrome-user-data-${Date.now()}`
+    );
+    
+    // Set download preferences
+    options.setUserPreferences({
+        'download.default_directory': downloadDir,
+        'download.prompt_for_download': false,
+        'download.directory_upgrade': true,
+        'safebrowsing.enabled': true,
+        'plugins.always_open_pdf_externally': true,
+        'plugins.plugins_disabled': ['Chrome PDF Viewer']
+    });
+    
+    return options;
+}
+
+// Create WebDriver instance
+async function createDriver(downloadDir) {
+    const options = createChromeOptions(downloadDir);
+    
+    const driver = await new Builder()
+        .forBrowser(Browser.CHROME)
+        .setChromeOptions(options)
+        .build();
+    
+    // Set timeouts
+    await driver.manage().setTimeouts({
+        implicit: 10000,
+        pageLoad: 30000,
+        script: 30000
+    });
+    
+    return driver;
+}
 
 // Helper functions (keep existing ones)
 const getFileSize = async (filePath) => {
@@ -86,6 +207,304 @@ const getAvailableSpace = async (dirPath) => {
     } catch (error) {
         console.warn('Error getting available space:', error.message);
         return 1024 * 1024 * 1024 * 5;
+    }
+};
+
+export const downloadBulkReportsUbuntu = async (req, res) => {
+    let driver = null;
+    let downloadDir = null;
+
+    try {
+        const { 
+            downloadPath, 
+            startRange, 
+            endRange, 
+            downloadAll, 
+            includeDownloaded = false,
+            startDate,
+            endDate,
+            factoryName,
+            language = 'english'
+        } = req.body;
+
+        // Create unique download directory
+        const jobId = Date.now().toString() + '_selenium_' + Math.random().toString(36).substr(2, 9);
+        downloadDir = path.join(baseTempDir, jobId);
+        ensureDownloadDir(downloadDir);
+
+        const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
+        ensureDownloadDir(targetDownloadDir);
+
+        // Get inspection records
+        const records = await getInspectionRecords(
+            startRange, 
+            endRange, 
+            downloadAll, 
+            includeDownloaded,
+            startDate,
+            endDate,
+            factoryName
+        );
+
+        if (records.length === 0) {
+            return res.json({
+                success: true,
+                message: 'No records found matching the specified criteria',
+                downloadInfo: {
+                    totalRecords: 0,
+                    successfulDownloads: 0,
+                    failedDownloads: 0,
+                    skippedDownloads: 0,
+                    totalFiles: 0,
+                    totalSize: '0 Bytes',
+                    details: []
+                }
+            });
+        }
+
+        console.log(`🚀 Starting Selenium WebDriver for ${records.length} records...`);
+        
+        // Create WebDriver
+        driver = await createDriver(downloadDir);
+        
+        // Login process
+        console.log('🔐 Performing login with Selenium...');
+        await driver.get(CONFIG.LOGIN_URL);
+        
+        // Wait for and fill login form
+        const usernameField = await driver.wait(until.elementLocated(By.id('username')), 10000);
+        const passwordField = await driver.wait(until.elementLocated(By.id('password')), 10000);
+        const loginButton = await driver.wait(until.elementLocated(By.id('js-login-submit')), 10000);
+        
+        await usernameField.clear();
+        await usernameField.sendKeys(process.env.P88_USERNAME);
+        
+        await passwordField.clear();
+        await passwordField.sendKeys(process.env.P88_PASSWORD);
+        
+        await loginButton.click();
+        
+        // Wait for login to complete
+        await driver.wait(until.urlContains('dashboard'), 30000);
+        console.log('✅ Login successful with Selenium');
+
+        // Download reports
+        const downloadResults = [];
+        let successfulDownloads = 0;
+        let failedDownloads = 0;
+        let skippedDownloads = 0;
+        let totalFiles = 0;
+        let totalSizeBytes = 0;
+
+        for (let i = 0; i < records.length; i++) {
+            const record = records[i];
+            const inspectionNumber = getFirstInspectionNumber(record);
+
+            if (!inspectionNumber) {
+                failedDownloads++;
+                downloadResults.push({
+                    inspectionNumber: 'N/A',
+                    groupNumber: record.groupNumber,
+                    project: record.project,
+                    success: false,
+                    error: 'No inspection number found'
+                });
+                continue;
+            }
+
+            try {
+                console.log(`📋 Processing ${i + 1}/${records.length}: ${inspectionNumber}`);
+                
+                // Check if already downloaded
+                if (!includeDownloaded && record.downloadStatus === 'Downloaded') {
+                    skippedDownloads++;
+                    downloadResults.push({
+                        inspectionNumber,
+                        groupNumber: record.groupNumber,
+                        project: record.project,
+                        success: true,
+                        skipped: true,
+                        reason: 'Already downloaded'
+                    });
+                    continue;
+                }
+
+                // Update status to 'In Progress'
+                await updateDownloadStatus(record._id, 'In Progress');
+
+                // Navigate to report
+                const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
+                await driver.get(reportUrl);
+
+                // Wait for print button and click
+                const printButton = await driver.wait(
+                    until.elementLocated(By.css('#page-wrapper a')), 
+                    15000
+                );
+                
+                // Get initial file count
+                const initialFiles = fs.existsSync(downloadDir) ? fs.readdirSync(downloadDir) : [];
+                
+                // Click print button
+                await printButton.click();
+                console.log(`🖱️ Clicked print button for ${inspectionNumber}`);
+
+                // Wait for download to complete
+                const downloadedFiles = await waitForDownloadComplete(downloadDir, 60000);
+                
+                // Find new files
+                const currentFiles = fs.readdirSync(downloadDir);
+                const newFiles = currentFiles.filter(file => !initialFiles.includes(file));
+                
+                if (newFiles.length === 0) {
+                    throw new Error('No new files downloaded');
+                }
+
+                // Move files to final destination
+                const customFileName = generateCustomFileName(record);
+                const movedFiles = [];
+                let recordTotalSize = 0;
+
+                for (let j = 0; j < newFiles.length; j++) {
+                    const tempFile = newFiles[j];
+                    const tempFilePath = path.join(downloadDir, tempFile);
+                    const fileExtension = path.extname(tempFile);
+                    const newFileName = `${customFileName}${newFiles.length > 1 ? `_${j + 1}` : ''}${fileExtension}`;
+                    const finalFilePath = path.join(targetDownloadDir, newFileName);
+
+                    // Handle file conflicts
+                    let actualFinalPath = finalFilePath;
+                    if (fs.existsSync(finalFilePath)) {
+                        const timestamp = Date.now();
+                        const conflictFileName = `${customFileName}${newFiles.length > 1 ? `_${j + 1}` : ''}_${timestamp}${fileExtension}`;
+                        actualFinalPath = path.join(targetDownloadDir, conflictFileName);
+                    }
+
+                    // Rename in temp dir for zip
+                    const tempRenamedPath = path.join(downloadDir, newFileName);
+                    fs.renameSync(tempFilePath, tempRenamedPath);
+
+                    // Copy to target
+                    fs.copyFileSync(tempRenamedPath, actualFinalPath);
+
+                    const size = await getFileSize(actualFinalPath);
+                    recordTotalSize += size;
+
+                    movedFiles.push({
+                        name: path.basename(actualFinalPath),
+                        originalName: tempFile,
+                        size: formatBytes(size),
+                        sizeBytes: size,
+                        inspectionNumber: inspectionNumber,
+                        groupNumber: record.groupNumber,
+                        project: record.project,
+                        customFileName: customFileName
+                    });
+                }
+
+                // Update status to 'Downloaded'
+                await updateDownloadStatus(record._id, 'Downloaded', new Date());
+
+                successfulDownloads++;
+                totalFiles += movedFiles.length;
+                totalSizeBytes += recordTotalSize;
+
+                downloadResults.push({
+                    inspectionNumber,
+                    groupNumber: record.groupNumber,
+                    project: record.project,
+                    fileCount: movedFiles.length,
+                    totalSize: recordTotalSize,
+                    files: movedFiles,
+                    success: true,
+                    customFileName: customFileName
+                });
+
+                console.log(`✅ Downloaded: ${inspectionNumber} (${movedFiles.length} files, ${formatBytes(recordTotalSize)})`);
+
+            } catch (error) {
+                console.error(`❌ Failed: ${inspectionNumber} - ${error.message}`);
+                
+                await updateDownloadStatus(record._id, 'Failed');
+                failedDownloads++;
+                
+                downloadResults.push({
+                    inspectionNumber,
+                    groupNumber: record.groupNumber,
+                    project: record.project,
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+
+        // 1. Close the driver first to release file locks
+        if (driver) {
+            await driver.quit();
+        }
+
+        // 2. Create the ZIP using the unique jobId to prevent mixing files
+        const zipFileName = `Bulk_Reports_${Date.now()}.zip`;
+        const zipPath = path.join(baseTempDir, zipFileName); // Save zip in base temp
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
+
+        // 3. Handle the archive events
+        output.on('close', () => {
+            console.log(`📦 ZIP created: ${archive.pointer()} total bytes`);
+            
+            // 4. THIS passes the file to the user device
+            res.download(zipPath, zipFileName, (err) => {
+                // 5. Cleanup: Delete the ZIP and the unique job folder after transfer
+                if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+                if (fs.existsSync(downloadDir)) fs.rmSync(downloadDir, { recursive: true, force: true });
+                console.log('🗑️ Cleaned up ZIP and temp files');
+            });
+        });
+
+        archive.on('error', (err) => { throw err; });
+        archive.pipe(output);
+
+        // 6. Append files from the unique downloadDir (NOT the global targetDownloadDir)
+        archive.directory(downloadDir, false); 
+        await archive.finalize();
+
+
+    } catch (error) {
+        console.error('Selenium download failed:', error);
+
+        // Cleanup on error
+        if (driver) {
+            try {
+                await driver.quit();
+            } catch (closeError) {
+                console.error('Error closing driver:', closeError);
+            }
+        }
+
+        if (downloadDir && fs.existsSync(downloadDir)) {
+            try {
+                fs.rmSync(downloadDir, { recursive: true, force: true });
+            } catch (cleanupError) {
+                console.error('Error cleaning up temp directory:', cleanupError);
+            }
+        }
+
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+// Platform-aware download function
+export const downloadBulkReportsAuto = async (req, res) => {
+    if (process.platform === 'linux') {
+        console.log('🐧 Using Selenium WebDriver for Linux/Ubuntu');
+        return await downloadBulkReportsUbuntu(req, res);
+    } else {
+        console.log('🪟 Using Puppeteer for Windows');
+        return await downloadBulkReports(req, res);
     }
 };
 
@@ -837,7 +1256,8 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
 
             // Move file from temp to final location
             try {
-                fs.copyFileSync(tempFilePath, actualFinalPath);
+                const finalRenamedPath = path.join(downloadDir, newFileName);
+                fs.renameSync(tempFilePath, finalRenamedPath);
                 
                 const size = await getFileSize(actualFinalPath);
                 totalSize += size;
