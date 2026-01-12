@@ -429,8 +429,6 @@ export const downloadSingleReportDirect = async (req, res) => {
         jobDir = path.join(baseTempDir, jobId);
         fs.mkdirSync(jobDir, { recursive: true });
 
-        console.log(`📁 Created temp directory: ${jobDir}`);
-
         // 2️⃣ Launch browser and setup download behavior
         browser = await puppeteer.launch({
             headless: CONFIG.HEADLESS,
@@ -466,9 +464,6 @@ export const downloadSingleReportDirect = async (req, res) => {
         // Wait for print button and click
         await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
         await page.click('#page-wrapper a');
-
-        // 3️⃣ Wait for the download to finish
-        console.log('⏳ Waiting for download to complete...');
         
         // Wait and check for file creation
         let downloadedFile = null;
@@ -484,8 +479,6 @@ export const downloadSingleReportDirect = async (req, res) => {
                 
                 if (pdfFiles.length > 0) {
                     downloadedFile = pdfFiles[0];
-                    console.log(`✅ Download completed: ${downloadedFile}`);
-                    break;
                 }
             } catch (error) {
                 console.log('📂 Checking for downloaded files...');
@@ -508,8 +501,6 @@ export const downloadSingleReportDirect = async (req, res) => {
         const filePath = path.join(jobDir, downloadedFile);
         const customFileName = `Report-${inspectionNumber}-${Date.now()}.pdf`;
 
-        console.log(`📤 Serving file: ${filePath} as ${customFileName}`);
-
         // Set proper headers for file download
         res.setHeader('Content-Disposition', `attachment; filename="${customFileName}"`);
         res.setHeader('Content-Type', 'application/pdf');
@@ -520,14 +511,12 @@ export const downloadSingleReportDirect = async (req, res) => {
             if (jobDir && fs.existsSync(jobDir)) {
                 try {
                     fs.rmSync(jobDir, { recursive: true, force: true });
-                    console.log(`🗑️ Cleaned up temp directory: ${jobDir}`);
                 } catch (cleanupError) {
                     console.error('Error cleaning up temp directory:', cleanupError);
                 }
             }
 
             if (err) {
-                console.error('Error sending file:', err);
                 if (!res.headersSent) {
                     res.status(500).json({
                         success: false,
@@ -554,7 +543,6 @@ export const downloadSingleReportDirect = async (req, res) => {
         if (jobDir && fs.existsSync(jobDir)) {
             try {
                 fs.rmSync(jobDir, { recursive: true, force: true });
-                console.log(`🗑️ Cleaned up temp directory after error: ${jobDir}`);
             } catch (cleanupError) {
                 console.error('Error cleaning up temp directory:', cleanupError);
             }
@@ -722,10 +710,6 @@ const downloadSingleReport = async (page, inspectionNumber, targetDownloadDir, r
 const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, finalDir, record, includeDownloaded = false, language = 'english') => {
     try {
         const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
-        
-        console.log(`🔍 Processing inspection: ${inspectionNumber}`);
-        console.log(`📁 Temp directory: ${tempDir}`);
-        console.log(`📁 Final directory: ${finalDir}`);
 
         // Check if already downloaded
         if (!includeDownloaded && record.downloadStatus === 'Downloaded') {
@@ -746,30 +730,20 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
         await updateDownloadStatus(record._id, 'In Progress');
 
         // Navigate to report
-        console.log(`🌐 Navigating to: ${reportUrl}`);
         await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
-
-        // Check if page loaded correctly
-        const pageTitle = await page.title();
-        console.log(`📄 Page title: ${pageTitle}`);
 
         // Change language if requested
         if (language === 'chinese') {
-            console.log(`🌐 Changing language to Chinese...`);
             const languageChanged = await changeLanguage(page, language);
             if (languageChanged) {
-                console.log(`✅ Language changed successfully`);
                 await new Promise(resolve => setTimeout(resolve, 2000));
             } else {
                 console.warn(`⚠️ Language change failed, continuing with default`);
             }
         }
 
-        // Wait for print button and click
-        console.log(`🔍 Looking for print button...`);
         try {
             await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
-            console.log(`✅ Print button found`);
         } catch (error) {
             console.error(`❌ Print button not found: ${error.message}`);
             await updateDownloadStatus(record._id, 'Failed');
@@ -778,17 +752,14 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
 
         // Get initial temp files
         const initialTempFiles = fs.existsSync(tempDir) ? fs.readdirSync(tempDir) : [];
-        console.log(`📂 Initial temp files: ${initialTempFiles.length} files`);
 
         // Click the print button
-        console.log(`🖱️ Clicking print button...`);
         await page.click('#page-wrapper a');
 
         // Wait a moment for the download to start
         await new Promise(resolve => setTimeout(resolve, 2000));
 
         // 3️⃣ Enhanced download waiting with better monitoring
-        console.log(`⏳ Waiting for download to complete...`);
         let newTempFiles = [];
         let attempts = 0;
         const maxAttempts = 30; // Increased to 30 seconds
@@ -801,11 +772,9 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
             try {
                 if (fs.existsSync(tempDir)) {
                     const currentTempFiles = fs.readdirSync(tempDir);
-                    console.log(`📂 Attempt ${attempts}: Found ${currentTempFiles.length} total files in temp dir`);
                     
                     // Log all files for debugging
                     if (currentTempFiles.length > lastFileCount) {
-                        console.log(`📄 Files in temp dir:`, currentTempFiles);
                         lastFileCount = currentTempFiles.length;
                     }
 
@@ -820,7 +789,6 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
                     });
 
                     if (newTempFiles.length > 0) {
-                        console.log(`✅ Found ${newTempFiles.length} new PDF files:`, newTempFiles);
                         break;
                     }
 
@@ -838,31 +806,6 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
                 console.log(`⚠️ Error checking temp directory: ${error.message}`);
             }
         }
-
-        if (newTempFiles.length === 0) {
-            console.error(`❌ No files downloaded after ${maxAttempts} seconds`);
-            
-            // Debug: Check if any files exist in temp directory
-            if (fs.existsSync(tempDir)) {
-                const allFiles = fs.readdirSync(tempDir);
-                console.log(`🔍 All files in temp directory:`, allFiles);
-            }
-            
-            // Debug: Take a screenshot for troubleshooting
-            try {
-                const screenshotPath = path.join(tempDir, `debug_${inspectionNumber}.png`);
-                await page.screenshot({ path: screenshotPath, fullPage: true });
-                console.log(`📸 Debug screenshot saved: ${screenshotPath}`);
-            } catch (screenshotError) {
-                console.log(`⚠️ Could not save debug screenshot: ${screenshotError.message}`);
-            }
-
-            await updateDownloadStatus(record._id, 'Failed');
-            throw new Error(`No files were downloaded for inspection ${inspectionNumber} after ${maxAttempts} seconds`);
-        }
-
-        // Move files from temp to final destination and rename
-        console.log(`📁 Moving ${newTempFiles.length} files to final destination...`);
         const customFileName = generateCustomFileName(record);
         const finalCustomFileName = includeDownloaded && record.downloadStatus === 'Downloaded' 
             ? `${customFileName}_${Date.now()}` 
@@ -871,7 +814,6 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
         // Ensure final directory exists
         if (!fs.existsSync(finalDir)) {
             fs.mkdirSync(finalDir, { recursive: true });
-            console.log(`📁 Created final directory: ${finalDir}`);
         }
 
         const movedFiles = [];
@@ -880,8 +822,6 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
         for (let i = 0; i < newTempFiles.length; i++) {
             const tempFile = newTempFiles[i];
             const tempFilePath = path.join(tempDir, tempFile);
-            
-            console.log(`📄 Processing file ${i + 1}/${newTempFiles.length}: ${tempFile}`);
 
             const fileExtension = path.extname(tempFile);
             const newFileName = `${finalCustomFileName}${newTempFiles.length > 1 ? `_${i + 1}` : ''}${fileExtension}`;
@@ -893,13 +833,11 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
                 const timestamp = Date.now();
                 const conflictFileName = `${finalCustomFileName}${newTempFiles.length > 1 ? `_${i + 1}` : ''}_${timestamp}${fileExtension}`;
                 actualFinalPath = path.join(finalDir, conflictFileName);
-                console.log(`⚠️ File conflict resolved: ${path.basename(actualFinalPath)}`);
             }
 
             // Move file from temp to final location
             try {
                 fs.copyFileSync(tempFilePath, actualFinalPath);
-                console.log(`✅ File moved: ${tempFile} -> ${path.basename(actualFinalPath)}`);
                 
                 const size = await getFileSize(actualFinalPath);
                 totalSize += size;
@@ -922,8 +860,6 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
 
         // Update status to 'Downloaded'
         await updateDownloadStatus(record._id, 'Downloaded', new Date());
-
-        console.log(`✅ Successfully processed inspection ${inspectionNumber}: ${movedFiles.length} files, ${formatBytes(totalSize)}`);
 
         return {
             inspectionNumber,
@@ -955,25 +891,38 @@ const downloadSingleReportWithTemp = async (page, inspectionNumber, tempDir, fin
 };
 
 // Enhanced login function with better session management
+// Enhanced login function with detailed debugging
 const performLogin = async (page) => {
     try {
-        console.log('🔐 Starting login process...');
         
         // Navigate to login page
         await page.goto(CONFIG.LOGIN_URL, { waitUntil: 'networkidle0', timeout: 30000 });
         
+        // Take screenshot of login page
+        try {
+            await page.screenshot({ path: '/tmp/login_page.png', fullPage: true });
+        } catch (screenshotError) {
+            console.log('⚠️ Could not save login page screenshot');
+        }
+        
         // Wait for login form
         await page.waitForSelector('#username', { timeout: 10000 });
         await page.waitForSelector('#password', { timeout: 10000 });
+        await page.waitForSelector('#js-login-submit', { timeout: 10000 });
         
-        // Clear any existing values and type credentials
+        
+        // Get credentials
+        const username = process.env.P88_USERNAME;
+        const password = process.env.P88_PASSWORD;
+        
+        // Clear and type username
         await page.click('#username', { clickCount: 3 });
-        await page.type('#username', 'sreynoch'); // Use hardcoded values for now
+        await page.type('#username', username, { delay: 100 });
+    
         
+        // Clear and type password
         await page.click('#password', { clickCount: 3 });
-        await page.type('#password', 'today2020#88'); // Use hardcoded values for now
-        
-        console.log('🔐 Credentials entered, clicking login...');
+        await page.type('#password', password, { delay: 100 });
         
         // Click login and wait for navigation
         await Promise.all([
@@ -981,22 +930,33 @@ const performLogin = async (page) => {
             page.click('#js-login-submit')
         ]);
         
-        // Verify login success
+        // Wait a bit more
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Check result
         const currentUrl = page.url();
         const pageTitle = await page.title();
         
-        console.log(`🔐 After login - URL: ${currentUrl}`);
-        console.log(`🔐 After login - Title: ${pageTitle}`);
+        // Check for error messages on the page
+        try {
+            const errorMessages = await page.$$eval('.alert, .error, .danger, [class*="error"], [class*="alert"]', 
+                elements => elements.map(el => el.textContent.trim()).filter(text => text.length > 0)
+            );
+            if (errorMessages.length > 0) {
+                console.log('⚠️ Error messages found on page:', errorMessages);
+            }
+        } catch (e) {
+            console.log('ℹ️ No error messages found on page');
+        }
         
         // Check if we're still on login page (login failed)
         if (currentUrl.includes('/login') || pageTitle.includes('Login')) {
-            throw new Error('Login failed - still on login page');
+            throw new Error(`Login failed - still on login page. URL: ${currentUrl}, Title: ${pageTitle}`);
         }
         
         // Wait a bit more for session to be fully established
         await new Promise(resolve => setTimeout(resolve, 3000));
         
-        console.log('✅ Login successful');
         return true;
         
     } catch (error) {
@@ -1014,18 +974,13 @@ const validateSession = async (page) => {
         
         const currentUrl = page.url();
         const pageTitle = await page.title();
-        
-        console.log(`🔐 Session check - URL: ${currentUrl}`);
-        console.log(`🔐 Session check - Title: ${pageTitle}`);
-        
+
         // If redirected to login, session is invalid
         if (currentUrl.includes('/login') || pageTitle.includes('Login')) {
-            console.log('⚠️ Session expired, re-logging in...');
             await performLogin(page);
             return false; // Session was invalid
         }
         
-        console.log('✅ Session is valid');
         return true; // Session is valid
         
     } catch (error) {
@@ -1039,10 +994,6 @@ const validateSession = async (page) => {
 const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir, finalDir, record, includeDownloaded = false, language = 'english') => {
     try {
         const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
-        
-        console.log(`🔍 Processing inspection: ${inspectionNumber}`);
-        console.log(`📁 Temp directory: ${tempDir}`);
-        console.log(`📁 Final directory: ${finalDir}`);
 
         // Check if already downloaded
         if (!includeDownloaded && record.downloadStatus === 'Downloaded') {
@@ -1063,23 +1014,17 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
         await updateDownloadStatus(record._id, 'In Progress');
 
         // Validate session before proceeding
-        console.log('🔐 Validating session...');
         await validateSession(page);
 
         // Navigate to report
-        console.log(`🌐 Navigating to: ${reportUrl}`);
         await page.goto(reportUrl, { waitUntil: 'networkidle0', timeout: 30000 });
 
         // Check if page loaded correctly and we're not redirected to login
         const pageTitle = await page.title();
         const currentUrl = page.url();
-        
-        console.log(`📄 Page title: ${pageTitle}`);
-        console.log(`🌐 Current URL: ${currentUrl}`);
 
         // If we're redirected to login, the session expired
         if (currentUrl.includes('/login') || pageTitle.includes('Login')) {
-            console.log('⚠️ Redirected to login page, re-authenticating...');
             await performLogin(page);
             
             // Try navigating to the report again
@@ -1087,10 +1032,7 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
             
             const newTitle = await page.title();
             const newUrl = page.url();
-            
-            console.log(`📄 After re-auth - Title: ${newTitle}`);
-            console.log(`🌐 After re-auth - URL: ${newUrl}`);
-            
+        
             if (newUrl.includes('/login') || newTitle.includes('Login')) {
                 throw new Error(`Unable to access report ${inspectionNumber} - authentication failed`);
             }
@@ -1098,10 +1040,8 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
 
         // Change language if requested
         if (language === 'chinese') {
-            console.log(`🌐 Changing language to Chinese...`);
             const languageChanged = await changeLanguage(page, language);
             if (languageChanged) {
-                console.log(`✅ Language changed successfully`);
                 await new Promise(resolve => setTimeout(resolve, 2000));
             } else {
                 console.warn(`⚠️ Language change failed, continuing with default`);
@@ -1109,10 +1049,8 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
         }
 
         // Wait for print button and click
-        console.log(`🔍 Looking for print button...`);
         try {
             await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
-            console.log(`✅ Print button found`);
         } catch (error) {
             console.error(`❌ Print button not found: ${error.message}`);
             
@@ -1120,7 +1058,6 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
             try {
                 const screenshotPath = path.join(tempDir, `no_print_button_${inspectionNumber}.png`);
                 await page.screenshot({ path: screenshotPath, fullPage: true });
-                console.log(`📸 Debug screenshot saved: ${screenshotPath}`);
             } catch (screenshotError) {
                 console.log(`⚠️ Could not save debug screenshot: ${screenshotError.message}`);
             }
@@ -1131,17 +1068,14 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
 
         // Get initial temp files
         const initialTempFiles = fs.existsSync(tempDir) ? fs.readdirSync(tempDir) : [];
-        console.log(`📂 Initial temp files: ${initialTempFiles.length} files`);
 
         // Click the print button
-        console.log(`🖱️ Clicking print button...`);
         await page.click('#page-wrapper a');
 
         // Wait longer for the download to start
         await new Promise(resolve => setTimeout(resolve, 5000)); // Increased wait time
 
         // Enhanced download waiting with better monitoring
-        console.log(`⏳ Waiting for download to complete...`);
         let newTempFiles = [];
         let attempts = 0;
         const maxAttempts = 45; // Increased to 45 seconds
@@ -1182,7 +1116,6 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
                     });
 
                     if (newTempFiles.length > 0) {
-                        console.log(`✅ Found ${newTempFiles.length} new PDF files:`, newTempFiles);
                         // Wait a bit more to ensure download is complete
                         await new Promise(resolve => setTimeout(resolve, 2000));
                         break;
@@ -1203,30 +1136,6 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
             }
         }
 
-        if (newTempFiles.length === 0) {
-            console.error(`❌ No files downloaded after ${maxAttempts} seconds`);
-            
-            // Debug: Check if any files exist in temp directory
-            if (fs.existsSync(tempDir)) {
-                const allFiles = fs.readdirSync(tempDir);
-                console.log(`🔍 All files in temp directory:`, allFiles);
-            }
-            
-            // Debug: Take a screenshot for troubleshooting
-            try {
-                const screenshotPath = path.join(tempDir, `debug_${inspectionNumber}.png`);
-                await page.screenshot({ path: screenshotPath, fullPage: true });
-                console.log(`📸 Debug screenshot saved: ${screenshotPath}`);
-            } catch (screenshotError) {
-                console.log(`⚠️ Could not save debug screenshot: ${screenshotError.message}`);
-            }
-
-            await updateDownloadStatus(record._id, 'Failed');
-            throw new Error(`No files were downloaded for inspection ${inspectionNumber} after ${maxAttempts} seconds`);
-        }
-
-        // Move files from temp to final destination and rename
-        console.log(`📁 Moving ${newTempFiles.length} files to final destination...`);
         const customFileName = generateCustomFileName(record);
         const finalCustomFileName = includeDownloaded && record.downloadStatus === 'Downloaded' 
             ? `${customFileName}_${Date.now()}` 
@@ -1235,7 +1144,6 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
         // Ensure final directory exists
         if (!fs.existsSync(finalDir)) {
             fs.mkdirSync(finalDir, { recursive: true });
-            console.log(`📁 Created final directory: ${finalDir}`);
         }
 
         const movedFiles = [];
@@ -1244,8 +1152,6 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
         for (let i = 0; i < newTempFiles.length; i++) {
             const tempFile = newTempFiles[i];
             const tempFilePath = path.join(tempDir, tempFile);
-            
-            console.log(`📄 Processing file ${i + 1}/${newTempFiles.length}: ${tempFile}`);
 
             const fileExtension = path.extname(tempFile);
             const newFileName = `${finalCustomFileName}${newTempFiles.length > 1 ? `_${i + 1}` : ''}${fileExtension}`;
@@ -1257,13 +1163,11 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
                 const timestamp = Date.now();
                 const conflictFileName = `${finalCustomFileName}${newTempFiles.length > 1 ? `_${i + 1}` : ''}_${timestamp}${fileExtension}`;
                 actualFinalPath = path.join(finalDir, conflictFileName);
-                console.log(`⚠️ File conflict resolved: ${path.basename(actualFinalPath)}`);
             }
 
             // Move file from temp to final location
             try {
                 fs.copyFileSync(tempFilePath, actualFinalPath);
-                console.log(`✅ File moved: ${tempFile} -> ${path.basename(actualFinalPath)}`);
                 
                 const size = await getFileSize(actualFinalPath);
                 totalSize += size;
@@ -1286,8 +1190,6 @@ const downloadSingleReportWithTempFixed = async (page, inspectionNumber, tempDir
 
         // Update status to 'Downloaded'
         await updateDownloadStatus(record._id, 'Downloaded', new Date());
-
-        console.log(`✅ Successfully processed inspection ${inspectionNumber}: ${movedFiles.length} files, ${formatBytes(totalSize)}`);
 
         return {
             inspectionNumber,
@@ -1341,7 +1243,6 @@ export const downloadBulkReports = async (req, res) => {
         const jobId = Date.now().toString() + '_bulk_' + Math.random().toString(36).substr(2, 9);
         jobDir = path.join(baseTempDir, jobId);
         fs.mkdirSync(jobDir, { recursive: true });
-        console.log(`📁 Created bulk temp directory: ${jobDir}`);
 
         const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
@@ -1379,7 +1280,7 @@ export const downloadBulkReports = async (req, res) => {
 
         // 2️⃣ Enhanced browser launch with better session handling
         browser = await puppeteer.launch({
-            headless: false, // SET TO FALSE FOR DEBUGGING - you can see what's happening
+            headless: CONFIG.HEADLESS,
             args: [
                 '--no-sandbox', 
                 '--disable-setuid-sandbox',
@@ -1419,8 +1320,6 @@ export const downloadBulkReports = async (req, res) => {
             downloadPath: jobDir
         });
 
-        console.log(`📁 Download path set to: ${jobDir}`);
-
         // Set additional headers to maintain session
         await page.setExtraHTTPHeaders({
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
@@ -1431,7 +1330,6 @@ export const downloadBulkReports = async (req, res) => {
         });
 
         // Login process with enhanced session management
-        console.log('🔐 Performing login...');
         await performLogin(page);
 
         // Download reports
@@ -1513,7 +1411,6 @@ export const downloadBulkReports = async (req, res) => {
         if (jobDir && fs.existsSync(jobDir)) {
             try {
                 fs.rmSync(jobDir, { recursive: true, force: true });
-                console.log(`🗑️ Cleaned up bulk temp directory: ${jobDir}`);
             } catch (cleanupError) {
                 console.error('Error cleaning up bulk temp directory:', cleanupError);
             }
@@ -1555,7 +1452,6 @@ export const downloadBulkReports = async (req, res) => {
         if (jobDir && fs.existsSync(jobDir)) {
             try {
                 fs.rmSync(jobDir, { recursive: true, force: true });
-                console.log(`🗑️ Cleaned up temp directory after error: ${jobDir}`);
             } catch (cleanupError) {
                 console.error('Error cleaning up temp directory:', cleanupError);
             }
@@ -1776,8 +1672,6 @@ export const saveDownloadParth = async (req, res) => {
             } catch (clientError) {
                 console.log('⚠️ Backup download behavior setup failed:', clientError.message);
             }
-
-            console.log(`📁 Download path set to: ${jobDir}`);
 
         // Get initial file list and timestamps
         const getFileList = async () => {
@@ -2013,7 +1907,6 @@ export const openDownloadFolder = async (req, res) => {
         
         exec(command, (error) => {
             if (error) {
-                console.error('Error opening folder:', error);
                 return res.status(500).json({
                     success: false,
                     error: 'Failed to open download folder'
@@ -2034,50 +1927,6 @@ export const openDownloadFolder = async (req, res) => {
             error: error.message
         });
     }
-};
-
-// Open download folder in system file explorer
-export const openDownloadFolder = async (req, res) => {
-  try {
-    const { downloadPath } = req.body;
-    const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
-
-    // Ensure directory exists
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
-    }
-
-    let command;
-    if (process.platform === "win32") {
-      command = `explorer "${targetDir}"`;
-    } else if (process.platform === "darwin") {
-      command = `open "${targetDir}"`;
-    } else {
-      command = `xdg-open "${targetDir}"`;
-    }
-
-    exec(command, (error) => {
-      if (error) {
-        console.error("Error opening folder:", error);
-        return res.status(500).json({
-          success: false,
-          error: "Failed to open download folder"
-        });
-      }
-
-      res.json({
-        success: true,
-        message: "Download folder opened successfully",
-        path: targetDir
-      });
-    });
-  } catch (error) {
-    console.error("Error opening download folder:", error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
 };
 
 // Get date filtered statistics
