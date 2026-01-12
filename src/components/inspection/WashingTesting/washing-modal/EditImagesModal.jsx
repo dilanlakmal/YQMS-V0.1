@@ -7,6 +7,8 @@ const EditImagesModal = ({
     onClose,
     title,
     images, // Array of Files or URL strings
+    notes, // Text notes
+    onNotesChange, // Callback for notes changes
     onRemoveImage,
     onUploadImage,
     onSave,
@@ -117,6 +119,19 @@ const EditImagesModal = ({
                                 onChange={handleFileChange}
                             />
                         </div>
+                    </div>
+
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Notes
+                        </label>
+                        <textarea
+                            value={notes || ""}
+                            onChange={(e) => onNotesChange && onNotesChange(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 text-sm"
+                            rows={3}
+                            placeholder="Add or edit notes here..."
+                        />
                     </div>
 
                     {/* Modal Actions */}

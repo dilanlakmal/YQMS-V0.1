@@ -1,5 +1,11 @@
 import React, { useRef, useEffect } from "react";
-import { X, RotateCcw, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  X,
+  RotateCcw,
+  Download,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import showToast from "../../../../utils/toast";
 
 const ImageViewerModal = ({
@@ -81,16 +87,16 @@ const ImageViewerModal = ({
 
   const handleTouchMove = (e) => {
     e.preventDefault();
-    
+
     if (e.touches.length === 1 && zoom > 1) {
       // Single touch panning
       const newPanX = e.touches[0].clientX - touchStartRef.current.x;
       const newPanY = e.touches[0].clientY - touchStartRef.current.y;
-      
+
       const maxPan = 500;
       const constrainedPanX = Math.max(-maxPan, Math.min(maxPan, newPanX));
       const constrainedPanY = Math.max(-maxPan, Math.min(maxPan, newPanY));
-      
+
       onPanMove({ panX: constrainedPanX, panY: constrainedPanY });
     } else if (e.touches.length === 2) {
       // Pinch zoom
@@ -100,7 +106,7 @@ const ImageViewerModal = ({
         touch2.clientX - touch1.clientX,
         touch2.clientY - touch1.clientY
       );
-      
+
       if (touchStartRef.current.distance > 0) {
         const scale = distance / touchStartRef.current.distance;
         const newZoom = Math.max(1, Math.min(5, zoom * scale));
@@ -118,7 +124,7 @@ const ImageViewerModal = ({
         // Single tap - toggle zoom
         onToggleZoom();
       }
-      
+
       onPanEnd();
       touchStartRef.current = { x: 0, y: 0, distance: 0, time: 0 };
     }
@@ -129,17 +135,17 @@ const ImageViewerModal = ({
     if (!isOpen) return;
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') {
+      if (event.key === "Escape") {
         onClose();
-      } else if (event.key === '+' || event.key === '=') {
+      } else if (event.key === "+" || event.key === "=") {
         onZoom(0.5);
-      } else if (event.key === '-') {
+      } else if (event.key === "-") {
         onZoom(-0.5);
-      } else if (event.key === '0') {
+      } else if (event.key === "0") {
         onZoom(1 - zoom);
-      } else if (event.key === 'ArrowLeft' && images.length > 1) {
+      } else if (event.key === "ArrowLeft" && images.length > 1) {
         onPreviousImage();
-      } else if (event.key === 'ArrowRight' && images.length > 1) {
+      } else if (event.key === "ArrowRight" && images.length > 1) {
         onNextImage();
       }
     };
@@ -150,16 +156,24 @@ const ImageViewerModal = ({
       onZoom(delta);
     };
 
-    document.addEventListener('keydown', handleKeyDown);
-    window.addEventListener('wheel', handleWheel, { passive: false });
-    document.body.style.overflow = 'hidden';
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("wheel", handleWheel, { passive: false });
+    document.body.style.overflow = "hidden";
 
     return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      window.removeEventListener('wheel', handleWheel);
-      document.body.style.overflow = '';
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("wheel", handleWheel);
+      document.body.style.overflow = "";
     };
-  }, [isOpen, zoom, onClose, onZoom, images.length, onNextImage, onPreviousImage]);
+  }, [
+    isOpen,
+    zoom,
+    onClose,
+    onZoom,
+    images.length,
+    onNextImage,
+    onPreviousImage,
+  ]);
 
   if (!isOpen) return null;
 
@@ -182,7 +196,10 @@ const ImageViewerModal = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      style={{ cursor: zoom > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default', touchAction: 'none' }}
+      style={{
+        cursor: zoom > 1 ? (isDragging ? "grabbing" : "grab") : "default",
+        touchAction: "none",
+      }}
     >
       {/* Image Counter - Bottom Right (if multiple images) */}
       {images.length > 1 && (
@@ -239,10 +256,10 @@ const ImageViewerModal = ({
       )}
 
       {/* Image Container - Centered with zoom and pan support */}
-      <div 
+      <div
         className="absolute inset-0 flex items-center justify-center overflow-hidden"
         onDoubleClick={handleImageDoubleClick}
-        style={{ touchAction: 'none' }}
+        style={{ touchAction: "none" }}
       >
         <div
           className="relative transition-transform duration-300 ease-out"
@@ -252,8 +269,8 @@ const ImageViewerModal = ({
               scale(${zoom}) 
               translate(${panX / zoom}px, ${panY / zoom}px)
             `,
-            transformOrigin: 'center center',
-            touchAction: 'none',
+            transformOrigin: "center center",
+            touchAction: "none",
           }}
           onMouseDown={handleImageMouseDown}
           onClick={(e) => {
@@ -273,7 +290,8 @@ const ImageViewerModal = ({
               console.error("Image load error:", imageUrl);
               e.target.style.display = "none";
               const placeholder = document.createElement("div");
-              placeholder.className = "text-white text-center p-8 bg-black/50 rounded-lg";
+              placeholder.className =
+                "text-white text-center p-8 bg-black/50 rounded-lg";
               placeholder.textContent = "Failed to load image";
               e.target.parentElement.appendChild(placeholder);
             }}
@@ -350,7 +368,7 @@ const ImageViewerModal = ({
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            onRotate('ccw');
+            onRotate("ccw");
           }}
           className="bg-transparent hover:bg-white/20 text-white rounded-full p-2 transition-colors"
           title="Rotate Left"
@@ -376,4 +394,3 @@ const ImageViewerModal = ({
 };
 
 export default ImageViewerModal;
-

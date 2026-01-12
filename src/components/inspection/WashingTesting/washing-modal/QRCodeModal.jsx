@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from "react";
-import { X, Upload, Waves, Droplets } from "lucide-react";
+import { X, Upload, Waves, Droplets, Printer, Camera } from "lucide-react";
 import { QRCodeCanvas } from "qrcode.react";
 import "./QRCodeModal.css";
 
@@ -8,7 +8,9 @@ const QRCodeModal = ({
   reportId,
   onClose,
   onDownloadQRCode,
+  onPrintQRCode, // Added for printing stamps
   onUploadQRCode,
+  onOpenScanner,
   getQRCodeBaseURL,
   fileInputRef,
 }) => {
@@ -57,17 +59,11 @@ const QRCodeModal = ({
           <X size={20} />
         </button>
 
-        <div className="p-8">
+        <div className="py-4 px-6">
           <div className="flex flex-col items-center">
-            <div className="mb-6 text-center relative">
-              {/* Washing Icons Decoration */}
-              <div className="absolute -top-6 left-1/2 -translate-x-1/2 flex gap-4 opacity-20 dark:opacity-10 pointer-events-none">
-                <Waves className="animate-bounce" size={24} />
-                <Droplets className="animate-pulse" size={20} />
-                <Waves className="animate-bounce [animation-delay:0.5s]" size={24} />
-              </div>
+            <div className="mb-2 text-center relative">
 
-              <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-2">
+              <h3 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent mb-1">
                 Launch Washing Test
               </h3>
               <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
@@ -119,34 +115,48 @@ const QRCodeModal = ({
                     src: "/assets/Home/YQMSLogoEdit.png",
                     x: undefined,
                     y: undefined,
-                    height: 200,
-                    width: 200,
+                    height: 90,  // Reduced from 120 for better scannability
+                    width: 90,   // Reduced from 120 for better scannability
                     excavate: true,
                   }}
                   style={{ height: "auto", maxWidth: "200px", width: "100%", pointerEvents: "none" }}
                 />
               </div>
 
-              {/* Download Hint */}
-              <div className="mt-4 flex flex-col items-center opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                <span className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">
-                  Click QR code to download
-                </span>
-                <div className="w-8 h-1 bg-indigo-500/20 rounded-full mt-1"></div>
-              </div>
             </div>
 
-            <div className="w-full mt-8 space-y-4">
+            <div className="mt-0 flex justify-center">
+              <button
+                type="button"
+                onClick={() => onOpenScanner(reportId)}
+                className="p-2 text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 transform transition-all duration-300 hover:scale-125 active:scale-95 group"
+                title="Open Live Camera Scanner"
+              >
+                <Camera size={32} className="group-hover:rotate-12 transition-transform" />
+              </button>
+            </div>
+
+            <div className="w-full mt-1 space-y-2">
               <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-100 dark:border-gray-800"></div>
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
                   <span className="bg-white/95 dark:bg-gray-900/95 px-3 text-gray-500 dark:text-gray-400 font-medium">
-                    Or alternative
+                    Or Actions
                   </span>
                 </div>
               </div>
+
+              <button
+                type="button"
+                onClick={() => onPrintQRCode(reportId)}
+                className="group relative w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden shadow-lg hover:shadow-blue-500/25 active:scale-95"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/10 to-white/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 ease-in-out"></div>
+                <Printer size={18} className="group-hover:rotate-12 transition-transform" />
+                <span className="font-bold text-sm tracking-wide">Print QR Stamp</span>
+              </button>
 
               <input
                 type="file"
@@ -172,7 +182,7 @@ const QRCodeModal = ({
           </div>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

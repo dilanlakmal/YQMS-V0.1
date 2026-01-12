@@ -275,7 +275,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
             </View>
           </View>
 
-          {report.status && (
+          {!!report.status && (
             <View style={styles.row}>
               <View style={[styles.col, { flexDirection: "row", alignItems: "baseline" }]}>
                 <Text style={[styles.label, { marginRight: 5, marginBottom: 0 }]}>Status:</Text>
@@ -292,7 +292,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
           )}
         </View>
 
-        {qrCodeDataURL && (
+        {!!qrCodeDataURL && (
           <View style={styles.qrCodeContainer}>
             <Image
               src={qrCodeDataURL}
@@ -345,7 +345,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
           <View style={styles.imagesRow}>
             {/* Step 1 Column */}
             <View style={styles.imageColumn}>
-              {((report.images && report.images.length > 0) || report.notes) && (
+              {!!((report.images && report.images.length > 0) || report.notes) && (
                 <>
                   <View style={styles.stepHeader}>
                     <Text style={styles.stepTitle}>Step 1: Sent To Wash ({report.images?.length || 0} imgs)</Text>
@@ -378,7 +378,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                       })}
                     </View>
                   )}
-                  {report.notes && (
+                  {!!report.notes && (
                     <View style={[styles.notesBox, styles.initialNotesBox]}>
                       <Text style={[styles.notesLabel, styles.initialNotesLabel]}>Notes:</Text>
                       <Text style={styles.notesContent}>{report.notes}</Text>
@@ -390,7 +390,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
 
             {/* Step 2 Column */}
             <View style={styles.imageColumn}>
-              {((report.receivedImages && report.receivedImages.length > 0) || report.receivedNotes) && (
+              {!!((report.receivedImages && report.receivedImages.length > 0) || report.receivedNotes) && (
                 <>
                   <View style={styles.stepHeader}>
                     <Text style={styles.stepTitle}>Step 2: Received ({report.receivedImages?.length || 0} imgs)</Text>
@@ -421,7 +421,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                       })}
                     </View>
                   )}
-                  {report.receivedNotes && (
+                  {!!report.receivedNotes && (
                     <View style={[styles.notesBox, styles.receivedNotesBox]}>
                       <Text style={[styles.notesLabel, styles.receivedNotesLabel]}>Notes:</Text>
                       <Text style={styles.notesContent}>{report.receivedNotes}</Text>
@@ -433,7 +433,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
 
             {/* Step 3 Column */}
             <View style={styles.imageColumn}>
-              {((report.completionImages && report.completionImages.length > 0) || report.completionNotes) && (
+              {!!((report.completionImages && report.completionImages.length > 0) || report.completionNotes) && (
                 <>
                   <View style={styles.stepHeader}>
                     <Text style={styles.stepTitle}>Step 3: Done ({report.completionImages?.length || 0} imgs)</Text>
@@ -464,7 +464,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                       })}
                     </View>
                   )}
-                  {report.completionNotes && (
+                  {!!report.completionNotes && (
                     <View style={[styles.notesBox, styles.completionNotesBox]}>
                       <Text style={[styles.notesLabel, styles.completionNotesLabel]}>Notes:</Text>
                       <Text style={styles.notesContent}>{report.completionNotes}</Text>
@@ -473,11 +473,11 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                 </>
               )}
             </View>
-          </View >
+          </View>
         ) : (
           <>
             {/* Regular Layout - Stacked Sections */}
-            {((report.images && report.images.length > 0) || report.notes) && (
+            {!!((report.images && report.images.length > 0) || report.notes) && (
               <View style={[styles.section, { marginTop: 10 }]} wrap={false}>
                 <View style={styles.stepHeader}>
                   <Text style={styles.stepTitle}>Step 1: Sent To Home Washing ({report.images?.length || 0} images)</Text>
@@ -521,7 +521,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                     })}
                   </View>
                 )}
-                {report.notes && (
+                {!!report.notes && (
                   <View style={[styles.notesBox, styles.initialNotesBox]}>
                     <Text style={[styles.notesLabel, styles.initialNotesLabel]}>Notes:</Text>
                     <Text style={styles.notesContent}>{report.notes}</Text>
@@ -530,7 +530,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
               </View>
             )}
 
-            {((report.receivedImages && report.receivedImages.length > 0) || report.receivedNotes) && (
+            {!!((report.receivedImages && report.receivedImages.length > 0) || report.receivedNotes) && (
               <View style={styles.section} wrap={false}>
                 <View style={styles.stepHeader}>
                   <Text style={styles.stepTitle}>Step 2: Received ({report.receivedImages?.length || 0} images)</Text>
@@ -568,7 +568,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                     })}
                   </View>
                 )}
-                {report.receivedNotes && (
+                {!!report.receivedNotes && (
                   <View style={[styles.notesBox, styles.receivedNotesBox]}>
                     <Text style={[styles.notesLabel, styles.receivedNotesLabel]}>Notes:</Text>
                     <Text style={styles.notesContent}>{report.receivedNotes}</Text>
@@ -577,7 +577,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
               </View>
             )}
 
-            {((report.completionImages && report.completionImages.length > 0) || report.completionNotes) && (
+            {!!((report.completionImages && report.completionImages.length > 0) || report.completionNotes) && (
               <View style={styles.section} wrap={false}>
                 <View style={styles.stepHeader}>
                   <Text style={styles.stepTitle}>Step 3: Completed ({report.completionImages?.length || 0} images)</Text>
@@ -615,7 +615,7 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
                     })}
                   </View>
                 )}
-                {report.completionNotes && (
+                {!!report.completionNotes && (
                   <View style={[styles.notesBox, styles.completionNotesBox]}>
                     <Text style={[styles.notesLabel, styles.completionNotesLabel]}>Notes:</Text>
                     <Text style={styles.notesContent}>{report.completionNotes}</Text>
@@ -625,8 +625,8 @@ const WashingMachineTestPDF = ({ report, apiBaseUrl = "", qrCodeDataURL = null, 
             )}
           </>
         )}
-      </Page >
-    </Document >
+      </Page>
+    </Document>
   );
 };
 

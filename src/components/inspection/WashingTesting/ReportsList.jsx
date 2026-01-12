@@ -42,6 +42,7 @@ const ReportsList = ({
   setFilterLimit,
   pagination,
   factories, // Add factories prop
+  activeTab,
 }) => {
   const [styleSuggestions, setStyleSuggestions] = React.useState([]);
   const [colorSuggestions, setColorSuggestions] = React.useState([]);
@@ -175,8 +176,8 @@ const ReportsList = ({
     <div className="">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
         <h2 className="text-xl font-semibold text-gray-800 dark:text-white flex items-center gap-2">
-          <ClipboardList className="w-6 h-6 text-blue-600" />
-          Reports
+          {/* <ClipboardList className="w-6 h-6 text-blue-600" /> */}
+          {activeTab === "warehouse_reports" ? "Wherehouse Report" : "Reports"}
           {isLoadingReports && <RotateCw className="w-5 h-5 animate-spin text-blue-600" />}
         </h2>
 
@@ -408,6 +409,7 @@ const ReportsList = ({
             ]}
             placeholder="Filter Status..."
             isClearable
+            isSearchable={false}
             styles={customStyles}
             className="text-sm"
           />

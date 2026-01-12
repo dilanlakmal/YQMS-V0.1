@@ -106,15 +106,17 @@ const ReportCard = ({
               <Pencil size={14} />
               <span className="hidden sm:inline">Edit</span>
             </button>
-            <button
-              onClick={() => onDelete(reportId)}
-              className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
-              title="Delete Report"
-            >
-              <Trash2 size={14} />
-              <span className="hidden sm:inline">Delete</span>
-              <span className="sm:hidden">Del</span>
-            </button>
+            {onDelete && (
+              <button
+                onClick={() => onDelete(reportId)}
+                className="px-2 md:px-3 py-1.5 text-xs md:text-sm bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-md hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors flex items-center gap-1"
+                title="Delete Report"
+              >
+                <Trash2 size={14} />
+                <span className="hidden sm:inline">Delete</span>
+                <span className="sm:hidden">Del</span>
+              </button>
+            )}
           </div>
           {/* QR Code Button */}
           {report.status === "completed" ? (

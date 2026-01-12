@@ -23,26 +23,25 @@ export const __dirname = path.dirname(__filename);
 export const __backendDir = path.resolve(__dirname, "..");
 
 export const API_BASE_URL =
-  process.env.API_BASE_URL || "https://192.167.6.207:5001";
-// process.env.API_BASE_URL || "http://localhost:5001";
+  process.env.API_BASE_URL || "https://localhost:5001";
 const options = {
   key: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.6.207-key.pem")
+    path.resolve(__dirname, "192.167.6.207-key.pem")
   ),
   cert: fs.readFileSync(
-    path.resolve(path.dirname(__filename), "192.167.6.207.pem")
+    path.resolve(__dirname, "192.167.6.207.pem")
   )
 };
 
 export const server = https.createServer(options, app);
 
-// Define allowed origins once (MUST be before Socket.io initialization)
+// Define allowed origins once
 const allowedOrigins = [
   "https://192.167.12.85:3001",
   "http://localhost:3001",
   "https://localhost:3001",
   "https://yqms.yaikh.com",
-  "https://192.167.6.207:3001",
+  "https://192.167.6.207:3001"
 ];
 
 // Initialize Socket.io

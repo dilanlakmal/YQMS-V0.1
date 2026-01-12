@@ -2,9 +2,9 @@
 import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useSearchParams } from "react-router-dom";
-import { Upload, X, Camera, ChevronDown, ChevronUp, FileText, FileSpreadsheet, Printer, QrCode, Scan, Pencil, CheckCircle, RotateCw, RotateCcw, Download, Trash2, Save, RefreshCw, Send, Search, ClipboardList } from "lucide-react";
+import { HiDocumentAdd, HiClipboardList } from "react-icons/hi";
+import { MdWarehouse } from "react-icons/md";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../config.js";
-import Select from "react-select";
 import { pdf } from "@react-pdf/renderer";
 import { Html5Qrcode } from "html5-qrcode";
 import { QRCodeCanvas } from "qrcode.react";
@@ -13,8 +13,6 @@ import generateWashingMachineTestExcel from "../components/inspection/WashingTes
 import {
   ImageViewerModal,
   useImageViewer,
-  normalizeImageUrl,
-  getImageFilename,
   FormSection,
   ReportsList,
   ReceivedModal,
@@ -30,6 +28,23 @@ import {
   useImageHandling,
   useFormState,
   useReportSubmission,
+  // Constants
+  getQRCodeBaseURL,
+  getCurrentDate,
+  IMAGE_LIMITS,
+  TABS,
+  // Edit handlers (only used ones)
+  prepareEditFormData,
+  handleEditFormSubmit,
+  // Order handlers
+  handleOrderNoSearch,
+  handleOrderNoSelection,
+  shouldAutoFetchColors,
+  // Image handlers (being used)
+  handleFileInputChange as handleFileInputChangeHandler,
+  handleCameraInputChange as handleCameraInputChangeHandler,
+  triggerFileInput as triggerFileInputHandler,
+  triggerCameraInput as triggerCameraInputHandler,
 } from "../components/inspection/WashingTesting/lib";
 import showToast from "../utils/toast";
 
@@ -37,40 +52,11 @@ const LaundryWashingMachineTest = () => {
   const { t } = useTranslation();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
-  const dateValue = new Date().toISOString().split("T")[0];
+  const dateValue = getCurrentDate(); // Use helper instead of inline code
   const fileInputRef = useRef(null);
   const cameraInputRef = useRef(null);
   const receivedImageInputRef = useRef(null);
   const completionImageInputRef = useRef(null);
-
-  // Get the base URL for QR codes - use computer's network IP so phones can access
-  const getQRCodeBaseURL = () => {
-    const currentProtocol = window.location.protocol; // Get current protocol (http: or https:)
-
-    if (QR_CODE_BASE_URL) {
-      // This ensures QR codes use the same protocol as the current page (HTTP/HTTPS)
-      try {
-        const url = new URL(QR_CODE_BASE_URL);
-        url.protocol = currentProtocol;
-        return url.toString().replace(/\/$/, ''); // Remove trailing slash if present
-      } catch (error) {
-        // If URL parsing fails, try simple string replacement
-        const protocolMatch = QR_CODE_BASE_URL.match(/^https?:\/\//);
-        if (protocolMatch) {
-          return QR_CODE_BASE_URL.replace(/^https?:\/\//, `${currentProtocol}//`);
-        }
-        // Fallback: prepend protocol if missing
-        return `${currentProtocol}//${QR_CODE_BASE_URL.replace(/^\/\//, '')}`;
-      }
-    }
-
-    const origin = window.location.origin;
-    const hostname = window.location.hostname;
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      console.warn("Accessing via localhost - QR codes may not work for network devices. Please set VITE_QR_CODE_BASE_URL in .env file.");
-    }
-    return origin;
-  };
 
   // Initialize custom hooks
   const initialFormData = {
@@ -87,6 +73,8 @@ const LaundryWashingMachineTest = () => {
 
   const { formData, setFormData, handleInputChange: handleFormInputChange, resetForm } = useFormState(initialFormData);
 
+  // Standard Reports Hook
+  const reportsHook = useReports();
   const {
     reports,
     isLoadingReports,
@@ -97,7 +85,21 @@ const LaundryWashingMachineTest = () => {
     deleteReport,
     toggleReport,
     pagination,
-  } = useReports();
+  } = reportsHook;
+
+  // Warehouse Reports Hook
+  const whReportsHook = useReports();
+  const {
+    reports: whReports,
+    isLoadingReports: isLoadingWhReports,
+    expandedReports: whExpandedReports,
+    printingReportId: whPrintingReportId,
+    setPrintingReportId: setWhPrintingReportId,
+    fetchReports: fetchWhReports,
+    deleteReport: deleteWhReport,
+    toggleReport: toggleWhReport,
+    pagination: whPagination,
+  } = whReportsHook;
 
   const {
     availableColors,
@@ -118,12 +120,9 @@ const LaundryWashingMachineTest = () => {
     setScanningReportId,
     generateQRCodeDataURL: generateQRCodeDataURLHook,
     downloadQRCode: downloadQRCodeHook,
-    initializeScannerHook,
-    stopScannerHook,
-    handleQRCodeFileUploadHook,
-    processQRScanResult,
+    printQRCode,
     statusCheckIntervalRef,
-  } = useQRCode(getQRCodeBaseURL);
+  } = useQRCode(() => getQRCodeBaseURL(QR_CODE_BASE_URL)); // Use helper function
 
   // Local scanner instance state (needed for custom scanner logic)
   const [html5QrCodeInstance, setHtml5QrCodeInstance] = useState(null);
@@ -139,11 +138,57 @@ const LaundryWashingMachineTest = () => {
     validateImageFile,
     handleImageUpload,
     handleRemoveImage,
-    rotateFormImage,
-    rotateReceivedImage,
-    rotateCompletionImage,
-    rotateReportImage,
   } = useImageHandling();
+
+  // Standard Filter states
+  const [filterStartDate, setFilterStartDate] = useState("");
+  const [filterEndDate, setFilterEndDate] = useState("");
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterColor, setFilterColor] = useState("");
+  const [filterFactory, setFilterFactory] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const [filterPage, setFilterPage] = useState(1);
+  const [filterLimit, setFilterLimit] = useState(10);
+
+  // Warehouse Filter states
+  const [whFilterStartDate, setWhFilterStartDate] = useState("");
+  const [whFilterEndDate, setWhFilterEndDate] = useState("");
+  const [whFilterSearch, setWhFilterSearch] = useState("");
+  const [whFilterColor, setWhFilterColor] = useState("");
+  const [whFilterFactory, setWhFilterFactory] = useState("");
+  const [whFilterStatus, setWhFilterStatus] = useState("");
+  const [whFilterPage, setWhFilterPage] = useState(1);
+  const [whFilterLimit, setWhFilterLimit] = useState(10);
+
+  // Create a combined fetch function to refresh both or active tab
+  const refreshAllReports = useCallback(async () => {
+    // We refresh both to ensure consistency across tabs
+    await Promise.all([
+      fetchReports({
+        startDate: filterStartDate,
+        endDate: filterEndDate,
+        search: filterSearch,
+        color: filterColor,
+        factory: filterFactory,
+        status: filterStatus,
+        page: filterPage,
+        limit: filterLimit,
+      }),
+      fetchWhReports({
+        startDate: whFilterStartDate,
+        endDate: whFilterEndDate,
+        search: whFilterSearch,
+        color: whFilterColor,
+        factory: whFilterFactory,
+        status: whFilterStatus,
+        page: whFilterPage,
+        limit: whFilterLimit,
+      })
+    ]);
+  }, [
+    fetchReports, filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterPage, filterLimit,
+    fetchWhReports, whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterPage, whFilterLimit
+  ]);
 
   const {
     isSubmitting,
@@ -152,8 +197,7 @@ const LaundryWashingMachineTest = () => {
     submitReport,
     saveReceivedStatus,
     saveCompletionStatus,
-    updateReport,
-  } = useReportSubmission(user, fetchReports);
+  } = useReportSubmission(user, refreshAllReports);
 
   // Received modal state
   const [showReceivedModal, setShowReceivedModal] = useState(false);
@@ -201,6 +245,7 @@ const LaundryWashingMachineTest = () => {
   const [editingImageReport, setEditingImageReport] = useState(null);
   const [editingImageType, setEditingImageType] = useState(null); // 'initial', 'received', 'completion'
   const [editingImages, setEditingImages] = useState([]);
+  const [editingNotes, setEditingNotes] = useState("");
   const [isUpdatingImages, setIsUpdatingImages] = useState(false);
   const [editFormData, setEditFormData] = useState({
     color: [],
@@ -235,22 +280,17 @@ const LaundryWashingMachineTest = () => {
   const [factories, setFactories] = useState([]);
   const [isLoadingFactories, setIsLoadingFactories] = useState(false);
 
-  // Filter states
-  const [filterStartDate, setFilterStartDate] = useState("");
-  const [filterEndDate, setFilterEndDate] = useState("");
-  const [filterSearch, setFilterSearch] = useState("");
-  const [filterColor, setFilterColor] = useState("");
-  const [filterFactory, setFilterFactory] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterPage, setFilterPage] = useState(1);
-  const [filterLimit, setFilterLimit] = useState(10);
-
-  // Reset page to 1 when filters (except page) change
+  // Reset page to 1 when filters (except page) change for standard reports
   useEffect(() => {
     setFilterPage(1);
   }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterLimit]);
 
-  // Fetch reports when filters or page change
+  // Reset page to 1 when filters (except page) change for warehouse reports
+  useEffect(() => {
+    setWhFilterPage(1);
+  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterLimit]);
+
+  // Fetch standard reports when filters or page change
   useEffect(() => {
     const timer = setTimeout(() => {
       fetchReports({
@@ -266,6 +306,23 @@ const LaundryWashingMachineTest = () => {
     }, 500); // Debounce
     return () => clearTimeout(timer);
   }, [filterStartDate, filterEndDate, filterSearch, filterColor, filterFactory, filterStatus, filterPage, filterLimit, fetchReports]);
+
+  // Fetch warehouse reports when filters or page change
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchWhReports({
+        startDate: whFilterStartDate,
+        endDate: whFilterEndDate,
+        search: whFilterSearch,
+        color: whFilterColor,
+        factory: whFilterFactory,
+        status: whFilterStatus,
+        page: whFilterPage,
+        limit: whFilterLimit
+      });
+    }, 500); // Debounce
+    return () => clearTimeout(timer);
+  }, [whFilterStartDate, whFilterEndDate, whFilterSearch, whFilterColor, whFilterFactory, whFilterStatus, whFilterPage, whFilterLimit, fetchWhReports]);
 
   // Dropdown states
   const [showColorDropdown, setShowColorDropdown] = useState(false);
@@ -286,7 +343,13 @@ const LaundryWashingMachineTest = () => {
 
     // If Order_No field is being changed, search for suggestions
     if (field === "ymStyle" && value.length >= 2) {
-      searchOrderNo(value);
+      // Use handler function
+      handleOrderNoSearch(
+        value,
+        setOrderNoSuggestions,
+        setShowOrderNoSuggestions,
+        setIsSearchingOrderNo
+      );
 
       // Clear any existing timer
       if (colorFetchTimerRef.current) {
@@ -295,16 +358,12 @@ const LaundryWashingMachineTest = () => {
       }
 
       // Auto-fetch colors when user stops typing (debounced)
-      // Only fetch if it looks like a complete YM Style (min 4 chars, starts with letters)
-      // Also check that value doesn't contain invalid characters like colons
-      const trimmedValue = value.trim();
-      if (trimmedValue.length >= 3 && /^[A-Za-z]/.test(trimmedValue) && !trimmedValue.includes(':')) {
+      // Use helper to check if should auto-fetch
+      if (shouldAutoFetchColors(value)) {
         colorFetchTimerRef.current = setTimeout(() => {
-          // Double-check the value hasn't changed while waiting
-          // The trimmedValue is captured in closure, so we can safely use it
-          if (trimmedValue.length >= 3 && !trimmedValue.includes(':')) {
-            fetchOrderColors(trimmedValue, setFormData);
-            fetchYorksysOrderETD(trimmedValue);
+          if (shouldAutoFetchColors(value)) {
+            fetchOrderColors(value, setFormData);
+            fetchYorksysOrderETD(value);
           }
         }, 800); // Wait 800ms after user stops typing
       }
@@ -321,76 +380,37 @@ const LaundryWashingMachineTest = () => {
     }
   };
 
-  // Search Order_No from dt_orders collection
-  const searchOrderNo = async (searchTerm) => {
-    if (!searchTerm || searchTerm.length < 2) {
-      setOrderNoSuggestions([]);
-      setShowOrderNoSuggestions(false);
-      return;
-    }
-
-    setIsSearchingOrderNo(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/washing/search-mono?term=${encodeURIComponent(searchTerm)}`
+  // Search for Order_No suggestions
+  const searchOrderNo = (value) => {
+    if (value && value.length >= 2) {
+      handleOrderNoSearch(
+        value,
+        setOrderNoSuggestions,
+        setShowOrderNoSuggestions,
+        setIsSearchingOrderNo
       );
-      if (response.ok) {
-        const suggestions = await response.json();
-        setOrderNoSuggestions(suggestions);
-        setShowOrderNoSuggestions(suggestions.length > 0);
-      } else {
-        setOrderNoSuggestions([]);
-        setShowOrderNoSuggestions(false);
-      }
-    } catch (error) {
-      console.error("Error searching Order_No:", error);
-      setOrderNoSuggestions([]);
-      setShowOrderNoSuggestions(false);
-    } finally {
-      setIsSearchingOrderNo(false);
     }
   };
 
-  // Handle Order_No selection from suggestions
+  // Handle Order_No selection - use handler function
   const handleOrderNoSelect = async (orderNo) => {
-    // Clear any pending color fetch timer since we're handling the fetch now
+    // Clear any pending color fetch timer
     if (colorFetchTimerRef.current) {
       clearTimeout(colorFetchTimerRef.current);
       colorFetchTimerRef.current = null;
     }
 
-    // Use case-insensitive comparison to see if we're just confirming what's already typed
-    const currentStyle = (formData.ymStyle || "").trim().toUpperCase();
-    const selectedStyle = (orderNo || "").trim().toUpperCase();
-
-    // If the selected order is the same as typed (even different casing),
-    // just update casing and close suggestions without resetting data
-    if (selectedStyle === currentStyle) {
-      setFormData(prev => ({ ...prev, ymStyle: orderNo }));
-      setShowOrderNoSuggestions(false);
-      setOrderNoSuggestions([]);
-
-      // Still trigger fetches (hook handles duplicate suppression case-insensitively now)
-      fetchOrderColors(orderNo, setFormData);
-      fetchYorksysOrderETD(orderNo);
-      return;
-    }
-
-    // Truly new style selected: Clear color, PO, and ETD
-    setFormData((prev) => ({
-      ...prev,
-      ymStyle: orderNo,
-      color: [],
-      po: [],
-      exFtyDate: [],
-    }));
-    setShowOrderNoSuggestions(false);
-    setOrderNoSuggestions([]);
-    resetOrderData();
-
-    // Fetch colors and ETD for the new style
-    await fetchOrderColors(orderNo, setFormData);
-    await fetchYorksysOrderETD(orderNo);
+    // Use handler function
+    await handleOrderNoSelection(
+      orderNo,
+      formData,
+      setFormData,
+      setShowOrderNoSuggestions,
+      setOrderNoSuggestions,
+      fetchOrderColors,
+      fetchYorksysOrderETD,
+      resetOrderData
+    );
   };
 
   // Handle image upload - store File objects instead of base64
@@ -401,92 +421,22 @@ const LaundryWashingMachineTest = () => {
     }));
   };
 
-  // Handle file input change
-  const handleFileInputChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const currentCount = formData.images?.length || 0;
-      const filesToHandle = Array.from(e.target.files);
+  // Use imported handlers for file/camera inputs
+  const handleFileInputChange = (e) => handleFileInputChangeHandler(
+    e, formData.images, setFormData, fileInputRef, IMAGE_LIMITS.INITIAL
+  );
 
-      if (currentCount >= 5) {
-        showToast.warning("Maximum of 5 images allowed per section.");
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
+  const handleCameraInputChange = (e) => handleCameraInputChangeHandler(
+    e, formData.images, setFormData, cameraInputRef, IMAGE_LIMITS.INITIAL
+  );
 
-      const availableSlots = 5 - currentCount;
-      const filesToAdd = filesToHandle.slice(0, availableSlots);
+  const triggerFileInput = () => triggerFileInputHandler(
+    formData.images, fileInputRef, IMAGE_LIMITS.INITIAL, "Initial Step"
+  );
 
-      if (filesToHandle.length > availableSlots) {
-        showToast.info(`Only ${availableSlots} more image(s) can be added (Limit: 5).`);
-      }
-
-      const validFiles = filesToAdd.filter(f => validateImageFile(f));
-      if (validFiles.length > 0) {
-        setFormData((prev) => ({
-          ...prev,
-          images: [...prev.images, ...validFiles],
-        }));
-      }
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  // Handle camera input change
-  const handleCameraInputChange = (e) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const currentCount = formData.images?.length || 0;
-      if (currentCount >= 5) {
-        showToast.warning("Maximum of 5 images allowed per section.");
-        if (cameraInputRef.current) cameraInputRef.current.value = "";
-        return;
-      }
-
-      const validFiles = Array.from(e.target.files).filter(f => validateImageFile(f));
-      if (validFiles.length > 0) {
-        // Since camera is usually one by one, we just check if it exceeds after adding
-        if (currentCount + validFiles.length > 5) {
-          showToast.warning("Total images exceed limit of 5. Only the first ones were added.");
-        }
-
-        const availableSlots = 5 - currentCount;
-        const filesToAdd = validFiles.slice(0, availableSlots);
-
-        setFormData((prev) => ({
-          ...prev,
-          images: [...prev.images, ...filesToAdd],
-        }));
-      }
-    }
-    if (cameraInputRef.current) {
-      cameraInputRef.current.value = "";
-    }
-  };
-
-  // Trigger file input
-  const triggerFileInput = () => {
-    if ((formData.images?.length || 0) >= 5) {
-      showToast.warning("Maximum of 5 images allowed (Initial Step).");
-      return;
-    }
-    if (fileInputRef.current) {
-      fileInputRef.current.removeAttribute("capture");
-      fileInputRef.current.click();
-    }
-  };
-
-  // Trigger camera input
-  const triggerCameraInput = () => {
-    if ((formData.images?.length || 0) >= 5) {
-      showToast.warning("Maximum of 5 images allowed (Initial Step).");
-      return;
-    }
-    if (cameraInputRef.current) {
-      cameraInputRef.current.setAttribute("capture", "environment");
-      cameraInputRef.current.click();
-    }
-  };
+  const triggerCameraInput = () => triggerCameraInputHandler(
+    formData.images, cameraInputRef, IMAGE_LIMITS.INITIAL, "Initial Step"
+  );
 
   // Handle image remove
   const handleRemoveImageWrapper = (index) => {
@@ -543,218 +493,60 @@ const LaundryWashingMachineTest = () => {
     if (success) {
       setShowDeleteConfirm(false);
       setReportToDelete(null);
+      // Manually refresh warehouse reports too to keep them in sync
+      fetchWhReports({
+        startDate: whFilterStartDate,
+        endDate: whFilterEndDate,
+        search: whFilterSearch,
+        color: whFilterColor,
+        factory: whFilterFactory,
+        status: whFilterStatus,
+        page: whFilterPage,
+        limit: whFilterLimit
+      });
     }
   };
 
-  // Helper function to normalize date to YYYY-MM-DD format for date input
-  const normalizeDateForInput = (dateString) => {
-    if (!dateString) return new Date().toISOString().split("T")[0];
-
-    // If already in YYYY-MM-DD format, return as is
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-      return dateString;
-    }
-
-    // Try to parse the date and convert to YYYY-MM-DD
-    try {
-      const date = new Date(dateString);
-      if (!isNaN(date.getTime())) {
-        return date.toISOString().split("T")[0];
-      }
-    } catch (error) {
-      console.error("Error parsing date:", error);
-    }
-
-    // If parsing fails, return today's date
-    return new Date().toISOString().split("T")[0];
-  };
-
-  // Handle edit report - open modal and populate form
+  // Handle edit report - use handler function
   const handleEditReport = async (report) => {
     setEditingReport(report);
 
-    // Populate edit form with current report data
-    setEditFormData({
-      color: report.color || [],
-      buyerStyle: report.buyerStyle || "",
-      po: report.po || [],
-      exFtyDate: report.exFtyDate || [],
-      factory: report.factory || "",
-      sendToHomeWashingDate: normalizeDateForInput(report.sendToHomeWashingDate),
-    });
-
-    // Fetch available options for the report's ymStyle
-    if (report.ymStyle) {
-      // Fetch colors
-      try {
-        const colorResponse = await fetch(
-          `${API_BASE_URL}/api/washing/order-details/${encodeURIComponent(report.ymStyle)}`
-        );
-        if (colorResponse.ok) {
-          const orderData = await colorResponse.json();
-          if (orderData.colors && Array.isArray(orderData.colors)) {
-            const colorNames = orderData.colors
-              .map(c => c.original || c)
-              .filter(Boolean);
-            const uniqueColors = [...new Set(colorNames)];
-            setEditAvailableColors(uniqueColors);
-          } else {
-            setEditAvailableColors([]);
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching order colors for edit:", error);
-        setEditAvailableColors([]);
-      }
-
-      // Fetch ETD and PO
-      try {
-        const etdResponse = await fetch(
-          `${API_BASE_URL}/api/yorksys-orders/by-style/${encodeURIComponent(report.ymStyle)}`
-        );
-        if (etdResponse.ok) {
-          const result = await etdResponse.json();
-          if (result.success && result.data && result.data.SKUData && Array.isArray(result.data.SKUData) && result.data.SKUData.length > 0) {
-            // Get ETDs
-            const allETDs = result.data.SKUData
-              .map(sku => sku.ETD)
-              .filter(etd => etd && etd.trim() !== "")
-              .map(etd => {
-                let etdDate = etd.trim();
-                try {
-                  if (/^\d{4}-\d{2}-\d{2}$/.test(etdDate)) {
-                    return etdDate;
-                  } else {
-                    const parsedDate = new Date(etdDate);
-                    if (!isNaN(parsedDate.getTime())) {
-                      return parsedDate.toISOString().split("T")[0];
-                    }
-                  }
-                } catch (dateError) {
-                  console.error("Error parsing ETD date:", dateError);
-                }
-                return etdDate;
-              })
-              .filter(Boolean);
-            const uniqueETDs = [...new Set(allETDs)].sort();
-            setEditAvailableETDs(uniqueETDs);
-
-            // Get POs
-            const allPOLines = result.data.SKUData
-              .map(sku => sku.POLine)
-              .filter(poline => poline && poline.trim() !== "")
-              .map(poline => poline.trim());
-            const uniquePOLines = [...new Set(allPOLines)];
-            setEditAvailablePOs(uniquePOLines);
-          } else {
-            setEditAvailablePOs([]);
-            setEditAvailableETDs([]);
-          }
-        } else if (etdResponse.status === 404) {
-          // Order not found - this is expected if Order_No doesn't match moNo or style
-          setEditAvailablePOs([]);
-          setEditAvailableETDs([]);
-        } else {
-          // Other error status
-          console.error(`Error fetching yorksys order for edit: ${etdResponse.status} ${etdResponse.statusText}`);
-          setEditAvailablePOs([]);
-          setEditAvailableETDs([]);
-        }
-      } catch (error) {
-        // Only log non-connection errors (connection errors are handled elsewhere)
-        if (!error.message.includes("Failed to fetch") && !error.message.includes("ERR_CONNECTION_REFUSED")) {
-          console.error("Error fetching yorksys order for edit:", error);
-        }
-        setEditAvailablePOs([]);
-        setEditAvailableETDs([]);
-      }
-    }
+    // Use handler function to prepare edit form
+    await prepareEditFormData(
+      report,
+      setEditFormData,
+      setEditAvailableColors,
+      setEditAvailablePOs,
+      setEditAvailableETDs
+    );
 
     setShowEditModal(true);
   };
 
-  // Handle edit form submit
-  const handleEditSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!editingReport) return;
-
-    // Validate that at least one color is selected
-    if (!editFormData.color || editFormData.color.length === 0) {
-      showToast.warning("Please select at least one color");
-      return;
-    }
-
-    try {
-      const formDataToSubmit = new FormData();
-
-      // Add form fields
-      formDataToSubmit.append("color", JSON.stringify(editFormData.color || []));
-      formDataToSubmit.append("buyerStyle", editFormData.buyerStyle || "");
-      formDataToSubmit.append("po", JSON.stringify(editFormData.po || []));
-      formDataToSubmit.append("exFtyDate", JSON.stringify(editFormData.exFtyDate || []));
-      formDataToSubmit.append("factory", editFormData.factory || "");
-      formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
-
-      const reportId = editingReport._id || editingReport.id;
-      const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`, {
-        method: "PUT",
-        body: formDataToSubmit,
-      });
-
-      const contentType = response.headers.get("content-type");
-      let result;
-
-      if (contentType && contentType.includes("application/json")) {
-        result = await response.json();
-      } else {
-        const text = await response.text();
-        console.error("Server returned non-JSON response:", text);
-        let errorMessage = `Server error (${response.status}): ${response.statusText}`;
-        const preMatch = text.match(/<pre>([^<]+)<\/pre>/i);
-        if (preMatch) {
-          const errorText = preMatch[1];
-          const errorMatch = errorText.match(/Error:\s*([^<]+)/i);
-          if (errorMatch) {
-            errorMessage = errorMatch[1].trim();
-          } else {
-            errorMessage = errorText.split('<br>')[0].trim();
-          }
-        }
-        throw new Error(errorMessage);
-      }
-
-      if (response.ok && result.success) {
-        showToast.success("Report updated successfully!");
-
-        // Refresh reports list
-        await fetchReports();
-
-        // Close modal and reset
-        setShowEditModal(false);
-        setEditingReport(null);
-        setEditFormData({
-          color: [],
-          buyerStyle: "",
-          po: [],
-          exFtyDate: [],
-          factory: "",
-          sendToHomeWashingDate: "",
-        });
-        setEditAvailableColors([]);
-        setEditAvailablePOs([]);
-        setEditAvailableETDs([]);
-      } else {
-        const errorMessage = result?.message || result?.error || `Server error (${response.status}): ${response.statusText}`;
-        showToast.error(errorMessage);
-        console.error("Error updating report:", result);
-      }
-    } catch (error) {
-      console.error("Error updating report:", error);
-      const errorMessage = error.message || "An error occurred while updating the report. Please try again.";
-      showToast.error(errorMessage);
-    }
+  // Handle edit form submit - use handler
+  const resetEditState = () => {
+    setEditingReport(null);
+    setEditFormData({
+      color: [],
+      buyerStyle: "",
+      po: [],
+      exFtyDate: [],
+      factory: "",
+      sendToHomeWashingDate: "",
+    });
+    setEditAvailableColors([]);
+    setEditAvailablePOs([]);
+    setEditAvailableETDs([]);
   };
+
+  const handleEditSubmit = (e) => handleEditFormSubmit(
+    e,
+    editingReport,
+    editFormData,
+    refreshAllReports,
+    setShowEditModal,
+    resetEditState
+  );
 
   // Initialize QR Code Scanner for a specific report
   const initializeScanner = async (reportId) => {
@@ -765,7 +557,7 @@ const LaundryWashingMachineTest = () => {
       }
 
       const scannerId = `report-date-scanner-${reportId}`;
-      const instance = new Html5Qrcode(scannerId);
+      const instance = new Html5Qrcode(scannerId, { verbose: false });
       setHtml5QrCodeInstance(instance);
       setScanningReportId(reportId);
 
@@ -782,8 +574,19 @@ const LaundryWashingMachineTest = () => {
         await instance.start(
           cameraId,
           {
-            fps: 10,
-            qrbox: { width: 250, height: 250 }
+            fps: 20, // Increased FPS for smoother scanning
+            qrbox: (viewfinderWidth, viewfinderHeight) => {
+              const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+              const qrboxSize = Math.floor(minEdgeSize * 0.7);
+              return {
+                width: qrboxSize,
+                height: qrboxSize
+              };
+            },
+            aspectRatio: 1.0,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true // Use native browser API if available (faster/better)
+            }
           },
           async (decodedText) => {
             // Check if scanned QR code is the Report Date QR
@@ -924,81 +727,26 @@ const LaundryWashingMachineTest = () => {
       return;
     }
 
-    try {
-      // Create a temporary container for Html5Qrcode (required by constructor)
-      const tempContainer = document.createElement('div');
-      tempContainer.id = 'temp-qr-file-scanner';
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.left = '-9999px';
-      document.body.appendChild(tempContainer);
+    const { parseQRCodeScanResult } = await import("../components/inspection/WashingTesting/lib");
 
-      // Use Html5Qrcode to scan QR code from file
-      const html5QrCode = new Html5Qrcode('temp-qr-file-scanner');
-      let decodedText;
+    // Helper to process scan result
+    const processResult = async (decodedText) => {
+      const result = parseQRCodeScanResult(decodedText, reportId);
 
-      try {
-        decodedText = await html5QrCode.scanFile(file, false);
-      } catch (scanError) {
-        // Clean up temporary container
-        document.body.removeChild(tempContainer);
-
-        // Check if it's a QR code scanning error
-        if (scanError && scanError.message) {
-          if (scanError.message.includes("No QR code found") || scanError.message.includes("QR code parse error")) {
-            showToast.error("No QR code found in the image. Please make sure the image contains a valid QR code and try again.");
-          } else {
-            showToast.error("Failed to scan QR code. The image may be corrupted or the QR code is not readable. Please try with a clearer image.");
-          }
-        } else {
-          showToast.error("Failed to scan QR code from the image. Please ensure the image contains a valid QR code.");
-        }
-        event.target.value = "";
-        return;
-      }
-
-      // Clean up temporary container
-      document.body.removeChild(tempContainer);
-
-      // Process the scanned QR code (same logic as camera scanner)
-      let targetReportId = reportId;
-      let isValidQRCode = false;
-
-      if (decodedText.includes("?scan=")) {
-        try {
-          const url = new URL(decodedText);
-          const scanParam = url.searchParams.get("scan");
-          if (scanParam) {
-            targetReportId = scanParam;
-            isValidQRCode = true;
-          } else {
-            showToast.warning("This QR code is not valid. Please upload the QR code that is displayed in the current modal window.");
-            event.target.value = "";
-            return;
-          }
-        } catch (error) {
+      if (!result.isValid) {
+        if (result.format === 'invalid_url' || result.format === 'unknown') {
           showToast.warning("This QR code is not valid. Please upload the QR code that is displayed in the current modal window.");
-          event.target.value = "";
-          return;
+        } else {
+          showToast.warning("Invalid QR code format.");
         }
-      } else if (decodedText === "REPORT_DATE_SCAN") {
-        targetReportId = reportId;
-        isValidQRCode = true;
-      } else if (decodedText.startsWith("REPORT_DATE_SCAN:")) {
-        const qrReportId = decodedText.split(":")[1];
-        if (qrReportId) {
-          targetReportId = qrReportId;
-          isValidQRCode = true;
-        }
-      } else {
-        showToast.warning("This QR code is not valid. Please upload the QR code that is displayed in the current modal window.");
-        event.target.value = "";
         return;
       }
+
+      const targetReportId = result.reportId;
 
       // Check if the scanned QR code belongs to the current report
-      if (isValidQRCode && targetReportId !== reportId) {
+      if (targetReportId !== reportId) {
         showToast.error("This QR code is from a different report. Please upload the QR code that is displayed in the current modal window.");
-        event.target.value = "";
         return;
       }
 
@@ -1012,13 +760,11 @@ const LaundryWashingMachineTest = () => {
           } else {
             showToast.error("Unable to verify the report. Please try again.");
           }
-          event.target.value = "";
           return;
         }
       } catch (fetchError) {
         console.error("Error fetching report:", fetchError);
         showToast.error("Network error. Failed to verify the report. Please check your connection and try again.");
-        event.target.value = "";
         return;
       }
 
@@ -1051,25 +797,69 @@ const LaundryWashingMachineTest = () => {
         setShowReportDateQR(null);
         setActiveTab("reports");
       }
-    } catch (error) {
-      console.error("Error scanning QR code from file:", error);
+    };
 
-      // Provide more specific error messages based on error type
-      if (error.message && error.message.includes("No QR code")) {
-        showToast.error("No QR code found in the image. Please make sure the image contains a valid QR code and try again.");
-      } else if (error.message && error.message.includes("parse")) {
-        showToast.error("Failed to read the QR code. The image may be blurry or the QR code is damaged. Please try with a clearer image.");
-      } else {
-        showToast.error("Failed to scan QR code from file. Please make sure it's a valid QR code image file (PNG, JPG, JPEG) and try again.");
-      }
+    try {
+      // Method 1: Try Html5Qrcode first (fastest)
+      const tempContainer = document.createElement('div');
+      tempContainer.id = 'temp-qr-file-scanner';
+      tempContainer.style.display = 'none';
+      document.body.appendChild(tempContainer);
 
-      // Clean up temporary container if it exists
-      const tempContainer = document.getElementById('temp-qr-file-scanner');
-      if (tempContainer) {
+      const html5QrCode = new Html5Qrcode('temp-qr-file-scanner');
+      try {
+        const decodedText = await html5QrCode.scanFile(file, false);
         document.body.removeChild(tempContainer);
+        await processResult(decodedText);
+        event.target.value = "";
+        return;
+      } catch (scanError) {
+        document.body.removeChild(tempContainer);
+        console.warn("Html5Qrcode failed, trying fallback...", scanError);
       }
+
+      // Method 2: Fallback to jsQR with Canvas (more robust for some images)
+      try {
+        const jsQR = (await import("jsqr")).default;
+
+        const img = new Image();
+        const objectUrl = URL.createObjectURL(file);
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = objectUrl;
+        });
+
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        context.drawImage(img, 0, 0);
+        const imageData = context.getImageData(0, 0, canvas.width, canvas.height);
+
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: "dontInvert",
+        });
+
+        URL.revokeObjectURL(objectUrl);
+
+        if (code) {
+          await processResult(code.data);
+          event.target.value = "";
+          return;
+        }
+      } catch (fallbackError) {
+        console.error("Fallback scan failed:", fallbackError);
+      }
+
+      // If both failed
+      showToast.error("Failed to scan QR code. The image may be corrupted or the QR code is not readable.");
+
+    } catch (error) {
+      console.error("Error in QR scan process:", error);
+      showToast.error("An error occurred while scanning. Please try again.");
     } finally {
-      // Reset file input
       event.target.value = "";
     }
   };
@@ -1461,6 +1251,7 @@ const LaundryWashingMachineTest = () => {
     setEditingImageReport(report);
     setEditingImageType('initial');
     setEditingImages(report.images || []);
+    setEditingNotes(report.notes || "");
     setShowEditInitialImagesModal(true);
   };
 
@@ -1469,6 +1260,7 @@ const LaundryWashingMachineTest = () => {
     setEditingImageReport(report);
     setEditingImageType('received');
     setEditingImages(report.receivedImages || []);
+    setEditingNotes(report.receivedNotes || "");
     setShowEditReceivedImagesModal(true);
   };
 
@@ -1477,6 +1269,7 @@ const LaundryWashingMachineTest = () => {
     setEditingImageReport(report);
     setEditingImageType('completion');
     setEditingImages(report.completionImages || []);
+    setEditingNotes(report.completionNotes || "");
     setShowEditCompletionImagesModal(true);
   };
 
@@ -1546,6 +1339,15 @@ const LaundryWashingMachineTest = () => {
         formDataToSubmit.append(`${fieldName}Urls`, JSON.stringify(existingImageUrls));
       }
 
+      // Add notes
+      const notesFieldName = editingImageType === 'initial'
+        ? 'notes'
+        : editingImageType === 'received'
+          ? 'receivedNotes'
+          : 'completionNotes';
+
+      formDataToSubmit.append(notesFieldName, editingNotes);
+
       const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`, {
         method: "PUT",
         body: formDataToSubmit,
@@ -1584,8 +1386,8 @@ const LaundryWashingMachineTest = () => {
         setEditingImageType(null);
         setEditingImages([]);
 
-        // Refresh reports
-        await fetchReports();
+        // Refresh all reports
+        await refreshAllReports();
       } else {
         const errorMessage = result?.message || result?.error || `Server error (${response.status}): ${response.statusText}`;
         showToast.error(errorMessage);
@@ -1673,16 +1475,19 @@ const LaundryWashingMachineTest = () => {
   const handlePrintPDF = async (report) => {
     const reportId = report._id || report.id;
 
+    const currentPrintingId = activeTab === "warehouse_reports" ? whPrintingReportId : printingReportId;
+    const currentSetPrintingId = activeTab === "warehouse_reports" ? setWhPrintingReportId : setPrintingReportId;
+
     // Prevent multiple clicks
-    if (printingReportId === reportId) {
+    if (currentPrintingId === reportId) {
       return;
     }
 
-    setPrintingReportId(reportId);
+    currentSetPrintingId(reportId);
 
     try {
       // Generate QR code data URL for the report - use URL format for mobile compatibility
-      const qrCodeValue = `${getQRCodeBaseURL()}/Launch-washing-machine-test?scan=${reportId}`;
+      const qrCodeValue = `${getQRCodeBaseURL(QR_CODE_BASE_URL)}/Launch-washing-machine-test?scan=${reportId}`;
       const qrCodeDataURL = await generateQRCodeDataURL(qrCodeValue, 100);
 
       const blob = await pdf(<WashingMachineTestPDF report={report} apiBaseUrl={API_BASE_URL} qrCodeDataURL={qrCodeDataURL} savedImageRotations={savedImageRotations} />).toBlob();
@@ -1817,7 +1622,7 @@ const LaundryWashingMachineTest = () => {
     } finally {
       // Reset printing state after a delay
       setTimeout(() => {
-        setPrintingReportId(null);
+        currentSetPrintingId(null);
       }, 3000);
     }
   };
@@ -1890,7 +1695,6 @@ const LaundryWashingMachineTest = () => {
       }
     };
 
-    fetchFactories();
     fetchFactories();
     // fetchReports(); // Handled by filter useEffect
 
@@ -1979,10 +1783,8 @@ const LaundryWashingMachineTest = () => {
                   }`}
               >
                 <span className="flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  New Report
+                  <HiDocumentAdd className={`w-5 h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
+                  Create New Report
                 </span>
               </button>
               <button
@@ -1993,8 +1795,20 @@ const LaundryWashingMachineTest = () => {
                   }`}
               >
                 <span className="flex items-center gap-2">
-                  <ClipboardList className="w-5 h-5" />
+                  <HiClipboardList className={`w-5 h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
                   Reports ({pagination.totalRecords})
+                </span>
+              </button>
+              <button
+                onClick={() => setActiveTab("warehouse_reports")}
+                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "warehouse_reports"
+                  ? "border-blue-500 text-blue-600 dark:text-blue-400"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
+                  }`}
+              >
+                <span className="flex items-center gap-2">
+                  <MdWarehouse className={`w-5 h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
+                  Warehouse Report
                 </span>
               </button>
             </nav>
@@ -2040,9 +1854,10 @@ const LaundryWashingMachineTest = () => {
 
           {/* Form Section is now in FormSection component */}
 
-          {/* Submitted Reports Section */}
+          {/* Submitted Reports Section - Standard Tab */}
           {activeTab === "reports" && (
             <ReportsList
+              activeTab={activeTab}
               reports={reports}
               isLoadingReports={isLoadingReports}
               onRefresh={() => fetchReports({
@@ -2053,7 +1868,7 @@ const LaundryWashingMachineTest = () => {
                 factory: filterFactory,
                 status: filterStatus,
                 page: filterPage,
-                limit: 10
+                limit: filterLimit
               })}
               expandedReports={expandedReports}
               onToggleReport={toggleReport}
@@ -2088,6 +1903,59 @@ const LaundryWashingMachineTest = () => {
               filterLimit={filterLimit}
               setFilterLimit={setFilterLimit}
               pagination={pagination}
+              factories={factories}
+            />
+          )}
+
+          {/* Submitted Reports Section - Warehouse Tab */}
+          {activeTab === "warehouse_reports" && (
+            <ReportsList
+              activeTab={activeTab}
+              reports={whReports}
+              isLoadingReports={isLoadingWhReports}
+              onRefresh={() => fetchWhReports({
+                startDate: whFilterStartDate,
+                endDate: whFilterEndDate,
+                search: whFilterSearch,
+                color: whFilterColor,
+                factory: whFilterFactory,
+                status: whFilterStatus,
+                page: whFilterPage,
+                limit: whFilterLimit
+              })}
+              expandedReports={whExpandedReports}
+              onToggleReport={toggleWhReport}
+              onPrintPDF={handlePrintPDF}
+              onDownloadPDF={handleDownloadPDF}
+              onExportExcel={handleExportExcel}
+              onEdit={handleEditReport}
+              onDelete={null} // Keep delete disabled for warehouse
+              onShowQRCode={(reportId) => setShowReportDateQR(showReportDateQR === reportId ? null : reportId)}
+              printingReportId={whPrintingReportId}
+              savedImageRotations={savedImageRotations}
+              openImageViewer={openImageViewer}
+              setActiveTab={setActiveTab}
+              onEditInitialImages={handleEditInitialImages}
+              onEditReceivedImages={handleEditReceivedImages}
+              onEditCompletionImages={handleEditCompletionImages}
+              // Warehouse Filter props
+              filterStartDate={whFilterStartDate}
+              setFilterStartDate={setWhFilterStartDate}
+              filterEndDate={whFilterEndDate}
+              setFilterEndDate={setWhFilterEndDate}
+              filterSearch={whFilterSearch}
+              setFilterSearch={setWhFilterSearch}
+              filterColor={whFilterColor}
+              setFilterColor={setWhFilterColor}
+              filterFactory={whFilterFactory}
+              setFilterFactory={setWhFilterFactory}
+              filterStatus={whFilterStatus}
+              setFilterStatus={setWhFilterStatus}
+              filterPage={whFilterPage}
+              setFilterPage={setWhFilterPage}
+              filterLimit={whFilterLimit}
+              setFilterLimit={setWhFilterLimit}
+              pagination={whPagination}
               factories={factories}
             />
           )}
@@ -2187,9 +2055,15 @@ const LaundryWashingMachineTest = () => {
             isOpen={!!showReportDateQR}
             reportId={showReportDateQR}
             onClose={() => setShowReportDateQR(null)}
-            onDownloadQRCode={downloadQRCode}
+            onDownloadQRCode={downloadQRCodeHook}
+            onPrintQRCode={printQRCode}
             onUploadQRCode={handleQRCodeFileUpload}
-            getQRCodeBaseURL={getQRCodeBaseURL}
+            onOpenScanner={(reportId) => {
+              setShowReportDateScanner(reportId);
+              // Wait for modal to animate and element to be available
+              setTimeout(() => initializeScanner(reportId), 300);
+            }}
+            getQRCodeBaseURL={() => getQRCodeBaseURL(QR_CODE_BASE_URL)}
             fileInputRef={fileInputRef}
           />
 
@@ -2212,9 +2086,12 @@ const LaundryWashingMachineTest = () => {
               setEditingImageReport(null);
               setEditingImageType(null);
               setEditingImages([]);
+              setEditingNotes("");
             }}
             title={`Edit Initial Images - ${editingImageReport?.ymStyle || "N/A"}`}
             images={editingImages}
+            notes={editingNotes}
+            onNotesChange={setEditingNotes}
             onRemoveImage={handleRemoveEditImage}
             onUploadImage={(files) => handleEditImageUpload(files, 'initial')}
             onSave={handleUpdateImages}
@@ -2230,9 +2107,12 @@ const LaundryWashingMachineTest = () => {
               setEditingImageReport(null);
               setEditingImageType(null);
               setEditingImages([]);
+              setEditingNotes("");
             }}
             title={`Edit Received Images - ${editingImageReport?.ymStyle || "N/A"}`}
             images={editingImages}
+            notes={editingNotes}
+            onNotesChange={setEditingNotes}
             onRemoveImage={handleRemoveEditImage}
             onUploadImage={(files) => handleEditImageUpload(files, 'received')}
             onSave={handleUpdateImages}
@@ -2248,9 +2128,12 @@ const LaundryWashingMachineTest = () => {
               setEditingImageReport(null);
               setEditingImageType(null);
               setEditingImages([]);
+              setEditingNotes("");
             }}
             title={`Edit Completion Images - ${editingImageReport?.ymStyle || "N/A"}`}
             images={editingImages}
+            notes={editingNotes}
+            onNotesChange={setEditingNotes}
             onRemoveImage={handleRemoveEditImage}
             onUploadImage={(files) => handleEditImageUpload(files, 'completion')}
             onSave={handleUpdateImages}
