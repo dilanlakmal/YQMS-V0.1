@@ -530,7 +530,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                     value={formData.beforeDryRoomTime}
                                     onChange={e => setFormData({ ...formData, beforeDryRoomTime: e.target.value })}
                                     disabled
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-100 cursor-not-allowed"
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                                 />
                             </div>
                             <div>
@@ -557,7 +557,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                                     value={formData.date}
                                     onChange={e => setFormData({ ...formData, date: e.target.value })}
                                     disabled
-                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-100 cursor-not-allowed"
+                                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                                 />
                             </div>
                         </div>

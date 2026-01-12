@@ -102,6 +102,12 @@ export default function Dashboard() {
   const [totalRibsFail, setTotalRibsFail] = useState(0);
   const [totalBodyPass, setTotalBodyPass] = useState(0);
   const [totalBodyFail, setTotalBodyFail] = useState(0);
+  const [topPass, setTopPass] = useState(0);
+  const [topFail, setTopFail] = useState(0);
+  const [middlePass, setMiddlePass] = useState(0);
+  const [middleFail, setMiddleFail] = useState(0);
+  const [bottomPass, setBottomPass] = useState(0);
+  const [bottomFail, setBottomFail] = useState(0);
   const [docsRaw, setDocsRaw] = useState([]);
   const [ordersRaw, setOrdersRaw] = useState([]);
   const [startDate, setStartDate] = useState(() => {
@@ -221,6 +227,9 @@ export default function Dashboard() {
       let totalRFail = 0;
       let totalBPass = 0;
       let totalBFail = 0;
+      let tPass = 0, tFail = 0;
+      let mPass = 0, mFail = 0;
+      let bPass = 0, bFail = 0;
 
       filtered.forEach(d => {
         const cust = (d.customer || d.buyer || 'Unknown').toString();
@@ -238,6 +247,18 @@ export default function Dashboard() {
               bodyCounts[cust] += bodyNum;
               if (s.status === 'pass') totalBPass += bodyNum;
               else if (s.status === 'fail') totalBFail += bodyNum;
+
+              // Record section specific pass/fail
+              if (sec === 'top') {
+                if (s.status === 'pass') tPass += bodyNum;
+                else if (s.status === 'fail') tFail += bodyNum;
+              } else if (sec === 'middle') {
+                if (s.status === 'pass') mPass += bodyNum;
+                else if (s.status === 'fail') mFail += bodyNum;
+              } else if (sec === 'bottom') {
+                if (s.status === 'pass') bPass += bodyNum;
+                else if (s.status === 'fail') bFail += bodyNum;
+              }
             }
             if (s.ribs !== undefined && s.ribs !== null && String(s.ribs).trim() !== '') {
               const ribsStr = String(s.ribs).trim();
@@ -245,6 +266,18 @@ export default function Dashboard() {
               ribsCounts[cust] += ribsNum;
               if (s.status === 'pass') totalRPass += ribsNum;
               else if (s.status === 'fail') totalRFail += ribsNum;
+
+              // Also count ribs for section metrics
+              if (sec === 'top') {
+                if (s.status === 'pass') tPass += ribsNum;
+                else if (s.status === 'fail') tFail += ribsNum;
+              } else if (sec === 'middle') {
+                if (s.status === 'pass') mPass += ribsNum;
+                else if (s.status === 'fail') mFail += ribsNum;
+              } else if (sec === 'bottom') {
+                if (s.status === 'pass') bPass += ribsNum;
+                else if (s.status === 'fail') bFail += ribsNum;
+              }
             }
           });
         });
@@ -256,6 +289,12 @@ export default function Dashboard() {
       setTotalRibsFail(totalRFail);
       setTotalBodyPass(totalBPass);
       setTotalBodyFail(totalBFail);
+      setTopPass(tPass);
+      setTopFail(tFail);
+      setMiddlePass(mPass);
+      setMiddleFail(mFail);
+      setBottomPass(bPass);
+      setBottomFail(bFail);
     } catch (e) {
       console.error('Error computing aggregates for dashboard filters', e);
     }
@@ -701,6 +740,75 @@ export default function Dashboard() {
         />
       </div>
 
+      {/* Section Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <KpiCard
+          title="Top Readings"
+          value={topPass + topFail}
+          subtitle={`${topPass + topFail ? Math.round((topPass / (topPass + topFail)) * 100) : 0}% pass rate`}
+          gradient="bg-gray-50 border-2 border-blue-200"
+          percent={topPass + topFail ? Math.round((topPass / (topPass + topFail)) * 100) : 0}
+          icon={
+            <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" fill="currentColor" />
+              <path d="M16 6l4-4M20 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+
+          }
+          cornerBg="bg-blue-50"
+          cornerIcon={
+            <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" fill="currentColor" />
+              <path d="M16 6l4-4M20 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+
+          }
+        />
+        <KpiCard
+          title="Middle Readings"
+          value={middlePass + middleFail}
+          subtitle={`${middlePass + middleFail ? Math.round((middlePass / (middlePass + middleFail)) * 100) : 0}% pass rate`}
+          gradient="bg-gray-50 border-2 border-orange-200"
+          percent={middlePass + middleFail ? Math.round((middlePass / (middlePass + middleFail)) * 100) : 0}
+          icon={
+            <svg className="w-5 h-5 text-pink-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" fill="currentColor" />
+              <path d="M16 6l4-4M20 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+
+          }
+          cornerBg="bg-orange-50"
+          cornerIcon={
+            <svg className="w-5 h-5 text-orange-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" fill="currentColor" />
+              <path d="M16 6l4-4M20 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+
+          }
+        />
+        <KpiCard
+          title="Bottom Readings"
+          value={bottomPass + bottomFail}
+          subtitle={`${bottomPass + bottomFail ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100) : 0}% pass rate`}
+          gradient="bg-gray-50 border-2 border-green-200"
+          percent={bottomPass + bottomFail ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100) : 0}
+          icon={
+            <svg className="w-5 h-5 text-pink-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" fill="currentColor" />
+              <path d="M16 6l4-4M20 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          }
+          cornerBg="bg-green-50"
+          cornerIcon={
+            <svg className="w-5 h-5 text-green-400" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" fill="currentColor" />
+              <path d="M16 6l4-4M20 2v4h-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+
+          }
+        />
+      </div>
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Body Chart */}
@@ -851,6 +959,132 @@ export default function Dashboard() {
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Sectional Performance Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Top Section Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">Top Performance</h3>
+          </div>
+          <div className="flex items-center justify-center p-2" style={{ height: 160 }}>
+            <Doughnut
+              data={{
+                labels: ['Pass', 'Fail'],
+                datasets: [{
+                  data: [topPass, topFail],
+                  backgroundColor: ['#787ae6ff', '#e2e8f0'],
+                  borderColor: ['#787ae6ff', '#e2e8f0'],
+                  borderWidth: 1
+                }]
+              }}
+              options={{
+                cutout: '70%',
+                plugins: {
+                  legend: { display: false },
+                  datalabels: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => `${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw / (topPass + topFail || 1) * 100)}%)`
+                    }
+                  }
+                }
+              }}
+            />
+            <div className="absolute flex flex-col items-center justify-center">
+              <span className="text-xl font-bold text-gray-800">{topPass + topFail ? Math.round(topPass / (topPass + topFail) * 100) : 0}%</span>
+              <span className="text-[10px] text-gray-500 uppercase font-medium">Pass</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Middle Section Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+              </svg>
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">Middle Performance</h3>
+          </div>
+          <div className="flex items-center justify-center p-2" style={{ height: 160 }}>
+            <Doughnut
+              data={{
+                labels: ['Pass', 'Fail'],
+                datasets: [{
+                  data: [middlePass, middleFail],
+                  backgroundColor: ['#f97316', '#e2e8f0'],
+                  borderColor: ['#f97316', '#e2e8f0'],
+                  borderWidth: 1
+                }]
+              }}
+              options={{
+                cutout: '70%',
+                plugins: {
+                  legend: { display: false },
+                  datalabels: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => `${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw / (middlePass + middleFail || 1) * 100)}%)`
+                    }
+                  }
+                }
+              }}
+            />
+            <div className="absolute flex flex-col items-center justify-center">
+              <span className="text-xl font-bold text-gray-800">{middlePass + middleFail ? Math.round(middlePass / (middlePass + middleFail) * 100) : 0}%</span>
+              <span className="text-[10px] text-gray-500 uppercase font-medium">Pass</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">Bottom Performance</h3>
+          </div>
+          <div className="flex items-center justify-center p-2" style={{ height: 160 }}>
+            <Doughnut
+              data={{
+                labels: ['Pass', 'Fail'],
+                datasets: [{
+                  data: [bottomPass, bottomFail],
+                  backgroundColor: ['#22c55e', '#e2e8f0'],
+                  borderColor: ['#22c55e', '#e2e8f0'],
+                  borderWidth: 1
+                }]
+              }}
+              options={{
+                cutout: '70%',
+                plugins: {
+                  legend: { display: false },
+                  datalabels: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label: (ctx) => `${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw / (bottomPass + bottomFail || 1) * 100)}%)`
+                    }
+                  }
+                }
+              }}
+            />
+            <div className="absolute flex flex-col items-center justify-center">
+              <span className="text-xl font-bold text-gray-800">{bottomPass + bottomFail ? Math.round(bottomPass / (bottomPass + bottomFail) * 100) : 0}%</span>
+              <span className="text-[10px] text-gray-500 uppercase font-medium">Pass</span>
+            </div>
+          </div>
         </div>
       </div>
 
