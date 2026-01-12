@@ -6,3 +6,6 @@ MongoDB_URI_ym_eco_board = mongodb://localhost:27017/
 
 JWT_SECRET = xxxxxxxxx
 JWT_REFRESH_SECRET = xxxxxxxxx
+
+P88_USERNAME= xxxx
+P88_PASSWORD="xxxx"
