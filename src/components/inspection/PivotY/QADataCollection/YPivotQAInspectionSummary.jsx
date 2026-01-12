@@ -265,6 +265,53 @@ const YPivotQAInspectionSummary = ({
     return reportData?.measurementData?.savedMeasurements || [];
   }, [reportData]);
 
+  // NEW: Process Measurement Data by Stage (Before / After) separate logic
+  const measurementStageData = useMemo(() => {
+    const stages = ["Before", "After"];
+
+    return stages
+      .map((stage) => {
+        // 1. Filter measurements for this specific stage
+        // (Legacy fallback: if no stage property, assume 'Before')
+        const stageMeasurements = savedMeasurements.filter(
+          (m) => m.stage === stage || (!m.stage && stage === "Before")
+        );
+
+        if (stageMeasurements.length === 0) return null;
+
+        // 2. Get the specific Specs/Config for this stage (Before specs vs After specs)
+        const configKey = `config${stage}`; // e.g., configBefore, configAfter
+        const stageConfig = reportData?.measurementData?.[configKey] || {};
+        const fullSpecs = stageConfig.fullSpecsList || [];
+        const selectedSpecs = stageConfig.selectedSpecsList || [];
+
+        // 3. Create display copies with Suffixes for the Overall Table (e.g. "XS (B)")
+        const suffix = stage === "Before" ? "(B)" : "(A)";
+        const measurementsForDisplay = stageMeasurements.map((m) => ({
+          ...m,
+          size: `${m.size} ${suffix}` // Appends (B) or (A) to size
+        }));
+
+        // 4. Group data for detailed tables
+        const grouped = groupMeasurementsByGroupId(stageMeasurements);
+
+        // 5. Group data for the Overall Table using the suffixed sizes
+        const groupedForOverall = groupMeasurementsByGroupId(
+          measurementsForDisplay
+        );
+
+        return {
+          stage,
+          label: stage === "Before" ? "Before Wash" : "After Wash",
+          suffix,
+          groupedData: grouped, // For detailed cards/tables
+          groupedDataForOverall: groupedForOverall, // For top summary table
+          specs: { full: fullSpecs, selected: selectedSpecs } // Specific specs for this stage
+        };
+      })
+      .filter(Boolean); // Remove empty stages
+  }, [savedMeasurements, reportData]);
+
   const measurementSpecsData = useMemo(() => {
     return reportData?.measurementData?.fullSpecsList || [];
   }, [reportData]);
@@ -922,7 +969,7 @@ const YPivotQAInspectionSummary = ({
       )}
 
       {/* 5. OVERALL MEASUREMENT SUMMARY */}
-      {savedMeasurements.length > 0 && (
+      {measurementStageData.length > 0 && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
           <div
             className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
@@ -939,53 +986,74 @@ const YPivotQAInspectionSummary = ({
           </div>
 
           {expandedSections.measurement && (
-            <div className="p-3 space-y-4">
-              {/* Overall Summary Table */}
-              <OverallMeasurementSummaryTable
-                groupedMeasurements={groupedMeasurements}
-              />
-
-              {/* Per-Config Detailed Summary */}
-              {groupedMeasurements.groups.map((group) => {
-                const configLabel =
-                  [
-                    group.lineName ? `Line ${group.lineName}` : null,
-                    group.tableName ? `Table ${group.tableName}` : null,
-                    group.colorName || null
-                  ]
-                    .filter(Boolean)
-                    .join(" / ") || "General";
-
-                const stats = calculateGroupStats(
-                  group.measurements,
-                  measurementSpecsData,
-                  measurementSelectedSpecs
-                );
-
-                return (
-                  <div
-                    key={group.id}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
-                  >
-                    <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 flex items-center gap-2">
-                      <Layers className="w-3.5 h-3.5 text-gray-500" />
-                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                        {configLabel}
-                      </span>
-                    </div>
-                    <div className="p-3 space-y-2">
-                      <MeasurementStatsCards stats={stats} compact />
-                      <MeasurementLegend compact />
-                      <MeasurementSummaryTable
-                        measurements={group.measurements}
-                        specsData={measurementSpecsData}
-                        selectedSpecsList={measurementSelectedSpecs}
-                        compact
-                      />
-                    </div>
+            <div className="p-3 space-y-6">
+              {/* Loop through each Stage (Before / After) */}
+              {measurementStageData.map((stageData) => (
+                <div key={stageData.stage} className="space-y-4">
+                  {/* Stage Separator Title */}
+                  <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
+                    <span
+                      className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
+                        stageData.stage === "Before"
+                          ? "bg-purple-500"
+                          : "bg-teal-500"
+                      }`}
+                    >
+                      {stageData.label}
+                    </span>
                   </div>
-                );
-              })}
+
+                  {/* Overall Table for this Stage (Shows sizes with (B)/(A)) */}
+                  <OverallMeasurementSummaryTable
+                    groupedMeasurements={stageData.groupedDataForOverall}
+                  />
+
+                  {/* Detailed 6-Card Visuals & Tables per Group for this Stage */}
+                  {stageData.groupedData.groups.map((group) => {
+                    const configLabel =
+                      [
+                        group.lineName ? `Line ${group.lineName}` : null,
+                        group.tableName ? `Table ${group.tableName}` : null,
+                        group.colorName || null
+                      ]
+                        .filter(Boolean)
+                        .join(" / ") || "General";
+
+                    // Use specific specs for this stage to calculate stats
+                    const stats = calculateGroupStats(
+                      group.measurements,
+                      stageData.specs.full,
+                      stageData.specs.selected
+                    );
+
+                    return (
+                      <div
+                        key={`${stageData.stage}-${group.id}`}
+                        className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden"
+                      >
+                        <div className="bg-gray-100 dark:bg-gray-700 px-3 py-2 flex items-center gap-2">
+                          <Layers className="w-3.5 h-3.5 text-gray-500" />
+                          <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                            {configLabel} ({stageData.label})
+                          </span>
+                        </div>
+                        <div className="p-3 space-y-2">
+                          {/* 6 Stats Cards */}
+                          <MeasurementStatsCards stats={stats} compact />
+                          <MeasurementLegend compact />
+                          {/* Detailed Measurement Table */}
+                          <MeasurementSummaryTable
+                            measurements={group.measurements}
+                            specsData={stageData.specs.full}
+                            selectedSpecsList={stageData.specs.selected}
+                            compact
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
             </div>
           )}
         </div>
