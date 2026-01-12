@@ -10,13 +10,24 @@ import { p88LegacyData } from "../../MongoDB/dbConnectionController.js";
 const stat = promisify(fs.stat);
 const readdir = promisify(fs.readdir);
 
+// UPDATED: Better temp directory management
+const baseTempDir =
+  process.platform === "win32"
+    ? path.join(process.env.TEMP || "C:/temp", "puppeteer-downloads")
+    : "/tmp/puppeteer-downloads";
+
+// Ensure base temp directory exists
+if (!fs.existsSync(baseTempDir)) {
+  fs.mkdirSync(baseTempDir, { recursive: true });
+}
+
 const CONFIG = {
   LOGIN_URL: "https://yw.pivot88.com/login",
   BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
   DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
   TIMEOUT: 15000,
   DELAY_BETWEEN_DOWNLOADS: 3000,
-  HEADLESS: true // Always run headless - no GUI windows
+  HEADLESS: "new" // Always run headless - no GUI windows
 };
 
 // Helper functions (keep existing ones)
@@ -433,6 +444,173 @@ const renameDownloadedFiles = async (
   return renamedFiles;
 };
 
+// NEW: Single file download with temp folder and direct serve
+export const downloadSingleReportDirect = async (req, res) => {
+  let browser = null;
+  let jobDir = null;
+
+  try {
+    const { inspectionNumber, language = "english" } = req.body;
+
+    if (!inspectionNumber) {
+      return res.status(400).json({
+        success: false,
+        error: "Inspection number is required"
+      });
+    }
+
+    // 1️⃣ Create unique temp folder for this job
+    const jobId =
+      Date.now().toString() + "_" + Math.random().toString(36).substr(2, 9);
+    jobDir = path.join(baseTempDir, jobId);
+    fs.mkdirSync(jobDir, { recursive: true });
+
+    console.log(`📁 Created temp directory: ${jobDir}`);
+
+    // 2️⃣ Launch browser and setup download behavior
+    browser = await puppeteer.launch({
+      headless: CONFIG.HEADLESS,
+      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    });
+
+    const page = await browser.newPage();
+
+    // 👉 Tell Puppeteer to download into TEMP folder
+    const client = await page.createCDPSession();
+    await client.send("Page.setDownloadBehavior", {
+      behavior: "allow",
+      downloadPath: jobDir
+    });
+
+    // Login process
+    await page.goto(CONFIG.LOGIN_URL);
+    await page.waitForSelector("#username");
+    await page.type("#username", process.env.P88_USERNAME);
+    await page.type("#password", process.env.P88_PASSWORD);
+    await page.click("#js-login-submit");
+    await page.waitForNavigation();
+
+    // Navigate to report
+    const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
+    await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
+
+    // Change language if requested
+    if (language === "chinese") {
+      await changeLanguage(page, language);
+    }
+
+    // Wait for print button and click
+    await page.waitForSelector("#page-wrapper a", { timeout: 15000 });
+    await page.click("#page-wrapper a");
+
+    // 3️⃣ Wait for the download to finish
+    console.log("⏳ Waiting for download to complete...");
+
+    // Wait and check for file creation
+    let downloadedFile = null;
+    let attempts = 0;
+    const maxAttempts = 20; // 20 seconds max wait
+
+    while (attempts < maxAttempts && !downloadedFile) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      try {
+        const files = fs.readdirSync(jobDir);
+        const pdfFiles = files.filter(
+          (file) => file.endsWith(".pdf") && !file.endsWith(".crdownload")
+        );
+
+        if (pdfFiles.length > 0) {
+          downloadedFile = pdfFiles[0];
+          console.log(`✅ Download completed: ${downloadedFile}`);
+          break;
+        }
+      } catch (error) {
+        console.log("📂 Checking for downloaded files...");
+      }
+
+      attempts++;
+    }
+
+    // Close browser
+    if (browser) {
+      await browser.close();
+      browser = null;
+    }
+
+    if (!downloadedFile) {
+      throw new Error(
+        "Download timeout - no file was downloaded within 20 seconds"
+      );
+    }
+
+    // 4️⃣ Send file to the user (browser decides location)
+    const filePath = path.join(jobDir, downloadedFile);
+    const customFileName = `Report-${inspectionNumber}-${Date.now()}.pdf`;
+
+    console.log(`📤 Serving file: ${filePath} as ${customFileName}`);
+
+    // Set proper headers for file download
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${customFileName}"`
+    );
+    res.setHeader("Content-Type", "application/pdf");
+
+    // Send file and cleanup
+    res.download(filePath, customFileName, (err) => {
+      // 🔥 Always cleanup temp directory
+      if (jobDir && fs.existsSync(jobDir)) {
+        try {
+          fs.rmSync(jobDir, { recursive: true, force: true });
+          console.log(`🗑️ Cleaned up temp directory: ${jobDir}`);
+        } catch (cleanupError) {
+          console.error("Error cleaning up temp directory:", cleanupError);
+        }
+      }
+
+      if (err) {
+        console.error("Error sending file:", err);
+        if (!res.headersSent) {
+          res.status(500).json({
+            success: false,
+            error: "Failed to send downloaded file"
+          });
+        }
+      } else {
+        console.log("✅ File sent successfully to user");
+      }
+    });
+  } catch (error) {
+    console.error("Direct download failed:", error);
+
+    // Cleanup on error
+    if (browser) {
+      try {
+        await browser.close();
+      } catch (closeError) {
+        console.error("Error closing browser:", closeError);
+      }
+    }
+
+    if (jobDir && fs.existsSync(jobDir)) {
+      try {
+        fs.rmSync(jobDir, { recursive: true, force: true });
+        console.log(`🗑️ Cleaned up temp directory after error: ${jobDir}`);
+      } catch (cleanupError) {
+        console.error("Error cleaning up temp directory:", cleanupError);
+      }
+    }
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+};
+
 // Single report download function (updated with status tracking and custom naming)
 const downloadSingleReport = async (
   page,
@@ -599,9 +777,703 @@ const downloadSingleReport = async (
   }
 };
 
-// Main bulk download function (updated)
+// Enhanced helper function for downloading single report with temp folder
+const downloadSingleReportWithTemp = async (
+  page,
+  inspectionNumber,
+  tempDir,
+  finalDir,
+  record,
+  includeDownloaded = false,
+  language = "english"
+) => {
+  try {
+    const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
+
+    console.log(`🔍 Processing inspection: ${inspectionNumber}`);
+    console.log(`📁 Temp directory: ${tempDir}`);
+    console.log(`📁 Final directory: ${finalDir}`);
+
+    // Check if already downloaded
+    if (!includeDownloaded && record.downloadStatus === "Downloaded") {
+      return {
+        inspectionNumber,
+        groupNumber: record.groupNumber,
+        project: record.project,
+        fileCount: 0,
+        totalSize: 0,
+        files: [],
+        success: true,
+        skipped: true,
+        reason: "Already downloaded"
+      };
+    }
+
+    // Update status to 'In Progress'
+    await updateDownloadStatus(record._id, "In Progress");
+
+    // Navigate to report
+    console.log(`🌐 Navigating to: ${reportUrl}`);
+    await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
+
+    // Check if page loaded correctly
+    const pageTitle = await page.title();
+    console.log(`📄 Page title: ${pageTitle}`);
+
+    // Change language if requested
+    if (language === "chinese") {
+      console.log(`🌐 Changing language to Chinese...`);
+      const languageChanged = await changeLanguage(page, language);
+      if (languageChanged) {
+        console.log(`✅ Language changed successfully`);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        console.warn(`⚠️ Language change failed, continuing with default`);
+      }
+    }
+
+    // Wait for print button and click
+    console.log(`🔍 Looking for print button...`);
+    try {
+      await page.waitForSelector("#page-wrapper a", { timeout: 15000 });
+      console.log(`✅ Print button found`);
+    } catch (error) {
+      console.error(`❌ Print button not found: ${error.message}`);
+      await updateDownloadStatus(record._id, "Failed");
+      throw new Error(
+        `Print button not found for inspection ${inspectionNumber}. Page may not have loaded correctly.`
+      );
+    }
+
+    // Get initial temp files
+    const initialTempFiles = fs.existsSync(tempDir)
+      ? fs.readdirSync(tempDir)
+      : [];
+    console.log(`📂 Initial temp files: ${initialTempFiles.length} files`);
+
+    // Click the print button
+    console.log(`🖱️ Clicking print button...`);
+    await page.click("#page-wrapper a");
+
+    // Wait a moment for the download to start
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // 3️⃣ Enhanced download waiting with better monitoring
+    console.log(`⏳ Waiting for download to complete...`);
+    let newTempFiles = [];
+    let attempts = 0;
+    const maxAttempts = 30; // Increased to 30 seconds
+    let lastFileCount = 0;
+
+    while (attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      attempts++;
+
+      try {
+        if (fs.existsSync(tempDir)) {
+          const currentTempFiles = fs.readdirSync(tempDir);
+          console.log(
+            `📂 Attempt ${attempts}: Found ${currentTempFiles.length} total files in temp dir`
+          );
+
+          // Log all files for debugging
+          if (currentTempFiles.length > lastFileCount) {
+            console.log(`📄 Files in temp dir:`, currentTempFiles);
+            lastFileCount = currentTempFiles.length;
+          }
+
+          // Filter for new PDF files (excluding partial downloads)
+          newTempFiles = currentTempFiles.filter((file) => {
+            const isNew = !initialTempFiles.includes(file);
+            const isPdf = file.toLowerCase().endsWith(".pdf");
+            const isNotPartial =
+              !file.endsWith(".crdownload") && !file.endsWith(".tmp");
+            const hasSize = fs.statSync(path.join(tempDir, file)).size > 0;
+
+            return isNew && isPdf && isNotPartial && hasSize;
+          });
+
+          if (newTempFiles.length > 0) {
+            console.log(
+              `✅ Found ${newTempFiles.length} new PDF files:`,
+              newTempFiles
+            );
+            break;
+          }
+
+          // Check for partial downloads
+          const partialFiles = currentTempFiles.filter(
+            (file) => file.endsWith(".crdownload") || file.endsWith(".tmp")
+          );
+          if (partialFiles.length > 0) {
+            console.log(`⏳ Partial downloads in progress:`, partialFiles);
+          }
+        } else {
+          console.log(`📂 Temp directory doesn't exist yet: ${tempDir}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Error checking temp directory: ${error.message}`);
+      }
+    }
+
+    if (newTempFiles.length === 0) {
+      console.error(`❌ No files downloaded after ${maxAttempts} seconds`);
+
+      // Debug: Check if any files exist in temp directory
+      if (fs.existsSync(tempDir)) {
+        const allFiles = fs.readdirSync(tempDir);
+        console.log(`🔍 All files in temp directory:`, allFiles);
+      }
+
+      // Debug: Take a screenshot for troubleshooting
+      try {
+        const screenshotPath = path.join(
+          tempDir,
+          `debug_${inspectionNumber}.png`
+        );
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log(`📸 Debug screenshot saved: ${screenshotPath}`);
+      } catch (screenshotError) {
+        console.log(
+          `⚠️ Could not save debug screenshot: ${screenshotError.message}`
+        );
+      }
+
+      await updateDownloadStatus(record._id, "Failed");
+      throw new Error(
+        `No files were downloaded for inspection ${inspectionNumber} after ${maxAttempts} seconds`
+      );
+    }
+
+    // Move files from temp to final destination and rename
+    console.log(
+      `📁 Moving ${newTempFiles.length} files to final destination...`
+    );
+    const customFileName = generateCustomFileName(record);
+    const finalCustomFileName =
+      includeDownloaded && record.downloadStatus === "Downloaded"
+        ? `${customFileName}_${Date.now()}`
+        : customFileName;
+
+    // Ensure final directory exists
+    if (!fs.existsSync(finalDir)) {
+      fs.mkdirSync(finalDir, { recursive: true });
+      console.log(`📁 Created final directory: ${finalDir}`);
+    }
+
+    const movedFiles = [];
+    let totalSize = 0;
+
+    for (let i = 0; i < newTempFiles.length; i++) {
+      const tempFile = newTempFiles[i];
+      const tempFilePath = path.join(tempDir, tempFile);
+
+      console.log(
+        `📄 Processing file ${i + 1}/${newTempFiles.length}: ${tempFile}`
+      );
+
+      const fileExtension = path.extname(tempFile);
+      const newFileName = `${finalCustomFileName}${
+        newTempFiles.length > 1 ? `_${i + 1}` : ""
+      }${fileExtension}`;
+      const finalFilePath = path.join(finalDir, newFileName);
+
+      // Handle file name conflicts
+      let actualFinalPath = finalFilePath;
+      if (fs.existsSync(finalFilePath)) {
+        const timestamp = Date.now();
+        const conflictFileName = `${finalCustomFileName}${
+          newTempFiles.length > 1 ? `_${i + 1}` : ""
+        }_${timestamp}${fileExtension}`;
+        actualFinalPath = path.join(finalDir, conflictFileName);
+        console.log(
+          `⚠️ File conflict resolved: ${path.basename(actualFinalPath)}`
+        );
+      }
+
+      // Move file from temp to final location
+      try {
+        fs.copyFileSync(tempFilePath, actualFinalPath);
+        console.log(
+          `✅ File moved: ${tempFile} -> ${path.basename(actualFinalPath)}`
+        );
+
+        const size = await getFileSize(actualFinalPath);
+        totalSize += size;
+
+        movedFiles.push({
+          name: path.basename(actualFinalPath),
+          originalName: tempFile,
+          size: formatBytes(size),
+          sizeBytes: size,
+          inspectionNumber: inspectionNumber,
+          groupNumber: record.groupNumber,
+          project: record.project,
+          customFileName: finalCustomFileName
+        });
+      } catch (moveError) {
+        console.error(`❌ Error moving file ${tempFile}:`, moveError);
+        throw moveError;
+      }
+    }
+
+    // Update status to 'Downloaded'
+    await updateDownloadStatus(record._id, "Downloaded", new Date());
+
+    console.log(
+      `✅ Successfully processed inspection ${inspectionNumber}: ${
+        movedFiles.length
+      } files, ${formatBytes(totalSize)}`
+    );
+
+    return {
+      inspectionNumber,
+      groupNumber: record.groupNumber,
+      project: record.project,
+      fileCount: movedFiles.length,
+      totalSize,
+      files: movedFiles,
+      success: true,
+      customFileName: finalCustomFileName,
+      redownloaded: includeDownloaded && record.downloadStatus === "Downloaded"
+    };
+  } catch (error) {
+    console.error(`❌ Error downloading report ${inspectionNumber}:`, error);
+    await updateDownloadStatus(record._id, "Failed");
+
+    return {
+      inspectionNumber,
+      groupNumber: record.groupNumber,
+      project: record.project,
+      fileCount: 0,
+      totalSize: 0,
+      files: [],
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Enhanced login function with better session management
+const performLogin = async (page) => {
+  try {
+    console.log("🔐 Starting login process...");
+
+    // Navigate to login page
+    await page.goto(CONFIG.LOGIN_URL, {
+      waitUntil: "networkidle0",
+      timeout: 30000
+    });
+
+    // Wait for login form
+    await page.waitForSelector("#username", { timeout: 10000 });
+    await page.waitForSelector("#password", { timeout: 10000 });
+
+    // Clear any existing values and type credentials
+    await page.click("#username", { clickCount: 3 });
+    await page.type("#username", "sreynoch"); // Use hardcoded values for now
+
+    await page.click("#password", { clickCount: 3 });
+    await page.type("#password", "today2020#88"); // Use hardcoded values for now
+
+    console.log("🔐 Credentials entered, clicking login...");
+
+    // Click login and wait for navigation
+    await Promise.all([
+      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 30000 }),
+      page.click("#js-login-submit")
+    ]);
+
+    // Verify login success
+    const currentUrl = page.url();
+    const pageTitle = await page.title();
+
+    console.log(`🔐 After login - URL: ${currentUrl}`);
+    console.log(`🔐 After login - Title: ${pageTitle}`);
+
+    // Check if we're still on login page (login failed)
+    if (currentUrl.includes("/login") || pageTitle.includes("Login")) {
+      throw new Error("Login failed - still on login page");
+    }
+
+    // Wait a bit more for session to be fully established
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    console.log("✅ Login successful");
+    return true;
+  } catch (error) {
+    console.error("❌ Login failed:", error.message);
+    throw error;
+  }
+};
+
+// Function to validate session before downloading
+const validateSession = async (page) => {
+  try {
+    // Try to access a protected page to check if session is valid
+    const testUrl = "https://yw.pivot88.com/dashboard"; // or any protected page
+    await page.goto(testUrl, { waitUntil: "networkidle0", timeout: 15000 });
+
+    const currentUrl = page.url();
+    const pageTitle = await page.title();
+
+    console.log(`🔐 Session check - URL: ${currentUrl}`);
+    console.log(`🔐 Session check - Title: ${pageTitle}`);
+
+    // If redirected to login, session is invalid
+    if (currentUrl.includes("/login") || pageTitle.includes("Login")) {
+      console.log("⚠️ Session expired, re-logging in...");
+      await performLogin(page);
+      return false; // Session was invalid
+    }
+
+    console.log("✅ Session is valid");
+    return true; // Session is valid
+  } catch (error) {
+    console.log("⚠️ Session validation failed, re-logging in...");
+    await performLogin(page);
+    return false;
+  }
+};
+
+// FIXED downloadSingleReportWithTemp function
+const downloadSingleReportWithTempFixed = async (
+  page,
+  inspectionNumber,
+  tempDir,
+  finalDir,
+  record,
+  includeDownloaded = false,
+  language = "english"
+) => {
+  try {
+    const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
+
+    console.log(`🔍 Processing inspection: ${inspectionNumber}`);
+    console.log(`📁 Temp directory: ${tempDir}`);
+    console.log(`📁 Final directory: ${finalDir}`);
+
+    // Check if already downloaded
+    if (!includeDownloaded && record.downloadStatus === "Downloaded") {
+      return {
+        inspectionNumber,
+        groupNumber: record.groupNumber,
+        project: record.project,
+        fileCount: 0,
+        totalSize: 0,
+        files: [],
+        success: true,
+        skipped: true,
+        reason: "Already downloaded"
+      };
+    }
+
+    // Update status to 'In Progress'
+    await updateDownloadStatus(record._id, "In Progress");
+
+    // Validate session before proceeding
+    console.log("🔐 Validating session...");
+    await validateSession(page);
+
+    // Navigate to report
+    console.log(`🌐 Navigating to: ${reportUrl}`);
+    await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
+
+    // Check if page loaded correctly and we're not redirected to login
+    const pageTitle = await page.title();
+    const currentUrl = page.url();
+
+    console.log(`📄 Page title: ${pageTitle}`);
+    console.log(`🌐 Current URL: ${currentUrl}`);
+
+    // If we're redirected to login, the session expired
+    if (currentUrl.includes("/login") || pageTitle.includes("Login")) {
+      console.log("⚠️ Redirected to login page, re-authenticating...");
+      await performLogin(page);
+
+      // Try navigating to the report again
+      await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
+
+      const newTitle = await page.title();
+      const newUrl = page.url();
+
+      console.log(`📄 After re-auth - Title: ${newTitle}`);
+      console.log(`🌐 After re-auth - URL: ${newUrl}`);
+
+      if (newUrl.includes("/login") || newTitle.includes("Login")) {
+        throw new Error(
+          `Unable to access report ${inspectionNumber} - authentication failed`
+        );
+      }
+    }
+
+    // Change language if requested
+    if (language === "chinese") {
+      console.log(`🌐 Changing language to Chinese...`);
+      const languageChanged = await changeLanguage(page, language);
+      if (languageChanged) {
+        console.log(`✅ Language changed successfully`);
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      } else {
+        console.warn(`⚠️ Language change failed, continuing with default`);
+      }
+    }
+
+    // Wait for print button and click
+    console.log(`🔍 Looking for print button...`);
+    try {
+      await page.waitForSelector("#page-wrapper a", { timeout: 15000 });
+      console.log(`✅ Print button found`);
+    } catch (error) {
+      console.error(`❌ Print button not found: ${error.message}`);
+
+      // Take a screenshot for debugging
+      try {
+        const screenshotPath = path.join(
+          tempDir,
+          `no_print_button_${inspectionNumber}.png`
+        );
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log(`📸 Debug screenshot saved: ${screenshotPath}`);
+      } catch (screenshotError) {
+        console.log(
+          `⚠️ Could not save debug screenshot: ${screenshotError.message}`
+        );
+      }
+
+      await updateDownloadStatus(record._id, "Failed");
+      throw new Error(
+        `Print button not found for inspection ${inspectionNumber}. Page may not have loaded correctly.`
+      );
+    }
+
+    // Get initial temp files
+    const initialTempFiles = fs.existsSync(tempDir)
+      ? fs.readdirSync(tempDir)
+      : [];
+    console.log(`📂 Initial temp files: ${initialTempFiles.length} files`);
+
+    // Click the print button
+    console.log(`🖱️ Clicking print button...`);
+    await page.click("#page-wrapper a");
+
+    // Wait longer for the download to start
+    await new Promise((resolve) => setTimeout(resolve, 5000)); // Increased wait time
+
+    // Enhanced download waiting with better monitoring
+    console.log(`⏳ Waiting for download to complete...`);
+    let newTempFiles = [];
+    let attempts = 0;
+    const maxAttempts = 45; // Increased to 45 seconds
+    let lastFileCount = 0;
+
+    while (attempts < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      attempts++;
+
+      try {
+        if (fs.existsSync(tempDir)) {
+          const currentTempFiles = fs.readdirSync(tempDir);
+
+          if (attempts % 5 === 0) {
+            // Log every 5 seconds
+            console.log(
+              `📂 Attempt ${attempts}: Found ${currentTempFiles.length} total files in temp dir`
+            );
+          }
+
+          if (currentTempFiles.length > lastFileCount) {
+            console.log(`📄 Files in temp dir:`, currentTempFiles);
+            lastFileCount = currentTempFiles.length;
+          }
+
+          // Filter for new PDF files (excluding partial downloads)
+          newTempFiles = currentTempFiles.filter((file) => {
+            const isNew = !initialTempFiles.includes(file);
+            const isPdf = file.toLowerCase().endsWith(".pdf");
+            const isNotPartial =
+              !file.endsWith(".crdownload") && !file.endsWith(".tmp");
+
+            if (isNew && isPdf && isNotPartial) {
+              try {
+                const hasSize =
+                  fs.statSync(path.join(tempDir, file)).size > 1000; // At least 1KB
+                return hasSize;
+              } catch (statError) {
+                return false;
+              }
+            }
+            return false;
+          });
+
+          if (newTempFiles.length > 0) {
+            console.log(
+              `✅ Found ${newTempFiles.length} new PDF files:`,
+              newTempFiles
+            );
+            // Wait a bit more to ensure download is complete
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            break;
+          }
+
+          // Check for partial downloads
+          const partialFiles = currentTempFiles.filter(
+            (file) => file.endsWith(".crdownload") || file.endsWith(".tmp")
+          );
+          if (partialFiles.length > 0 && attempts % 10 === 0) {
+            console.log(`⏳ Partial downloads in progress:`, partialFiles);
+          }
+        } else {
+          console.log(`📂 Temp directory doesn't exist yet: ${tempDir}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ Error checking temp directory: ${error.message}`);
+      }
+    }
+
+    if (newTempFiles.length === 0) {
+      console.error(`❌ No files downloaded after ${maxAttempts} seconds`);
+
+      // Debug: Check if any files exist in temp directory
+      if (fs.existsSync(tempDir)) {
+        const allFiles = fs.readdirSync(tempDir);
+        console.log(`🔍 All files in temp directory:`, allFiles);
+      }
+
+      // Debug: Take a screenshot for troubleshooting
+      try {
+        const screenshotPath = path.join(
+          tempDir,
+          `debug_${inspectionNumber}.png`
+        );
+        await page.screenshot({ path: screenshotPath, fullPage: true });
+        console.log(`📸 Debug screenshot saved: ${screenshotPath}`);
+      } catch (screenshotError) {
+        console.log(
+          `⚠️ Could not save debug screenshot: ${screenshotError.message}`
+        );
+      }
+
+      await updateDownloadStatus(record._id, "Failed");
+      throw new Error(
+        `No files were downloaded for inspection ${inspectionNumber} after ${maxAttempts} seconds`
+      );
+    }
+
+    // Move files from temp to final destination and rename
+    console.log(
+      `📁 Moving ${newTempFiles.length} files to final destination...`
+    );
+    const customFileName = generateCustomFileName(record);
+    const finalCustomFileName =
+      includeDownloaded && record.downloadStatus === "Downloaded"
+        ? `${customFileName}_${Date.now()}`
+        : customFileName;
+
+    // Ensure final directory exists
+    if (!fs.existsSync(finalDir)) {
+      fs.mkdirSync(finalDir, { recursive: true });
+      console.log(`📁 Created final directory: ${finalDir}`);
+    }
+
+    const movedFiles = [];
+    let totalSize = 0;
+
+    for (let i = 0; i < newTempFiles.length; i++) {
+      const tempFile = newTempFiles[i];
+      const tempFilePath = path.join(tempDir, tempFile);
+
+      console.log(
+        `📄 Processing file ${i + 1}/${newTempFiles.length}: ${tempFile}`
+      );
+
+      const fileExtension = path.extname(tempFile);
+      const newFileName = `${finalCustomFileName}${
+        newTempFiles.length > 1 ? `_${i + 1}` : ""
+      }${fileExtension}`;
+      const finalFilePath = path.join(finalDir, newFileName);
+
+      // Handle file name conflicts
+      let actualFinalPath = finalFilePath;
+      if (fs.existsSync(finalFilePath)) {
+        const timestamp = Date.now();
+        const conflictFileName = `${finalCustomFileName}${
+          newTempFiles.length > 1 ? `_${i + 1}` : ""
+        }_${timestamp}${fileExtension}`;
+        actualFinalPath = path.join(finalDir, conflictFileName);
+        console.log(
+          `⚠️ File conflict resolved: ${path.basename(actualFinalPath)}`
+        );
+      }
+
+      // Move file from temp to final location
+      try {
+        fs.copyFileSync(tempFilePath, actualFinalPath);
+        console.log(
+          `✅ File moved: ${tempFile} -> ${path.basename(actualFinalPath)}`
+        );
+
+        const size = await getFileSize(actualFinalPath);
+        totalSize += size;
+
+        movedFiles.push({
+          name: path.basename(actualFinalPath),
+          originalName: tempFile,
+          size: formatBytes(size),
+          sizeBytes: size,
+          inspectionNumber: inspectionNumber,
+          groupNumber: record.groupNumber,
+          project: record.project,
+          customFileName: finalCustomFileName
+        });
+      } catch (moveError) {
+        console.error(`❌ Error moving file ${tempFile}:`, moveError);
+        throw moveError;
+      }
+    }
+
+    // Update status to 'Downloaded'
+    await updateDownloadStatus(record._id, "Downloaded", new Date());
+
+    console.log(
+      `✅ Successfully processed inspection ${inspectionNumber}: ${
+        movedFiles.length
+      } files, ${formatBytes(totalSize)}`
+    );
+
+    return {
+      inspectionNumber,
+      groupNumber: record.groupNumber,
+      project: record.project,
+      fileCount: movedFiles.length,
+      totalSize,
+      files: movedFiles,
+      success: true,
+      customFileName: finalCustomFileName,
+      redownloaded: includeDownloaded && record.downloadStatus === "Downloaded"
+    };
+  } catch (error) {
+    console.error(`❌ Error downloading report ${inspectionNumber}:`, error);
+    await updateDownloadStatus(record._id, "Failed");
+
+    return {
+      inspectionNumber,
+      groupNumber: record.groupNumber,
+      project: record.project,
+      fileCount: 0,
+      totalSize: 0,
+      files: [],
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Main bulk download function (UPDATED with proper login)
 export const downloadBulkReports = async (req, res) => {
   let browser = null;
+  let jobDir = null;
+
   try {
     const {
       downloadPath,
@@ -615,11 +1487,18 @@ export const downloadBulkReports = async (req, res) => {
       language = "english"
     } = req.body;
 
+    // 1️⃣ Create unique temp folder for this bulk job
+    const jobId =
+      Date.now().toString() +
+      "_bulk_" +
+      Math.random().toString(36).substr(2, 9);
+    jobDir = path.join(baseTempDir, jobId);
+    fs.mkdirSync(jobDir, { recursive: true });
+    console.log(`📁 Created bulk temp directory: ${jobDir}`);
+
     const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
 
-    // ... existing validation code ...
-
-    // Get inspection records from database with date and factory filters
+    // Get inspection records
     const records = await getInspectionRecords(
       startRange,
       endRange,
@@ -631,6 +1510,11 @@ export const downloadBulkReports = async (req, res) => {
     );
 
     if (records.length === 0) {
+      // Cleanup empty job directory
+      if (jobDir && fs.existsSync(jobDir)) {
+        fs.rmSync(jobDir, { recursive: true, force: true });
+      }
+
       return res.json({
         success: true,
         message: "No records found matching the specified criteria",
@@ -646,41 +1530,65 @@ export const downloadBulkReports = async (req, res) => {
       });
     }
 
-    // Launch browser for downloading
+    // 2️⃣ Enhanced browser launch with better session handling
     browser = await puppeteer.launch({
-      headless: CONFIG.HEADLESS,
+      headless: false, // SET TO FALSE FOR DEBUGGING - you can see what's happening
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--no-first-run",
         "--no-zygote",
+        "--disable-blink-features=AutomationControlled", // Hide automation
         "--disable-extensions",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding"
+        "--disable-plugins"
       ],
-      ignoreDefaultArgs: ["--disable-extensions"],
-      timeout: 60000
+      defaultViewport: null,
+      ignoreDefaultArgs: ["--enable-automation"] // Hide automation flags
     });
 
     const page = await browser.newPage();
 
-    // Set download behavior
+    // Enhanced user agent and headers
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    );
+
+    // Remove webdriver property
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", {
+        get: () => undefined
+      });
+    });
+
+    // Set viewport
+    await page.setViewport({ width: 1366, height: 768 });
+
+    // 👉 Enhanced download behavior setup
     const client = await page.createCDPSession();
     await client.send("Page.setDownloadBehavior", {
       behavior: "allow",
-      downloadPath: targetDownloadDir
+      downloadPath: jobDir
     });
 
-    // Login process
-    await page.goto(CONFIG.LOGIN_URL);
-    await page.waitForSelector("#username");
-    await page.type("#username", "sreynoch");
-    await page.type("#password", "today2020#88");
-    await page.click("#js-login-submit");
-    await page.waitForNavigation();
+    console.log(`📁 Download path set to: ${jobDir}`);
+
+    // Set additional headers to maintain session
+    await page.setExtraHTTPHeaders({
+      Accept:
+        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+      "Accept-Language": "en-US,en;q=0.5",
+      "Accept-Encoding": "gzip, deflate",
+      Connection: "keep-alive",
+      "Upgrade-Insecure-Requests": "1"
+    });
+
+    // Login process with enhanced session management
+    console.log("🔐 Performing login...");
+    await performLogin(page);
 
     // Download reports
     const downloadResults = [];
@@ -708,15 +1616,17 @@ export const downloadBulkReports = async (req, res) => {
       }
 
       try {
-        // Pass includeDownloaded and language parameters to downloadSingleReport
-        const result = await downloadSingleReport(
+        // Use the FIXED single report download function
+        const result = await downloadSingleReportWithTempFixed(
           page,
           inspectionNumber,
-          targetDownloadDir,
+          jobDir, // Use temp directory
+          targetDownloadDir, // Final destination
           record,
           includeDownloaded,
           language
         );
+
         downloadResults.push(result);
 
         if (result.success) {
@@ -756,6 +1666,16 @@ export const downloadBulkReports = async (req, res) => {
       await browser.close();
     }
 
+    // 🔥 Cleanup temp directory
+    if (jobDir && fs.existsSync(jobDir)) {
+      try {
+        fs.rmSync(jobDir, { recursive: true, force: true });
+        console.log(`🗑️ Cleaned up bulk temp directory: ${jobDir}`);
+      } catch (cleanupError) {
+        console.error("Error cleaning up bulk temp directory:", cleanupError);
+      }
+    }
+
     const summaryMessage = includeDownloaded
       ? `Download completed: ${successfulDownloads} successful (${redownloadedCount} re-downloaded), ${failedDownloads} failed, ${skippedDownloads} skipped`
       : `Download completed: ${successfulDownloads} successful, ${failedDownloads} failed, ${skippedDownloads} skipped`;
@@ -779,12 +1699,21 @@ export const downloadBulkReports = async (req, res) => {
   } catch (error) {
     console.error("Bulk download failed:", error);
 
-    // Ensure browser is closed on error
+    // Cleanup on error
     if (browser) {
       try {
         await browser.close();
       } catch (closeError) {
         console.error("Error closing browser:", closeError);
+      }
+    }
+
+    if (jobDir && fs.existsSync(jobDir)) {
+      try {
+        fs.rmSync(jobDir, { recursive: true, force: true });
+        console.log(`🗑️ Cleaned up temp directory after error: ${jobDir}`);
+      } catch (cleanupError) {
+        console.error("Error cleaning up temp directory:", cleanupError);
       }
     }
 
@@ -960,6 +1889,7 @@ export const checkBulkSpace = async (req, res) => {
 // Keep existing single download function
 export const saveDownloadParth = async (req, res) => {
   let browser = null;
+  let jobDir = null;
   try {
     const { downloadPath, language = "english" } = req.body;
     const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
@@ -969,32 +1899,50 @@ export const saveDownloadParth = async (req, res) => {
       fs.mkdirSync(targetDownloadDir, { recursive: true });
     }
 
+    // 2️⃣ Launch browser with better configuration
     browser = await puppeteer.launch({
       headless: CONFIG.HEADLESS,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor",
         "--disable-dev-shm-usage",
         "--disable-gpu",
         "--no-first-run",
-        "--no-zygote",
-        "--disable-extensions",
-        "--disable-background-timer-throttling",
-        "--disable-backgrounding-occluded-windows",
-        "--disable-renderer-backgrounding"
+        "--no-zygote"
       ],
-      ignoreDefaultArgs: ["--disable-extensions"],
-      timeout: 60000
+      defaultViewport: null
     });
 
     const page = await browser.newPage();
 
-    // Set download behavior
+    // Set user agent to avoid detection
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    );
+
+    // 👉 Enhanced download behavior setup
     const client = await page.createCDPSession();
     await client.send("Page.setDownloadBehavior", {
       behavior: "allow",
-      downloadPath: targetDownloadDir
+      downloadPath: jobDir
     });
+
+    // Also set via page._client() as backup
+    try {
+      await page._client().send("Page.setDownloadBehavior", {
+        behavior: "allow",
+        downloadPath: jobDir
+      });
+    } catch (clientError) {
+      console.log(
+        "⚠️ Backup download behavior setup failed:",
+        clientError.message
+      );
+    }
+
+    console.log(`📁 Download path set to: ${jobDir}`);
 
     // Get initial file list and timestamps
     const getFileList = async () => {
@@ -1018,8 +1966,8 @@ export const saveDownloadParth = async (req, res) => {
     // Login process
     await page.goto(CONFIG.LOGIN_URL);
     await page.waitForSelector("#username");
-    await page.type("#username", "sreynoch");
-    await page.type("#password", "today2020#88");
+    await page.type("#username", process.env.P88_USERNAME);
+    await page.type("#password", process.env.P88_PASSWORD);
     await page.click("#js-login-submit");
     await page.waitForNavigation();
 
@@ -1148,7 +2096,6 @@ export const validateDownloadParth = async (req, res) => {
       });
     }
 
-    // Check if path is valid and accessible
     try {
       const resolvedPath = path.resolve(downloadPath);
 
@@ -1169,11 +2116,17 @@ export const validateDownloadParth = async (req, res) => {
         message: "Path is valid and writable"
       });
     } catch (error) {
+      let errorMessage = "Path is not accessible";
+      if (error.code === "EPERM" || error.code === "EACCES") {
+        errorMessage =
+          "Permission denied. Please choose a folder you have write access to.";
+      }
+
       res.json({
         success: true,
         isValid: false,
         path: downloadPath,
-        message: `Path is not accessible: ${error.message}`
+        message: errorMessage
       });
     }
   } catch (error) {
