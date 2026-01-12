@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { API_BASE_URL } from "../../../../config";
 import PaperPreview from "./PaperPreview";
+import HistoryModal from "./HistoryModal";
+import UpdateModel from "./UpdateModel";
 import { useAuth } from "../../authentication/AuthContext";
 
 export default function ExportPanel() {
@@ -15,8 +17,17 @@ export default function ExportPanel() {
   const [ordersRaw, setOrdersRaw] = useState([]);
   const [docsRaw, setDocsRaw] = useState([]);
   const [displayedReports, setDisplayedReports] = useState([]);
-  const [expandedRows, setExpandedRows] = useState({});
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Modal state
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [selectedReportForHistory, setSelectedReportForHistory] =
+    useState(null);
+
+  // Update Modal state
+  const [isUpdateModelOpen, setIsUpdateModelOpen] = useState(false);
+  const [selectedReportForUpdate, setSelectedReportForUpdate] = useState(null);
+
   const itemsPerPage = 10;
 
   useEffect(() => {
@@ -92,11 +103,9 @@ export default function ExportPanel() {
     setCurrentPage(1); // Reset to page 1 when filters change
   }, [factoryStyleFilter, ordersRaw]);
 
-  const toggleRowExpansion = (reportId) => {
-    setExpandedRows((prev) => ({
-      ...prev,
-      [reportId]: !prev[reportId]
-    }));
+  const openHistoryModal = (report) => {
+    setSelectedReportForHistory(report);
+    setIsHistoryModalOpen(true);
   };
 
   const handleExport = async () => {
@@ -122,6 +131,7 @@ export default function ExportPanel() {
         url += `&start=${encodeURIComponent(startIso)}&end=${encodeURIComponent(
           endIso
         )}`;
+        console.log("Exporting with date range:", startIso, "to", endIso);
       } else {
         console.log("Exporting all reports (no date filter)");
       }
@@ -129,7 +139,10 @@ export default function ExportPanel() {
       // Add factory style filter if selected
       if (factoryStyleFilter) {
         url += `&factoryStyleNo=${encodeURIComponent(factoryStyleFilter)}`;
+        console.log("Filtering by Factory Style:", factoryStyleFilter);
       }
+
+      console.log("Fetching reports from:", url);
 
       const res = await fetch(url);
       if (!res.ok) {
@@ -138,6 +151,8 @@ export default function ExportPanel() {
       }
       const json = await res.json();
       const docs = json && json.data ? json.data : [];
+
+      console.log("Reports fetched:", docs.length);
 
       if (!Array.isArray(docs) || docs.length === 0) {
         alert("No reports found for the selected period.");
@@ -189,6 +204,38 @@ export default function ExportPanel() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleEdit = (reportId) => {
+    const report = displayedReports.find((r) => r._id === reportId);
+    if (report) {
+      setSelectedReportForUpdate(report);
+      setIsUpdateModelOpen(true);
+    }
+  };
+
+  const handleUpdateSuccess = () => {
+    // Refresh data
+    const fetchData = async () => {
+      // Re-fetch logic similar to useEffect
+      // Or simpler: trigger the existing fetch
+      try {
+        const base = API_BASE_URL && API_BASE_URL !== "" ? API_BASE_URL : "";
+        const prefix = base.endsWith("/") ? base.slice(0, -1) : base;
+        const res = await fetch(`${prefix}/api/humidity-reports?limit=0`);
+        if (res.ok) {
+          const json = await res.json();
+          if (json.data && Array.isArray(json.data)) {
+            setOrdersRaw(json.data);
+            // displayedReports updates via effect if filters exist, else direct?
+            // Actually, effect depends on ordersRaw, so it should auto-update
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchData();
   };
 
   const handleApprove = async (reportId) => {
@@ -326,14 +373,40 @@ export default function ExportPanel() {
 
     if (allPassed) {
       return (
-        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">
-          ✓ Complete
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-green-100 text-green-700 font-medium">
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M5 13l4 4L19 7"
+            />
+          </svg>
+          Pass
         </span>
       );
     } else {
       return (
-        <span className="px-2 py-1 text-xs rounded-full bg-yellow-100 text-yellow-700 font-medium">
-          ⚡ In Progress
+        <span className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-full bg-red-100 text-red-700 font-medium">
+          <svg
+            className="w-3 h-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+          Fail
         </span>
       );
     }
@@ -567,7 +640,6 @@ export default function ExportPanel() {
               <tbody className="divide-y divide-gray-200">
                 {currentPageReports.map((report, idx) => {
                   const reportId = report._id || idx;
-                  const isExpanded = expandedRows[reportId];
                   const history = report.history || [];
                   const latestDate = report.updatedAt || report.createdAt || "";
                   const isSupervisor =
@@ -590,7 +662,7 @@ export default function ExportPanel() {
                           {formatDate(latestDate)}
                         </td>
                         <td className="px-4 py-3 text-sm text-center">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-800 font-medium">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-purple-100 text-purple-800 font-medium">
                             {history.length}
                           </span>
                         </td>
@@ -619,52 +691,71 @@ export default function ExportPanel() {
                           <div className="flex items-center justify-center gap-2">
                             {history.length > 0 && (
                               <button
-                                onClick={() => toggleRowExpansion(reportId)}
-                                className="inline-flex items-center gap-1 px-3 py-1 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded transition-colors"
+                                onClick={() => openHistoryModal(report)}
+                                className="inline-flex items-center p-2.5 text-green-600 hover:text-green-700 bg-green-50 hover:bg-green-100 rounded-xl transition-all duration-200 group"
+                                title="View History"
                               >
-                                {isExpanded ? (
-                                  <>
-                                    <svg
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
-                                      />
-                                    </svg>
-                                    Hide
-                                  </>
-                                ) : (
-                                  <>
-                                    <svg
-                                      className="w-4 h-4"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      viewBox="0 0 24 24"
-                                    >
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                      />
-                                      <path
-                                        strokeLinecap="round"
-                                        strokeLinejoin="round"
-                                        strokeWidth={2}
-                                        d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                      />
-                                    </svg>
-                                    View
-                                  </>
-                                )}
+                                <svg
+                                  className="w-4 h-4"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                  />
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                  />
+                                </svg>
                               </button>
                             )}
+                            {(() => {
+                              const latestCheck = history[history.length - 1];
+                              const isLastPassed =
+                                latestCheck &&
+                                latestCheck.top?.status === "pass" &&
+                                latestCheck.middle?.status === "pass" &&
+                                latestCheck.bottom?.status === "pass";
+                              const isDisabled = isLastPassed;
+
+                              return (
+                                <button
+                                  onClick={() => handleEdit(reportId)}
+                                  disabled={isDisabled}
+                                  className={`inline-flex items-center p-2.5 rounded-xl transition-all duration-200 group ${
+                                    isDisabled
+                                      ? "text-gray-400 bg-gray-100 cursor-not-allowed"
+                                      : "text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100"
+                                  }`}
+                                  title={
+                                    isDisabled
+                                      ? "Report locked (3 passed)"
+                                      : "Edit Report"
+                                  }
+                                >
+                                  <svg
+                                    className="w-4 h-4"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    viewBox="0 0 24 24"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      strokeWidth={2}
+                                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                                    />
+                                  </svg>
+                                </button>
+                              );
+                            })()}
                             {isSupervisor && !isApproved && (
                               <button
                                 onClick={() => handleApprove(reportId)}
@@ -690,274 +781,6 @@ export default function ExportPanel() {
                           </div>
                         </td>
                       </tr>
-
-                      {isExpanded && history.length > 0 && (
-                        <tr>
-                          <td colSpan="8" className="px-4 py-4 bg-gray-50">
-                            <div className="space-y-3">
-                              <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                                Inspection History
-                              </h4>
-                              <div className="overflow-x-auto rounded-lg">
-                                <table className="w-full text-sm border">
-                                  <thead className="bg-gray-100">
-                                    <tr>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        rowSpan={2}
-                                      >
-                                        Check #
-                                      </th>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        rowSpan={2}
-                                      >
-                                        Date
-                                      </th>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        rowSpan={2}
-                                      >
-                                        Before Dry
-                                      </th>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        rowSpan={2}
-                                      >
-                                        After Dry
-                                      </th>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        colSpan="3"
-                                      >
-                                        Top
-                                      </th>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        colSpan="3"
-                                      >
-                                        Middle
-                                      </th>
-                                      <th
-                                        className="px-3 py-2 text-center text-sm font-bold text-gray-700 border-l border-gray-200"
-                                        colSpan="3"
-                                      >
-                                        Bottom
-                                      </th>
-                                    </tr>
-                                    <tr>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">
-                                        Body
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
-                                        Ribs
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
-                                        Status
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">
-                                        Body
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
-                                        Ribs
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
-                                        Status
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm border-l border-gray-200">
-                                        Body
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
-                                        Ribs
-                                      </th>
-                                      <th className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
-                                        Status
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {history.map((check, checkIdx) => (
-                                      <tr
-                                        key={checkIdx}
-                                        className="hover:bg-gray-50"
-                                      >
-                                        <td className="px-3 py-2 text-center font-medium text-gray-700">
-                                          {checkIdx + 1}
-                                        </td>
-                                        <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">
-                                          {formatDate(check.date)}
-                                        </td>
-                                        <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">
-                                          {formatTime(
-                                            check.beforeDryRoom ||
-                                              check.beforeDryRoomTime
-                                          )}
-                                        </td>
-                                        <td className="px-3 py-2 text-center text-gray-600 border-l border-gray-200">
-                                          {formatTime(
-                                            check.afterDryRoom ||
-                                              check.afterDryRoomTime
-                                          )}
-                                        </td>
-                                        {/* Top Section */}
-                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">
-                                          {check.top?.body || "N/A"}
-                                        </td>
-                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">
-                                          {check.top?.ribs || "N/A"}
-                                        </td>
-                                        <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                          {check.top?.status === "pass" ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
-                                              <svg
-                                                className="w-3 h-3 mr-1"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M5 13l4 4L19 7"
-                                                />
-                                              </svg>
-                                              Pass
-                                            </span>
-                                          ) : check.top?.status === "fail" ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
-                                              <svg
-                                                className="w-3 h-3 mr-1"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M6 18L18 6M6 6l12 12"
-                                                />
-                                              </svg>
-                                              Fail
-                                            </span>
-                                          ) : (
-                                            "N/A"
-                                          )}
-                                        </td>
-                                        {/* Middle Section */}
-                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">
-                                          {check.middle?.body || "N/A"}
-                                        </td>
-                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">
-                                          {check.middle?.ribs || "N/A"}
-                                        </td>
-                                        <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                          {check.middle?.status === "pass" ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
-                                              <svg
-                                                className="w-3 h-3 mr-1"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M5 13l4 4L19 7"
-                                                />
-                                              </svg>
-                                              Pass
-                                            </span>
-                                          ) : check.middle?.status ===
-                                            "fail" ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
-                                              <svg
-                                                className="w-3 h-3 mr-1"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M6 18L18 6M6 6l12 12"
-                                                />
-                                              </svg>
-                                              Fail
-                                            </span>
-                                          ) : (
-                                            "N/A"
-                                          )}
-                                        </td>
-                                        {/* Bottom Section */}
-                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">
-                                          {check.bottom?.body || "N/A"}
-                                        </td>
-                                        <td className="px-2 py-2 text-center text-gray-700 text-sm border-l border-gray-200">
-                                          {check.bottom?.ribs || "N/A"}
-                                        </td>
-                                        <td className="px-2 py-2 text-center text-sm border-l border-gray-200">
-                                          {check.bottom?.status === "pass" ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 text-green-800 font-semibold text-sm">
-                                              <svg
-                                                className="w-3 h-3 mr-1"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M5 13l4 4L19 7"
-                                                />
-                                              </svg>
-                                              Pass
-                                            </span>
-                                          ) : check.bottom?.status ===
-                                            "fail" ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 text-red-800 font-semibold text-sm">
-                                              <svg
-                                                className="w-3 h-3 mr-1"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                viewBox="0 0 24 24"
-                                              >
-                                                <path
-                                                  strokeLinecap="round"
-                                                  strokeLinejoin="round"
-                                                  strokeWidth={2}
-                                                  d="M6 18L18 6M6 6l12 12"
-                                                />
-                                              </svg>
-                                              Fail
-                                            </span>
-                                          ) : (
-                                            "N/A"
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                              {history[history.length - 1]?.generalRemark && (
-                                <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                                  <p className="text-xs font-semibold text-gray-700 mb-1">
-                                    Latest Remark:
-                                  </p>
-                                  <p className="text-sm text-gray-600">
-                                    {history[history.length - 1].generalRemark}
-                                  </p>
-                                </div>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )}
                     </React.Fragment>
                   );
                 })}
@@ -1049,6 +872,23 @@ export default function ExportPanel() {
           </div>
         )}
       </div>
+
+      <HistoryModal
+        open={isHistoryModalOpen}
+        onCancel={() => setIsHistoryModalOpen(false)}
+        report={selectedReportForHistory}
+        formatDate={formatDate}
+        formatTime={formatTime}
+      />
+
+      {selectedReportForUpdate && (
+        <UpdateModel
+          open={isUpdateModelOpen}
+          onCancel={() => setIsUpdateModelOpen(false)}
+          report={selectedReportForUpdate}
+          onUpdate={handleUpdateSuccess}
+        />
+      )}
     </div>
   );
 }
