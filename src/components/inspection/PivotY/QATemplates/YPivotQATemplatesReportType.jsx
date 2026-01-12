@@ -45,6 +45,7 @@ const YPivotQATemplatesReportType = () => {
     _id: null,
     ReportType: "",
     Measurement: "No",
+    MeasurementAdditional: "No",
     Header: "Yes",
     Photos: "Yes",
     Line: "Yes",
@@ -201,6 +202,7 @@ const YPivotQATemplatesReportType = () => {
       _id: template._id,
       ReportType: template.ReportType,
       Measurement: template.Measurement,
+      MeasurementAdditional: template.MeasurementAdditional || "No",
       Header: template.Header,
       Photos: template.Photos,
       Line: template.Line || "Yes",
@@ -444,6 +446,7 @@ const YPivotQATemplatesReportType = () => {
                   Report Type
                 </th>
                 <th className={headerClass}>Meas.</th>
+                <th className={headerClass}>Meas 2</th>
                 <th className={headerClass}>Head</th>
                 <th className={headerClass}>Pics</th>
                 <th className="px-4 py-3 min-w-[180px] whitespace-normal break-words leading-tight">
@@ -508,6 +511,9 @@ const YPivotQATemplatesReportType = () => {
                     </td>
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Measurement} />
+                    </td>
+                    <td className="px-2 py-4 text-center">
+                      <StatusBadge val={t.MeasurementAdditional || "No"} />
                     </td>
                     <td className="px-2 py-4 text-center">
                       <StatusBadge val={t.Header} />

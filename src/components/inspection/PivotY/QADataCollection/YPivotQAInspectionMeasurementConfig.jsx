@@ -356,7 +356,8 @@ const YPivotQAInspectionMeasurementConfig = ({
     // Update parent with measurement AND persist K value
     updateParent({
       savedMeasurements: updatedMeasurements,
-      lastSelectedKValue: selectedKValue // Persist K value
+      lastSelectedKValue: selectedKValue, // Persist K value
+      triggerAutoSave: true
     });
 
     if (editingMeasurementIndex === null) {

@@ -415,7 +415,7 @@ const YPivotQATemplatesHeader = ({ headerData, onUpdateHeaderData }) => {
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg p-3 shadow-lg mb-6">
         <h2 className="text-white font-bold text-sm uppercase tracking-wider flex items-center gap-2">
           <ChevronRight className="w-4 h-4" />
-          Header Inspection Data
+          Checklist
         </h2>
       </div>
 

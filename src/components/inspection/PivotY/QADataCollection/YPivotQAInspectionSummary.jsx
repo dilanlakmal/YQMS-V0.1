@@ -29,11 +29,13 @@ import {
   Award,
   User,
   Save,
-  CheckCircle2
+  CheckCircle2,
+  FileSpreadsheet
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 import YPivotQAInspectionQRCode from "./YPivotQAInspectionQRCode";
 import { determineBuyerFromOrderNo } from "./YPivotQAInspectionBuyerDetermination";
+import YPivotQAInspectionPPSheetSummary from "./YPivotQAInspectionPPSheetSummary";
 import { createPortal } from "react-dom";
 
 // Import from Measurement Summary
@@ -254,6 +256,9 @@ const YPivotQAInspectionSummary = ({
 
   const [inspectorInfo, setInspectorInfo] = useState(null);
 
+  const isPilotRun = selectedTemplate?.ReportType === "Pilot Run-Sewing";
+  const ppSheetData = reportData?.ppSheetData;
+
   const savedDefects = useMemo(() => {
     if (defectData?.savedDefects) return defectData.savedDefects;
     if (reportData?.defectData?.savedDefects)
@@ -338,7 +343,8 @@ const YPivotQAInspectionSummary = ({
     config: true,
     header: true,
     photos: true,
-    measurement: true
+    measurement: true,
+    ppSheet: true
   });
 
   // Derived values
@@ -1332,7 +1338,7 @@ const YPivotQAInspectionSummary = ({
             onClick={() => toggleSection("header")}
           >
             <h2 className="text-white font-bold text-sm flex items-center gap-2">
-              <ClipboardCheck className="w-4 h-4" /> Header Inspection Check
+              <ClipboardCheck className="w-4 h-4" /> Checklist
             </h2>
             {expandedSections.header ? (
               <ChevronUp className="text-white w-4 h-4" />
@@ -1414,7 +1420,7 @@ const YPivotQAInspectionSummary = ({
               onClick={() => toggleSection("photos")}
             >
               <h2 className="text-white font-bold text-sm flex items-center gap-2">
-                <Camera className="w-4 h-4" /> Photo Documentation
+                <Camera className="w-4 h-4" /> Photos
               </h2>
               {expandedSections.photos ? (
                 <ChevronUp className="text-white w-4 h-4" />
@@ -1502,6 +1508,31 @@ const YPivotQAInspectionSummary = ({
             )}
           </div>
         )}
+
+      {/* 9. PP SHEET SUMMARY (Conditional) */}
+      {isPilotRun && ppSheetData && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div
+            className="bg-gradient-to-r from-indigo-600 to-blue-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
+            onClick={() => toggleSection("ppSheet")}
+          >
+            <h2 className="text-white font-bold text-sm flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4" /> PP Meeting Report
+            </h2>
+            {expandedSections.ppSheet ? (
+              <ChevronUp className="text-white w-4 h-4" />
+            ) : (
+              <ChevronDown className="text-white w-4 h-4" />
+            )}
+          </div>
+
+          {expandedSections.ppSheet && (
+            <div className="p-4">
+              <YPivotQAInspectionPPSheetSummary ppSheetData={ppSheetData} />
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Preview Modal */}
       {previewImage && (

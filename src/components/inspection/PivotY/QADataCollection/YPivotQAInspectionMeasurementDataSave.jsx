@@ -147,7 +147,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
       const allMeasurements =
         reportData.measurementData?.savedMeasurements || [];
 
-      // A. Merge Measurements (Preserve other stages)
+      // A. Identify measurements from OTHER stages (to preserve them)
       const otherStageMeasurements = allMeasurements.filter((m) => {
         if (m.stage) return m.stage !== targetStage;
         // Legacy data handling
@@ -155,12 +155,25 @@ const YPivotQAInspectionMeasurementDataSave = ({
         return true;
       });
 
-      const updatedCurrentStageMeasurements = (
-        childUpdates.savedMeasurements || []
-      ).map((m) => ({
-        ...m,
-        stage: targetStage
-      }));
+      // --- FIX START: PREVENT DATA WIPE ---
+      // If childUpdates contains new measurements, use them.
+      // If NOT (e.g. during auto-save reset), keep the existing measurements for this stage.
+      let measurementsToProcess = childUpdates.savedMeasurements;
+
+      if (!measurementsToProcess) {
+        measurementsToProcess = allMeasurements.filter(
+          (m) =>
+            m.stage === targetStage || (!m.stage && targetStage === "Before")
+        );
+      }
+
+      const updatedCurrentStageMeasurements = measurementsToProcess.map(
+        (m) => ({
+          ...m,
+          stage: targetStage
+        })
+      );
+      // --- FIX END ---
 
       const combinedMeasurements = [
         ...otherStageMeasurements,
@@ -168,8 +181,10 @@ const YPivotQAInspectionMeasurementDataSave = ({
       ];
 
       // B. Pack Configuration Data into Namespaced Key
+      // (Remove savedMeasurements from configFields so we don't duplicate it)
       const { savedMeasurements, manualDataByGroup, ...configFields } =
         childUpdates;
+
       const configKey = `config${targetStage}`;
 
       // Build the update object
@@ -178,7 +193,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
         savedMeasurements: combinedMeasurements,
         [configKey]: {
           ...(reportData.measurementData?.[configKey] || {}),
-          ...configFields // Store specs list and selections in configBefore/configAfter
+          ...configFields // Store specs list and selections
         }
       };
 
@@ -549,7 +564,29 @@ const YPivotQAInspectionMeasurementDataSave = ({
   };
 
   // =================================================================================
-  // 5. RENDER
+  // 5. AUTO-SAVE EFFECT
+  // =================================================================================
+  useEffect(() => {
+    // Check if the trigger flag is present in the unpacked measurement data
+    if (stageSpecificReportData?.measurementData?.triggerAutoSave) {
+      // 1. Trigger the Save
+      handleSaveData();
+
+      // 2. Reset the flag immediately to prevent infinite loops
+      // We use handleChildUpdate to ensure it goes through the same logic path
+      // passing skipSelectionPersist to avoid resetting UI state like K-value
+      handleChildUpdate(
+        { triggerAutoSave: false },
+        { skipSelectionPersist: true }
+      );
+    }
+  }, [
+    stageSpecificReportData?.measurementData?.triggerAutoSave,
+    handleChildUpdate
+  ]);
+
+  // =================================================================================
+  // 6. RENDER
   // =================================================================================
   if (loadingData) {
     return (

@@ -1942,7 +1942,7 @@ export const updateMeasurementData = async (req, res) => {
         };
       }
 
-      // IMPORTANT: Ensure stage is always saved
+      // Ensure stage is always saved
       return {
         groupId: item.groupId,
         stage: item.stage || "Before", // Default to Before if not specified
@@ -1970,7 +1970,7 @@ export const updateMeasurementData = async (req, res) => {
       };
     });
 
-    // IMPORTANT: Merge with existing data instead of replacing completely
+    // Merge with existing data instead of replacing completely
     // This preserves data from other stages that weren't in this save request
     const existingMeasurements = report.measurementData || [];
 
@@ -2009,91 +2009,6 @@ export const updateMeasurementData = async (req, res) => {
     });
   }
 };
-
-// export const updateMeasurementData = async (req, res) => {
-//   try {
-//     const { reportId, measurementData } = req.body;
-
-//     if (!reportId || !measurementData || !Array.isArray(measurementData)) {
-//       return res
-//         .status(400)
-//         .json({ success: false, message: "Invalid payload." });
-//     }
-
-//     const report = await FincheckInspectionReports.findOne({
-//       reportId: parseInt(reportId)
-//     });
-
-//     if (!report) {
-//       return res
-//         .status(404)
-//         .json({ success: false, message: "Report not found." });
-//     }
-
-//     // Process the incoming array. If an item has manualData with images, process them.
-//     const processedMeasurementData = measurementData.map((item) => {
-//       let processedManualData = null;
-
-//       if (item.manualData) {
-//         // Handle Images in Manual Data
-//         const processedImages = (item.manualData.images || [])
-//           .map((img, idx) => {
-//             let finalUrl = img.imageURL;
-
-//             // Check if Base64 (New Image)
-//             if (img.imgSrc && img.imgSrc.startsWith("data:image")) {
-//               const savedPath = saveMeasManualBase64Image(
-//                 img.imgSrc,
-//                 reportId,
-//                 item.groupId, // Use Group ID for uniqueness scope
-//                 idx
-//               );
-//               if (savedPath) finalUrl = savedPath;
-//             }
-
-//             return {
-//               imageId:
-//                 img.id ||
-//                 img.imageId ||
-//                 `mm_${item.groupId}_${idx}_${Date.now()}`,
-//               imageURL: finalUrl,
-//               remark: img.remark || "" // Persist the image remark
-//             };
-//           })
-//           .filter((img) => img.imageURL); // Remove failed saves
-
-//         processedManualData = {
-//           remarks: item.manualData.remarks || "",
-//           status: item.manualData.status || "Pass",
-//           images: processedImages
-//         };
-//       }
-
-//       return {
-//         ...item,
-//         manualData: processedManualData
-//       };
-//     });
-
-//     // Replace existing data
-//     report.measurementData = processedMeasurementData;
-
-//     await report.save();
-
-//     return res.status(200).json({
-//       success: true,
-//       message: "Measurement data saved successfully.",
-//       data: report.measurementData
-//     });
-//   } catch (error) {
-//     console.error("Error updating measurement data:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Internal server error.",
-//       error: error.message
-//     });
-//   }
-// };
 
 // ============================================================
 // Update Defect Data
@@ -2541,6 +2456,7 @@ const sanitizeNumberArray = (arr) => {
 // SUBMIT FULL REPORT (OPTIMIZED Version)
 // Only processes sections that have unsaved changes
 // ============================================================
+
 export const submitFullInspectionReport = async (req, res) => {
   try {
     const {
@@ -2553,8 +2469,8 @@ export const submitFullInspectionReport = async (req, res) => {
       defectData,
       defectManualData,
       ppSheetData,
-      // NEW: Frontend specifies which sections have unsaved changes
-      sectionsToUpdate = null // null = process all (backward compatible), [] = none, ['headerData', ...] = specific
+      // Frontend specifies which sections have unsaved changes
+      sectionsToUpdate = null
     } = req.body;
 
     if (!reportId) {
@@ -2579,15 +2495,8 @@ export const submitFullInspectionReport = async (req, res) => {
     const shouldProcessSection = (sectionName, data) => {
       // If data is undefined/null/empty, skip
       if (data === undefined || data === null) return false;
-      if (Array.isArray(data) && data.length === 0) return false;
-      if (
-        typeof data === "object" &&
-        !Array.isArray(data) &&
-        Object.keys(data).length === 0
-      )
-        return false;
 
-      // If sectionsToUpdate is null, process ALL provided sections (backward compatible / full save)
+      // If sectionsToUpdate is null, process ALL provided sections (backward compatible)
       if (sectionsToUpdate === null) return true;
 
       // If sectionsToUpdate is specified, only process those sections
@@ -2843,9 +2752,9 @@ export const submitFullInspectionReport = async (req, res) => {
         if (defect.isNoLocation) {
           const processedImages = (defect.images || [])
             .map((img, imgIdx) =>
+              // FIX: Removed uploadDirDefect argument to match processImageObject definition
               processImageObject(
                 img,
-                uploadDirDefect,
                 `def_noloc_${reportId}_${defectCode}`,
                 imgIdx
               )
@@ -2887,9 +2796,9 @@ export const submitFullInspectionReport = async (req, res) => {
         const groupId = manualItem.groupId || 0;
         const processedImages = (manualItem.images || [])
           .map((img, idx) => {
+            // FIX: Removed uploadDirDefectManual argument
             const processed = processImageObject(
               img,
-              uploadDirDefectManual,
               `def_man_${reportId}_${groupId}`,
               idx
             );
