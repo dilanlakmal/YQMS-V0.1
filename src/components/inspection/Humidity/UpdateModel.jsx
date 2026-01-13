@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Swal from "sweetalert2";
 import { API_BASE_URL } from "../../../../config";
 
@@ -25,6 +25,9 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
   const [isSaving, setIsSaving] = useState(false);
   const [expandedRecordIndex, setExpandedRecordIndex] = useState(0);
   const [availableColors, setAvailableColors] = useState([]);
+  const [colorSearch, setColorSearch] = useState("");
+  const [showColorDropdown, setShowColorDropdown] = useState(false);
+  const colorRef = useRef(null);
 
   const ribsAvailable = true; // Assume true for edit or derive from data
 
@@ -119,6 +122,17 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
       );
     }
   }, [open, report]);
+
+  // Click outside to close color dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (colorRef.current && !colorRef.current.contains(event.target)) {
+        setShowColorDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // Fetch available colors when factoryStyleNo changes or on load
   useEffect(() => {
@@ -592,36 +606,80 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                   readOnly
                 />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">
+              <div ref={colorRef}>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Color Name
                 </label>
-                {availableColors.length > 0 ? (
-                  <select
-                    value={formData.colorName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, colorName: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-white"
-                  >
-                    <option value="">Select Color</option>
-                    {availableColors.map((color, idx) => (
-                      <option key={idx} value={color}>
-                        {color}
-                      </option>
-                    ))}
-                  </select>
-                ) : (
+                <div className="relative">
                   <input
                     type="text"
-                    value={formData.colorName}
-                    onChange={(e) =>
-                      setFormData({ ...formData, colorName: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2"
-                    placeholder="Enter color name"
+                    placeholder="Select or type color..."
+                    value={colorSearch || formData.colorName}
+                    onFocus={() => {
+                      setColorSearch("");
+                      setShowColorDropdown(true);
+                    }}
+                    onChange={(e) => {
+                      setColorSearch(e.target.value);
+                      setFormData({ ...formData, colorName: e.target.value });
+                      setShowColorDropdown(true);
+                    }}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   />
-                )}
+                  <div
+                    className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 cursor-pointer"
+                    onClick={() => {
+                      if (!showColorDropdown) setColorSearch("");
+                      setShowColorDropdown(!showColorDropdown);
+                    }}
+                  >
+                    <svg
+                      className={`fill-current h-4 w-4 transition-transform ${
+                        showColorDropdown ? "rotate-180" : ""
+                      }`}
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 20 20"
+                    >
+                      <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
+                    </svg>
+                  </div>
+
+                  {showColorDropdown && (
+                    <div className="absolute z-[60] w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-48 overflow-y-auto min-w-[200px]">
+                      {availableColors.length > 0 ? (
+                        availableColors
+                          .filter(
+                            (c) =>
+                              !colorSearch ||
+                              c
+                                .toLowerCase()
+                                .includes(colorSearch.toLowerCase())
+                          )
+                          .map((color, idx) => (
+                            <div
+                              key={idx}
+                              className={`px-4 py-2 cursor-pointer text-sm font-medium transition-colors border-b border-gray-50 last:border-0 ${
+                                formData.colorName === color
+                                  ? "bg-blue-50 text-blue-700"
+                                  : "hover:bg-blue-600 hover:text-white text-gray-700"
+                              }`}
+                              onClick={() => {
+                                setFormData({ ...formData, colorName: color });
+                                setColorSearch(color);
+                                setShowColorDropdown(false);
+                              }}
+                            >
+                              {color}
+                            </div>
+                          ))
+                      ) : (
+                        <div className="px-4 py-2 text-xs text-gray-400 italic">
+                          No suggested colors for this style.
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -651,7 +709,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                     })
                   }
                   disabled
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-100 cursor-not-allowed"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                 />
               </div>
               <div>
@@ -695,7 +753,7 @@ export default function UpdateModel({ open, onCancel, report, onUpdate }) {
                     setFormData({ ...formData, date: e.target.value })
                   }
                   disabled
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-100 cursor-not-allowed"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 bg-gray-50"
                 />
               </div>
             </div>

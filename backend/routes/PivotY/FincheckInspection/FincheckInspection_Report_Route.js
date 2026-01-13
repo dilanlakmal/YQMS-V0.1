@@ -2,7 +2,8 @@ import express from "express";
 import {
   getInspectionReports,
   getDefectImagesForReport,
-  getReportMeasurementSpecs
+  getReportMeasurementSpecs,
+  checkUserPermission
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
@@ -21,5 +22,8 @@ router.get(
   "/api/fincheck-reports/:reportId/measurement-specs",
   getReportMeasurementSpecs
 );
+
+// Route to check permission
+router.get("/api/fincheck-reports/check-permission", checkUserPermission);
 
 export default router;

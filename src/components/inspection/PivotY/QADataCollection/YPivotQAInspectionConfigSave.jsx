@@ -128,7 +128,11 @@ const YPivotQAInspectionConfigSave = ({
   }, [reportId]);
 
   // --- SAVE TO BACKEND ---
-  const saveToBackend = async (groupsToSave, showModal = true) => {
+  const saveToBackend = async (
+    groupsToSave,
+    showModal = true,
+    shouldLock = true
+  ) => {
     if (!isReportSaved || !reportId) return;
 
     const selectedTemplate = reportData.selectedTemplate;
@@ -162,10 +166,19 @@ const YPivotQAInspectionConfigSave = ({
 
       if (res.data.success) {
         setIsUpdateMode(true);
-        setLockTrigger((prev) => prev + 1);
+        // ONLY TRIGGER LOCK IF REQUESTED
+        if (shouldLock) {
+          setLockTrigger((prev) => prev + 1);
+        }
+
         if (onSaveSuccess) {
           onSaveSuccess();
         }
+
+        // setLockTrigger((prev) => prev + 1);
+        // if (onSaveSuccess) {
+        //   onSaveSuccess();
+        // }
         if (showModal) {
           setStatusModal({
             isOpen: true,
@@ -236,13 +249,15 @@ const YPivotQAInspectionConfigSave = ({
         return;
       }
     }
-
-    saveToBackend(groups);
+    // Manual Click = Lock the UI (Pass true)
+    saveToBackend(groups, true, true);
+    //saveToBackend(groups);
   };
 
   // --- IMMEDIATE SAVE HANDLER ---
   const handleImmediateSave = (updatedGroups) => {
-    saveToBackend(updatedGroups, true);
+    saveToBackend(updatedGroups, false, false);
+    //saveToBackend(updatedGroups, true);
   };
 
   // ✅ Handle Clear All Backend Call
