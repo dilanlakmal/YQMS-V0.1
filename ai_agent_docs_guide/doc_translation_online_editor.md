@@ -64,7 +64,7 @@ To build the **User Interface** (Step 7), you generally need these libraries in 
 Azure translates the *File*, but it doesn't give you a list of "Sentence A = Sentence B".
 **You need your Glossary Agent to do this.**
 
-**Modify [createGlossary.js](file:///d:/YorkMars/Production-Pro/glossary-agent/node_js/createGlossary.js) to add an `align` mode:**
+**Modify [createGlossary.js](file:///D:\YorkMars\YQMS-V0.1\backend\controller\glossaries\agentGlossaryController.js) to add an `align` mode:**
 *   **Input**: Source Text, Target Text.
 *   **Prompt**: *"Align these two texts sentence-by-sentence. Output JSON."*
 *   **Output**:
@@ -84,7 +84,7 @@ You asked: *"Do I need to extract Source if I don't edit it?"*
 1.  **Visual Alignment**: Users need to see "Sentence A" right next to "Sentence B". If you just show a PDF on the left, it's hard to find which line matches the editable text on the right.
 2.  **The "Learning" Context**: The Glossary Agent needs to know: *"What was the original English word for 'ប្រាក់ធានា'?"* If you don't extract the source, the Agent can't learn the pair.
 
-**Modify [createGlossary.js](file:///d:/YorkMars/Production-Pro/glossary-agent/node_js/createGlossary.js) to add an `align` mode:**
+**Modify [createGlossary.js](file:///D:\YorkMars\YQMS-V0.1\backend\controller\glossaries\agentGlossaryController.js) to add an `align` mode:**
 *   **Input**: Source Text, Target Text.
 *   **Prompt**: *"Align these two texts sentence-by-sentence. Output JSON."*
 *   **Output**:

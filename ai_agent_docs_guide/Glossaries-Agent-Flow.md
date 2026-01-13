@@ -85,7 +85,7 @@ We will stop using  filess and start using a **Database**.
 
 **The dynamics way**:
 
-* we create **ONE SQL Table** called `GlossaryTerms`.
+* we create **ONE MongoDB Collection** called `GlossaryTerms`.
 Columns : `SourceWord`, `TargetWord`,`LangPair`(e.g., 'en-km'),`Domain`(e.g., 'Engineering','Building','')
 
 * **Merge**: When the bulk scan finishes, we import all 100 TSVs into this ONE table.
