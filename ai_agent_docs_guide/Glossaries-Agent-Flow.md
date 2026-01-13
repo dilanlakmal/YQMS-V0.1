@@ -70,7 +70,7 @@ To archieve this "Full Ponential":
 
 ## Deep Research Quesions :
 
-### 1. What is Buld Scan ?
+### 1. What is Bulk Scan ?
 
 **Problem:** We have 5 years of "Archieved Contracts" PDFs sitting on our server. They contain valuable terminologies, but the system doesn't know it yet.
 
@@ -146,3 +146,41 @@ Why ?
     *   **Context**: A document translation takes 3-5 minutes. Users will **never notice** an extra 0.5 seconds at the start.
 
 **Conclusion**: Keep it simple. Don't pre-generate files. Just generate them on-the-fly when the user clicks "Translate".
+
+
+
+-----
+### The Logic Flow: Translation & Learning Cycle
+
+Here the lifecycle of system translator 
+### Step 1 : Translation
+1. **User**: Uploads document `Contract.docx` (English) -> Selects target language (Khmer) .  (supports ANY file format that Azure Document Translation Word: .doc, .docx
+Excel: .xls, .xlsx
+PowerPoint: .ppt, .pptx
+PDF: .pdf
+HTML: .html)
+2. **System Action**:
+    * **Retrieval**: Uses **SQL** take 10ms.
+    *   `SELECT * FROM Terms WHERE Pair='en-km'`
+     *   **Execution**: Creates `temp.tsv` -> Sends to Azure blob storage -> Gets Result to use as glossary for translation.
+    
+### Step 2: The "Online Editor"
+ It's like a mini-CAT tool.
+
+ 1.  **UI Display**:
+    *   Left Column: Original English Text (extracted from doc).
+    *   Right Column: Azure's Khmer Translation (editable).
+2.  **User Action**: Users reads line 5: "Deposit" -> "ប្រាក់កក់".
+    *   User clicks and types: "ប្រាក់ធានា".
+    *   User clicks **"Save & Finish"**.
+### Step 3: Smart Auto-Tagging & Learning 🤖
+*This is where the Agent runs.*
+1.  **Trigger**: When user clicks "Finalize".
+2.  **System Auto-Tagging**:
+    *   `LangPair`: Took from User Selection (`en-km`).
+    *   `Project`: Took from Filename (`Contract.docx`).
+3.  **The Agent's Job**:
+    *   The Node.js Agent receives the *Specific Sentence* that changed.
+    *   **Prompt**: *"User changed 'Deposit' to 'Warranty'. Is this a glossary term?"*
+    *   **Result**: Agents adds `Deposit <-> ប្រាក់ធានា` to Database.
+    *   **Benefit**: The Agent filters out non-terms (like fixing a typo "teh" -> "the") so your DB stays clean.
