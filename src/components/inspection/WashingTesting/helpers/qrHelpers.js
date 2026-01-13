@@ -20,9 +20,9 @@ export const getQRCodeBaseURL = (QR_CODE_BASE_URL) => {
             return url.toString().replace(/\/$/, ''); // Remove trailing slash if present
         } catch (error) {
             // If URL parsing fails, try simple string replacement
-            const protocolMatch = QR_CODE_BASE_URL.match(/^https?:\/\//);
+            const protocolMatch = QR_CODE_BASE_URL.match(/^http?:\/\//);
             if (protocolMatch) {
-                return QR_CODE_BASE_URL.replace(/^https?:\/\//, `${currentProtocol}//`);
+                return QR_CODE_BASE_URL.replace(/^http?:\/\//, `${currentProtocol}//`);
             }
             // Fallback: prepend protocol if missing
             return `${currentProtocol}//${QR_CODE_BASE_URL.replace(/^\/\//, '')}`;

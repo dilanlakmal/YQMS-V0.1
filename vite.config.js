@@ -18,14 +18,14 @@ export default defineConfig({
     host: "0.0.0.0",
     port: 3001,
     open: true,
-    https: {
-      key: fs.readFileSync(
-        "./backend/Config/192.167.6.207-key.pem"
-      ),
-      cert: fs.readFileSync(
-        "./backend/Config/192.167.6.207.pem"
-      )
-    }
+    // https: {
+    //   key: fs.readFileSync(
+    //     "./backend/Config/192.167.6.207-key.pem"
+    //   ),
+    //   cert: fs.readFileSync(
+    //     "./backend/Config/192.167.6.207.pem"
+    //   )
+    // }
   },
   build: {
     //minify: false, // Use esbuild for minification

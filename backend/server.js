@@ -650,5 +650,5 @@ app.get("/api/health", (req, res) => {
 
 // Start the server
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`HTTPS Server is running on https://localhost:${PORT}`);
+  console.log(`HTTP Server is running on http://localhost:${PORT}`);
 });
