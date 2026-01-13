@@ -444,7 +444,9 @@ export const MeasurementSummaryTable = ({
         }`}
       >
         <thead>
+          {/* --- HEADER ROW 1 --- */}
           <tr className="bg-gray-100 dark:bg-gray-800">
+            {/* 1. Point Name Header */}
             <th
               rowSpan={2}
               className={`border border-gray-300 dark:border-gray-600 ${
@@ -460,12 +462,33 @@ export const MeasurementSummaryTable = ({
                 <span>Point</span>
               </div>
             </th>
+
+            {/* 2. NEW: Tolerance Headers */}
+            <th
+              rowSpan={2}
+              className={`border border-gray-300 dark:border-gray-600 ${
+                compact ? "p-1" : "p-1.5"
+              } text-center bg-gray-50 dark:bg-gray-800 w-[50px]`}
+            >
+              <span className="text-red-500 font-bold">TOL (-)</span>
+            </th>
+            <th
+              rowSpan={2}
+              className={`border border-gray-300 dark:border-gray-600 ${
+                compact ? "p-1" : "p-1.5"
+              } text-center bg-gray-50 dark:bg-gray-800 w-[50px]`}
+            >
+              <span className="text-red-500 font-bold">TOL (+)</span>
+            </th>
+
+            {/* 3. Size Headers */}
             {tableData.map(
               (sizeData, sIdx) =>
                 sizeData.columns.length > 0 && (
                   <th
                     key={sIdx}
-                    colSpan={sizeData.columns.length}
+                    // UDPATE: Add +1 to colSpan to account for the new Spec column
+                    colSpan={sizeData.columns.length + 1}
                     className={`border border-gray-300 dark:border-gray-600 ${
                       compact ? "p-1" : "p-1.5"
                     } text-center bg-indigo-100 dark:bg-indigo-900/40`}
@@ -486,43 +509,71 @@ export const MeasurementSummaryTable = ({
                 )
             )}
           </tr>
+
+          {/* --- HEADER ROW 2 --- */}
           <tr className="bg-gray-50 dark:bg-gray-700">
-            {tableData.map((sizeData, sIdx) =>
-              sizeData.columns.map((col, cIdx) => (
-                <th
-                  key={`${sIdx}-${cIdx}`}
-                  className={`border border-gray-300 dark:border-gray-600 ${
-                    compact ? "p-1" : "p-1.5"
-                  } text-center min-w-[40px] ${
-                    col.isAllMode
-                      ? "bg-purple-100 dark:bg-purple-900/40"
-                      : "bg-amber-100 dark:bg-amber-900/40"
-                  }`}
-                >
-                  <div
-                    className={`${
-                      compact ? "text-[9px]" : "text-[10px]"
-                    } font-bold`}
+            {/* Note: Point, Tol-, Tol+ have rowSpan=2, so we don't render them here */}
+
+            {tableData.map((sizeData, sIdx) => (
+              <React.Fragment key={sIdx}>
+                {/* 1. NEW: Spec Sub-Header */}
+                {sizeData.columns.length > 0 && (
+                  <th
+                    className={`border border-gray-300 dark:border-gray-600 ${
+                      compact ? "p-1" : "p-1.5"
+                    } text-center bg-blue-50 dark:bg-blue-900/20`}
                   >
-                    #{col.pcsNumber}
-                  </div>
-                  <div
-                    className={`text-[7px] font-bold px-1 py-0.5 rounded inline-block ${
+                    <span
+                      className={`font-bold text-blue-600 dark:text-blue-400 ${
+                        compact ? "text-[9px]" : "text-[10px]"
+                      }`}
+                    >
+                      Spec
+                    </span>
+                  </th>
+                )}
+
+                {/* 2. Existing Reading Headers (#1, #2...) */}
+                {sizeData.columns.map((col, cIdx) => (
+                  <th
+                    key={`${sIdx}-${cIdx}`}
+                    className={`border border-gray-300 dark:border-gray-600 ${
+                      compact ? "p-1" : "p-1.5"
+                    } text-center min-w-[40px] ${
                       col.isAllMode
-                        ? "bg-purple-500 text-white"
-                        : "bg-amber-500 text-white"
+                        ? "bg-purple-100 dark:bg-purple-900/40"
+                        : "bg-amber-100 dark:bg-amber-900/40"
                     }`}
                   >
-                    {col.isAllMode ? "A" : "C"}
-                  </div>
-                </th>
-              ))
-            )}
+                    <div
+                      className={`${
+                        compact ? "text-[9px]" : "text-[10px]"
+                      } font-bold`}
+                    >
+                      #{col.pcsNumber}
+                    </div>
+                    <div
+                      className={`text-[7px] font-bold px-1 py-0.5 rounded inline-block ${
+                        col.isAllMode
+                          ? "bg-purple-500 text-white"
+                          : "bg-amber-500 text-white"
+                      }`}
+                    >
+                      {col.isAllMode ? "A" : "C"}
+                    </div>
+                  </th>
+                ))}
+              </React.Fragment>
+            ))}
           </tr>
         </thead>
         <tbody>
           {displaySpecs.map((spec, specIdx) => {
             const isCritical = isCriticalSpec(spec.id);
+
+            // Extract Tolerances
+            const tolMinus = spec.TolMinus?.fraction || "-";
+            const tolPlus = spec.TolPlus?.fraction || "-";
 
             return (
               <tr
@@ -535,6 +586,7 @@ export const MeasurementSummaryTable = ({
                     : "bg-gray-50 dark:bg-gray-800/50"
                 }`}
               >
+                {/* 1. Point Name Cell */}
                 <td
                   className={`border border-gray-300 dark:border-gray-600 ${
                     compact ? "p-1" : "p-1.5"
@@ -561,58 +613,105 @@ export const MeasurementSummaryTable = ({
                   </div>
                 </td>
 
-                {tableData.map((sizeData, sIdx) =>
-                  sizeData.columns.map((col, cIdx) => {
-                    if (!col.isAllMode && !isCritical) {
-                      return (
+                {/* 2. NEW: Tolerance Value Cells */}
+                <td
+                  className={`border border-gray-300 dark:border-gray-600 ${
+                    compact ? "p-1" : "p-1.5"
+                  } text-center`}
+                >
+                  <span className="text-gray-500 font-bold text-[10px]">
+                    {tolMinus}
+                  </span>
+                </td>
+                <td
+                  className={`border border-gray-300 dark:border-gray-600 ${
+                    compact ? "p-1" : "p-1.5"
+                  } text-center`}
+                >
+                  <span className="text-gray-500 font-bold text-[10px]">
+                    {tolPlus}
+                  </span>
+                </td>
+
+                {/* 3. Size Data Loop */}
+                {tableData.map((sizeData, sIdx) => {
+                  // Find Spec Value for this specific size
+                  const matchingSpec = spec.Specs?.find(
+                    (s) => s.size === sizeData.size
+                  );
+                  const specValue = matchingSpec ? matchingSpec.fraction : "-";
+
+                  return (
+                    <React.Fragment key={sIdx}>
+                      {/* 3a. NEW: Spec Value Cell */}
+                      {sizeData.columns.length > 0 && (
                         <td
-                          key={`${sIdx}-${cIdx}`}
-                          className="border border-gray-300 dark:border-gray-600 p-1 text-center bg-gray-200 dark:bg-gray-700"
+                          className={`border border-gray-300 dark:border-gray-600 ${
+                            compact ? "p-1" : "p-1.5"
+                          } text-center bg-blue-50/50 dark:bg-blue-900/10`}
                         >
-                          <span className="text-[8px] text-gray-400">—</span>
+                          <span className="text-blue-600 dark:text-blue-400 font-bold text-[10px]">
+                            {specValue}
+                          </span>
                         </td>
-                      );
-                    }
+                      )}
 
-                    const measurement =
-                      col.measurements?.[spec.id]?.[col.pcsIndex];
-                    const value = measurement?.decimal || 0;
-                    const displayValue = measurement?.fraction || "0";
-                    const toleranceResult = checkTolerance(
-                      spec,
-                      value,
-                      sizeData.size
-                    );
+                      {/* 3b. Existing Reading Cells */}
+                      {sizeData.columns.map((col, cIdx) => {
+                        if (!col.isAllMode && !isCritical) {
+                          return (
+                            <td
+                              key={`${sIdx}-${cIdx}`}
+                              className="border border-gray-300 dark:border-gray-600 p-1 text-center bg-gray-200 dark:bg-gray-700"
+                            >
+                              <span className="text-[8px] text-gray-400">
+                                —
+                              </span>
+                            </td>
+                          );
+                        }
 
-                    let bgColor, textColor;
-                    if (
-                      value === 0 ||
-                      toleranceResult.isDefault ||
-                      toleranceResult.isWithin
-                    ) {
-                      bgColor = "bg-green-100 dark:bg-green-900/50";
-                      textColor = "text-green-700 dark:text-green-300";
-                    } else {
-                      bgColor = "bg-red-100 dark:bg-red-900/50";
-                      textColor = "text-red-700 dark:text-red-300";
-                    }
+                        const measurement =
+                          col.measurements?.[spec.id]?.[col.pcsIndex];
+                        const value = measurement?.decimal || 0;
+                        const displayValue = measurement?.fraction || "0";
+                        const toleranceResult = checkTolerance(
+                          spec,
+                          value,
+                          sizeData.size
+                        );
 
-                    return (
-                      <td
-                        key={`${sIdx}-${cIdx}`}
-                        className={`border border-gray-300 dark:border-gray-600 p-0.5 text-center ${bgColor}`}
-                      >
-                        <span
-                          className={`${
-                            compact ? "text-[9px]" : "text-[10px]"
-                          } font-mono font-bold ${textColor}`}
-                        >
-                          {displayValue}
-                        </span>
-                      </td>
-                    );
-                  })
-                )}
+                        let bgColor, textColor;
+                        if (
+                          value === 0 ||
+                          toleranceResult.isDefault ||
+                          toleranceResult.isWithin
+                        ) {
+                          bgColor = "bg-green-100 dark:bg-green-900/50";
+                          textColor = "text-green-700 dark:text-green-300";
+                        } else {
+                          bgColor = "bg-red-100 dark:bg-red-900/50";
+                          textColor = "text-red-700 dark:text-red-300";
+                        }
+
+                        return (
+                          <td
+                            key={`${sIdx}-${cIdx}`}
+                            className={`border border-gray-300 dark:border-gray-600 p-0.5 text-center ${bgColor}`}
+                          >
+                            <span
+                              className={`${
+                                compact ? "text-[9px]" : "text-[10px]"
+                              } font-mono font-bold ${textColor}`}
+                            >
+                              {displayValue}
+                            </span>
+                          </td>
+                        );
+                      })}
+                    </React.Fragment>
+                  );
+                })}
               </tr>
             );
           })}

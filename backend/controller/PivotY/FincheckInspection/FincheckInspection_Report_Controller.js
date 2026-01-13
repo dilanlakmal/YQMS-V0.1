@@ -244,14 +244,15 @@ export const getDefectImagesForReport = async (req, res) => {
 // ============================================================
 // Get Measurement Specifications Linked to a Report
 // ============================================================
+
 export const getReportMeasurementSpecs = async (req, res) => {
   try {
     const { reportId } = req.params;
 
-    // 1. Fetch the Report to get Order No and Measurement Method
+    // 1. Fetch the Report to get Order No
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
-    }).select("orderNos measurementMethod inspectionDetails");
+    }).select("orderNos");
 
     if (!report) {
       return res
@@ -259,24 +260,11 @@ export const getReportMeasurementSpecs = async (req, res) => {
         .json({ success: false, message: "Report not found" });
     }
 
-    // Determine Method (Check root field, fallback to inspectionDetails)
-    const method =
-      report.measurementMethod || report.inspectionDetails?.measurement;
     const orderNos = report.orderNos;
-
-    // Validation
-    if (
-      !method ||
-      method === "N/A" ||
-      method === "No" ||
-      !orderNos ||
-      orderNos.length === 0
-    ) {
+    if (!orderNos || orderNos.length === 0) {
       return res.status(200).json({
         success: true,
-        message: "No measurement configuration found",
-        full: [],
-        selected: []
+        specs: { Before: null, After: null }
       });
     }
 
@@ -284,48 +272,51 @@ export const getReportMeasurementSpecs = async (req, res) => {
     const primaryOrderNo = orderNos[0];
 
     // 2. Find the Specs in the Specs Collection
+    // We fetch EVERYTHING (Before and After)
     const specsRecord = await QASectionsMeasurementSpecs.findOne({
       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
     }).lean();
 
-    let fullSpecs = [];
-    let selectedSpecs = [];
+    const result = {
+      Before: { full: [], selected: [] },
+      After: { full: [], selected: [] }
+    };
 
     if (specsRecord) {
-      // 3a. Extract based on Method (Before vs After)
-      if (method === "Before") {
-        fullSpecs = specsRecord.AllBeforeWashSpecs || [];
-        selectedSpecs = specsRecord.selectedBeforeWashSpecs || [];
-      } else if (method === "After") {
-        fullSpecs = specsRecord.AllAfterWashSpecs || [];
-        selectedSpecs = specsRecord.selectedAfterWashSpecs || [];
-      }
+      // Process Before
+      result.Before.full = specsRecord.AllBeforeWashSpecs || [];
+      result.Before.selected =
+        specsRecord.selectedBeforeWashSpecs &&
+        specsRecord.selectedBeforeWashSpecs.length > 0
+          ? specsRecord.selectedBeforeWashSpecs
+          : specsRecord.AllBeforeWashSpecs || [];
+
+      // Process After
+      result.After.full = specsRecord.AllAfterWashSpecs || [];
+      result.After.selected =
+        specsRecord.selectedAfterWashSpecs &&
+        specsRecord.selectedAfterWashSpecs.length > 0
+          ? specsRecord.selectedAfterWashSpecs
+          : specsRecord.AllAfterWashSpecs || [];
     } else {
-      // 3b. Fallback: If not in QASections, check DtOrder (Legacy/Raw Data)
-      // Note: DtOrder usually only has raw Before Wash data
-      if (method === "Before") {
-        const dtOrder = await DtOrder.findOne({
-          Order_No: primaryOrderNo
-        }).lean();
-        if (dtOrder && dtOrder.BeforeWashSpecs) {
-          // Map _id to id string if needed
-          fullSpecs = dtOrder.BeforeWashSpecs.map((s) => ({
-            ...s,
-            id: s._id ? s._id.toString() : s.id
-          }));
-        }
+      // Fallback: Check DtOrder (Legacy - usually only Before)
+      const dtOrder = await DtOrder.findOne({
+        Order_No: primaryOrderNo
+      }).lean();
+
+      if (dtOrder && dtOrder.BeforeWashSpecs) {
+        const legacySpecs = dtOrder.BeforeWashSpecs.map((s) => ({
+          ...s,
+          id: s._id ? s._id.toString() : s.id
+        }));
+        result.Before.full = legacySpecs;
+        result.Before.selected = legacySpecs;
       }
     }
 
-    // If "Selected" array is empty, it implies all specs are active/critical
-    // or the user hasn't filtered them. We return full list as selected in that case.
-    const finalSelected = selectedSpecs.length > 0 ? selectedSpecs : fullSpecs;
-
     return res.status(200).json({
       success: true,
-      measurementMethod: method,
-      full: fullSpecs,
-      selected: finalSelected
+      specs: result
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
@@ -334,8 +325,9 @@ export const getReportMeasurementSpecs = async (req, res) => {
 };
 
 // ============================================================
-// NEW: Check User Permission for UI Visibility
+// Check User Permission for UI Visibility
 // ============================================================
+
 export const checkUserPermission = async (req, res) => {
   try {
     const { empId } = req.query;

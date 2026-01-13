@@ -25,8 +25,10 @@ import {
   EyeOff,
   Info
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 import { useAuth } from "../../../authentication/AuthContext";
+import YPivotQAInspectionQRCode from "../QADataCollection/YPivotQAInspectionQRCode";
 
 // =============================================================================
 // Helper: Filter Input Wrapper
@@ -307,6 +309,44 @@ const InspectorAutoCloseModal = ({ data, onClose }) => {
 };
 
 // =============================================================================
+// Helper: Report QR Code Modal (Manual Close)
+// =============================================================================
+const ReportQRModal = ({ report, onClose }) => {
+  if (!report) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fadeIn">
+      <div className="relative bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-2xl w-full p-2 border border-gray-200 dark:border-gray-700 transform scale-100 transition-all">
+        {/* Close Button */}
+        <button
+          onClick={onClose}
+          className="absolute -top-3 -right-3 p-2 bg-white dark:bg-gray-700 text-gray-500 dark:text-gray-300 hover:text-red-500 rounded-full shadow-lg border border-gray-100 dark:border-gray-600 transition-colors z-50"
+        >
+          <X className="w-5 h-5" />
+        </button>
+
+        {/* Reuse the existing QR Component */}
+        <div className="overflow-hidden rounded-2xl">
+          <YPivotQAInspectionQRCode
+            reportId={report.reportId}
+            inspectionDate={report.inspectionDate}
+            orderNos={report.orderNos}
+            reportType={report.reportType}
+            inspectionType={report.inspectionType}
+            empId={report.empId}
+          />
+        </div>
+
+        <p className="text-center text-xs text-gray-400 py-2">
+          Scan this code to load report details instantly.
+        </p>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
+// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 const YPivotQAReportMain = () => {
@@ -316,6 +356,8 @@ const YPivotQAReportMain = () => {
   // State for Report ID Visibility
   const [canViewReportId, setCanViewReportId] = useState(false);
   const [reports, setReports] = useState([]);
+  // State to track which report's QR is being viewed
+  const [viewingReportQR, setViewingReportQR] = useState(null);
   const [showDetailedView, setShowDetailedView] = useState(false);
   const [viewingInspector, setViewingInspector] = useState(null);
 
@@ -718,7 +760,7 @@ const YPivotQAReportMain = () => {
                 <th className="px-6 py-4 rounded-tl-lg">Date</th>
                 {/* CONDITIONAL HEADER */}
                 {canViewReportId && <th className="px-6 py-4">Report ID</th>}
-                {/* <th className="px-6 py-4">Report ID</th> */}
+
                 <th className="px-6 py-4">Order No</th>
                 <th className="px-6 py-4">Cust. Style</th>
                 <th className="px-6 py-4">Customer</th>
@@ -842,9 +884,23 @@ const YPivotQAReportMain = () => {
                       {/* Report ID */}
                       {canViewReportId && (
                         <td className="px-6 py-4">
-                          <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
-                            {report.reportId}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/30 px-2 py-1 rounded">
+                              {report.reportId}
+                            </span>
+
+                            {/* NEW: Info Icon Trigger */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setViewingReportQR(report);
+                              }}
+                              className="p-1.5 rounded-full hover:bg-indigo-100 dark:hover:bg-indigo-900/50 text-gray-400 hover:text-indigo-600 transition-colors"
+                              title="View Report QR"
+                            >
+                              <Info className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </td>
                       )}
 
@@ -1124,6 +1180,14 @@ const YPivotQAReportMain = () => {
         <InspectorAutoCloseModal
           data={viewingInspector}
           onClose={() => setViewingInspector(null)}
+        />
+      )}
+
+      {/* Report QR Code Modal */}
+      {viewingReportQR && (
+        <ReportQRModal
+          report={viewingReportQR}
+          onClose={() => setViewingReportQR(null)}
         />
       )}
 
