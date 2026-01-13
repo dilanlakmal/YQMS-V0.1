@@ -22,8 +22,8 @@ sequenceDiagram
     Azure-->>API: 3. Return Contract_Translated.docx
     
     par Parallel Processing
-        API->>Agent: 4a. Extract Text (Source Doc)
-        API->>Agent: 4b. Extract Text (Translated Doc)
+        API->>Agent: 4a. Extract Text (Source Doc, Read only)
+        API->>Agent: 4b. Extract Text (Translated Doc,Read and Edit)
     end
     
     Agent->>Agent: 5. AI Alignment (Match Sentence A to Sentence B)
@@ -75,3 +75,24 @@ Azure translates the *File*, but it doesn't give you a list of "Sentence A = Sen
     ]
     ```
 *   **Usage**: Your React App takes this JSON and renders the "Editor". This is how you enable editing without needing Microsoft Office Online.
+
+## 🧠 The "Alignment" Logic (Why extract Source?)
+
+You asked: *"Do I need to extract Source if I don't edit it?"*
+**Answer**: You don't *edit* it, but you should *extract* it for two reasons:
+
+1.  **Visual Alignment**: Users need to see "Sentence A" right next to "Sentence B". If you just show a PDF on the left, it's hard to find which line matches the editable text on the right.
+2.  **The "Learning" Context**: The Glossary Agent needs to know: *"What was the original English word for 'ប្រាក់ធានា'?"* If you don't extract the source, the Agent can't learn the pair.
+
+**Modify [createGlossary.js](file:///d:/YorkMars/Production-Pro/glossary-agent/node_js/createGlossary.js) to add an `align` mode:**
+*   **Input**: Source Text, Target Text.
+*   **Prompt**: *"Align these two texts sentence-by-sentence. Output JSON."*
+*   **Output**:
+    ```json
+    [
+      {"id": 1, "source": "The deposit is refundable.", "target": "ប្រាក់កក់គឺអាចដកវិញបាន។"},
+      {"id": 2, "source": "Sign here.", "target": "ចុះហត្ថលេខានៅទីនេះ។"}
+    ]
+    ```
+*   **Usage**: Your React App takes this JSON and renders the "Editor". This is how you enable editing without needing Microsoft Office Online.
+
