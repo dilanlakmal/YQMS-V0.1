@@ -438,36 +438,44 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
             }
         }
 
-        // 1. Close the driver first to release file locks
-        if (driver) {
-            await driver.quit();
+         // 1. Close the driver first to release file locks
+    if (driver) {
+      await driver.quit();
+      driver = null; // Prevent double-closing in catch block
+    }
+
+    // 2. Create the ZIP file on the server temporarily
+    const zipFileName = `Bulk_Reports_${Date.now()}.zip`;
+    const zipPath = path.join(baseTempDir, zipFileName); 
+    const output = fs.createWriteStream(zipPath);
+    const archive = archiver('zip', { zlib: { level: 9 } });
+
+    // 3. This event fires when the ZIP is fully finished
+    output.on('close', () => {
+      console.log(`📦 ZIP finished: ${archive.pointer()} total bytes`);
+      
+      // 4. THIS IS THE KEY: Send the file to the user's browser
+      res.download(zipPath, zipFileName, (err) => {
+        if (err) {
+          console.error("Error sending file to user:", err);
         }
+        
+        // 5. Cleanup: Delete the ZIP and the temp folder from Ubuntu AFTER the user gets it
+        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+        if (downloadDir && fs.existsSync(downloadDir)) {
+          fs.rmSync(downloadDir, { recursive: true, force: true });
+        }
+        console.log('🗑️ Cleaned up ZIP and temp files from server');
+      });
+    });
 
-        // 2. Create the ZIP using the unique jobId to prevent mixing files
-        const zipFileName = `Bulk_Reports_${Date.now()}.zip`;
-        const zipPath = path.join(baseTempDir, zipFileName); // Save zip in base temp
-        const output = fs.createWriteStream(zipPath);
-        const archive = archiver('zip', { zlib: { level: 9 } });
+    archive.on('error', (err) => { throw err; });
+    archive.pipe(output);
 
-        // 3. Handle the archive events
-        output.on('close', () => {
-            console.log(`📦 ZIP created: ${archive.pointer()} total bytes`);
-            
-            // 4. THIS passes the file to the user device
-            res.download(zipPath, zipFileName, (err) => {
-                // 5. Cleanup: Delete the ZIP and the unique job folder after transfer
-                if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-                if (fs.existsSync(downloadDir)) fs.rmSync(downloadDir, { recursive: true, force: true });
-                console.log('🗑️ Cleaned up ZIP and temp files');
-            });
-        });
-
-        archive.on('error', (err) => { throw err; });
-        archive.pipe(output);
-
-        // 6. Append files from the unique downloadDir (NOT the global targetDownloadDir)
-        archive.directory(downloadDir, false); 
-        await archive.finalize();
+    // 6. Add the files we downloaded in this session to the ZIP
+    // We zip the "downloadDir" because your loop renames files inside it
+    archive.directory(downloadDir, false); 
+    await archive.finalize();
 
 
     } catch (error) {
@@ -506,335 +514,6 @@ export const downloadBulkReportsAuto = async (req, res) => {
         console.log('🪟 Using Puppeteer for Windows');
         return await downloadBulkReports(req, res);
     }
-};
-
-export const downloadBulkReportsUbuntu = async (req, res) => {
-  let driver = null;
-  let downloadDir = null;
-
-  try {
-    const {
-      downloadPath,
-      startRange,
-      endRange,
-      downloadAll,
-      includeDownloaded = false,
-      startDate,
-      endDate,
-      factoryName,
-      language = "english"
-    } = req.body;
-
-    // Create unique download directory
-    const jobId =
-      Date.now().toString() +
-      "_selenium_" +
-      Math.random().toString(36).substr(2, 9);
-    downloadDir = path.join(baseTempDir, jobId);
-    ensureDownloadDir(downloadDir);
-
-    const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
-    ensureDownloadDir(targetDownloadDir);
-
-    // Get inspection records
-    const records = await getInspectionRecords(
-      startRange,
-      endRange,
-      downloadAll,
-      includeDownloaded,
-      startDate,
-      endDate,
-      factoryName
-    );
-
-    if (records.length === 0) {
-      return res.json({
-        success: true,
-        message: "No records found matching the specified criteria",
-        downloadInfo: {
-          totalRecords: 0,
-          successfulDownloads: 0,
-          failedDownloads: 0,
-          skippedDownloads: 0,
-          totalFiles: 0,
-          totalSize: "0 Bytes",
-          details: []
-        }
-      });
-    }
-
-    console.log(
-      `🚀 Starting Selenium WebDriver for ${records.length} records...`
-    );
-
-    // Create WebDriver
-    driver = await createDriver(downloadDir);
-
-    // Login process
-    console.log("🔐 Performing login with Selenium...");
-    await driver.get(CONFIG.LOGIN_URL);
-
-    // Wait for and fill login form
-    const usernameField = await driver.wait(
-      until.elementLocated(By.id("username")),
-      10000
-    );
-    const passwordField = await driver.wait(
-      until.elementLocated(By.id("password")),
-      10000
-    );
-    const loginButton = await driver.wait(
-      until.elementLocated(By.id("js-login-submit")),
-      10000
-    );
-
-    await usernameField.clear();
-    await usernameField.sendKeys(process.env.P88_USERNAME);
-
-    await passwordField.clear();
-    await passwordField.sendKeys(process.env.P88_PASSWORD);
-
-    await loginButton.click();
-
-    // Wait for login to complete
-    await driver.wait(until.urlContains("dashboard"), 30000);
-    console.log("✅ Login successful with Selenium");
-
-    // Download reports
-    const downloadResults = [];
-    let successfulDownloads = 0;
-    let failedDownloads = 0;
-    let skippedDownloads = 0;
-    let totalFiles = 0;
-    let totalSizeBytes = 0;
-
-    for (let i = 0; i < records.length; i++) {
-      const record = records[i];
-      const inspectionNumber = getFirstInspectionNumber(record);
-
-      if (!inspectionNumber) {
-        failedDownloads++;
-        downloadResults.push({
-          inspectionNumber: "N/A",
-          groupNumber: record.groupNumber,
-          project: record.project,
-          success: false,
-          error: "No inspection number found"
-        });
-        continue;
-      }
-
-      try {
-        console.log(
-          `📋 Processing ${i + 1}/${records.length}: ${inspectionNumber}`
-        );
-
-        // Check if already downloaded
-        if (!includeDownloaded && record.downloadStatus === "Downloaded") {
-          skippedDownloads++;
-          downloadResults.push({
-            inspectionNumber,
-            groupNumber: record.groupNumber,
-            project: record.project,
-            success: true,
-            skipped: true,
-            reason: "Already downloaded"
-          });
-          continue;
-        }
-
-        // Update status to 'In Progress'
-        await updateDownloadStatus(record._id, "In Progress");
-
-        // Navigate to report
-        const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
-        await driver.get(reportUrl);
-
-        // Wait for print button and click
-        const printButton = await driver.wait(
-          until.elementLocated(By.css("#page-wrapper a")),
-          15000
-        );
-
-        // Get initial file count
-        const initialFiles = fs.existsSync(downloadDir)
-          ? fs.readdirSync(downloadDir)
-          : [];
-
-        // Click print button
-        await printButton.click();
-        console.log(`🖱️ Clicked print button for ${inspectionNumber}`);
-
-        // Wait for download to complete
-        const downloadedFiles = await waitForDownloadComplete(
-          downloadDir,
-          60000
-        );
-
-        // Find new files
-        const currentFiles = fs.readdirSync(downloadDir);
-        const newFiles = currentFiles.filter(
-          (file) => !initialFiles.includes(file)
-        );
-
-        if (newFiles.length === 0) {
-          throw new Error("No new files downloaded");
-        }
-
-        // Move files to final destination
-        const customFileName = generateCustomFileName(record);
-        const movedFiles = [];
-        let recordTotalSize = 0;
-
-        for (let j = 0; j < newFiles.length; j++) {
-          const tempFile = newFiles[j];
-          const tempFilePath = path.join(downloadDir, tempFile);
-          const fileExtension = path.extname(tempFile);
-          const newFileName = `${customFileName}${
-            newFiles.length > 1 ? `_${j + 1}` : ""
-          }${fileExtension}`;
-          const finalFilePath = path.join(targetDownloadDir, newFileName);
-
-          // Handle file conflicts
-          let actualFinalPath = finalFilePath;
-          if (fs.existsSync(finalFilePath)) {
-            const timestamp = Date.now();
-            const conflictFileName = `${customFileName}${
-              newFiles.length > 1 ? `_${j + 1}` : ""
-            }_${timestamp}${fileExtension}`;
-            actualFinalPath = path.join(targetDownloadDir, conflictFileName);
-          }
-
-          // Rename in temp dir for zip
-          const tempRenamedPath = path.join(downloadDir, newFileName);
-          fs.renameSync(tempFilePath, tempRenamedPath);
-
-          // Copy to target
-          fs.copyFileSync(tempRenamedPath, actualFinalPath);
-
-          const size = await getFileSize(actualFinalPath);
-          recordTotalSize += size;
-
-          movedFiles.push({
-            name: path.basename(actualFinalPath),
-            originalName: tempFile,
-            size: formatBytes(size),
-            sizeBytes: size,
-            inspectionNumber: inspectionNumber,
-            groupNumber: record.groupNumber,
-            project: record.project,
-            customFileName: customFileName
-          });
-        }
-
-        // Update status to 'Downloaded'
-        await updateDownloadStatus(record._id, "Downloaded", new Date());
-
-        successfulDownloads++;
-        totalFiles += movedFiles.length;
-        totalSizeBytes += recordTotalSize;
-
-        downloadResults.push({
-          inspectionNumber,
-          groupNumber: record.groupNumber,
-          project: record.project,
-          fileCount: movedFiles.length,
-          totalSize: recordTotalSize,
-          files: movedFiles,
-          success: true,
-          customFileName: customFileName
-        });
-
-        console.log(
-          `✅ Downloaded: ${inspectionNumber} (${
-            movedFiles.length
-          } files, ${formatBytes(recordTotalSize)})`
-        );
-      } catch (error) {
-        console.error(`❌ Failed: ${inspectionNumber} - ${error.message}`);
-
-        await updateDownloadStatus(record._id, "Failed");
-        failedDownloads++;
-
-        downloadResults.push({
-          inspectionNumber,
-          groupNumber: record.groupNumber,
-          project: record.project,
-          success: false,
-          error: error.message
-        });
-      }
-    }
-
-    // 1. Close the driver first to release file locks
-    if (driver) {
-      await driver.quit();
-    }
-
-    // 2. Create the ZIP using the unique jobId to prevent mixing files
-    const zipFileName = `Bulk_Reports_${Date.now()}.zip`;
-    const zipPath = path.join(baseTempDir, zipFileName); // Save zip in base temp
-    const output = fs.createWriteStream(zipPath);
-    const archive = archiver("zip", { zlib: { level: 9 } });
-
-    // 3. Handle the archive events
-    output.on("close", () => {
-      console.log(`📦 ZIP created: ${archive.pointer()} total bytes`);
-
-      // 4. THIS passes the file to the user device
-      res.download(zipPath, zipFileName, (err) => {
-        // 5. Cleanup: Delete the ZIP and the unique job folder after transfer
-        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-        if (fs.existsSync(downloadDir))
-          fs.rmSync(downloadDir, { recursive: true, force: true });
-        console.log("🗑️ Cleaned up ZIP and temp files");
-      });
-    });
-
-    archive.on("error", (err) => {
-      throw err;
-    });
-    archive.pipe(output);
-
-    // 6. Append files from the unique downloadDir (NOT the global targetDownloadDir)
-    archive.directory(downloadDir, false);
-    await archive.finalize();
-  } catch (error) {
-    console.error("Selenium download failed:", error);
-
-    // Cleanup on error
-    if (driver) {
-      try {
-        await driver.quit();
-      } catch (closeError) {
-        console.error("Error closing driver:", closeError);
-      }
-    }
-
-    if (downloadDir && fs.existsSync(downloadDir)) {
-      try {
-        fs.rmSync(downloadDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error("Error cleaning up temp directory:", cleanupError);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
-  }
-};
-
-// Platform-aware download function
-export const downloadBulkReportsAuto = async (req, res) => {
-  if (process.platform === "linux") {
-    console.log("🐧 Using Selenium WebDriver for Linux/Ubuntu");
-    return await downloadBulkReportsUbuntu(req, res);
-  } else {
-    console.log("🪟 Using Puppeteer for Windows");
-    return await downloadBulkReports(req, res);
-  }
 };
 
 export const initializeDownloadStatus = async (req, res) => {
@@ -1975,240 +1654,66 @@ export const downloadBulkReports = async (req, res) => {
     let jobDir = null;
 
     try {
-        const { 
-            downloadPath, 
-            startRange, 
-            endRange, 
-            downloadAll, 
-            includeDownloaded = false,
-            startDate,
-            endDate,
-            factoryName,
-            language = 'english'
-        } = req.body;
+        const { startRange, endRange, downloadAll, language = 'english', ...filters } = req.body;
 
-        // 1️⃣ Create unique temp folder for this bulk job
-        const jobId = Date.now().toString() + '_bulk_' + Math.random().toString(36).substr(2, 9);
+        // 1. Create a unique temp folder on the server
+        const jobId = `bulk_${Date.now()}`;
         jobDir = path.join(baseTempDir, jobId);
-        fs.mkdirSync(jobDir, { recursive: true });
+        if (!fs.existsSync(jobDir)) fs.mkdirSync(jobDir, { recursive: true });
 
-        const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
-
-        // Get inspection records
-        const records = await getInspectionRecords(
-            startRange, 
-            endRange, 
-            downloadAll, 
-            includeDownloaded,
-            startDate,
-            endDate,
-            factoryName
-        );
-
-        if (records.length === 0) {
-            // Cleanup empty job directory
-            if (jobDir && fs.existsSync(jobDir)) {
-                fs.rmSync(jobDir, { recursive: true, force: true });
-            }
-
-            return res.json({
-                success: true,
-                message: 'No records found matching the specified criteria',
-                downloadInfo: {
-                    totalRecords: 0,
-                    successfulDownloads: 0,
-                    failedDownloads: 0,
-                    skippedDownloads: 0,
-                    totalFiles: 0,
-                    totalSize: '0 Bytes',
-                    details: []
-                }
-            });
-        }
-
-        // 2️⃣ Enhanced browser launch with better session handling
+        // 2. Launch Browser
         browser = await puppeteer.launch({
             headless: CONFIG.HEADLESS,
-            args: [
-                '--no-sandbox', 
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor',
-                '--disable-dev-shm-usage',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-blink-features=AutomationControlled', // Hide automation
-                '--disable-extensions',
-                '--disable-plugins',
-            ],
-            defaultViewport: null,
-            ignoreDefaultArgs: ['--enable-automation'], // Hide automation flags
+            args: ['--no-sandbox']
         });
-
         const page = await browser.newPage();
-
-        // Enhanced user agent and headers
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-
-        // Remove webdriver property
-        await page.evaluateOnNewDocument(() => {
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined,
-            });
-        });
-
-        // Set viewport
-        await page.setViewport({ width: 1366, height: 768 });
-
-        // 👉 Enhanced download behavior setup
+        
+        // Set download behavior to our TEMP folder
         const client = await page.createCDPSession();
         await client.send('Page.setDownloadBehavior', {
             behavior: 'allow',
             downloadPath: jobDir
         });
 
-        // Set additional headers to maintain session
-        await page.setExtraHTTPHeaders({
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-        });
-
-        // Login process with enhanced session management
         await performLogin(page);
 
-        // Download reports
-        const downloadResults = [];
-        let successfulDownloads = 0;
-        let failedDownloads = 0;
-        let skippedDownloads = 0;
-        let redownloadedCount = 0;
-        let totalFiles = 0;
-        let totalSizeBytes = 0;
+        // 3. Fetch records from DB
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, filters);
 
-        for (let i = 0; i < records.length; i++) {
-            const record = records[i];
+        // 4. Download Loop
+        for (const record of records) {
             const inspectionNumber = getFirstInspectionNumber(record);
+            if (!inspectionNumber) continue;
 
-            if (!inspectionNumber) {
-                failedDownloads++;
-                downloadResults.push({
-                    inspectionNumber: 'N/A',
-                    groupNumber: record.groupNumber,
-                    project: record.project,
-                    success: false,
-                    error: 'No inspection number found'
-                });
-                continue;
-            }
-
-            try {
-                // Use the FIXED single report download function
-                const result = await downloadSingleReportWithTempFixed(
-                    page, 
-                    inspectionNumber, 
-                    jobDir, // Use temp directory
-                    targetDownloadDir, // Final destination
-                    record, 
-                    includeDownloaded, 
-                    language
-                );
-
-                downloadResults.push(result);
-
-                if (result.success) {
-                    if (result.skipped) {
-                        skippedDownloads++;
-                    } else {
-                        successfulDownloads++;
-                        totalFiles += result.fileCount;
-                        totalSizeBytes += result.totalSize;
-
-                        if (result.redownloaded) {
-                            redownloadedCount++;
-                        } else {
-                            console.log(`✅ Downloaded: ${inspectionNumber} (${result.fileCount} files)`);
-                        }
-                    }
-                } else {
-                    failedDownloads++;
-                    console.log(`❌ Failed: ${inspectionNumber} - ${result.error}`);
-                }
-
-            } catch (error) {
-                console.error(`Error processing record ${record._id}:`, error);
-                failedDownloads++;
-                downloadResults.push({
-                    inspectionNumber: inspectionNumber,
-                    groupNumber: record.groupNumber,
-                    project: record.project,
-                    success: false,
-                    error: error.message
-                });
-            }
+            // Note: We pass jobDir as the destination
+            await downloadSingleReportWithTempFixed(page, inspectionNumber, jobDir, jobDir, record, false, language);
         }
 
-        if (browser) {
-            await browser.close();
-        }
+        await browser.close();
+        browser = null;
 
-        // 🔥 Cleanup temp directory
-        if (jobDir && fs.existsSync(jobDir)) {
-            try {
-                fs.rmSync(jobDir, { recursive: true, force: true });
-            } catch (cleanupError) {
-                console.error('Error cleaning up bulk temp directory:', cleanupError);
-            }
-        }
+        // 5. ZIP and SEND to User
+        const zipFileName = `Reports_${Date.now()}.zip`;
+        const zipPath = path.join(baseTempDir, zipFileName);
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver('zip', { zlib: { level: 9 } });
 
-        const summaryMessage = includeDownloaded 
-            ? `Download completed: ${successfulDownloads} successful (${redownloadedCount} re-downloaded), ${failedDownloads} failed, ${skippedDownloads} skipped`
-            : `Download completed: ${successfulDownloads} successful, ${failedDownloads} failed, ${skippedDownloads} skipped`;
-
-        res.json({
-            success: true,
-            message: summaryMessage,
-            downloadInfo: {
-                totalRecords: records.length,
-                successfulDownloads,
-                failedDownloads,
-                skippedDownloads,
-                redownloadedCount,
-                totalFiles,
-                totalSize: formatBytes(totalSizeBytes),
-                downloadPath: targetDownloadDir,
-                details: downloadResults,
-                includeDownloaded
-            }
+        output.on('close', () => {
+            // This is the part that actually transfers the file to the user's device
+            res.download(zipPath, zipFileName, (err) => {
+                // Cleanup server files after transfer
+                if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+                if (fs.existsSync(jobDir)) fs.rmSync(jobDir, { recursive: true, force: true });
+            });
         });
+
+        archive.pipe(output);
+        archive.directory(jobDir, false);
+        await archive.finalize();
 
     } catch (error) {
-        console.error('Bulk download failed:', error);
-
-        // Cleanup on error
-        if (browser) {
-            try {
-                await browser.close();
-            } catch (closeError) {
-                console.error('Error closing browser:', closeError);
-            }
-        }
-
-        if (jobDir && fs.existsSync(jobDir)) {
-            try {
-                fs.rmSync(jobDir, { recursive: true, force: true });
-            } catch (cleanupError) {
-                console.error('Error cleaning up temp directory:', cleanupError);
-            }
-        }
-
-        res.status(500).json({
-            success: false,
-            error: error.message
-        });
+        if (browser) await browser.close();
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 

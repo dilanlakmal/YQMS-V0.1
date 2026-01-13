@@ -193,22 +193,9 @@ const PrintP88Report = () => {
             return;
         }
 
-        if (downloadMode === 'range' && (startRange > endRange || startRange < 1)) {
-            setStatus({ message: 'Please enter a valid range', type: 'error' });
-            return;
-        }
-
-        if (spaceInfo && !spaceInfo.hasEnoughSpace) {
-            const recordText = spaceInfo.recordCount ? ` for ${spaceInfo.recordCount} reports` : '';
-            const proceed = window.confirm(
-                `Warning: You may not have enough disk space${recordText}. Available: ${spaceInfo.availableSpace}, Estimated needed: ${spaceInfo.estimatedDownloadSize}. Do you want to proceed anyway?`
-            );
-            if (!proceed) return;
-        }
-
         setLoading(true);
         setShowDownloadDialog(false);
-        setProgress({ current: 0, total: spaceInfo?.recordCount || 1 });
+        setStatus({ message: 'Generating reports and preparing ZIP... Please wait.', type: 'warning' });
 
         try {
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
@@ -234,33 +221,41 @@ const PrintP88Report = () => {
                 body: JSON.stringify(body)
             });
 
-            if (!response.ok) {
-                let serverError = `HTTP error! status: ${response.status}`;
-                try {
-                    const errorData = await response.json();
-                    serverError = errorData.message || errorData.error || serverError;
-                } catch (e) {
-                    // Ignore if response body is not valid JSON
-                }
-                throw new Error(serverError);
-            }
+            if (!response.ok) throw new Error('Failed to generate reports');
 
-            const data = await response.json();
-            if (data.success) {
-                setDownloadInfo(data.downloadInfo);
-                setStatus({ 
-                    message: `Bulk download completed! ${data.downloadInfo.successfulDownloads} successful, ${data.downloadInfo.failedDownloads} failed. Total: ${data.downloadInfo.totalFiles} files (${data.downloadInfo.totalSize})`, 
-                    type: 'success' 
-                });
+            // CHECK CONTENT TYPE: Is it a ZIP file or a JSON error?
+            const contentType = response.headers.get("content-type");
+
+            if (contentType && contentType.includes("application/json")) {
+                // If the server sends JSON (usually an error or "no records found")
+                const data = await response.json();
+                setStatus({ message: data.message || 'No records found', type: 'info' });
             } else {
-                setStatus({ message: data.message || 'Failed to download report(s)', type: 'error' });
+                // IF IT IS A FILE (The ZIP)
+                // 1. Get the data as a Blob
+                const blob = await response.blob();
+
+                // 2. Create a hidden download link
+                const url = window.URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                
+                // Set the filename for the user's computer
+                link.setAttribute('download', `P88_Reports_${new Date().toISOString().split('T')[0]}.zip`);
+                
+                // 3. Trigger the click and cleanup
+                document.body.appendChild(link);
+                link.click();
+                link.parentNode.removeChild(link);
+                window.URL.revokeObjectURL(url);
+
+                setStatus({ message: 'Download started! Check your browser downloads.', type: 'success' });
             }
         } catch (error) {
-            console.error('Error:', error);
-            setStatus({ message: error.message, type: 'error' });
+            console.error('Download Error:', error);
+            setStatus({ message: `Download failed: ${error.message}`, type: 'error' });
         } finally {
             setLoading(false);
-            setProgress(null);
         }
     };
 
