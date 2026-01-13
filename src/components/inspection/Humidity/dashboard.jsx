@@ -177,6 +177,12 @@ export default function Dashboard() {
   const [totalRibsFail, setTotalRibsFail] = useState(0);
   const [totalBodyPass, setTotalBodyPass] = useState(0);
   const [totalBodyFail, setTotalBodyFail] = useState(0);
+  const [topPass, setTopPass] = useState(0);
+  const [topFail, setTopFail] = useState(0);
+  const [middlePass, setMiddlePass] = useState(0);
+  const [middleFail, setMiddleFail] = useState(0);
+  const [bottomPass, setBottomPass] = useState(0);
+  const [bottomFail, setBottomFail] = useState(0);
   const [docsRaw, setDocsRaw] = useState([]);
   const [ordersRaw, setOrdersRaw] = useState([]);
   const [startDate, setStartDate] = useState(() => {
@@ -191,7 +197,12 @@ export default function Dashboard() {
   const [buyerStyleFilter, setBuyerStyleFilter] = useState("");
   const [customerFilter, setCustomerFilter] = useState("");
   const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
+  const [showStyleDropdown, setShowStyleDropdown] = useState(false);
+  const [styleSearch, setStyleSearch] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [isOrderLoading, setIsOrderLoading] = useState(false);
   const buyerRef = useRef(null);
+  const styleRef = useRef(null);
 
   useEffect(() => {
     let mounted = true;
@@ -261,6 +272,40 @@ export default function Dashboard() {
       window.removeEventListener("humidityReportsUpdated", onUpdated);
     };
   }, []);
+
+  // Fetch detailed order data when style is selected
+  useEffect(() => {
+    let mounted = true;
+    const fetchFullOrder = async () => {
+      if (!factoryStyleFilter) {
+        setSelectedOrder(null);
+        return;
+      }
+      try {
+        setIsOrderLoading(true);
+        const base =
+          API_BASE_URL && API_BASE_URL !== ""
+            ? API_BASE_URL.replace(/\/$/, "")
+            : "";
+        const res = await fetch(
+          `${base}/api/yorksys-orders/${encodeURIComponent(factoryStyleFilter)}`
+        );
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        const json = await res.json();
+        const order = json && json.data ? json.data : json || null;
+        if (mounted) setSelectedOrder(order);
+      } catch (e) {
+        console.error("Error fetching full order details:", e);
+        if (mounted) setSelectedOrder(null);
+      } finally {
+        if (mounted) setIsOrderLoading(false);
+      }
+    };
+    fetchFullOrder();
+    return () => {
+      mounted = false;
+    };
+  }, [factoryStyleFilter]);
 
   // filtered docs based on current filters
   const filteredDocs = useMemo(() => {
@@ -334,6 +379,12 @@ export default function Dashboard() {
       let totalRFail = 0;
       let totalBPass = 0;
       let totalBFail = 0;
+      let tPass = 0,
+        tFail = 0;
+      let mPass = 0,
+        mFail = 0;
+      let bPass = 0,
+        bFail = 0;
 
       filtered.forEach((d) => {
         const cust = (d.customer || d.buyer || "Unknown").toString();
@@ -355,6 +406,18 @@ export default function Dashboard() {
               bodyCounts[cust] += bodyNum;
               if (s.status === "pass") totalBPass += bodyNum;
               else if (s.status === "fail") totalBFail += bodyNum;
+
+              // Record section specific pass/fail
+              if (sec === "top") {
+                if (s.status === "pass") tPass += bodyNum;
+                else if (s.status === "fail") tFail += bodyNum;
+              } else if (sec === "middle") {
+                if (s.status === "pass") mPass += bodyNum;
+                else if (s.status === "fail") mFail += bodyNum;
+              } else if (sec === "bottom") {
+                if (s.status === "pass") bPass += bodyNum;
+                else if (s.status === "fail") bFail += bodyNum;
+              }
             }
             if (
               s.ribs !== undefined &&
@@ -366,6 +429,18 @@ export default function Dashboard() {
               ribsCounts[cust] += ribsNum;
               if (s.status === "pass") totalRPass += ribsNum;
               else if (s.status === "fail") totalRFail += ribsNum;
+
+              // Also count ribs for section metrics
+              if (sec === "top") {
+                if (s.status === "pass") tPass += ribsNum;
+                else if (s.status === "fail") tFail += ribsNum;
+              } else if (sec === "middle") {
+                if (s.status === "pass") mPass += ribsNum;
+                else if (s.status === "fail") mFail += ribsNum;
+              } else if (sec === "bottom") {
+                if (s.status === "pass") bPass += ribsNum;
+                else if (s.status === "fail") bFail += ribsNum;
+              }
             }
           });
         });
@@ -377,6 +452,12 @@ export default function Dashboard() {
       setTotalRibsFail(totalRFail);
       setTotalBodyPass(totalBPass);
       setTotalBodyFail(totalBFail);
+      setTopPass(tPass);
+      setTopFail(tFail);
+      setMiddlePass(mPass);
+      setMiddleFail(mFail);
+      setBottomPass(bPass);
+      setBottomFail(bFail);
     } catch (e) {
       console.error("Error computing aggregates for dashboard filters", e);
     }
@@ -530,6 +611,20 @@ export default function Dashboard() {
     }
   }, [factoryStyleFilter, buyerOptionsFiltered, customerOptionsFiltered]);
 
+  // Handle click outside for dropdowns
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (buyerRef.current && !buyerRef.current.contains(event.target)) {
+        setShowBuyerDropdown(false);
+      }
+      if (styleRef.current && !styleRef.current.contains(event.target)) {
+        setShowStyleDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   const total = totalRibsPass + totalRibsFail;
   const passPct = total ? Math.round((totalRibsPass / total) * 100) : 0;
   const failPct = total ? Math.round((totalRibsFail / total) * 100) : 0;
@@ -573,7 +668,12 @@ export default function Dashboard() {
           latest.middle?.status === "pass" &&
           latest.bottom?.status === "pass";
         return allPass ? "pass" : "fail";
-      })()
+      })(),
+      upperCentisimalIndex:
+        doc.upperCentisimalIndex ||
+        (doc.history && doc.history.length > 0
+          ? doc.history[doc.history.length - 1].upperCentisimalIndex
+          : null)
     }));
   }, [filteredDocs]);
 
@@ -699,53 +799,92 @@ export default function Dashboard() {
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
             />
           </div>
-          <div>
+          <div ref={styleRef}>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Factory Style No
             </label>
             <div className="relative">
-              <select
-                value={factoryStyleFilter}
-                onChange={(e) => setFactoryStyleFilter(e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg bg-white appearance-none pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              <input
+                type="text"
+                placeholder="Select or type style..."
+                value={styleSearch || factoryStyleFilter}
+                onFocus={() => setShowStyleDropdown(true)}
+                onChange={(e) => {
+                  setStyleSearch(e.target.value);
+                  setFactoryStyleFilter(e.target.value);
+                  setShowStyleDropdown(true);
+                }}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all pr-10"
+              />
+              <div
+                className="absolute inset-y-0 right-0 flex items-center px-3 text-gray-400 cursor-pointer"
+                onClick={() => setShowStyleDropdown(!showStyleDropdown)}
               >
-                <option value="">All Styles</option>
-                {[
-                  ...new Set([
-                    ...(Array.isArray(ordersRaw)
-                      ? ordersRaw
-                          .map((o) => (o.moNo || o.style || "").toString())
-                          .filter(Boolean)
-                      : []),
-                    ...(Array.isArray(docsRaw)
-                      ? docsRaw
-                          .map((d) =>
-                            (
-                              d.factoryStyleNo ||
-                              d.factoryStyle ||
-                              d.moNo ||
-                              d.style ||
-                              ""
-                            ).toString()
-                          )
-                          .filter(Boolean)
-                      : [])
-                  ])
-                ].map((f) => (
-                  <option key={f} value={f}>
-                    {f}
-                  </option>
-                ))}
-              </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
                 <svg
-                  className="fill-current h-5 w-5"
+                  className={`fill-current h-5 w-5 transition-transform ${
+                    showStyleDropdown ? "rotate-180" : ""
+                  }`}
                   xmlns="http://www.w3.org/2000/svg"
                   viewBox="0 0 20 20"
                 >
                   <path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" />
                 </svg>
               </div>
+
+              {showStyleDropdown && (
+                <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-xl max-h-60 overflow-y-auto">
+                  <div
+                    className="px-4 py-2 hover:bg-blue-50 cursor-pointer text-sm text-gray-500 border-b border-gray-50 italic"
+                    onClick={() => {
+                      setFactoryStyleFilter("");
+                      setStyleSearch("");
+                      setShowStyleDropdown(false);
+                    }}
+                  >
+                    Clear Search / All Styles
+                  </div>
+                  {[
+                    ...new Set([
+                      ...(Array.isArray(ordersRaw)
+                        ? ordersRaw
+                            .map((o) => (o.moNo || o.style || "").toString())
+                            .filter(Boolean)
+                        : []),
+                      ...(Array.isArray(docsRaw)
+                        ? docsRaw
+                            .map((d) =>
+                              (
+                                d.factoryStyleNo ||
+                                d.factoryStyle ||
+                                d.moNo ||
+                                d.style ||
+                                ""
+                              ).toString()
+                            )
+                            .filter(Boolean)
+                        : [])
+                    ])
+                  ]
+                    .filter(
+                      (f) =>
+                        !styleSearch ||
+                        f.toLowerCase().includes(styleSearch.toLowerCase())
+                    )
+                    .map((f) => (
+                      <div
+                        key={f}
+                        className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer text-sm text-gray-700 font-medium transition-colors border-b border-gray-50 last:border-0"
+                        onClick={() => {
+                          setFactoryStyleFilter(f);
+                          setStyleSearch(f);
+                          setShowStyleDropdown(false);
+                        }}
+                      >
+                        {f}
+                      </div>
+                    ))}
+                </div>
+              )}
             </div>
           </div>
           <div ref={buyerRef}>
@@ -785,6 +924,64 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Selected Order Detailed Info Section */}
+      {/* {factoryStyleFilter && (
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6 overflow-hidden animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="flex items-center gap-2 mb-6 border-b border-gray-50 pb-4">
+            <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-800">Order Information</h3>
+              <p className="text-xs text-gray-500 font-medium">Detailed specs for Style: <span className="text-blue-600 font-extrabold">{factoryStyleFilter}</span></p>
+            </div>
+          </div>
+
+          {isOrderLoading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+            </div>
+          ) : selectedOrder ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100 ">
+                <div className="text-[13px] uppercase text-gray-800 font-bold tracking-widest mb-1">Customer</div>
+                <div className="text-lg font-extrabold text-gray-800">{selectedOrder.buyer || 'N/A'}</div>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Fabrication</div>
+                <div className="text-sm font-bold text-gray-800 break-words">
+                  {Array.isArray(selectedOrder.FabricContent) && selectedOrder.FabricContent.length > 0
+                    ? selectedOrder.FabricContent.map(f => `${f.fabricName || f.fabric || ''} ${f.percentageValue || ''}%`.trim()).join(', ')
+                    : 'N/A'}
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">PO Number / Line</div>
+                <div className="text-lg font-extrabold text-gray-800">
+                  {selectedOrder.poNo || 'N/A'}
+                  {selectedOrder.SKUData?.[0]?.POLine ? <span className="text-gray-400 text-sm ml-2">({selectedOrder.SKUData[0].POLine})</span> : ''}
+                </div>
+              </div>
+              <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
+                <div className="text-[10px] uppercase text-gray-400 font-bold tracking-widest mb-1">Available Colors</div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {[...new Set([
+                    ...(Array.isArray(selectedOrder.SKUData) ? selectedOrder.SKUData.map(s => s.Color).filter(Boolean) : []),
+                    ...((Array.isArray(selectedOrder.OrderQtyByCountry) ? selectedOrder.OrderQtyByCountry.flatMap(c => (c.ColorQty || []).map(cq => cq.ColorName)) : [])).filter(Boolean)
+                  ])].map((col, idx) => (
+                    <span key={idx} className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-black rounded uppercase tracking-tighter shadow-sm">{col}</span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-6 text-gray-400 italic text-sm font-medium">No extended order details found for this style.</div>
+          )}
+        </div>
+      )} */}
 
       {/* Quick Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -890,6 +1087,46 @@ export default function Dashboard() {
           }
           color={failPctBody <= 20 ? "red" : failPctBody <= 50 ? "red" : "red"}
         />
+        {(() => {
+          if (!factoryStyleFilter) return null;
+          const relevantDoc = filteredDocs.find(
+            (d) =>
+              (d.upperCentisimalIndex &&
+                String(d.upperCentisimalIndex).trim() !== "") ||
+              (Array.isArray(d.history) &&
+                d.history.some((h) => h.upperCentisimalIndex))
+          );
+          const uci = relevantDoc
+            ? relevantDoc.upperCentisimalIndex ||
+              relevantDoc.history.find((h) => h.upperCentisimalIndex)
+                ?.upperCentisimalIndex
+            : null;
+
+          if (!uci) return null;
+
+          return (
+            <StatsCard
+              label="Upper Centisimal Index"
+              value={uci}
+              icon={
+                <svg
+                  className="w-6 h-6"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10"
+                  />
+                </svg>
+              }
+              color="orange"
+            />
+          );
+        })()}
       </div>
 
       {/* Main KPI Cards - Body Metrics */}
@@ -1081,6 +1318,178 @@ export default function Dashboard() {
                 fillRule="evenodd"
                 d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
                 clipRule="evenodd"
+              />
+            </svg>
+          }
+        />
+      </div>
+
+      {/* Section Metrics Row */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <KpiCard
+          title="Top Readings"
+          value={topPass + topFail}
+          subtitle={`${
+            topPass + topFail
+              ? Math.round((topPass / (topPass + topFail)) * 100)
+              : 0
+          }% pass rate`}
+          gradient="bg-gray-50 border-2 border-blue-200"
+          percent={
+            topPass + topFail
+              ? Math.round((topPass / (topPass + topFail)) * 100)
+              : 0
+          }
+          icon={
+            <svg
+              className="w-5 h-5 text-indigo-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+          cornerBg="bg-blue-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-blue-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+        />
+        <KpiCard
+          title="Middle Readings"
+          value={middlePass + middleFail}
+          subtitle={`${
+            middlePass + middleFail
+              ? Math.round((middlePass / (middlePass + middleFail)) * 100)
+              : 0
+          }% pass rate`}
+          gradient="bg-gray-50 border-2 border-orange-200"
+          percent={
+            middlePass + middleFail
+              ? Math.round((middlePass / (middlePass + middleFail)) * 100)
+              : 0
+          }
+          icon={
+            <svg
+              className="w-5 h-5 text-pink-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+          cornerBg="bg-orange-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-orange-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+        />
+        <KpiCard
+          title="Bottom Readings"
+          value={bottomPass + bottomFail}
+          subtitle={`${
+            bottomPass + bottomFail
+              ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100)
+              : 0
+          }% pass rate`}
+          gradient="bg-gray-50 border-2 border-green-200"
+          percent={
+            bottomPass + bottomFail
+              ? Math.round((bottomPass / (bottomPass + bottomFail)) * 100)
+              : 0
+          }
+          icon={
+            <svg
+              className="w-5 h-5 text-pink-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          }
+          cornerBg="bg-green-50"
+          cornerIcon={
+            <svg
+              className="w-5 h-5 text-green-400"
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"
+                fill="currentColor"
+              />
+              <path
+                d="M16 6l4-4M20 2v4h-4"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             </svg>
           }
@@ -1305,6 +1714,316 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Sectional Performance Charts */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Top Section Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 15l7-7 7 7"
+                />
+              </svg>
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">
+              Top Performance
+            </h3>
+          </div>
+          <div
+            className="flex items-center justify-center p-2"
+            style={{ height: 160 }}
+          >
+            {topPass === 0 && topFail === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <svg
+                  className="w-16 h-16 mb-4 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+                <p className="font-medium text-gray-700">
+                  No Top Data Available
+                </p>
+                <p className="text-sm mt-1 text-center">
+                  Enter top readings in your inspection reports to see this
+                  chart
+                </p>
+              </div>
+            ) : (
+              <>
+                <Doughnut
+                  data={{
+                    labels: ["Pass", "Fail"],
+                    datasets: [
+                      {
+                        data: [topPass, topFail],
+                        backgroundColor: ["#93c5fd", "#fca5a5"],
+                        borderColor: ["#3b82f6", "#ef4444"],
+                        borderWidth: 1
+                      }
+                    ]
+                  }}
+                  options={{
+                    cutout: "70%",
+                    plugins: {
+                      legend: { display: false },
+                      datalabels: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) =>
+                            `${ctx.label}: ${ctx.raw} (${Math.round(
+                              (ctx.raw / (topPass + topFail || 1)) * 100
+                            )}%)`
+                        }
+                      }
+                    }
+                  }}
+                />
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold text-gray-800">
+                    {topPass + topFail
+                      ? Math.round((topPass / (topPass + topFail)) * 100)
+                      : 0}
+                    %
+                  </span>
+                  <span className="text-[10px] text-gray-500 uppercase font-medium">
+                    Pass
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-[#93c5fd]" />
+            <span className="text-sm font-medium text-gray-600">Pass</span>
+            <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
+            <span className="text-sm font-medium text-gray-600">Fail</span>
+          </div>
+        </div>
+
+        {/* Middle Section Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-orange-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M18 12H6"
+                />
+              </svg>
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">
+              Middle Performance
+            </h3>
+          </div>
+          <div
+            className="flex items-center justify-center p-2"
+            style={{ height: 160 }}
+          >
+            {middlePass === 0 && middleFail === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <svg
+                  className="w-16 h-16 mb-4 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+                <p className="font-medium text-gray-700">
+                  No Middle Data Available
+                </p>
+                <p className="text-sm mt-1 text-center">
+                  Enter middle readings in your inspection reports to see this
+                  chart
+                </p>
+              </div>
+            ) : (
+              <>
+                <Doughnut
+                  data={{
+                    labels: ["Pass", "Fail"],
+                    datasets: [
+                      {
+                        data: [middlePass, middleFail],
+                        backgroundColor: ["#fde68a", "#fca5a5"],
+                        borderColor: ["#f59e0b", "#ef4444"],
+                        borderWidth: 1
+                      }
+                    ]
+                  }}
+                  options={{
+                    cutout: "70%",
+                    plugins: {
+                      legend: { display: false },
+                      datalabels: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) =>
+                            `${ctx.label}: ${ctx.raw} (${Math.round(
+                              (ctx.raw / (middlePass + middleFail || 1)) * 100
+                            )}%)`
+                        }
+                      }
+                    }
+                  }}
+                />
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold text-gray-800">
+                    {middlePass + middleFail
+                      ? Math.round(
+                          (middlePass / (middlePass + middleFail)) * 100
+                        )
+                      : 0}
+                    %
+                  </span>
+                  <span className="text-[10px] text-gray-500 uppercase font-medium">
+                    Pass
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-[#fde68a]" />
+            <span className="text-sm font-medium text-gray-600">Pass</span>
+            <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
+            <span className="text-sm font-medium text-gray-600">Fail</span>
+          </div>
+        </div>
+
+        {/* Bottom Section Chart */}
+        <div className="bg-white rounded-xl shadow-md border border-gray-100 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+              <svg
+                className="w-5 h-5 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 9l-7 7-7-7"
+                />
+              </svg>
+            </div>
+            <h3 className="text-md font-semibold text-gray-800">
+              Bottom Performance
+            </h3>
+          </div>
+          <div
+            className="flex items-center justify-center p-2"
+            style={{ height: 160 }}
+          >
+            {bottomPass === 0 && bottomFail === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <svg
+                  className="w-16 h-16 mb-4 text-gray-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
+                  />
+                </svg>
+                <p className="font-medium text-gray-700">
+                  No Bottom Data Available
+                </p>
+                <p className="text-sm mt-1 text-center">
+                  Enter bottom readings in your inspection reports to see this
+                  chart
+                </p>
+              </div>
+            ) : (
+              <>
+                <Doughnut
+                  data={{
+                    labels: ["Pass", "Fail"],
+                    datasets: [
+                      {
+                        data: [bottomPass, bottomFail],
+                        backgroundColor: ["#86efac", "#fca5a5"],
+                        borderColor: ["#22c55e", "#ef4444"],
+                        borderWidth: 1
+                      }
+                    ]
+                  }}
+                  options={{
+                    cutout: "70%",
+                    plugins: {
+                      legend: { display: false },
+                      datalabels: { display: false },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) =>
+                            `${ctx.label}: ${ctx.raw} (${Math.round(
+                              (ctx.raw / (bottomPass + bottomFail || 1)) * 100
+                            )}%)`
+                        }
+                      }
+                    }
+                  }}
+                />
+                <div className="absolute flex flex-col items-center justify-center">
+                  <span className="text-xl font-bold text-gray-800">
+                    {bottomPass + bottomFail
+                      ? Math.round(
+                          (bottomPass / (bottomPass + bottomFail)) * 100
+                        )
+                      : 0}
+                    %
+                  </span>
+                  <span className="text-[10px] text-gray-500 uppercase font-medium">
+                    Pass
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            <div className="w-3 h-3 rounded-full bg-[#86efac]" />
+            <span className="text-sm font-medium text-gray-600">Pass</span>
+            <div className="w-3 h-3 rounded-full bg-[#fca5a5]" />
+            <span className="text-sm font-medium text-gray-600">Fail</span>
+          </div>
+        </div>
+      </div>
+
       {/* Recent Activity */}
       <div className="bg-white rounded-xl shadow-md border border-gray-100 p-10">
         <div className="flex items-center gap-2 mb-12">
@@ -1415,6 +2134,11 @@ export default function Dashboard() {
                     </div>
                     <div className="text-sm text-gray-600">
                       {activity.customer}
+                      {activity.upperCentisimalIndex && (
+                        <span className="ml-2 px-2 py-0.5 bg-orange-100 text-orange-700 rounded text-[10px] font-bold">
+                          UC: {activity.upperCentisimalIndex}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="hidden md:flex items-center gap-2 text-sm text-gray-600">
