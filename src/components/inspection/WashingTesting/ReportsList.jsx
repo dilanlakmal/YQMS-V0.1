@@ -128,6 +128,7 @@ const ReportsList = ({
       borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
       color: "black",
       minHeight: "42px",
+      cursor: "pointer",
       "&::placeholder": {
         color: "gray"
       }
@@ -140,6 +141,14 @@ const ReportsList = ({
       "&:active": {
         backgroundColor: "#d1d5db" // Gray-300 on click
       }
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      cursor: "pointer",
+    }),
+    clearIndicator: (base) => ({
+      ...base,
+      cursor: "pointer",
     }),
     singleValue: (base) => ({
       ...base,

@@ -60,6 +60,7 @@ const LaundryWashingMachineTest = () => {
 
   // Initialize custom hooks
   const initialFormData = {
+    reportType: "Home Wash/Garment Wash Test", // Default value
     color: [],
     ymStyle: "",
     buyerStyle: "",
@@ -462,6 +463,7 @@ const LaundryWashingMachineTest = () => {
       // setActiveTab("reports"); // Removed per request
       // Reset form
       resetForm({
+        reportType: "Home Wash/Garment Wash Test",
         color: [],
         ymStyle: "",
         buyerStyle: "",
@@ -1762,14 +1764,32 @@ const LaundryWashingMachineTest = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-gray-100 p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg">
         <div className="p-4 md:p-6">
-          {/* Page Title */}
-          <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
-              Launch Washing Machine Test
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Report Washing - Enter test details and view submitted reports
-            </p>
+          {/* Page Title & Report Type Selection */}
+          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-gray-100 dark:border-gray-700 pb-4">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-1">
+                Launch Washing Machine Test
+              </h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                Report Washing - Enter test details and view submitted reports
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 bg-blue-50/50 dark:bg-gray-800/50 p-3 rounded-xl border border-blue-100 dark:border-gray-700">
+              <label className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+                Report Type
+              </label>
+              <select
+                value={formData.reportType}
+                onChange={(e) => handleInputChange("reportType", e.target.value)}
+                className="min-w-[240px] px-4 py-2.5 bg-white dark:bg-gray-700 text-gray-800 dark:text-white border-2 border-blue-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-semibold shadow-sm cursor-pointer transition-all hover:border-blue-300"
+              >
+                <option value="Home Wash/Garment Wash Test">Home Wash/Garment Wash Test</option>
+                <option value="HT Testing">HT Testing</option>
+                <option value="EMB testing">EMB testing</option>
+                <option value="Printing Testing">Printing Testing</option>
+                <option value="Pulling Test">Pulling Test</option>
+              </select>
+            </div>
           </div>
 
           {/* Tab Navigation */}

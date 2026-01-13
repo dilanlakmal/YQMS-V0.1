@@ -147,6 +147,10 @@ const ReportCard = ({
       {!isExpanded && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 mt-2 text-xs md:text-sm">
           <div>
+            <span className="text-gray-500 dark:text-gray-400">Type: </span>
+            <span className="font-medium text-blue-600 dark:text-blue-400">{report.reportType || "Home Wash/Garment Wash Test"}</span>
+          </div>
+          <div>
             <span className="text-gray-500 dark:text-gray-400">Buyer Style: </span>
             <span className="text-gray-900 dark:text-white break-words">{report.buyerStyle || "N/A"}</span>
           </div>
@@ -177,6 +181,14 @@ const ReportCard = ({
       {isExpanded && (
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4 mt-4">
+            <div>
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                Report Type
+              </p>
+              <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">
+                {report.reportType || "Home Wash/Garment Wash Test"}
+              </p>
+            </div>
             <div>
               <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
                 Buyer Style

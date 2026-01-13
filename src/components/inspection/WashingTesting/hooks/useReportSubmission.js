@@ -23,6 +23,7 @@ export const useReportSubmission = (user, fetchReports) => {
       const formDataToSubmit = new FormData();
 
       // Add form fields
+      formDataToSubmit.append("reportType", formData.reportType || "Home Wash/Garment Wash Test");
       formDataToSubmit.append("ymStyle", formData.ymStyle || "");
       formDataToSubmit.append("buyerStyle", formData.buyerStyle || "");
       formDataToSubmit.append("color", JSON.stringify(formData.color || []));
@@ -235,6 +236,7 @@ export const useReportSubmission = (user, fetchReports) => {
 
     try {
       const formDataToSubmit = new FormData();
+      formDataToSubmit.append("reportType", editFormData.reportType || "Home Wash/Garment Wash Test");
       formDataToSubmit.append("color", JSON.stringify(editFormData.color || []));
       formDataToSubmit.append("buyerStyle", editFormData.buyerStyle || "");
       formDataToSubmit.append("po", JSON.stringify(editFormData.po || []));
