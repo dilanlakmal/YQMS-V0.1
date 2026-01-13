@@ -1,5 +1,6 @@
 
 
+import { motion } from "framer-motion";
 
 const TeamSelection = ({
     teams,
@@ -12,14 +13,20 @@ const TeamSelection = ({
         setCurrentStep(currentStep + 1);
     }
     return (
-        <div className="p-6 rounded-lg m-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {
-                teams.map((team) => (
-                    <Team
+                teams.map((team, index) => (
+                    <motion.div
                         key={team.id}
-                        team={team}
-                        onSelect={() => handleTeamSelect(team)}
-                    />
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                    >
+                        <Team
+                            team={team}
+                            onSelect={() => handleTeamSelect(team)}
+                        />
+                    </motion.div>
                 ))
             }
         </div>
@@ -28,8 +35,15 @@ const TeamSelection = ({
 
 const Team = ({ team, onSelect }) => {
     return (
-        <button onClick={onSelect} className="w-full text-center p-4 border border-blue-500 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-md hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-300">
-            <h2 className="text-xl text-white font-sans">{team.name}</h2>
+        <button
+            onClick={onSelect}
+            className="w-full group relative flex flex-col items-center justify-center p-6 h-40 bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md hover:border-blue-400 transition-all duration-200 text-slate-700 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+        >
+            <div className="w-12 h-12 mb-4 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                <span className="text-xl font-bold">{team.name.charAt(0)}</span>
+            </div>
+            <h2 className="text-lg font-semibold">{team.name}</h2>
+            <div className="absolute inset-0 border-2 border-transparent group-hover:border-blue-50 rounded-xl pointer-events-none" />
         </button>
     );
 }

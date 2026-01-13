@@ -13,7 +13,7 @@ import { useTheme } from "./context/ThemeContext";
 import { API_BASE_URL } from "../../config";
 import LanguageSwitcher from "../components/layout/LangSwitch";
 import YQMSAIChatBox from "../pages/YQMSAIChatBox";
-import ChatGuide from "./chatbot/ChatStepIntro"; 
+import ChatGuide from "./chatbot/components/StepIntro";
 
 import {
   Layers,
@@ -327,7 +327,7 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
 
   };
 
-  return  (
+  return (
     <>
       <nav className="bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm shadow-md fixed top-0 left-0 right-0 z-50 transition-colors">
         <div className="max-w-screen-2xl mx-auto px-2 sm:px-4 lg:px-6">
@@ -362,9 +362,8 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
                         })}{" "}
                         {section.title}{" "}
                         <ChevronDown
-                          className={`w-4 h-4 ml-1 transition-transform ${
-                            isMenuOpen === section.id ? "rotate-180" : ""
-                          }`}
+                          className={`w-4 h-4 ml-1 transition-transform ${isMenuOpen === section.id ? "rotate-180" : ""
+                            }`}
                         />
                       </button>
                       {isMenuOpen === section.id && (
@@ -395,7 +394,7 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
                   target: "#botIcon",
                   content: "Our main chatbot live here"
                 }
-              ]}/>
+              ]} />
               <button
                 onClick={handleBotClick}
                 className="p-2 rounded-full text-slate-600 dark:text-slate-300 hover:bg-gray-200 dark:hover:bg-slate-800 transition-colors relative"
@@ -430,9 +429,8 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
                       {user.name}
                     </span>
                     <ChevronDown
-                      className={`w-4 h-4 text-slate-500 transition-transform ${
-                        isProfileOpen ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 text-slate-500 transition-transform ${isProfileOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
                   {isProfileOpen && (
@@ -471,18 +469,16 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
 
       {/* --- REDESIGNED MOBILE MENU --- */}
       <div
-        className={`fixed inset-0 z-50 md:hidden transition-opacity ${
-          isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        className={`fixed inset-0 z-50 md:hidden transition-opacity ${isMobileMenuOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
       >
         <div
           className="absolute inset-0 bg-black/50"
           onClick={() => setIsMobileMenuOpen(false)}
         ></div>
         <div
-          className={`relative w-full max-w-xs ml-auto h-full bg-white dark:bg-slate-900 flex flex-col transition-transform transform ${
-            isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
-          }`}
+          className={`relative w-full max-w-xs ml-auto h-full bg-white dark:bg-slate-900 flex flex-col transition-transform transform ${isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
+            }`}
         >
           <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-slate-700">
             <h2 className="font-bold text-lg text-slate-800 dark:text-white">
@@ -508,9 +504,8 @@ export default function Navbar({ onLogout, isChatOpen, setIsChatOpen }) {
                       {section.title}
                     </span>
                     <ChevronDown
-                      className={`w-5 h-5 transition-transform ${
-                        mobileExpandedSection === section.id ? "rotate-180" : ""
-                      }`}
+                      className={`w-5 h-5 transition-transform ${mobileExpandedSection === section.id ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
                   {mobileExpandedSection === section.id && (

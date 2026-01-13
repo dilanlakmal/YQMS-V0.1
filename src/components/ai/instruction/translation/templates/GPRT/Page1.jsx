@@ -1,208 +1,403 @@
-import GPRT_FIRST_PAGE_DATA from "../../data/GPRT/FirstPage";
 import EditWord from "../../../../utils/EditWord";
 import { splitChineseWords } from "../../../../../../utils/segmenter";
-
+import { getOriginLangByPage } from "../../api/extraction.js";
+import { useState, useEffect } from "react";
+import { updateProductionData } from "../../api/extraction.js";
 
 const FirstPage = ({
+    production,
+    setProduction,
     editable,
-    step
+    step,
+    currentLanguage // Receives "en", "zh", etc.
 }) => {
+    const [fetchedLang, setFetchedLang] = useState("");
 
-    const title = GPRT_FIRST_PAGE_DATA.header.content.title.values;
-    const content = GPRT_FIRST_PAGE_DATA.header.content;
-    const titleInfo = GPRT_FIRST_PAGE_DATA.header.content.infoTable;
-    const hightLightInfo = GPRT_FIRST_PAGE_DATA.header.content.highlightRow;
+    useEffect(() => {
+        const fetchLang = async () => {
+            if (production?.documentId && !currentLanguage) {
+                const lang = await getOriginLangByPage(production.documentId, 1);
+                setFetchedLang(lang.OrigenLang);
+            }
+        };
+        fetchLang();
+    }, [production, currentLanguage]);
 
-    const productionSpecifications = GPRT_FIRST_PAGE_DATA.tables;
+    // Use passed language prop (for Review/Translation mode) or fetched origin lang (for Edit mode)
+    const displayLang = currentLanguage || fetchedLang;
+    const originLang = displayLang || "en";
 
-    const notes = GPRT_FIRST_PAGE_DATA.note.content.texts;
+    // Helper to safely get text, falling back to English or first available key if specific lang is missing
+    const getLocalizedText = (obj, lang) => {
+        if (!obj) return "";
+        if (typeof obj === 'string') return obj;
 
-    const stamp = GPRT_FIRST_PAGE_DATA.stamp;
+        // If it's a cell object with specialized 'text' property
+        const data = (obj.text && typeof obj.text === 'object') ? obj.text : obj;
 
-    const originLang = GPRT_FIRST_PAGE_DATA.meta.originLang;
-    const currentLang = GPRT_FIRST_PAGE_DATA.meta.currentLang;
+        // Language mapping (the data seems to use full names)
+        const langMap = {
+            "en": "english",
+            "zh": "chinese",
+            "km": "khmer",
+            "kh": "khmer"
+        };
 
-    const renderContentByStep  = (input) => {
+        const targetKey = langMap[lang] || lang;
+        if (data[lang] && typeof data[lang] === 'string') return data[lang];
+        if (data[targetKey] && typeof data[targetKey] === 'string') return data[targetKey];
+
+        // Fallback strategy
+        const fallbacks = ["english", "en", "chinese", "zh", "khmer", "km"];
+        for (const fb of fallbacks) {
+            if (data[fb] && typeof data[fb] === 'string') return data[fb];
+        }
+
+        // Final fallback: first string value found
+        const keys = Object.keys(data).filter(k => k !== '_id' && k !== 'colSpan' && k !== 'rowSpan');
+        for (const k of keys) {
+            if (typeof data[k] === 'string') return data[k];
+        }
+
+        return "";
+    };
+
+    const title = getLocalizedText(production?.title?.text, originLang);
+    const customer = production?.customer;
+    const factory = production?.factory;
+    const productionSpecifications = customer?.purchase?.specs || [];
+    const sample = customer?.style?.sample || {};
+    const notes = customer?.manufacturingNote || [];
+    const stamp = factory?.factoryStamp;
+
+    // blob handling logic (kept as is)
+    if (sample.img?.data) {
+        const blob = new Blob([new Uint8Array(sample.img.data)], { type: "image/png" });
+        const blobUrl = URL.createObjectURL(blob);
+        sample.img = blobUrl;
+        sample.imgId = sample?.description;
+    }
+
+    if (stamp?.img?.data) {
+        const blob = new Blob([new Uint8Array(stamp.img.data)], { type: "image/png" });
+        const blobUrl = URL.createObjectURL(blob);
+        stamp.img = {
+            src: blobUrl,
+            id: stamp?.description
+        };
+    }
+
+    const renderContentByStep = (input, onChange) => {
         const state = step.toLowerCase();
         if (state) {
             switch (state) {
                 case "preview":
-                    return <EditWord word={input} />
+                    return <EditWord word={input} onChange={onChange} />
                 case "glossary":
-                    return (
-                        splitChineseWords(input).map((w, i) => (
-                            <EditWord key={i} word={w} />
-                        ))
-                    )
-                case "complete": 
-                    return (
-                        <p>{input}</p>
-                    )
+                    // Fallback or specific logic if needed
+                    return (splitChineseWords(input).map((w, i) => (<EditWord key={i} word={w} />)))
+                case "complete":
+                    return input;
+                case "review": // Using review mode for clean text or specialized edit if implemented
+                    return <span className="text-slate-900">{input}</span>
+                case "edit":
+                    return <EditWord word={input} onChange={onChange} />
                 default:
                     return input
             }
         }
-        return (
-            <p>-</p>
-        )
+        return <p className="text-slate-400 font-mono text-xs">-</p>
     };
 
-    return (
-        <table  className="table-auto md:table-fixed border-collapse border border-black border-3 w-full text-center">
-            <thead >
-                <tr>
-                    <th colSpan={2} className="p-4">
-                        {/* <EditWord word={title.left[originLang].value} /> */}
-                        {renderContentByStep (title.left[originLang].value)}
-                    </th>
-                    <th colSpan={2} className="p-4">
-                        {
-                        // splitChineseWords(title.right[originLang].value).map((word, index) => (
-                        //     <EditWord key={index} word={word} />
-                        // ))
-                        renderContentByStep (title.right[originLang].value)
-                        }
-                    </th>
-                </tr>
-            </thead>
-            <tbody>
-                <tr>
-                    <td rowSpan={titleInfo.rows.length} colSpan={2} className="border border-black border-3 p-2">
-                        <img alt={content.image.id} src={content.image.value} />
-                    </td>
-                    <td className="border border-black border-3 p-2">
-                        {
-                        // splitChineseWords(titleInfo.rows[0].label[originLang]).map((t, idx) => (
-                        // <EditWord word={t} key={idx} />
-                        // ))
-                        renderContentByStep (titleInfo.rows[0].label[originLang])
-                        }
-                    </td>
-                    <td className="border border-black border-3 p-2">
-                        {
-                        // splitChineseWords(titleInfo.rows[0].value[originLang]).map((t, idx) => (
-                        // <EditWord word={t} key={idx} />
-                        // ))
-                            renderContentByStep (titleInfo.rows[0].value[originLang])
-                        }
-                    </td>
-                </tr>
+    function updateProduction(production, updater) {
+        const copy = structuredClone(production);
+        updater(copy);
+        setProduction(copy);
+        return copy;
+    }
 
-                {
-                    titleInfo.rows.slice(1).map((title, i) => (
-                        <tr key={i + 1}>
-                            <td className="border border-black border-3 p-2">
-                                {
-                                    // splitChineseWords(title.label[originLang]).map((t, idx) => (
-                                    // <EditWord word={t} key={idx} />
-                                    // ))
-                                    renderContentByStep (title.label[originLang])
-                                }
-                            </td>
-                            <td className="border border-black border-3 p-2">
-                                {
-                                    // splitChineseWords(title.value[originLang]).map((t, idx) => (
-                                    // <EditWord word={t} key={idx} />
-                                    // ))
-                                    renderContentByStep (title.value[originLang])
-                                }
-                            </td>
-                        </tr>
-                ))
-                }   
-                <tr>
-                    {
-                        hightLightInfo.cells.map((c, i) => (
-                            <td className="border border-black border-3" key={i}>
-                                {
-                                    // splitChineseWords(c.value[originLang]).map((w, idx) => (
-                                    //     <EditWord word={w} key={idx} />
-                                    // ))
-                                    renderContentByStep (c.value[originLang])
-                                }
-                            </td>
-                        ))
-                    }
-                </tr>
-                <tr>
-                    <td colSpan={3} className="text-start pl-2">
-                        {
-                            notes.map((note, idx) => (
-                                <p key={idx}>
-                                    {
-                                        // splitChineseWords(note[originLang]).map((w,  i) => (
-                                        //     <EditWord word={w} key={i} />
-                                        // ))
-                                        renderContentByStep (note[originLang])
+    const commonCellClass = "border border-slate-300 p-3 text-sm text-slate-700 align-top";
+    const labelClass = "font-semibold text-slate-500 text-xs uppercase tracking-wide mb-1 block";
+
+    return (
+        <div className="w-full bg-white shadow-lg shadow-slate-200/50 p-8 md:p-12 mx-auto max-w-5xl rounded-lg">
+            {/* Header Section */}
+            <header className="mb-8 border-b-2 border-slate-100 pb-6">
+                <h1 className="text-3xl font-bold text-slate-900 text-center">
+                    {renderContentByStep(title, async (newValue) => {
+                        const updatedProduction = updateProduction(production, (prod) => {
+                            prod.title.text[originLang] = newValue;
+                        });
+                        await updateProductionData(production.documentId, updatedProduction);
+                    })}
+                </h1>
+            </header>
+
+            {/* Top Grid Info */}
+            <div className="grid grid-cols-12 gap-0 border border-slate-300 rounded-sm overflow-hidden mb-8">
+                {/* Image Section - Spans 2 rows visually */}
+                <div className="col-span-12 md:col-span-4 row-span-2 border-r border-b md:border-b-0 border-slate-300 p-4 flex items-center justify-center bg-slate-50">
+                    {sample.img ? (
+                        <img
+                            alt={sample.imgId || "Sample"}
+                            src={sample.img}
+                            className="max-h-64 object-contain rounded shadow-sm border border-slate-200 bg-white"
+                        />
+                    ) : (
+                        <div className="w-full h-48 flex items-center justify-center text-slate-300 text-sm">No Image</div>
+                    )}
+                </div>
+
+                {/* Info Fields */}
+                <div className="col-span-6 md:col-span-4 p-4 border-r border-b border-slate-300">
+                    <span className={labelClass}>Style Code Label</span>
+                    <div>
+                        {renderContentByStep(getLocalizedText(customer?.style.code.label, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.customer.style.code.label[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </div>
+                </div>
+                <div className="col-span-6 md:col-span-4 p-4 border-b border-slate-300">
+                    <span className={labelClass}>Style Code Value</span>
+                    <div className="font-medium text-slate-900">
+                        {renderContentByStep(getLocalizedText(customer?.style.code.value, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.customer.style.code.value[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </div>
+                </div>
+
+                <div className="col-span-6 md:col-span-4 p-4 border-r border-b border-slate-300">
+                    <span className={labelClass}>Factory ID Label</span>
+                    <div>
+                        {renderContentByStep(getLocalizedText(factory?.factoryID.label, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.factory.factoryID.label[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </div>
+                </div>
+                <div className="col-span-6 md:col-span-4 p-4 border-b border-slate-300">
+                    <span className={labelClass}>Factory ID Value</span>
+                    <div className="font-medium text-slate-900">
+                        {renderContentByStep(getLocalizedText(factory?.factoryID.value, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.factory.factoryID.value[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </div>
+                </div>
+
+                <div className="col-span-6 md:col-span-4 p-4  border-slate-300 border-r-0 md:border-r">
+                    <span className={labelClass}>Order No. Label</span>
+                    <div>
+                        {renderContentByStep(getLocalizedText(customer?.purchase.order.orderNumber.label, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.customer.purchase.order.orderNumber.label[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </div>
+                </div>
+                {/* Note: In original code, image spanned 4 rows. Here I'm simplifying grid for responsiveness. Adjusting cols to match logic roughly. */}
+
+                <div className="col-span-6 md:col-span-4 p-4 md:border-r border-slate-300">
+                    <span className={labelClass}>Order Number</span>
+                    <div className="font-medium text-slate-900">
+                        {renderContentByStep(getLocalizedText(customer?.purchase.order.orderNumber.value, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.customer.purchase.order.orderNumber.value[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </div>
+                </div>
+
+                <div className="col-span-6 md:col-span-4 p-4 border-slate-300">
+                    {/* Empty or additional info could go here to balance grid */}
+                </div>
+
+                {/* Quantity Row */}
+                <div className="col-span-6 md:col-span-4 p-4 border-r border-t border-slate-300">
+                    <span className={labelClass}>Quantity Label</span>
+                    {renderContentByStep(getLocalizedText(customer?.purchase.quantity.label, originLang),
+                        async (newValue) => {
+                            const updatedProduction = updateProduction(production, (prod) => {
+                                prod.customer.purchase.quantity.label[originLang] = newValue;
+                            });
+                            await updateProductionData(production.documentId, updatedProduction);
+                        }
+                    )}
+                </div>
+                <div className="col-span-6 md:col-span-8 p-4 border-t border-slate-300 flex items-center gap-2">
+                    <span className={labelClass}>Quantity:</span>
+                    <span className="font-medium text-slate-900 mr-1">
+                        {renderContentByStep(getLocalizedText(customer?.purchase.quantity.value, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.customer.purchase.quantity.value[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </span>
+                    <span className="text-slate-600">
+                        {renderContentByStep(getLocalizedText(customer?.purchase.quantity.unit, originLang),
+                            async (newValue) => {
+                                const updatedProduction = updateProduction(production, (prod) => {
+                                    prod.customer.purchase.quantity.unit[originLang] = newValue;
+                                });
+                                await updateProductionData(production.documentId, updatedProduction);
+                            }
+                        )}
+                    </span>
+                </div>
+
+                {/* Packing & Order Type */}
+                <div className="col-span-4 p-4 border-r border-t border-slate-300">
+                    <span className={labelClass}>Packing Main</span>
+                    {renderContentByStep(getLocalizedText(customer?.packing.main.label, originLang),
+                        async (newValue) => {
+                            const updatedProduction = updateProduction(production, (prod) => {
+                                prod.customer.packing.main.label[originLang] = newValue;
+                            });
+                            await updateProductionData(production.documentId, updatedProduction);
+                        }
+                    )}
+                </div>
+                <div className="col-span-4 p-4 border-r border-t border-slate-300">
+                    <span className={labelClass}>Order Type Label</span>
+                    {renderContentByStep(getLocalizedText(customer?.purchase.order.orderType.label, originLang),
+                        async (newValue) => {
+                            const updatedProduction = updateProduction(production, (prod) => {
+                                prod.customer.purchase.order.orderType.label[originLang] = newValue;
+                            });
+                            await updateProductionData(production.documentId, updatedProduction);
+                        }
+                    )}
+                </div>
+                <div className="col-span-4 p-4 border-t border-slate-300">
+                    <span className={labelClass}>Order Type Value</span>
+                    {renderContentByStep(getLocalizedText(customer?.purchase.order.orderType.value, originLang),
+                        async (newValue) => {
+                            const updatedProduction = updateProduction(production, (prod) => {
+                                prod.customer.purchase.order.orderType.value[originLang] = newValue;
+                            });
+                            await updateProductionData(production.documentId, updatedProduction);
+                        }
+                    )}
+                </div>
+            </div>
+
+            {/* Notes Section */}
+            <div className="mb-8">
+                <h3 className="text-sm font-bold text-slate-800 uppercase border-b border-slate-200 pb-2 mb-3">Manufacturing Notes</h3>
+                <div className="bg-yellow-50/50 p-6 rounded-lg border border-yellow-100 text-slate-700 space-y-2">
+                    {notes.map((note, idx) => (
+                        <div key={idx} className="flex gap-2">
+                            <span className="font-bold text-yellow-600">•</span>
+                            <div className="flex-1">
+                                {renderContentByStep(getLocalizedText(note, originLang),
+                                    async (newValue) => {
+                                        const updatedProduction = updateProduction(production, (prod) => {
+                                            const noteRef = prod.customer.manufacturingNote.find(n => getLocalizedText(n, originLang) === getLocalizedText(note, originLang));
+                                            if (noteRef) {
+                                                noteRef[originLang] = newValue;
+                                            }
+                                        });
+                                        await updateProductionData(production.documentId, updatedProduction);
                                     }
-                                </p>
-                            ))
-                        }                    
-                    </td>
-                </tr>   
-                {
-                    Object.values(productionSpecifications).map((prod, i) => (
-                    <tr key={i}>
-                        <td colSpan={4} className="p-2">
-                            <ProductionSpecific table={prod} originLang={originLang} renderContentByStep ={renderContentByStep }/>
-                        </td>
-                    </tr>  
-                    ))
-                }
-                <tr>
-                    <td colSpan={3}></td>
-                    <td  className="text-start p-5 pt-20">
-                        <img src={stamp.image.src} alt="Stamp from customer"/>
-                    </td>
-                </tr>
-            </tbody>
-        </table>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {notes.length === 0 && <span className="text-slate-400 italic">No notes available.</span>}
+                </div>
+            </div>
+
+            {/* Production Specifications */}
+            <div className="mb-8 overflow-hidden rounded-lg border border-slate-200">
+                {productionSpecifications.map((prod, i) => (
+                    <div key={i} className="mb-4 last:mb-0">
+                        <ProductionSpecific
+                            table={prod}
+                            originLang={originLang}
+                            renderContentByStep={renderContentByStep}
+                            getLocalizedText={getLocalizedText} // Pass helper down
+                        />
+                    </div>
+                ))}
+            </div>
+
+            {/* Stamp Section */}
+            <div className="flex justify-end mt-10 pt-6 border-t border-slate-100">
+                <div className="text-center">
+                    {stamp?.img?.src ? (
+                        <div className="relative">
+                            <img src={stamp.img.src} alt="Stamp" className="w-32 h-32 object-contain opacity-80" />
+                            <p className="text-xs text-slate-400 mt-2">Factory Stamp</p>
+                        </div>
+                    ) : (
+                        <div className="w-32 h-32 border-2 border-dashed border-slate-300 rounded flex items-center justify-center text-slate-300 text-xs">
+                            Place Stamp Here
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
     );
 };
 
-const ProductionSpecific = ({table, originLang, renderContentByStep }) => {
-    console.log(table)
-    const header = table.heads;
-    const rows = table.rows;
+const ProductionSpecific = ({ table, originLang, renderContentByStep, getLocalizedText }) => {
+    if (!table || table.length === 0) return null;
+    const header = table[0];
+    const rows = table.slice(1);
+
     return (
-        <table className="table-auto text-center">
-            <thead>
-                {
-                    header.map((h, i) => (
-                        <th key={i} className="border border-black border-3">
-                            {
-                                // splitChineseWords(h[originLang]).map((w, i) => (
-                                //     <EditWord word={w} key={i} />
-                                // ))
-                                renderContentByStep (h[originLang])
-                            }
-                        </th>
-                    ))
-                }
-            </thead>
-            <tbody>
-                {
-                    rows.map((cols, i) => (
-                        <tr key={i}>
-                            {
-                                cols.map((cell, i) => (
-                                    <td key={i} colSpan={cell.colSpan} className="border border-black border-3">
-                                        {
-                                            // splitChineseWords(cell[originLang]).map((w, i) => (
-                                            //     <EditWord word={w} key={i}/>
-                                            // ))
-                                            renderContentByStep (cell[originLang])
-                                        }
-                                    </td>
-                                ))
-                            }
+        <div className="overflow-x-auto">
+            <table className="w-full text-left text-slate-600">
+                <thead className="bg-slate-50 text-slate-700 font-semibold uppercase text-xs tracking-wider">
+                    <tr>
+                        {header.map((h, i) => (
+                            <th key={i} className="px-4 py-3 border-b border-slate-200">
+                                {renderContentByStep(getLocalizedText(h, originLang))}
+                            </th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 bg-white">
+                    {rows.map((cols, rowIndex) => (
+                        <tr key={rowIndex} className="hover:bg-slate-50/50 transition-colors">
+                            {cols.map((cell, cellIndex) => (
+                                <td key={cellIndex} colSpan={cell.colSpan} className="px-4 py-3 border-r last:border-r-0 border-slate-100 align-top">
+                                    {renderContentByStep(getLocalizedText(cell, originLang))}
+                                </td>
+                            ))}
                         </tr>
-                    ))
-                }                
-            </tbody>
-
-
-        </table>
+                    ))}
+                </tbody>
+            </table>
+        </div>
     )
 }
+
 export default FirstPage;
