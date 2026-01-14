@@ -23,6 +23,34 @@ const PrintP88Report = () => {
   const [dateFilteredStats, setDateFilteredStats] = useState(null);
   const [language, setLanguage] = useState("english");
 
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [timerInterval, setTimerInterval] = useState(null);
+
+  // Helper to format seconds into MM:SS
+  const formatTime = (seconds) => {
+    if (seconds <= 0) return "Finishing...";
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  // Effect to handle the countdown
+  useEffect(() => {
+    let interval;
+    if (loading && timeRemaining !== null) {
+      interval = setInterval(() => {
+        setElapsedTime((prev) => prev + 1);
+        setTimeRemaining((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      setTimerInterval(interval);
+    } else {
+      clearInterval(timerInterval);
+      setElapsedTime(0);
+    }
+    return () => clearInterval(interval);
+  }, [loading]);
+
   // Fetch available factories on component mount
   useEffect(() => {
     fetchFactories();
@@ -170,29 +198,6 @@ const PrintP88Report = () => {
     }
   };
 
-  const validatePath = async (path) => {
-    if (!path) {
-      setPathValidation(null);
-      return;
-    }
-    try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
-      const response = await fetch(`${apiBaseUrl}/api/scraping/validate-path`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ downloadPath: path })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setPathValidation(data);
-      }
-    } catch (error) {
-      console.error("Error validating path:", error);
-    }
-  };
-
   const handlePrintReport = async () => {
     // Validate date range
     if (!startDate || !endDate) {
@@ -235,24 +240,20 @@ const PrintP88Report = () => {
       return;
     }
 
-    if (downloadMode === "range" && (startRange > endRange || startRange < 1)) {
-      setStatus({ message: "Please enter a valid range", type: "error" });
-      return;
-    }
+    const reportsCount =
+      downloadMode === "range"
+        ? Math.min(endRange, dateFilteredStats.totalRecords) - startRange + 1
+        : dateFilteredStats.totalRecords;
 
-    if (spaceInfo && !spaceInfo.hasEnoughSpace) {
-      const recordText = spaceInfo.recordCount
-        ? ` for ${spaceInfo.recordCount} reports`
-        : "";
-      const proceed = window.confirm(
-        `Warning: You may not have enough disk space${recordText}. Available: ${spaceInfo.availableSpace}, Estimated needed: ${spaceInfo.estimatedDownloadSize}. Do you want to proceed anyway?`
-      );
-      if (!proceed) return;
-    }
+    const estimatedSeconds = 15 + reportsCount * 25;
+    setTimeRemaining(estimatedSeconds);
 
     setLoading(true);
     setShowDownloadDialog(false);
-    setProgress({ current: 0, total: spaceInfo?.recordCount || 1 });
+    setStatus({
+      message: "Generating reports and preparing ZIP... Please wait.",
+      type: "warning"
+    });
 
     try {
       const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
@@ -278,47 +279,54 @@ const PrintP88Report = () => {
         body: JSON.stringify(body)
       });
 
-      if (!response.ok) {
-        let serverError = `HTTP error! status: ${response.status}`;
-        try {
-          const errorData = await response.json();
-          serverError = errorData.message || errorData.error || serverError;
-        } catch (e) {
-          // Ignore if response body is not valid JSON
-        }
-        throw new Error(serverError);
-      }
+      if (!response.ok) throw new Error("Failed to generate reports");
 
-      const data = await response.json();
-      if (data.success) {
-        setDownloadInfo(data.downloadInfo);
+      // CHECK CONTENT TYPE: Is it a ZIP file or a JSON error?
+      const contentType = response.headers.get("content-type");
+
+      if (contentType && contentType.includes("application/json")) {
+        // If the server sends JSON (usually an error or "no records found")
+        const data = await response.json();
         setStatus({
-          message: `Bulk download completed! ${data.downloadInfo.successfulDownloads} successful, ${data.downloadInfo.failedDownloads} failed. Total: ${data.downloadInfo.totalFiles} files (${data.downloadInfo.totalSize})`,
-          type: "success"
+          message: data.message || "No records found",
+          type: "info"
         });
       } else {
+        // IF IT IS A FILE (The ZIP)
+        // 1. Get the data as a Blob
+        const blob = await response.blob();
+
+        // 2. Create a hidden download link
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+
+        // Set the filename for the user's computer
+        link.setAttribute(
+          "download",
+          `P88_Reports_${new Date().toISOString().split("T")[0]}.zip`
+        );
+
+        // 3. Trigger the click and cleanup
+        document.body.appendChild(link);
+        link.click();
+        link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(url);
+
         setStatus({
-          message: data.message || "Failed to download report(s)",
-          type: "error"
+          message: "Download started! Check your browser downloads.",
+          type: "success"
         });
       }
     } catch (error) {
-      console.error("Error:", error);
-      setStatus({ message: error.message, type: "error" });
+      console.error("Download Error:", error);
+      setStatus({
+        message: `Download failed: ${error.message}`,
+        type: "error"
+      });
     } finally {
       setLoading(false);
-      setProgress(null);
-    }
-  };
-
-  const handlePathChange = async (e) => {
-    const path = e.target.value;
-    setSelectedPath(path);
-    await validatePath(path);
-    if (path) {
-      await checkAvailableSpace(path);
-    } else {
-      await checkAvailableSpace();
+      setTimeRemaining(null);
     }
   };
 
@@ -470,6 +478,42 @@ const PrintP88Report = () => {
                   </div>
                 )}
             </div>
+
+            {loading && timeRemaining !== null && (
+              <div className="mb-6 bg-blue-600 rounded-xl p-6 text-white shadow-lg animate-pulse">
+                <div className="flex justify-between items-center mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    <span className="font-bold text-lg">
+                      Processing Bulk Download
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs uppercase opacity-80">
+                      Estimated Time Remaining
+                    </div>
+                    <div className="text-2xl font-mono font-bold">
+                      {formatTime(timeRemaining)}
+                    </div>
+                  </div>
+                </div>
+                <div className="w-full bg-blue-400/30 rounded-full h-2">
+                  <div
+                    className="bg-white h-2 rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${Math.min(
+                        100,
+                        (elapsedTime / (elapsedTime + timeRemaining)) * 100
+                      )}%`
+                    }}
+                  ></div>
+                </div>
+                <div className="mt-2 text-xs text-center italic opacity-90">
+                  Please do not close this tab. Generating{" "}
+                  {spaceInfo?.recordCount} high-quality PDF reports...
+                </div>
+              </div>
+            )}
 
             {/* Filtered Record Statistics */}
             {dateFilteredStats && (
@@ -730,14 +774,7 @@ const PrintP88Report = () => {
             {/* Download Button */}
             <button
               onClick={handlePrintReport}
-              disabled={
-                loading ||
-                !startDate ||
-                !endDate ||
-                (startDate &&
-                  endDate &&
-                  new Date(startDate) > new Date(endDate))
-              }
+              disabled={loading || !startDate || !endDate}
               className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform ${
                 loading ||
                 !startDate ||
@@ -751,12 +788,11 @@ const PrintP88Report = () => {
             >
               {loading ? (
                 <div className="flex items-center justify-center space-x-3">
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  <span>
-                    {progress
-                      ? `Processing ${progress.current}/${progress.total}...`
-                      : "Processing..."}
-                  </span>
+                  {/* <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    <span>{progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...'}</span> */}
+                  <div className="flex items-center justify-center space-x-3">
+                    <span>Remaining: {formatTime(timeRemaining)}</span>
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center justify-center space-x-2">
@@ -780,6 +816,7 @@ const PrintP88Report = () => {
                       ? `Download Reports ${startRange}-${endRange}`
                       : "Download All Filtered Reports"}
                   </span>
+                  {/* <span>Start Download</span> */}
                 </div>
               )}
             </button>
@@ -911,19 +948,15 @@ const PrintP88Report = () => {
                   </div>
                 </div>
 
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      📁 Download Location:
-                    </div>
-                    <div className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Total Size: {downloadInfo.totalSize}
-                    </div>
-                  </div>
-                  <div className="bg-white dark:bg-gray-600 dark:text-gray-200 p-3 rounded border dark:border-gray-500 font-mono text-sm break-all">
-                    {downloadInfo.downloadPath}
-                  </div>
-                </div>
+                {/* <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">📁 Download Location:</div>
+                                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Size: {downloadInfo.totalSize}</div>
+                                    </div>
+                                    <div className="bg-white dark:bg-gray-600 dark:text-gray-200 p-3 rounded border dark:border-gray-500 font-mono text-sm break-all">
+                                        {downloadInfo.downloadPath}
+                                    </div>
+                                </div> */}
 
                 {downloadInfo.details && downloadInfo.details.length > 0 && (
                   <details className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -1157,14 +1190,12 @@ const PrintP88Report = () => {
                             {spaceInfo.estimatedDownloadSize}
                           </div>
                         </div>
-                        <div className="md:col-span-2">
-                          <span className="font-medium text-gray-700 dark:text-gray-300">
-                            Location:
-                          </span>
-                          <div className="text-gray-900 dark:text-gray-200 font-mono text-xs bg-white dark:bg-gray-700 p-2 rounded border dark:border-gray-600 mt-1 break-all">
-                            {spaceInfo.path}
-                          </div>
-                        </div>
+                        {/* <div className="md:col-span-2">
+                                                    <span className="font-medium text-gray-700 dark:text-gray-300">Location:</span>
+                                                    <div className="text-gray-900 dark:text-gray-200 font-mono text-xs bg-white dark:bg-gray-700 p-2 rounded border dark:border-gray-600 mt-1 break-all">
+                                                        {spaceInfo.path}
+                                                    </div>
+                                                </div> */}
                       </div>
                       <div
                         className={`text-sm mt-3 p-2 rounded ${
@@ -1181,57 +1212,39 @@ const PrintP88Report = () => {
               )}
 
               {/* Download Path Input */}
-              <div className="space-y-3">
-                <label className="block text-sm font-semibold text-gray-900 dark:text-white">
-                  📁 Custom Download Path (Optional)
-                </label>
-                <input
-                  type="text"
-                  value={selectedPath}
-                  onChange={handlePathChange}
-                  placeholder="Leave empty for default path (e.g., C:\Downloads\Reports)"
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-
-                {pathValidation && (
-                  <div
-                    className={`p-3 rounded-lg text-sm ${
-                      pathValidation.isValid
-                        ? "bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800"
-                        : "bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800"
-                    }`}
-                  >
-                    <div className="flex items-center space-x-2">
-                      {pathValidation.isValid ? (
-                        <svg
-                          className="w-4 h-4 text-green-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      ) : (
-                        <svg
-                          className="w-4 h-4 text-red-500"
-                          fill="currentColor"
-                          viewBox="0 0 20 20"
-                        >
-                          <path
-                            fillRule="evenodd"
-                            d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                            clipRule="evenodd"
-                          />
-                        </svg>
-                      )}
-                      <span>{pathValidation.message}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
+              {/* <div className="space-y-3">
+                                <label className="block text-sm font-semibold text-gray-900 dark:text-white">
+                                    📁 Custom Download Path (Optional)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={selectedPath}
+                                    onChange={handlePathChange}
+                                    placeholder="Leave empty for default path (e.g., C:\Downloads\Reports)"
+                                    className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                />
+                                
+                                {pathValidation && (
+                                    <div className={`p-3 rounded-lg text-sm ${
+                                        pathValidation.isValid 
+                                            ? 'bg-green-50 text-green-700 border border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-800' 
+                                            : 'bg-red-50 text-red-700 border border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-800'
+                                    }`}>
+                                        <div className="flex items-center space-x-2">
+                                            {pathValidation.isValid ? (
+                                                <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="w-4 h-4 text-red-500" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                                </svg>
+                                            )}
+                                            <span>{pathValidation.message}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div> */}
 
               {/* Action Buttons */}
               <div className="flex space-x-4 pt-4">

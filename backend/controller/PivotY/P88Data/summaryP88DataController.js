@@ -1,10 +1,15 @@
-import mongoose from 'mongoose';
+import mongoose from "mongoose";
 
 // Import your P88 model - adjust the path as needed
-import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
+import { p88LegacyData } from "../../MongoDB/dbConnectionController.js";
 
- // Get all P88 inspection data with optional filtering and pagination
- export const getAllInspections = async (req, res) => {
+// Helper function to escape regex special characters
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+};
+
+// Get all P88 inspection data with optional filtering and pagination
+export const getAllInspections = async (req, res) => {
   try {
     const {
       page = 1,
@@ -15,58 +20,80 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       supplier,
       project,
       inspectionResult,
+      style,
       poNumbers,
-      sortBy = 'scheduledInspectionDate',
-      sortOrder = 'desc'
+      sortBy = "scheduledInspectionDate",
+      sortOrder = "desc"
     } = req.query;
 
     // Build filter object
     const filter = {};
-    
+
     if (inspector) {
-      filter.inspector = { $regex: inspector, $options: 'i' };
+      filter.inspector = { $regex: escapeRegExp(inspector), $options: "i" };
     }
-    
+
     if (approvalStatus) {
-      filter.approvalStatus = { $regex: approvalStatus, $options: 'i' };
+      filter.approvalStatus = {
+        $regex: escapeRegExp(approvalStatus),
+        $options: "i"
+      };
     }
-    
+
     if (reportType) {
-      filter.reportType = { $regex: reportType, $options: 'i' };
+      filter.reportType = { $regex: escapeRegExp(reportType), $options: "i" };
     }
-    
+
     if (supplier) {
-      filter.supplier = { $regex: supplier, $options: 'i' };
+      filter.supplier = { $regex: escapeRegExp(supplier), $options: "i" };
     }
-    
+
     if (project) {
-      filter.project = { $regex: project, $options: 'i' };
+      filter.project = { $regex: escapeRegExp(project), $options: "i" };
     }
-    
+
+    // Use $and for complex queries to handle both string and array fields safely
+    const complexFilters = [];
+
+    if (style) {
+      const escapedStyle = escapeRegExp(style);
+      complexFilters.push({
+        $or: [
+          { style: { $regex: escapedStyle, $options: "i" } },
+          { style: { $elemMatch: { $regex: escapedStyle, $options: "i" } } }
+        ]
+      });
+    }
+
     if (inspectionResult) {
       filter.inspectionResult = inspectionResult;
     }
 
-    // FIXED: Handle poNumbers as array field
     if (poNumbers) {
-      filter.poNumbers = { 
-        $elemMatch: { 
-          $regex: poNumbers, 
-          $options: 'i' 
-        } 
-      };
+      const escapedPo = escapeRegExp(poNumbers);
+      complexFilters.push({
+        $or: [
+          { poNumbers: { $regex: escapedPo, $options: "i" } },
+          { poNumbers: { $elemMatch: { $regex: escapedPo, $options: "i" } } }
+        ]
+      });
+    }
+
+    if (complexFilters.length > 0) {
+      filter.$and = complexFilters;
     }
 
     // Build sort object
     const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    sort[sortBy] = sortOrder === "desc" ? -1 : 1;
 
     // Calculate pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
     // Execute query
     const [inspections, totalCount] = await Promise.all([
-      p88LegacyData.find(filter)
+      p88LegacyData
+        .find(filter)
         .sort(sort)
         .skip(skip)
         .limit(parseInt(limit))
@@ -83,22 +110,22 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
           total: { $sum: 1 },
           passed: {
             $sum: {
-              $cond: [{ $eq: ['$approvalStatus', 'Accepted'] }, 1, 0]
+              $cond: [{ $eq: ["$approvalStatus", "Accepted"] }, 1, 0]
             }
           },
           failed: {
             $sum: {
-              $cond: [{ $eq: ['$approvalStatus', 'Reworked'] }, 1, 0]
+              $cond: [{ $eq: ["$approvalStatus", "Reworked"] }, 1, 0]
             }
           },
           pending: {
             $sum: {
-              $cond: [{ $eq: ['$approvalStatus', 'Pending Approval'] }, 1, 0]
+              $cond: [{ $eq: ["$approvalStatus", "Pending Approval"] }, 1, 0]
             }
           },
           hold: {
             $sum: {
-              $cond: [{ $eq: ['$inspectionResult', 'Not Complete'] }, 1, 0]
+              $cond: [{ $eq: ["$inspectionResult", "Not Complete"] }, 1, 0]
             }
           }
         }
@@ -126,26 +153,25 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       summary,
       message: `Retrieved ${inspections.length} inspection records`
     });
-
   } catch (error) {
-    console.error('Error fetching P88 inspection data:', error);
+    console.error("Error fetching P88 inspection data:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch inspection data',
+      message: "Failed to fetch inspection data",
       error: error.message
     });
   }
 };
 
- // Get single inspection by ID
- export const getInspectionById = async (req, res) => {
+// Get single inspection by ID
+export const getInspectionById = async (req, res) => {
   try {
     const { id } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         success: false,
-        message: 'Invalid inspection ID format'
+        message: "Invalid inspection ID format"
       });
     }
 
@@ -154,28 +180,27 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
     if (!inspection) {
       return res.status(404).json({
         success: false,
-        message: 'Inspection not found'
+        message: "Inspection not found"
       });
     }
 
     res.status(200).json({
       success: true,
       data: inspection,
-      message: 'Inspection retrieved successfully'
+      message: "Inspection retrieved successfully"
     });
-
   } catch (error) {
-    console.error('Error fetching inspection by ID:', error);
+    console.error("Error fetching inspection by ID:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch inspection',
+      message: "Failed to fetch inspection",
       error: error.message
     });
   }
 };
 
- // Get inspections by group number
- export const getInspectionsByGroup = async (req, res) => {
+// Get inspections by group number
+export const getInspectionsByGroup = async (req, res) => {
   try {
     const { groupNumber } = req.params;
 
@@ -184,7 +209,7 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
     if (!inspections.length) {
       return res.status(404).json({
         success: false,
-        message: 'No inspections found for this group number'
+        message: "No inspections found for this group number"
       });
     }
 
@@ -194,41 +219,40 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       count: inspections.length,
       message: `Retrieved ${inspections.length} inspections for group ${groupNumber}`
     });
-
   } catch (error) {
-    console.error('Error fetching inspections by group:', error);
+    console.error("Error fetching inspections by group:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch inspections by group',
+      message: "Failed to fetch inspections by group",
       error: error.message
     });
   }
 };
 
- // Get dashboard statistics
- export const getDashboardStats = async (req, res) => {
+// Get dashboard statistics
+export const getDashboardStats = async (req, res) => {
   try {
     const stats = await p88LegacyData.aggregate([
       {
         $group: {
           _id: null,
           totalInspections: { $sum: 1 },
-          totalQtyInspected: { $sum: '$qtyInspected' },
-          totalQtyToInspect: { $sum: '$qtyToInspect' },
-          avgDefectRate: { $avg: '$defectRate' },
+          totalQtyInspected: { $sum: "$qtyInspected" },
+          totalQtyToInspect: { $sum: "$qtyToInspect" },
+          avgDefectRate: { $avg: "$defectRate" },
           passedInspections: {
             $sum: {
-              $cond: [{ $eq: ['$inspectionResult', 'Pass'] }, 1, 0]
+              $cond: [{ $eq: ["$inspectionResult", "Pass"] }, 1, 0]
             }
           },
           failedInspections: {
             $sum: {
-              $cond: [{ $eq: ['$inspectionResult', 'Fail'] }, 1, 0]
+              $cond: [{ $eq: ["$inspectionResult", "Fail"] }, 1, 0]
             }
           },
           pendingInspections: {
             $sum: {
-              $cond: [{ $eq: ['$inspectionResult', 'Pending'] }, 1, 0]
+              $cond: [{ $eq: ["$inspectionResult", "Pending"] }, 1, 0]
             }
           }
         }
@@ -237,25 +261,28 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 
     // Get top suppliers
     const topSuppliers = await p88LegacyData.aggregate([
-      { $match: { supplier: { $ne: null, $ne: '' } } },
-      { $group: { _id: '$supplier', count: { $sum: 1 } } },
+      { $match: { supplier: { $ne: null, $ne: "" } } },
+      { $group: { _id: "$supplier", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
     ]);
 
     // Get top inspectors
     const topInspectors = await p88LegacyData.aggregate([
-      { $match: { inspector: { $ne: null, $ne: '' } } },
-      { $group: { _id: '$inspector', count: { $sum: 1 } } },
+      { $match: { inspector: { $ne: null, $ne: "" } } },
+      { $group: { _id: "$inspector", count: { $sum: 1 } } },
       { $sort: { count: -1 } },
       { $limit: 10 }
     ]);
 
     // Get recent inspections
-    const recentInspections = await p88LegacyData.find()
+    const recentInspections = await p88LegacyData
+      .find()
       .sort({ submittedInspectionDate: -1 })
       .limit(10)
-      .select('groupNumber inspector inspectionResult submittedInspectionDate supplier')
+      .select(
+        "groupNumber inspector inspectionResult submittedInspectionDate supplier"
+      )
       .lean();
 
     const dashboardData = {
@@ -276,53 +303,61 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
     res.status(200).json({
       success: true,
       data: dashboardData,
-      message: 'Dashboard statistics retrieved successfully'
+      message: "Dashboard statistics retrieved successfully"
     });
-
   } catch (error) {
-    console.error('Error fetching dashboard stats:', error);
+    console.error("Error fetching dashboard stats:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch dashboard statistics',
+      message: "Failed to fetch dashboard statistics",
       error: error.message
     });
   }
 };
 
- // Search inspections
- export const searchInspections = async (req, res) => {
+// Search inspections
+export const searchInspections = async (req, res) => {
   try {
-    const { query, field = 'all' } = req.query;
+    const { query, field = "all" } = req.query;
 
     if (!query) {
       return res.status(400).json({
         success: false,
-        message: 'Search query is required'
+        message: "Search query is required"
       });
     }
 
+    const escapedQuery = escapeRegExp(query);
     let searchFilter = {};
 
-    if (field === 'all') {
+    if (field === "all") {
       searchFilter = {
         $or: [
-          { groupNumber: { $regex: query, $options: 'i' } },
-          { inspector: { $regex: query, $options: 'i' } },
-          { supplier: { $regex: query, $options: 'i' } },
-          { project: { $regex: query, $options: 'i' } },
+          { groupNumber: { $regex: escapedQuery, $options: "i" } },
+          { inspector: { $regex: escapedQuery, $options: "i" } },
+          { supplier: { $regex: escapedQuery, $options: "i" } },
+          { project: { $regex: escapedQuery, $options: "i" } },
           // FIXED: Handle poNumbers as array in search
-          { poNumbers: { $elemMatch: { $regex: query, $options: 'i' } } },
-          { style: { $regex: query, $options: 'i' } }
+          { poNumbers: { $regex: escapedQuery, $options: "i" } },
+          {
+            poNumbers: { $elemMatch: { $regex: escapedQuery, $options: "i" } }
+          },
+          { style: { $regex: escapedQuery, $options: "i" } },
+          { style: { $elemMatch: { $regex: escapedQuery, $options: "i" } } }
         ]
       };
-    } else if (field === 'poNumbers') {
+    } else if (field === "poNumbers") {
       // FIXED: Handle poNumbers field specifically
-      searchFilter.poNumbers = { $elemMatch: { $regex: query, $options: 'i' } };
+      searchFilter.$or = [
+        { poNumbers: { $regex: escapedQuery, $options: "i" } },
+        { poNumbers: { $elemMatch: { $regex: escapedQuery, $options: "i" } } }
+      ];
     } else {
-      searchFilter[field] = { $regex: query, $options: 'i' };
+      searchFilter[field] = { $regex: escapedQuery, $options: "i" };
     }
 
-    const inspections = await p88LegacyData.find(searchFilter)
+    const inspections = await p88LegacyData
+      .find(searchFilter)
       .sort({ submittedInspectionDate: -1 })
       .limit(50)
       .lean();
@@ -333,39 +368,41 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       count: inspections.length,
       message: `Found ${inspections.length} matching inspections`
     });
-
   } catch (error) {
-    console.error('Error searching inspections:', error);
+    console.error("Error searching inspections:", error);
     res.status(500).json({
       success: false,
-      message: 'Failed to search inspections',
+      message: "Failed to search inspections",
       error: error.message
     });
   }
 };
 
-
 // Get distinct values for filter dropdowns
 export const getFilterOptions = async (req, res) => {
   try {
-    const [inspectors, suppliers, projects, reportTypes] = await Promise.all([
-      p88LegacyData.distinct('inspector').exec(),
-      p88LegacyData.distinct('supplier').exec(),
-      p88LegacyData.distinct('project').exec(),
-      p88LegacyData.distinct('reportType').exec(),
-    ]);
+    const [inspectors, suppliers, projects, reportTypes, styles] =
+      await Promise.all([
+        p88LegacyData.distinct("inspector").exec(),
+        p88LegacyData.distinct("supplier").exec(),
+        p88LegacyData.distinct("project").exec(),
+        p88LegacyData.distinct("reportType").exec(),
+        p88LegacyData.distinct("style").exec()
+      ]);
 
     // FIXED: Handle poNumbers array field using aggregation
     const poNumbersAggregation = await p88LegacyData.aggregate([
-      { $unwind: '$poNumbers' },
-      { $group: { _id: '$poNumbers' } },
+      { $unwind: "$poNumbers" },
+      { $group: { _id: "$poNumbers" } },
       { $sort: { _id: 1 } }
     ]);
 
-    const poNumbers = poNumbersAggregation.map(item => item._id).filter(item => item);
+    const poNumbers = poNumbersAggregation
+      .map((item) => item._id)
+      .filter((item) => item);
 
     // Helper to filter out null/empty values and sort alphabetically
-    const cleanAndSort = (arr) => arr.filter(item => item).sort();
+    const cleanAndSort = (arr) => arr.filter((item) => item).sort();
 
     res.status(200).json({
       success: true,
@@ -374,17 +411,17 @@ export const getFilterOptions = async (req, res) => {
         supplier: cleanAndSort(suppliers),
         project: cleanAndSort(projects),
         reportType: cleanAndSort(reportTypes),
-        poNumbers: cleanAndSort(poNumbers), // Now properly handles array field
+        poNumbers: cleanAndSort(poNumbers),
+        style: cleanAndSort(styles)
       },
-      message: 'Filter options retrieved successfully'
+      message: "Filter options retrieved successfully"
     });
-
   } catch (error) {
-    console.error('Error fetching filter options:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Failed to fetch filter options', 
-      error: error.message 
+    console.error("Error fetching filter options:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch filter options",
+      error: error.message
     });
   }
 };
