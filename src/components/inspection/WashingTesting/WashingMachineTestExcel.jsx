@@ -185,6 +185,7 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
 
     // --- General Info Section (2-Column Grid) ---
     addSectionHeader("GENERAL INFORMATION");
+    addInfoRow("Report Type:", report.reportType || "Home Wash/Garment Wash Test");
     addInfoRow("YM Style:", report.ymStyle || "N/A", "Buyer Style:", report.buyerStyle || "N/A");
     addInfoRow("Factory:", report.factory || "N/A", "Status:", report.status || "N/A", true);
 
@@ -201,6 +202,37 @@ const generateWashingMachineTestExcel = async (report, apiBaseUrl = "") => {
     addInfoRow("Colors:", report.color && report.color.length > 0 ? report.color.join(", ") : "N/A");
     addInfoRow("PO:", report.po && report.po.length > 0 ? report.po.join(", ") : "N/A");
     addInfoRow("Ex Fty Date:", report.exFtyDate && report.exFtyDate.length > 0 ? report.exFtyDate.join(", ") : "N/A");
+
+    // --- Dynamic Extra Fields Section ---
+    const skipFields = [
+      "reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "status",
+      "createdAt", "updatedAt", "submittedAt", "userId", "userName", "engName", "notes",
+      "images", "receivedImages", "completionImages", "receivedNotes", "completionNotes",
+      "receivedDate", "receivedAt", "completedDate", "completedAt", "_id", "id", "__v"
+    ];
+
+    const extraFields = Object.keys(report).filter(key => !skipFields.includes(key));
+
+    if (extraFields.length > 0) {
+      currentRow++;
+      addSectionHeader("REPORT DETAILS");
+      for (let i = 0; i < extraFields.length; i += 2) {
+        const k1 = extraFields[i];
+        const k2 = extraFields[i + 1];
+
+        const label1 = (k1.replace(/([A-Z])/g, ' $1').charAt(0).toUpperCase() + k1.replace(/([A-Z])/g, ' $1').slice(1)).trim() + ":";
+        const val1 = report[k1]?.toString() || "N/A";
+
+        let label2 = "";
+        let val2 = "";
+        if (k2) {
+          label2 = (k2.replace(/([A-Z])/g, ' $1').charAt(0).toUpperCase() + k2.replace(/([A-Z])/g, ' $1').slice(1)).trim() + ":";
+          val2 = report[k2]?.toString() || "N/A";
+        }
+
+        addInfoRow(label1, val1, label2, val2);
+      }
+    }
 
     currentRow++;
 

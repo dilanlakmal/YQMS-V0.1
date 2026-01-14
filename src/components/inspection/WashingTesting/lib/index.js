@@ -19,6 +19,7 @@
 
 // Main Components
 export { default as FormSection } from '../FormSection';
+export { default as DynamicFormSection } from '../DynamicFormSection';
 export { default as ReportsList } from '../ReportsList';
 export { default as ReportCard } from '../ReportCard';
 export { default as ReportTimeline } from '../ReportTimeline';

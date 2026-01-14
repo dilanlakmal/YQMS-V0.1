@@ -1,5 +1,8 @@
 import React from "react";
 import Select from "react-select";
+import { DatePicker as AntDatePicker } from "antd";
+import dayjs from "dayjs";
+import { Calendar } from "lucide-react";
 
 const EditReportModal = ({
   isOpen,
@@ -38,6 +41,28 @@ const EditReportModal = ({
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Report Type */}
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Report Type
+                </label>
+                <select
+                  value={editFormData.reportType}
+                  onChange={(e) => setEditFormData((prev) => ({
+                    ...prev,
+                    reportType: e.target.value,
+                  }))}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
+                  required
+                >
+                  <option value="Home Wash/Garment Wash Test">Home Wash/Garment Wash Test</option>
+                  <option value="HT Testing">HT Testing</option>
+                  <option value="EMB testing">EMB testing</option>
+                  <option value="Printing Testing">Printing Testing</option>
+                  <option value="Pulling Test">Pulling Test</option>
+                </select>
+              </div>
+
               {/* Buyer Style - Read Only */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -417,16 +442,22 @@ const EditReportModal = ({
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   SEND To Home Washing Date
                 </label>
-                <input
-                  type="date"
-                  value={editFormData.sendToHomeWashingDate}
-                  onChange={(e) => setEditFormData((prev) => ({
-                    ...prev,
-                    sendToHomeWashingDate: e.target.value,
-                  }))}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-                  required
-                />
+                <div className="relative group ant-datepicker-container">
+                  <AntDatePicker
+                    value={editFormData.sendToHomeWashingDate ? dayjs(editFormData.sendToHomeWashingDate) : null}
+                    onChange={(date, dateString) => setEditFormData((prev) => ({
+                      ...prev,
+                      sendToHomeWashingDate: dateString ? dayjs(date).format('YYYY-MM-DD') : '',
+                    }))}
+                    format="MM/DD/YYYY"
+                    placeholder="mm/dd/yyyy"
+                    className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
+                    suffixIcon={null}
+                    allowClear
+                    inputReadOnly={true}
+                  />
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
+                </div>
               </div>
             </div>
 

@@ -22,7 +22,8 @@ export const useReportSubmission = (user, fetchReports) => {
     try {
       const formDataToSubmit = new FormData();
 
-      // Add form fields
+      // Add common form fields
+      formDataToSubmit.append("reportType", formData.reportType || "Home Wash/Garment Wash Test");
       formDataToSubmit.append("ymStyle", formData.ymStyle || "");
       formDataToSubmit.append("buyerStyle", formData.buyerStyle || "");
       formDataToSubmit.append("color", JSON.stringify(formData.color || []));
@@ -33,6 +34,18 @@ export const useReportSubmission = (user, fetchReports) => {
       formDataToSubmit.append("notes", formData.notes || "");
       formDataToSubmit.append("userId", user?.id || user?._id || "");
       formDataToSubmit.append("userName", user?.name || user?.username || "");
+
+      // Add all other fields dynamically (avoiding already added ones, images, and complex objects)
+      const skipFields = ["reportType", "ymStyle", "buyerStyle", "color", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "notes", "images", "userId", "userName"];
+      Object.keys(formData).forEach(key => {
+        if (!skipFields.includes(key) && formData[key] !== undefined && formData[key] !== null) {
+          if (Array.isArray(formData[key])) {
+            formDataToSubmit.append(key, JSON.stringify(formData[key]));
+          } else {
+            formDataToSubmit.append(key, formData[key]);
+          }
+        }
+      });
 
       // Validate and add image files
       if (formData.images && formData.images.length > 0) {
@@ -235,12 +248,25 @@ export const useReportSubmission = (user, fetchReports) => {
 
     try {
       const formDataToSubmit = new FormData();
+      formDataToSubmit.append("reportType", editFormData.reportType || "Home Wash/Garment Wash Test");
       formDataToSubmit.append("color", JSON.stringify(editFormData.color || []));
       formDataToSubmit.append("buyerStyle", editFormData.buyerStyle || "");
       formDataToSubmit.append("po", JSON.stringify(editFormData.po || []));
       formDataToSubmit.append("exFtyDate", JSON.stringify(editFormData.exFtyDate || []));
       formDataToSubmit.append("factory", editFormData.factory || "");
       formDataToSubmit.append("sendToHomeWashingDate", editFormData.sendToHomeWashingDate || "");
+
+      // Add all other fields dynamically
+      const skipFields = ["reportType", "color", "buyerStyle", "po", "exFtyDate", "factory", "sendToHomeWashingDate", "images"];
+      Object.keys(editFormData).forEach(key => {
+        if (!skipFields.includes(key) && editFormData[key] !== undefined && editFormData[key] !== null) {
+          if (Array.isArray(editFormData[key])) {
+            formDataToSubmit.append(key, JSON.stringify(editFormData[key]));
+          } else {
+            formDataToSubmit.append(key, editFormData[key]);
+          }
+        }
+      });
 
       const response = await fetch(`${API_BASE_URL}/api/report-washing/${reportId}`, {
         method: "PUT",

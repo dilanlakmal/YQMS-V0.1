@@ -3,7 +3,13 @@ import { useTranslation } from "react-i18next";
 import { useAuth } from "../components/authentication/AuthContext";
 import { useSearchParams } from "react-router-dom";
 import { HiDocumentAdd, HiClipboardList } from "react-icons/hi";
-import { MdWarehouse } from "react-icons/md";
+import {
+  MdWarehouse,
+  MdLocalLaundryService,
+  MdOutlineDeviceThermostat,
+  MdOutlineImagesearchRoller,
+  MdOutlineExpand
+} from "react-icons/md";
 import { API_BASE_URL, QR_CODE_BASE_URL } from "../../config.js";
 import { pdf } from "@react-pdf/renderer";
 import { Html5Qrcode } from "html5-qrcode";
@@ -14,6 +20,7 @@ import {
   ImageViewerModal,
   useImageViewer,
   FormSection,
+  DynamicFormSection,
   ReportsList,
   ReceivedModal,
   CompletionModal,
@@ -33,6 +40,9 @@ import {
   getCurrentDate,
   IMAGE_LIMITS,
   TABS,
+  REPORT_TYPES,
+  getReportTypeConfig,
+  getInitialFormData,
   // Edit handlers (only used ones)
   prepareEditFormData,
   handleEditFormSubmit,
@@ -59,17 +69,7 @@ const LaundryWashingMachineTest = () => {
   const completionImageInputRef = useRef(null);
 
   // Initialize custom hooks
-  const initialFormData = {
-    color: [],
-    ymStyle: "",
-    buyerStyle: "",
-    po: [],
-    exFtyDate: [],
-    factory: "",
-    sendToHomeWashingDate: dateValue,
-    images: [],
-    notes: "",
-  };
+  const initialFormData = getInitialFormData(REPORT_TYPES.HOME_WASH);
 
   const { formData, setFormData, handleInputChange: handleFormInputChange, resetForm } = useFormState(initialFormData);
 
@@ -266,6 +266,10 @@ const LaundryWashingMachineTest = () => {
   // Tab state
   const [activeTab, setActiveTab] = useState("form"); // "form" or "reports"
 
+  // Custom Dropdown State
+  const [isReportTypeOpen, setIsReportTypeOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
   // normalizeImageUrl and getImageFilename are now imported from utils
 
   // Order_No autocomplete state
@@ -329,8 +333,23 @@ const LaundryWashingMachineTest = () => {
   const [showPODropdown, setShowPODropdown] = useState(false);
   const [showETDDropdown, setShowETDDropdown] = useState(false);
 
-  // Handle input change with order data clearing
+  // Handle input change with order data clearing and report type switching
   const handleInputChange = (field, value) => {
+    // Special handling for report type change
+    if (field === "reportType") {
+      // When report type changes, reset the form with new initial data
+      const newFormData = getInitialFormData(value);
+      // Preserve any common data if desired (optional)
+      setFormData(newFormData);
+      // Reset all dependent states
+      resetOrderData();
+      setImageRotations({});
+      setShowColorDropdown(false);
+      setShowPODropdown(false);
+      setShowETDDropdown(false);
+      return;
+    }
+
     handleFormInputChange(field, value, (field, value, newData, prev) => {
       // Clear color, PO, and ETD when Order_No changes manually
       if (field === "ymStyle" && prev.ymStyle !== value) {
@@ -457,21 +476,12 @@ const LaundryWashingMachineTest = () => {
   // Handle form submit
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const currentReportType = formData.reportType || REPORT_TYPES.HOME_WASH;
     const success = await submitReport(formData, () => {
       // Keep on the form tab for faster subsequent entries
       // setActiveTab("reports"); // Removed per request
-      // Reset form
-      resetForm({
-        color: [],
-        ymStyle: "",
-        buyerStyle: "",
-        po: [],
-        exFtyDate: [],
-        factory: "",
-        sendToHomeWashingDate: new Date().toISOString().split("T")[0],
-        images: [],
-        notes: "",
-      });
+      // Reset form with initial data for the current report type
+      resetForm(getInitialFormData(currentReportType));
       setImageRotations({});
       setShowColorDropdown(false);
       setShowPODropdown(false);
@@ -1746,6 +1756,19 @@ const LaundryWashingMachineTest = () => {
     };
   }, [showEditColorDropdown, showEditPODropdown, showEditETDDropdown]);
 
+  // Close Report Type dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsReportTypeOpen(false);
+      }
+    };
+    if (isReportTypeOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isReportTypeOpen]);
+
   // Close QR code modal if report becomes completed
   useEffect(() => {
     if (showReportDateQR) {
@@ -1762,14 +1785,95 @@ const LaundryWashingMachineTest = () => {
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-gray-100 p-2 sm:p-4 md:p-6">
       <div className="max-w-7xl mx-auto bg-white rounded-xl shadow-lg">
         <div className="p-4 md:p-6">
-          {/* Page Title */}
-          <div className="mb-6">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-white mb-2">
-              Launch Washing Machine Test
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              Report Washing - Enter test details and view submitted reports
-            </p>
+          {/* Page Title & Report Type Selection */}
+          <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-6 border-b border-gray-200 dark:border-gray-700 pb-5">
+            <div className="flex-1">
+              <h1 className="text-3xl sm:text-4xl font-bold mb-2 text-gray-900 dark:text-white">
+                Launch Washing Machine Test
+              </h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2">
+                <svg className="w-4 h-4 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                  <circle cx="10" cy="10" r="3">
+                    <animate attributeName="opacity" values="1;0.3;1" dur="2s" repeatCount="indefinite" />
+                  </circle>
+                </svg>
+                Report Washing - Enter test details and view submitted reports
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+              <label className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-600 dark:text-blue-400 whitespace-nowrap">
+                Report Type
+              </label>
+
+              <div className="relative" ref={dropdownRef}>
+                {/* Custom Selection Button */}
+                <button
+                  onClick={() => setIsReportTypeOpen(!isReportTypeOpen)}
+                  className={`flex items-center justify-between min-w-[260px] px-4 py-2 rounded-xl border-2 transition-all duration-300 shadow-sm
+                    ${isReportTypeOpen
+                      ? 'bg-white dark:bg-gray-800 border-blue-500 ring-4 ring-blue-500/10 shadow-blue-50/50'
+                      : 'bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-gray-800 dark:to-gray-700 border-blue-200/60 dark:border-gray-600 hover:border-blue-400 hover:shadow-md'
+                    }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-xl text-blue-600 dark:text-blue-400">
+                      {formData.reportType === "Home Wash/Garment Wash Test" && <MdLocalLaundryService />}
+                      {formData.reportType === "HT Testing" && <MdOutlineDeviceThermostat />}
+                      {formData.reportType === "EMB/Printing Testing" && <MdOutlineImagesearchRoller />}
+                      {formData.reportType === "Pulling Test" && <MdOutlineExpand />}
+                    </span>
+                    <span className="font-bold text-gray-800 dark:text-gray-100 text-[13px] tracking-tight">
+                      {formData.reportType}
+                    </span>
+                  </div>
+                  <svg
+                    className={`w-4 h-4 text-blue-600 transition-transform duration-300 ${isReportTypeOpen ? 'rotate-180' : ''}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+
+                {/* Animated Dropdown Menu */}
+                {isReportTypeOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1.5 z-50 overflow-hidden bg-white/98 dark:bg-gray-800/98 backdrop-blur-xl rounded-xl border-2 border-blue-100 dark:border-gray-600 shadow-2xl animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-1.5 space-y-0.5">
+                      {[
+                        { val: "Home Wash/Garment Wash Test", icon: <MdLocalLaundryService /> },
+                        { val: "HT Testing", icon: <MdOutlineDeviceThermostat /> },
+                        { val: "EMB/Printing Testing", icon: <MdOutlineImagesearchRoller /> },
+                        { val: "Pulling Test", icon: <MdOutlineExpand /> }
+                      ].map((type) => (
+                        <button
+                          key={type.val}
+                          onClick={() => {
+                            handleInputChange("reportType", type.val);
+                            setIsReportTypeOpen(false);
+                          }}
+                          className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all duration-200 group
+                            ${formData.reportType === type.val
+                              ? 'bg-blue-600 text-white shadow-md'
+                              : 'hover:bg-blue-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                            }`}
+                        >
+                          <span className={`text-lg ${formData.reportType === type.val ? 'text-white' : 'text-blue-500/70 group-hover:text-blue-600'}`}>
+                            {type.icon}
+                          </span>
+                          <span className={`flex-1 text-left font-semibold text-[11px] ${formData.reportType === type.val ? 'text-white' : ''}`}>
+                            {type.val}
+                          </span>
+                          {formData.reportType === type.val && (
+                            <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           {/* Tab Navigation */}
@@ -1814,9 +1918,9 @@ const LaundryWashingMachineTest = () => {
             </nav>
           </div>
 
-          {/* Form Section */}
+          {/* Form Section - Dynamic based on Report Type */}
           {activeTab === "form" && (
-            <FormSection
+            <DynamicFormSection
               formData={formData}
               handleInputChange={handleInputChange}
               handleSubmit={handleSubmit}

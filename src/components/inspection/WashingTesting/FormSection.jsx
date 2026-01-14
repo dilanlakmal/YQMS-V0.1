@@ -1,6 +1,8 @@
 import React from "react";
-import { Upload, Camera, X, Send, RotateCw } from "lucide-react";
+import { Upload, Camera, X, Send, RotateCw, Calendar } from "lucide-react";
 import Select from "react-select";
+import { DatePicker as AntDatePicker } from "antd";
+import dayjs from "dayjs";
 
 const FormSection = ({
   formData,
@@ -493,18 +495,23 @@ const FormSection = ({
             )}
           </div>
 
-          {/* SEND To Home Washing Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               SEND To Home Washing Date
             </label>
-            <input
-              type="date"
-              value={formData.sendToHomeWashingDate}
-              onChange={(e) => handleInputChange("sendToHomeWashingDate", e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white"
-              required
-            />
+            <div className="relative group ant-datepicker-container">
+              <AntDatePicker
+                value={formData.sendToHomeWashingDate ? dayjs(formData.sendToHomeWashingDate) : null}
+                onChange={(date, dateString) => handleInputChange("sendToHomeWashingDate", dateString ? dayjs(date).format('YYYY-MM-DD') : '')}
+                format="MM/DD/YYYY"
+                placeholder="mm/dd/yyyy"
+                className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
+                suffixIcon={null}
+                allowClear
+                inputReadOnly={true}
+              />
+              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
+            </div>
           </div>
 
           {/* Image Upload */}

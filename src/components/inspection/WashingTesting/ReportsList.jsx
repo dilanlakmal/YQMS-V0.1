@@ -1,6 +1,8 @@
 import React from "react";
 import { RotateCw, RefreshCw, Search, Calendar, X, ChevronLeft, ChevronRight, ClipboardList } from "lucide-react";
 import Select from "react-select";
+import { DatePicker as AntDatePicker } from "antd";
+import dayjs from "dayjs";
 import { API_BASE_URL } from "../../../../config.js";
 import ReportCard from "./ReportCard";
 
@@ -128,6 +130,7 @@ const ReportsList = ({
       borderColor: state.isFocused ? "#3b82f6" : "#d1d5db",
       color: "black",
       minHeight: "42px",
+      cursor: "pointer",
       "&::placeholder": {
         color: "gray"
       }
@@ -140,6 +143,14 @@ const ReportsList = ({
       "&:active": {
         backgroundColor: "#d1d5db" // Gray-300 on click
       }
+    }),
+    dropdownIndicator: (base) => ({
+      ...base,
+      cursor: "pointer",
+    }),
+    clearIndicator: (base) => ({
+      ...base,
+      cursor: "pointer",
     }),
     singleValue: (base) => ({
       ...base,
@@ -415,32 +426,27 @@ const ReportsList = ({
           />
         </div>
 
-        {/* Start Date */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Calendar className="h-4 w-4 text-gray-400" />
-          </div>
-          <input
-            type="date"
-            className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white px-3 py-2 border"
-            placeholder="Start Date"
-            value={filterStartDate || ""}
-            onChange={(e) => setFilterStartDate && setFilterStartDate(e.target.value)}
+        {/* Date Range Picker */}
+        <div className="relative group sm:col-span-2 md:col-span-2 lg:col-span-2 ant-datepicker-container">
+          <AntDatePicker.RangePicker
+            value={filterStartDate && filterEndDate ? [dayjs(filterStartDate), dayjs(filterEndDate)] : null}
+            onChange={(dates, dateStrings) => {
+              if (dates && dates[0] && dates[1]) {
+                setFilterStartDate && setFilterStartDate(dates[0].format('YYYY-MM-DD'));
+                setFilterEndDate && setFilterEndDate(dates[1].format('YYYY-MM-DD'));
+              } else {
+                setFilterStartDate && setFilterStartDate('');
+                setFilterEndDate && setFilterEndDate('');
+              }
+            }}
+            format="MM/DD/YYYY"
+            placeholder={["Start Date", "End Date"]}
+            className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:text-white h-[42px]"
+            suffixIcon={null}
+            allowClear
+            inputReadOnly={true}
           />
-        </div>
-
-        {/* End Date */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Calendar className="h-4 w-4 text-gray-400" />
-          </div>
-          <input
-            type="date"
-            className="pl-10 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white px-3 py-2 border"
-            placeholder="End Date"
-            value={filterEndDate || ""}
-            onChange={(e) => setFilterEndDate && setFilterEndDate(e.target.value)}
-          />
+          <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 group-focus-within:text-blue-500 transition-colors pointer-events-none z-10" />
         </div>
       </div>
 
