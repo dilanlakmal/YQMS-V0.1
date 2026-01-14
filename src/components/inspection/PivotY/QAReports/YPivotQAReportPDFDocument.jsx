@@ -469,31 +469,122 @@ const styles = StyleSheet.create({
   },
 
   // AQL Section
-  aqlCard: {
+  // 1. Top Grid (Type, Level, Batch, etc.)
+  aqlTopGrid: {
     flexDirection: "row",
-    gap: 8,
-    marginBottom: 12
+    gap: 4,
+    marginBottom: 6
   },
-  aqlCardItem: {
+  aqlInfoBox: {
     flex: 1,
-    padding: 10,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: colors.gray[200],
+    padding: 6,
     borderRadius: 4,
-    alignItems: "center"
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.gray[100] // Default gray
   },
-  aqlCardLabel: {
-    fontSize: 6,
+  // Specific backgrounds for the info boxes
+  bgPurple: { backgroundColor: "#f3e8ff" }, // Batch
+  bgCyan: { backgroundColor: "#ecfeff" }, // Letter
+  bgEmerald: { backgroundColor: "#ecfdf5" }, // Sample
+  bgIndigo: { backgroundColor: "#e0e7ff" }, // Inspected
+
+  aqlLabel: {
+    fontSize: 5,
     color: colors.gray[500],
     textTransform: "uppercase",
-    marginBottom: 4
+    marginBottom: 2,
+    fontFamily: "Helvetica-Bold"
   },
-  aqlCardValue: {
-    fontSize: 14,
+  aqlValue: {
+    fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: colors.primary
+    color: colors.gray[800]
   },
+
+  // 2. AQL Levels Row (Minor 2.5, Major 1.0...)
+  aqlLevelRow: {
+    flexDirection: "row",
+    gap: 4,
+    marginBottom: 8
+  },
+  aqlLevelBox: {
+    flex: 1,
+    padding: 6,
+    borderRadius: 4,
+    borderWidth: 1,
+    alignItems: "center"
+  },
+  levelGreen: { backgroundColor: "#f0fdf4", borderColor: "#bbf7d0" },
+  levelOrange: { backgroundColor: "#fff7ed", borderColor: "#fed7aa" },
+  levelRed: { backgroundColor: "#fef2f2", borderColor: "#fecaca" },
+
+  // 3. AQL Table Specifics
+  tableHeaderDark: {
+    flexDirection: "row",
+    backgroundColor: "#1f2937", // Dark Slate
+    color: "#FFFFFF"
+  },
+  // Column Widths for AQL Table
+  colDefectName: { width: "40%", padding: 6, justifyContent: "center" },
+  colAqlValue: {
+    width: "15%",
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center"
+  },
+
+  // Colored Table Headers
+  bgHeaderGreen: { backgroundColor: "#16a34a" },
+  bgHeaderOrange: { backgroundColor: "#ea580c" },
+  bgHeaderRed: { backgroundColor: "#dc2626" },
+
+  // Table Footer Rows (Ac/Re, Status)
+  tableFooterRow: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray[200],
+    minHeight: 20,
+    alignItems: "center"
+  },
+  bgGrayLight: { backgroundColor: "#f3f4f6" },
+
+  // Badges
+  statusBadge: {
+    padding: "2 6",
+    borderRadius: 4,
+    fontSize: 6,
+    fontFamily: "Helvetica-Bold",
+    textTransform: "uppercase"
+  },
+  badgePass: { backgroundColor: "#dcfce7", color: "#166534" },
+  badgeFail: { backgroundColor: "#fee2e2", color: "#991b1b" },
+
+  //   aqlCard: {
+  //     flexDirection: "row",
+  //     gap: 8,
+  //     marginBottom: 12
+  //   },
+  //   aqlCardItem: {
+  //     flex: 1,
+  //     padding: 10,
+  //     backgroundColor: "#FFFFFF",
+  //     borderWidth: 1,
+  //     borderColor: colors.gray[200],
+  //     borderRadius: 4,
+  //     alignItems: "center"
+  //   },
+  //   aqlCardLabel: {
+  //     fontSize: 6,
+  //     color: colors.gray[500],
+  //     textTransform: "uppercase",
+  //     marginBottom: 4
+  //   },
+  //   aqlCardValue: {
+  //     fontSize: 14,
+  //     fontFamily: "Helvetica-Bold",
+  //     color: colors.primary
+  //   },
 
   // Divider
   divider: {
@@ -1174,138 +1265,378 @@ const ColorSizeTable = ({ data }) => {
 // =============================================================================
 // AQL SECTION
 // =============================================================================
-const AQLSection = ({ aqlResult, aqlSampleData, totals, inspectedQty }) => {
+
+const AQLSection = ({
+  aqlResult,
+  aqlSampleData,
+  totals,
+  inspectedQty,
+  defectsList
+}) => {
   if (!aqlResult) return null;
+
+  // Helper to safely get values
+  const minorLevel = aqlSampleData?.minorConfig?.AQLLevel || "N/A";
+  const majorLevel = aqlSampleData?.majorConfig?.AQLLevel || "N/A";
+  const criticalLevel = aqlSampleData?.criticalConfig?.AQLLevel || "N/A";
+
+  const renderStatusBadge = (status) => {
+    if (status === "PASS") {
+      return (
+        <View style={[styles.statusBadge, styles.badgePass]}>
+          <Text>PASS</Text>
+        </View>
+      );
+    }
+    if (status === "FAIL") {
+      return (
+        <View style={[styles.statusBadge, styles.badgeFail]}>
+          <Text>FAIL</Text>
+        </View>
+      );
+    }
+    return <Text style={{ fontSize: 6, color: "#9ca3af" }}>N/A</Text>;
+  };
 
   return (
     <View style={styles.section}>
-      <Text style={[styles.sectionTitle, { backgroundColor: "#7C3AED" }]}>
-        AQL DEFECT RESULT
+      {/* 1. Header (Purple Gradient style) */}
+      <Text style={[styles.sectionTitle, { backgroundColor: "#9333EA" }]}>
+        DEFECT RESULT (AQL)
       </Text>
+
       <View style={styles.sectionContent}>
-        {/* AQL Cards */}
-        <View style={styles.aqlCard}>
-          <View style={styles.aqlCardItem}>
-            <Text style={styles.aqlCardLabel}>Inspected Qty</Text>
-            <Text style={styles.aqlCardValue}>{inspectedQty}</Text>
-          </View>
-          <View style={styles.aqlCardItem}>
-            <Text style={styles.aqlCardLabel}>Sample Size</Text>
-            <Text style={styles.aqlCardValue}>
-              {aqlSampleData?.sampleSize || "-"}
+        {/* 2. Top Info Grid (6 Cards) */}
+        <View style={styles.aqlTopGrid}>
+          {/* Type */}
+          <View style={styles.aqlInfoBox}>
+            <Text style={styles.aqlLabel}>Type</Text>
+            <Text style={styles.aqlValue}>
+              {aqlSampleData?.baseConfig?.InspectionType || "-"}
             </Text>
           </View>
-          <View style={styles.aqlCardItem}>
-            <Text style={styles.aqlCardLabel}>Minor Accept</Text>
-            <Text style={styles.aqlCardValue}>
-              {aqlSampleData?.minorAccept ?? "-"}
+          {/* Level */}
+          <View style={styles.aqlInfoBox}>
+            <Text style={styles.aqlLabel}>Level</Text>
+            <Text style={styles.aqlValue}>
+              {aqlSampleData?.baseConfig?.Level || "-"}
             </Text>
           </View>
-          <View style={styles.aqlCardItem}>
-            <Text style={styles.aqlCardLabel}>Major Accept</Text>
-            <Text style={styles.aqlCardValue}>
-              {aqlSampleData?.majorAccept ?? "-"}
+          {/* Batch */}
+          <View style={[styles.aqlInfoBox, styles.bgPurple]}>
+            <Text style={[styles.aqlLabel, { color: "#7e22ce" }]}>Batch</Text>
+            <Text style={[styles.aqlValue, { color: "#581c87" }]}>
+              {aqlResult.batch}
+            </Text>
+          </View>
+          {/* Letter */}
+          <View style={[styles.aqlInfoBox, styles.bgEmerald]}>
+            <Text style={[styles.aqlLabel, { color: "#047857" }]}>Letter</Text>
+            <Text style={[styles.aqlValue, { color: "#064e3b" }]}>
+              {aqlResult.sampleLetter}
+            </Text>
+          </View>
+          {/* Sample */}
+          <View style={[styles.aqlInfoBox, styles.bgCyan]}>
+            <Text style={[styles.aqlLabel, { color: "#0891b2" }]}>Sample</Text>
+            <Text style={[styles.aqlValue, { color: "#164e63" }]}>
+              {aqlResult.sampleSize}
+            </Text>
+          </View>
+          {/* Inspected */}
+          <View style={[styles.aqlInfoBox, styles.bgIndigo]}>
+            <Text style={[styles.aqlLabel, { color: "#4338ca" }]}>
+              Inspected
+            </Text>
+            <Text style={[styles.aqlValue, { color: "#312e81" }]}>
+              {inspectedQty}
             </Text>
           </View>
         </View>
 
-        {/* AQL Result Table */}
+        {/* 3. AQL Levels Row (Green/Orange/Red) */}
+        <View style={styles.aqlLevelRow}>
+          <View style={[styles.aqlLevelBox, styles.levelGreen]}>
+            <Text style={[styles.aqlLabel, { color: "#15803d" }]}>
+              Minor AQL
+            </Text>
+            <Text style={[styles.aqlValue, { color: "#14532d", fontSize: 10 }]}>
+              {minorLevel}
+            </Text>
+          </View>
+          <View style={[styles.aqlLevelBox, styles.levelOrange]}>
+            <Text style={[styles.aqlLabel, { color: "#c2410c" }]}>
+              Major AQL
+            </Text>
+            <Text style={[styles.aqlValue, { color: "#7c2d12", fontSize: 10 }]}>
+              {majorLevel}
+            </Text>
+          </View>
+          <View style={[styles.aqlLevelBox, styles.levelRed]}>
+            <Text style={[styles.aqlLabel, { color: "#b91c1c" }]}>
+              Critical AQL
+            </Text>
+            <Text style={[styles.aqlValue, { color: "#7f1d1d", fontSize: 10 }]}>
+              {criticalLevel}
+            </Text>
+          </View>
+        </View>
+
+        {/* 4. Detailed Defect Table */}
         <View style={styles.table}>
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderCell, { width: "25%" }]}>
-              Category
-            </Text>
-            <Text style={[styles.tableHeaderCell, { width: "25%" }]}>
-              Found
-            </Text>
-            <Text style={[styles.tableHeaderCell, { width: "25%" }]}>
-              Allowed
-            </Text>
-            <Text style={[styles.tableHeaderCell, { width: "25%" }]}>
-              Result
-            </Text>
+          {/* Header */}
+          <View style={styles.tableHeaderDark}>
+            <View style={styles.colDefectName}>
+              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>
+                DEFECT NAME
+              </Text>
+            </View>
+            <View style={[styles.colAqlValue, styles.bgHeaderGreen]}>
+              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>
+                MINOR
+              </Text>
+            </View>
+            <View style={[styles.colAqlValue, styles.bgHeaderOrange]}>
+              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>
+                MAJOR
+              </Text>
+            </View>
+            <View style={[styles.colAqlValue, styles.bgHeaderRed]}>
+              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>
+                CRITICAL
+              </Text>
+            </View>
+            <View style={[styles.colAqlValue, { backgroundColor: "#111827" }]}>
+              <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>
+                TOTAL
+              </Text>
+            </View>
           </View>
-          {/* Minor */}
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCell, { width: "25%" }]}>Minor</Text>
-            <Text style={[styles.tableCell, { width: "25%" }]}>
-              {totals?.minor || 0}
-            </Text>
-            <Text style={[styles.tableCell, { width: "25%" }]}>
-              {aqlSampleData?.minorAccept ?? "N/A"}
-            </Text>
-            <Text
+
+          {/* Defect Rows */}
+          {defectsList &&
+            defectsList.map((defect, idx) => (
+              <View
+                key={idx}
+                style={[
+                  styles.tableRow,
+                  { backgroundColor: idx % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }
+                ]}
+              >
+                <View style={styles.colDefectName}>
+                  <Text style={{ fontSize: 7, color: colors.gray[800] }}>
+                    {defect.defectCode} - {defect.defectName}
+                  </Text>
+                </View>
+                <View style={styles.colAqlValue}>
+                  <Text
+                    style={{
+                      fontSize: 7,
+                      color:
+                        defect.minor > 0 ? colors.success : colors.gray[300],
+                      fontFamily:
+                        defect.minor > 0 ? "Helvetica-Bold" : "Helvetica"
+                    }}
+                  >
+                    {defect.minor || "-"}
+                  </Text>
+                </View>
+                <View style={styles.colAqlValue}>
+                  <Text
+                    style={{
+                      fontSize: 7,
+                      color:
+                        defect.major > 0 ? colors.warning : colors.gray[300],
+                      fontFamily:
+                        defect.major > 0 ? "Helvetica-Bold" : "Helvetica"
+                    }}
+                  >
+                    {defect.major || "-"}
+                  </Text>
+                </View>
+                <View style={styles.colAqlValue}>
+                  <Text
+                    style={{
+                      fontSize: 7,
+                      color:
+                        defect.critical > 0 ? colors.danger : colors.gray[300],
+                      fontFamily:
+                        defect.critical > 0 ? "Helvetica-Bold" : "Helvetica"
+                    }}
+                  >
+                    {defect.critical || "-"}
+                  </Text>
+                </View>
+                <View style={styles.colAqlValue}>
+                  <Text style={{ fontSize: 7, fontFamily: "Helvetica-Bold" }}>
+                    {defect.total}
+                  </Text>
+                </View>
+              </View>
+            ))}
+
+          {/* Footer: TOTAL */}
+          <View
+            style={[
+              styles.tableFooterRow,
+              styles.bgGrayLight,
+              { borderTopWidth: 1, borderTopColor: colors.gray[300] }
+            ]}
+          >
+            <View
               style={[
-                styles.tableCell,
-                { width: "25%" },
-                aqlResult.minorPass
-                  ? styles.measurementCellPass
-                  : styles.measurementCellFail
+                styles.colDefectName,
+                { alignItems: "flex-end", paddingRight: 10 }
               ]}
             >
-              {aqlResult.minorPass ? "PASS" : "FAIL"}
-            </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.gray[600]
+                }}
+              >
+                TOTAL
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.success
+                }}
+              >
+                {totals.minor}
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.warning
+                }}
+              >
+                {totals.major}
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.danger
+                }}
+              >
+                {totals.critical}
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.primary
+                }}
+              >
+                {totals.total}
+              </Text>
+            </View>
           </View>
-          {/* Major */}
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCell, { width: "25%" }]}>Major</Text>
-            <Text style={[styles.tableCell, { width: "25%" }]}>
-              {totals?.major || 0}
-            </Text>
-            <Text style={[styles.tableCell, { width: "25%" }]}>
-              {aqlSampleData?.majorAccept ?? "N/A"}
-            </Text>
-            <Text
+
+          {/* Footer: Ac / Re */}
+          <View style={styles.tableFooterRow}>
+            <View
               style={[
-                styles.tableCell,
-                { width: "25%" },
-                aqlResult.majorPass
-                  ? styles.measurementCellPass
-                  : styles.measurementCellFail
+                styles.colDefectName,
+                { alignItems: "flex-end", paddingRight: 10 }
               ]}
             >
-              {aqlResult.majorPass ? "PASS" : "FAIL"}
-            </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.gray[500]
+                }}
+              >
+                Ac / Re
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text style={{ fontSize: 7, color: colors.gray[600] }}>
+                {aqlResult.minor.ac} / {aqlResult.minor.re}
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text style={{ fontSize: 7, color: colors.gray[600] }}>
+                {aqlResult.major.ac} / {aqlResult.major.re}
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text style={{ fontSize: 7, color: colors.gray[600] }}>
+                {aqlResult.critical.ac} / {aqlResult.critical.re}
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text style={{ fontSize: 7, color: colors.gray[400] }}>-</Text>
+            </View>
           </View>
-          {/* Critical */}
-          <View style={styles.tableRow}>
-            <Text style={[styles.tableCell, { width: "25%" }]}>Critical</Text>
-            <Text style={[styles.tableCell, { width: "25%" }]}>
-              {totals?.critical || 0}
-            </Text>
-            <Text style={[styles.tableCell, { width: "25%" }]}>0</Text>
-            <Text
+
+          {/* Footer: STATUS */}
+          <View style={[styles.tableFooterRow, styles.bgGrayLight]}>
+            <View
               style={[
-                styles.tableCell,
-                { width: "25%" },
-                (totals?.critical || 0) === 0
-                  ? styles.measurementCellPass
-                  : styles.measurementCellFail
+                styles.colDefectName,
+                { alignItems: "flex-end", paddingRight: 10 }
               ]}
             >
-              {(totals?.critical || 0) === 0 ? "PASS" : "FAIL"}
-            </Text>
+              <Text
+                style={{
+                  fontSize: 7,
+                  fontFamily: "Helvetica-Bold",
+                  color: colors.gray[600]
+                }}
+              >
+                STATUS
+              </Text>
+            </View>
+            <View style={styles.colAqlValue}>
+              {renderStatusBadge(aqlResult.minor.status)}
+            </View>
+            <View style={styles.colAqlValue}>
+              {renderStatusBadge(aqlResult.major.status)}
+            </View>
+            <View style={styles.colAqlValue}>
+              {renderStatusBadge(aqlResult.critical.status)}
+            </View>
+            <View style={styles.colAqlValue}>
+              <Text style={{ fontSize: 7, color: colors.gray[400] }}>-</Text>
+            </View>
           </View>
         </View>
 
-        {/* Final Result */}
+        {/* 5. Final Result Banner */}
         <View
           style={[
             styles.resultBanner,
-            { marginTop: 12 },
+            { marginTop: 12, borderWidth: 1 },
             aqlResult.final === "PASS"
-              ? styles.resultBannerPass
-              : styles.resultBannerFail
+              ? { backgroundColor: "#f0fdf4", borderColor: "#15803d" }
+              : { backgroundColor: "#fef2f2", borderColor: "#b91c1c" }
           ]}
         >
-          <View style={styles.resultItem}>
-            <Text style={styles.resultLabel}>AQL Final Result</Text>
+          <View style={{ flex: 1, alignItems: "center" }}>
+            <Text style={[styles.resultLabel, { fontSize: 8 }]}>
+              FINAL DEFECT RESULT
+            </Text>
             <Text
               style={[
                 styles.resultValue,
+                { fontSize: 14 },
                 aqlResult.final === "PASS"
-                  ? styles.resultPass
-                  : styles.resultFail
+                  ? { color: "#15803d" }
+                  : { color: "#b91c1c" }
               ]}
             >
               {aqlResult.final}
@@ -1616,15 +1947,12 @@ const PhotoDocumentationSection = ({ photoData }) => {
       arr.slice(i * size, i * size + size)
     );
 
-  // Pre-filter valid sections
-  const validSections = photoData
-    .map((section) => ({
-      ...section,
-      validItems:
-        section.items?.filter((item) => item.images?.length > 0).slice(0, 6) ||
-        []
-    }))
-    .filter((section) => section.validItems.length > 0);
+  // Filter sections that actually have content
+  const validSections = photoData.filter(
+    (section) =>
+      section.items &&
+      section.items.some((item) => item.images && item.images.length > 0)
+  );
 
   if (validSections.length === 0) return null;
 
@@ -1636,24 +1964,53 @@ const PhotoDocumentationSection = ({ photoData }) => {
 
       <View style={styles.sectionContent}>
         {validSections.map((section, sectionIdx) => {
-          const itemRows = chunk(section.validItems, 3);
+          // --- STEP 1: FLATTEN THE IMAGES ---
+          // Instead of creating a row per Item, we create a list of ALL images
+          // belonging to this section, carrying over their item metadata.
+          const allImagesInSection = [];
 
-          // Calculate top margin (reduce for the very first section to save space)
+          section.items.forEach((item) => {
+            if (item.images && item.images.length > 0) {
+              item.images.forEach((img, imgIndex) => {
+                // We assume img has { base64: "..." }
+                if (img.base64) {
+                  allImagesInSection.push({
+                    uniqueId: `${item.itemNo}-${imgIndex}`,
+                    base64: img.base64,
+                    // Show item name. Optional: Add (1/3) if multiple images exist
+                    title: `#${item.itemNo} ${item.itemName}`,
+                    remarks: item.remarks,
+                    isMulti: item.images.length > 1,
+                    indexStr:
+                      item.images.length > 1
+                        ? `(${imgIndex + 1}/${item.images.length})`
+                        : ""
+                  });
+                }
+              });
+            }
+          });
+
+          if (allImagesInSection.length === 0) return null;
+
+          // --- STEP 2: CHUNK THE FLATTENED IMAGES ---
+          const imageRows = chunk(allImagesInSection, 3);
+
+          // Calculate top margin
           const sectionStyle =
             sectionIdx === 0 ? { marginTop: 4 } : { marginTop: 12 };
 
           return (
             <View key={section.sectionId || sectionIdx} style={sectionStyle}>
-              {/* Loop through Rows */}
-              {itemRows.map((row, rowIndex) => (
+              {/* Loop through Rows of Images */}
+              {imageRows.map((row, rowIndex) => (
                 <View
                   key={rowIndex}
-                  // wrap={false} keeps the content inside this View together.
-                  // For rowIndex 0, this bundles the TITLE + ROW 1.
+                  // Keep title with the first row of images
                   wrap={false}
                   style={{ marginBottom: 12 }}
                 >
-                  {/* Render Title ONLY inside the first row block */}
+                  {/* Render Title ONLY before the very first row of this section */}
                   {rowIndex === 0 && (
                     <Text style={styles.subsectionTitle}>
                       {section.sectionName}
@@ -1662,42 +2019,23 @@ const PhotoDocumentationSection = ({ photoData }) => {
 
                   {/* Render the Row of Images */}
                   <View style={{ flexDirection: "row", gap: 8 }}>
-                    {row.map((item, itemIdx) => (
-                      <View key={itemIdx} style={{ width: "32%" }}>
+                    {row.map((imgData, colIndex) => (
+                      <View key={colIndex} style={{ width: "32%" }}>
                         <View style={styles.imageWrapper}>
-                          {item.images[0]?.base64 ? (
-                            <Image
-                              style={styles.image}
-                              src={item.images[0].base64}
-                              cache={false}
-                            />
-                          ) : (
-                            <View
-                              style={[
-                                styles.image,
-                                {
-                                  backgroundColor: colors.gray[200],
-                                  justifyContent: "center",
-                                  alignItems: "center"
-                                }
-                              ]}
-                            >
-                              <Text
-                                style={{ fontSize: 6, color: colors.gray[500] }}
-                              >
-                                No Image
-                              </Text>
-                            </View>
-                          )}
+                          <Image
+                            style={styles.image}
+                            src={imgData.base64}
+                            cache={false}
+                          />
                         </View>
 
                         <View style={styles.imageCaption}>
                           <Text style={styles.imageCaptionTitle}>
-                            #{item.itemNo} {item.itemName}
+                            {imgData.title} {imgData.indexStr}
                           </Text>
-                          {item.remarks && (
+                          {imgData.remarks && (
                             <Text style={styles.imageCaptionSubtitle}>
-                              "{item.remarks}"
+                              "{imgData.remarks}"
                             </Text>
                           )}
                         </View>
@@ -1787,6 +2125,7 @@ const YPivotQAReportPDFDocument = ({
               aqlSampleData={aqlSampleData}
               totals={summaryData?.totals}
               inspectedQty={inspectedQty}
+              defectsList={summaryData?.defectsList || []}
             />
           )}
 
