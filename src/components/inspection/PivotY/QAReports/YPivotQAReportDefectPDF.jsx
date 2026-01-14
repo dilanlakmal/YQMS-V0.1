@@ -415,7 +415,7 @@ const DefectSectionPDF = ({ summaryData }) => {
   if (!summaryData?.groups || summaryData.groups.length === 0) return null;
 
   return (
-    <View style={styles.section} break>
+    <View style={styles.section}>
       <Text style={[styles.sectionTitle, { backgroundColor: "#7C3AED" }]}>
         DEFECT SUMMARY ({summaryData.totals?.total || 0} Total)
       </Text>
