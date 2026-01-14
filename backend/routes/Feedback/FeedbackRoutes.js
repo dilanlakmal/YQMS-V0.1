@@ -9,7 +9,11 @@ import {
   deleteMessage,
   updateFeedbackStatus,
   getFeedbackStats,
-  upload
+  upload,
+  getRating,
+  saveRating,
+  getAuthUserRating,
+  getRatingStats 
 } from "../../controller/Feedback/FeedbackController.js";
 import authenticateUser from "../../middleware/authenticateUser.js";
 
@@ -28,5 +32,9 @@ router.delete("/api/feedbacks/:id/messages/:messageId", authenticateUser, delete
 // Admin operations
 router.put("/api/feedbacks/:id/status", authenticateUser, updateFeedbackStatus);
 
+router.get("/api/ratings", authenticateUser, getRating);
+router.post("/api/ratings", authenticateUser, saveRating);
+router.get("/api/ratings/my-ratings", authenticateUser, getAuthUserRating);
+router.get("/api/ratings/stats", getRatingStats);
 
 export default router;

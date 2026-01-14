@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { MessageSquare, Plus, History, Send, Users } from 'lucide-react';
+import { MessageSquare, Plus, History, Users, Star, BarChart3 } from 'lucide-react';
 import FeedbackForm from '../components/Feedback/feedbackForm';
 import SubmittedFeedbacks from '../components/Feedback/SubmittedFeedbacks';
+import RatingSystem from '@/components/Feedback/RatingSystem';
 
 const Feedback = () => {
   const [activeTab, setActiveTab] = useState('new');
@@ -20,6 +21,14 @@ const Feedback = () => {
       icon: <History size={20} />,
       component: <SubmittedFeedbacks />,
       description: 'View and continue conversations'
+    },
+    {
+      id: 'ratings',
+      label: 'Rate Services',
+      icon: <Star size={20} />,
+      component: <RatingSystem />,
+      description: 'Rate overall experience and individual modules',
+      color: 'from-yellow-500 to-orange-500'
     }
   ];
 
@@ -54,6 +63,14 @@ const Feedback = () => {
                   Community Feedback
                 </span>
               </div>
+              {activeTab === 'ratings' && (
+                <div className="flex items-center gap-2 bg-yellow-50 dark:bg-yellow-900/20 px-3 py-2 rounded-lg">
+                  <BarChart3 className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                  <span className="text-sm font-medium text-yellow-700 dark:text-yellow-300">
+                    Rating System
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

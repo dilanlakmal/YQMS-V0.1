@@ -3,7 +3,8 @@ import { useAuth } from '../authentication/AuthContext';
 import { 
   MessageCircle, Send, Image as ImageIcon, Calendar, User, Tag, 
   ChevronDown, ChevronUp, Edit3, Trash2, X, Check, Upload, 
-  MoreVertical, Eye
+  MoreVertical, Eye, Clock, AlertCircle, CheckCircle2, XCircle,
+  Paperclip, Smile
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 
@@ -35,27 +36,14 @@ const SubmittedFeedbacks = () => {
   const isMessageFromCurrentUser = (message) => {
     if (!user || !message) return false;
 
-    // Get current user ID from multiple possible sources
     const currentUserId = getSafeId(user._id) || getSafeId(user.userId) || getSafeId(user.id);
     const currentUserEmpId = user.emp_id;
     const currentUserName = user.eng_name || user.name;
 
-    // Get message author details
     const messageAuthorId = getSafeId(message.authorId);
     const messageEmpId = message.empId;
     const messageAuthor = message.author;
 
-    // Debug logging
-    console.log('User comparison:', {
-      currentUserId,
-      currentUserEmpId,
-      currentUserName,
-      messageAuthorId,
-      messageEmpId,
-      messageAuthor
-    });
-
-    // Check multiple criteria for ownership
     if (currentUserId && messageAuthorId && currentUserId === messageAuthorId) {
       return true;
     }
@@ -71,9 +59,7 @@ const SubmittedFeedbacks = () => {
     return false;
   };
 
-  // Fetch current user and feedbacks
   useEffect(() => {
-    console.log('Current user from auth:', user); // Debug log
     fetchFeedbacks();
   }, [user]);
 
@@ -88,7 +74,6 @@ const SubmittedFeedbacks = () => {
       
       if (response.ok) {
         const data = await response.json();
-        console.log('Fetched feedbacks:', data.data); // Debug log
         setFeedbacks(data.data || []);
       } else {
         console.error('Failed to fetch feedbacks:', response.status);
@@ -222,8 +207,6 @@ const SubmittedFeedbacks = () => {
         ));
         setEditingMessage(null);
         setEditText('');
-      } else {
-        console.error('Failed to edit message');
       }
     } catch (error) {
       console.error('Error editing message:', error);
@@ -252,349 +235,519 @@ const SubmittedFeedbacks = () => {
             : feedback
         ));
         setShowDropdown(null);
-      } else {
-        console.error('Failed to delete message');
       }
     } catch (error) {
       console.error('Error deleting message:', error);
     }
   };
 
-  const getPriorityColor = (priority) => {
+  const getPriorityConfig = (priority) => {
     switch (priority) {
-      case 'high': return 'text-red-600 bg-red-50 dark:bg-red-900/20';
-      case 'medium': return 'text-yellow-600 bg-yellow-50 dark:bg-yellow-900/20';
-      case 'low': return 'text-green-600 bg-green-50 dark:bg-green-900/20';
-      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20';
+      case 'high': 
+        return {
+          color: 'text-red-700 bg-red-100 border-red-200 dark:text-red-300 dark:bg-red-900/30 dark:border-red-800',
+          icon: AlertCircle,
+          label: 'High Priority'
+        };
+      case 'medium': 
+        return {
+          color: 'text-amber-700 bg-amber-100 border-amber-200 dark:text-amber-300 dark:bg-amber-900/30 dark:border-amber-800',
+          icon: Clock,
+          label: 'Medium Priority'
+        };
+      case 'low': 
+        return {
+          color: 'text-green-700 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-800',
+          icon: CheckCircle2,
+          label: 'Low Priority'
+        };
+      default: 
+        return {
+          color: 'text-gray-700 bg-gray-100 border-gray-200 dark:text-gray-300 dark:bg-gray-900/30 dark:border-gray-800',
+          icon: Clock,
+          label: 'Normal Priority'
+        };
     }
   };
 
-  const getStatusColor = (status) => {
+  const getStatusConfig = (status) => {
     switch (status) {
-      case 'open': return 'text-blue-600 bg-blue-50 dark:bg-blue-900/20';
-      case 'in-progress': return 'text-orange-600 bg-orange-50 dark:bg-orange-900/20';
-      case 'resolved': return 'text-green-600 bg-green-50 dark:bg-green-900/20';
-      case 'closed': return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20';
-      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20';
+      case 'open': 
+        return {
+          color: 'text-blue-700 bg-blue-100 border-blue-200 dark:text-blue-300 dark:bg-blue-900/30 dark:border-blue-800',
+          icon: MessageCircle,
+          label: 'Open'
+        };
+      case 'in-progress': 
+        return {
+          color: 'text-orange-700 bg-orange-100 border-orange-200 dark:text-orange-300 dark:bg-orange-900/30 dark:border-orange-800',
+          icon: Clock,
+          label: 'In Progress'
+        };
+      case 'resolved': 
+        return {
+          color: 'text-green-700 bg-green-100 border-green-200 dark:text-green-300 dark:bg-green-900/30 dark:border-green-800',
+          icon: CheckCircle2,
+          label: 'Resolved'
+        };
+      case 'closed': 
+        return {
+          color: 'text-gray-700 bg-gray-100 border-gray-200 dark:text-gray-300 dark:bg-gray-900/30 dark:border-gray-800',
+          icon: XCircle,
+          label: 'Closed'
+        };
+      default: 
+        return {
+          color: 'text-gray-700 bg-gray-100 border-gray-200 dark:text-gray-300 dark:bg-gray-900/30 dark:border-gray-800',
+          icon: MessageCircle,
+          label: 'Unknown'
+        };
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading feedbacks...</span>
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto mb-4"></div>
+            <p className="text-lg font-medium text-gray-700 dark:text-gray-300">Loading your feedbacks...</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Please wait a moment</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      {/* Image Preview Modal */}
-      {imagePreview && (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-          <div className="relative max-w-4xl max-h-full">
-            <button
-              onClick={() => setImagePreview(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300"
-            >
-              <X className="w-8 h-8" />
-            </button>
-            <img
-              src={imagePreview.preview || `${API_BASE_URL}${imagePreview.url}`}
-              alt={imagePreview.name}
-              className="max-w-full max-h-full object-contain rounded-lg"
-            />
-            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white p-4 rounded-b-lg">
-              <p className="text-sm">{imagePreview.name}</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {feedbacks.length === 0 ? (
-        <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl shadow-lg">
-          <MessageCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-            No feedback submitted yet
-          </h3>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            My Feedback Conversations
+          </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Submit your first feedback to get started with the conversation.
+            Track and manage your submitted feedback with real-time conversations
           </p>
         </div>
-      ) : (
-        feedbacks.map(feedback => (
-          <div key={getSafeId(feedback._id)} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            {/* Feedback Header */}
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                      {feedback.title}
-                    </h3>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getPriorityColor(feedback.priority)}`}>
-                      {feedback.priority}
-                    </span>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(feedback.status)}`}>
-                      {feedback.status}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    <div className="flex items-center gap-1">
-                      <Tag className="w-4 h-4" />
-                      {feedback.module}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <User className="w-4 h-4" />
-                      {feedback.author}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Calendar className="w-4 h-4" />
-                      {new Date(feedback.createdAt).toLocaleDateString()}
-                    </div>
-                  </div>
-                  
-                  <p className="text-gray-700 dark:text-gray-300">
-                    {feedback.comment}
-                  </p>
-                </div>
-                
-                <button
-                  onClick={() => setExpandedFeedback(expandedFeedback === getSafeId(feedback._id) ? null : getSafeId(feedback._id))}
-                  className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Chat ({feedback.messages?.length || 0})
-                  {expandedFeedback === getSafeId(feedback._id) ? (
-                    <ChevronUp className="w-4 h-4" />
-                  ) : (
-                    <ChevronDown className="w-4 h-4" />
-                  )}
-                </button>
+
+        {/* Image Preview Modal */}
+        {imagePreview && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="relative max-w-5xl max-h-[90vh] bg-white dark:bg-gray-800 rounded-2xl overflow-hidden shadow-2xl">
+              <button
+                onClick={() => setImagePreview(null)}
+                className="absolute top-4 right-4 z-10 p-2 bg-black/20 hover:bg-black/40 text-white rounded-full transition-colors backdrop-blur-sm"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <img
+                src={imagePreview.preview || `${API_BASE_URL}${imagePreview.url}`}
+                alt={imagePreview.name}
+                className="max-w-full max-h-full object-contain"
+              />
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent text-white p-6">
+                <p className="font-medium">{imagePreview.name}</p>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Chat Section */}
-            {expandedFeedback === getSafeId(feedback._id) && (
-              <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-900/10">
-                {/* Messages Area */}
-                <div className="p-6 max-h-[500px] overflow-y-auto space-y-4">
-                  {feedback.messages?.map((message) => {
-                    const isCurrentUser = isMessageFromCurrentUser(message);
-                    
-                    console.log('Message render:', { // Debug log
-                      messageId: getSafeId(message._id),
-                      author: message.author,
-                      isCurrentUser,
-                      authorId: message.authorId,
-                      empId: message.empId
-                    });
-
-                    return (
-                      <div
-                        key={getSafeId(message._id)}
-                        className={`flex w-full ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div className={`relative max-w-[70%] group ${isCurrentUser ? 'flex flex-row-reverse items-end' : 'flex items-end'}`}>
-                          
-                          {/* Avatar */}
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${
-                            isCurrentUser ? 'ml-2 bg-blue-500' : 'mr-2 bg-gray-500'
-                          }`}>
-                            {message.author.charAt(0).toUpperCase()}
+        {feedbacks.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-xl border border-gray-200 dark:border-gray-700 p-12 max-w-md mx-auto">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
+                <MessageCircle className="w-10 h-10 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                No feedback submitted yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                Start a conversation by submitting your first feedback. We're here to help improve your experience.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {feedbacks.map(feedback => {
+              const priorityConfig = getPriorityConfig(feedback.priority);
+              const statusConfig = getStatusConfig(feedback.status);
+              const PriorityIcon = priorityConfig.icon;
+              const StatusIcon = statusConfig.icon;
+              
+              return (
+                <div key={getSafeId(feedback._id)} className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-2xl transition-all duration-300">
+                  
+                  {/* Feedback Header */}
+                  <div className="p-8 bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-700 border-b border-gray-200 dark:border-gray-600">
+                    <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6">
+                      <div className="flex-1 space-y-4">
+                        
+                        {/* Title and Badges */}
+                        <div className="flex flex-wrap items-center gap-3">
+                          <h3 className="text-xl font-bold text-gray-900 dark:text-white leading-tight">
+                            {feedback.title}
+                          </h3>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${priorityConfig.color}`}>
+                              <PriorityIcon className="w-3 h-3" />
+                              {priorityConfig.label}
+                            </span>
+                            <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${statusConfig.color}`}>
+                              <StatusIcon className="w-3 h-3" />
+                              {statusConfig.label}
+                            </span>
                           </div>
+                        </div>
+                        
+                        {/* Metadata */}
+                        <div className="flex flex-wrap items-center gap-6 text-sm text-gray-600 dark:text-gray-400">
+                          <div className="flex items-center gap-2">
+                            <Tag className="w-4 h-4 text-blue-500" />
+                            <span className="font-medium">{feedback.module}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <User className="w-4 h-4 text-green-500" />
+                            <span>{feedback.author}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-purple-500" />
+                            <span>{new Date(feedback.createdAt).toLocaleDateString('en-US', { 
+                              year: 'numeric', 
+                              month: 'long', 
+                              day: 'numeric' 
+                            })}</span>
+                          </div>
+                        </div>
+                        
+                        {/* Description */}
+                        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-600">
+                          <p className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                            {feedback.comment}
+                          </p>
+                        </div>
+                      </div>
+                      
+                      {/* Chat Toggle Button */}
+                      <div className="flex-shrink-0">
+                        <button
+                          onClick={() => setExpandedFeedback(expandedFeedback === getSafeId(feedback._id) ? null : getSafeId(feedback._id))}
+                          className="group flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                        >
+                          <MessageCircle className="w-5 h-5" />
+                          <span>Chat ({feedback.messages?.length || 0})</span>
+                          {expandedFeedback === getSafeId(feedback._id) ? (
+                            <ChevronUp className="w-5 h-5 group-hover:transform group-hover:-translate-y-0.5 transition-transform" />
+                          ) : (
+                            <ChevronDown className="w-5 h-5 group-hover:transform group-hover:translate-y-0.5 transition-transform" />
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
 
-                          <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-                            {/* Author and time */}
-                            <div className={`flex items-center gap-2 mb-1 px-1 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
-                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                                {isCurrentUser ? 'You' : message.author}
-                                {message.isAdmin && <span className="text-blue-500 ml-1">(Staff)</span>}
-                              </span>
-                              <span className="text-xs text-gray-500">
-                                {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
+                  {/* Chat Section */}
+                  {expandedFeedback === getSafeId(feedback._id) && (
+                    <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50">
+                      
+                      {/* Messages Area */}
+                      <div className="p-6 max-h-[600px] overflow-y-auto space-y-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
+                        {feedback.messages?.length > 0 ? feedback.messages.map((message) => {
+                          const isCurrentUser = isMessageFromCurrentUser(message);
+                          
+                          return (
+                            <div
+                              key={getSafeId(message._id)}
+                              className={`flex w-full ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div className={`relative max-w-[75%] group ${isCurrentUser ? 'flex flex-row-reverse items-end' : 'flex items-end'}`}>
+                                
+                                {/* Avatar */}
+                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg ${
+                                  isCurrentUser 
+                                    ? 'ml-3 bg-gradient-to-br from-blue-500 to-indigo-600' 
+                                    : 'mr-3 bg-gradient-to-br from-gray-500 to-gray-600'
+                                }`}>
+                                  {message.author.charAt(0).toUpperCase()}
+                                </div>
 
-                            {/* Message bubble */}
-                            <div className={`relative px-4 py-3 rounded-2xl shadow-sm ${
-                              isCurrentUser
-                                ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 rounded-bl-none'
-                            }`}>
-                              
-                              {/* Message Actions for Current User */}
-                              {isCurrentUser && (
-                                <div className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <button
-                                    onClick={() => setShowDropdown(showDropdown === getSafeId(message._id) ? null : getSafeId(message._id))}
-                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full"
-                                  >
-                                    <MoreVertical className="w-4 h-4 text-gray-500" />
-                                  </button>
-                                  {showDropdown === getSafeId(message._id) && (
-                                    <div className="absolute left-0 bottom-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl py-1 z-20 min-w-[100px]">
-                                      <button 
-                                        onClick={() => handleEditMessage(feedback._id, message._id)} 
-                                        className="w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                      >
-                                        <Edit3 className="w-3 h-3" /> Edit
-                                      </button>
-                                      <button 
-                                        onClick={() => handleDeleteMessage(feedback._id, message._id)} 
-                                        className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                      >
-                                        <Trash2 className="w-3 h-3" /> Delete
-                                      </button>
+                                <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+                                  
+                                  {/* Author and time */}
+                                  <div className={`flex items-center gap-2 mb-2 px-1 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                      {isCurrentUser ? 'You' : message.author}
+                                      {message.isAdmin && (
+                                        <span className="ml-1 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] rounded-full font-bold">
+                                          STAFF
+                                        </span>
+                                      )}
+                                    </span>
+                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                      {new Date(message.timestamp).toLocaleTimeString([], { 
+                                        hour: '2-digit', 
+                                        minute: '2-digit',
+                                        hour12: true 
+                                      })}
+                                    </span>
+                                  </div>
+
+                                  {/* Message bubble */}
+                                  <div className={`relative px-5 py-4 rounded-2xl shadow-lg backdrop-blur-sm ${
+                                    isCurrentUser
+                                      ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-br-md'
+                                      : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 rounded-bl-md'
+                                  }`}>
+                                    
+                                    {/* Message Actions for Current User */}
+                                    {isCurrentUser && (
+                                      <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                        <button
+                                          onClick={() => setShowDropdown(showDropdown === getSafeId(message._id) ? null : getSafeId(message._id))}
+                                          className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full shadow-lg backdrop-blur-sm transition-colors"
+                                        >
+                                          <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                        </button>
+                                        {showDropdown === getSafeId(message._id) && (
+                                          <div className="absolute left-0 bottom-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl py-2 z-20 min-w-[120px] backdrop-blur-sm">
+                                            <button 
+                                              onClick={() => handleEditMessage(feedback._id, message._id)} 
+                                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                                            >
+                                              <Edit3 className="w-4 h-4 text-blue-500" /> 
+                                              <span>Edit</span>
+                                            </button>
+                                            <button 
+                                              onClick={() => handleDeleteMessage(feedback._id, message._id)} 
+                                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+                                            >
+                                              <Trash2 className="w-4 h-4" /> 
+                                              <span>Delete</span>
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    )}
+
+                                    {/* Message Content */}
+                                    {editingMessage === getSafeId(message._id) ? (
+                                      <div className="min-w-[250px] space-y-3">
+                                        <textarea
+                                          value={editText}
+                                          onChange={(e) => setEditText(e.target.value)}
+                                          className="w-full p-3 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                          rows={3}
+                                          placeholder="Edit your message..."
+                                        />
+                                        <div className="flex justify-end gap-2">
+                                          <button 
+                                            onClick={() => handleSaveEdit(feedback._id, message._id)} 
+                                            className="p-2 bg-green-500 hover:bg-green-600 rounded-lg text-white shadow-lg transition-colors"
+                                          >
+                                            <Check className="w-4 h-4"/>
+                                          </button>
+                                          <button 
+                                            onClick={() => setEditingMessage(null)} 
+                                            className="p-2 bg-gray-500 hover:bg-gray-600 rounded-lg text-white shadow-lg transition-colors"
+                                          >
+                                            <X className="w-4 h-4"/>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        {message.message && (
+                                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                            {message.message}
+                                          </p>
+                                        )}
+                                        
+                                        {/* Message Images */}
+                                        {message.images?.length > 0 && (
+                                          <div className={`grid gap-3 mt-4 ${
+                                            message.images.length === 1 ? 'grid-cols-1' : 
+                                            message.images.length === 2 ? 'grid-cols-2' : 
+                                            'grid-cols-2 md:grid-cols-3'
+                                          }`}>
+                                            {message.images.map(image => (
+                                              <div
+                                                key={image.id}
+                                                className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-white/20 hover:border-white/40 transition-all duration-200"
+                                                onClick={() => setImagePreview(image)}
+                                              >
+                                                <img
+                                                  src={`${API_BASE_URL}${image.url}`}
+                                                  alt="attachment"
+                                                  className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-300"
+                                                />
+                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all duration-200">
+                                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                                                </div>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                  </div>
+
+                                  {/* Edited indicator */}
+                                  {message.edited && (
+                                    <div className={`text-xs mt-2 px-2 py-1 rounded-full ${
+                                      isCurrentUser 
+                                        ? 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' 
+                                        : 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800'
+                                    }`}>
+                                      edited
                                     </div>
                                   )}
                                 </div>
-                              )}
+                              </div>
+                            </div>
+                          );
+                        }) : (
+                          <div className="text-center py-12">
+                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                              <MessageCircle className="w-8 h-8 text-gray-400" />
+                            </div>
+                            <p className="text-gray-500 dark:text-gray-400 font-medium">No messages yet</p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Start the conversation below</p>
+                          </div>
+                        )}
+                      </div>
 
-                              {/* Message Content */}
-                              {editingMessage === getSafeId(message._id) ? (
-                                <div className="min-w-[200px]">
-                                  <textarea
-                                    value={editText}
-                                    onChange={(e) => setEditText(e.target.value)}
-                                    className="w-full p-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border rounded"
-                                    rows={2}
-                                  />
-                                  <div className="flex justify-end gap-2 mt-2">
-                                    <button 
-                                      onClick={() => handleSaveEdit(feedback._id, message._id)} 
-                                      className="p-1 bg-green-500 rounded text-white"
-                                    >
-                                      <Check className="w-3 h-3"/>
-                                    </button>
-                                    <button 
-                                      onClick={() => setEditingMessage(null)} 
-                                      className="p-1 bg-gray-500 rounded text-white"
-                                    >
-                                      <X className="w-3 h-3"/>
-                                    </button>
+                      {/* Message Input */}
+                                           {/* Message Input */}
+                      <div className="p-6 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">
+                        
+                        {/* Image Preview for New Message */}
+                        {newMessageImages[getSafeId(feedback._id)] && newMessageImages[getSafeId(feedback._id)].length > 0 && (
+                          <div className="mb-4">
+                            <div className="flex items-center gap-2 mb-3">
+                              <Paperclip className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                Attachments ({newMessageImages[getSafeId(feedback._id)].length})
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                              {newMessageImages[getSafeId(feedback._id)].map(image => (
+                                <div key={image.id} className="relative group">
+                                  <div className="aspect-square rounded-xl overflow-hidden border-2 border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
+                                    <img
+                                      src={image.preview}
+                                      alt={image.name}
+                                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-200"
+                                    />
+                                  </div>
+                                  <button
+                                    onClick={() => removeMessageImage(getSafeId(feedback._id), image.id)}
+                                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-all duration-200 transform hover:scale-110"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                  <div className="absolute bottom-1 left-1 right-1 bg-black/60 text-white text-xs px-2 py-1 rounded truncate opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                    {image.name}
                                   </div>
                                 </div>
-                              ) : (
-                                <>
-                                  {message.message && (
-                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                      {message.message}
-                                    </p>
-                                  )}
-                                  
-                                  {/* Message Images */}
-                                  {message.images?.length > 0 && (
-                                    <div className={`grid gap-2 mt-3 ${message.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                      {message.images.map(image => (
-                                        <img
-                                          key={image.id}
-                                          src={`${API_BASE_URL}${image.url}`}
-                                          alt="attachment"
-                                          className="rounded-lg max-h-48 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                          onClick={() => setImagePreview(image)}
-                                        />
-                                      ))}
-                                    </div>
-                                  )}
-                                </>
-                              )}
+                              ))}
                             </div>
+                          </div>
+                        )}
 
-                            {/* Edited indicator */}
-                            {message.edited && (
-                              <div className={`text-xs mt-1 px-1 ${isCurrentUser ? 'text-blue-600' : 'text-gray-500'}`}>
-                                edited
+                        {/* Input Area */}
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <div className="relative">
+                              <input
+                                type="text"
+                                value={newMessages[getSafeId(feedback._id)] || ''}
+                                onChange={(e) => setNewMessages(prev => ({
+                                  ...prev,
+                                  [getSafeId(feedback._id)]: e.target.value
+                                }))}
+                                placeholder="Type your message here..."
+                                className="w-full pl-4 pr-12 py-4 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                                onKeyPress={(e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault();
+                                    handleSendMessage(getSafeId(feedback._id));
+                                  }
+                                }}
+                              />
+                              
+                              {/* Image Upload Button */}
+                              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                <input
+                                  type="file"
+                                  multiple
+                                  accept="image/*"
+                                  onChange={(e) => handleImageUpload(getSafeId(feedback._id), e.target.files)}
+                                  className="hidden"
+                                  id={`image-upload-${getSafeId(feedback._id)}`}
+                                />
+                                <label
+                                  htmlFor={`image-upload-${getSafeId(feedback._id)}`}
+                                  className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors duration-200 flex items-center justify-center group"
+                                  title="Attach images"
+                                >
+                                  <ImageIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                </label>
                               </div>
-                            )}
+                            </div>
+                          </div>
+                          
+                          {/* Send Button */}
+                          <button
+                            onClick={() => handleSendMessage(getSafeId(feedback._id))}
+                            disabled={!newMessages[getSafeId(feedback._id)]?.trim() && (!newMessageImages[getSafeId(feedback._id)] || newMessageImages[getSafeId(feedback._id)].length === 0)}
+                            className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:shadow-none transition-all duration-200 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
+                          >
+                            <Send className="w-5 h-5" />
+                            <span className="hidden sm:inline">Send</span>
+                          </button>
+                        </div>
+
+                        {/* Quick Actions */}
+                        <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200 dark:border-gray-600">
+                          <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
+                            <span className="flex items-center gap-1">
+                              <ImageIcon className="w-3 h-3" />
+                              Max 5MB per image
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <Paperclip className="w-3 h-3" />
+                              Up to 10 images
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+                            <kbd className="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs">Enter</kbd>
+                            <span>to send</span>
                           </div>
                         </div>
                       </div>
-                    );
-                  }) || (
-                    <div className="text-center py-8 text-gray-500">No messages yet.</div>
-                  )}
-                </div>
-
-                {/* Message Input */}
-                <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600">
-                  {/* Image Preview for New Message */}
-                  {newMessageImages[getSafeId(feedback._id)] && newMessageImages[getSafeId(feedback._id)].length > 0 && (
-                    <div className="mb-3 grid grid-cols-4 gap-2">
-                      {newMessageImages[getSafeId(feedback._id)].map(image => (
-                        <div key={image.id} className="relative group">
-                          <img
-                            src={image.preview}
-                            alt={image.name}
-                            className="w-full h-16 object-cover rounded border border-gray-200 dark:border-gray-600"
-                          />
-                          <button
-                            onClick={() => removeMessageImage(getSafeId(feedback._id), image.id)}
-                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                          >
-                            <X className="w-3 h-3" />
-                          </button>
-                        </div>
-                      ))}
                     </div>
                   )}
-
-                  <div className="flex gap-3">
-                    <div className="flex-1 flex gap-2">
-                      <input
-                        type="text"
-                        value={newMessages[getSafeId(feedback._id)] || ''}
-                        onChange={(e) => setNewMessages(prev => ({
-                          ...prev,
-                          [getSafeId(feedback._id)]: e.target.value
-                        }))}
-                        placeholder="Type your message..."
-                        className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
-                        onKeyPress={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleSendMessage(getSafeId(feedback._id));
-                          }
-                        }}
-                      />
-                      
-                      {/* Image Upload Button */}
-                      <div className="relative">
-                        <input
-                          type="file"
-                          multiple
-                          accept="image/*"
-                          onChange={(e) => handleImageUpload(getSafeId(feedback._id), e.target.files)}
-                          className="hidden"
-                          id={`image-upload-${getSafeId(feedback._id)}`}
-                        />
-                        <label
-                          htmlFor={`image-upload-${getSafeId(feedback._id)}`}
-                          className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200 flex items-center justify-center"
-                        >
-                          <ImageIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={() => handleSendMessage(getSafeId(feedback._id))}
-                      disabled={!newMessages[getSafeId(feedback._id)]?.trim() && (!newMessageImages[getSafeId(feedback._id)] || newMessageImages[getSafeId(feedback._id)].length === 0)}
-                      className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
-                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })}
           </div>
-        ))
-      )}
+        )}
+
+        {/* Footer */}
+        <div className="mt-12 text-center">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700">
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              Real-time conversations • Secure & Private
+            </span>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
 
 export default SubmittedFeedbacks;
+

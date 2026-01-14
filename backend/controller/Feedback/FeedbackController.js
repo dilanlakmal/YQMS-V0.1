@@ -1,9 +1,11 @@
 // controllers/feedbackController.js
-import { Feedback } from "../../controller/MongoDB/dbConnectionController.js";
+import { Feedback,
+  Rating,
+  UserMain
+ } from "../../controller/MongoDB/dbConnectionController.js";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { fileURLToPath } from "url";
 import {  __dirname } from "../../Config/appConfig.js";
 
 // Configure multer for image uploads
@@ -538,6 +540,191 @@ export const getFeedbackStats = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch feedback statistics',
+      error: error.message
+    });
+  }
+};
+
+
+//Rateing System Controller Functions
+export const getRating = async (req, res) => {
+  try {
+    // Remove the populate for now to avoid the schema error
+    const ratings = await Rating.find({})
+      .sort({ createdAt: -1 });
+
+    // Manually populate user data if needed
+    const ratingsWithUsers = await Promise.all(
+      ratings.map(async (rating) => {
+        try {
+          const user = await UserMain.findById(rating.userId).select('name eng_name emp_id');
+          return {
+            ...rating.toObject(),
+            user: user || null
+          };
+        } catch (error) {
+          console.error('Error fetching user for rating:', error);
+          return {
+            ...rating.toObject(),
+            user: null
+          };
+        }
+      })
+    );
+
+    res.json({
+      success: true,
+      data: ratingsWithUsers
+    });
+  } catch (error) {
+    console.error('Error fetching ratings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch ratings',
+      error: error.message
+    });
+  }
+};
+
+export const saveRating = async (req, res) => {
+  try {
+    const { moduleId, rating, comment } = req.body;
+    const userId = req.userId;
+
+    // Validate input
+    if (!moduleId || !rating) {
+      return res.status(400).json({
+        success: false,
+        message: 'Module ID and rating are required'
+      });
+    }
+
+    if (rating < 1 || rating > 5) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rating must be between 1 and 5'
+      });
+    }
+
+    // Check if user already rated this module
+    const existingRating = await Rating.findOne({ userId, moduleId });
+
+    if (existingRating) {
+      // Update existing rating
+      existingRating.rating = rating;
+      existingRating.comment = comment || '';
+      existingRating.updatedAt = new Date();
+      await existingRating.save();
+
+      res.json({
+        success: true,
+        message: 'Rating updated successfully',
+        data: existingRating
+      });
+    } else {
+      // Create new rating
+      const newRating = new Rating({
+        userId,
+        moduleId,
+        rating,
+        comment: comment || ''
+      });
+
+      await newRating.save();
+
+      res.status(201).json({
+        success: true,
+        message: 'Rating submitted successfully',
+        data: newRating
+      });
+    }
+  } catch (error) {
+    console.error('Error submitting rating:', error);
+    
+    // Handle duplicate key error
+    if (error.code === 11000) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already rated this module'
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Failed to submit rating',
+      error: error.message
+    });
+  }
+};
+
+export const getAuthUserRating = async (req, res) => {
+  try {
+    const userId = req.userId;
+    const ratings = await Rating.find({ userId }).sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      data: ratings
+    });
+  } catch (error) {
+    console.error('Error fetching user ratings:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch user ratings',
+      error: error.message
+    });
+  }
+};
+
+// Add a new function to get rating statistics
+export const getRatingStats = async (req, res) => {
+  try {
+    const stats = await Rating.aggregate([
+      {
+        $group: {
+          _id: '$moduleId',
+          averageRating: { $avg: '$rating' },
+          totalRatings: { $sum: 1 },
+          ratings: { $push: '$rating' }
+        }
+      },
+      {
+        $addFields: {
+          distribution: {
+            $reduce: {
+              input: [1, 2, 3, 4, 5],
+              initialValue: [],
+              in: {
+                $concatArrays: [
+                  '$$value',
+                  [{
+                    star: '$$this',
+                    count: {
+                      $size: {
+                        $filter: {
+                          input: '$ratings',
+                          cond: { $eq: ['$$this', '$$this'] }
+                        }
+                      }
+                    }
+                  }]
+                ]
+              }
+            }
+          }
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    console.error('Error fetching rating stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch rating statistics',
       error: error.message
     });
   }
