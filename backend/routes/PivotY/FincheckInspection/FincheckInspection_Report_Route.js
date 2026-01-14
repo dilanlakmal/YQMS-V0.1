@@ -3,7 +3,8 @@ import {
   getInspectionReports,
   getDefectImagesForReport,
   getReportMeasurementSpecs,
-  checkUserPermission
+  checkUserPermission,
+  getReportImagesAsBase64
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
@@ -25,5 +26,11 @@ router.get(
 
 // Route to check permission
 router.get("/api/fincheck-reports/check-permission", checkUserPermission);
+
+// Get all report images as base64 for PDF generation
+router.get(
+  "/api/fincheck-reports/:reportId/images-base64",
+  getReportImagesAsBase64
+);
 
 export default router;

@@ -67,6 +67,8 @@ import {
 import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectionBuyerDetermination";
 import { useAuth } from "../../../authentication/AuthContext";
 
+import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
+
 // =============================================================================
 // HELPER COMPONENTS
 // =============================================================================
@@ -1340,6 +1342,25 @@ const YPivotQAReportFullView = () => {
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print</span>
             </button>
+
+            {/* New PDF Generator Button */}
+            <YPivotQAReportPDFGenerator
+              report={report}
+              orderData={orderData}
+              inspectorInfo={inspectorInfo}
+              definitions={definitions}
+              headerData={headerData}
+              measurementStageData={measurementStageData}
+              measurementResult={measurementResult}
+              summaryData={summaryData}
+              defectImages={defectImages}
+              aqlResult={aqlResult}
+              aqlSampleData={aqlSampleData}
+              finalResult={finalReportResult}
+              defectResult={defectResult}
+              isAQLMethod={isAQLMethod}
+              inspectedQty={inspectedQty}
+            />
           </div>
         </div>
       </div>
