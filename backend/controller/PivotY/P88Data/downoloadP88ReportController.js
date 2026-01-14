@@ -396,19 +396,14 @@ const getInspectionRecords = async (startRange, endRange, downloadAll, startDate
         query.supplier = factoryName;
     }
     
-    console.log(`🔍 Query for records:`, query);
-    console.log(`📊 Include downloaded: ${includeDownloaded}`);
-    
     if (downloadAll) {
         const records = await p88LegacyData.find(query).sort({ submittedInspectionDate: 1 }).lean();
-        console.log(`📋 Found ${records.length} records for download`);
         return records;
     }
     
     const skip = Math.max(0, startRange - 1);
     const limit = Math.max(1, endRange - startRange + 1);
     const records = await p88LegacyData.find(query).sort({ submittedInspectionDate: 1 }).skip(skip).limit(limit).lean();
-    console.log(`📋 Found ${records.length} records for range ${startRange}-${endRange}`);
     return records;
 };
 
@@ -422,8 +417,6 @@ export const downloadSingleReportDirect = async (req, res) => {
     let jobDir = null;
     try {
         const { inspectionNumber, language = 'english' } = req.body;
-        
-        console.log(`🌐 Starting single download with language: ${language}`);
         
         if (!inspectionNumber) {
             return res.status(400).json({
@@ -464,7 +457,6 @@ export const downloadSingleReportDirect = async (req, res) => {
         await new Promise(resolve => setTimeout(resolve, 3000));
 
         // 🔥 ALWAYS try to change language (for both English and Chinese)
-        console.log(`🌐 Changing language to ${language} for report ${inspectionNumber}`);
         const languageChanged = await changeLanguage(page, language);
         if (languageChanged) {
             console.log(`✅ Language changed to ${language} for ${inspectionNumber}`);
@@ -572,8 +564,6 @@ export const downloadBulkReports = async (req, res) => {
     try {
         const { startRange, endRange, downloadAll, startDate, endDate, factoryName, language = 'english', includeDownloaded = false } = req.body;
         
-        console.log(`🌐 Starting bulk download with language: ${language}`);
-        
         jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
         fs.mkdirSync(jobDir, { recursive: true });
 
@@ -612,7 +602,6 @@ export const downloadBulkReports = async (req, res) => {
             if (!inspNo) continue;
 
             try {
-                console.log(`🚀 Processing: ${inspNo} in ${language}`);
                 await updateDownloadStatus(record._id, 'In Progress');
                 const filesBefore = fs.readdirSync(jobDir);
 
@@ -626,10 +615,8 @@ export const downloadBulkReports = async (req, res) => {
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // 🔥 ALWAYS try to change language (for both English and Chinese)
-                console.log(`🌐 Changing language to ${language} for report ${inspNo}`);
                 const languageChanged = await changeLanguage(page, language);
                 if (languageChanged) {
-                    console.log(`✅ Language changed to ${language} for ${inspNo}`);
                     // Wait for page to reload with new language
                     await new Promise(resolve => setTimeout(resolve, 4000));
                 } else {
@@ -637,7 +624,6 @@ export const downloadBulkReports = async (req, res) => {
                 }
 
                 // Wait for and click print button with multiple selectors
-                console.log(`🖨️ Looking for print button...`);
                 let printButton = null;
                 
                 const printSelectors = [
@@ -653,7 +639,6 @@ export const downloadBulkReports = async (req, res) => {
                         await page.waitForSelector(selector, { timeout: 5000 });
                         printButton = await page.$(selector);
                         if (printButton) {
-                            console.log(`✅ Found print button with selector: ${selector}`);
                             break;
                         }
                     } catch (e) {
@@ -666,14 +651,12 @@ export const downloadBulkReports = async (req, res) => {
                 }
 
                 // Click print button
-                console.log(`🖨️ Clicking print button...`);
                 await printButton.click();
                 
                 // Wait a bit for download to start
                 await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // Wait for file download
-                console.log(`⏳ Waiting for file download...`);
                 const newFiles = await waitForNewFile(jobDir, filesBefore);
 
                 // Rename files
@@ -682,11 +665,9 @@ export const downloadBulkReports = async (req, res) => {
                     const oldPath = path.join(jobDir, file);
                     const newName = `${baseName}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
                     fs.renameSync(oldPath, path.join(jobDir, newName));
-                    console.log(`📄 Renamed: ${file} → ${newName}`);
                 });
 
                 await updateDownloadStatus(record._id, 'Downloaded');
-                console.log(`✅ Downloaded: ${inspNo} in ${language}`);
                 
             } catch (err) {
                 console.error(`❌ Error downloading ${inspNo}:`, err.message);
@@ -696,7 +677,6 @@ export const downloadBulkReports = async (req, res) => {
                 try {
                     const screenshotPath = path.join(jobDir, `error_${inspNo}_${Date.now()}.png`);
                     await page.screenshot({ path: screenshotPath, fullPage: true });
-                    console.log(`📸 Error screenshot saved: ${screenshotPath}`);
                 } catch (screenshotError) {
                     console.log('Could not take error screenshot:', screenshotError.message);
                 }
