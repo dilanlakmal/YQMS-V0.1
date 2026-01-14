@@ -4,7 +4,8 @@ import {
   getDefectImagesForReport,
   getReportMeasurementSpecs,
   checkUserPermission,
-  getReportImagesAsBase64
+  getReportImagesAsBase64,
+  getReportDefectHeatmap
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
@@ -31,6 +32,12 @@ router.get("/api/fincheck-reports/check-permission", checkUserPermission);
 router.get(
   "/api/fincheck-reports/:reportId/images-base64",
   getReportImagesAsBase64
+);
+
+// GET - Defect Heatmap/Visual Summary
+router.get(
+  "/api/fincheck-inspection/report/:reportId/defect-heatmap",
+  getReportDefectHeatmap
 );
 
 export default router;

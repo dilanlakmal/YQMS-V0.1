@@ -3,7 +3,8 @@ import {
   QASectionsMeasurementSpecs,
   DtOrder,
   RoleManagment,
-  UserMain
+  UserMain,
+  QASectionsProductLocation
 } from "../../MongoDB/dbConnectionController.js";
 
 import axios from "axios";
@@ -515,6 +516,89 @@ export const getReportImagesAsBase64 = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to fetch images",
+      error: error.message
+    });
+  }
+};
+
+// ============================================================
+// GET Defect Heatmap Data (Product Location Map + Counts)
+// ============================================================
+
+export const getReportDefectHeatmap = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    }).select("productTypeId defectData");
+
+    if (!report || !report.productTypeId) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Data not found" });
+    }
+
+    const locationMap = await QASectionsProductLocation.findOne({
+      productTypeId: report.productTypeId,
+      isActive: true
+    }).lean();
+
+    if (!locationMap) {
+      return res
+        .status(404)
+        .json({ success: false, message: "No map configured." });
+    }
+
+    const counts = {
+      Front: {},
+      Back: {}
+    };
+
+    if (report.defectData && Array.isArray(report.defectData)) {
+      report.defectData.forEach((defect) => {
+        if (!defect.isNoLocation && defect.locations) {
+          defect.locations.forEach((loc) => {
+            const locNo = loc.locationNo;
+            const viewKey =
+              loc.view && loc.view.toLowerCase() === "back" ? "Back" : "Front";
+            const qty = loc.qty || (loc.positions ? loc.positions.length : 1);
+            const defectName = defect.defectName;
+
+            // Initialize if not exists
+            if (!counts[viewKey][locNo]) {
+              counts[viewKey][locNo] = {
+                total: 0,
+                defects: {} // Map for defect breakdown
+              };
+            }
+
+            // Add to total
+            counts[viewKey][locNo].total += qty;
+
+            // Add to specific defect breakdown
+            if (counts[viewKey][locNo].defects[defectName]) {
+              counts[viewKey][locNo].defects[defectName] += qty;
+            } else {
+              counts[viewKey][locNo].defects[defectName] = qty;
+            }
+          });
+        }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        map: locationMap,
+        counts: counts
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching defect heatmap:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Server Error",
       error: error.message
     });
   }

@@ -65,6 +65,8 @@ import {
   DefectSummaryTable
 } from "../QADataCollection/YPivotQAInspectionDefectSummary";
 
+import DefectLocationSummary from "./DefectLocationSummary";
+
 import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectionBuyerDetermination";
 import { useAuth } from "../../../authentication/AuthContext";
 
@@ -880,6 +882,8 @@ const YPivotQAReportFullView = () => {
   // Permission State
   const [canViewReportId, setCanViewReportId] = useState(false);
 
+  const [defectHeatmap, setDefectHeatmap] = useState(null);
+
   // =========================================================================
   // FETCH ALL DATA
   // =========================================================================
@@ -1023,6 +1027,30 @@ const YPivotQAReportFullView = () => {
     };
     checkPermission();
   }, [user]);
+
+  // NEW: Fetch Defect Heatmap (Visual Locations)
+  useEffect(() => {
+    const fetchHeatmap = async () => {
+      if (!reportId) return;
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/defect-heatmap`
+        );
+        if (res.data.success) {
+          setDefectHeatmap(res.data.data);
+        }
+      } catch (err) {
+        // It's okay if this fails (e.g., 404 if no map config exists)
+        // Just log nicely and don't set state
+        console.log("No defect location map available or error fetching.");
+      }
+    };
+
+    // Only fetch if we have loaded the report (to ensure it exists)
+    if (report) {
+      fetchHeatmap();
+    }
+  }, [reportId, report]);
 
   // =========================================================================
   // DERIVED DATA
@@ -1848,6 +1876,14 @@ const YPivotQAReportFullView = () => {
                   groups={summaryData.groups}
                   totals={summaryData.totals}
                 />
+
+                {/* --- NEW: DEFECT LOCATION VISUAL SUMMARY --- */}
+                {defectHeatmap && (
+                  <DefectLocationSummary
+                    mapData={defectHeatmap.map}
+                    counts={defectHeatmap.counts}
+                  />
+                )}
 
                 {/* NEW: Defect Images Grid */}
                 {defectImages.length > 0 && (
