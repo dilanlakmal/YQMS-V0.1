@@ -137,29 +137,6 @@ const PrintP88Report = () => {
         }
     };
 
-    const validatePath = async (path) => {
-        if (!path) {
-            setPathValidation(null);
-            return;
-        }
-        try {
-            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-            const response = await fetch(`${apiBaseUrl}/api/scraping/validate-path`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ downloadPath: path })
-            });
-            if (response.ok) {
-                const data = await response.json();
-                setPathValidation(data);
-            }
-        } catch (error) {
-            console.error('Error validating path:', error);
-        }
-    };
-
     const handlePrintReport = async () => {
         // Validate date range
         if (!startDate || !endDate) {
@@ -256,17 +233,6 @@ const PrintP88Report = () => {
             setStatus({ message: `Download failed: ${error.message}`, type: 'error' });
         } finally {
             setLoading(false);
-        }
-    };
-
-    const handlePathChange = async (e) => {
-        const path = e.target.value;
-        setSelectedPath(path);
-        await validatePath(path);
-        if (path) {
-            await checkAvailableSpace(path);
-        } else {
-            await checkAvailableSpace();
         }
     };
 
@@ -629,7 +595,7 @@ const PrintP88Report = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                {/* <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
                                     <div className="flex justify-between items-center mb-2">
                                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">📁 Download Location:</div>
                                         <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Total Size: {downloadInfo.totalSize}</div>
@@ -637,7 +603,7 @@ const PrintP88Report = () => {
                                     <div className="bg-white dark:bg-gray-600 dark:text-gray-200 p-3 rounded border dark:border-gray-500 font-mono text-sm break-all">
                                         {downloadInfo.downloadPath}
                                     </div>
-                                </div>
+                                </div> */}
 
                                 {downloadInfo.details && downloadInfo.details.length > 0 && (
                                     <details className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
@@ -778,12 +744,12 @@ const PrintP88Report = () => {
                                                     <span className="font-medium text-gray-700 dark:text-gray-300">Estimated Download:</span>
                                                     <div className="text-gray-900 dark:text-white">{spaceInfo.estimatedDownloadSize}</div>
                                                 </div>
-                                                <div className="md:col-span-2">
+                                                {/* <div className="md:col-span-2">
                                                     <span className="font-medium text-gray-700 dark:text-gray-300">Location:</span>
                                                     <div className="text-gray-900 dark:text-gray-200 font-mono text-xs bg-white dark:bg-gray-700 p-2 rounded border dark:border-gray-600 mt-1 break-all">
                                                         {spaceInfo.path}
                                                     </div>
-                                                </div>
+                                                </div> */}
                                             </div>
                                             <div className={`text-sm mt-3 p-2 rounded ${
                                                 spaceInfo.hasEnoughSpace ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300' : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300'
@@ -796,7 +762,7 @@ const PrintP88Report = () => {
                             )}
 
                             {/* Download Path Input */}
-                            <div className="space-y-3">
+                            {/* <div className="space-y-3">
                                 <label className="block text-sm font-semibold text-gray-900 dark:text-white">
                                     📁 Custom Download Path (Optional)
                                 </label>
@@ -828,7 +794,7 @@ const PrintP88Report = () => {
                                         </div>
                                     </div>
                                 )}
-                            </div>
+                            </div> */}
 
                             {/* Action Buttons */}
                             <div className="flex space-x-4 pt-4">
