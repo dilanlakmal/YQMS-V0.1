@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 // Import your P88 model - adjust the path as needed
 import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 
+// Helper function to escape regex special characters
+const escapeRegExp = (string) => {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+};
+
  // Get all P88 inspection data with optional filtering and pagination
  export const getAllInspections = async (req, res) => {
   try {
@@ -15,6 +20,7 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       supplier,
       project,
       inspectionResult,
+      style,
       poNumbers,
       sortBy = 'scheduledInspectionDate',
       sortOrder = 'desc'
@@ -24,37 +30,54 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
     const filter = {};
     
     if (inspector) {
-      filter.inspector = { $regex: inspector, $options: 'i' };
+      filter.inspector = { $regex: escapeRegExp(inspector), $options: 'i' };
     }
     
     if (approvalStatus) {
-      filter.approvalStatus = { $regex: approvalStatus, $options: 'i' };
+      filter.approvalStatus = { $regex: escapeRegExp(approvalStatus), $options: 'i' };
     }
     
     if (reportType) {
-      filter.reportType = { $regex: reportType, $options: 'i' };
+      filter.reportType = { $regex: escapeRegExp(reportType), $options: 'i' };
     }
     
     if (supplier) {
-      filter.supplier = { $regex: supplier, $options: 'i' };
+      filter.supplier = { $regex: escapeRegExp(supplier), $options: 'i' };
     }
     
     if (project) {
-      filter.project = { $regex: project, $options: 'i' };
+      filter.project = { $regex: escapeRegExp(project), $options: 'i' };
     }
     
+    // Use $and for complex queries to handle both string and array fields safely
+    const complexFilters = [];
+
+    if (style) {
+      const escapedStyle = escapeRegExp(style);
+      complexFilters.push({
+        $or: [
+          { style: { $regex: escapedStyle, $options: 'i' } },
+          { style: { $elemMatch: { $regex: escapedStyle, $options: 'i' } } }
+        ]
+      });
+    }
+
     if (inspectionResult) {
       filter.inspectionResult = inspectionResult;
     }
 
-    // FIXED: Handle poNumbers as array field
     if (poNumbers) {
-      filter.poNumbers = { 
-        $elemMatch: { 
-          $regex: poNumbers, 
-          $options: 'i' 
-        } 
-      };
+      const escapedPo = escapeRegExp(poNumbers);
+      complexFilters.push({
+        $or: [
+          { poNumbers: { $regex: escapedPo, $options: 'i' } },
+          { poNumbers: { $elemMatch: { $regex: escapedPo, $options: 'i' } } }
+        ]
+      });
+    }
+
+    if (complexFilters.length > 0) {
+      filter.$and = complexFilters;
     }
 
     // Build sort object
@@ -301,25 +324,31 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
       });
     }
 
+    const escapedQuery = escapeRegExp(query);
     let searchFilter = {};
 
     if (field === 'all') {
       searchFilter = {
         $or: [
-          { groupNumber: { $regex: query, $options: 'i' } },
-          { inspector: { $regex: query, $options: 'i' } },
-          { supplier: { $regex: query, $options: 'i' } },
-          { project: { $regex: query, $options: 'i' } },
+          { groupNumber: { $regex: escapedQuery, $options: 'i' } },
+          { inspector: { $regex: escapedQuery, $options: 'i' } },
+          { supplier: { $regex: escapedQuery, $options: 'i' } },
+          { project: { $regex: escapedQuery, $options: 'i' } },
           // FIXED: Handle poNumbers as array in search
-          { poNumbers: { $elemMatch: { $regex: query, $options: 'i' } } },
-          { style: { $regex: query, $options: 'i' } }
+          { poNumbers: { $regex: escapedQuery, $options: 'i' } },
+          { poNumbers: { $elemMatch: { $regex: escapedQuery, $options: 'i' } } },
+          { style: { $regex: escapedQuery, $options: 'i' } },
+          { style: { $elemMatch: { $regex: escapedQuery, $options: 'i' } } },
         ]
       };
     } else if (field === 'poNumbers') {
       // FIXED: Handle poNumbers field specifically
-      searchFilter.poNumbers = { $elemMatch: { $regex: query, $options: 'i' } };
+      searchFilter.$or = [
+        { poNumbers: { $regex: escapedQuery, $options: 'i' } },
+        { poNumbers: { $elemMatch: { $regex: escapedQuery, $options: 'i' } } }
+      ];
     } else {
-      searchFilter[field] = { $regex: query, $options: 'i' };
+      searchFilter[field] = { $regex: escapedQuery, $options: 'i' };
     }
 
     const inspections = await p88LegacyData.find(searchFilter)
@@ -348,11 +377,12 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 // Get distinct values for filter dropdowns
 export const getFilterOptions = async (req, res) => {
   try {
-    const [inspectors, suppliers, projects, reportTypes] = await Promise.all([
+    const [inspectors, suppliers, projects, reportTypes, styles] = await Promise.all([
       p88LegacyData.distinct('inspector').exec(),
       p88LegacyData.distinct('supplier').exec(),
       p88LegacyData.distinct('project').exec(),
       p88LegacyData.distinct('reportType').exec(),
+      p88LegacyData.distinct('style').exec(),
     ]);
 
     // FIXED: Handle poNumbers array field using aggregation
@@ -374,7 +404,8 @@ export const getFilterOptions = async (req, res) => {
         supplier: cleanAndSort(suppliers),
         project: cleanAndSort(projects),
         reportType: cleanAndSort(reportTypes),
-        poNumbers: cleanAndSort(poNumbers), // Now properly handles array field
+        poNumbers: cleanAndSort(poNumbers), 
+        style: cleanAndSort(styles),
       },
       message: 'Filter options retrieved successfully'
     });

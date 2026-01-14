@@ -260,7 +260,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
     },
     {
       key: 'approvalStatus',
-      label: 'Approval Status',
+      label: 'Status',
       type: 'select',
       icon: '✅',
       options: ['Pending Approval', 'Accepted', 'Reworked'],
@@ -292,6 +292,13 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
       placeholder: '',
       icon: '🏷️',
       options: [...(options.poNumbers || [])].sort()
+    },
+    {
+      key: 'style',
+      label: 'Style',
+      placeholder: '',
+      icon: '👕',
+      options: [...(options.style || [])].sort()
     }
   ];
 
@@ -332,7 +339,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
 
       {/* Filter Fields */}
       <div className="p-6">
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-6 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-4 lg:grid-cols-8 xl:grid-cols-8 gap-6">
           {filterFields.map((field) => (
             <FilterField
               key={field.key}

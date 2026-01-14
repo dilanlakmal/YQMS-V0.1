@@ -14,7 +14,8 @@ const SummaryP88Data = () => {
     supplier: [],
     project: [],
     reportType: [],
-    poNumbers: []
+    poNumbers: [],
+    style: [],
   });
 
   // State for server-side operations
@@ -27,7 +28,8 @@ const SummaryP88Data = () => {
     supplier: '',
     project: '',
     reportType: '',
-    poNumbers: ''
+    poNumbers: '',
+    style: '',
   });
   const [sortConfig, setSortConfig] = useState({
     key: 'scheduledInspectionDate',
@@ -271,6 +273,7 @@ const SummaryP88Data = () => {
                     { key: 'etd', label: 'ETD', icon: '🚢' },
                     { key: 'eta', label: 'ETA', icon: '🏁' },
                     { key: 'poNumbers', label: 'PO #', icon: '📄' },
+                   { key: 'style', label: 'Style', icon: '👕' },
                     { key: 'submittedInspectionDate', label: 'Submitted Date', icon: '📤' },
                     { key: 'qtyToInspect', label: 'Qty to Inspect', icon: '📊' },
                     { key: 'qtyInspected', label: 'Qty Inspected', icon: '✅' },
@@ -346,6 +349,9 @@ const SummaryP88Data = () => {
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {inspection.poNumbers?.join(', ') || '-'}
+                    </td>
+                    <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
+                      {Array.isArray(inspection.style) ? inspection.style.join(', ') : inspection.style || '-'}
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       {formatDateTime(inspection.submittedInspectionDate)}
