@@ -23,6 +23,34 @@ const PrintP88Report = () => {
     const [dateFilteredStats, setDateFilteredStats] = useState(null);
     const [language, setLanguage] = useState('english');
 
+    const [timeRemaining, setTimeRemaining] = useState(null);
+    const [elapsedTime, setElapsedTime] = useState(0);
+    const [timerInterval, setTimerInterval] = useState(null);
+
+     // Helper to format seconds into MM:SS
+    const formatTime = (seconds) => {
+        if (seconds <= 0) return "Finishing...";
+        const mins = Math.floor(seconds / 60);
+        const secs = seconds % 60;
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    };
+
+    // Effect to handle the countdown
+    useEffect(() => {
+        let interval;
+        if (loading && timeRemaining !== null) {
+            interval = setInterval(() => {
+                setElapsedTime(prev => prev + 1);
+                setTimeRemaining(prev => (prev > 0 ? prev - 1 : 0));
+            }, 1000);
+            setTimerInterval(interval);
+        } else {
+            clearInterval(timerInterval);
+            setElapsedTime(0);
+        }
+        return () => clearInterval(interval);
+    }, [loading]);
+
     // Fetch available factories on component mount
     useEffect(() => {
         fetchFactories();
@@ -170,6 +198,13 @@ const PrintP88Report = () => {
             return;
         }
 
+        const reportsCount = downloadMode === 'range' 
+            ? (Math.min(endRange, dateFilteredStats.totalRecords) - startRange + 1)
+            : dateFilteredStats.totalRecords;
+        
+        const estimatedSeconds = 15 + (reportsCount * 25); 
+        setTimeRemaining(estimatedSeconds);
+
         setLoading(true);
         setShowDownloadDialog(false);
         setStatus({ message: 'Generating reports and preparing ZIP... Please wait.', type: 'warning' });
@@ -233,6 +268,7 @@ const PrintP88Report = () => {
             setStatus({ message: `Download failed: ${error.message}`, type: 'error' });
         } finally {
             setLoading(false);
+            setTimeRemaining(null);
         }
     };
 
@@ -344,6 +380,30 @@ const PrintP88Report = () => {
                                 </div>
                             )}
                         </div>
+
+                        {loading && timeRemaining !== null && (
+                            <div className="mb-6 bg-blue-600 rounded-xl p-6 text-white shadow-lg animate-pulse">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="flex items-center space-x-3">
+                                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                        <span className="font-bold text-lg">Processing Bulk Download</span>
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="text-xs uppercase opacity-80">Estimated Time Remaining</div>
+                                        <div className="text-2xl font-mono font-bold">{formatTime(timeRemaining)}</div>
+                                    </div>
+                                </div>
+                                <div className="w-full bg-blue-400/30 rounded-full h-2">
+                                    <div 
+                                        className="bg-white h-2 rounded-full transition-all duration-1000" 
+                                        style={{ width: `${Math.min(100, (elapsedTime / (elapsedTime + timeRemaining)) * 100)}%` }}
+                                    ></div>
+                                </div>
+                                <div className="mt-2 text-xs text-center italic opacity-90">
+                                    Please do not close this tab. Generating {spaceInfo?.recordCount} high-quality PDF reports...
+                                </div>
+                            </div>
+                        )}
 
                         {/* Filtered Record Statistics */}
                         {dateFilteredStats && (
@@ -500,7 +560,7 @@ const PrintP88Report = () => {
                         {/* Download Button */}
                         <button
                             onClick={handlePrintReport}
-                            disabled={loading || !startDate || !endDate || (startDate && endDate && new Date(startDate) > new Date(endDate))}
+                            disabled={loading || !startDate || !endDate}
                             className={`w-full py-4 px-6 rounded-xl font-semibold text-lg transition-all duration-200 transform ${
                                 loading || !startDate || !endDate || (startDate && endDate && new Date(startDate) > new Date(endDate))
                                     ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed'
@@ -509,8 +569,11 @@ const PrintP88Report = () => {
                         >
                             {loading ? (
                                 <div className="flex items-center justify-center space-x-3">
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                    <span>{progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...'}</span>
+                                    {/* <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                    <span>{progress ? `Processing ${progress.current}/${progress.total}...` : 'Processing...'}</span> */}
+                                     <div className="flex items-center justify-center space-x-3">
+                                        <span>Remaining: {formatTime(timeRemaining)}</span>
+                                    </div>
                                 </div>
                             ) : (
                                 <div className="flex items-center justify-center space-x-2">
@@ -522,6 +585,7 @@ const PrintP88Report = () => {
                                          downloadMode === 'range' ? `Download Reports ${startRange}-${endRange}` :
                                          'Download All Filtered Reports'}
                                     </span>
+                                    {/* <span>Start Download</span> */}
                                 </div>
                             )}
                         </button>
