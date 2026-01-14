@@ -277,6 +277,35 @@ const ReportCard = ({
             </div>
           </div>
 
+          {/* Final Results for EMB/HT Testing */}
+          {(report.reportType === "EMB/Printing Testing" || report.reportType === "HT Testing") && (report.finalResult || report.checkedBy || report.checkedDate || report.finalResults) && (
+            <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-200 dark:border-gray-700">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-2">
+                Approval & Final Results
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Final Result</p>
+                  <p className={`text-sm font-bold ${report.finalResult === 'Accepted' || report.finalResults === 'Accepted' ? 'text-green-600' : 'text-red-600'}`}>
+                    {report.finalResult || report.finalResults || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Checked By</p>
+                  <p className="text-sm font-bold text-gray-800 dark:text-white">
+                    {report.checkedBy || "N/A"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase">Date</p>
+                  <p className="text-sm font-bold text-gray-800 dark:text-white">
+                    {report.checkedDate || report.finalDate || "N/A"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Timeline View */}
           <ReportTimeline
             report={report}

@@ -27,6 +27,7 @@ const reportWashingSchema = new mongoose.Schema(
     completionImages: { type: [String], default: [] } // Images added during completion
   },
   {
+    strict: false,
     timestamps: true,
     collection: "report_washing"
   }

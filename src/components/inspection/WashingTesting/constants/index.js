@@ -66,3 +66,6 @@ export const DATE_FORMATS = {
     ISO: 'YYYY-MM-DD',
     DISPLAY: 'DD/MM/YYYY',
 };
+
+// Export all report type configurations
+export * from './reportTypes';

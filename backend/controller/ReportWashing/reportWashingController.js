@@ -92,8 +92,9 @@ export const saveReportWashing = async (req, res) => {
     const parsedPO = typeof po === "string" ? JSON.parse(po) : po;
     const parsedExFtyDate = typeof exFtyDate === "string" ? JSON.parse(exFtyDate) : exFtyDate;
 
-    // Prepare data
+    // Prepare data - Include all fields from req.body dynamically
     const reportData = {
+      ...req.body,
       ymStyle: ymStyle.trim(),
       buyerStyle: buyerStyle ? buyerStyle.trim() : "",
       color: Array.isArray(parsedColor) ? parsedColor : [parsedColor],
