@@ -13,6 +13,7 @@ import {
 import MeasurementSectionPDF from "./YPivotQAReportMeasurementPDF";
 import DefectSectionPDF from "./YPivotQAReportDefectPDF";
 import YPivotQAReportPPSheetPDF from "./YPivotQAReportPPSheetPDF";
+import DefectLocationSummaryPDF from "./DefectLocationSummaryPDF";
 
 // =============================================================================
 // FONT REGISTRATION (Optional - for better typography)
@@ -560,32 +561,6 @@ const styles = StyleSheet.create({
   },
   badgePass: { backgroundColor: "#dcfce7", color: "#166534" },
   badgeFail: { backgroundColor: "#fee2e2", color: "#991b1b" },
-
-  //   aqlCard: {
-  //     flexDirection: "row",
-  //     gap: 8,
-  //     marginBottom: 12
-  //   },
-  //   aqlCardItem: {
-  //     flex: 1,
-  //     padding: 10,
-  //     backgroundColor: "#FFFFFF",
-  //     borderWidth: 1,
-  //     borderColor: colors.gray[200],
-  //     borderRadius: 4,
-  //     alignItems: "center"
-  //   },
-  //   aqlCardLabel: {
-  //     fontSize: 6,
-  //     color: colors.gray[500],
-  //     textTransform: "uppercase",
-  //     marginBottom: 4
-  //   },
-  //   aqlCardValue: {
-  //     fontSize: 14,
-  //     fontFamily: "Helvetica-Bold",
-  //     color: colors.primary
-  //   },
 
   // Divider
   divider: {
@@ -1665,7 +1640,11 @@ const AQLSection = ({
 // =============================================================================
 // DEFECT SUMMARY SECTION
 // =============================================================================
-const DefectSummarySection = ({ summaryData, defectImages }) => {
+const DefectSummarySection = ({
+  summaryData,
+  defectImages,
+  defectHeatmapData
+}) => {
   if (!summaryData?.groups || summaryData.groups.length === 0) {
     return null;
   }
@@ -1675,7 +1654,15 @@ const DefectSummarySection = ({ summaryData, defectImages }) => {
       {/* 1. New Table Component from external file */}
       <DefectSectionPDF summaryData={summaryData} />
 
-      {/* 2. Existing Defect Visual Evidence Logic (Kept here as requested) */}
+      {/* 2. NEW: Defect Location Map */}
+      {defectHeatmapData && (
+        <DefectLocationSummaryPDF
+          mapData={defectHeatmapData.map}
+          counts={defectHeatmapData.counts}
+        />
+      )}
+
+      {/* 3. Existing Defect Visual Evidence Logic (Kept here as requested) */}
       {defectImages && defectImages.length > 0 && (
         <View style={styles.section}>
           <Text
@@ -2093,7 +2080,8 @@ const YPivotQAReportPDFDocument = ({
   photoDataWithImages,
   headerDataWithImages,
   defectImagesWithBase64,
-  ppSheetDataWithImages
+  ppSheetDataWithImages,
+  defectHeatmapData
 }) => {
   const selectedOrders = reportData?.orderNos || [];
   const orderNo = selectedOrders.length > 0 ? selectedOrders[0] : "N/A";
@@ -2149,6 +2137,7 @@ const YPivotQAReportPDFDocument = ({
           <DefectSummarySection
             summaryData={summaryData}
             defectImages={defectImagesWithBase64}
+            defectHeatmapData={defectHeatmapData}
           />
         </Page>
       )}

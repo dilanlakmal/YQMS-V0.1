@@ -323,7 +323,7 @@ const YPivotQAReportPDFGenerator = ({
 
       if (report.ppSheetData) {
         setStage("Processing PP Sheet images...");
-        setProgress(58); // Inserted between Checklists (42-57%) and Photos (60%)
+        setProgress(55); // Inserted between Checklists (42-57%) and Photos (60%)
 
         const ppImages = report.ppSheetData.images || [];
         let processedPPImages = [];
@@ -353,7 +353,48 @@ const YPivotQAReportPDFGenerator = ({
       }
 
       // ========================================================================
-      // STAGE 5: Process Photo Documentation Images
+      // STAGE 5B: Fetch & Process Defect Heatmap (NEW)
+      // ========================================================================
+      let defectHeatmapData = null;
+      setStage("Processing defect location map...");
+      setProgress(58);
+
+      try {
+        // 1. Fetch JSON Data
+        const heatmapRes = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/report/${report.reportId}/defect-heatmap`
+        );
+
+        if (heatmapRes.data.success && heatmapRes.data.data) {
+          const mapData = heatmapRes.data.data.map;
+          const counts = heatmapRes.data.data.counts;
+
+          // 2. Convert Front/Back Images to Base64
+          // We must do this because React-PDF renders Base64 much more reliably than remote URLs
+          // especially if auth/cookies are involved or for performance.
+
+          if (mapData.frontView?.imagePath) {
+            const base64 = await imageUrlToBase64(mapData.frontView.imagePath);
+            if (base64) mapData.frontView.imagePath = base64;
+          }
+
+          if (mapData.backView?.imagePath) {
+            const base64 = await imageUrlToBase64(mapData.backView.imagePath);
+            if (base64) mapData.backView.imagePath = base64;
+          }
+
+          defectHeatmapData = {
+            map: mapData,
+            counts: counts
+          };
+        }
+      } catch (err) {
+        console.warn("Could not fetch defect heatmap for PDF:", err);
+        // Not critical, continue without map
+      }
+
+      // ========================================================================
+      // STAGE 5C: Process Photo Documentation Images
       // ========================================================================
       setStage(
         `Processing photo documentation (0/${allPhotoImages.length})...`
@@ -435,6 +476,7 @@ const YPivotQAReportPDFGenerator = ({
           headerDataWithImages={headerDataWithImages}
           defectImagesWithBase64={defectImagesWithBase64}
           ppSheetDataWithImages={ppSheetDataWithImages}
+          defectHeatmapData={defectHeatmapData}
         />
       );
 
