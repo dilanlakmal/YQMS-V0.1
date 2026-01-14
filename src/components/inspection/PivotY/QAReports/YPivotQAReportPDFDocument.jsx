@@ -1000,7 +1000,7 @@ const SKUDetailsTable = ({ skuData }) => {
   );
 };
 
-const OrderInfoSection = ({ orderData, selectedOrders }) => {
+const OrderInfoSection = ({ orderData, selectedOrders, remarks }) => {
   const dtOrder = orderData?.dtOrder || {};
   const yorksys = orderData?.yorksysOrder || {};
 
@@ -1116,7 +1116,7 @@ const OrderInfoSection = ({ orderData, selectedOrders }) => {
           </View>
 
           {/* Row 6 (Full Width) */}
-          <View style={[rowStyle, { borderBottomWidth: 0 }]}>
+          <View style={[rowStyle, { borderBottomWidth: remarks ? 1 : 0 }]}>
             <View style={{ width: "100%" }}>
               <DataItem
                 label="Fabric Content"
@@ -1126,6 +1126,19 @@ const OrderInfoSection = ({ orderData, selectedOrders }) => {
               />
             </View>
           </View>
+
+          {/* --- Row 7: REMARKS SECTION --- */}
+          {remarks && (
+            <View style={{ marginTop: 6 }}>
+              {/* Reusing existing 'remarkBox' styles for consistent Amber look */}
+              <View style={styles.remarkBox}>
+                <Text style={styles.remarkLabel}>Inspection Remarks</Text>
+                <Text style={[styles.remarkText, { fontStyle: "normal" }]}>
+                  {remarks}
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
 
         {/* 2. Color Size Breakdown */}
@@ -2111,6 +2124,7 @@ const YPivotQAReportPDFDocument = ({
         <OrderInfoSection
           orderData={orderData}
           selectedOrders={selectedOrders}
+          remarks={reportData?.inspectionDetails?.remarks}
         />
       </Page>
 
