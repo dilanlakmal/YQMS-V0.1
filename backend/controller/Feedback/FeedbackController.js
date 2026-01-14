@@ -135,6 +135,7 @@ export const createFeedback = async (req, res) => {
 // Get user's submitted feedbacks
 export const getUserFeedbacks = async (req, res) => {
   try {
+    // Fetch all feedbacks, not just for the authenticated user
     const feedbacks = await Feedback.find({})
       .sort({ lastActivity: -1 });
 
@@ -144,10 +145,10 @@ export const getUserFeedbacks = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error fetching user feedbacks:', error);
+    console.error('Error fetching feedbacks:', error);
     res.status(500).json({
       success: false,
-      message: 'Failed to fetch user feedbacks',
+      message: 'Failed to fetch feedbacks',
       error: error.message
     });
   }
@@ -244,11 +245,8 @@ export const addMessage = async (req, res) => {
   try {
     const { id } = req.params;
     const { message } = req.body;
-    
-    const userId = '6746b2c2b2c45a00e00599bb';
-    const userName = 'Test User';
-    const isAdmin = false;
 
+    const { userId, userName, isAdmin } = await getAuthUser(req);
     const feedback = await Feedback.findById(id);
     if (!feedback) {
       return res.status(404).json({
@@ -300,6 +298,12 @@ export const addMessage = async (req, res) => {
 
   } catch (error) {
     console.error('Error adding message:', error);
+    if (error.message.includes('authenticated') || error.message.includes('User not found')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to post a message'
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to add message',
@@ -313,10 +317,8 @@ export const editMessage = async (req, res) => {
   try {
     const { id, messageId } = req.params;
     const { message } = req.body;
-    
-    // Hardcode user for testing - only allow editing own messages
-    const userId = '6746b2c2b2c45a00e00599bb';
 
+    const { userId } = await getAuthUser(req);
     const feedback = await Feedback.findById(id);
     if (!feedback) {
       return res.status(404).json({
@@ -356,6 +358,12 @@ export const editMessage = async (req, res) => {
 
   } catch (error) {
     console.error('Error editing message:', error);
+    if (error.message.includes('authenticated') || error.message.includes('User not found')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to edit a message'
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to edit message',
@@ -368,10 +376,8 @@ export const editMessage = async (req, res) => {
 export const deleteMessage = async (req, res) => {
   try {
     const { id, messageId } = req.params;
-    
-    // Hardcode user for testing - only allow deleting own messages
-    const userId = '6746b2c2b2c45a00e00599bb';
 
+    const { userId } = await getAuthUser(req);
     const feedback = await Feedback.findById(id);
     if (!feedback) {
       return res.status(404).json({
@@ -408,6 +414,12 @@ export const deleteMessage = async (req, res) => {
 
   } catch (error) {
     console.error('Error deleting message:', error);
+    if (error.message.includes('authenticated') || error.message.includes('User not found')) {
+      return res.status(401).json({
+        success: false,
+        message: 'Authentication required to delete a message'
+      });
+    }
     res.status(500).json({
       success: false,
       message: 'Failed to delete message',

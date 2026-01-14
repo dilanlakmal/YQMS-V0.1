@@ -18,6 +18,7 @@ const messageSchema = new mongoose.Schema({
   images: [{
     id: String,
     name: String,
+    empId: String,
     url: String,
     size: Number,
     uploadedAt: {
@@ -86,12 +87,14 @@ const feedbackSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     required: true
   },
+  empId: {type: String}, 
   assignedTo: {
     type: mongoose.Schema.Types.ObjectId
   },
   images: [{
     id: String,
     name: String,
+    empId: String,
     url: String,
     size: Number,
     uploadedAt: {

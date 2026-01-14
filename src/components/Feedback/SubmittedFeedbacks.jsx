@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../authentication/AuthContext';
 import { 
   MessageCircle, Send, Image as ImageIcon, Calendar, User, Tag, 
   ChevronDown, ChevronUp, Edit3, Trash2, X, Check, Upload, 
   MoreVertical, Eye
 } from 'lucide-react';
+import { API_BASE_URL } from '../../../config';
 
 const SubmittedFeedbacks = () => {
+  const { user } = useAuth();
   const [feedbacks, setFeedbacks] = useState([]);
   const [expandedFeedback, setExpandedFeedback] = useState(null);
   const [newMessages, setNewMessages] = useState({});
@@ -15,33 +18,77 @@ const SubmittedFeedbacks = () => {
   const [editText, setEditText] = useState('');
   const [showDropdown, setShowDropdown] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [currentUser, setCurrentUser] = useState('6746b2c2b2c45a00e00599bb');
 
-  const API_BASE_URL = 'https://192.167.12.85:5000';
+  // Helper to safely extract ID from various formats
+  const getSafeId = (id) => {
+    if (!id) return null;
+    if (typeof id === 'string') return id;
+    if (id.$oid) return id.$oid;
+    if (typeof id === 'object' && id.toString) {
+      const str = id.toString();
+      return str === '[object Object]' ? null : str;
+    }
+    return null;
+  };
+
+  // Enhanced function to check if message belongs to current user
+  const isMessageFromCurrentUser = (message) => {
+    if (!user || !message) return false;
+
+    // Get current user ID from multiple possible sources
+    const currentUserId = getSafeId(user._id) || getSafeId(user.userId) || getSafeId(user.id);
+    const currentUserEmpId = user.emp_id;
+    const currentUserName = user.eng_name || user.name;
+
+    // Get message author details
+    const messageAuthorId = getSafeId(message.authorId);
+    const messageEmpId = message.empId;
+    const messageAuthor = message.author;
+
+    // Debug logging
+    console.log('User comparison:', {
+      currentUserId,
+      currentUserEmpId,
+      currentUserName,
+      messageAuthorId,
+      messageEmpId,
+      messageAuthor
+    });
+
+    // Check multiple criteria for ownership
+    if (currentUserId && messageAuthorId && currentUserId === messageAuthorId) {
+      return true;
+    }
+    
+    if (currentUserEmpId && messageEmpId && currentUserEmpId === messageEmpId) {
+      return true;
+    }
+    
+    if (currentUserName && messageAuthor && currentUserName === messageAuthor) {
+      return true;
+    }
+
+    return false;
+  };
 
   // Fetch current user and feedbacks
   useEffect(() => {
+    console.log('Current user from auth:', user); // Debug log
     fetchFeedbacks();
-  }, []);
-
-  const fetchCurrentUser = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setCurrentUser(payload.userId);
-    } catch (error) {
-      console.error('Error fetching current user:', error);
-    }
-  };
+  }, [user]);
 
   const fetchFeedbacks = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/feedbacks/my-feedbacks`);
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${API_BASE_URL}/api/feedbacks/my-feedbacks`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
       
       if (response.ok) {
         const data = await response.json();
+        console.log('Fetched feedbacks:', data.data); // Debug log
         setFeedbacks(data.data || []);
       } else {
         console.error('Failed to fetch feedbacks:', response.status);
@@ -56,7 +103,7 @@ const SubmittedFeedbacks = () => {
   const handleImageUpload = (feedbackId, files) => {
     const validFiles = Array.from(files).filter(file => {
       const isValidType = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'].includes(file.type);
-      const isValidSize = file.size <= 5 * 1024 * 1024; // 5MB limit
+      const isValidSize = file.size <= 5 * 1024 * 1024;
       return isValidType && isValidSize;
     });
 
@@ -108,8 +155,12 @@ const SubmittedFeedbacks = () => {
         formData.append('images', image.file);
       });
 
+      const token = localStorage.getItem('accessToken');
       const response = await fetch(`${API_BASE_URL}/api/feedbacks/${feedbackId}/messages`, {
         method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
         body: formData
       });
 
@@ -121,7 +172,6 @@ const SubmittedFeedbacks = () => {
             ? { ...feedback, messages: [...(feedback.messages || []), data.data] }
             : feedback
         ));
-
         setNewMessages(prev => ({ ...prev, [feedbackId]: '' }));
         setNewMessageImages(prev => ({ ...prev, [feedbackId]: [] }));
       }
@@ -131,10 +181,10 @@ const SubmittedFeedbacks = () => {
   };
 
   const handleEditMessage = (feedbackId, messageId) => {
-    const feedback = feedbacks.find(f => f._id === feedbackId);
-    const message = feedback?.messages.find(m => m._id === messageId);
+    const feedback = feedbacks.find(f => getSafeId(f._id) === getSafeId(feedbackId));
+    const message = feedback?.messages.find(m => getSafeId(m._id) === getSafeId(messageId));
     
-    if (message && message.authorId === currentUser) {
+    if (message && isMessageFromCurrentUser(message)) {
       setEditingMessage(messageId);
       setEditText(message.message);
       setShowDropdown(null);
@@ -145,9 +195,13 @@ const SubmittedFeedbacks = () => {
     if (!editText.trim()) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/feedbacks/${feedbackId}/messages/${messageId}`, {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${API_BASE_URL}/api/feedbacks/${getSafeId(feedbackId)}/messages/${getSafeId(messageId)}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
         body: JSON.stringify({ message: editText.trim() })
       });
 
@@ -155,18 +209,17 @@ const SubmittedFeedbacks = () => {
         const data = await response.json();
         
         setFeedbacks(prev => prev.map(feedback => 
-          feedback._id === feedbackId 
+          getSafeId(feedback._id) === getSafeId(feedbackId)
             ? {
                 ...feedback,
                 messages: feedback.messages.map(message =>
-                  message._id === messageId
+                  getSafeId(message._id) === getSafeId(messageId)
                     ? data.data
                     : message
                 )
               }
             : feedback
         ));
-
         setEditingMessage(null);
         setEditText('');
       } else {
@@ -181,16 +234,20 @@ const SubmittedFeedbacks = () => {
     if (!window.confirm('Are you sure you want to delete this message?')) return;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/feedbacks/${feedbackId}/messages/${messageId}`, {
-        method: 'DELETE'
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${API_BASE_URL}/api/feedbacks/${getSafeId(feedbackId)}/messages/${getSafeId(messageId)}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
       });
 
       if (response.ok) {
         setFeedbacks(prev => prev.map(feedback => 
-          feedback._id === feedbackId 
+          getSafeId(feedback._id) === getSafeId(feedbackId)
             ? {
                 ...feedback,
-                messages: feedback.messages.filter(message => message._id !== messageId)
+                messages: feedback.messages.filter(message => getSafeId(message._id) !== getSafeId(messageId))
               }
             : feedback
         ));
@@ -244,7 +301,7 @@ const SubmittedFeedbacks = () => {
               <X className="w-8 h-8" />
             </button>
             <img
-              src={imagePreview.preview}
+              src={imagePreview.preview || `${API_BASE_URL}${imagePreview.url}`}
               alt={imagePreview.name}
               className="max-w-full max-h-full object-contain rounded-lg"
             />
@@ -267,7 +324,7 @@ const SubmittedFeedbacks = () => {
         </div>
       ) : (
         feedbacks.map(feedback => (
-          <div key={feedback._id} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <div key={getSafeId(feedback._id)} className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
             {/* Feedback Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700">
               <div className="flex items-start justify-between gap-4">
@@ -305,12 +362,12 @@ const SubmittedFeedbacks = () => {
                 </div>
                 
                 <button
-                  onClick={() => setExpandedFeedback(expandedFeedback === feedback._id ? null : feedback._id)}
+                  onClick={() => setExpandedFeedback(expandedFeedback === getSafeId(feedback._id) ? null : getSafeId(feedback._id))}
                   className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors duration-200"
                 >
                   <MessageCircle className="w-4 h-4" />
                   Chat ({feedback.messages?.length || 0})
-                  {expandedFeedback === feedback._id ? (
+                  {expandedFeedback === getSafeId(feedback._id) ? (
                     <ChevronUp className="w-4 h-4" />
                   ) : (
                     <ChevronDown className="w-4 h-4" />
@@ -320,146 +377,153 @@ const SubmittedFeedbacks = () => {
             </div>
 
             {/* Chat Section */}
-            {expandedFeedback === feedback._id && (
-              <div className="border-t border-gray-200 dark:border-gray-700">
-                {/* Messages */}
-                <div className="p-6 max-h-96 overflow-y-auto space-y-4">
-                  {feedback.messages?.map(message => {
-                    const isCurrentUser = message.authorId === currentUser || message.authorId?.toString() === currentUser;
+            {expandedFeedback === getSafeId(feedback._id) && (
+              <div className="border-t border-gray-200 dark:border-gray-700 bg-gray-50/30 dark:bg-gray-900/10">
+                {/* Messages Area */}
+                <div className="p-6 max-h-[500px] overflow-y-auto space-y-4">
+                  {feedback.messages?.map((message) => {
+                    const isCurrentUser = isMessageFromCurrentUser(message);
                     
-                    // Debug logging
-                    console.log('Message debug:', {
-                      messageId: message._id,
-                      messageAuthorId: message.authorId,
-                      currentUser,
+                    console.log('Message render:', { // Debug log
+                      messageId: getSafeId(message._id),
+                      author: message.author,
                       isCurrentUser,
-                      authorIdType: typeof message.authorId,
-                      currentUserType: typeof currentUser
+                      authorId: message.authorId,
+                      empId: message.empId
                     });
-                    
+
                     return (
-                    <div
-                      key={message._id}
-                      className={`flex ${isCurrentUser ? 'justify-end' : 'justify-start'} mb-4`}
-                    >
-                      <div className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg relative group ${
-                        isCurrentUser
-                          ? 'bg-blue-600 dark:bg-blue-500 text-white'
-                          : 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                      }`}>
-                        {/* Message Actions for Current User Only */}
-                        {isCurrentUser && (
-                          <div className="absolute -top-2 -right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                            <div className="relative">
-                              <button
-                                onClick={() => setShowDropdown(showDropdown === message._id ? null : message._id)}
-                                className="w-6 h-6 bg-gray-600 hover:bg-gray-700 text-white rounded-full flex items-center justify-center"
-                              >
-                                <MoreVertical className="w-3 h-3" />
-                              </button>
+                      <div
+                        key={getSafeId(message._id)}
+                        className={`flex w-full ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className={`relative max-w-[70%] group ${isCurrentUser ? 'flex flex-row-reverse items-end' : 'flex items-end'}`}>
+                          
+                          {/* Avatar */}
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 ${
+                            isCurrentUser ? 'ml-2 bg-blue-500' : 'mr-2 bg-gray-500'
+                          }`}>
+                            {message.author.charAt(0).toUpperCase()}
+                          </div>
+
+                          <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+                            {/* Author and time */}
+                            <div className={`flex items-center gap-2 mb-1 px-1 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                              <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                                {isCurrentUser ? 'You' : message.author}
+                                {message.isAdmin && <span className="text-blue-500 ml-1">(Staff)</span>}
+                              </span>
+                              <span className="text-xs text-gray-500">
+                                {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+
+                            {/* Message bubble */}
+                            <div className={`relative px-4 py-3 rounded-2xl shadow-sm ${
+                              isCurrentUser
+                                ? 'bg-blue-600 text-white rounded-br-none'
+                                : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 rounded-bl-none'
+                            }`}>
                               
-                              {showDropdown === message._id && (
-                                <div className="absolute right-0 top-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-lg py-1 z-10 min-w-[120px]">
+                              {/* Message Actions for Current User */}
+                              {isCurrentUser && (
+                                <div className="absolute -left-8 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
-                                    onClick={() => handleEditMessage(feedback._id, message._id)}
-                                    className="w-full px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                    onClick={() => setShowDropdown(showDropdown === getSafeId(message._id) ? null : getSafeId(message._id))}
+                                    className="p-1 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full"
                                   >
-                                    <Edit3 className="w-3 h-3" />
-                                    Edit
+                                    <MoreVertical className="w-4 h-4 text-gray-500" />
                                   </button>
-                                  <button
-                                    onClick={() => handleDeleteMessage(feedback._id, message._id)}
-                                    className="w-full px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
-                                  >
-                                    <Trash2 className="w-3 h-3" />
-                                    Delete
-                                  </button>
+                                  {showDropdown === getSafeId(message._id) && (
+                                    <div className="absolute left-0 bottom-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg shadow-xl py-1 z-20 min-w-[100px]">
+                                      <button 
+                                        onClick={() => handleEditMessage(feedback._id, message._id)} 
+                                        className="w-full px-3 py-2 text-left text-xs hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                      >
+                                        <Edit3 className="w-3 h-3" /> Edit
+                                      </button>
+                                      <button 
+                                        onClick={() => handleDeleteMessage(feedback._id, message._id)} 
+                                        className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-2"
+                                      >
+                                        <Trash2 className="w-3 h-3" /> Delete
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
-                            </div>
-                          </div>
-                        )}
 
-                        <div className={`flex items-center gap-2 mb-1 ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
-                          <span className="text-xs font-medium opacity-75">
-                            {message.author}
-                          </span>
-                          <span className="text-xs opacity-50">
-                            {new Date(message.timestamp).toLocaleTimeString()}
-                          </span>
-                          {message.edited && (
-                            <span className="text-xs opacity-50">(edited)</span>
-                          )}
-                        </div>
-
-                        {/* Message Content */}
-                        {editingMessage === message._id ? (
-                          <div className="space-y-2">
-                            <textarea
-                              value={editText}
-                              onChange={(e) => setEditText(e.target.value)}
-                              className="w-full p-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded resize-none"
-                              rows={2}
-                            />
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => handleSaveEdit(feedback._id, message._id)}
-                                className="px-2 py-1 bg-green-600 text-white rounded text-xs hover:bg-green-700"
-                              >
-                                <Check className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditingMessage(null);
-                                  setEditText('');
-                                }}
-                                className="px-2 py-1 bg-gray-600 text-white rounded text-xs hover:bg-gray-700"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            {message.message && (
-                              <p className="text-sm mb-2">{message.message}</p>
-                            )}
-                            
-                            {/* Message Images */}
-                            {message.images && message.images.length > 0 && (
-                              <div className="grid grid-cols-2 gap-2 mt-2">
-                                {message.images.map(image => (
-                                  <div key={image.id} className="relative group cursor-pointer">
-                                    <img
-                                      src={image.url}
-                                      alt={image.name}
-                                      className="w-full h-20 object-cover rounded border border-white/20"
-                                      onClick={() => setImagePreview(image)}
-                                    />
-                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 rounded flex items-center justify-center transition-all duration-200">
-                                      <Eye className="w-4 h-4 text-white opacity-0 group-hover:opacity-100" />
-                                    </div>
+                              {/* Message Content */}
+                              {editingMessage === getSafeId(message._id) ? (
+                                <div className="min-w-[200px]">
+                                  <textarea
+                                    value={editText}
+                                    onChange={(e) => setEditText(e.target.value)}
+                                    className="w-full p-2 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border rounded"
+                                    rows={2}
+                                  />
+                                  <div className="flex justify-end gap-2 mt-2">
+                                    <button 
+                                      onClick={() => handleSaveEdit(feedback._id, message._id)} 
+                                      className="p-1 bg-green-500 rounded text-white"
+                                    >
+                                      <Check className="w-3 h-3"/>
+                                    </button>
+                                    <button 
+                                      onClick={() => setEditingMessage(null)} 
+                                      className="p-1 bg-gray-500 rounded text-white"
+                                    >
+                                      <X className="w-3 h-3"/>
+                                    </button>
                                   </div>
-                                ))}
+                                </div>
+                              ) : (
+                                <>
+                                  {message.message && (
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                      {message.message}
+                                    </p>
+                                  )}
+                                  
+                                  {/* Message Images */}
+                                  {message.images?.length > 0 && (
+                                    <div className={`grid gap-2 mt-3 ${message.images.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                      {message.images.map(image => (
+                                        <img
+                                          key={image.id}
+                                          src={`${API_BASE_URL}${image.url}`}
+                                          alt="attachment"
+                                          className="rounded-lg max-h-48 w-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                          onClick={() => setImagePreview(image)}
+                                        />
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              )}
+                            </div>
+
+                            {/* Edited indicator */}
+                            {message.edited && (
+                              <div className={`text-xs mt-1 px-1 ${isCurrentUser ? 'text-blue-600' : 'text-gray-500'}`}>
+                                edited
                               </div>
                             )}
-                          </>
-                        )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}) || (
-                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                      No messages yet. Start the conversation!
-                    </div>
+                    );
+                  }) || (
+                    <div className="text-center py-8 text-gray-500">No messages yet.</div>
                   )}
                 </div>
 
                 {/* Message Input */}
                 <div className="p-4 bg-gray-50 dark:bg-gray-700/50 border-t border-gray-200 dark:border-gray-600">
                   {/* Image Preview for New Message */}
-                  {newMessageImages[feedback._id] && newMessageImages[feedback._id].length > 0 && (
+                  {newMessageImages[getSafeId(feedback._id)] && newMessageImages[getSafeId(feedback._id)].length > 0 && (
                     <div className="mb-3 grid grid-cols-4 gap-2">
-                      {newMessageImages[feedback._id].map(image => (
+                      {newMessageImages[getSafeId(feedback._id)].map(image => (
                         <div key={image.id} className="relative group">
                           <img
                             src={image.preview}
@@ -467,7 +531,7 @@ const SubmittedFeedbacks = () => {
                             className="w-full h-16 object-cover rounded border border-gray-200 dark:border-gray-600"
                           />
                           <button
-                            onClick={() => removeMessageImage(feedback._id, image.id)}
+                            onClick={() => removeMessageImage(getSafeId(feedback._id), image.id)}
                             className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
                           >
                             <X className="w-3 h-3" />
@@ -481,17 +545,17 @@ const SubmittedFeedbacks = () => {
                     <div className="flex-1 flex gap-2">
                       <input
                         type="text"
-                        value={newMessages[feedback._id] || ''}
+                        value={newMessages[getSafeId(feedback._id)] || ''}
                         onChange={(e) => setNewMessages(prev => ({
                           ...prev,
-                          [feedback._id]: e.target.value
+                          [getSafeId(feedback._id)]: e.target.value
                         }))}
                         placeholder="Type your message..."
                         className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                         onKeyPress={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
-                            handleSendMessage(feedback._id);
+                            handleSendMessage(getSafeId(feedback._id));
                           }
                         }}
                       />
@@ -502,12 +566,12 @@ const SubmittedFeedbacks = () => {
                           type="file"
                           multiple
                           accept="image/*"
-                          onChange={(e) => handleImageUpload(feedback._id, e.target.files)}
+                          onChange={(e) => handleImageUpload(getSafeId(feedback._id), e.target.files)}
                           className="hidden"
-                          id={`image-upload-${feedback._id}`}
+                          id={`image-upload-${getSafeId(feedback._id)}`}
                         />
                         <label
-                          htmlFor={`image-upload-${feedback._id}`}
+                          htmlFor={`image-upload-${getSafeId(feedback._id)}`}
                           className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer transition-colors duration-200 flex items-center justify-center"
                         >
                           <ImageIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
@@ -516,8 +580,8 @@ const SubmittedFeedbacks = () => {
                     </div>
                     
                     <button
-                      onClick={() => handleSendMessage(feedback._id)}
-                      disabled={!newMessages[feedback._id]?.trim() && (!newMessageImages[feedback._id] || newMessageImages[feedback._id].length === 0)}
+                      onClick={() => handleSendMessage(getSafeId(feedback._id))}
+                      disabled={!newMessages[getSafeId(feedback._id)]?.trim() && (!newMessageImages[getSafeId(feedback._id)] || newMessageImages[getSafeId(feedback._id)].length === 0)}
                       className="px-4 py-2 bg-blue-600 dark:bg-blue-500 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                     >
                       <Send className="w-4 h-4" />

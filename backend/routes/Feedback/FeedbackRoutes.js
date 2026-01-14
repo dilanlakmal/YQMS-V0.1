@@ -22,9 +22,9 @@ router.get("/api/feedbacks/my-feedbacks", getUserFeedbacks);
 router.get("/api/feedbacks/stats", getFeedbackStats);
 router.get("/api/feedbacks/:id", getFeedbackById);
 // Message operations
-router.post("/api/feedbacks/:id/messages", upload.array('images', 10), addMessage);
-router.put("/api/feedbacks/:id/messages/:messageId", editMessage);
-router.delete("/api/feedbacks/:id/messages/:messageId", deleteMessage);
+router.post("/api/feedbacks/:id/messages", authenticateUser, upload.array('images', 10), addMessage);
+router.put("/api/feedbacks/:id/messages/:messageId", authenticateUser, editMessage);
+router.delete("/api/feedbacks/:id/messages/:messageId", authenticateUser, deleteMessage);
 // Admin operations
 router.put("/api/feedbacks/:id/status", authenticateUser, updateFeedbackStatus);
 
