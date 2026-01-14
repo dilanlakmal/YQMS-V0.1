@@ -38,7 +38,8 @@ import {
   RefreshCw,
   Eye,
   Clock,
-  ClipboardList
+  ClipboardList,
+  FileSpreadsheet
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -66,6 +67,8 @@ import {
 
 import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectionBuyerDetermination";
 import { useAuth } from "../../../authentication/AuthContext";
+
+import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
 
 import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
 
@@ -717,7 +720,8 @@ const YPivotQAReportFullView = () => {
     config: true,
     header: true,
     photos: true,
-    measurement: true
+    measurement: true,
+    ppSheet: true
   });
 
   const toggleSection = (key) =>
@@ -2541,6 +2545,39 @@ const YPivotQAReportFullView = () => {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+        {/* 10. PP Sheet / Pilot Run Meeting Report (Conditional) */}
+        {report.ppSheetData && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+            <div
+              className="bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2.5 flex justify-between items-center cursor-pointer"
+              onClick={() => toggleSection("ppSheet")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4" /> PP Sheet / Pilot Meeting
+              </h2>
+              {expandedSections.ppSheet ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.ppSheet && (
+              <YPivotQAReportPPSheetSection
+                ppSheetData={report.ppSheetData}
+                onImageClick={(url, title) => {
+                  // Reusing the existing image preview logic
+                  if (url) {
+                    setPreviewImage({
+                      images: [{ url: url, defectName: title }],
+                      startIndex: 0
+                    });
+                  }
+                }}
+              />
             )}
           </div>
         )}

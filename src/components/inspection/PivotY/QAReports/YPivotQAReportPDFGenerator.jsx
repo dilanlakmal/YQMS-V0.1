@@ -317,6 +317,42 @@ const YPivotQAReportPDFGenerator = ({
       }
 
       // ========================================================================
+      // STAGE 5A: Process PP Sheet Images (NEW)
+      // ========================================================================
+      let ppSheetDataWithImages = null;
+
+      if (report.ppSheetData) {
+        setStage("Processing PP Sheet images...");
+        setProgress(58); // Inserted between Checklists (42-57%) and Photos (60%)
+
+        const ppImages = report.ppSheetData.images || [];
+        let processedPPImages = [];
+
+        if (ppImages.length > 0) {
+          // Ensure URLs are absolute before processing
+          const ppImagesWithUrls = ppImages.map((img) => ({
+            ...img,
+            url: (img.imageURL || img.url || "").startsWith("http")
+              ? img.imageURL || img.url
+              : `${API_BASE_URL}${img.imageURL || img.url}`
+          }));
+
+          processedPPImages = await processImagesInBatches(
+            ppImagesWithUrls,
+            5,
+            (p) => {
+              // Minor progress updates within this micro-stage
+            }
+          );
+        }
+
+        ppSheetDataWithImages = {
+          ...report.ppSheetData,
+          images: processedPPImages // These now contain .base64
+        };
+      }
+
+      // ========================================================================
       // STAGE 5: Process Photo Documentation Images
       // ========================================================================
       setStage(
@@ -398,6 +434,7 @@ const YPivotQAReportPDFGenerator = ({
           photoDataWithImages={photoDataWithImages}
           headerDataWithImages={headerDataWithImages}
           defectImagesWithBase64={defectImagesWithBase64}
+          ppSheetDataWithImages={ppSheetDataWithImages}
         />
       );
 

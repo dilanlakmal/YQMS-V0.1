@@ -12,6 +12,7 @@ import {
 
 import MeasurementSectionPDF from "./YPivotQAReportMeasurementPDF";
 import DefectSectionPDF from "./YPivotQAReportDefectPDF";
+import YPivotQAReportPPSheetPDF from "./YPivotQAReportPPSheetPDF";
 
 // =============================================================================
 // FONT REGISTRATION (Optional - for better typography)
@@ -2078,7 +2079,8 @@ const YPivotQAReportPDFDocument = ({
   inspectedQty,
   photoDataWithImages,
   headerDataWithImages,
-  defectImagesWithBase64
+  defectImagesWithBase64,
+  ppSheetDataWithImages
 }) => {
   const selectedOrders = reportData?.orderNos || [];
   const orderNo = selectedOrders.length > 0 ? selectedOrders[0] : "N/A";
@@ -2159,6 +2161,16 @@ const YPivotQAReportPDFDocument = ({
             headers={definitions.headers}
             headerData={headerDataWithImages}
           />
+        </Page>
+      )}
+
+      {/* PAGE: PP SHEET / PILOT RUN */}
+      {ppSheetDataWithImages && (
+        <Page size="A4" style={styles.page}>
+          <Header reportData={reportData} orderNo={orderNo} />
+          <Footer />
+
+          <YPivotQAReportPPSheetPDF ppSheetData={ppSheetDataWithImages} />
         </Page>
       )}
 
