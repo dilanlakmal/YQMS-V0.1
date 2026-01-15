@@ -11,6 +11,7 @@ import {
   XCircle
 } from "lucide-react";
 import YPivotQATemplatesImageEditor from "../QATemplates/YPivotQATemplatesImageEditor";
+import Swal from "sweetalert2";
 
 const YPivotQAInspectionMeasurementManual = ({ data, onUpdate }) => {
   // Destructure with defaults
@@ -72,11 +73,31 @@ const YPivotQAInspectionMeasurementManual = ({ data, onUpdate }) => {
     setEditorContext(null);
   };
 
-  const handleDeleteImage = (index) => {
-    if (window.confirm("Delete this photo?")) {
+  const handleDeleteImage = async (index) => {
+    // REPLACE window.confirm with Swal
+    const result = await Swal.fire({
+      title: "Delete Photo?",
+      text: "This action cannot be undone.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#6b7280",
+      confirmButtonText: "Yes, delete it"
+    });
+
+    if (result.isConfirmed) {
       const newImages = [...images];
       newImages.splice(index, 1);
       onUpdate({ ...data, images: newImages });
+
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        toast: true,
+        position: "top-end",
+        showConfirmButton: false,
+        timer: 1500
+      });
     }
   };
 
