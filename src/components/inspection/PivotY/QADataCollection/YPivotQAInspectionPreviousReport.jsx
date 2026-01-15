@@ -310,8 +310,8 @@ const YPivotQAInspectionPreviousReport = ({ user }) => {
             <input
               type="text"
               value={filterEmpId}
-              onChange={(e) => setFilterEmpId(e.target.value)}
-              className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded-xl text-xs font-medium focus:ring-2 focus:ring-indigo-500"
+              readOnly={true}
+              className="w-full px-3 py-2 bg-gray-200 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl text-xs font-medium text-gray-500 cursor-not-allowed select-none"
             />
           </FilterInput>
         </div>
