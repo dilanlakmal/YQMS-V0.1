@@ -644,22 +644,23 @@ const SKUDataTable = ({ skuData, orderNo }) => {
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              {/* --- Added specific width w-[40%] to SKU Column --- */}
+              <th className="px-3 py-2 text-left font-bold text-[10px] uppercase w-[40%]">
                 SKU
               </th>
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-left font-bold text-[10px] uppercase">
                 PO Line
               </th>
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-left font-bold text-[10px] uppercase">
                 Color
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
                 ETD
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
                 ETA
               </th>
-              <th className="px-2 py-1.5 text-right font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-right font-bold text-[10px] uppercase">
                 Qty
               </th>
             </tr>
@@ -674,22 +675,23 @@ const SKUDataTable = ({ skuData, orderNo }) => {
                     : "bg-gray-50 dark:bg-gray-800/50"
                 }`}
               >
-                <td className="px-2 py-1.5 font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                {/* --- Added 'font-bold' to ALL cells below --- */}
+                <td className="px-3 py-2 font-bold text-[11px] text-gray-800 dark:text-gray-200 break-all">
                   {sku.sku || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.POLine || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-[11px] text-gray-700 dark:text-gray-300">
+                <td className="px-2 py-2 font-bold text-[11px] text-gray-700 dark:text-gray-300">
                   {sku.Color || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-center text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.ETD || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-center text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.ETA || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-right font-semibold text-[11px] text-emerald-600 dark:text-emerald-400">
+                <td className="px-2 py-2 font-bold text-right text-[11px] text-emerald-600 dark:text-emerald-400">
                   {sku.Qty?.toLocaleString() || 0}
                 </td>
               </tr>
@@ -2313,7 +2315,8 @@ const YPivotQAReportFullView = () => {
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* --- MODIFIED: Changed from grid-cols-2 to space-y-6 for FULL WIDTH --- */}
+                      <div className="space-y-6">
                         {orderData.orderBreakdowns.map((breakdown) => {
                           const skuData = breakdown.yorksysOrder?.skuData;
                           if (!skuData || skuData.length === 0) return null;
@@ -2383,81 +2386,134 @@ const YPivotQAReportFullView = () => {
 
             <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
               <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-                <SectionHeader title="Inspection Scope" icon={Layers} />
+                {/* RENAMED TITLE */}
+                <SectionHeader title="Inspection Configuration" icon={Layers} />
               </div>
               <div className="flex-1 overflow-x-auto">
                 {lineTableConfig.length > 0 ? (
                   <table className="w-full text-xs text-left">
                     <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 font-medium">
                       <tr>
-                        {scopeColumns.map((col) => (
-                          <th key={col} className="px-3 py-2">
-                            {col}
+                        {/* 1. DYNAMIC CONFIG COLUMNS */}
+                        {lineTableConfig.some((g) => g.lineName || g.line) && (
+                          <th className="px-3 py-2">Line</th>
+                        )}
+                        {lineTableConfig.some(
+                          (g) => g.tableName || g.table
+                        ) && <th className="px-3 py-2">Table</th>}
+                        {lineTableConfig.some(
+                          (g) => g.colorName || g.color
+                        ) && <th className="px-3 py-2">Color</th>}
+
+                        {/* 2. CARTON COLUMN (Conditionally displayed) */}
+                        {config.cartonQty > 0 && (
+                          <th className="px-3 py-2 text-center text-blue-600">
+                            Cartons
                           </th>
-                        ))}
-                        <th className="px-3 py-2 text-right">Qty</th>
+                        )}
+
+                        {/* 3. AQL SPECIFIC: FINISHED QTY */}
+                        {isAQLMethod && (
+                          <th className="px-3 py-2 text-center">
+                            Finished Qty
+                          </th>
+                        )}
+
+                        {/* 4. SAMPLE SIZE (Common) */}
+                        <th className="px-3 py-2 text-right">Sample Size</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {lineTableConfig.map(
-                        (group) =>
-                          group.assignments?.map((assign, idx) => (
-                            <tr
-                              key={`${group.id}-${assign.id || idx}`}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-700/20"
-                            >
-                              {scopeColumns.includes("Line") && (
-                                <td className="px-3 py-1.5 font-bold">
-                                  {idx === 0
-                                    ? group.lineName || group.line
-                                    : ""}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Table") && (
-                                <td className="px-3 py-1.5">
-                                  {idx === 0
-                                    ? group.tableName || group.table
-                                    : ""}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Color") && (
-                                <td className="px-3 py-1.5 text-indigo-600">
-                                  {idx === 0
-                                    ? group.colorName || group.color
-                                    : ""}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 text-right font-mono">
-                                {assign.qty || 0}
+                      {lineTableConfig.map((group, idx) => {
+                        // Check which config columns are active to ensure alignment
+                        const hasLine = lineTableConfig.some(
+                          (g) => g.lineName || g.line
+                        );
+                        const hasTable = lineTableConfig.some(
+                          (g) => g.tableName || g.table
+                        );
+                        const hasColor = lineTableConfig.some(
+                          (g) => g.colorName || g.color
+                        );
+                        const hasCartons = config.cartonQty > 0;
+
+                        // Calculate Fixed Sample Size (Sum of assignments for this group)
+                        const fixedSampleSize =
+                          group.assignments?.reduce(
+                            (sum, a) => sum + (a.qty || 0),
+                            0
+                          ) || 0;
+
+                        return (
+                          <tr
+                            key={idx}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/20"
+                          >
+                            {/* --- CONFIG COLUMNS --- */}
+                            {hasLine && (
+                              <td className="px-3 py-2 font-bold text-gray-700 dark:text-gray-300">
+                                {group.lineName || group.line || "-"}
                               </td>
-                            </tr>
-                          )) || (
-                            <tr key={group.id}>
-                              {scopeColumns.includes("Line") && (
-                                <td className="px-3 py-1.5">
-                                  {group.lineName || group.line}
+                            )}
+                            {hasTable && (
+                              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                {group.tableName || group.table || "-"}
+                              </td>
+                            )}
+                            {hasColor && (
+                              <td className="px-3 py-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                                {group.colorName || group.color || "-"}
+                              </td>
+                            )}
+
+                            {/* --- METRIC COLUMNS (Merged for AQL / Cartons) --- */}
+
+                            {/* A. CARTONS (Merged if exists) */}
+                            {hasCartons &&
+                              (idx === 0 ? (
+                                <td
+                                  className="px-3 py-2 text-center font-mono font-bold text-blue-600 border-l border-gray-100 dark:border-gray-700"
+                                  rowSpan={lineTableConfig.length}
+                                >
+                                  {config.cartonQty}
                                 </td>
-                              )}
-                              {scopeColumns.includes("Table") && (
-                                <td className="px-3 py-1.5">
-                                  {group.tableName || group.table}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Color") && (
-                                <td className="px-3 py-1.5">
-                                  {group.colorName || group.color}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 text-right">-</td>
-                            </tr>
-                          )
-                      )}
+                              ) : null)}
+
+                            {/* B. AQL MODE: Merged Columns */}
+                            {isAQLMethod ? (
+                              idx === 0 ? (
+                                <>
+                                  {/* Finished Qty (InspectedQty from details) */}
+                                  <td
+                                    className="px-3 py-2 text-center font-mono border-l border-gray-100 dark:border-gray-700"
+                                    rowSpan={lineTableConfig.length}
+                                  >
+                                    {config.inspectedQty || 0}
+                                  </td>
+                                  {/* AQL Sample Size (Report Wide) */}
+                                  <td
+                                    className="px-3 py-2 text-right font-mono font-bold text-emerald-600 border-l border-gray-100 dark:border-gray-700"
+                                    rowSpan={lineTableConfig.length}
+                                  >
+                                    {config.aqlSampleSize || 0}
+                                  </td>
+                                </>
+                              ) : null // Don't render for subsequent rows
+                            ) : (
+                              // C. FIXED MODE: Individual Row Values
+                              <td className="px-3 py-2 text-right font-mono font-bold text-gray-800 dark:text-gray-200">
+                                {fixedSampleSize}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
                   <div className="p-6 text-center text-gray-400">
                     <AlertCircle className="w-6 h-6 mx-auto mb-1 opacity-50" />
-                    <p className="text-xs">No scope configured</p>
+                    <p className="text-xs">No configuration found</p>
                   </div>
                 )}
               </div>
