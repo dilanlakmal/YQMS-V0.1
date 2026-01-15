@@ -4,30 +4,24 @@ const loadingPromises = new Map();
 
 export const normalizeImageUrl = (src) => {
   if (!src) return null;
-  
-  if (typeof src === 'string') {
-    if (src.startsWith('data:')) return src;
-    if (src.startsWith('{')) {
+  if (typeof src === "string") {
+    if (src.startsWith("data:")) return src;
+    if (src.startsWith("{")) {
       try {
         const parsed = JSON.parse(src);
         return parsed.originalUrl || parsed.url || parsed.src || parsed.path;
-      } catch (e) {
-        return src;
-      }
+      } catch (e) { return src; }
     }
     return src.trim();
   }
-  
-  if (typeof src === 'object' && src !== null) {
+  if (typeof src === "object" && src !== null) {
     return src.originalUrl || src.url || src.src || src.path;
   }
-  
   return null;
 };
 
 export const generateImageKeys = (url) => {
   const keys = new Set([url]);
-
   if (url.includes("yqms.yaikh.com")) {
     const path = url.split("yqms.yaikh.com")[1];
     if (path) {
@@ -35,33 +29,44 @@ export const generateImageKeys = (url) => {
       keys.add(path.startsWith("/") ? path.substring(1) : "/" + path);
     }
   }
-
   return Array.from(keys);
 };
 
 const loadImageOptimized = async (imageUrl, API_BASE_URL) => {
   try {
-    if (imageUrl.startsWith('data:')) {
-      return imageUrl;
-    }
+    if (imageUrl.startsWith("data:")) return imageUrl;
 
     let cleanUrl = imageUrl;
-    if (cleanUrl.startsWith('/')) {
+    // Only prepend API_BASE_URL if it's a relative path
+    if (cleanUrl.startsWith("/") && !cleanUrl.startsWith("http")) {
       cleanUrl = `${API_BASE_URL}${cleanUrl}`;
     }
 
-    
-    const response = await fetch( {
-      method: 'GET',
-      headers: { 'Accept': 'application/json' },
-      signal: AbortSignal.timeout(3000) // 3s timeout
+    const response = await fetch(cleanUrl, {
+      method: "GET",
+      signal: AbortSignal.timeout(10000) // 10s timeout for slower servers
     });
 
     if (!response.ok) return null;
 
-    const data = await response.json();
-    return data.dataUrl || null;
+    const contentType = response.headers.get("content-type");
+
+    // If the server returns JSON (your specific API behavior)
+    if (contentType && contentType.includes("application/json")) {
+      const data = await response.json();
+      return data.dataUrl || null;
+    } 
+    
+    // If it's a direct image (like face_photo .jpeg)
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   } catch (error) {
+    console.error("Image load error:", imageUrl, error);
     return null;
   }
 };
@@ -70,17 +75,9 @@ export const loadImageAsBase64 = async (src, API_BASE_URL) => {
   const imageUrl = normalizeImageUrl(src);
   if (!imageUrl) return null;
 
-  // Check cache first
-  if (imageCache.has(imageUrl)) {
-    return imageCache.get(imageUrl);
-  }
+  if (imageCache.has(imageUrl)) return imageCache.get(imageUrl);
+  if (loadingPromises.has(imageUrl)) return loadingPromises.get(imageUrl);
 
-  // Check if already loading
-  if (loadingPromises.has(imageUrl)) {
-    return loadingPromises.get(imageUrl);
-  }
-
-  // Create loading promise
   const loadPromise = loadImageOptimized(imageUrl, API_BASE_URL);
   loadingPromises.set(imageUrl, loadPromise);
 
@@ -92,6 +89,7 @@ export const loadImageAsBase64 = async (src, API_BASE_URL) => {
     loadingPromises.delete(imageUrl);
   }
 };
+
 
 export const collectAllImageUrls = (recordData, inspectorDetails) => {
   const imageUrls = new Set();

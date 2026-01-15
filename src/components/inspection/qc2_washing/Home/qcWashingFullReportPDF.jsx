@@ -1273,205 +1273,126 @@ const NewInspectionDetailsSection = ({
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Inspection Details</Text>
-      {/* New Checkpoint Inspection Data */}
+      
       {inspectionDetails.checkpointInspectionData &&
       inspectionDetails.checkpointInspectionData.length > 0 ? (
         <View style={{ marginBottom: 15 }}>
-          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>
-            Checkpoints
-          </Text>
-          {inspectionDetails.checkpointInspectionData.map(
-            (mainPoint, index) => {
-              // Get status for main checkpoint
-              const mainPointDef = checkpointDefinitions?.find(
-                (def) => def._id === mainPoint.checkpointId
-              );
-              const mainPointOption = mainPointDef?.options?.find(
-                (opt) => opt.name === mainPoint.decision
-              );
-              const isMainFail = mainPointOption?.isFail;
-              const mainPointStatus = {
-                isPass: !isMainFail,
-                status: isMainFail ? "NO" : "OK",
-                color: isMainFail ? "#dc2626" : "#16a34a",
-                backgroundColor: isMainFail ? "#fee2e2" : "#dcfce7"
-              };
+          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>Checkpoints</Text>
+          
+          {inspectionDetails.checkpointInspectionData.map((mainPoint, index) => {
+            const mainPointDef = checkpointDefinitions?.find(
+              (def) => def._id === mainPoint.checkpointId
+            );
+            const mainPointOption = mainPointDef?.options?.find(
+              (opt) => opt.name === mainPoint.decision
+            );
+            const isMainFail = mainPointOption?.isFail;
+            const mainPointStatus = {
+              status: isMainFail ? "NO" : "OK",
+              color: isMainFail ? "#dc2626" : "#16a34a",
+              backgroundColor: isMainFail ? "#fee2e2" : "#dcfce7"
+            };
 
-              return (
-                <View
-                  key={mainPoint.id || index}
-                  style={{
-                    marginBottom: 10,
-                    borderWidth: 1,
-                    borderColor: "#e5e7eb",
-                    padding: 8
-                  }}
-                >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      marginBottom: 8
-                    }}
-                  >
-                    <Text style={{ fontSize: 9, fontWeight: "bold" }}>
-                      {safeString(mainPoint.name || `Checkpoint ${index + 1}`)}
+            return (
+              <View key={mainPoint.id || index} style={{ marginBottom: 10, borderWidth: 1, borderColor: "#e5e7eb", padding: 8 }}>
+                {/* Main Point Header */}
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                  <Text style={{ fontSize: 9, fontWeight: "bold" }}>
+                    {safeString(mainPoint.name || `Checkpoint ${index + 1}`)}
+                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={[styles.passStatus, { backgroundColor: mainPointStatus.backgroundColor, color: mainPointStatus.color }]}>
+                      {safeString(mainPoint.decision)}
                     </Text>
-                    <View
-                      style={{ flexDirection: "row", alignItems: "center" }}
-                    >
-                      <Text
-                        style={[
-                          styles.passStatus,
-                          {
-                            backgroundColor: mainPointStatus.backgroundColor,
-                            color: mainPointStatus.color
-                          }
-                        ]}
-                      >
-                        {safeString(mainPoint.decision)}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.passStatus,
-                          {
-                            backgroundColor: mainPointStatus.backgroundColor,
-                            color: mainPointStatus.color,
-                            fontWeight: "bold",
-                            marginLeft: 8
-                          }
-                        ]}
-                      >
-                        {mainPointStatus.status}
-                      </Text>
-                    </View>
+                    <Text style={[styles.passStatus, { backgroundColor: mainPointStatus.backgroundColor, color: mainPointStatus.color, fontWeight: "bold", marginLeft: 8 }]}>
+                      {mainPointStatus.status}
+                    </Text>
                   </View>
-
-                  {/* Sub Points */}
-                  {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
-                    <View
-                      style={{
-                        marginTop: 8,
-                        paddingLeft: 8,
-                        borderLeftWidth: 2,
-                        borderLeftColor: "#e5e7eb"
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 8,
-                          fontWeight: "bold",
-                          marginBottom: 5,
-                          color: "#6b7280"
-                        }}
-                      >
-                        Sub-points:
-                      </Text>
-                      {mainPoint.subPoints.map((subPoint, subIndex) => {
-                        const subPointDef = mainPointDef?.subPoints?.find(
-                          (sp) => sp.id === subPoint.subPointId
-                        );
-                        const subPointOption = subPointDef?.options?.find(
-                          (opt) => opt.name === subPoint.decision
-                        );
-                        const isFail = subPointOption?.isFail === true;
-
-                        const displayName =
-                          (rawSubPointName || "").toString().trim() ||
-                          `Sub-point ${subIndex + 1}`;
-                        const displayOption =
-                          (subPoint.decision || "").toString().trim() || "N/A";
-
-                        return (
-                          <View
-                            key={subPoint.id || `subpoint-${subIndex}`}
-                            style={{
-                              marginBottom: 6,
-                              backgroundColor: "#f9fafb",
-                              padding: 6,
-                              borderWidth: 1,
-                              borderColor: "#e5e7eb"
-                            }}
-                          >
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                alignItems: "center"
-                              }}
-                            >
-                              <View
-                                style={{
-                                  flexDirection: "row",
-                                  alignItems: "center",
-                                  width: "70%"
-                                }}
-                              >
-                                <Text
-                                  style={{
-                                    fontSize: 8,
-                                    color: "#374151",
-                                    fontWeight: "500",
-                                    marginRight: 4
-                                  }}
-                                >
-                                  {subIndex + 1}.
-                                </Text>
-                                <SafeText
-                                  style={[
-                                    styles.passStatus,
-                                    {
-                                      backgroundColor: isFail
-                                        ? "#fee2e2"
-                                        : "#dcfce7",
-                                      color: isFail ? "#dc2626" : "#16a34a",
-                                      fontSize: 7
-                                    }
-                                  ]}
-                                >
-                                  {displayName} - {displayOption}
-                                </SafeText>
-                              </View>
-                              <Text
-                                style={[
-                                  styles.passStatus,
-                                  {
-                                    backgroundColor: isFail
-                                      ? "#fee2e2"
-                                      : "#dcfce7",
-                                    color: isFail ? "#dc2626" : "#16a34a",
-                                    fontWeight: "bold",
-                                    fontSize: 7
-                                  }
-                                ]}
-                              >
-                                {isFail ? "NO" : "OK"}
-                              </Text>
-                            </View>
-                          </View>
-                        );
-                      })}
-                    </View>
-                  )}
                 </View>
-              );
-            }
-          )}
+
+                {/* Sub Points Section */}
+                {mainPoint.subPoints && mainPoint.subPoints.length > 0 && (
+                  <View style={{ marginTop: 8, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: "#e5e7eb" }}>
+                    <Text style={{ fontSize: 8, fontWeight: "bold", marginBottom: 5, color: "#6b7280" }}>
+                      Sub-points:
+                    </Text>
+                    
+                    {mainPoint.subPoints.map((subPoint, subIndex) => {
+                      const subPointDef = mainPointDef?.subPoints?.find(
+                        (sp) => sp.id === subPoint.subPointId
+                      );
+                      const subPointOption = subPointDef?.options?.find(
+                        (opt) => opt.name === subPoint.decision
+                      );
+                      const isFail = subPointOption?.isFail === true;
+
+                      const rawSubPointName = subPointDef?.name || subPoint.name || "";
+                      const displayName = rawSubPointName.toString().trim() || `Sub-point ${subIndex + 1}`;
+                      const displayOption = (subPoint.decision || "").toString().trim() || "N/A";
+
+                      // Get Sub-point Images
+                      const capturedImgs = subPoint.comparisonImages || [];
+                      const uploadedImgs = subPoint.uploadedImages || [];
+                      const allSubPointImgs = [...capturedImgs, ...uploadedImgs];
+
+                      return (
+                        <View key={subPoint.id || `subpoint-${subIndex}`} style={{ marginBottom: 6, backgroundColor: "#f9fafb", padding: 6, borderWidth: 1, borderColor: "#e5e7eb" }}>
+                          {/* Sub-point Row */}
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <View style={{ flexDirection: "row", alignItems: "center", width: "70%" }}>
+                              <Text style={{ fontSize: 8, color: "#374151", fontWeight: "500", marginRight: 4 }}>
+                                {subIndex + 1}.
+                              </Text>
+                              <SafeText style={[styles.passStatus, { backgroundColor: isFail ? "#fee2e2" : "#dcfce7", color: isFail ? "#dc2626" : "#16a34a", fontSize: 7 }]}>
+                                {displayName} - {displayOption}
+                              </SafeText>
+                            </View>
+                            <Text style={[styles.passStatus, { backgroundColor: isFail ? "#fee2e2" : "#dcfce7", color: isFail ? "#dc2626" : "#16a34a", fontWeight: "bold", fontSize: 7 }]}>
+                              {isFail ? "NO" : "OK"}
+                            </Text>
+                          </View>
+
+                          {/* Sub-point Remark */}
+                          {subPoint.remark && (
+                            <Text style={{ fontSize: 6, color: "#6b7280", marginTop: 2, fontStyle: 'italic' }}>
+                              Remark: {subPoint.remark}
+                            </Text>
+                          )}
+
+                          {/* ADDED: Sub-point Images Rendering */}
+                          {allSubPointImgs.length > 0 && (
+                            <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 4 }}>
+                              {allSubPointImgs.slice(0, 4).map((img, imgIdx) => (
+                                <View key={`sub-img-${imgIdx}`} style={{ marginRight: 4, marginBottom: 2, alignItems: 'center' }}>
+                                  <SafeImage
+                                    src={img}
+                                    style={{ width: 60, height: 45, borderWidth: 0.5, borderColor: '#d1d5db' }}
+                                    alt={`Subpoint ${subIndex + 1} Image ${imgIdx + 1}`}
+                                  />
+                                  <Text style={{ fontSize: 4, color: '#9ca3af', marginTop: 1 }}>
+                                    {imgIdx < capturedImgs.length ? `C${imgIdx + 1}` : `U${imgIdx - capturedImgs.length + 1}`}
+                                  </Text>
+                                </View>
+                              ))}
+                              {allSubPointImgs.length > 4 && (
+                                <Text style={{ fontSize: 5, color: "#9ca3af", alignSelf: 'center' }}>
+                                  +{allSubPointImgs.length - 4} more
+                                </Text>
+                              )}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })}
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </View>
       ) : (
         <View style={{ marginBottom: 15 }}>
-          <Text style={[styles.sectionTitle, { fontSize: 10 }]}>
-            Checkpoints
-          </Text>
-          <Text
-            style={{
-              fontSize: 8,
-              color: "#6b7280",
-              textAlign: "center",
-              padding: 10
-            }}
-          >
+          <Text style={{ fontSize: 8, color: "#6b7280", textAlign: "center", padding: 10 }}>
             No checkpoint inspection data available
           </Text>
         </View>
@@ -1636,71 +1557,114 @@ const QcWashingFullReportPDF = ({
   );
 
   // Updated SafeImage component
-  const SafeImage = ({ src, style, alt }) => {
-    const getImageSource = (imgSrc) => {
-      if (!imgSrc) {
-        return null;
-      }
+  // const SafeImage = ({ src, style, alt }) => {
+  //   const getImageSource = (imgSrc) => {
+  //     if (!imgSrc) {
+  //       return null;
+  //     }
       
-      let url = '';
-      if (typeof imgSrc === 'string') {
-        url = imgSrc.trim();
-      } else if (typeof imgSrc === 'object' && imgSrc !== null) {
-        url = imgSrc.originalUrl || imgSrc.url || imgSrc.src || imgSrc.path || '';
-      }
+  //     let url = '';
+  //     if (typeof imgSrc === 'string') {
+  //       url = imgSrc.trim();
+  //     } else if (typeof imgSrc === 'object' && imgSrc !== null) {
+  //       url = imgSrc.originalUrl || imgSrc.url || imgSrc.src || imgSrc.path || '';
+  //     }
 
-      // If already base64, return as-is
-      if (url.startsWith('data:')) {
-        return url;
-      }
+  //     // If already base64, return as-is
+  //     if (url.startsWith('data:')) {
+  //       return url;
+  //     }
 
-      if (!url) {
-        return null;
-      }
+  //     if (!url) {
+  //       return null;
+  //     }
 
-      // Check if we have preloaded base64 data with exact match
-      if (preloadedImages && preloadedImages[url]) {
-        return preloadedImages[url];
-      }
+  //     // Check if we have preloaded base64 data with exact match
+  //     if (preloadedImages && preloadedImages[url]) {
+  //       return preloadedImages[url];
+  //     }
 
-      // Try different URL variations
-      const urlVariations = [
-        url,
-        url.replace("./public/", "/"),
-        url.replace("./public", ""),
-        url.startsWith("/") ? url.substring(1) : "/" + url,
-        url.replace(/^\/+/, "/"),
-        // Add variations for inspector images
-        url.includes("/uploads/") ? url : "/uploads/" + url.split("/").pop(),
-        url.includes("/storage/") ? url : "/storage/" + url.split("/").pop(),
-        // Add more variations for defect images
-        url.includes("/qc_washing_images/")
-          ? url
-          : "/storage/qc_washing_images/defect/" + url.split("/").pop()
-      ];
+  //     // Try different URL variations
+  //     const urlVariations = [
+  //       url,
+  //       url.replace("./public/", "/"),
+  //       url.replace("./public", ""),
+  //       url.startsWith("/") ? url.substring(1) : "/" + url,
+  //       url.replace(/^\/+/, "/"),
+  //       // Add variations for inspector images
+  //       url.includes("/uploads/") ? url : "/uploads/" + url.split("/").pop(),
+  //       url.includes("/storage/") ? url : "/storage/" + url.split("/").pop(),
+  //       // Add more variations for defect images
+  //       url.includes("/qc_washing_images/")
+  //         ? url
+  //         : "/storage/qc_washing_images/defect/" + url.split("/").pop()
+  //     ];
 
-      for (const variation of urlVariations) {
-        if (preloadedImages[variation]) {
-          return preloadedImages[variation];
-        }
-      }
+  //     for (const variation of urlVariations) {
+  //       if (preloadedImages[variation]) {
+  //         return preloadedImages[variation];
+  //       }
+  //     }
 
-      return null;
-    };
+  //     return null;
+  //   };
 
-    const imageUrl = getImageSource(src);
+  //   const imageUrl = getImageSource(src);
 
-    if (!imageUrl) {
-      return <ImagePlaceholder style={style} text="No Image" subtext={alt || 'Missing'} />;
+  //   if (!imageUrl) {
+  //     return <ImagePlaceholder style={style} text="No Image" subtext={alt || 'Missing'} />;
+  //   }
+
+  //   try {
+  //     return <Image src={imageUrl} style={style} />;
+  //   } catch (error) {
+  //     console.error('Image render error for', alt, ':', error);
+  //     return <ImagePlaceholder style={style} text="Load Error" subtext={error.message} />;
+  //   }
+  // };
+
+  const SafeImage = ({ src, style, alt }) => {
+  const getImageSource = (imgSrc) => {
+    if (!imgSrc) return null;
+    
+    let url = typeof imgSrc === 'string' ? imgSrc.trim() : (imgSrc.originalUrl || imgSrc.url || '');
+    if (!url) return null;
+
+    // 1. If it's already Base64, return it
+    if (url.startsWith('data:')) return url;
+
+    // 2. Check the preloaded cache (this is key for the face_photo)
+    if (preloadedImages && preloadedImages[url]) {
+      return preloadedImages[url];
     }
 
-    try {
-      return <Image src={imageUrl} style={style} />;
-    } catch (error) {
-      console.error('Image render error for', alt, ':', error);
-      return <ImagePlaceholder style={style} text="Load Error" subtext={error.message} />;
+    // 3. Handle Absolute URLs (like kottrahr.com)
+    if (url.startsWith('http')) {
+      // If we preloaded it via optimizedImageLoader, it should be in cache
+      return preloadedImages[url] || url; 
     }
+
+    // 4. Fallback for internal relative paths
+    const variations = [
+      url,
+      url.startsWith('/') ? url : '/' + url,
+      API_BASE_URL + (url.startsWith('/') ? url : '/' + url)
+    ];
+
+    for (const v of variations) {
+      if (preloadedImages[v]) return preloadedImages[v];
+    }
+
+    return null;
   };
+
+  const imageUrl = getImageSource(src);
+  if (!imageUrl) {
+    return <ImagePlaceholder style={style} text="No Photo" subtext={alt} />;
+  }
+
+  return <Image src={imageUrl} style={style} />;
+};
 
   if (isLoading) {
     return (
