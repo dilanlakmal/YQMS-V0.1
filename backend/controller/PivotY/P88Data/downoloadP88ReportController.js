@@ -131,7 +131,7 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     let jobDir = null;
     const { jobId } = req.body;
     try {
-        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, language = 'english', includeDownloaded = false  } = req.body;
+        const { startRange, endRange, downloadAll, startDate, endDate, factoryName,poNumber, styleNumber, language = 'english', includeDownloaded = false  } = req.body;
 
         activeJobs.set(jobId, {
             status: 'running',
@@ -147,7 +147,7 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
          // Update job info
         activeJobs.get(jobId).jobDir = jobDir;
 
-        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, includeDownloaded );
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded );
         if (records.length === 0) return res.json({ success: false, message: 'No records matching criteria' });
 
         const options = new chrome.Options();
@@ -419,7 +419,7 @@ const getFilename = (record) => {
 };
 
 // Get inspection records from your MongoDB collection (updated to include download status)
-const getInspectionRecords = async (startRange, endRange, downloadAll, startDate, endDate, factoryName, includeDownloaded = false) => {
+const getInspectionRecords = async (startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded = false) => {
     let query = {};
     
     // Only exclude downloaded records if user hasn't selected to include them
@@ -436,6 +436,14 @@ const getInspectionRecords = async (startRange, endRange, downloadAll, startDate
     
     if (factoryName?.trim()) {
         query.supplier = factoryName;
+    }
+    
+    if (poNumber?.trim()) {
+        query.poNumbers = poNumber;
+    }
+    
+    if (styleNumber?.trim()) {
+        query.style = styleNumber; // Changed from styleNumber to style (lowercase)
     }
     
     if (downloadAll) {
@@ -605,7 +613,7 @@ export const downloadBulkReportsCancellable = async (req, res) => {
     const { jobId } = req.body;
     
     try {
-        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, language = 'english', includeDownloaded = false } = req.body;
+        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
         
         // Store job info for potential cancellation
         activeJobs.set(jobId, {
@@ -622,7 +630,7 @@ export const downloadBulkReportsCancellable = async (req, res) => {
         // Update job info with directory
         activeJobs.get(jobId).jobDir = jobDir;
         
-        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, includeDownloaded);
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded);
         
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
@@ -925,12 +933,12 @@ export const downloadBulkReports = async (req, res) => {
     let browser = null;
     let jobDir = null;
     try {
-        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, language = 'english', includeDownloaded = false } = req.body;
+        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
         
         jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
         fs.mkdirSync(jobDir, { recursive: true });
 
-        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, includeDownloaded );
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded );
         
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
@@ -1147,7 +1155,9 @@ export const checkBulkSpace = async (req, res) => {
             includeDownloaded = false,
             startDate,
             endDate,
-            factoryName
+            factoryName,
+            poNumber,
+            styleNumber
         } = req.body;
 
          const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
@@ -1170,6 +1180,16 @@ export const checkBulkSpace = async (req, res) => {
         // Add factory filter
         if (factoryName && factoryName.trim() !== '') {
             query.supplier = factoryName;
+        }
+
+        // Add PO number filter
+        if (poNumber && poNumber.trim() !== '') {
+            query.poNumbers = poNumber;
+        }
+        
+        // Add style filter
+        if (styleNumber && styleNumber.trim() !== '') {
+            query.style = styleNumber;
         }
         
         // Filter out already downloaded records unless specifically requested
@@ -1493,6 +1513,105 @@ export const getFactories = async (req, res) => {
     }
 };
 
+// Get unique PO numbers from database
+export const getPONumbers = async (req, res) => {
+    try {
+        const poNumbers = await p88LegacyData.distinct('poNumbers');
+        // Flatten array since poNumbers might be an array field
+        const flattenedPOs = poNumbers.flat().filter(po => po && po.trim() !== '');
+        
+        res.json({
+            success: true,
+            poNumbers: [...new Set(flattenedPOs)].sort()
+        });
+    } catch (error) {
+        console.error('Error getting PO numbers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+
+// Get unique styles from database
+export const getStyles = async (req, res) => {
+    try {
+        const styles = await p88LegacyData.distinct('style'); // Changed from 'Style' to 'style'
+        const filteredStyles = styles.filter(style => style && style.trim() !== '');
+        
+        res.json({
+            success: true,
+            styles: filteredStyles.sort()
+        });
+    } catch (error) {
+        console.error('Error getting styles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+// Get cross-filtered options based on current filters
+export const getCrossFilteredOptions = async (req, res) => {
+    try {
+        const { startDate, endDate, factoryName, poNumber, styleNumber } = req.query;
+        
+        let baseQuery = {};
+        
+        // Add date filter if provided
+        if (startDate && endDate) {
+            baseQuery.submittedInspectionDate = {
+                $gte: new Date(startDate),
+                $lte: new Date(endDate + 'T23:59:59.999Z')
+            };
+        }
+        
+        // Build queries for each filter option
+        const factoryQuery = { ...baseQuery };
+        const poQuery = { ...baseQuery };
+        const styleQuery = { ...baseQuery };
+        
+        // Add cross-filters (exclude the field we're getting options for)
+        if (poNumber && poNumber.trim() !== '') {
+            factoryQuery.poNumbers = poNumber;
+            styleQuery.poNumbers = poNumber;
+        }
+        
+        if (styleNumber && styleNumber.trim() !== '') {
+            factoryQuery.style = styleNumber; // Changed to 'style'
+            poQuery.style = styleNumber; // Changed to 'style'
+        }
+        
+        if (factoryName && factoryName.trim() !== '') {
+            poQuery.supplier = factoryName;
+            styleQuery.supplier = factoryName;
+        }
+        
+        // Get filtered options
+        const [factories, poNumbers, styles] = await Promise.all([
+            p88LegacyData.distinct('supplier', factoryQuery),
+            p88LegacyData.distinct('poNumbers', poQuery),
+            p88LegacyData.distinct('style', styleQuery) // Changed to 'style'
+        ]);
+        
+        res.json({
+            success: true,
+            factories: factories.filter(f => f && f.trim() !== '').sort(),
+            poNumbers: [...new Set(poNumbers.flat())].filter(po => po && po.trim() !== '').sort(),
+            styles: styles.filter(s => s && s.trim() !== '').sort()
+        });
+        
+    } catch (error) {
+        console.error('Error getting cross-filtered options:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
 // Open download folder in system file explorer
 export const openDownloadFolder = async (req, res) => {
     try {
@@ -1540,42 +1659,49 @@ export const openDownloadFolder = async (req, res) => {
 // Get date filtered statistics
 export const getDateFilteredStats = async (req, res) => {
     try {
-        const { startDate, endDate, factoryName, includeDownloaded = 'false' } = req.query;
+        const { startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded = 'false' } = req.query;
         
-        if (!startDate || !endDate) {
-            return res.status(400).json({
-                success: false,
-                error: 'Start date and end date are required'
-            });
-        }
-
-        let query = {
-            submittedInspectionDate: {
+        let query = {};
+        
+        if (startDate && endDate) {
+            query.submittedInspectionDate = {
                 $gte: new Date(startDate),
                 $lte: new Date(endDate + 'T23:59:59.999Z')
-            }
-        };
-
+            };
+        }
+        
         if (factoryName && factoryName.trim() !== '') {
             query.supplier = factoryName;
         }
-
+        
+        if (poNumber && poNumber.trim() !== '') {
+            query.poNumbers = poNumber;
+        }
+        
+        if (styleNumber && styleNumber.trim() !== '') {
+            query.style = styleNumber; // Changed to 'style'
+        }
+        
         if (includeDownloaded !== 'true') {
             query.downloadStatus = { $ne: 'Downloaded' };
         }
-
+        
         const totalRecords = await p88LegacyData.countDocuments(query);
         const downloadedQuery = { ...query, downloadStatus: 'Downloaded' };
         const downloadedRecords = await p88LegacyData.countDocuments(downloadedQuery);
         const pendingRecords = totalRecords - (includeDownloaded === 'true' ? 0 : downloadedRecords);
-
+        
         res.json({
             success: true,
             totalRecords,
             downloadedRecords: includeDownloaded === 'true' ? downloadedRecords : 0,
             pendingRecords,
-            dateRange: { startDate, endDate },
-            factory: factoryName || 'All Factories'
+            filters: {
+                dateRange: startDate && endDate ? { startDate, endDate } : null,
+                factory: factoryName || null,
+                poNumber: poNumber || null,
+                styleNumber: styleNumber || null
+            }
         });
     } catch (error) {
         console.error('Error getting date filtered stats:', error);
@@ -1584,4 +1710,91 @@ export const getDateFilteredStats = async (req, res) => {
             error: error.message
         });
     }
-}
+};
+
+export const searchSuppliers = async (req, res) => {
+    try {
+        const { query } = req.query;
+        if (!query || query.trim().length < 1) {
+            return res.json({ success: true, suggestions: [] });
+        }
+        
+        const suppliers = await p88LegacyData.distinct('supplier', {
+            supplier: { $regex: query.trim(), $options: 'i' }
+        });
+        
+        const filteredSuppliers = suppliers
+            .filter(supplier => supplier && supplier.trim() !== '')
+            .slice(0, 10) // Limit to 10 suggestions
+            .sort();
+        
+        res.json({
+            success: true,
+            suggestions: filteredSuppliers
+        });
+    } catch (error) {
+        console.error('Error searching suppliers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const searchPONumbers = async (req, res) => {
+    try {
+        const { query } = req.query;
+        if (!query || query.trim().length < 1) {
+            return res.json({ success: true, suggestions: [] });
+        }
+        
+        const poNumbers = await p88LegacyData.distinct('poNumbers', {
+            poNumbers: { $regex: query.trim(), $options: 'i' }
+        });
+        
+        const filteredPOs = [...new Set(poNumbers.flat())]
+            .filter(po => po && po.trim() !== '')
+            .slice(0, 10)
+            .sort();
+        
+        res.json({
+            success: true,
+            suggestions: filteredPOs
+        });
+    } catch (error) {
+        console.error('Error searching PO numbers:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+export const searchStyles = async (req, res) => {
+    try {
+        const { query } = req.query;
+        if (!query || query.trim().length < 1) {
+            return res.json({ success: true, suggestions: [] });
+        }
+        
+        const styles = await p88LegacyData.distinct('style', {
+            style: { $regex: query.trim(), $options: 'i' }
+        });
+        
+        const filteredStyles = styles
+            .filter(style => style && style.trim() !== '')
+            .slice(0, 10)
+            .sort();
+        
+        res.json({
+            success: true,
+            suggestions: filteredStyles
+        });
+    } catch (error) {
+        console.error('Error searching styles:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
