@@ -4,7 +4,7 @@ import {
   MessageCircle, Send, Image as ImageIcon, Calendar, User, Tag, 
   ChevronDown, ChevronUp, Edit3, Trash2, X, Check, Upload, 
   MoreVertical, Eye, Clock, AlertCircle, CheckCircle2, XCircle,
-  Paperclip, Smile
+  Paperclip, Smile, Palette, Settings, Sun, Moon, Monitor
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 
@@ -19,6 +19,135 @@ const SubmittedFeedbacks = () => {
   const [editText, setEditText] = useState('');
   const [showDropdown, setShowDropdown] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [pollingInterval, setPollingInterval] = useState(null);
+  
+  // Theme customization states
+  const [showThemePanel, setShowThemePanel] = useState(false);
+  const [chatTheme, setChatTheme] = useState(() => {
+    return localStorage.getItem('chatTheme') || 'default';
+  });
+  const [chatBackground, setChatBackground] = useState(() => {
+    return localStorage.getItem('chatBackground') || 'default';
+  });
+  const [bubbleStyle, setBubbleStyle] = useState(() => {
+    return localStorage.getItem('bubbleStyle') || 'modern';
+  });
+
+  // Theme configurations
+  const themes = {
+    default: {
+      name: 'Default',
+      primary: 'from-blue-600 to-indigo-600',
+      primaryHover: 'from-blue-700 to-indigo-700',
+      secondary: 'from-gray-500 to-gray-600',
+      accent: 'text-blue-600',
+      userBubble: 'bg-gradient-to-br from-blue-600 to-indigo-600',
+      otherBubble: 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600'
+    },
+    purple: {
+      name: 'Purple',
+      primary: 'from-purple-600 to-pink-600',
+      primaryHover: 'from-purple-700 to-pink-700',
+      secondary: 'from-purple-500 to-purple-600',
+      accent: 'text-purple-600',
+      userBubble: 'bg-gradient-to-br from-purple-600 to-pink-600',
+      otherBubble: 'bg-white dark:bg-gray-700 border border-purple-200 dark:border-purple-600'
+    },
+    green: {
+      name: 'Green',
+      primary: 'from-green-600 to-emerald-600',
+      primaryHover: 'from-green-700 to-emerald-700',
+      secondary: 'from-green-500 to-green-600',
+      accent: 'text-green-600',
+      userBubble: 'bg-gradient-to-br from-green-600 to-emerald-600',
+      otherBubble: 'bg-white dark:bg-gray-700 border border-green-200 dark:border-green-600'
+    },
+    orange: {
+      name: 'Orange',
+      primary: 'from-orange-600 to-red-600',
+      primaryHover: 'from-orange-700 to-red-700',
+      secondary: 'from-orange-500 to-orange-600',
+      accent: 'text-orange-600',
+      userBubble: 'bg-gradient-to-br from-orange-600 to-red-600',
+      otherBubble: 'bg-white dark:bg-gray-700 border border-orange-200 dark:border-orange-600'
+    },
+    dark: {
+      name: 'Dark',
+      primary: 'from-gray-800 to-gray-900',
+      primaryHover: 'from-gray-900 to-black',
+      secondary: 'from-gray-600 to-gray-700',
+      accent: 'text-gray-800',
+      userBubble: 'bg-gradient-to-br from-gray-800 to-gray-900',
+      otherBubble: 'bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600'
+    }
+  };
+
+  const backgrounds = {
+    default: {
+      name: 'Default',
+      class: 'bg-gradient-to-b from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50',
+      pattern: ''
+    },
+    dots: {
+      name: 'Dots',
+      class: 'bg-gradient-to-b from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50',
+      pattern: 'bg-[radial-gradient(circle_at_1px_1px,rgba(0,0,0,0.05)_1px,transparent_0)] bg-[length:20px_20px] dark:bg-[radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)]'
+    },
+    grid: {
+      name: 'Grid',
+      class: 'bg-gradient-to-b from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50',
+      pattern: 'bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[length:20px_20px] dark:bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)]'
+    },
+    waves: {
+      name: 'Waves',
+      class: 'bg-gradient-to-b from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20',
+      pattern: 'bg-[url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%239C92AC" fill-opacity="0.1"%3E%3Cpath d="M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")]'
+    },
+    bubbles: {
+      name: 'Bubbles',
+      class: 'bg-gradient-to-b from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20',
+      pattern: 'bg-[url("data:image/svg+xml,%3Csvg width="100" height="100" xmlns="http://www.w3.org/2000/svg"%3E%3Cdefs%3E%3Cpattern id="a" patternUnits="userSpaceOnUse" width="100" height="100"%3E%3Ccircle cx="50" cy="50" r="25" fill="none" stroke="%23e0e7ff" stroke-width="1" opacity="0.3"/%3E%3Ccircle cx="25" cy="25" r="10" fill="none" stroke="%23e0e7ff" stroke-width="1" opacity="0.2"/%3E%3Ccircle cx="75" cy="75" r="15" fill="none" stroke="%23e0e7ff" stroke-width="1" opacity="0.2"/%3E%3C/pattern%3E%3C/defs%3E%3Crect width="100" height="100" fill="url(%23a)"/%3E%3C/svg%3E")]'
+    }
+  };
+
+  const bubbleStyles = {
+    modern: {
+      name: 'Modern',
+      user: 'rounded-2xl rounded-br-md',
+      other: 'rounded-2xl rounded-bl-md',
+      shadow: 'shadow-lg'
+    },
+    classic: {
+      name: 'Classic',
+      user: 'rounded-lg',
+      other: 'rounded-lg',
+      shadow: 'shadow-md'
+    },
+    minimal: {
+      name: 'Minimal',
+      user: 'rounded-xl',
+      other: 'rounded-xl',
+      shadow: 'shadow-sm'
+    },
+    bubble: {
+      name: 'Bubble',
+      user: 'rounded-full px-6',
+      other: 'rounded-full px-6',
+      shadow: 'shadow-lg'
+    }
+  };
+
+  // Save theme preferences
+  useEffect(() => {
+    localStorage.setItem('chatTheme', chatTheme);
+    localStorage.setItem('chatBackground', chatBackground);
+    localStorage.setItem('bubbleStyle', bubbleStyle);
+  }, [chatTheme, chatBackground, bubbleStyle]);
+
+  // Get current theme configuration
+  const currentTheme = themes[chatTheme];
+  const currentBackground = backgrounds[chatBackground];
+  const currentBubbleStyle = bubbleStyles[bubbleStyle];
 
   // Helper to safely extract ID from various formats
   const getSafeId = (id) => {
@@ -30,6 +159,50 @@ const SubmittedFeedbacks = () => {
       return str === '[object Object]' ? null : str;
     }
     return null;
+  };
+
+  // Helper function to format date
+  const formatMessageDate = (timestamp) => {
+    const messageDate = new Date(timestamp);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const messageDateOnly = new Date(messageDate.getFullYear(), messageDate.getMonth(), messageDate.getDate());
+    const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+
+    if (messageDateOnly.getTime() === todayOnly.getTime()) {
+      return 'Today';
+    } else if (messageDateOnly.getTime() === yesterdayOnly.getTime()) {
+      return 'Yesterday';
+    } else {
+      return messageDate.toLocaleDateString('en-US', { 
+        weekday: 'long',
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    }
+  };
+
+  // Helper function to format time
+  const formatMessageTime = (timestamp) => {
+    return new Date(timestamp).toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit',
+      hour12: true 
+    });
+  };
+
+  // Helper function to check if we need to show date separator
+  const shouldShowDateSeparator = (currentMessage, previousMessage) => {
+    if (!previousMessage) return true;
+    
+    const currentDate = new Date(currentMessage.timestamp);
+    const previousDate = new Date(previousMessage.timestamp);
+    
+    return currentDate.toDateString() !== previousDate.toDateString();
   };
 
   // Enhanced function to check if message belongs to current user
@@ -55,13 +228,65 @@ const SubmittedFeedbacks = () => {
     if (currentUserName && messageAuthor && currentUserName === messageAuthor) {
       return true;
     }
-
     return false;
   };
 
   useEffect(() => {
     fetchFeedbacks();
   }, [user]);
+
+  const fetchFeedbackUpdates = async (feedbackId) => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      const response = await fetch(`${API_BASE_URL}/api/feedbacks/${feedbackId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setFeedbacks(prev => prev.map(feedback => 
+          getSafeId(feedback._id) === getSafeId(feedbackId) 
+            ? { ...feedback, messages: data.data.messages, lastActivity: data.data.lastActivity }
+            : feedback
+        ));
+      }
+    } catch (error) {
+      console.error('Error fetching feedback updates:', error);
+    }
+  };
+
+  // Add polling effect
+  useEffect(() => {
+    if (expandedFeedback) {
+      const interval = setInterval(() => {
+        fetchFeedbackUpdates(expandedFeedback);
+      }, 3000);
+      
+      setPollingInterval(interval);
+      
+      return () => {
+        if (interval) {
+          clearInterval(interval);
+        }
+      };
+    } else {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+        setPollingInterval(null);
+      }
+    }
+  }, [expandedFeedback]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
+      }
+    };
+  }, []);
 
   const fetchFeedbacks = async () => {
     try {
@@ -323,15 +548,122 @@ const SubmittedFeedbacks = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            My Feedback Conversations
-          </h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Track and manage your submitted feedback with real-time conversations
-          </p>
+        {/* Header with Theme Button */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              My Feedback Conversations
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400">
+              Track and manage your submitted feedback with real-time conversations
+            </p>
+          </div>
+          
+          {/* Theme Customization Button */}
+          <button
+            onClick={() => setShowThemePanel(!showThemePanel)}
+            className={`flex items-center gap-2 px-4 py-2 bg-gradient-to-r ${currentTheme.primary} hover:${currentTheme.primaryHover} text-white rounded-xl font-medium shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`}
+          >
+            <Palette className="w-5 h-5" />
+            <span className="hidden sm:inline">Customize</span>
+          </button>
         </div>
+
+        {/* Theme Customization Panel */}
+        {showThemePanel && (
+          <div className="mb-8 bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-200 dark:border-gray-700 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <Settings className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Chat Customization</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              
+              {/* Theme Selection */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Color Theme</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(themes).map(([key, theme]) => (
+                    <button
+                      key={key}
+                      onClick={() => setChatTheme(key)}
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 ${
+                        chatTheme === key 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      <div className={`w-full h-6 bg-gradient-to-r ${theme.primary} rounded-lg mb-2`}></div>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{theme.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Background Selection */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Background Pattern</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(backgrounds).map(([key, bg]) => (
+                    <button
+                      key={key}
+                      onClick={() => setChatBackground(key)}
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 ${
+                        chatBackground === key 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      <div className={`w-full h-6 ${bg.class} ${bg.pattern} rounded-lg mb-2 border border-gray-200 dark:border-gray-600`}></div>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{bg.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bubble Style Selection */}
+              <div>
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Bubble Style</h4>
+                <div className="grid grid-cols-2 gap-2">
+                  {Object.entries(bubbleStyles).map(([key, style]) => (
+                    <button
+                      key={key}
+                      onClick={() => setBubbleStyle(key)}
+                      className={`p-3 rounded-xl border-2 transition-all duration-200 ${
+                        bubbleStyle === key 
+                          ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
+                          : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="flex gap-1 mb-2">
+                        <div className={`w-4 h-4 bg-blue-500 ${style.user} ${style.shadow}`}></div>
+                        <div className={`w-4 h-4 bg-gray-300 ${style.other} ${style.shadow}`}></div>
+                      </div>
+                      <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{style.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-xl">
+                            <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Preview</h5>
+              <div className={`${currentBackground.class} ${currentBackground.pattern} p-4 rounded-lg space-y-3`}>
+                <div className="flex justify-end">
+                  <div className={`${currentTheme.userBubble} text-white px-4 py-2 ${currentBubbleStyle.user} ${currentBubbleStyle.shadow} max-w-xs`}>
+                    <p className="text-sm">Your message preview</p>
+                  </div>
+                </div>
+                <div className="flex justify-start">
+                  <div className={`${currentTheme.otherBubble} text-gray-900 dark:text-white px-4 py-2 ${currentBubbleStyle.other} ${currentBubbleStyle.shadow} max-w-xs`}>
+                    <p className="text-sm">Staff reply preview</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Image Preview Modal */}
         {imagePreview && (
@@ -434,7 +766,7 @@ const SubmittedFeedbacks = () => {
                       <div className="flex-shrink-0">
                         <button
                           onClick={() => setExpandedFeedback(expandedFeedback === getSafeId(feedback._id) ? null : getSafeId(feedback._id))}
-                          className="group flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                          className={`group flex items-center gap-3 px-6 py-3 bg-gradient-to-r ${currentTheme.primary} hover:${currentTheme.primaryHover} text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105`}
                         >
                           <MessageCircle className="w-5 h-5" />
                           <span>Chat ({feedback.messages?.length || 0})</span>
@@ -450,166 +782,180 @@ const SubmittedFeedbacks = () => {
 
                   {/* Chat Section */}
                   {expandedFeedback === getSafeId(feedback._id) && (
-                    <div className="bg-gradient-to-b from-gray-50 to-white dark:from-gray-900/50 dark:to-gray-800/50">
+                    <div className={`${currentBackground.class} ${currentBackground.pattern}`}>
                       
                       {/* Messages Area */}
                       <div className="p-6 max-h-[600px] overflow-y-auto space-y-6 scrollbar-thin scrollbar-thumb-gray-300 dark:scrollbar-thumb-gray-600 scrollbar-track-transparent">
-                        {feedback.messages?.length > 0 ? feedback.messages.map((message) => {
+                        {feedback.messages?.length > 0 ? feedback.messages.map((message, index) => {
                           const isCurrentUser = isMessageFromCurrentUser(message);
+                          const previousMessage = index > 0 ? feedback.messages[index - 1] : null;
+                          const showDateSeparator = shouldShowDateSeparator(message, previousMessage);
                           
                           return (
-                            <div
-                              key={getSafeId(message._id)}
-                              className={`flex w-full ${isCurrentUser ? 'justify-end' : 'justify-start'}`}
-                            >
-                              <div className={`relative max-w-[75%] group ${isCurrentUser ? 'flex flex-row-reverse items-end' : 'flex items-end'}`}>
-                                
-                                {/* Avatar */}
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg ${
-                                  isCurrentUser 
-                                    ? 'ml-3 bg-gradient-to-br from-blue-500 to-indigo-600' 
-                                    : 'mr-3 bg-gradient-to-br from-gray-500 to-gray-600'
-                                }`}>
-                                  {message.author.charAt(0).toUpperCase()}
-                                </div>
-
-                                <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
-                                  
-                                  {/* Author and time */}
-                                  <div className={`flex items-center gap-2 mb-2 px-1 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
-                                    <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                                      {isCurrentUser ? 'You' : message.author}
-                                      {message.isAdmin && (
-                                        <span className="ml-1 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] rounded-full font-bold">
-                                          STAFF
-                                        </span>
-                                      )}
-                                    </span>
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                                      {new Date(message.timestamp).toLocaleTimeString([], { 
-                                        hour: '2-digit', 
-                                        minute: '2-digit',
-                                        hour12: true 
-                                      })}
-                                    </span>
-                                  </div>
-
-                                  {/* Message bubble */}
-                                  <div className={`relative px-5 py-4 rounded-2xl shadow-lg backdrop-blur-sm ${
-                                    isCurrentUser
-                                      ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-br-md'
-                                      : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border border-gray-200 dark:border-gray-600 rounded-bl-md'
-                                  }`}>
-                                    
-                                    {/* Message Actions for Current User */}
-                                    {isCurrentUser && (
-                                      <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200">
-                                        <button
-                                          onClick={() => setShowDropdown(showDropdown === getSafeId(message._id) ? null : getSafeId(message._id))}
-                                          className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full shadow-lg backdrop-blur-sm transition-colors"
-                                        >
-                                          <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-                                        </button>
-                                        {showDropdown === getSafeId(message._id) && (
-                                          <div className="absolute left-0 bottom-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl py-2 z-20 min-w-[120px] backdrop-blur-sm">
-                                            <button 
-                                              onClick={() => handleEditMessage(feedback._id, message._id)} 
-                                              className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
-                                            >
-                                              <Edit3 className="w-4 h-4 text-blue-500" /> 
-                                              <span>Edit</span>
-                                            </button>
-                                            <button 
-                                              onClick={() => handleDeleteMessage(feedback._id, message._id)} 
-                                              className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
-                                            >
-                                              <Trash2 className="w-4 h-4" /> 
-                                              <span>Delete</span>
-                                            </button>
-                                          </div>
-                                        )}
+                            <div key={getSafeId(message._id)}>
+                              {/* Date Separator */}
+                              {showDateSeparator && (
+                                <div className="flex items-center justify-center my-6">
+                                  <div className="flex items-center gap-3">
+                                    <div className="h-px bg-gray-300 dark:bg-gray-600 flex-1 w-16"></div>
+                                    <div className="px-4 py-2 bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-200 dark:border-gray-600 rounded-full shadow-sm">
+                                      <div className="flex items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-400">
+                                        <Calendar className="w-3 h-3" />
+                                        <span>{formatMessageDate(message.timestamp)}</span>
                                       </div>
-                                    )}
-
-                                    {/* Message Content */}
-                                    {editingMessage === getSafeId(message._id) ? (
-                                      <div className="min-w-[250px] space-y-3">
-                                        <textarea
-                                          value={editText}
-                                          onChange={(e) => setEditText(e.target.value)}
-                                          className="w-full p-3 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                                          rows={3}
-                                          placeholder="Edit your message..."
-                                        />
-                                        <div className="flex justify-end gap-2">
-                                          <button 
-                                            onClick={() => handleSaveEdit(feedback._id, message._id)} 
-                                            className="p-2 bg-green-500 hover:bg-green-600 rounded-lg text-white shadow-lg transition-colors"
-                                          >
-                                            <Check className="w-4 h-4"/>
-                                          </button>
-                                          <button 
-                                            onClick={() => setEditingMessage(null)} 
-                                            className="p-2 bg-gray-500 hover:bg-gray-600 rounded-lg text-white shadow-lg transition-colors"
-                                          >
-                                            <X className="w-4 h-4"/>
-                                          </button>
-                                        </div>
-                                      </div>
-                                    ) : (
-                                      <>
-                                        {message.message && (
-                                          <p className="text-sm leading-relaxed whitespace-pre-wrap">
-                                            {message.message}
-                                          </p>
-                                        )}
-                                        
-                                        {/* Message Images */}
-                                        {message.images?.length > 0 && (
-                                          <div className={`grid gap-3 mt-4 ${
-                                            message.images.length === 1 ? 'grid-cols-1' : 
-                                            message.images.length === 2 ? 'grid-cols-2' : 
-                                            'grid-cols-2 md:grid-cols-3'
-                                          }`}>
-                                            {message.images.map(image => (
-                                              <div
-                                                key={image.id}
-                                                className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-white/20 hover:border-white/40 transition-all duration-200"
-                                                onClick={() => setImagePreview(image)}
-                                              >
-                                                <img
-                                                  src={`${API_BASE_URL}${image.url}`}
-                                                  alt="attachment"
-                                                  className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-300"
-                                                />
-                                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all duration-200">
-                                                  <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-                                                </div>
-                                              </div>
-                                            ))}
-                                          </div>
-                                        )}
-                                      </>
-                                    )}
-                                  </div>
-
-                                  {/* Edited indicator */}
-                                  {message.edited && (
-                                    <div className={`text-xs mt-2 px-2 py-1 rounded-full ${
-                                      isCurrentUser 
-                                        ? 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' 
-                                        : 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800'
-                                    }`}>
-                                      edited
                                     </div>
-                                  )}
+                                    <div className="h-px bg-gray-300 dark:bg-gray-600 flex-1 w-16"></div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Message */}
+                              <div className={`flex w-full ${isCurrentUser ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`relative max-w-[75%] group ${isCurrentUser ? 'flex flex-row-reverse items-end' : 'flex items-end'}`}>
+                                  
+                                  {/* Avatar */}
+                                  <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white flex-shrink-0 shadow-lg ${
+                                    isCurrentUser 
+                                      ? `ml-3 bg-gradient-to-br ${currentTheme.primary}` 
+                                      : `mr-3 bg-gradient-to-br ${currentTheme.secondary}`
+                                  }`}>
+                                    {message.author.charAt(0).toUpperCase()}
+                                  </div>
+
+                                  <div className={`flex flex-col ${isCurrentUser ? 'items-end' : 'items-start'}`}>
+                                    
+                                    {/* Author and time */}
+                                    <div className={`flex items-center gap-2 mb-2 px-1 ${isCurrentUser ? 'flex-row-reverse' : ''}`}>
+                                      <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                        {isCurrentUser ? 'You' : message.author}
+                                        {message.isAdmin && (
+                                          <span className="ml-1 px-2 py-0.5 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[10px] rounded-full font-bold">
+                                            STAFF
+                                          </span>
+                                        )}
+                                      </span>
+                                      <span className="text-xs text-gray-500 dark:text-gray-400">
+                                        {formatMessageTime(message.timestamp)}
+                                      </span>
+                                    </div>
+
+                                    {/* Message bubble */}
+                                    <div className={`relative px-5 py-4 ${currentBubbleStyle.shadow} backdrop-blur-sm ${
+                                      isCurrentUser
+                                        ? `${currentTheme.userBubble} text-white ${currentBubbleStyle.user}`
+                                        : `${currentTheme.otherBubble} text-gray-900 dark:text-white ${currentBubbleStyle.other}`
+                                    }`}>
+                                      
+                                      {/* Message Actions for Current User */}
+                                      {isCurrentUser && (
+                                        <div className="absolute -left-10 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200">
+                                          <button
+                                            onClick={() => setShowDropdown(showDropdown === getSafeId(message._id) ? null : getSafeId(message._id))}
+                                            className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-full shadow-lg backdrop-blur-sm transition-colors"
+                                          >
+                                            <MoreVertical className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                                          </button>
+                                          {showDropdown === getSafeId(message._id) && (
+                                            <div className="absolute left-0 bottom-12 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-xl shadow-2xl py-2 z-20 min-w-[120px] backdrop-blur-sm">
+                                              <button 
+                                                onClick={() => handleEditMessage(feedback._id, message._id)} 
+                                                className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center gap-3 transition-colors"
+                                              >
+                                                <Edit3 className="w-4 h-4 text-blue-500" /> 
+                                                <span>Edit</span>
+                                              </button>
+                                              <button 
+                                                onClick={() => handleDeleteMessage(feedback._id, message._id)} 
+                                                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-3 transition-colors"
+                                              >
+                                                <Trash2 className="w-4 h-4" /> 
+                                                <span>Delete</span>
+                                              </button>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {/* Message Content */}
+                                      {editingMessage === getSafeId(message._id) ? (
+                                        <div className="min-w-[250px] space-y-3">
+                                          <textarea
+                                            value={editText}
+                                            onChange={(e) => setEditText(e.target.value)}
+                                            className="w-full p-3 text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                                            rows={3}
+                                            placeholder="Edit your message..."
+                                          />
+                                          <div className="flex justify-end gap-2">
+                                            <button 
+                                              onClick={() => handleSaveEdit(feedback._id, message._id)} 
+                                              className="p-2 bg-green-500 hover:bg-green-600 rounded-lg text-white shadow-lg transition-colors"
+                                            >
+                                              <Check className="w-4 h-4"/>
+                                            </button>
+                                            <button 
+                                              onClick={() => setEditingMessage(null)} 
+                                              className="p-2 bg-gray-500 hover:bg-gray-600 rounded-lg text-white shadow-lg transition-colors"
+                                            >
+                                              <X className="w-4 h-4"/>
+                                            </button>
+                                          </div>
+                                        </div>
+                                      ) : (
+                                        <>
+                                          {message.message && (
+                                            <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                                              {message.message}
+                                            </p>
+                                          )}
+                                          
+                                          {/* Message Images */}
+                                          {message.images?.length > 0 && (
+                                            <div className={`grid gap-3 mt-4 ${
+                                              message.images.length === 1 ? 'grid-cols-1' : 
+                                              message.images.length === 2 ? 'grid-cols-2' : 
+                                              'grid-cols-2 md:grid-cols-3'
+                                            }`}>
+                                              {message.images.map(image => (
+                                                <div
+                                                  key={image.id}
+                                                  className="relative group cursor-pointer overflow-hidden rounded-xl border-2 border-white/20 hover:border-white/40 transition-all duration-200"
+                                                  onClick={() => setImagePreview(image)}
+                                                >
+                                                  <img
+                                                    src={`${API_BASE_URL}${image.url}`}
+                                                    alt="attachment"
+                                                    className="w-full h-32 object-cover group-hover:scale-110 transition-transform duration-300"
+                                                  />
+                                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 flex items-center justify-center transition-all duration-200">
+                                                    <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </>
+                                      )}
+                                    </div>
+
+                                    {/* Edited indicator */}
+                                    {message.edited && (
+                                      <div className={`text-xs mt-2 px-2 py-1 rounded-full ${
+                                        isCurrentUser 
+                                          ? `${currentTheme.accent} bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30` 
+                                          : 'text-gray-500 bg-gray-100 dark:text-gray-400 dark:bg-gray-800'
+                                      }`}>
+                                        edited
+                                      </div>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             </div>
                           );
                         }) : (
                           <div className="text-center py-12">
-                            <div className="w-16 h-16 bg-gray-100 dark:bg-gray-700 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <div className="w-16 h-16 bg-gray-100/50 dark:bg-gray-700/50 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
                               <MessageCircle className="w-8 h-8 text-gray-400" />
                             </div>
                             <p className="text-gray-500 dark:text-gray-400 font-medium">No messages yet</p>
@@ -619,8 +965,7 @@ const SubmittedFeedbacks = () => {
                       </div>
 
                       {/* Message Input */}
-                                           {/* Message Input */}
-                      <div className="p-6 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-600">
+                      <div className="p-6 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-t border-gray-200 dark:border-gray-600">
                         
                         {/* Image Preview for New Message */}
                         {newMessageImages[getSafeId(feedback._id)] && newMessageImages[getSafeId(feedback._id)].length > 0 && (
@@ -668,7 +1013,7 @@ const SubmittedFeedbacks = () => {
                                   [getSafeId(feedback._id)]: e.target.value
                                 }))}
                                 placeholder="Type your message here..."
-                                className="w-full pl-4 pr-12 py-4 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+                                className="w-full pl-4 pr-12 py-4 text-sm bg-white/80 dark:bg-gray-700/80 backdrop-blur-sm border border-gray-300 dark:border-gray-600 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:text-white placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
                                 onKeyPress={(e) => {
                                   if (e.key === 'Enter' && !e.shiftKey) {
                                     e.preventDefault();
@@ -692,7 +1037,7 @@ const SubmittedFeedbacks = () => {
                                   className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg cursor-pointer transition-colors duration-200 flex items-center justify-center group"
                                   title="Attach images"
                                 >
-                                  <ImageIcon className="w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:text-blue-500 transition-colors" />
+                                  <ImageIcon className={`w-5 h-5 text-gray-500 dark:text-gray-400 group-hover:${currentTheme.accent} transition-colors`} />
                                 </label>
                               </div>
                             </div>
@@ -702,7 +1047,7 @@ const SubmittedFeedbacks = () => {
                           <button
                             onClick={() => handleSendMessage(getSafeId(feedback._id))}
                             disabled={!newMessages[getSafeId(feedback._id)]?.trim() && (!newMessageImages[getSafeId(feedback._id)] || newMessageImages[getSafeId(feedback._id)].length === 0)}
-                            className="px-6 py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:shadow-none transition-all duration-200 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2"
+                            className={`px-6 py-4 bg-gradient-to-r ${currentTheme.primary} hover:${currentTheme.primaryHover} disabled:from-gray-400 disabled:to-gray-500 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl disabled:shadow-none transition-all duration-200 transform hover:scale-105 disabled:scale-100 disabled:cursor-not-allowed flex items-center gap-2`}
                           >
                             <Send className="w-5 h-5" />
                             <span className="hidden sm:inline">Send</span>
@@ -737,10 +1082,10 @@ const SubmittedFeedbacks = () => {
 
         {/* Footer */}
         <div className="mt-12 text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm rounded-full shadow-lg border border-gray-200 dark:border-gray-700">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
             <span className="text-sm text-gray-600 dark:text-gray-400">
-              Real-time conversations • Secure & Private
+              Real-time conversations • Secure & Private • Customizable
             </span>
           </div>
         </div>
