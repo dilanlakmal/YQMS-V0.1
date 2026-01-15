@@ -71,6 +71,8 @@ import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectio
 import { useAuth } from "../../../authentication/AuthContext";
 
 import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
+import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
+import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
 
 import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
 
@@ -798,7 +800,7 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
   }
 
   const processedMeasurements = backendMeasurementData
-    .filter((m) => m.size !== "Manual_Entry")
+    //.filter((m) => m.size !== "Manual_Entry")
     .map((m) => ({
       ...m,
       allEnabledPcs: new Set(m.allEnabledPcs || []),
@@ -1854,7 +1856,8 @@ const YPivotQAReportFullView = () => {
         )}
 
         {/* 4. Defect Summary */}
-        {summaryData.groups.length > 0 && (
+        {(summaryData.groups.length > 0 ||
+          (report.defectManualData && report.defectManualData.length > 0)) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
               className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
@@ -1873,6 +1876,15 @@ const YPivotQAReportFullView = () => {
                 <ChevronDown className="text-white w-4 h-4" />
               )}
             </div>
+
+            {/* --- MANUAL DEFECT DISPLAY SECTION --- */}
+            {report.defectManualData && report.defectManualData.length > 0 && (
+              <div className="px-4 pb-6">
+                <YPivotQAInspectionManualDefectDisplay
+                  manualData={report.defectManualData}
+                />
+              </div>
+            )}
 
             {expandedSections.defectSummary && (
               <div className="p-0">
@@ -2056,91 +2068,144 @@ const YPivotQAReportFullView = () => {
             {expandedSections.measurement && (
               <div className="p-4 space-y-8">
                 {/* Loop through each Stage (Before / After) */}
-                {measurementStageData.map((stageData) => (
-                  <div key={stageData.stage} className="space-y-5">
-                    {/* Stage Header */}
-                    <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
-                      <span
-                        className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
-                          stageData.stage === "Before"
-                            ? "bg-purple-500"
-                            : "bg-teal-500"
-                        }`}
-                      >
-                        {stageData.label}
-                      </span>
-                    </div>
+                {measurementStageData.map((stageData) => {
+                  // Check if we have any data groups (including Manual Entry)
+                  const hasData = stageData.groupedData.groups.length > 0;
 
-                    {/* Check if specs are loaded for this stage */}
-                    {stageData.specs.full.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200">
-                        <Loader2 className="w-6 h-6 animate-spin mb-1 text-indigo-500" />
-                        <p className="text-xs">
-                          Loading Specs for {stageData.label}...
-                        </p>
+                  return (
+                    <div key={stageData.stage} className="space-y-5">
+                      {/* Stage Header */}
+                      <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
+                        <span
+                          className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
+                            stageData.stage === "Before"
+                              ? "bg-purple-500"
+                              : "bg-teal-500"
+                          }`}
+                        >
+                          {stageData.label}
+                        </span>
                       </div>
-                    ) : (
-                      <>
-                        {/* Overall Result Table */}
-                        <OverallMeasurementSummaryTable
-                          groupedMeasurements={stageData.groupedDataForOverall}
-                          sizeList={sizeList}
-                        />
 
-                        {/* Detailed Groups */}
-                        {stageData.groupedData.groups.map((group) => {
-                          const configLabel =
-                            [
-                              group.lineName ? `Line ${group.lineName}` : null,
-                              group.tableName
-                                ? `Table ${group.tableName}`
-                                : null,
-                              group.colorName
-                                ? group.colorName.toUpperCase()
-                                : null
-                            ]
-                              .filter(Boolean)
-                              .join(" / ") || "General Configuration";
+                      {/* LOADING STATE: Only show if NO Specs AND NO Data (Manual or otherwise) */}
+                      {stageData.specs.full.length === 0 && !hasData ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200">
+                          <Loader2 className="w-6 h-6 animate-spin mb-1 text-indigo-500" />
+                          <p className="text-xs">
+                            Loading Specs for {stageData.label}...
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Overall Result Table - Only show if we have specs */}
+                          {stageData.specs.full.length > 0 && (
+                            <OverallMeasurementSummaryTable
+                              groupedMeasurements={
+                                stageData.groupedDataForOverall
+                              }
+                              sizeList={sizeList}
+                            />
+                          )}
 
-                          const stats = calculateGroupStats(
-                            group.measurements,
-                            stageData.specs.full,
-                            stageData.specs.selected
-                          );
+                          {/* Detailed Groups */}
+                          {stageData.groupedData.groups.map((group) => {
+                            const configLabel =
+                              [
+                                group.lineName
+                                  ? `Line ${group.lineName}`
+                                  : null,
+                                group.tableName
+                                  ? `Table ${group.tableName}`
+                                  : null,
+                                group.colorName
+                                  ? group.colorName.toUpperCase()
+                                  : null
+                              ]
+                                .filter(Boolean)
+                                .join(" / ") || "General Configuration";
 
-                          return (
-                            <div
-                              key={`${stageData.stage}-${group.id}`}
-                              className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
-                            >
-                              <div className="bg-gray-100 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase">
-                                  {configLabel} ({stageData.label})
-                                </span>
-                              </div>
+                            // Calculate stats only if specs exist
+                            const stats =
+                              stageData.specs.full.length > 0
+                                ? calculateGroupStats(
+                                    group.measurements,
+                                    stageData.specs.full,
+                                    stageData.specs.selected
+                                  )
+                                : {
+                                    totalPoints: 0,
+                                    passPoints: 0,
+                                    failPoints: 0,
+                                    totalPcs: 0,
+                                    passPcs: 0,
+                                    failPcs: 0,
+                                    pointPassRate: "0.0",
+                                    pcsPassRate: "0.0"
+                                  };
 
-                              <div className="p-4 space-y-5 bg-white dark:bg-gray-800">
-                                <MeasurementStatsCards stats={stats} />
-                                <div className="py-1">
-                                  <MeasurementLegend />
+                            // Robustly find manual data
+                            let manualData = group.measurements.find(
+                              (m) => m.manualData
+                            )?.manualData;
+
+                            if (
+                              !manualData &&
+                              report.measurementData?.manualDataByGroup
+                            ) {
+                              manualData =
+                                report.measurementData.manualDataByGroup[
+                                  group.id
+                                ];
+                            }
+
+                            return (
+                              <div
+                                key={`${stageData.stage}-${group.id}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+                              >
+                                <div className="bg-gray-100 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                                  <Layers className="w-4 h-4 text-gray-500" />
+                                  <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase">
+                                    {configLabel} ({stageData.label})
+                                  </span>
                                 </div>
-                                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                                  <MeasurementSummaryTable
-                                    measurements={group.measurements}
-                                    specsData={stageData.specs.full}
-                                    selectedSpecsList={stageData.specs.selected}
-                                    sizeList={sizeList}
-                                  />
+
+                                <div className="p-4 space-y-5 bg-white dark:bg-gray-800">
+                                  {/* Display Manual Data */}
+                                  {manualData && (
+                                    <YPivotQAReportMeasurementManualDisplay
+                                      manualData={manualData}
+                                    />
+                                  )}
+
+                                  {/* Only show Stats and Table if Specs exist */}
+                                  {stageData.specs.full.length > 0 && (
+                                    <>
+                                      <MeasurementStatsCards stats={stats} />
+                                      <div className="py-1">
+                                        <MeasurementLegend />
+                                      </div>
+                                      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <MeasurementSummaryTable
+                                          measurements={group.measurements}
+                                          specsData={stageData.specs.full}
+                                          selectedSpecsList={
+                                            stageData.specs.selected
+                                          }
+                                          sizeList={sizeList}
+                                        />
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-                  </div>
-                ))}
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

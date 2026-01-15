@@ -206,8 +206,11 @@ export const groupMeasurementsByGroupId = (savedMeasurements) => {
  * @param {Array} sizeList - Reference size order from DtOrder.SizeLis
  */
 export const buildTableData = (measurements, sizeList = []) => {
+  const validMeasurements = measurements.filter(
+    (m) => m.size !== "Manual_Entry"
+  );
   // Get unique sizes and sort by reference list
-  const uniqueSizes = [...new Set(measurements.map((m) => m.size))];
+  const uniqueSizes = [...new Set(validMeasurements.map((m) => m.size))];
   const sortedSizes = sortSizesByReference(uniqueSizes, sizeList);
 
   // Build data in the correct order
