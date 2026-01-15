@@ -1,14 +1,14 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from "react";
 
-const FilterField = ({ 
-  label, 
-  type = 'input', 
-  value, 
-  onChange, 
-  placeholder, 
-  options = [], 
+const FilterField = ({
+  label,
+  type = "input",
+  value,
+  onChange,
+  placeholder,
+  options = [],
   icon,
-  datalistId 
+  datalistId
 }) => {
   const [isFocused, setIsFocused] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -24,8 +24,8 @@ const FilterField = ({
 
   // Filter options based on input value
   useEffect(() => {
-    if (inputValue && type !== 'select') {
-      const filtered = options.filter(option =>
+    if (inputValue && type !== "select") {
+      const filtered = options.filter((option) =>
         option.toLowerCase().includes(inputValue.toLowerCase())
       );
       setFilteredOptions(filtered);
@@ -46,8 +46,8 @@ const FilterField = ({
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [inputValue, value]);
 
   const baseInputClasses = `
@@ -60,7 +60,7 @@ const FilterField = ({
 
   const handleInputFocus = () => {
     setIsFocused(true);
-    if (type !== 'select' && options.length > 0) {
+    if (type !== "select" && options.length > 0) {
       setIsDropdownOpen(true);
     }
   };
@@ -88,15 +88,15 @@ const FilterField = ({
     const newValue = e.target.value;
     setInputValue(newValue); // Update input display value
     // Don't call onChange here - only update the visual input
-    
-    if (type !== 'select' && options.length > 0) {
+
+    if (type !== "select" && options.length > 0) {
       setIsDropdownOpen(true);
     }
   };
 
   const handleDropdownToggle = () => {
-    if (type === 'select') return;
-    
+    if (type === "select") return;
+
     if (isDropdownOpen) {
       setIsDropdownOpen(false);
       // Reset input to last selected value
@@ -110,17 +110,17 @@ const FilterField = ({
   };
 
   const handleClear = () => {
-    setInputValue('');
-    onChange(''); // Clear the filter
+    setInputValue("");
+    onChange(""); // Clear the filter
     setIsDropdownOpen(false);
   };
 
   // Handle Enter key to select first filtered option
   const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && filteredOptions.length > 0) {
+    if (e.key === "Enter" && filteredOptions.length > 0) {
       e.preventDefault();
       handleOptionSelect(filteredOptions[0]);
-    } else if (e.key === 'Escape') {
+    } else if (e.key === "Escape") {
       setIsDropdownOpen(false);
       setInputValue(value); // Reset to last selected value
       inputRef.current?.blur();
@@ -133,9 +133,9 @@ const FilterField = ({
         <span className="text-lg">{icon}</span>
         {label}
       </label>
-      
+
       <div className="relative">
-        {type === 'select' ? (
+        {type === "select" ? (
           <select
             value={value}
             onChange={(e) => onChange(e.target.value)}
@@ -144,8 +144,10 @@ const FilterField = ({
             className={baseInputClasses}
           >
             <option value="">All Status</option>
-            {options.map(option => (
-              <option key={option} value={option}>{option}</option>
+            {options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
             ))}
           </select>
         ) : (
@@ -162,7 +164,7 @@ const FilterField = ({
               className={baseInputClasses}
               autoComplete="off"
             />
-            
+
             {/* Dropdown Arrow - Only show if there are options */}
             {options.length > 0 && (
               <button
@@ -171,23 +173,31 @@ const FilterField = ({
                 className="absolute inset-y-0 right-8 flex items-center px-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                 tabIndex={-1}
               >
-                <svg 
-                  className={`w-4 h-4 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`} 
-                  fill="none" 
-                  stroke="currentColor" 
+                <svg
+                  className={`w-4 h-4 transition-transform duration-200 ${
+                    isDropdownOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
                   viewBox="0 0 24 24"
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M19 9l-7 7-7-7"
+                  />
                 </svg>
               </button>
             )}
-            
+
             {/* Custom Dropdown with improved styling */}
             {isDropdownOpen && filteredOptions.length > 0 && (
               <div 
                 className="absolute z-[9999] w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto"
                 style={{
-                  boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)'
+                  boxShadow:
+                    "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)"
                 }}
               >
                 {filteredOptions.slice(0, 10).map((option, index) => (
@@ -205,13 +215,13 @@ const FilterField = ({
                     )}
                   </div>
                 ))}
-                
+
                 {filteredOptions.length > 10 && (
                   <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 font-medium">
                     Showing 10 of {filteredOptions.length} results. Keep typing to narrow down...
                   </div>
                 )}
-                
+
                 {filteredOptions.length === 0 && inputValue && (
                   <div className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400 text-center italic">
                     No matches found for "{inputValue}"
@@ -221,7 +231,7 @@ const FilterField = ({
             )}
           </>
         )}
-        
+
         {/* Clear Button */}
         {value && (
           <button
@@ -230,8 +240,18 @@ const FilterField = ({
             className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 dark:text-gray-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
             tabIndex={-1}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}
@@ -241,21 +261,23 @@ const FilterField = ({
 };
 
 const FilterPanel = ({ filters, onFilterChange, options }) => {
-  const hasActiveFilters = Object.values(filters).some(value => value !== '');
-  const activeFilterCount = Object.values(filters).filter(value => value !== '').length;
+  const hasActiveFilters = Object.values(filters).some((value) => value !== "");
+  const activeFilterCount = Object.values(filters).filter(
+    (value) => value !== ""
+  ).length;
 
   const clearAllFilters = () => {
-    Object.keys(filters).forEach(key => {
-      onFilterChange(key, '');
+    Object.keys(filters).forEach((key) => {
+      onFilterChange(key, "");
     });
   };
 
   const filterFields = [
     {
-      key: 'inspector',
-      label: 'Inspector',
-      placeholder: '',
-      icon: '👤',
+      key: "inspector",
+      label: "Inspector",
+      placeholder: "",
+      icon: "👤",
       options: [...(options.inspector || [])].sort()
     },
     {
@@ -266,31 +288,31 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
       options: ['Pending Approval', 'Accepted', 'Reworked'],
     },
     {
-      key: 'reportType',
-      label: 'Report Type',
-      placeholder: '',
-      icon: '📋',
+      key: "reportType",
+      label: "Report Type",
+      placeholder: "",
+      icon: "📋",
       options: [...(options.reportType || [])].sort()
     },
     {
-      key: 'supplier',
-      label: 'Supplier',
-      placeholder: '',
-      icon: '🏢',
+      key: "supplier",
+      label: "Supplier",
+      placeholder: "",
+      icon: "🏢",
       options: [...(options.supplier || [])].sort()
     },
     {
-      key: 'project',
-      label: 'Project',
-      placeholder: '',
-      icon: '🏗️',
+      key: "project",
+      label: "Project",
+      placeholder: "",
+      icon: "🏗️",
       options: [...(options.project || [])].sort()
     },
     {
-      key: 'poNumbers',
-      label: 'PO #',
-      placeholder: '',
-      icon: '🏷️',
+      key: "poNumbers",
+      label: "PO #",
+      placeholder: "",
+      icon: "🏷️",
       options: [...(options.poNumbers || [])].sort()
     },
     {
@@ -321,15 +343,25 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
               </p>
             </div>
           </div>
-          
+
           {hasActiveFilters && (
             <button
               type="button"
               onClick={clearAllFilters}
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 rounded-lg transition-colors duration-200"
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                />
               </svg>
               Clear All
             </button>
@@ -362,7 +394,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
               <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active filters:</span>
               {Object.entries(filters).map(([key, value]) => {
                 if (!value) return null;
-                const field = filterFields.find(f => f.key === key);
+                const field = filterFields.find((f) => f.key === key);
                 return (
                   <div
                     key={key}
@@ -376,8 +408,18 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
                       onClick={() => onFilterChange(key, '')}
                       className="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
                     >
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      <svg
+                        className="w-3 h-3"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M6 18L18 6M6 6l12 12"
+                        />
                       </svg>
                     </button>
                   </div>

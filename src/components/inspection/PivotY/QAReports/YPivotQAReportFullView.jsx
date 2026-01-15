@@ -38,7 +38,8 @@ import {
   RefreshCw,
   Eye,
   Clock,
-  ClipboardList
+  ClipboardList,
+  FileSpreadsheet
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -64,8 +65,14 @@ import {
   DefectSummaryTable
 } from "../QADataCollection/YPivotQAInspectionDefectSummary";
 
+import DefectLocationSummary from "./DefectLocationSummary";
+
 import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectionBuyerDetermination";
 import { useAuth } from "../../../authentication/AuthContext";
+
+import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
+
+import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
 
 // =============================================================================
 // HELPER COMPONENTS
@@ -252,6 +259,157 @@ const ImagePreviewModal = ({ images, startIndex = 0, onClose }) => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// NEW: PRODUCTION STATUS COMPONENTS
+// =============================================================================
+
+const ProgressBar = ({ label, value, colorClass = "bg-blue-500" }) => (
+  <div className="mb-3">
+    <div className="flex justify-between items-center mb-1">
+      <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+        {label}
+      </span>
+      <span className="text-xs font-bold text-gray-800 dark:text-white">
+        {value}%
+      </span>
+    </div>
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div
+        className={`h-2 rounded-full ${colorClass} transition-all duration-500`}
+        style={{ width: `${Math.min(value, 100)}%` }}
+      />
+    </div>
+  </div>
+);
+
+const ProductionStatusSection = ({ inspectionDetails }) => {
+  if (!inspectionDetails || !inspectionDetails.qualityPlanEnabled) return null;
+
+  const { productionStatus, packingList } = inspectionDetails;
+
+  // Check if production status has non-zero values
+  const showProduction =
+    productionStatus && Object.values(productionStatus).some((val) => val > 0);
+
+  // Check if packing list has non-zero values
+  const showPacking =
+    packingList && Object.values(packingList).some((val) => val > 0);
+
+  if (!showProduction && !showPacking) return null;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 flex items-center gap-2">
+        <ClipboardList className="w-4 h-4 text-white" />
+        <h2 className="text-white font-bold text-sm">
+          Production Status & Packing List
+        </h2>
+      </div>
+
+      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* LEFT: Production Status (Progress Bars) */}
+        {showProduction && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 dark:border-gray-700 pb-2">
+              Production Progress
+            </h3>
+            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+              <ProgressBar
+                label="Cutting"
+                value={productionStatus.cutting}
+                colorClass="bg-purple-500"
+              />
+              <ProgressBar
+                label="Sewing"
+                value={productionStatus.sewing}
+                colorClass="bg-indigo-500"
+              />
+              <ProgressBar
+                label="Ironing"
+                value={productionStatus.ironing}
+                colorClass="bg-blue-500"
+              />
+              <ProgressBar
+                label="QC2 Checking"
+                value={productionStatus.qc2FinishedChecking}
+                colorClass="bg-teal-500"
+              />
+              <ProgressBar
+                label="Folding"
+                value={productionStatus.folding}
+                colorClass="bg-emerald-500"
+              />
+              <ProgressBar
+                label="Packing"
+                value={productionStatus.packing}
+                colorClass="bg-green-500"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* RIGHT: Packing List (Card Grid) */}
+        {showPacking && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 dark:border-gray-700 pb-2">
+              Packing List Status
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                <p className="text-[10px] text-blue-500 uppercase font-bold">
+                  Total Cartons
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.totalCartons?.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
+                <p className="text-[10px] text-green-500 uppercase font-bold">
+                  Finished Cartons
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.finishedCartons?.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
+                <p className="text-[10px] text-purple-500 uppercase font-bold">
+                  Total Pcs
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.totalPcs?.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-100 dark:border-orange-800">
+                <p className="text-[10px] text-orange-500 uppercase font-bold">
+                  Finished Pcs
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.finishedPcs?.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Optional Summary Text */}
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+              <p className="text-xs text-gray-500">
+                Carton Completion:{" "}
+                <span className="font-bold text-gray-800 dark:text-gray-200">
+                  {Math.round(
+                    (packingList.finishedCartons /
+                      (packingList.totalCartons || 1)) *
+                      100
+                  )}
+                  %
+                </span>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -715,13 +873,16 @@ const YPivotQAReportFullView = () => {
     config: true,
     header: true,
     photos: true,
-    measurement: true
+    measurement: true,
+    ppSheet: true
   });
 
   const toggleSection = (key) =>
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   // Permission State
   const [canViewReportId, setCanViewReportId] = useState(false);
+
+  const [defectHeatmap, setDefectHeatmap] = useState(null);
 
   // =========================================================================
   // FETCH ALL DATA
@@ -866,6 +1027,30 @@ const YPivotQAReportFullView = () => {
     };
     checkPermission();
   }, [user]);
+
+  // NEW: Fetch Defect Heatmap (Visual Locations)
+  useEffect(() => {
+    const fetchHeatmap = async () => {
+      if (!reportId) return;
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/defect-heatmap`
+        );
+        if (res.data.success) {
+          setDefectHeatmap(res.data.data);
+        }
+      } catch (err) {
+        // It's okay if this fails (e.g., 404 if no map config exists)
+        // Just log nicely and don't set state
+        console.log("No defect location map available or error fetching.");
+      }
+    };
+
+    // Only fetch if we have loaded the report (to ensure it exists)
+    if (report) {
+      fetchHeatmap();
+    }
+  }, [reportId, report]);
 
   // =========================================================================
   // DERIVED DATA
@@ -1348,6 +1533,25 @@ const YPivotQAReportFullView = () => {
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print</span>
             </button>
+
+            {/* New PDF Generator Button */}
+            <YPivotQAReportPDFGenerator
+              report={report}
+              orderData={orderData}
+              inspectorInfo={inspectorInfo}
+              definitions={definitions}
+              headerData={headerData}
+              measurementStageData={measurementStageData}
+              measurementResult={measurementResult}
+              summaryData={summaryData}
+              defectImages={defectImages}
+              aqlResult={aqlResult}
+              aqlSampleData={aqlSampleData}
+              finalResult={finalReportResult}
+              defectResult={defectResult}
+              isAQLMethod={isAQLMethod}
+              inspectedQty={inspectedQty}
+            />
           </div>
         </div>
       </div>
@@ -1691,6 +1895,14 @@ const YPivotQAReportFullView = () => {
                   totals={summaryData.totals}
                 />
 
+                {/* --- NEW: DEFECT LOCATION VISUAL SUMMARY --- */}
+                {defectHeatmap && (
+                  <DefectLocationSummary
+                    mapData={defectHeatmap.map}
+                    counts={defectHeatmap.counts}
+                  />
+                )}
+
                 {/* NEW: Defect Images Grid */}
                 {defectImages.length > 0 && (
                   <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
@@ -2028,6 +2240,27 @@ const YPivotQAReportFullView = () => {
                     icon={Tag}
                     className="md:col-span-4"
                   />
+
+                  {/* --- START OF NEW REMARKS SECTION --- */}
+                  {config.remarks && (
+                    <div className="md:col-span-4 mt-1">
+                      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-3.5 flex gap-3">
+                        <div className="shrink-0">
+                          <div className="p-2 bg-amber-100 dark:bg-amber-800/40 rounded-lg">
+                            <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-1">
+                            Inspection Remarks
+                          </h4>
+                          <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                            {config.remarks}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* NEW: All Distinct SKUs Card */}
                   {allUniqueSKUs.length > 0 && (
@@ -2403,6 +2636,9 @@ const YPivotQAReportFullView = () => {
           </div>
         )}
 
+        {/* --- PRODUCTION STATUS --- */}
+        <ProductionStatusSection inspectionDetails={report.inspectionDetails} />
+
         {/* 9. Photo Documentation */}
         {report.photoData && report.photoData.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -2538,6 +2774,39 @@ const YPivotQAReportFullView = () => {
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+        {/* 10. PP Sheet / Pilot Run Meeting Report (Conditional) */}
+        {report.ppSheetData && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+            <div
+              className="bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2.5 flex justify-between items-center cursor-pointer"
+              onClick={() => toggleSection("ppSheet")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4" /> PP Sheet / Pilot Meeting
+              </h2>
+              {expandedSections.ppSheet ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.ppSheet && (
+              <YPivotQAReportPPSheetSection
+                ppSheetData={report.ppSheetData}
+                onImageClick={(url, title) => {
+                  // Reusing the existing image preview logic
+                  if (url) {
+                    setPreviewImage({
+                      images: [{ url: url, defectName: title }],
+                      startIndex: 0
+                    });
+                  }
+                }}
+              />
             )}
           </div>
         )}

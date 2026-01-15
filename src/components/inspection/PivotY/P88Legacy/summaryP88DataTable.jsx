@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import FilterPanel from './FilterPanel.jsx';
-import SummaryCards from './SummaryCards.jsx';
-import ReactPaginate from 'react-paginate';
-
+import React, { useState, useEffect, useCallback } from "react";
+import FilterPanel from "./FilterPanel.jsx";
+import SummaryCards from "./SummaryCards.jsx";
+import ReactPaginate from "react-paginate";
 
 const SummaryP88Data = () => {
   const [inspectionData, setInspectionData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [summary, setSummary] = useState({ total: 0, passed: 0, failed: 0, pending: 0, hold: 0 });
+  const [summary, setSummary] = useState({
+    total: 0,
+    passed: 0,
+    failed: 0,
+    pending: 0,
+    hold: 0
+  });
   const [filterOptions, setFilterOptions] = useState({
     inspector: [],
     supplier: [],
@@ -32,8 +37,8 @@ const SummaryP88Data = () => {
     style: '',
   });
   const [sortConfig, setSortConfig] = useState({
-    key: 'scheduledInspectionDate',
-    direction: 'desc'
+    key: "scheduledInspectionDate",
+    direction: "desc"
   });
 
   useEffect(() => {
@@ -43,24 +48,30 @@ const SummaryP88Data = () => {
   const fetchInspectionData = useCallback(async () => {
     try {
       setLoading(true);
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
       const params = new URLSearchParams({
         page: currentPage + 1,
         limit: 100,
         sortBy: sortConfig.key,
         sortOrder: sortConfig.direction,
-        ...Object.fromEntries(Object.entries(filters).filter(([_, v]) => v !== ''))
+        ...Object.fromEntries(
+          Object.entries(filters).filter(([_, v]) => v !== "")
+        )
       });
 
-      const response = await fetch(`${apiBaseUrl}/api/p88-data?${params.toString()}`);
+      const response = await fetch(
+        `${apiBaseUrl}/api/p88-data?${params.toString()}`
+      );
       if (!response.ok) {
-        throw new Error('Failed to fetch inspection data');
+        throw new Error("Failed to fetch inspection data");
       }
 
       const data = await response.json();
       setInspectionData(data.results || []);
       setPageCount(data.pagination.totalPages || 0);
-      setSummary(data.summary || { total: 0, passed: 0, failed: 0, pending: 0, hold: 0 });
+      setSummary(
+        data.summary || { total: 0, passed: 0, failed: 0, pending: 0, hold: 0 }
+      );
     } catch (err) {
       setError(err.message);
     } finally {
@@ -80,10 +91,10 @@ const SummaryP88Data = () => {
 
   const fetchFilterOptions = async () => {
     try {
-      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+      const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || "";
       const response = await fetch(`${apiBaseUrl}/api/p88-data/filter-options`);
       if (!response.ok) {
-        throw new Error('Failed to fetch filter options');
+        throw new Error("Failed to fetch filter options");
       }
       const data = await response.json();
       setFilterOptions(data.data);
@@ -93,11 +104,11 @@ const SummaryP88Data = () => {
   };
 
   const formatDate = (date) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
+    if (!date) return "-";
+    return new Date(date).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
     });
   };
 
@@ -127,9 +138,11 @@ const SummaryP88Data = () => {
     const config = statusConfig[status] || { bg: 'bg-gray-100 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-300', icon: '❓' };
     
     return (
-      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}>
+      <span
+        className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold ${config.bg} ${config.text}`}
+      >
         <span className="text-xs">{config.icon}</span>
-        {status || 'Not Completed'}
+        {status || "Not Completed"}
       </span>
     );
   };
@@ -139,22 +152,26 @@ const SummaryP88Data = () => {
       return <span className="text-gray-400 ml-1">↕️</span>;
     }
     return (
-      <span className={`ml-1 ${sortConfig.direction === 'asc' ? 'text-blue-500' : 'text-blue-500'}`}>
-        {sortConfig.direction === 'asc' ? '↑' : '↓'}
+      <span
+        className={`ml-1 ${
+          sortConfig.direction === "asc" ? "text-blue-500" : "text-blue-500"
+        }`}
+      >
+        {sortConfig.direction === "asc" ? "↑" : "↓"}
       </span>
     );
   };
 
   const handleSort = (key) => {
-    let direction = 'asc';
-    if (sortConfig.key === key && sortConfig.direction === 'asc') {
-      direction = 'desc';
+    let direction = "asc";
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
+      direction = "desc";
     }
     setSortConfig({ key, direction });
   };
 
   const handleFilterChange = (key, value) => {
-    setFilters(prev => ({
+    setFilters((prev) => ({
       ...prev,
       [key]: value
     }));
@@ -196,8 +213,8 @@ const SummaryP88Data = () => {
             <p className="text-gray-600 dark:text-gray-300 mb-6 text-center max-w-md">
               We encountered an error while loading the inspection data: <span className="font-medium">{error}</span>
             </p>
-            <button 
-              onClick={fetchInspectionData} 
+            <button
+              onClick={fetchInspectionData}
               className="flex items-center gap-2 px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-all duration-200 transform hover:scale-105 shadow-lg"
             >
               <span>🔄</span>
@@ -226,12 +243,14 @@ const SummaryP88Data = () => {
         </div> */}
 
         {/* Filter Panel */}
-        <FilterPanel filters={filters} onFilterChange={handleFilterChange} options={filterOptions} />
+        <FilterPanel
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          options={filterOptions}
+        />
 
         {/* Summary Cards */}
         <SummaryCards summary={summary} />
-
-        
 
         {/* Data Table */}
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
@@ -242,12 +261,14 @@ const SummaryP88Data = () => {
                 <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Inspection Records</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                   {inspectionData.length} records found
-                  {Object.values(filters).some(v => v) && ' (filtered)'}
+                  {Object.values(filters).some((v) => v) && " (filtered)"}
                 </p>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                 <span>📊</span>
-                <span>Page {currentPage + 1} of {pageCount}</span>
+                <span>
+                  Page {currentPage + 1} of {pageCount}
+                </span>
               </div>
             </div>
           </div>
@@ -282,7 +303,7 @@ const SummaryP88Data = () => {
                     { key: 'project', label: 'Project', icon: '🏗️' },
                     { key: 'sampleInspected', label: 'Sample Inspected', icon: '🔬' }
                   ].map((column) => (
-                    <th 
+                    <th
                       key={column.key}
                       onClick={() => handleSort(column.key)}
                       className="px-4 py-4 text-left font-semibold text-gray-700 dark:text-gray-200 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors duration-150 select-none group"
@@ -326,7 +347,7 @@ const SummaryP88Data = () => {
                     <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-blue-400 rounded-full"></span>
-                        {inspection.inspector || '-'}
+                        {inspection.inspector || "-"}
                       </div>
                     </td>
                     <td className="px-4 py-4">
@@ -377,7 +398,7 @@ const SummaryP88Data = () => {
                     <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 max-w-[150px] break-words">
                       <div className="flex items-center gap-2">
                         <span className="w-2 h-2 bg-purple-400 rounded-full"></span>
-                        {inspection.project || '-'}
+                        {inspection.project || "-"}
                       </div>
                     </td>
                     <td className="px-4 py-4 text-sm text-gray-700 dark:text-gray-300 text-center font-medium">
@@ -398,7 +419,7 @@ const SummaryP88Data = () => {
                       </button>
                     </td> */}
                     <td className="px-4 py-4">
-                      <a 
+                      <a
                         href={`/inspection-report/${inspection._id}`}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -433,7 +454,7 @@ const SummaryP88Data = () => {
                 Showing page <span className="font-semibold">{currentPage + 1}</span> of{' '}
                 <span className="font-semibold">{pageCount}</span>
               </div>
-              
+
               <ReactPaginate
                 previousLabel={
                   <div className="flex items-center gap-2">
@@ -447,7 +468,7 @@ const SummaryP88Data = () => {
                     <span>→</span>
                   </div>
                 }
-                breakLabel={'...'}
+                breakLabel={"..."}
                 pageCount={pageCount}
                 marginPagesDisplayed={2}
                 pageRangeDisplayed={5}
