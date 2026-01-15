@@ -1876,43 +1876,50 @@ const LaundryWashingMachineTest = () => {
             </div>
           </div>
 
-          {/* Tab Navigation */}
+          {/* Tab Navigation - Mobile Optimized */}
           <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-            <nav className="flex space-x-4" aria-label="Tabs">
+            <nav
+              className="flex overflow-x-auto scrollbar-hide -mb-px"
+              aria-label="Tabs"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
               <button
                 onClick={() => setActiveTab("form")}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "form"
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "form"
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <HiDocumentAdd className={`w-5 h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
-                  Create New Report
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <HiDocumentAdd className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "form" ? "text-emerald-600" : "text-emerald-500/70"}`} />
+                  <span className="hidden sm:inline">Create New Report</span>
+                  <span className="sm:hidden">Create</span>
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab("reports")}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "reports"
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "reports"
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <HiClipboardList className={`w-5 h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
-                  Reports ({pagination.totalRecords})
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <HiClipboardList className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "reports" ? "text-blue-600" : "text-blue-500/70"}`} />
+                  <span className="hidden sm:inline">Reports ({pagination.totalRecords})</span>
+                  <span className="sm:hidden">Reports <span className="text-[10px] bg-blue-100 dark:bg-blue-900 px-1.5 py-0.5 rounded-full">{pagination.totalRecords}</span></span>
                 </span>
               </button>
               <button
                 onClick={() => setActiveTab("warehouse_reports")}
-                className={`py-3 px-4 border-b-2 font-medium text-sm transition-colors ${activeTab === "warehouse_reports"
+                className={`flex-shrink-0 py-3 px-3 sm:px-4 border-b-2 font-medium text-xs sm:text-sm transition-colors whitespace-nowrap ${activeTab === "warehouse_reports"
                   ? "border-blue-500 text-blue-600 dark:text-blue-400"
                   : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-300"
                   }`}
               >
-                <span className="flex items-center gap-2">
-                  <MdWarehouse className={`w-5 h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
-                  Warehouse Report
+                <span className="flex items-center gap-1.5 sm:gap-2">
+                  <MdWarehouse className={`w-4 h-4 sm:w-5 sm:h-5 ${activeTab === "warehouse_reports" ? "text-amber-600" : "text-amber-500/70"}`} />
+                  <span className="hidden sm:inline">Warehouse Report</span>
+                  <span className="sm:hidden">Warehouse</span>
                 </span>
               </button>
             </nav>
