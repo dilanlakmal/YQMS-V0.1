@@ -2081,7 +2081,8 @@ const YPivotQAReportPDFDocument = ({
   headerDataWithImages,
   defectImagesWithBase64,
   ppSheetDataWithImages,
-  defectHeatmapData
+  defectHeatmapData,
+  sizeList = []
 }) => {
   const selectedOrders = reportData?.orderNos || [];
   const orderNo = selectedOrders.length > 0 ? selectedOrders[0] : "N/A";
@@ -2150,6 +2151,7 @@ const YPivotQAReportPDFDocument = ({
           <MeasurementSectionPDF
             measurementStageData={measurementStageData}
             measurementResult={measurementResult}
+            sizeList={sizeList}
           />
         </Page>
       )}

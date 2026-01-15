@@ -863,6 +863,7 @@ const YPivotQAReportFullView = () => {
     Before: { full: [], selected: [] },
     After: { full: [], selected: [] }
   });
+  const [sizeList, setSizeList] = useState([]);
 
   // UI States
   const [previewImage, setPreviewImage] = useState(null);
@@ -988,6 +989,7 @@ const YPivotQAReportFullView = () => {
 
             if (specsRes.data.success) {
               setMeasurementSpecs(specsRes.data.specs); // Save { Before:..., After:... }
+              setSizeList(specsRes.data.sizeList || []);
             }
           } catch (err) {
             console.warn("Could not fetch measurement specs", err);
@@ -1543,6 +1545,7 @@ const YPivotQAReportFullView = () => {
               defectResult={defectResult}
               isAQLMethod={isAQLMethod}
               inspectedQty={inspectedQty}
+              sizeList={sizeList}
             />
           </div>
         </div>
@@ -2079,6 +2082,7 @@ const YPivotQAReportFullView = () => {
                         {/* Overall Result Table */}
                         <OverallMeasurementSummaryTable
                           groupedMeasurements={stageData.groupedDataForOverall}
+                          sizeList={sizeList}
                         />
 
                         {/* Detailed Groups */}
@@ -2124,6 +2128,7 @@ const YPivotQAReportFullView = () => {
                                     measurements={group.measurements}
                                     specsData={stageData.specs.full}
                                     selectedSpecsList={stageData.specs.selected}
+                                    sizeList={sizeList}
                                   />
                                 </div>
                               </div>

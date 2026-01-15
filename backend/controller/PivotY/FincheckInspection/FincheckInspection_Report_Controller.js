@@ -251,6 +251,85 @@ export const getDefectImagesForReport = async (req, res) => {
 // Get Measurement Specifications Linked to a Report
 // ============================================================
 
+// export const getReportMeasurementSpecs = async (req, res) => {
+//   try {
+//     const { reportId } = req.params;
+
+//     // 1. Fetch the Report to get Order No
+//     const report = await FincheckInspectionReports.findOne({
+//       reportId: parseInt(reportId)
+//     }).select("orderNos");
+
+//     if (!report) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Report not found" });
+//     }
+
+//     const orderNos = report.orderNos;
+//     if (!orderNos || orderNos.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         specs: { Before: null, After: null }
+//       });
+//     }
+
+//     // Use the first order number to find specs
+//     const primaryOrderNo = orderNos[0];
+
+//     // 2. Find the Specs in the Specs Collection
+//     // We fetch EVERYTHING (Before and After)
+//     const specsRecord = await QASectionsMeasurementSpecs.findOne({
+//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+//     }).lean();
+
+//     const result = {
+//       Before: { full: [], selected: [] },
+//       After: { full: [], selected: [] }
+//     };
+
+//     if (specsRecord) {
+//       // Process Before
+//       result.Before.full = specsRecord.AllBeforeWashSpecs || [];
+//       result.Before.selected =
+//         specsRecord.selectedBeforeWashSpecs &&
+//         specsRecord.selectedBeforeWashSpecs.length > 0
+//           ? specsRecord.selectedBeforeWashSpecs
+//           : specsRecord.AllBeforeWashSpecs || [];
+
+//       // Process After
+//       result.After.full = specsRecord.AllAfterWashSpecs || [];
+//       result.After.selected =
+//         specsRecord.selectedAfterWashSpecs &&
+//         specsRecord.selectedAfterWashSpecs.length > 0
+//           ? specsRecord.selectedAfterWashSpecs
+//           : specsRecord.AllAfterWashSpecs || [];
+//     } else {
+//       // Fallback: Check DtOrder (Legacy - usually only Before)
+//       const dtOrder = await DtOrder.findOne({
+//         Order_No: primaryOrderNo
+//       }).lean();
+
+//       if (dtOrder && dtOrder.BeforeWashSpecs) {
+//         const legacySpecs = dtOrder.BeforeWashSpecs.map((s) => ({
+//           ...s,
+//           id: s._id ? s._id.toString() : s.id
+//         }));
+//         result.Before.full = legacySpecs;
+//         result.Before.selected = legacySpecs;
+//       }
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       specs: result
+//     });
+//   } catch (error) {
+//     console.error("Error fetching report measurement specs:", error);
+//     return res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
 export const getReportMeasurementSpecs = async (req, res) => {
   try {
     const { reportId } = req.params;
@@ -270,15 +349,24 @@ export const getReportMeasurementSpecs = async (req, res) => {
     if (!orderNos || orderNos.length === 0) {
       return res.status(200).json({
         success: true,
-        specs: { Before: null, After: null }
+        specs: { Before: null, After: null },
+        sizeList: [] // Return empty size list
       });
     }
 
     // Use the first order number to find specs
     const primaryOrderNo = orderNos[0];
 
-    // 2. Find the Specs in the Specs Collection
-    // We fetch EVERYTHING (Before and After)
+    // 2. Fetch DtOrder to get SizeList for ordering
+    const dtOrder = await DtOrder.findOne({
+      Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+    })
+      .select("SizeList")
+      .lean();
+
+    const sizeList = dtOrder?.SizeList || [];
+
+    // 3. Find the Specs in the Specs Collection
     const specsRecord = await QASectionsMeasurementSpecs.findOne({
       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
     }).lean();
@@ -306,12 +394,12 @@ export const getReportMeasurementSpecs = async (req, res) => {
           : specsRecord.AllAfterWashSpecs || [];
     } else {
       // Fallback: Check DtOrder (Legacy - usually only Before)
-      const dtOrder = await DtOrder.findOne({
+      const dtOrderFull = await DtOrder.findOne({
         Order_No: primaryOrderNo
       }).lean();
 
-      if (dtOrder && dtOrder.BeforeWashSpecs) {
-        const legacySpecs = dtOrder.BeforeWashSpecs.map((s) => ({
+      if (dtOrderFull && dtOrderFull.BeforeWashSpecs) {
+        const legacySpecs = dtOrderFull.BeforeWashSpecs.map((s) => ({
           ...s,
           id: s._id ? s._id.toString() : s.id
         }));
@@ -322,7 +410,8 @@ export const getReportMeasurementSpecs = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      specs: result
+      specs: result,
+      sizeList: sizeList // NEW: Include size list in response
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
