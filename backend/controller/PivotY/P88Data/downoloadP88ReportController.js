@@ -11,6 +11,7 @@ import archiver from 'archiver';
 
 const stat = promisify(fs.stat);
 // const readdir = promisify(fs.readdir);
+const activeJobs = new Map();
 
 const baseTempDir = process.platform === 'win32' 
     ? path.join(process.env.TEMP || 'C:/temp', 'p88-bulk-temp')
@@ -128,11 +129,23 @@ const getAvailableSpace = async (dirPath) => {
 export const downloadBulkReportsUbuntu = async (req, res) => {
     let driver = null;
     let jobDir = null;
+    const { jobId } = req.body;
     try {
         const { startRange, endRange, downloadAll, startDate, endDate, factoryName, language = 'english', includeDownloaded = false  } = req.body;
+
+        activeJobs.set(jobId, {
+            status: 'running',
+            startTime: new Date(),
+            cancelled: false,
+            jobDir: null,
+            driver: null
+        });
         
         jobDir = path.join(baseTempDir, `selenium_${Date.now()}`);
         fs.mkdirSync(jobDir, { recursive: true });
+
+         // Update job info
+        activeJobs.get(jobId).jobDir = jobDir;
 
         const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, includeDownloaded );
         if (records.length === 0) return res.json({ success: false, message: 'No records matching criteria' });
@@ -142,7 +155,14 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         options.setUserPreferences({ 'download.default_directory': jobDir });
 
         driver = await new Builder().forBrowser(Browser.CHROME).setChromeOptions(options).build();
+          // Update job info with driver
+        activeJobs.get(jobId).driver = driver;
+
         await driver.sendAndGetDevToolsCommand('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
+
+        let processedCount = 0;
+        let successCount = 0;
+        let failedCount = 0;
 
         // Login
         await driver.get(CONFIG.LOGIN_URL);
@@ -152,6 +172,11 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         await driver.wait(until.urlContains('dashboard'), 20000);
 
         for (const record of records) {
+
+            const jobInfo = activeJobs.get(jobId);
+            if (!jobInfo || jobInfo.cancelled) {
+                break;
+            }
             const inspNo = record.inspectionNumbers?.[0] || record.inspectionNumbersKey?.split('-')[0];
             if (!inspNo) continue;
 
@@ -180,9 +205,21 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
                 console.error(`❌ Error on ${inspNo}:`, err.message);
                 await updateDownloadStatus(record._id, 'Failed');
             }
+             processedCount++;
+            
+            // Update job progress
+            if (activeJobs.has(jobId)) {
+                activeJobs.get(jobId).progress = {
+                    processed: processedCount,
+                    total: records.length,
+                    success: successCount,
+                    failed: failedCount
+                };
+            }
         }
 
         await driver.quit();
+        activeJobs.delete(jobId);
         await streamZipAndCleanup(jobDir, res);
     } catch (error) {
         if (driver) await driver.quit();
@@ -190,6 +227,11 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     }
 };
 
+export const downloadBulkReportsAutoCancellable = async (req, res) => {
+    process.platform === 'linux' 
+        ? await  downloadBulkReportsUbuntu(req, res) 
+        : await downloadBulkReportsCancellable(req, res);
+};
 
 export const initializeDownloadStatus = async (req, res) => {
   try {
@@ -554,6 +596,327 @@ export const downloadSingleReportDirect = async (req, res) => {
                 error: error.message
             });
         }
+    }
+};
+
+export const downloadBulkReportsCancellable = async (req, res) => {
+    let browser = null;
+    let jobDir = null;
+    const { jobId } = req.body;
+    
+    try {
+        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, language = 'english', includeDownloaded = false } = req.body;
+        
+        // Store job info for potential cancellation
+        activeJobs.set(jobId, {
+            status: 'running',
+            startTime: new Date(),
+            cancelled: false,
+            jobDir: null,
+            browser: null
+        });
+        
+        jobDir = path.join(baseTempDir, `puppeteer_${jobId}`);
+        fs.mkdirSync(jobDir, { recursive: true });
+        
+        // Update job info with directory
+        activeJobs.get(jobId).jobDir = jobDir;
+        
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, includeDownloaded);
+        
+        browser = await puppeteer.launch({ 
+            headless: CONFIG.HEADLESS, 
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-web-security',
+                '--disable-features=VizDisplayCompositor'
+            ]
+        });
+        
+        // Update job info with browser
+        activeJobs.get(jobId).browser = browser;
+        
+        const page = await browser.newPage();
+        
+        // Set longer timeouts
+        page.setDefaultTimeout(60000);
+        page.setDefaultNavigationTimeout(60000);
+        
+        const client = await page.target().createCDPSession();
+        await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
+
+        // Login process
+        await page.goto(CONFIG.LOGIN_URL);
+        await page.waitForSelector('#username');
+        await page.type('#username', process.env.P88_USERNAME);
+        await page.type('#password', process.env.P88_PASSWORD);
+        await page.click('#js-login-submit');
+        await page.waitForNavigation();
+
+        let processedCount = 0;
+        let successCount = 0;
+        let failedCount = 0;
+
+        for (const record of records) {
+            // Check if job was cancelled
+            const jobInfo = activeJobs.get(jobId);
+            if (!jobInfo || jobInfo.cancelled) {
+                break;
+            }
+
+            const inspNo = record.inspectionNumbers?.[0] || record.inspectionNumbersKey?.split('-')[0];
+            if (!inspNo) continue;
+
+            try {
+                await updateDownloadStatus(record._id, 'In Progress');
+                const filesBefore = fs.readdirSync(jobDir);
+
+                // Navigate to report
+                await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { 
+                    waitUntil: 'networkidle0',
+                    timeout: 60000 
+                });
+
+                // Wait for page to fully load
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Try to change language
+                const languageChanged = await changeLanguage(page, language);
+                if (languageChanged) {
+                    await new Promise(resolve => setTimeout(resolve, 4000));
+                }
+
+                // Wait for and click print button
+                let printButton = null;
+                const printSelectors = [
+                    '#page-wrapper a',
+                    'a[href*="print"]',
+                    'a[onclick*="print"]',
+                    '.print-btn',
+                    'button[onclick*="print"]'
+                ];
+
+                for (const selector of printSelectors) {
+                    try {
+                        await page.waitForSelector(selector, { timeout: 5000 });
+                        printButton = await page.$(selector);
+                        if (printButton) break;
+                    } catch (e) {
+                        continue;
+                    }
+                }
+
+                if (!printButton) {
+                    throw new Error('Print button not found with any selector');
+                }
+
+                await printButton.click();
+                await new Promise(resolve => setTimeout(resolve, 3000));
+
+                // Wait for file download
+                const newFiles = await waitForNewFile(jobDir, filesBefore);
+
+                // Rename files
+                const baseName = getFilename(record);
+                newFiles.forEach((file, index) => {
+                    const oldPath = path.join(jobDir, file);
+                    const newName = `${baseName}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
+                    fs.renameSync(oldPath, path.join(jobDir, newName));
+                });
+
+                await updateDownloadStatus(record._id, 'Downloaded');
+                successCount++;
+                
+            } catch (err) {
+                console.error(`❌ Error downloading ${inspNo}:`, err.message);
+                await updateDownloadStatus(record._id, 'Failed');
+                failedCount++;
+            }
+            
+            processedCount++;
+            
+            // Update job progress
+            if (activeJobs.has(jobId)) {
+                activeJobs.get(jobId).progress = {
+                    processed: processedCount,
+                    total: records.length,
+                    success: successCount,
+                    failed: failedCount
+                };
+            }
+        }
+
+        await browser.close();
+        
+        // Remove from active jobs
+        activeJobs.delete(jobId);
+        
+        // Send ZIP file
+        await streamZipAndCleanup(jobDir, res);
+
+    } catch (error) {
+        console.error('❌ Cancellable bulk download failed:', error);
+        
+        if (browser) {
+            try {
+                await browser.close();
+            } catch (closeError) {
+                console.error('Error closing browser:', closeError);
+            }
+        }
+        
+        // Clean up job
+        activeJobs.delete(jobId);
+        
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: error.message });
+        }
+    }
+};
+
+// NEW: Cancel download function
+export const cancelBulkDownload = async (req, res) => {
+    try {
+        const { jobId } = req.body;
+        
+        if (!jobId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Job ID is required'
+            });
+        }
+        
+        const jobInfo = activeJobs.get(jobId);
+        
+        if (!jobInfo) {
+            return res.status(404).json({
+                success: false,
+                error: 'Job not found or already completed'
+            });
+        }
+        
+        // Mark job as cancelled
+        jobInfo.cancelled = true;
+        jobInfo.cancelledAt = new Date();
+        
+        // Close browser if it exists
+        if (jobInfo.browser) {
+            try {
+                await jobInfo.browser.close();
+            } catch (error) {
+                console.error('Error closing browser during cancellation:', error);
+            }
+        }
+        
+        // Wait a moment for any ongoing operations to complete
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Check if there are any downloaded files to send
+        if (jobInfo.jobDir && fs.existsSync(jobInfo.jobDir)) {
+            const files = fs.readdirSync(jobInfo.jobDir);
+            const pdfFiles = files.filter(file => file.endsWith('.pdf'));
+            
+            if (pdfFiles.length > 0) {
+                
+                // Create ZIP with partial results
+                const zipName = `Reports_Partial_${Date.now()}.zip`;
+                const zipPath = path.join(baseTempDir, zipName);
+                const output = fs.createWriteStream(zipPath);
+                const archive = archiver('zip', { zlib: { level: 9 } });
+                
+                output.on('close', () => {
+                    // Send the partial results ZIP
+                    res.download(zipPath, zipName, (err) => {
+                        // Cleanup
+                        if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+                        if (fs.existsSync(jobInfo.jobDir)) {
+                            fs.rmSync(jobInfo.jobDir, { recursive: true, force: true });
+                        }
+                        activeJobs.delete(jobId);
+                        
+                        // if (err) {
+                        //     console.error('Error sending partial results:', err);
+                        // } else {
+                        //     console.log(`Partial results sent successfully for job ${jobId}`);
+                        // }
+                    });
+                });
+                
+                output.on('error', (err) => {
+                    console.error('Error creating partial results ZIP:', err);
+                    activeJobs.delete(jobId);
+                    if (!res.headersSent) {
+                        res.status(500).json({
+                            success: false,
+                            error: 'Failed to create partial results ZIP'
+                        });
+                    }
+                });
+                
+                archive.pipe(output);
+                archive.directory(jobInfo.jobDir, false);
+                await archive.finalize();
+                
+            } else {
+                // No files downloaded yet
+                activeJobs.delete(jobId);
+                res.json({
+                    success: true,
+                    message: 'Download cancelled. No files were completed yet.',
+                    partialResults: false
+                });
+            }
+        } else {
+            // No job directory found
+            activeJobs.delete(jobId);
+            res.json({
+                success: true,
+                message: 'Download cancelled. No files were completed yet.',
+                partialResults: false
+            });
+        }
+        
+    } catch (error) {
+        console.error('Error cancelling download:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
+    }
+};
+
+// NEW: Get job status function (optional - for progress tracking)
+export const getJobStatus = async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        
+        const jobInfo = activeJobs.get(jobId);
+        
+        if (!jobInfo) {
+            return res.status(404).json({
+                success: false,
+                error: 'Job not found'
+            });
+        }
+        
+        res.json({
+            success: true,
+            jobInfo: {
+                status: jobInfo.status,
+                cancelled: jobInfo.cancelled,
+                startTime: jobInfo.startTime,
+                progress: jobInfo.progress || null
+            }
+        });
+        
+    } catch (error) {
+        console.error('Error getting job status:', error);
+        res.status(500).json({
+            success: false,
+            error: error.message
+        });
     }
 };
 

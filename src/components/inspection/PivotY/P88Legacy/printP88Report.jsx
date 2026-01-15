@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect,  useRef } from 'react';
 
 const PrintP88Report = () => {
     const [loading, setLoading] = useState(false);
@@ -26,6 +26,10 @@ const PrintP88Report = () => {
     const [timeRemaining, setTimeRemaining] = useState(null);
     const [elapsedTime, setElapsedTime] = useState(0);
     const [timerInterval, setTimerInterval] = useState(null);
+    const [isCancelling, setIsCancelling] = useState(false);
+    const [currentJobId, setCurrentJobId] = useState(null);
+    const abortControllerRef = useRef(null);
+
 
      // Helper to format seconds into MM:SS
     const formatTime = (seconds) => {
@@ -192,6 +196,66 @@ const PrintP88Report = () => {
         }
     };
 
+     const handleCancelDownload = async () => {
+        if (!currentJobId) {
+            console.log('No job ID found for cancellation');
+            return;
+        }
+        
+        setIsCancelling(true);
+        setStatus({ message: 'Cancelling download and preparing partial results...', type: 'warning' });
+        
+        try {
+            // Abort the current fetch request
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+            
+            const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+            const response = await fetch(`${apiBaseUrl}/api/scraping/cancel-bulk-download`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ jobId: currentJobId })
+            });
+            
+            if (response.ok) {
+                // Check if we got a ZIP file (partial results) or JSON response
+                const contentType = response.headers.get("content-type");
+                if (contentType && contentType.includes("application/json")) {
+                    const data = await response.json();
+                    setStatus({ message: data.message || 'Download cancelled', type: 'info' });
+                } else {
+                    // We got a ZIP file with partial results
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', `P88_Reports_Partial_${new Date().toISOString().split('T')[0]}.zip`);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.parentNode.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    setStatus({ message: 'Download cancelled. Partial results downloaded successfully!', type: 'success' });
+                }
+            } else {
+                const errorText = await response.text();
+                console.error('Cancel response error:', errorText);
+                setStatus({ message: 'Failed to cancel download properly', type: 'error' });
+            }
+        } catch (error) {
+            console.error('Cancel Error:', error);
+            setStatus({ message: `Cancel failed: ${error.message}`, type: 'error' });
+        } finally {
+            setIsCancelling(false);
+            setLoading(false);
+            setTimeRemaining(null);
+            setCurrentJobId(null);
+            abortControllerRef.current = null;
+        }
+    };
+
     const handleConfirmDownload = async () => {
         if (pathValidation && !pathValidation.isValid) {
             setStatus({ message: 'Please select a valid download path', type: 'error' });
@@ -204,16 +268,25 @@ const PrintP88Report = () => {
         
         const estimatedSeconds = 15 + (reportsCount * 25); 
         setTimeRemaining(estimatedSeconds);
-
         setLoading(true);
+        setIsCancelling(false);
         setShowDownloadDialog(false);
         setStatus({ message: 'Generating reports and preparing ZIP... Please wait.', type: 'warning' });
-
+        
+        // Generate unique job ID
+        const jobId = `job_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        setCurrentJobId(jobId);
+        console.log('Starting download with job ID:', jobId);
+        
+        // Create new AbortController for this request
+        abortControllerRef.current = new AbortController();
+        
         try {
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-            const endpoint = 'download-bulk-reports';
+            const endpoint = 'download-bulk-reports-cancellable'; // Use cancellable endpoint
             
             const body = { 
+                jobId: jobId, // Include job ID
                 downloadPath: selectedPath,
                 startRange: downloadMode === 'range' ? startRange : null,
                 endRange: downloadMode === 'range' ? endRange : null,
@@ -224,30 +297,27 @@ const PrintP88Report = () => {
                 includeDownloaded: includeDownloaded,
                 language: language
             };
-
+            
             const response = await fetch(`${apiBaseUrl}/api/scraping/${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify(body)
+                body: JSON.stringify(body),
+                signal: abortControllerRef.current.signal // Add abort signal
             });
-
+            
             if (!response.ok) throw new Error('Failed to generate reports');
-
+            
             // CHECK CONTENT TYPE: Is it a ZIP file or a JSON error?
             const contentType = response.headers.get("content-type");
-
             if (contentType && contentType.includes("application/json")) {
                 // If the server sends JSON (usually an error or "no records found")
                 const data = await response.json();
                 setStatus({ message: data.message || 'No records found', type: 'info' });
             } else {
                 // IF IT IS A FILE (The ZIP)
-                // 1. Get the data as a Blob
                 const blob = await response.blob();
-
-                // 2. Create a hidden download link
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
@@ -255,20 +325,27 @@ const PrintP88Report = () => {
                 // Set the filename for the user's computer
                 link.setAttribute('download', `P88_Reports_${new Date().toISOString().split('T')[0]}.zip`);
                 
-                // 3. Trigger the click and cleanup
+                // Trigger the click and cleanup
                 document.body.appendChild(link);
                 link.click();
                 link.parentNode.removeChild(link);
                 window.URL.revokeObjectURL(url);
-
-                setStatus({ message: 'Download started! Check your browser downloads.', type: 'success' });
+                setStatus({ message: 'Download completed successfully! Check your browser downloads.', type: 'success' });
             }
         } catch (error) {
-            console.error('Download Error:', error);
-            setStatus({ message: `Download failed: ${error.message}`, type: 'error' });
+            if (error.name === 'AbortError') {
+                // Request was aborted (cancelled)
+                setStatus({ message: 'Download was cancelled by user', type: 'info' });
+            } else {
+                console.error('Download Error:', error);
+                setStatus({ message: `Download failed: ${error.message}`, type: 'error' });
+            }
         } finally {
             setLoading(false);
             setTimeRemaining(null);
+            setCurrentJobId(null);
+            setIsCancelling(false);
+            abortControllerRef.current = null;
         }
     };
 
@@ -402,6 +479,17 @@ const PrintP88Report = () => {
                                 <div className="mt-2 text-xs text-center italic opacity-90">
                                     Please do not close this tab. Generating {spaceInfo?.recordCount} high-quality PDF reports...
                                 </div>
+                                {!isCancelling && (
+                                        <button
+                                            onClick={handleCancelDownload}
+                                            className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors duration-200 flex items-center space-x-2"
+                                        >
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                            <span>Cancel & Download Partial</span>
+                                        </button>
+                                    )}
                             </div>
                         )}
 

@@ -13,7 +13,10 @@ import {
     getDateFilteredStats,
     downloadSingleReportDirect,
     downloadBulkReportsAuto,
-    downloadBulkReportsUbuntu
+    downloadBulkReportsUbuntu,
+    downloadBulkReportsCancellable,
+    cancelBulkDownload,
+    getJobStatus
 } from '../../../controller/PivotY/P88Data/downoloadP88ReportController.js';
 
 const router = express.Router();
@@ -32,5 +35,8 @@ router.post('/api/scraping/reset-download-status', resetDownloadStatus);
 router.post('/api/scraping/download-single-direct', downloadSingleReportDirect);
 router.post('/api/scraping/download-bulk-reports-auto', downloadBulkReportsAuto);
 router.post('/api/scraping/download-bulk-reports-ubuntu', downloadBulkReportsUbuntu);
+router.post('/api/scraping/download-bulk-reports-cancellable', downloadBulkReportsCancellable);
+router.post('/api/scraping/cancel-bulk-download', cancelBulkDownload);
+router.get('/api/scraping/job-status/:jobId', getJobStatus);
 
 export default router;
