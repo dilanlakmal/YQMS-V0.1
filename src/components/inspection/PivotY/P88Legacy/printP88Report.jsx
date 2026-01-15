@@ -532,9 +532,6 @@ const PrintP88Report = () => {
                                 </div>
                             )}
                         </div>
-
-                        {/* Rest of your existing component remains the same... */}
-                        {/* Loading, stats, download mode, buttons, etc. */}
                         
                         {/* Show stats even without filters */}
                         {dateFilteredStats && (
