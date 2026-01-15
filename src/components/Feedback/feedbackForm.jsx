@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Send, Upload, X, Image, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { useState } from 'react';
+import { Send, Upload, X, FileText, AlertCircle, CheckCircle } from 'lucide-react';
 import { API_BASE_URL } from '../../../config'; // Adjust path as needed
 
 const FeedbackForm = () => {

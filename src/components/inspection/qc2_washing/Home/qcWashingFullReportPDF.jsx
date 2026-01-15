@@ -10,7 +10,6 @@ import {
 } from "@react-pdf/renderer";
 import {
   getToleranceAsFraction,
-  decimalToFraction
 } from "../Home/fractionConverter";
 
 // --- FONT REGISTRATION ---

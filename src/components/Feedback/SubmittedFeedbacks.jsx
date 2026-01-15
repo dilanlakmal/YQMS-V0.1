@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../authentication/AuthContext';
 import { 
   MessageCircle, Send, Image as ImageIcon, Calendar, User, Tag, 
-  ChevronDown, ChevronUp, Edit3, Trash2, X, Check, Upload, 
+  ChevronDown, ChevronUp, Edit3, Trash2, X, Check, 
   MoreVertical, Eye, Clock, AlertCircle, CheckCircle2, XCircle,
-  Paperclip, Smile, Palette, Settings, Sun, Moon, Monitor
+  Paperclip, Palette, Settings
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 
@@ -697,7 +697,7 @@ const SubmittedFeedbacks = () => {
                 No feedback submitted yet
               </h3>
               <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                Start a conversation by submitting your first feedback. We're here to help improve your experience.
+                Start a conversation by submitting your first feedback. We are here to help improve your experience.
               </p>
             </div>
           </div>
