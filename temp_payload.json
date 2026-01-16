@@ -1,0 +1,7 @@
+{
+    "sourceSegment": "The hydraulic pump failed due to high pressure.",
+    "newTargetSegment": "The hydraulic pump failed because of excessive pressure.",
+    "sourceLang": "en",
+    "targetLang": "km",
+    "project": "TestProject"
+}

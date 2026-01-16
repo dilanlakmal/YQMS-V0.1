@@ -18,6 +18,7 @@ const unlink = promisify(fs.unlink);
 import { countDocumentCharacters, calculateTranslationCost } from "../../AISystemUtils/system-translate/documentHelper.js";
 import { logTranslationCost } from "../../AISystemUtils/system-translate/translationCostLogger.js";
 import { getGlossaryUrl } from "../glossaries/glossaryController.js";
+import { GlossaryTerm } from "../MongoDB/dbConnectionController.js";
 
 // Create temp directory if it doesn't exist
 const tempUploadDir = path.join(process.cwd(), 'temp', 'uploads');
@@ -49,7 +50,7 @@ export const uploadMiddleware = upload.fields([
 ]);
 
 // Helper function to poll translation job status
-const pollTranslationStatus = async(endpoint, apiKey, jobId, apiVersion = "2024-05-01") => {
+const pollTranslationStatus = async (endpoint, apiKey, jobId, apiVersion = "2024-05-01") => {
     const maxAttempts = 60; // Maximum polling attempts (5 minutes with 5-second intervals)
     const pollInterval = 5000; // 5 seconds
 
@@ -114,7 +115,99 @@ const sanitizeBlobName = (filename) => {
     return `${safeBase}${ext}`;
 };
 
-const translateFiles = async(req, res) => {
+/**
+ * Generate Just-in-Time Glossary from MongoDB
+ * Queries GlossaryTerms collection, creates temp TSV, uploads to Azure Blob
+ * @param {string} sourceLang - Source language code (e.g., 'en')
+ * @param {string} targetLang - Target language code (e.g., 'km')
+ * @param {string} domain - Optional domain filter (e.g., 'Legal', 'Engineering')
+ * @returns {Promise<{glossaryUrl: string, blobName: string, termCount: number} | null>}
+ */
+const generateJustInTimeGlossary = async (sourceLang, targetLang, domain = null) => {
+    try {
+        console.log(`Generating Just-in-Time Glossary: ${sourceLang} -> ${targetLang}${domain ? ` (${domain})` : ''}`);
+
+        // Query MongoDB for matching terms
+        const query = {
+            sourceLang: sourceLang.toLowerCase(),
+            targetLang: targetLang.toLowerCase()
+        };
+
+        if (domain && domain !== 'General') {
+            query.domain = domain;
+        }
+
+        const terms = await GlossaryTerm.find(query)
+            .select('source target')
+            .limit(5000) // Azure has limits
+            .lean();
+
+        if (!terms || terms.length === 0) {
+            console.log("No glossary terms found in database. Proceeding without glossary.");
+            return null;
+        }
+
+        console.log(`Found ${terms.length} glossary terms in database.`);
+
+        // Generate TSV content (no header, Azure format)
+        const tsvContent = terms.map(t => `${t.source}\t${t.target}`).join('\n');
+
+        // Create temp file
+        const tempDir = path.join(process.cwd(), 'temp', 'glossaries');
+        if (!fs.existsSync(tempDir)) {
+            fs.mkdirSync(tempDir, { recursive: true });
+        }
+
+        const tempFileName = `temp_${sourceLang}_${targetLang}_${Date.now()}.tsv`;
+        const tempFilePath = path.join(tempDir, tempFileName);
+        const tsvBuffer = Buffer.from(tsvContent, 'utf-8');
+        fs.writeFileSync(tempFilePath, tsvBuffer);
+
+        // Upload to Azure Blob Storage (glossaries container)
+        const glossaryContainer = process.env.AZURE_STORAGE_GLOSSARY_CONTAINER || "glossaries";
+        const blobName = `temp/${tempFileName}`;
+
+        const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
+        const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+
+        await uploadFileToBlob(
+            tsvBuffer,
+            blobName,
+            glossaryContainer,
+            storageAccountName,
+            storageAccountKey
+        );
+
+        console.log(`Uploaded Just-in-Time glossary: ${blobName} (${terms.length} terms)`);
+
+        // Generate SAS URL
+        const glossaryUrl = getBlobSASUrl(
+            glossaryContainer,
+            blobName,
+            storageAccountName,
+            storageAccountKey,
+            BlobSASPermissions.parse("r"),
+            1 // 1 hour expiry
+        );
+
+        // Cleanup temp file
+        fs.unlink(tempFilePath, (err) => {
+            if (err) console.warn(`Failed to cleanup temp glossary file: ${err.message}`);
+        });
+
+        return {
+            glossaryUrl,
+            blobName,
+            termCount: terms.length
+        };
+
+    } catch (error) {
+        console.error("Just-in-Time Glossary Error:", error.message);
+        return null;
+    }
+};
+
+const translateFiles = async (req, res) => {
     let sourceLanguage; // Declare at function scope
     let targetLanguage; // Declare at function scope
 
@@ -123,6 +216,7 @@ const translateFiles = async(req, res) => {
         targetLanguage = req.body.targetLanguage;
         sourceLanguage = req.body.sourceLanguage || null;
         const glossaryBlobName = req.body.glossaryBlobName || null;
+        const domain = req.body.domain || 'General';
 
         let selectedBlobFiles = [];
         if (req.body.blobFileNames) {
@@ -313,19 +407,39 @@ const translateFiles = async(req, res) => {
                 language: targetLanguage
             };
 
-            // Add glossary if provided
+            // Add glossary - prefer manual selection, otherwise use Just-in-Time from MongoDB
+            let glossaryAdded = false;
+
             if (glossaryBlobName) {
+                // Manual glossary selection
                 try {
                     const glossaryInfo = await getGlossaryUrl(glossaryBlobName, 24);
-                    // Azure only supports TSV format, so always use "tsv"
                     targetObject.glossaries = [{
                         glossaryUrl: glossaryInfo.glossaryUrl,
-                        format: "tsv" // Always use "tsv" regardless of original file format
+                        format: "tsv"
                     }];
-                    console.log(`Using glossary: ${glossaryBlobName} (converted to TSV)`);
+                    console.log(`Using manual glossary: ${glossaryBlobName}`);
+                    glossaryAdded = true;
                 } catch (glossaryError) {
-                    console.warn(`Failed to get glossary URL for ${glossaryBlobName}:`, glossaryError.message);
-                    // Continue without glossary if it fails
+                    console.warn(`Failed to get manual glossary URL:`, glossaryError.message);
+                }
+            }
+
+            // If no manual glossary, try Just-in-Time from MongoDB
+            // Use 'en' as default source if auto-detect (sourceLanguage is null)
+            if (!glossaryAdded && targetLanguage) {
+                try {
+                    const jitSourceLang = sourceLanguage || 'en'; // Default to English for auto-detect
+                    const jitGlossary = await generateJustInTimeGlossary(jitSourceLang, targetLanguage, domain);
+                    if (jitGlossary) {
+                        targetObject.glossaries = [{
+                            glossaryUrl: jitGlossary.glossaryUrl,
+                            format: "tsv"
+                        }];
+                        console.log(`Using Just-in-Time glossary: ${jitGlossary.termCount} terms (${jitSourceLang} -> ${targetLanguage})`);
+                    }
+                } catch (jitError) {
+                    console.warn(`Just-in-Time glossary failed:`, jitError.message);
                 }
             }
 
@@ -498,7 +612,7 @@ const translateFiles = async(req, res) => {
 };
 
 // New endpoint: List files in containers
-export const listFiles = async(req, res) => {
+export const listFiles = async (req, res) => {
     try {
         const storageAccountName = process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage";
         const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
@@ -527,7 +641,8 @@ export const listFiles = async(req, res) => {
                     files: sourceFiles.map(file => ({
                         ...file,
                         cleanName: extractCleanFileName(file.name),
-                        originalName: file.name
+                        originalName: file.name,
+                        container: sourceContainerName
                     }))
                 };
             } catch (err) {
@@ -552,7 +667,8 @@ export const listFiles = async(req, res) => {
                     files: targetFiles.map(file => ({
                         ...file,
                         cleanName: extractCleanFileName(file.name),
-                        originalName: file.name
+                        originalName: file.name,
+                        container: targetContainerName
                     }))
                 };
             } catch (err) {
@@ -575,7 +691,7 @@ export const listFiles = async(req, res) => {
 };
 
 // New endpoint: Download file from blob storage
-export const downloadFile = async(req, res) => {
+export const downloadFile = async (req, res) => {
     try {
         const { container, fileName } = req.query;
 
@@ -634,7 +750,7 @@ export const downloadFile = async(req, res) => {
 };
 
 // New endpoint: Delete file from blob storage
-export const deleteFile = async(req, res) => {
+export const deleteFile = async (req, res) => {
     try {
         const { container, fileName } = req.query;
 
@@ -668,7 +784,7 @@ export const deleteFile = async(req, res) => {
     }
 };
 
-export const getCharacterCount = async(req, res) => {
+export const getCharacterCount = async (req, res) => {
     try {
         const uploadedFiles = req.files && req.files["files"] ? req.files["files"] : [];
 

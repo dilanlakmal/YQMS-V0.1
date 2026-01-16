@@ -129,6 +129,9 @@ import createCoverPageSchema from "../../models/YDT/coverPage.js";
 //Humidity Models
 import createHumidityModel from "../../models/huminity/HumidityReport.js";
 
+//Glossary Term Model
+import createGlossaryTermModel from "../../models/GlossaryTerm.js";
+
 //MongoDB Connections
 export const ymProdConnection = mongoose.createConnection(
     process.env.MongoDB_URI_ym_prod
@@ -309,6 +312,9 @@ export const CoverPage = createCoverPageSchema(ymProdConnection);
 
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
+
+//Glossary Term Exported Model
+export const GlossaryTerm = createGlossaryTermModel(ymProdConnection);
 
 //Disconnect DB connection
 export async function disconnectMongoDB() {

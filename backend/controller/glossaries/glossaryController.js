@@ -3,6 +3,8 @@
  * Handles CRUD operations for translation glossaries
  */
 
+import pdf from 'pdf-extraction';
+
 import { randomUUID } from "crypto";
 import {
   uploadFileToBlob,
@@ -22,9 +24,12 @@ import {
   parseGlossaryFile,
   getDisplayEntries
 } from "../../AISystemUtils/glossaries/glossaryHelper.js";
+import { alignText, evaluateCorrection, extractGlossaryTerms } from "./agentGlossaryController.js";
 import fs from 'fs';
 import { promisify } from 'util';
 const unlink = promisify(fs.unlink);
+import path from 'path';
+import { GlossaryTerm } from "../MongoDB/dbConnectionController.js";
 
 // Glossary container name
 const GLOSSARY_CONTAINER = process.env.AZURE_STORAGE_GLOSSARY_CONTAINER || "glossaries";
@@ -41,7 +46,7 @@ const parseGlossaryBlobName = (blobName) => {
 
   const hasTimestamp = /\d{4}-\d{2}-\d{2}/.test(basename);;
 
-  if(!hasTimestamp) {
+  if (!hasTimestamp) {
 
     const sourceLang = simpleParts[0];
     const targetLang = simpleParts.slice(1).join('-');
@@ -55,7 +60,7 @@ const parseGlossaryBlobName = (blobName) => {
         uuid: 'latest',
         format: ext,
         originalName: blobName
-     
+
       }
     }
   }
@@ -104,8 +109,8 @@ const parseGlossaryBlobName = (blobName) => {
  */
 const findGlossaryByLanguagePair = async (source, target) => {
 
-   // Just generate the name and check existence
-    const name = generateGlossaryBlobName(source, target);
+  // Just generate the name and check existence
+  const name = generateGlossaryBlobName(source, target);
 
   // try {
   //   // List all blobs in glossary container
@@ -149,7 +154,7 @@ const findGlossaryByLanguagePair = async (source, target) => {
   //   throw error;
   // }
 
-  return {blobName: name};
+  return { blobName: name };
 };
 
 /**
@@ -166,8 +171,8 @@ export const uploadGlossary = async (req, res) => {
     }
 
     if (!sourceLanguage || !targetLanguage) {
-      return res.status(400).json({ 
-        error: "Source language and target language are required" 
+      return res.status(400).json({
+        error: "Source language and target language are required"
       });
     }
 
@@ -176,8 +181,8 @@ export const uploadGlossary = async (req, res) => {
     const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 
     if (!storageAccountKey) {
-      return res.status(500).json({ 
-        error: "Azure Blob Storage account key not configured" 
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
       });
     }
 
@@ -193,11 +198,11 @@ export const uploadGlossary = async (req, res) => {
 
     // Validate glossary file
     const validation = await validateGlossaryFile(fileBuffer, file.originalname);
-    
+
     if (!validation.valid) {
       // Clean up temp file
       if (file.path && fs.existsSync(file.path)) {
-        await unlink(file.path).catch(() => {});
+        await unlink(file.path).catch(() => { });
       }
       return res.status(400).json({
         error: "Glossary validation failed",
@@ -210,7 +215,7 @@ export const uploadGlossary = async (req, res) => {
     const originalCount = validation.entries.length;
     const expandedEntries = expandEntriesWithCaseVariations(validation.entries);
     const expandedCount = expandedEntries.length;
-    
+
     if (expandedCount > originalCount) {
       console.log(`Expanded ${originalCount} entries to ${expandedCount} entries with case variations`);
     }
@@ -253,7 +258,7 @@ export const uploadGlossary = async (req, res) => {
 
     // Clean up temp file
     if (file.path && fs.existsSync(file.path)) {
-      await unlink(file.path).catch(() => {});
+      await unlink(file.path).catch(() => { });
     }
 
     // Return glossary metadata
@@ -274,10 +279,10 @@ export const uploadGlossary = async (req, res) => {
 
   } catch (error) {
     console.error("Glossary upload error:", error);
-    
+
     // Clean up temp file on error
     if (req.file?.path && fs.existsSync(req.file.path)) {
-      await unlink(req.file.path).catch(() => {});
+      await unlink(req.file.path).catch(() => { });
     }
 
     return res.status(500).json({
@@ -297,8 +302,8 @@ export const listGlossaries = async (req, res) => {
     const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 
     if (!storageAccountKey) {
-      return res.status(500).json({ 
-        error: "Azure Blob Storage account key not configured" 
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
       });
     }
 
@@ -353,8 +358,8 @@ export const getGlossariesByLanguagePair = async (req, res) => {
     const { sourceLang, targetLang } = req.params;
 
     if (!sourceLang || !targetLang) {
-      return res.status(400).json({ 
-        error: "Source and target language parameters are required" 
+      return res.status(400).json({
+        error: "Source and target language parameters are required"
       });
     }
 
@@ -362,8 +367,8 @@ export const getGlossariesByLanguagePair = async (req, res) => {
     const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 
     if (!storageAccountKey) {
-      return res.status(500).json({ 
-        error: "Azure Blob Storage account key not configured" 
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
       });
     }
 
@@ -391,7 +396,7 @@ export const getGlossariesByLanguagePair = async (req, res) => {
           languagePair: `${metadata.sourceLang}-${metadata.targetLang}`
         };
       })
-      .filter(glossary => 
+      .filter(glossary =>
         glossary &&
         glossary.sourceLanguage.toLowerCase() === sourceLang.toLowerCase() &&
         glossary.targetLanguage.toLowerCase() === targetLang.toLowerCase()
@@ -423,8 +428,8 @@ export const deleteGlossary = async (req, res) => {
     const { blobName } = req.query;
 
     if (!blobName) {
-      return res.status(400).json({ 
-        error: "blobName parameter is required" 
+      return res.status(400).json({
+        error: "blobName parameter is required"
       });
     }
 
@@ -432,8 +437,8 @@ export const deleteGlossary = async (req, res) => {
     const storageAccountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
 
     if (!storageAccountKey) {
-      return res.status(500).json({ 
-        error: "Azure Blob Storage account key not configured" 
+      return res.status(500).json({
+        error: "Azure Blob Storage account key not configured"
       });
     }
 
@@ -506,8 +511,8 @@ export const getGlossaryUrlEndpoint = async (req, res) => {
     const expiresInHours = parseInt(req.query.expiresInHours) || 24;
 
     if (!blobName) {
-      return res.status(400).json({ 
-        error: "blobName parameter is required" 
+      return res.status(400).json({
+        error: "blobName parameter is required"
       });
     }
 
@@ -771,62 +776,45 @@ export const addEntriesToGlossary = async (req, res) => {
     let targetBlobName = blobName;
 
     if (blobName) {
-      // Use provided blob name
       existingGlossary = { blobName: blobName };
     } else {
-      // Find by language pair
       existingGlossary = await findGlossaryByLanguagePair(
         sourceLanguage.toLowerCase(),
-        targetLanguage.toLowerCase(),
-        storageAccountName,
-        storageAccountKey
+        targetLanguage.toLowerCase()
       );
       if (existingGlossary) {
         targetBlobName = existingGlossary.blobName;
       }
     }
 
-    // Get existing entries if glossary exists
+    // Get existing entries
     let existingEntries = [];
-    if (existingGlossary) {
-      try {
-        // Download existing glossary
-        const existingBuffer = await readBlobContent(
-          GLOSSARY_CONTAINER,
-          blobName,
-          storageAccountName,
-          storageAccountKey
-        );
-
-        // Parse existing TSV entries
-        existingEntries = await parseGlossaryFile(existingBuffer, 'tsv');
-        console.log(`Found existing glossary ${blobName} with ${existingEntries.length} entries.Merging...`);
-      } catch (error) {
-        // File doesn't exist yet, that's fine. We will create it.
-        console.log(`Creating new glossary master file: ${blobName}`);
-        // If we can't read it, treat as new glossary
-        // existingGlossary = null;
-        // existingEntries = [];
-      }
+    try {
+      const existingBuffer = await readBlobContent(
+        GLOSSARY_CONTAINER,
+        targetBlobName,
+        storageAccountName,
+        storageAccountKey
+      );
+      existingEntries = await parseGlossaryFile(existingBuffer, 'tsv');
+    } catch (error) {
+      console.log(`Glossary ${targetBlobName} not found or empty. Creating new.`);
     }
 
-    // Expand new entries with case variations (includes plural forms)
-    const expandedNewEntries = expandEntriesWithCaseVariations(variations.entries);
-    // console.log(`Expanded ${entries.length} new entries to ${expandedNewEntries.length} entries with case variations and plural forms`);
+    // Expand New Entries
+    const expandedNewEntries = expandEntriesWithCaseVariations(entries);
 
-    // Merge entries - ignore duplicates, just append all new entries
-    const AlldEntries = [...existingEntries, ...expandedNewEntries];
-    const addedVariations = expandedNewEntries;
+    // Merge entries
+    const mergedEntries = [...existingEntries, ...expandedNewEntries];
 
-    // Convert merged entries to TSV
-    const tsvContent = AlldEntries
+    // Convert to TSV
+    const tsvContent = mergedEntries
       .map(e => `${e.source}\t${e.target}`)
       .join('\n');
     const tsvBuffer = Buffer.from(tsvContent, 'utf-8');
 
-    // Upload updated TSV
-    if (existingGlossary) {
-      // Update existing glossary
+    // Upload
+    if (existingEntries.length > 0) {
       await updateBlobContent(
         GLOSSARY_CONTAINER,
         targetBlobName,
@@ -834,14 +822,11 @@ export const addEntriesToGlossary = async (req, res) => {
         storageAccountName,
         storageAccountKey
       );
-      console.log(`Updated glossary ${targetBlobName} with ${mergedEntries.length} total entries`);
     } else {
-      // Create new glossary
-      targetBlobName = generateGlossaryBlobName(
-        sourceLanguage.toLowerCase(),
-        targetLanguage.toLowerCase(),
-        'tsv'
-      );
+      // If targetBlobName was just generated but didn't exist, we might need to ensure it's set correctly
+      if (!targetBlobName) {
+        targetBlobName = generateGlossaryBlobName(sourceLanguage.toLowerCase(), targetLanguage.toLowerCase(), 'tsv');
+      }
       await uploadFileToBlob(
         tsvBuffer,
         targetBlobName,
@@ -849,31 +834,299 @@ export const addEntriesToGlossary = async (req, res) => {
         storageAccountName,
         storageAccountKey
       );
-      console.log(`Created new glossary ${targetBlobName} with ${mergedEntries.length} entries`);
     }
 
-    // Return response
     return res.status(200).json({
       success: true,
-      message: existingGlossary 
-        ? `Added ${addedVariations.length} entries to existing glossary`
-        : `Created new glossary with ${addedVariations.length} entries`,
+      message: `Updated glossary ${targetBlobName}`,
       glossary: {
         blobName: targetBlobName,
         sourceLanguage: sourceLanguage.toLowerCase(),
         targetLanguage: targetLanguage.toLowerCase(),
         totalEntries: mergedEntries.length,
-        addedEntries: addedVariations.length
-      },
-      addedVariations: addedVariations.slice(0, 50) // Limit to first 50 for response size
+        addedEntries: expandedNewEntries.length
+      }
     });
 
   } catch (error) {
-    console.error("Add entries to glossary error:", error);
+    console.error("Add entries error:", error);
     return res.status(500).json({
-      error: "Failed to add entries to glossary",
+      error: "Failed to add entries",
       details: error.message
     });
   }
 };
+
+/**
+ * Align Source and Target Content for Editor
+ * POST /api/glossaries/align
+ */
+export const alignContent = async (req, res) => {
+  try {
+    const { sourceFile, targetFile, sourceText: rawSource, targetText: rawTarget, sourceLang, targetLang } = req.body;
+
+    // 1. If raw text provided (e.g. for txt/md files), use it.
+    let sText = rawSource;
+    let tText = rawTarget;
+
+    // 2. If file info provided (for PDF/Doc), download and extract text
+    if ((!sText || !tText) && (sourceFile && targetFile)) {
+      console.log("Aligning files from storage:", sourceFile.name, targetFile.name);
+
+      // Helper to read text (handles PDF and plain text)
+      const readTextFromPath = async (filePath) => {
+        const ext = path.extname(filePath).toLowerCase();
+        if (ext === '.pdf') {
+          const buffer = await fs.promises.readFile(filePath);
+          const data = await pdf(buffer);
+          return data.text;
+        } else {
+          return await fs.promises.readFile(filePath, 'utf-8');
+        }
+      };
+
+      // Helper to extract text from a blob stream
+      const extractText = async (container, fileName) => {
+        const tempPath = path.join(process.cwd(), 'temp', `${Date.now()}_${fileName}`);
+
+        // Correct usage: downloadBlobByName returns a buffer
+        const buffer = await downloadBlobByName(container, fileName,
+          process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage",
+          process.env.AZURE_STORAGE_ACCOUNT_KEY
+        );
+
+        // Explicitly write buffer to tempPath
+        await fs.promises.writeFile(tempPath, buffer);
+
+        // Use existing helper
+        const text = await readTextFromPath(tempPath);
+
+        // Cleanup async
+        fs.unlink(tempPath, (err) => { if (err) console.error("Cleanup error:", err) });
+        return text;
+      };
+
+      // Ensure temp dir exists
+      const tempDir = path.join(process.cwd(), 'temp');
+      if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+      if (!sText && sourceFile) sText = await extractText(sourceFile.container || "inputdocuments", sourceFile.originalName);
+      if (!tText && targetFile) tText = await extractText(targetFile.container || "documentstraslated", targetFile.originalName);
+    }
+
+    if (!sText || !tText) return res.status(400).json({ error: "Missing text content or valid file references" });
+
+    const alignments = await alignText(sText, tText, sourceLang || 'en', targetLang || 'km');
+
+    // Map response to match frontend expectation (source/target instead of source/target)
+    // The alignText returns {id, source, target}. Editor expects array of these.
+    res.json({ success: true, alignment: alignments });
+  } catch (error) {
+    console.error("Align Content Error:", error);
+    res.status(500).json({ error: "Alignment failed: " + error.message });
+  }
+};
+
+/**
+ * Submit User Correction Feedback
+ * POST /api/glossaries/feedback
+ */
+export const submitCorrection = async (req, res) => {
+  console.log("DEBUG: submitCorrection called with body:", req.body);
+  try {
+    const { sourceSegment, newTarget, sourceLang, targetLang, project } = req.body;
+    const evaluation = await evaluateCorrection(sourceSegment, newTarget, sourceLang, targetLang);
+    console.log("DEBUG: Evaluation Result:", JSON.stringify(evaluation, null, 2));
+
+    if (evaluation.shouldAddToGlossary && evaluation.term) {
+      console.log("Auto-learning term:", evaluation.term);
+
+      // Check if term already exists to avoid duplicates
+      const existingTerm = await GlossaryTerm.findOne({
+        sourceLang: sourceLang,
+        targetLang: targetLang,
+        source: evaluation.term.source
+      });
+
+      if (!existingTerm) {
+        const newTerm = new GlossaryTerm({
+          source: evaluation.term.source,
+          target: evaluation.term.target,
+          sourceLang: sourceLang,
+          targetLang: targetLang,
+          project: project || "UserCorrection",
+          domain: "General", // Could be inferred
+          verificationStatus: "verified", // Auto-verify for now or 'pending'
+          createdBy: "agent-learning",
+          metadata: {
+            context: sourceSegment,
+            confidenceScore: 0.95
+          }
+        });
+
+        await newTerm.save();
+        console.log("Term saved to MongoDB:", newTerm);
+      } else {
+        console.log("Term already exists:", existingTerm);
+      }
+    }
+
+    res.json({ success: true, evaluation });
+  } catch (error) {
+    console.error("Feedback Error:", error);
+    res.status(500).json({ error: "Feedback processing failed" });
+  }
+};
+
+/**
+ * Learn Glossary Terms from Parallel Documents
+ * POST /api/glossaries/learn
+ * 
+ * Takes source + target documents (or text) and extracts ALL glossary terms
+ * using Azure OpenAI, then bulk-saves them to MongoDB.
+ */
+export const learnFromDocument = async (req, res) => {
+  try {
+    const {
+      sourceText,
+      targetText,
+      sourceLang,
+      targetLang,
+      project,
+      domain,
+      sourceFile,
+      targetFile
+    } = req.body;
+
+    console.log("Learning from document:", { project, sourceLang, targetLang, domain });
+
+    let sText = sourceText;
+    let tText = targetText;
+
+    // If file references provided, extract text from files
+    if ((!sText || !tText) && (sourceFile && targetFile)) {
+      console.log("Extracting text from files:", sourceFile.name, targetFile.name);
+
+      // Helper to read text (handles PDF and plain text)
+      const readTextFromPath = async (filePath) => {
+        const ext = path.extname(filePath).toLowerCase();
+        if (ext === '.pdf') {
+          const buffer = await fs.promises.readFile(filePath);
+          const data = await pdf(buffer);
+          return data.text;
+        } else {
+          return await fs.promises.readFile(filePath, 'utf-8');
+        }
+      };
+
+      // Helper to extract text from a blob stream
+      const extractText = async (container, fileName) => {
+        const tempDir = path.join(process.cwd(), 'temp');
+        if (!fs.existsSync(tempDir)) fs.mkdirSync(tempDir);
+
+        const tempPath = path.join(tempDir, `${Date.now()}_${fileName}`);
+
+        const buffer = await downloadBlobByName(container, fileName,
+          process.env.AZURE_STORAGE_ACCOUNT_NAME || "sophystorage",
+          process.env.AZURE_STORAGE_ACCOUNT_KEY
+        );
+
+        await fs.promises.writeFile(tempPath, buffer);
+        const text = await readTextFromPath(tempPath);
+
+        fs.unlink(tempPath, (err) => { if (err) console.error("Cleanup error:", err) });
+        return text;
+      };
+
+      if (!sText && sourceFile) sText = await extractText(sourceFile.container || "inputdocuments", sourceFile.originalName);
+      if (!tText && targetFile) tText = await extractText(targetFile.container || "documentstraslated", targetFile.originalName);
+    }
+
+    if (!sText || !tText) {
+      return res.status(400).json({ error: "Missing source or target text content" });
+    }
+
+    // Extract glossary terms using Azure OpenAI
+    console.log("Calling extractGlossaryTerms...");
+    const terms = await extractGlossaryTerms(sText, tText, sourceLang || 'en', targetLang || 'km');
+
+    if (!terms || terms.length === 0) {
+      return res.json({ success: true, message: "No significant terms found", termsAdded: 0 });
+    }
+
+    // Bulk insert/upsert terms to MongoDB
+    let addedCount = 0;
+    let skippedCount = 0;
+
+    for (const term of terms) {
+      if (!term.source || !term.target) continue;
+
+      try {
+        // Check for duplicates
+        const exists = await GlossaryTerm.findOne({
+          sourceLang: sourceLang || 'en',
+          targetLang: targetLang || 'km',
+          source: term.source.trim()
+        });
+
+        if (exists) {
+          // If the target has changed, update it
+          if (exists.target !== term.target.trim()) {
+            console.log(`Updating term: ${term.source} | Old: ${exists.target} -> New: ${term.target.trim()}`);
+            exists.target = term.target.trim();
+            exists.domain = domain || exists.domain;
+            exists.project = project || exists.project;
+            exists.updatedBy = "agent-bulk-learning-update";
+            await exists.save();
+            addedCount++;
+          } else {
+            skippedCount++;
+          }
+          continue;
+        }
+
+        // Insert new term
+        const newTerm = new GlossaryTerm({
+          source: term.source.trim(),
+          target: term.target.trim(),
+          sourceLang: sourceLang || 'en',
+          targetLang: targetLang || 'km',
+          project: project || "General",
+          domain: domain || "General",
+          verificationStatus: "verified",
+          createdBy: "agent-bulk-learning",
+          metadata: {
+            confidenceScore: 0.85
+          }
+        });
+
+        await newTerm.save();
+        addedCount++;
+        console.log("Term saved:", term.source, "->", term.target);
+      } catch (saveError) {
+        if (saveError.code === 11000) {
+          // Duplicate key error - skip
+          skippedCount++;
+        } else {
+          console.error("Error saving term:", saveError.message);
+        }
+      }
+    }
+
+    console.log(`Learning complete: ${addedCount} terms added, ${skippedCount} duplicates skipped.`);
+
+    res.json({
+      success: true,
+      termsExtracted: terms.length,
+      termsAdded: addedCount,
+      termsSkipped: skippedCount,
+      terms: terms.slice(0, 10) // Return first 10 for preview
+    });
+
+  } catch (error) {
+    console.error("Learn From Document Error:", error);
+    res.status(500).json({ error: "Learning failed: " + error.message });
+  }
+};
+
 

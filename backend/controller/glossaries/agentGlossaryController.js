@@ -1,6 +1,5 @@
 import fs from "fs";
 import path from "path";
-import { PDFParse } from "pdf-parse"; // Note: Ensure this import matches your installed package (e.g. 'pdf-parse')
 import dotenv from "dotenv";
 import { Command } from "commander";
 import { AzureOpenAI } from "openai";
@@ -145,33 +144,230 @@ ${targetText.substring(0, MAX_CHARS_PER_DOC)}
         // 5. Save Output
         fs.writeFileSync(outputFile, glossaryData, "utf-8");
         console.log(`✅ Success! Glossary saved to: ${outputFile}`);
-
-        // For integration, we could also log the JSON result
-        // console.log(JSON.stringify({ status: "success", outputFile }));
-
     } catch (error) {
         console.error("Azure OpenAI Error:", error);
         throw error;
     }
 }
 
-// CLI Setup
-const program = new Command();
-program
-    .name("createGlossary")
-    .description("CLI to create a glossary from source and target files using Azure AI")
-    .argument("<sourceFile>", "Path to Source File (PDF/TXT)")
-    .argument("<sourceLang>", "Source Language Name")
-    .argument("<targetFile>", "Path to Target File (PDF/TXT)")
-    .argument("<targetLang>", "Target Language Name")
-    .argument("<outputFile>", "Path to Output TSV File")
-    .action(async (sourceFile, sourceLang, targetFile, targetLang, outputFile) => {
-        try {
-            await createGlossary(sourceFile, sourceLang, targetFile, targetLang, outputFile);
-        } catch (err) {
-            console.error("Failed:", err.message);
-            process.exit(1);
-        }
+function getAzureClient() {
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const apiKey = process.env.AZURE_OPENAI_KEY;
+    const deployment = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+    const apiVersion = process.env.AZURE_OPENAI_API_VERSION || "2024-12-01-preview";
+
+    if (!endpoint || !apiKey || !deployment) {
+        throw new Error("Missing Azure OpenAI config. Check your .env file.");
+    }
+
+    const client = new AzureOpenAI({
+        endpoint: endpoint,
+        apiKey: apiKey,
+        apiVersion: apiVersion,
+        deployment: deployment
     });
 
-program.parse(process.argv);
+    return { client, deployment };
+}
+
+/**
+ * Aligns source and target text sentence-by-sentence.
+ * @param {string} sourceText 
+ * @param {string} targetText 
+ * @param {string} sourceLang 
+ * @param {string} targetLang 
+ * @returns {Promise<Array<{id: number, source: string, target: string}>>}
+ */
+export async function alignText(sourceText, targetText, sourceLang, targetLang) {
+    const { client, deployment } = getAzureClient();
+
+    const systemPrompt = `
+You are a linguistic alignment engine.
+Task: Align the provided Source Text with the Target Text sentence-by-sentence.
+Input: Two blocks of text.
+Output: A JSON array of objects, where each object has 'id', 'source', and 'target'.
+Rules: 
+- Ensure the meaning matches. 
+- If a sentence is missing in one side, leave it empty.
+- Do not summarize. strictly align actual sentences.
+- Return ONLY JSON.
+    `;
+
+    const userPrompt = `
+Source Language: ${sourceLang}
+Target Language: ${targetLang}
+
+[SOURCE TEXT]
+${sourceText.substring(0, 10000)}
+
+[TARGET TEXT]
+${targetText.substring(0, 10000)}
+    `;
+
+    try {
+        const completion = await client.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            model: deployment,
+            response_format: { type: "json_object" },
+            temperature: 0.1,
+        });
+
+        let content = completion.choices[0].message.content;
+        const result = JSON.parse(content);
+        // Handle cases where AI might wrap it in a root key like "alignments"
+        if (result.alignments) return result.alignments;
+        if (Array.isArray(result)) return result;
+        // Fallback: try to find an array in values
+        const values = Object.values(result);
+        for (const v of values) {
+            if (Array.isArray(v)) return v;
+        }
+        return [];
+    } catch (error) {
+        console.error("Alignment Error:", error);
+        return [];
+    }
+}
+
+/**
+ * Evaluates a user correction to determine if it should be added to the glossary.
+ * @param {string} sourceSegment 
+ * @param {string} newTargetSegment 
+ * @param {string} sourceLang 
+ * @param {string} targetLang 
+ * @returns {Promise<{shouldAddToGlossary: boolean, term: {source: string, target: string}, reason: string}>}
+ */
+export async function evaluateCorrection(sourceSegment, newTargetSegment, sourceLang, targetLang) {
+    const { client, deployment } = getAzureClient();
+
+    const systemPrompt = `
+You are a glossary curator.
+A user has manually corrected a translation.
+Task: Identify if there is a specific Terminology pair that motivated this change.
+Logic:
+- If the change fixes a typo or grammar, return shouldAddToGlossary: false.
+- If the change replaces a word with a better domain-specific term, return shouldAddToGlossary: true and extract the term.
+- Extracted term must be in base form (singular, infinitive).
+
+Output JSON format:
+{
+    "shouldAddToGlossary": boolean,
+    "term": { "source": "extracted source term", "target": "extracted target term" },
+    "reason": "explanation"
+}
+    `;
+
+    const userPrompt = `
+Source Segment: "${sourceSegment}"
+User Corrected Target: "${newTargetSegment}"
+Language Pair: ${sourceLang} -> ${targetLang}
+    `;
+
+    try {
+        const completion = await client.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            model: deployment,
+            response_format: { type: "json_object" },
+            temperature: 0.1,
+        });
+
+        return JSON.parse(completion.choices[0].message.content);
+    } catch (error) {
+        console.error("Evaluation Error:", error);
+        return { shouldAddToGlossary: false, reason: error.message };
+    }
+}
+
+/**
+ * Extracts ALL glossary terms from parallel source/target documents.
+ * This is the BULK extraction mode - processes entire documents.
+ * @param {string} sourceText - Full source document text
+ * @param {string} targetText - Full target document text (user-edited)
+ * @param {string} sourceLang - Source language code (e.g., 'en')
+ * @param {string} targetLang - Target language code (e.g., 'km')
+ * @returns {Promise<Array<{source: string, target: string}>>} - Array of term pairs
+ */
+export async function extractGlossaryTerms(sourceText, targetText, sourceLang, targetLang) {
+    const { client, deployment } = getAzureClient();
+
+    const systemPrompt = `
+You are an expert terminologist for ${targetLang} localization.
+Your goal is to extract ALL glossary term pairs from the provided parallel texts.
+
+Criteria for selecting terms:
+1. Technical/Domain-Specific: Include words that have a specialized meaning in this context.
+2. Recurring Entities: Include product names, feature names, or repeated key concepts.
+3. Idioms and Phrases: Include expressions where the translation is not literal.
+4. Exclude Common Words: Do not include common verbs/nouns unless they have specialized meaning.
+
+Output JSON format:
+{
+    "terms": [
+        { "source": "English term", "target": "Khmer translation" },
+        { "source": "Another term", "target": "ការបកប្រែ" }
+    ]
+}
+
+Extract 10-50 high-quality term pairs. Focus on accuracy over quantity.
+    `;
+
+    const userPrompt = `
+[SOURCE DOCUMENT - ${sourceLang}]
+${sourceText.substring(0, MAX_CHARS_PER_DOC)}
+
+[TARGET DOCUMENT - ${targetLang}]
+${targetText.substring(0, MAX_CHARS_PER_DOC)}
+    `;
+
+    try {
+        console.log("Extracting glossary terms from parallel documents...");
+        const completion = await client.chat.completions.create({
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: userPrompt }
+            ],
+            model: deployment,
+            response_format: { type: "json_object" },
+            max_tokens: 4000,
+            temperature: 0.2,
+        });
+
+        const result = JSON.parse(completion.choices[0].message.content);
+        console.log(`Extracted ${result.terms?.length || 0} glossary terms.`);
+        return result.terms || [];
+    } catch (error) {
+        console.error("Glossary Extraction Error:", error);
+        return [];
+    }
+}
+
+import { fileURLToPath } from 'url';
+
+// CLI Setup (Only run if executed directly)
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+    const program = new Command();
+    program
+        .name("createGlossary")
+        .description("CLI to create a glossary from source and target files using Azure AI")
+        .argument("<sourceFile>", "Path to Source File (PDF/TXT)")
+        .argument("<sourceLang>", "Source Language Name")
+        .argument("<targetFile>", "Path to Target File (PDF/TXT)")
+        .argument("<targetLang>", "Target Language Name")
+        .argument("<outputFile>", "Path to Output TSV File")
+        .action(async (sourceFile, sourceLang, targetFile, targetLang, outputFile) => {
+            try {
+                await createGlossary(sourceFile, sourceLang, targetFile, targetLang, outputFile);
+            } catch (err) {
+                console.error("Failed:", err.message);
+                process.exit(1);
+            }
+        });
+
+    program.parse(process.argv);
+}

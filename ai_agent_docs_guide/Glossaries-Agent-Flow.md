@@ -86,7 +86,7 @@ We will stop using  filess and start using a **Database**.
 **The dynamics way**:
 
 * we create **ONE MongoDB Collection** called `GlossaryTerms`.
-Columns : `SourceWord`, `TargetWord`,`LangPair`(e.g., 'en-km'),`Domain`(e.g., 'Engineering','Building','')
+Columns : `SourceWord`, `TargetWord`,`LangPair`(e.g., 'en-km'),`Domain`(e.g., 'Engineering','Building',''), and Project Name (title of the document).
 
 * **Merge**: When the bulk scan finishes, we import all 100 TSVs into this ONE table.
 * **Purge**: If 50 files contian "hello" -> "ជំរាបសួរ"​ we need store only once.

@@ -2,7 +2,7 @@ import fs from 'fs';
 import { createRequire } from 'module';
 
 const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+const pdfParse = require('pdf-extraction');
 const mammoth = require('mammoth');
 
 /**
@@ -15,13 +15,11 @@ export const countDocumentCharacters = async (fileBuffer, fileName) => {
 
     switch (ext) {
       case 'pdf':
-        // Dynamic import for CommonJS module
-        const pdfParseModule = await import('pdf-parse');
-        const pdfParse = pdfParseModule.default || pdfParseModule;
+        // Use static require (dynamic import optional but keeping simple)
         const pdfData = await pdfParse(fileBuffer);
         text = pdfData.text;
         break;
-      
+
       case 'docx':
         // Dynamic import for CommonJS module
         const mammothModule = await import('mammoth');
@@ -29,7 +27,7 @@ export const countDocumentCharacters = async (fileBuffer, fileName) => {
         const docxResult = await mammoth.extractRawText({ buffer: fileBuffer });
         text = docxResult.value;
         break;
-      
+
       case 'doc':
         // DOC files require different handling (could use antiword or similar)
         // For now, return approximate based on file size
@@ -38,13 +36,13 @@ export const countDocumentCharacters = async (fileBuffer, fileName) => {
           estimated: true,
           message: 'Character count for .doc files is estimated'
         };
-      
+
       case 'txt':
       case 'html':
       case 'xml':
         text = fileBuffer.toString('utf-8');
         break;
-      
+
       case 'xlsx':
       case 'xls':
       case 'pptx':
@@ -55,7 +53,7 @@ export const countDocumentCharacters = async (fileBuffer, fileName) => {
           estimated: true,
           message: 'Character count for spreadsheet/presentation files is estimated'
         };
-      
+
       default:
         // Default: estimate based on file size
         return {

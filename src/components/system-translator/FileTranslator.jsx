@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
-import { ArrowRightLeft, X, Loader2 } from "lucide-react";
+import { Upload, FileText, Check, AlertCircle, RefreshCw, Globe, ChevronRight, ArrowRightLeft, BookOpen, Download, Edit2, X, Loader2 } from "lucide-react";
+import TranslationEditor from './TranslationEditor';
 import LanguageSelector from "./LanguageSelector";
 import GlossarySelector from "./glossaries/GlossarySelector";
 import { API_BASE_URL } from "../../../config";
@@ -24,11 +25,13 @@ export default function FileTranslator() {
   const [selectedBlobFiles, setSelectedBlobFiles] = useState([]) // Files selected from blob storage
   const [translationResult, setTranslationResult] = useState(null) // New state for storing translation results
   const [targetLanguage, setTargetLanguage] = useState("km")
+  const [selectedLanguagePair, setSelectedLanguagePair] = useState('en-km');
+  const [editorState, setEditorState] = useState(null); // { sourceFile, targetFile, sourceLang, targetLang } // Change from "en" to "auto"
   const [sourceLanguage, setSourceLanguage] = useState("auto") // Change from "en" to "auto"
   const [isLoading, setIsLoading] = useState(false)
-  const [dragActive,setDragActive] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
   const [error, setError] = useState("")
-  const [success,setSuccess] = useState("")
+  const [success, setSuccess] = useState("")
   const [progress, setProgress] = useState("")
   const [activeTab, setActiveTab] = useState("upload")
   const [blobFiles, setBlobFiles] = useState({ source: [], target: [] })
@@ -38,6 +41,7 @@ export default function FileTranslator() {
   const [estimatedCost, setEstimatedCost] = useState(null);
   const [countingCharacters, setCountingCharacters] = useState(false);
   const [selectedGlossary, setSelectedGlossary] = useState(null);
+  const [domain, setDomain] = useState("General");
 
   // Load files from blob storage
   const loadBlobFiles = async () => {
@@ -147,7 +151,7 @@ export default function FileTranslator() {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/api/translate-files/delete?container=${container}&fileName=${encodeURIComponent(fileName)}`,
+        `${API_BASE_URL} /api/translate - files / delete? container = ${container}& fileName=${encodeURIComponent(fileName)} `,
         { method: "DELETE" }
       )
 
@@ -155,11 +159,11 @@ export default function FileTranslator() {
         throw new Error("Delete failed")
       }
 
-      setSuccess(`Deleted: ${fileName}`)
+      setSuccess(`Deleted: ${fileName} `)
       setTimeout(() => setSuccess(""), 3000)
       loadBlobFiles() // Reload files
     } catch (err) {
-      setError(`Failed to delete ${fileName}: ${err.message}`)
+      setError(`Failed to delete ${fileName}: ${err.message} `)
     }
   }
 
@@ -216,7 +220,7 @@ export default function FileTranslator() {
   const getLanguagePairDisplay = (translatedFilename, defaultSource = "en") => {
     const targetLang = extractLanguageCode(translatedFilename);
     if (targetLang) {
-      return `${defaultSource}→${targetLang}`;
+      return `${defaultSource}→${targetLang} `;
     }
     return "";
   };
@@ -306,6 +310,44 @@ export default function FileTranslator() {
     });
   };
 
+  // Helper to find remote source candidate for a local source file
+  const getRemoteSourceCandidate = (sourceFile, sourceBlobs) => {
+    // If it already has a container, it's a blob.
+    if (sourceFile.container) return sourceFile;
+
+    const localName = sourceFile.name; // Browser File object has .name
+    if (!localName) return null;
+
+    // Backend sanitize logic approximation:
+    // It replaces special chars with _.
+    // And prepends a UUID.
+    const normalize = (str) => str.replace(/[^a-zA-Z0-9._-]/g, "_");
+    const safeName = normalize(localName);
+
+    // Find blobs that contain this name (loosely)
+    const candidates = sourceBlobs.filter(b => {
+      // Check against originalName first if listed (backend now returns it)
+      if (b.originalName && (
+        b.originalName === localName ||
+        b.originalName.endsWith(localName)
+      )) return true;
+
+      return b.name && (
+        b.name.includes(safeName) ||
+        b.name.includes(localName)
+      );
+    });
+
+    // Sort by date descending (newest first)
+    candidates.sort((a, b) => {
+      const dateA = new Date(a.lastModified).getTime();
+      const dateB = new Date(b.lastModified).getTime();
+      return dateB - dateA;
+    });
+
+    return candidates.length > 0 ? candidates[0] : null;
+  };
+
   const downloadBlobFile = async (container, fileName) => {
     try {
       const response = await fetch(
@@ -335,10 +377,10 @@ export default function FileTranslator() {
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
 
-      setSuccess(`Downloaded: ${downloadName}`)
+      setSuccess(`Downloaded: ${downloadName} `)
       setTimeout(() => setSuccess(""), 3000)
     } catch (err) {
-      setError(`Failed to download: ${err.message}`)
+      setError(`Failed to download: ${err.message} `)
     }
   }
 
@@ -360,7 +402,7 @@ export default function FileTranslator() {
       setTimeout(() => window.URL.revokeObjectURL(url), 60000)
 
     } catch (err) {
-      setError(`Failed to open: ${err.message}`)
+      setError(`Failed to open: ${err.message} `)
     }
   }
 
@@ -378,7 +420,7 @@ export default function FileTranslator() {
   const validateFiles = (filesToValidate) => {
     for (const file of filesToValidate) {
       if (!VALID_FILE_TYPES.includes(file.type)) {
-        return `Invalid file type: ${file.name}. Supported: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, HTML, XML`
+        return `Invalid file type: ${file.name}.Supported: PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, HTML, XML`
       }
       if (file.size > MAX_FILE_SIZE) {
         return `File too large: ${file.name}. Maximum size: 50MB`
@@ -452,7 +494,7 @@ export default function FileTranslator() {
       const formData = new FormData();
       files.forEach((file) => formData.append("files", file));
 
-      const response = await fetch(`${API_BASE_URL}/api/translate-files/character-count`, {
+      const response = await fetch(`${API_BASE_URL} /api/translate - files / character - count`, {
         method: "POST",
         body: formData,
       });
@@ -512,6 +554,9 @@ export default function FileTranslator() {
       if (selectedGlossary) {
         formData.append("glossaryBlobName", selectedGlossary)
       }
+
+      // Add domain
+      formData.append("domain", domain)
 
       setProgress("Submitting translation job to Azure...")
 
@@ -623,19 +668,19 @@ export default function FileTranslator() {
       <div className="flex gap-2 border-b translator-border">
         <button
           onClick={() => setActiveTab("upload")}
-          className={`px-4 py-2 font-medium transition-colors ${activeTab === "upload"
+          className={`px - 4 py - 2 font - medium transition - colors ${activeTab === "upload"
             ? "translator-primary-text border-b-2 border-primary"
             : "translator-muted-foreground hover:translator-text-foreground"
-            }`}
+            } `}
         >
           Upload & Translate
         </button>
         <button
           onClick={() => setActiveTab("files")}
-          className={`px-4 py-2 font-medium transition-colors ${activeTab === "files"
+          className={`px - 4 py - 2 font - medium transition - colors ${activeTab === "files"
             ? "translator-primary-text border-b-2 border-primary"
             : "translator-muted-foreground hover:translator-text-foreground"
-            }`}
+            } `}
         >
           My Files
         </button>
@@ -670,7 +715,7 @@ export default function FileTranslator() {
                     setSelectedGlossary(null);
                   }
                 }}
-                className={`p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-gray-500 ${sourceLanguage === 'auto' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                className={`p - 2 rounded - full hover: bg - gray - 100 dark: hover: bg - gray - 700 transition - colors text - gray - 500 ${sourceLanguage === 'auto' ? 'opacity-50 cursor-not-allowed' : ''} `}
                 title="Swap languages"
                 disabled={sourceLanguage === 'auto'}
               >
@@ -700,6 +745,27 @@ export default function FileTranslator() {
               value={selectedGlossary}
               onChange={setSelectedGlossary}
             />
+          </div>
+
+          {/* Domain Selection */}
+          <div className="flex items-center gap-4 mb-4 p-4 translator-card translator-rounded bg-white/50 dark:bg-gray-900/50">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                <span className="text-blue-600 dark:text-blue-400 font-bold text-xs uppercase tracking-wider">Domain</span>
+              </div>
+              <p className="text-xs text-gray-500 hidden md:block">Specialized glossary focus</p>
+            </div>
+            <select
+              value={domain}
+              onChange={(e) => setDomain(e.target.value)}
+              className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-3 py-1.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none flex-1 max-w-xs transition-shadow shadow-sm"
+            >
+              <option value="General">General (Default)</option>
+              <option value="Legal">Legal</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Building">Building</option>
+              <option value="Medical">Medical</option>
+            </select>
           </div>
 
           {/* Main Content Area */}
@@ -798,58 +864,72 @@ export default function FileTranslator() {
                 <div className="grid gap-4">
                   {(() => {
                     return translationResult.sourceFiles.map((sourceFile, idx) => {
-                      const sourceName = sourceFile.name || sourceFile.cleanName || sourceFile.originalName;
-                      const translatedFile = getMostRecentTranslation(sourceFile, blobFiles.target);
+                      const matched = getMostRecentTranslation(sourceFile, blobFiles.target);
+                      const remoteSource = getRemoteSourceCandidate(sourceFile, blobFiles.source);
+                      const isFound = !!matched;
 
                       return (
-                        <div key={idx} className="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-100 dark:border-blue-800">
-                          <div className="flex items-center gap-4 overflow-hidden">
-                            <div className="w-12 h-12 flex items-center justify-center rounded bg-white dark:bg-gray-800 shadow-sm text-blue-500">
-                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                              </svg>
+                        <div key={idx} className="flex items-center justify-between translator-card p-6 rounded-lg translator-border border shadow-sm">
+                          <div className="flex items-center gap-4">
+                            <div className="p-3 bg-blue-50 rounded-lg">
+                              <FileText className="w-6 h-6 text-blue-600" />
                             </div>
-                            <div className="min-w-0">
-                              <h4 className="font-medium text-gray-900 dark:text-gray-100 truncate pr-4">{translatedFile ? translatedFile.cleanName : sourceName}</h4>
-                              <div className="flex items-center gap-2">
-                                {translatedFile ? (
-                                  <span className="text-sm text-green-600 font-medium">Translated</span>
-                                ) : (
-                                  <span className="text-sm text-blue-600 flex items-center gap-1">
-                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                    Finalizing...
-                                  </span>
-                                )}
+                            <div>
+                              <h4 className="font-medium text-gray-900">{sourceFile.name}</h4>
+                              <div className="flex items-center gap-2 text-sm text-gray-500 mt-1">
+                                <span className="flex items-center gap-1">
+                                  {isFound ? (
+                                    <span className="text-green-600 flex items-center gap-1">
+                                      <Check className="w-4 h-4" /> Translated
+                                    </span>
+                                  ) : (
+                                    <span className="flex items-center gap-1">
+                                      <RefreshCw className="w-4 h-4 animate-spin" /> Processing...
+                                    </span>
+                                  )}
+                                </span>
+                                <span>•</span>
+                                <span>{(sourceFile.size / 1024).toFixed(1)} KB</span>
                               </div>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {/* Open Action */}
-                            <button
-                              onClick={() => translatedFile && openBlobFile("documentstraslated", translatedFile.originalName)}
-                              disabled={!translatedFile}
-                              className="px-4 py-2 text-sm font-medium text-blue-600 bg-white border border-blue-200 rounded hover:bg-blue-50 disabled:opacity-50 disabled:cursor-wait"
-                            >
-                              Open translation
-                            </button>
-
-                            {/* Download Action */}
-                            <button
-                              onClick={() => translatedFile && downloadBlobFile("documentstraslated", translatedFile.originalName)}
-                              disabled={!translatedFile}
-                              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-wait"
-                            >
-                              Download result
-                            </button>
-
-                            <button
-                              onClick={handleClear}
-                              className="p-2 text-gray-400 hover:text-gray-600 ml-2"
-                              title="Close"
-                            >
-                              <X size={20} />
-                            </button>
+                            {matched ? (
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => downloadBlobFile(matched.container || "documentstraslated", matched.originalName)}
+                                  className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors border border-gray-200 flex items-center gap-1"
+                                >
+                                  <Download className="w-4 h-4" />
+                                  Download
+                                </button>
+                                <button
+                                  onClick={() => openBlobFile(matched.container || "documentstraslated", matched.originalName)}
+                                  className="px-3 py-1.5 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors border border-blue-200 flex items-center gap-1"
+                                >
+                                  <BookOpen className="w-4 h-4" />
+                                  Open
+                                </button>
+                                {/* AI Editor Button */}
+                                {remoteSource && (
+                                  <button
+                                    onClick={() => setEditorState({
+                                      sourceFile: remoteSource,
+                                      targetFile: matched,
+                                      sourceLang: sourceLanguage === 'auto' ? 'en' : sourceLanguage,
+                                      targetLang: targetLanguage
+                                    })}
+                                    className="px-3 py-1.5 text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-md transition-colors border border-purple-200 flex items-center gap-1"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                    Correct in AI Editor
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-sm text-gray-400 italic">Translating...</span>
+                            )}
                           </div>
                         </div>
                       );
@@ -898,7 +978,7 @@ export default function FileTranslator() {
               disabled={loadingFiles}
               className="text-sm translator-primary-text hover:opacity-80 flex items-center gap-2"
             >
-              <svg className={`h-4 w-4 ${loadingFiles ? "animate-spin" : ""}`} fill="none" viewBox="0 0 24 24">
+              <svg className={`h - 4 w - 4 ${loadingFiles ? "animate-spin" : ""} `} fill="none" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               Refresh
@@ -1083,6 +1163,18 @@ export default function FileTranslator() {
             )}
           </div>
         </div>
+      )}
+      {/* Editor Modal */}
+      {editorState && (
+        <TranslationEditor
+          isOpen={!!editorState}
+          onClose={() => setEditorState(null)}
+          sourceFile={editorState.sourceFile}
+          targetFile={editorState.targetFile}
+          sourceLang={editorState.sourceLang}
+          targetLang={editorState.targetLang}
+          domain={domain}
+        />
       )}
     </div>
   )
