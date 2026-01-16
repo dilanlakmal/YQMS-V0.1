@@ -3,6 +3,14 @@ import {
   UserMain
 } from "../../MongoDB/dbConnectionController.js";
 
+// Helper function to normalize date to midnight UTC
+const normalizeToMidnightUTC = (dateInput) => {
+  const date = new Date(dateInput);
+  return new Date(
+    Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), 0, 0, 0, 0)
+  );
+};
+
 // 1. POST /api/scc/ht-inspection-report
 export const saveHtInspectionReport = async (req, res) => {
   try {
@@ -68,7 +76,7 @@ export const saveHtInspectionReport = async (req, res) => {
     ).padStart(2, "0")}`;
 
     const reportData = {
-      inspectionDate: new Date(inspectionDate), // Store as ISODate
+      inspectionDate: normalizeToMidnightUTC(inspectionDate), // Store as ISODate
       machineNo,
       moNo,
       buyer,
@@ -178,16 +186,11 @@ export const loadHtInspectionReport = async (req, res) => {
       });
     }
 
-    // Convert string date from query to Date object for matching if dates are stored as ISODate
-    // If dates are stored as "MM/DD/YYYY" strings, this query needs adjustment.
-    // Assuming inspectionDate in schema is ISODate
-    const searchDateStart = new Date(inspectionDate);
-    searchDateStart.setHours(0, 0, 0, 0);
-    const searchDateEnd = new Date(inspectionDate);
-    searchDateEnd.setHours(23, 59, 59, 999);
+    // Normalize the search date to midnight UTC for exact matching
+    const normalizedDate = normalizeToMidnightUTC(inspectionDate);
 
     const report = await HTInspectionReport.findOne({
-      inspectionDate: { $gte: searchDateStart, $lte: searchDateEnd },
+      inspectionDate: normalizedDate,
       machineNo,
       moNo,
       color,
