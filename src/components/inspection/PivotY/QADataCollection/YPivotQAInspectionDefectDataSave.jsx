@@ -323,7 +323,10 @@ const transformManualDataFromBackend = (backendManualData) => {
   const manualDataByGroup = {};
 
   (backendManualData || []).forEach((manual) => {
-    const groupId = manual.groupId;
+    const groupId =
+      manual.groupId !== undefined && manual.groupId !== null
+        ? manual.groupId
+        : 0;
     manualDataByGroup[groupId] = {
       remarks: manual.remarks || "",
       images: (manual.images || []).map((img) => ({
@@ -353,28 +356,40 @@ const transformManualDataFromBackend = (backendManualData) => {
 // HELPER: Transform Manual Data to Backend
 // ==============================================================================
 const transformManualDataToBackend = (manualDataByGroup) => {
-  return Object.entries(manualDataByGroup || {}).map(([groupId, data]) => ({
-    groupId: parseInt(groupId) || groupId,
-    remarks: data.remarks || "",
-    images: (data.images || []).map((img) => {
-      const isBase64 =
-        img.imgSrc?.startsWith("data:") ||
-        img.editedImgSrc?.startsWith("data:");
-      const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+  return Object.entries(manualDataByGroup || {}).map(([key, data]) => {
+    // Object keys are strings. Convert back to Number.
+    // Use Number() to safely handle large integers/timestamps
+    let numericGroupId = Number(key);
 
-      return {
-        id: img.id || img.imageId,
-        imageId: img.id || img.imageId,
-        imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
-        imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null,
-        remark: (img.remark || "").slice(0, 100)
-      };
-    }),
-    line: data.line || "",
-    table: data.table || "",
-    color: data.color || "",
-    qcUser: data.qcUser || null
-  }));
+    // 2. If it is NaN (e.g. legacy "general" string), force it to 0
+    if (isNaN(numericGroupId)) {
+      numericGroupId = 0;
+    }
+
+    return {
+      groupId: numericGroupId, // Save as Number
+      remarks: data.remarks || "",
+      images: (data.images || []).map((img) => {
+        // ... (keep existing image logic)
+        const isBase64 =
+          img.imgSrc?.startsWith("data:") ||
+          img.editedImgSrc?.startsWith("data:");
+        const hasExistingUrl = img.imageURL && img.imageURL.startsWith("/");
+
+        return {
+          id: img.id || img.imageId,
+          imageId: img.id || img.imageId,
+          imgSrc: img.editedImgSrc || (isBase64 ? img.imgSrc : null),
+          imageURL: hasExistingUrl && !isBase64 ? img.imageURL : null,
+          remark: (img.remark || "").slice(0, 100)
+        };
+      }),
+      line: data.line || "",
+      table: data.table || "",
+      color: data.color || "",
+      qcUser: data.qcUser || null
+    };
+  });
 };
 
 // ==============================================================================

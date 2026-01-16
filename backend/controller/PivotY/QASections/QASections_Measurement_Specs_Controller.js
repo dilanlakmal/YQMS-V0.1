@@ -4,28 +4,42 @@ import {
 } from "../../MongoDB/dbConnectionController.js";
 import mongoose from "mongoose";
 
-// Get Specs (Check existing -> Fallback to dt_orders)
+// =========================================================================
+// BEFORE WASH FUNCTIONS
+// =========================================================================
+
 export const getQASectionsMeasurementSpecs = async (req, res) => {
   const { moNo } = req.params;
-  const cleanMoNo = moNo.trim(); // Remove leading/trailing spaces
+  const cleanMoNo = moNo.trim();
 
   try {
-    // 1. Check if data already exists in the new QASections collection
-    // We use a case-insensitive regex to find the Order_No
+    // 1. Check if data already exists in the QASections collection
     const existingRecord = await QASectionsMeasurementSpecs.findOne({
       Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") }
     });
 
-    if (existingRecord) {
+    // CRITICAL CHANGE:
+    // Even if existingRecord is found, we ONLY return it if AllBeforeWashSpecs has data.
+    // If AllBeforeWashSpecs is empty (but AllAfterWashSpecs might have data),
+    // we simply skip this block and fall back to DtOrder.
+    if (
+      existingRecord &&
+      existingRecord.AllBeforeWashSpecs &&
+      existingRecord.AllBeforeWashSpecs.length > 0
+    ) {
       return res.status(200).json({
         source: "qa_sections",
-        data: existingRecord
+        data: {
+          Order_No: existingRecord.Order_No,
+          AllBeforeWashSpecs: existingRecord.AllBeforeWashSpecs,
+          selectedBeforeWashSpecs: existingRecord.selectedBeforeWashSpecs || [],
+          isSaveAllBeforeWashSpecs:
+            existingRecord.isSaveAllBeforeWashSpecs || "No"
+        }
       });
     }
 
-    // 2. If not found, fetch raw data from dt_orders
-    // Since 'BeforeWashSpecs' is not in your DtOrderSchema, Mongoose removes it by default.
-    // .lean() returns a plain JavaScript object, bypassing the schema strictness.
+    // 2. FALLBACK: Fetch raw data from dt_orders
     const dtOrderData = await DtOrder.findOne(
       { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
       { BeforeWashSpecs: 1, Order_No: 1, _id: 0 }
@@ -43,12 +57,11 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
     ) {
       return res.status(404).json({
         message:
-          "No 'Before Wash Specs' found for this order. Please upload the Washing Spec Excel file first."
+          "No 'Before Wash Specs' found in Master Data (dt_orders). Please upload the Washing Spec Excel file."
       });
     }
 
-    // 3. Process Data for Frontend
-    // Add unique IDs to the raw data for frontend UI keys/tracking
+    // 3. Process Data for Frontend (Add IDs)
     const processedSpecs = dtOrderData.BeforeWashSpecs.map((spec) => ({
       ...spec,
       id: new mongoose.Types.ObjectId().toString()
@@ -57,19 +70,18 @@ export const getQASectionsMeasurementSpecs = async (req, res) => {
     return res.status(200).json({
       source: "dt_orders",
       data: {
-        Order_No: dtOrderData.Order_No, // Use the correct casing from DB
+        Order_No: dtOrderData.Order_No,
         AllBeforeWashSpecs: processedSpecs,
         selectedBeforeWashSpecs: [],
         isSaveAllBeforeWashSpecs: "No"
       }
     });
   } catch (error) {
-    console.error("Error fetching measurement specs:", error);
+    console.error("Error fetching Before Wash specs:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// Save Specs Selection
 export const saveQASectionsMeasurementSpecs = async (req, res) => {
   const { moNo, allSpecs, selectedSpecs, isSaveAll } = req.body;
 
@@ -80,12 +92,11 @@ export const saveQASectionsMeasurementSpecs = async (req, res) => {
   try {
     const updateData = {
       Order_No: moNo,
-      AllBeforeWashSpecs: allSpecs, // Save the full source list
-      selectedBeforeWashSpecs: selectedSpecs, // Save user selection
+      AllBeforeWashSpecs: allSpecs,
+      selectedBeforeWashSpecs: selectedSpecs,
       isSaveAllBeforeWashSpecs: isSaveAll ? "Yes" : "No"
     };
 
-    // Use upsert: true to create if it doesn't exist, or update if it does
     const result = await QASectionsMeasurementSpecs.findOneAndUpdate(
       { Order_No: moNo },
       { $set: updateData },
@@ -93,18 +104,18 @@ export const saveQASectionsMeasurementSpecs = async (req, res) => {
     );
 
     res.status(200).json({
-      message: "Measurement specs selection saved successfully.",
+      message: "Before Wash specs saved successfully.",
       data: result
     });
   } catch (error) {
-    console.error("Error saving measurement specs:", error);
+    console.error("Error saving Before Wash specs:", error);
     res.status(500).json({ error: error.message });
   }
 };
 
-// -------------------------------------------------------------------------
+// =========================================================================
 // AFTER WASH FUNCTIONS
-// -------------------------------------------------------------------------
+// =========================================================================
 
 export const getQASectionsMeasurementSpecsAW = async (req, res) => {
   const { moNo } = req.params;
@@ -116,7 +127,9 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
       Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") }
     });
 
-    // If record exists AND has AfterWash data populated
+    // CRITICAL CHANGE:
+    // Only return local data if AllAfterWashSpecs is populated.
+    // If only BeforeWash existed in DB, this logic skips and fetches Fresh SizeSpec for AW.
     if (
       existingRecord &&
       existingRecord.AllAfterWashSpecs &&
@@ -132,7 +145,7 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
       });
     }
 
-    // 2. If not found, fetch raw SizeSpec from dt_orders
+    // 2. FALLBACK: Fetch raw SizeSpec from dt_orders
     const dtOrderData = await DtOrder.findOne(
       { Order_No: { $regex: new RegExp(`^${cleanMoNo}$`, "i") } },
       { SizeSpec: 1, Order_No: 1, _id: 0 }
@@ -147,36 +160,28 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
     if (!dtOrderData.SizeSpec || dtOrderData.SizeSpec.length === 0) {
       return res.status(404).json({
         message:
-          "No 'Size Spec' data found for this order in the master order table."
+          "No 'Size Spec' data found for this order in Master Data (dt_orders)."
       });
     }
 
-    // 3. Transform Data (SizeSpec -> Target Schema)
+    // 3. Transform Data (SizeSpec -> QA Section Schema)
     const processedSpecs = dtOrderData.SizeSpec.map((item, index) => {
-      // Transform the Specs array (Dynamic Keys -> Fixed Structure)
       const transformedSpecsValues = [];
 
       if (item.Specs && Array.isArray(item.Specs)) {
         item.Specs.forEach((sizeObj, sIdx) => {
-          // sizeObj looks like { "S": "28" } OR { "S": { "raw": "28", "decimal": 28 } }
           const sizeKey = Object.keys(sizeObj)[0];
-
           if (sizeKey) {
             const rawValue = sizeObj[sizeKey];
-
             let fractionStr = "";
             let decimalVal = 0;
 
-            // 🔍 FIX: Check if the value is an object or a primitive
             if (rawValue && typeof rawValue === "object") {
-              // If it's an object, look for common property names used in your system
               fractionStr =
                 rawValue.raw || rawValue.fraction || rawValue.value || "";
               decimalVal = rawValue.decimal || 0;
             } else {
-              // If it's a string or number, use it directly
               fractionStr = String(rawValue || "");
-              // Simple check: if the string is just a number, parse it, otherwise 0
               decimalVal = !isNaN(parseFloat(fractionStr))
                 ? parseFloat(fractionStr)
                 : 0;
@@ -195,10 +200,9 @@ export const getQASectionsMeasurementSpecsAW = async (req, res) => {
       return {
         id: new mongoose.Types.ObjectId().toString(),
         no: index + 1,
-        kValue: "NA", // Hardcoded as SizeSpec usually doesn't have K values
+        kValue: "NA",
         MeasurementPointEngName: item.EnglishRemark || item.Area || "Unknown",
         MeasurementPointChiName: item.ChineseName || "",
-        // Handle Tolerance Objects
         TolMinus: {
           fraction:
             item.ToleranceMinus?.fraction || String(item.ToleranceMinus || ""),
@@ -236,6 +240,7 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
 
   try {
     const updateData = {
+      Order_No: moNo, // Ensure MO is set for upsert
       AllAfterWashSpecs: allSpecs,
       selectedAfterWashSpecs: selectedSpecs
     };
@@ -247,7 +252,7 @@ export const saveQASectionsMeasurementSpecsAW = async (req, res) => {
     );
 
     res.status(200).json({
-      message: "After Wash specs selection saved successfully.",
+      message: "After Wash specs saved successfully.",
       data: result
     });
   } catch (error) {

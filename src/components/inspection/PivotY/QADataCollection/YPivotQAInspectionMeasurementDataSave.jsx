@@ -61,6 +61,24 @@ const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
   );
 };
 
+// Add this helper at the top of the file
+const blobToBase64 = async (url) => {
+  if (!url || !url.startsWith("blob:")) return url;
+  try {
+    const response = await fetch(url);
+    const blob = await response.blob();
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  } catch (e) {
+    console.error("Error converting blob to base64", e);
+    return null;
+  }
+};
+
 const YPivotQAInspectionMeasurementDataSave = ({
   selectedOrders,
   orderData,
@@ -155,7 +173,7 @@ const YPivotQAInspectionMeasurementDataSave = ({
         return true;
       });
 
-      // --- FIX START: PREVENT DATA WIPE ---
+      // ---PREVENT DATA WIPE ---
       // If childUpdates contains new measurements, use them.
       // If NOT (e.g. during auto-save reset), keep the existing measurements for this stage.
       let measurementsToProcess = childUpdates.savedMeasurements;
@@ -415,31 +433,52 @@ const YPivotQAInspectionMeasurementDataSave = ({
     try {
       const payload = [];
 
-      const processManualImagesForSave = (images) => {
-        return (images || []).map((img) => {
-          let payloadImageURL = null;
-          let payloadImgSrc = null;
-          const imageData = img.editedImgSrc || img.imgSrc || img.url;
+      const processManualImagesForSave = async (images) => {
+        if (!images || images.length === 0) return [];
 
-          if (imageData && imageData.startsWith("data:")) {
-            payloadImgSrc = imageData;
-            payloadImageURL = null;
-          } else if (imageData && imageData.includes(API_BASE_URL)) {
-            payloadImageURL = imageData.replace(API_BASE_URL, "");
-            payloadImgSrc = null;
-          } else {
-            payloadImageURL = imageData;
-            payloadImgSrc = null;
-          }
+        return Promise.all(
+          images.map(async (img) => {
+            let payloadImgSrc = null;
+            let payloadImageURL = null;
 
-          return {
-            id: img.id,
-            imageId: img.id,
-            imageURL: payloadImageURL,
-            imgSrc: payloadImgSrc,
-            remark: img.remark
-          };
-        });
+            // Get the raw source
+            const rawSrc = img.editedImgSrc || img.imgSrc || img.url;
+
+            if (rawSrc) {
+              if (rawSrc.startsWith("blob:")) {
+                // CONVERT BLOB TO BASE64 FOR BACKEND
+                payloadImgSrc = await blobToBase64(rawSrc);
+                payloadImageURL = null; // Clear URL so backend creates new file
+              } else if (rawSrc.startsWith("data:")) {
+                // Already Base64
+                payloadImgSrc = rawSrc;
+                payloadImageURL = null;
+              } else if (rawSrc.includes("/storage/")) {
+                // Existing Server Path - Keep it, Don't send Base64
+                // Strip full domain if present
+                if (rawSrc.startsWith("http")) {
+                  try {
+                    const urlObj = new URL(rawSrc);
+                    payloadImageURL = urlObj.pathname;
+                  } catch (e) {
+                    payloadImageURL = rawSrc;
+                  }
+                } else {
+                  payloadImageURL = rawSrc;
+                }
+                payloadImgSrc = null;
+              }
+            }
+
+            return {
+              id: img.id,
+              imageId: img.id,
+              imageURL: payloadImageURL, // Send relative path if existing
+              imgSrc: payloadImgSrc, // Send Base64 if new/edited
+              remark: img.remark
+            };
+          })
+        );
       };
 
       // Group measurements by groupId for this stage
@@ -452,12 +491,18 @@ const YPivotQAInspectionMeasurementDataSave = ({
       });
 
       // Process each group
-      Object.keys(measurementsByGroup).forEach((groupIdStr) => {
+      // We need to await the image processing
+      const allGroupIdsStr = Object.keys(measurementsByGroup);
+
+      for (const groupIdStr of allGroupIdsStr) {
         const groupMeasurements = measurementsByGroup[groupIdStr];
         const groupId = parseInt(groupIdStr);
 
-        groupMeasurements.forEach((m, index) => {
+        // Process this group's measurements
+        for (let index = 0; index < groupMeasurements.length; index++) {
+          const m = groupMeasurements[index];
           const isFirstInGroup = index === 0;
+
           const cleanMeasurement = {
             ...m,
             allEnabledPcs: Array.from(m.allEnabledPcs || []),
@@ -469,32 +514,42 @@ const YPivotQAInspectionMeasurementDataSave = ({
           if (isFirstInGroup) {
             const groupManualData = manualDataByGroup[groupId];
             if (groupManualData) {
+              // AWAIT THE IMAGE PROCESSING
+              const processedImages = await processManualImagesForSave(
+                groupManualData.images
+              );
+
               cleanMeasurement.manualData = {
                 remarks: groupManualData.remarks,
                 status: groupManualData.status,
-                images: processManualImagesForSave(groupManualData.images)
+                images: processedImages
               };
             }
           } else {
             cleanMeasurement.manualData = null;
           }
           payload.push(cleanMeasurement);
-        });
-      });
+        }
+      }
 
       // Handle groups with only manual data (no measurements)
-      const allGroupIds = Object.keys(manualDataByGroup).map(Number);
+      const allManualGroupIds = Object.keys(manualDataByGroup).map(Number);
       const groupsWithMeasurements = new Set(
         stageMeasurements.map((m) => m.groupId)
       );
 
-      allGroupIds.forEach((groupId) => {
+      for (const groupId of allManualGroupIds) {
         if (!groupsWithMeasurements.has(groupId)) {
           const groupManualData = manualDataByGroup[groupId];
           if (
             groupManualData &&
             (groupManualData.remarks || groupManualData.images?.length > 0)
           ) {
+            // AWAIT THE IMAGE PROCESSING
+            const processedImages = await processManualImagesForSave(
+              groupManualData.images
+            );
+
             payload.push({
               groupId: groupId,
               size: "Manual_Entry",
@@ -512,12 +567,12 @@ const YPivotQAInspectionMeasurementDataSave = ({
               manualData: {
                 remarks: groupManualData.remarks,
                 status: groupManualData.status,
-                images: processManualImagesForSave(groupManualData.images)
+                images: processedImages
               }
             });
           }
         }
-      });
+      }
 
       if (payload.length === 0) {
         setSaving(false);

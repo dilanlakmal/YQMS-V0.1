@@ -72,6 +72,32 @@ const HistoryModal = ({ open, onCancel, report, formatDate, formatTime }) => {
                   {report.buyerStyle || "N/A"}
                 </span>
               </div>
+              <div className="flex flex-wrap items-center gap-2 text-green-600/80 text-[11px] font-bold mt-2">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/40 border border-green-200/50 rounded-lg shadow-sm backdrop-blur-sm">
+                  <span className="text-[12px] uppercase text-green-600/60 tracking-wider">
+                    Customer:
+                  </span>
+                  <span className="text-green-700 text-[12px]">
+                    {report.customer || "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/40 border border-green-200/50 rounded-lg shadow-sm backdrop-blur-sm">
+                  <span className="text-[12px] uppercase text-green-600/60 tracking-wider">
+                    Fabrication:
+                  </span>
+                  <span className="text-green-700 text-[12px]">
+                    {report.fabrication || "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white/40 border border-green-200/50 rounded-lg shadow-sm backdrop-blur-sm">
+                  <span className="text-[12px] uppercase text-green-600/60 tracking-wider">
+                    Color:
+                  </span>
+                  <span className="text-green-700 text-[12px]">
+                    {report.colorName || "N/A"}
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 

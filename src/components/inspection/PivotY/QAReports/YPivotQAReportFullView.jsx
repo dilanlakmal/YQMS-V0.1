@@ -17,6 +17,8 @@ import {
   Camera,
   MessageSquare,
   XCircle,
+  ChevronLeft,
+  ChevronRight,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -36,7 +38,8 @@ import {
   RefreshCw,
   Eye,
   Clock,
-  ClipboardList
+  ClipboardList,
+  FileSpreadsheet
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -62,34 +65,353 @@ import {
   DefectSummaryTable
 } from "../QADataCollection/YPivotQAInspectionDefectSummary";
 
+import DefectLocationSummary from "./DefectLocationSummary";
+
 import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectionBuyerDetermination";
+import { useAuth } from "../../../authentication/AuthContext";
+
+import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
+import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
+import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
+
+import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
 
 // =============================================================================
 // HELPER COMPONENTS
 // =============================================================================
 
-const ImagePreviewModal = ({ src, alt, onClose }) => {
-  if (!src) return null;
+const ImagePreviewModal = ({ images, startIndex = 0, onClose }) => {
+  const [currentIndex, setCurrentIndex] = React.useState(startIndex);
+
+  if (!images || images.length === 0) return null;
+
+  const currentImage = images[currentIndex];
+
+  const resolveUrl = (img) => {
+    // 1. Get the raw path from various possible property names
+    const url = img.url || img.src || img.imageURL;
+
+    if (!url) return "";
+
+    // 2. If it's already a full URL (http/https), return it as is
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+
+    // 3. Otherwise, prepend API_BASE_URL
+    // Clean up slashes to avoid double slash (e.g., base//path)
+    const baseUrl = API_BASE_URL.endsWith("/")
+      ? API_BASE_URL.slice(0, -1)
+      : API_BASE_URL;
+
+    const path = url.startsWith("/") ? url : `/${url}`;
+
+    return `${baseUrl}${path}`;
+  };
+
+  const handleNext = (e) => {
+    e?.stopPropagation();
+    setCurrentIndex((prev) => (prev + 1) % images.length);
+  };
+
+  const handlePrev = (e) => {
+    e?.stopPropagation();
+    setCurrentIndex((prev) => (prev - 1 + images.length) % images.length);
+  };
+
+  // Keyboard navigation
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "ArrowRight") handleNext();
+      if (e.key === "ArrowLeft") handlePrev();
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Helper for Status Badge Color
+  const getStatusColor = (status) => {
+    if (!status) return "bg-gray-500 text-white";
+    const s = status.toLowerCase();
+    if (s === "minor") return "bg-orange-200 text-orange-900 border-orange-300"; // Light Orange
+    if (s === "major") return "bg-red-200 text-red-900 border-red-300"; // Light Red
+    if (s === "critical") return "bg-red-800 text-white border-red-900"; // Dark Red
+    return "bg-gray-500 text-white";
+  };
+
   return (
     <div
-      className="fixed inset-0 z-[150] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm animate-fadeIn"
+      className="fixed inset-0 z-[150] bg-black/95 flex items-center justify-center p-4 backdrop-blur-md animate-fadeIn"
       onClick={onClose}
     >
-      <div className="relative max-w-4xl w-full max-h-[90vh]">
+      <div className="relative w-full h-full flex flex-col items-center justify-center">
+        {/* Close Button */}
         <button
           onClick={onClose}
-          className="absolute -top-4 -right-4 bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition-colors"
+          className="absolute top-4 right-4 z-50 bg-gray-800/50 hover:bg-red-600 text-white rounded-full p-2 transition-colors border border-gray-600 backdrop-blur"
         >
           <XCircle className="w-8 h-8" />
         </button>
-        <img
-          src={src}
-          alt={alt}
-          className="w-full h-full object-contain rounded-lg shadow-2xl"
-        />
-        <p className="text-center text-white/80 mt-2 font-mono text-sm">
-          {alt}
-        </p>
+
+        {/* Navigation Arrows */}
+        {images.length > 1 && (
+          <>
+            <button
+              onClick={handlePrev}
+              className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-black/40 hover:bg-white/10 text-white rounded-full transition-all z-40 border border-white/10 backdrop-blur"
+            >
+              <ChevronLeft className="w-8 h-8" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-black/40 hover:bg-white/10 text-white rounded-full transition-all z-40 border border-white/10 backdrop-blur"
+            >
+              <ChevronRight className="w-8 h-8" />
+            </button>
+          </>
+        )}
+
+        {/* Main Image */}
+        <div
+          className="flex-1 w-full flex items-center justify-center overflow-hidden pb-20"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <img
+            src={resolveUrl(currentImage)}
+            alt={currentImage.defectName || "Preview"}
+            className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl"
+          />
+        </div>
+
+        {/* Footer Bar */}
+        <div
+          className="absolute bottom-6 w-full max-w-5xl px-4"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="bg-gray-900/90 backdrop-blur-xl rounded-2xl border border-gray-700 p-4 shadow-2xl">
+            {/* Grid Layout: Left (Config), Center (Defect), Right (Counter) */}
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+              {/* LEFT: Config Label */}
+              <div className="flex-1 w-full md:w-auto flex justify-start">
+                {currentImage.configLabel ? (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600">
+                    <Layers className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-mono font-bold text-gray-300 uppercase tracking-wide">
+                      {currentImage.configLabel}
+                    </span>
+                  </div>
+                ) : (
+                  <div /> // Spacer
+                )}
+              </div>
+
+              {/* CENTER: Defect Info */}
+              <div className="flex-[2] flex flex-col items-center justify-center text-center">
+                {/* Name + Badges Row */}
+                <div className="flex flex-wrap items-center justify-center gap-2 mb-1">
+                  <h3 className="text-lg font-bold text-white tracking-tight">
+                    {currentImage.isMain === false
+                      ? "Additional Evidence"
+                      : currentImage.defectName || "Image Preview"}
+                  </h3>
+
+                  {/* Position Badge (Inside/Outside) */}
+                  {currentImage.positionType &&
+                    currentImage.positionType !== "N/A" && (
+                      <span
+                        className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded border ${
+                          currentImage.positionType === "Outside"
+                            ? "bg-blue-900/40 text-blue-200 border-blue-700/50"
+                            : "bg-indigo-900/40 text-indigo-200 border-indigo-700/50"
+                        }`}
+                      >
+                        {currentImage.positionType}
+                      </span>
+                    )}
+
+                  {/* Status Badge (Minor/Major/Critical) */}
+                  {currentImage.status && (
+                    <span
+                      className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded border ${getStatusColor(
+                        currentImage.status
+                      )}`}
+                    >
+                      {currentImage.status}
+                    </span>
+                  )}
+                </div>
+
+                {/* Location Text */}
+                {currentImage.locationText && (
+                  <p className="text-sm text-gray-400 font-medium">
+                    ( {currentImage.locationText} )
+                  </p>
+                )}
+              </div>
+
+              {/* RIGHT: Counter */}
+              <div className="flex-1 w-full md:w-auto flex justify-end">
+                {images.length > 1 && (
+                  <div className="px-3 py-1 rounded-full bg-black/40 border border-white/10 text-xs font-mono text-gray-400">
+                    {currentIndex + 1} / {images.length}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// NEW: PRODUCTION STATUS COMPONENTS
+// =============================================================================
+
+const ProgressBar = ({ label, value, colorClass = "bg-blue-500" }) => (
+  <div className="mb-3">
+    <div className="flex justify-between items-center mb-1">
+      <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+        {label}
+      </span>
+      <span className="text-xs font-bold text-gray-800 dark:text-white">
+        {value}%
+      </span>
+    </div>
+    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+      <div
+        className={`h-2 rounded-full ${colorClass} transition-all duration-500`}
+        style={{ width: `${Math.min(value, 100)}%` }}
+      />
+    </div>
+  </div>
+);
+
+const ProductionStatusSection = ({ inspectionDetails }) => {
+  if (!inspectionDetails || !inspectionDetails.qualityPlanEnabled) return null;
+
+  const { productionStatus, packingList } = inspectionDetails;
+
+  // Check if production status has non-zero values
+  const showProduction =
+    productionStatus && Object.values(productionStatus).some((val) => val > 0);
+
+  // Check if packing list has non-zero values
+  const showPacking =
+    packingList && Object.values(packingList).some((val) => val > 0);
+
+  if (!showProduction && !showPacking) return null;
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+      <div className="bg-gradient-to-r from-cyan-600 to-blue-600 px-4 py-2.5 flex items-center gap-2">
+        <ClipboardList className="w-4 h-4 text-white" />
+        <h2 className="text-white font-bold text-sm">
+          Production Status & Packing List
+        </h2>
+      </div>
+
+      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* LEFT: Production Status (Progress Bars) */}
+        {showProduction && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 dark:border-gray-700 pb-2">
+              Production Progress
+            </h3>
+            <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+              <ProgressBar
+                label="Cutting"
+                value={productionStatus.cutting}
+                colorClass="bg-purple-500"
+              />
+              <ProgressBar
+                label="Sewing"
+                value={productionStatus.sewing}
+                colorClass="bg-indigo-500"
+              />
+              <ProgressBar
+                label="Ironing"
+                value={productionStatus.ironing}
+                colorClass="bg-blue-500"
+              />
+              <ProgressBar
+                label="QC2 Checking"
+                value={productionStatus.qc2FinishedChecking}
+                colorClass="bg-teal-500"
+              />
+              <ProgressBar
+                label="Folding"
+                value={productionStatus.folding}
+                colorClass="bg-emerald-500"
+              />
+              <ProgressBar
+                label="Packing"
+                value={productionStatus.packing}
+                colorClass="bg-green-500"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* RIGHT: Packing List (Card Grid) */}
+        {showPacking && (
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 uppercase border-b border-gray-100 dark:border-gray-700 pb-2">
+              Packing List Status
+            </h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
+                <p className="text-[10px] text-blue-500 uppercase font-bold">
+                  Total Cartons
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.totalCartons?.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-100 dark:border-green-800">
+                <p className="text-[10px] text-green-500 uppercase font-bold">
+                  Finished Cartons
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.finishedCartons?.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-100 dark:border-purple-800">
+                <p className="text-[10px] text-purple-500 uppercase font-bold">
+                  Total Pcs
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.totalPcs?.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-100 dark:border-orange-800">
+                <p className="text-[10px] text-orange-500 uppercase font-bold">
+                  Finished Pcs
+                </p>
+                <p className="text-lg font-black text-gray-800 dark:text-gray-100">
+                  {packingList.finishedPcs?.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Optional Summary Text */}
+            <div className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 text-center">
+              <p className="text-xs text-gray-500">
+                Carton Completion:{" "}
+                <span className="font-bold text-gray-800 dark:text-gray-200">
+                  {Math.round(
+                    (packingList.finishedCartons /
+                      (packingList.totalCartons || 1)) *
+                      100
+                  )}
+                  %
+                </span>
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -324,22 +646,23 @@ const SKUDataTable = ({ skuData, orderNo }) => {
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              {/* --- Added specific width w-[40%] to SKU Column --- */}
+              <th className="px-3 py-2 text-left font-bold text-[10px] uppercase w-[40%]">
                 SKU
               </th>
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-left font-bold text-[10px] uppercase">
                 PO Line
               </th>
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-left font-bold text-[10px] uppercase">
                 Color
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
                 ETD
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
                 ETA
               </th>
-              <th className="px-2 py-1.5 text-right font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-right font-bold text-[10px] uppercase">
                 Qty
               </th>
             </tr>
@@ -354,22 +677,23 @@ const SKUDataTable = ({ skuData, orderNo }) => {
                     : "bg-gray-50 dark:bg-gray-800/50"
                 }`}
               >
-                <td className="px-2 py-1.5 font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                {/* --- Added 'font-bold' to ALL cells below --- */}
+                <td className="px-3 py-2 font-bold text-[11px] text-gray-800 dark:text-gray-200 break-all">
                   {sku.sku || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.POLine || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-[11px] text-gray-700 dark:text-gray-300">
+                <td className="px-2 py-2 font-bold text-[11px] text-gray-700 dark:text-gray-300">
                   {sku.Color || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-center text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.ETD || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-center text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.ETA || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-right font-semibold text-[11px] text-emerald-600 dark:text-emerald-400">
+                <td className="px-2 py-2 font-bold text-right text-[11px] text-emerald-600 dark:text-emerald-400">
                   {sku.Qty?.toLocaleString() || 0}
                 </td>
               </tr>
@@ -476,7 +800,7 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
   }
 
   const processedMeasurements = backendMeasurementData
-    .filter((m) => m.size !== "Manual_Entry")
+    //.filter((m) => m.size !== "Manual_Entry")
     .map((m) => ({
       ...m,
       allEnabledPcs: new Set(m.allEnabledPcs || []),
@@ -528,6 +852,7 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
 const YPivotQAReportFullView = () => {
   const { reportId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   // Loading & Error States
   const [loading, setLoading] = useState(true);
@@ -542,6 +867,7 @@ const YPivotQAReportFullView = () => {
     Before: { full: [], selected: [] },
     After: { full: [], selected: [] }
   });
+  const [sizeList, setSizeList] = useState([]);
 
   // UI States
   const [previewImage, setPreviewImage] = useState(null);
@@ -552,11 +878,16 @@ const YPivotQAReportFullView = () => {
     config: true,
     header: true,
     photos: true,
-    measurement: true
+    measurement: true,
+    ppSheet: true
   });
 
   const toggleSection = (key) =>
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  // Permission State
+  const [canViewReportId, setCanViewReportId] = useState(false);
+
+  const [defectHeatmap, setDefectHeatmap] = useState(null);
 
   // =========================================================================
   // FETCH ALL DATA
@@ -662,6 +993,7 @@ const YPivotQAReportFullView = () => {
 
             if (specsRes.data.success) {
               setMeasurementSpecs(specsRes.data.specs); // Save { Before:..., After:... }
+              setSizeList(specsRes.data.sizeList || []);
             }
           } catch (err) {
             console.warn("Could not fetch measurement specs", err);
@@ -679,6 +1011,52 @@ const YPivotQAReportFullView = () => {
 
     fetchAllData();
   }, [reportId]);
+
+  // USEEFFECT FOR PERMISSION CHECK
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (user?.emp_id) {
+        try {
+          const res = await axios.get(
+            `${API_BASE_URL}/api/fincheck-reports/check-permission?empId=${user.emp_id}`
+          );
+          if (res.data && res.data.isAdmin) {
+            setCanViewReportId(true);
+          } else {
+            setCanViewReportId(false);
+          }
+        } catch (error) {
+          console.error("Failed to check permission", error);
+          setCanViewReportId(false);
+        }
+      }
+    };
+    checkPermission();
+  }, [user]);
+
+  // NEW: Fetch Defect Heatmap (Visual Locations)
+  useEffect(() => {
+    const fetchHeatmap = async () => {
+      if (!reportId) return;
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-inspection/report/${reportId}/defect-heatmap`
+        );
+        if (res.data.success) {
+          setDefectHeatmap(res.data.data);
+        }
+      } catch (err) {
+        // It's okay if this fails (e.g., 404 if no map config exists)
+        // Just log nicely and don't set state
+        console.log("No defect location map available or error fetching.");
+      }
+    };
+
+    // Only fetch if we have loaded the report (to ensure it exists)
+    if (report) {
+      fetchHeatmap();
+    }
+  }, [reportId, report]);
 
   // =========================================================================
   // DERIVED DATA
@@ -818,44 +1196,106 @@ const YPivotQAReportFullView = () => {
     [config?.inspectedQty]
   );
 
-  // NEW: Flatten Defect Images for Display
+  // Flatten Defect Images for Display
   const defectImages = useMemo(() => {
     const images = [];
     if (!report?.defectData) return images;
 
+    // 1. Helpers to track sequential counting per Config Group
+    const configCounters = {}; // Stores current max count for a Config: { "Line 30": 2 }
+    const pieceIdMap = {}; // Maps a unique DB ID to a Display ID: { "db_id_123": 1 }
+
+    // Helper function to get the Sequential Display Number
+    const getDisplayPcsNumber = (configKey, uniqueDbId) => {
+      // Create a composite key to ensure uniqueness across report
+      const mapKey = `${configKey}__${uniqueDbId}`;
+      if (pieceIdMap[mapKey]) return pieceIdMap[mapKey]; // Return existing number if we've seen this piece (e.g. for Additional images)
+
+      // Initialize counter for this config if new
+      if (!configCounters[configKey]) configCounters[configKey] = 0;
+
+      // Increment and save
+      configCounters[configKey]++;
+      pieceIdMap[mapKey] = configCounters[configKey];
+      return configCounters[configKey];
+    };
+
     report.defectData.forEach((defect) => {
-      const { defectName, defectCode } = defect;
+      const { defectName } = defect;
+
+      // Config Label
+      const configParts = [
+        defect.lineName ? `Line ${defect.lineName}` : null,
+        defect.tableName ? `Table ${defect.tableName}` : null,
+        defect.colorName ? `Color ${defect.colorName}` : null
+      ].filter(Boolean);
+      const configLabel =
+        configParts.length > 0 ? configParts.join(" • ") : "General";
 
       if (defect.isNoLocation) {
         // No Location Mode
-        defect.images?.forEach((img) => {
+        defect.images?.forEach((img, idx) => {
+          // For No-Location, every image is treated as a new "Piece" finding
+          // We generate a unique ID based on the defect + index
+          const dbUniqueId = `${defect._id}_Gen_${idx}`;
+          const displayNum = getDisplayPcsNumber(configLabel, dbUniqueId);
+
           images.push({
             ...img,
+            uniquePieceId: dbUniqueId,
+            pcsLabel: `Pcs #${displayNum}`,
             defectName,
             locationText: "General",
-            positionType: "N/A"
+            positionType: "N/A",
+            status: defect.status,
+            configLabel: configLabel,
+            isMain: true,
+            // For No-Location, use the root remark
+            comment: defect.additionalRemark || ""
           });
         });
       } else {
         // Location Mode
         defect.locations?.forEach((loc) => {
           loc.positions?.forEach((pos) => {
-            // 1. Required Image
+            const dbUniqueId = `${defect._id}_${loc.locationId}_${pos.pcsNo}`;
+            const displayNum = getDisplayPcsNumber(configLabel, dbUniqueId);
+            const pcsLabel = `Pcs #${displayNum}`;
+
+            // Common props (REMOVED 'comment' from here to prevent bleeding)
+            const commonProps = {
+              uniquePieceId: dbUniqueId,
+              pcsLabel,
+              defectName,
+              locationText: `${loc.locationName} - ${loc.view}`,
+              positionType: pos.position,
+              status: pos.status,
+              configLabel: configLabel
+            };
+
+            // 1. Required (Main) Image
             if (pos.requiredImage) {
+              // Priority: Image-level remark > Position-level remark > Legacy comment
+              const mainRemark =
+                pos.requiredImage.additionalRemark || pos.comment || "";
+
               images.push({
                 ...pos.requiredImage,
-                defectName,
-                locationText: `${loc.locationName} - ${loc.view}`,
-                positionType: pos.position // "Inside" or "Outside"
+                ...commonProps,
+                isMain: true,
+                comment: mainRemark // Specific to Main
               });
             }
+
             // 2. Additional Images
             pos.additionalImages?.forEach((img) => {
+              // If image has no specific comment, use the 'pos.additionalRemark' here
+              const addRemark = img.comment || pos.additionalRemark || "";
               images.push({
                 ...img,
-                defectName,
-                locationText: `${loc.locationName} - ${loc.view}`,
-                positionType: pos.position // "Inside" or "Outside"
+                ...commonProps,
+                isMain: false,
+                comment: addRemark // Specific to Additional
               });
             });
           });
@@ -865,6 +1305,58 @@ const YPivotQAReportFullView = () => {
 
     return images;
   }, [report?.defectData]);
+
+  // =========================================================================
+  // Group Defect Images by Configuration for Display
+  // =========================================================================
+
+  const defectImagesByConfig = useMemo(() => {
+    const groups = {};
+    defectImages.forEach((img) => {
+      const key = img.configLabel;
+      if (!groups[key]) {
+        groups[key] = { images: [], uniquePieces: new Set() };
+      }
+      groups[key].images.push(img);
+      groups[key].uniquePieces.add(img.uniquePieceId); // Add Piece ID to Set
+    });
+    return groups;
+  }, [defectImages]);
+
+  // =========================================================================
+  // Flatten Photo Documentation Images for Swiping
+  // =========================================================================
+  const allPhotoDataImages = useMemo(() => {
+    if (!report?.photoData) return [];
+
+    const flatList = [];
+
+    report.photoData.forEach((section) => {
+      if (section.items && Array.isArray(section.items)) {
+        section.items.forEach((item) => {
+          if (item.images && Array.isArray(item.images)) {
+            item.images.forEach((img) => {
+              // Construct the object structure expected by ImagePreviewModal
+              flatList.push({
+                ...img, // Keep original ID and URL
+                // 1. Main Section Name -> Mapped to Title
+                defectName: section.sectionName,
+
+                // 2. Sub Section Name -> Mapped to Position Badge
+                // (Using positionType allows it to appear as a badge)
+                positionType: item.itemName,
+
+                // 3. Remarks -> Mapped to Subtitle/Location text
+                locationText: item.remarks ? item.remarks : ""
+              });
+            });
+          }
+        });
+      }
+    });
+
+    return flatList;
+  }, [report?.photoData]);
 
   const summaryData = useDefectSummaryData(savedDefects, null);
   const { aqlSampleData, loadingAql } = useAqlData(
@@ -1021,9 +1513,12 @@ const YPivotQAReportFullView = () => {
                 <h1 className="text-lg font-black text-white">
                   Inspection Report
                 </h1>
-                <p className="text-xs text-indigo-100">
-                  ID: <span className="font-mono">{report.reportId}</span>
-                </p>
+                {/* CONDITIONAL RENDER HERE */}
+                {canViewReportId && (
+                  <p className="text-xs text-indigo-100">
+                    ID: <span className="font-mono">{report.reportId}</span>
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -1036,6 +1531,26 @@ const YPivotQAReportFullView = () => {
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print</span>
             </button>
+
+            {/* New PDF Generator Button */}
+            <YPivotQAReportPDFGenerator
+              report={report}
+              orderData={orderData}
+              inspectorInfo={inspectorInfo}
+              definitions={definitions}
+              headerData={headerData}
+              measurementStageData={measurementStageData}
+              measurementResult={measurementResult}
+              summaryData={summaryData}
+              defectImages={defectImages}
+              aqlResult={aqlResult}
+              aqlSampleData={aqlSampleData}
+              finalResult={finalReportResult}
+              defectResult={defectResult}
+              isAQLMethod={isAQLMethod}
+              inspectedQty={inspectedQty}
+              sizeList={sizeList}
+            />
           </div>
         </div>
       </div>
@@ -1215,14 +1730,16 @@ const YPivotQAReportFullView = () => {
                   {/* The 4 Info Cards */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {/* Card 1: Report ID */}
-                    <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30">
-                      <p className="text-[10px] text-indigo-500 uppercase font-bold mb-1">
-                        Report ID
-                      </p>
-                      <p className="text-sm font-mono font-black text-indigo-700 dark:text-indigo-300 truncate">
-                        {report.reportId}
-                      </p>
-                    </div>
+                    {canViewReportId && (
+                      <div className="p-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/10 border border-indigo-100 dark:border-indigo-900/30">
+                        <p className="text-[10px] text-indigo-500 uppercase font-bold mb-1">
+                          Report ID
+                        </p>
+                        <p className="text-sm font-mono font-black text-indigo-700 dark:text-indigo-300 truncate">
+                          {report.reportId}
+                        </p>
+                      </div>
+                    )}
 
                     {/* Card 2: Date */}
                     <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-700/30 border border-gray-100 dark:border-gray-700">
@@ -1339,7 +1856,8 @@ const YPivotQAReportFullView = () => {
         )}
 
         {/* 4. Defect Summary */}
-        {summaryData.groups.length > 0 && (
+        {(summaryData.groups.length > 0 ||
+          (report.defectManualData && report.defectManualData.length > 0)) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
               className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
@@ -1359,6 +1877,15 @@ const YPivotQAReportFullView = () => {
               )}
             </div>
 
+            {/* --- MANUAL DEFECT DISPLAY SECTION --- */}
+            {report.defectManualData && report.defectManualData.length > 0 && (
+              <div className="px-4 pb-6">
+                <YPivotQAInspectionManualDefectDisplay
+                  manualData={report.defectManualData}
+                />
+              </div>
+            )}
+
             {expandedSections.defectSummary && (
               <div className="p-0">
                 {/* existing Summary Table */}
@@ -1367,75 +1894,153 @@ const YPivotQAReportFullView = () => {
                   totals={summaryData.totals}
                 />
 
+                {/* --- NEW: DEFECT LOCATION VISUAL SUMMARY --- */}
+                {defectHeatmap && (
+                  <DefectLocationSummary
+                    mapData={defectHeatmap.map}
+                    counts={defectHeatmap.counts}
+                  />
+                )}
+
                 {/* NEW: Defect Images Grid */}
                 {defectImages.length > 0 && (
                   <div className="p-4 border-t border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/30">
-                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-4 flex items-center gap-2">
                       <Camera className="w-3.5 h-3.5" />
                       Defect Visual Evidence
                     </h3>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                      {defectImages.map((img, idx) => (
-                        <div
-                          key={img.imageId || idx}
-                          className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm group"
-                        >
-                          {/* Image Container */}
-                          <div
-                            className="relative h-40 cursor-pointer overflow-hidden bg-gray-100"
-                            onClick={() =>
-                              setPreviewImage({
-                                src: img.imageURL.startsWith("http")
-                                  ? img.imageURL
-                                  : `${API_BASE_URL}${img.imageURL}`,
-                                alt: img.defectName
-                              })
-                            }
-                          >
-                            <img
-                              src={
-                                img.imageURL.startsWith("http")
-                                  ? img.imageURL
-                                  : `${API_BASE_URL}${img.imageURL}`
-                              }
-                              alt={img.defectName}
-                              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                            />
-                            {/* Hover Overlay */}
-                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                              <Eye className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all drop-shadow-md" />
-                            </div>
-
-                            {/* Position Badge (Inside/Outside) */}
-                            {img.positionType && img.positionType !== "N/A" && (
-                              <div
-                                className={`absolute top-2 right-2 px-1.5 py-0.5 rounded text-[9px] font-bold uppercase shadow-sm ${
-                                  img.positionType === "Outside"
-                                    ? "bg-orange-500 text-white"
-                                    : "bg-blue-500 text-white"
-                                }`}
-                              >
-                                {img.positionType}
-                              </div>
-                            )}
+                    {/* Iterate through Groups */}
+                    {Object.entries(defectImagesByConfig).map(
+                      ([configName, groupData]) => (
+                        <div key={configName} className="mb-8 last:mb-0">
+                          {/* Configuration Header */}
+                          <div className="flex items-center gap-2 mb-3 pl-1">
+                            <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 uppercase">
+                              {configName}
+                            </span>
+                            {/* COUNT: Use the Set size (Unique Pieces) instead of Image Length */}
+                            <span className="text-[10px] bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded-full font-bold">
+                              {groupData.uniquePieces.size}
+                            </span>
                           </div>
 
-                          {/* Details */}
-                          <div className="p-2">
-                            <p
-                              className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate"
-                              title={img.defectName}
-                            >
-                              {img.defectName}
-                            </p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate mt-0.5">
-                              {img.locationText}
-                            </p>
+                          {/* Grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {groupData.images.map((img) => (
+                              <div
+                                key={img.imageId || img.url}
+                                className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm group flex flex-col"
+                              >
+                                {/* Image Container */}
+                                <div
+                                  className="relative h-72 cursor-pointer overflow-hidden bg-gray-100"
+                                  onClick={() => {
+                                    const globalIndex = defectImages.findIndex(
+                                      (x) => x === img
+                                    );
+                                    setPreviewImage({
+                                      images: defectImages,
+                                      startIndex:
+                                        globalIndex !== -1 ? globalIndex : 0
+                                    });
+                                  }}
+                                >
+                                  <img
+                                    src={
+                                      img.imageURL.startsWith("http")
+                                        ? img.imageURL
+                                        : `${API_BASE_URL}${img.imageURL}`
+                                    }
+                                    alt={img.defectName}
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                  />
+
+                                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                    <Eye className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all drop-shadow-md" />
+                                  </div>
+
+                                  {/* LABELS CONTAINER */}
+                                  <div className="absolute top-2 right-2 flex flex-row items-center gap-1">
+                                    {/* Position Badge */}
+                                    {img.positionType &&
+                                      img.positionType !== "N/A" && (
+                                        <span
+                                          className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase shadow-sm border ${
+                                            img.positionType === "Outside"
+                                              ? "bg-orange-500 text-white border-orange-600"
+                                              : "bg-blue-500 text-white border-blue-600"
+                                          }`}
+                                        >
+                                          {img.positionType}
+                                        </span>
+                                      )}
+                                    {/* Status Badge */}
+                                    {img.status && (
+                                      <span
+                                        className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase shadow-sm border ${
+                                          img.status === "Minor"
+                                            ? "bg-orange-100 text-orange-700 border-orange-200"
+                                            : img.status === "Major"
+                                            ? "bg-red-100 text-red-700 border-red-200"
+                                            : "bg-red-600 text-white border-red-700"
+                                        }`}
+                                      >
+                                        {img.status}
+                                      </span>
+                                    )}
+                                    {/* NEW: Additional Badge (Purple) */}
+                                    {!img.isMain && (
+                                      <span className="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase shadow-sm border bg-purple-500 text-white border-purple-600">
+                                        Additional
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Details Footer */}
+                                <div className="p-3 flex-1 flex flex-col justify-between">
+                                  <div>
+                                    {/* NEW: Pcs # Label + Defect Name */}
+                                    <div className="flex items-start gap-1.5 mb-1">
+                                      <span className="flex-shrink-0 px-1.5 py-0.5 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded text-[10px] font-bold border border-gray-200 dark:border-gray-600">
+                                        {img.pcsLabel}
+                                      </span>
+
+                                      {/* Title Logic: Main vs Additional */}
+                                      <p className="text-sm font-bold text-gray-800 dark:text-gray-200 leading-tight">
+                                        {img.isMain
+                                          ? img.defectName
+                                          : "Additional Evidence"}
+                                      </p>
+                                    </div>
+
+                                    {/* Location Text (Hide for Additional if you want, or keep for context) */}
+                                    {img.isMain && (
+                                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate pl-1">
+                                        {img.locationText}
+                                      </p>
+                                    )}
+                                  </div>
+
+                                  {/* Comment Section (with Icon) */}
+                                  {(img.comment ||
+                                    (img.isMain && img.displayRemark)) && (
+                                    <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-700 flex items-start gap-1.5">
+                                      <MessageSquare className="w-3 h-3 text-indigo-500 mt-0.5 flex-shrink-0" />
+                                      <p className="text-[10px] text-gray-600 dark:text-gray-300 italic leading-snug">
+                                        {img.comment}
+                                      </p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      ))}
-                    </div>
+                      )
+                    )}
                   </div>
                 )}
               </div>
@@ -1463,89 +2068,144 @@ const YPivotQAReportFullView = () => {
             {expandedSections.measurement && (
               <div className="p-4 space-y-8">
                 {/* Loop through each Stage (Before / After) */}
-                {measurementStageData.map((stageData) => (
-                  <div key={stageData.stage} className="space-y-5">
-                    {/* Stage Header */}
-                    <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
-                      <span
-                        className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
-                          stageData.stage === "Before"
-                            ? "bg-purple-500"
-                            : "bg-teal-500"
-                        }`}
-                      >
-                        {stageData.label}
-                      </span>
-                    </div>
+                {measurementStageData.map((stageData) => {
+                  // Check if we have any data groups (including Manual Entry)
+                  const hasData = stageData.groupedData.groups.length > 0;
 
-                    {/* Check if specs are loaded for this stage */}
-                    {stageData.specs.full.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200">
-                        <Loader2 className="w-6 h-6 animate-spin mb-1 text-indigo-500" />
-                        <p className="text-xs">
-                          Loading Specs for {stageData.label}...
-                        </p>
+                  return (
+                    <div key={stageData.stage} className="space-y-5">
+                      {/* Stage Header */}
+                      <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
+                        <span
+                          className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
+                            stageData.stage === "Before"
+                              ? "bg-purple-500"
+                              : "bg-teal-500"
+                          }`}
+                        >
+                          {stageData.label}
+                        </span>
                       </div>
-                    ) : (
-                      <>
-                        {/* Overall Result Table */}
-                        <OverallMeasurementSummaryTable
-                          groupedMeasurements={stageData.groupedDataForOverall}
-                        />
 
-                        {/* Detailed Groups */}
-                        {stageData.groupedData.groups.map((group) => {
-                          const configLabel =
-                            [
-                              group.lineName ? `Line ${group.lineName}` : null,
-                              group.tableName
-                                ? `Table ${group.tableName}`
-                                : null,
-                              group.colorName
-                                ? group.colorName.toUpperCase()
-                                : null
-                            ]
-                              .filter(Boolean)
-                              .join(" / ") || "General Configuration";
+                      {/* LOADING STATE: Only show if NO Specs AND NO Data (Manual or otherwise) */}
+                      {stageData.specs.full.length === 0 && !hasData ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200">
+                          <Loader2 className="w-6 h-6 animate-spin mb-1 text-indigo-500" />
+                          <p className="text-xs">
+                            Loading Specs for {stageData.label}...
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Overall Result Table - Only show if we have specs */}
+                          {stageData.specs.full.length > 0 && (
+                            <OverallMeasurementSummaryTable
+                              groupedMeasurements={
+                                stageData.groupedDataForOverall
+                              }
+                              sizeList={sizeList}
+                            />
+                          )}
 
-                          const stats = calculateGroupStats(
-                            group.measurements,
-                            stageData.specs.full,
-                            stageData.specs.selected
-                          );
+                          {/* Detailed Groups */}
+                          {stageData.groupedData.groups.map((group) => {
+                            const configLabel =
+                              [
+                                group.lineName
+                                  ? `Line ${group.lineName}`
+                                  : null,
+                                group.tableName
+                                  ? `Table ${group.tableName}`
+                                  : null,
+                                group.colorName
+                                  ? group.colorName.toUpperCase()
+                                  : null
+                              ]
+                                .filter(Boolean)
+                                .join(" / ") || "General Configuration";
 
-                          return (
-                            <div
-                              key={`${stageData.stage}-${group.id}`}
-                              className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
-                            >
-                              <div className="bg-gray-100 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase">
-                                  {configLabel} ({stageData.label})
-                                </span>
-                              </div>
+                            // Calculate stats only if specs exist
+                            const stats =
+                              stageData.specs.full.length > 0
+                                ? calculateGroupStats(
+                                    group.measurements,
+                                    stageData.specs.full,
+                                    stageData.specs.selected
+                                  )
+                                : {
+                                    totalPoints: 0,
+                                    passPoints: 0,
+                                    failPoints: 0,
+                                    totalPcs: 0,
+                                    passPcs: 0,
+                                    failPcs: 0,
+                                    pointPassRate: "0.0",
+                                    pcsPassRate: "0.0"
+                                  };
 
-                              <div className="p-4 space-y-5 bg-white dark:bg-gray-800">
-                                <MeasurementStatsCards stats={stats} />
-                                <div className="py-1">
-                                  <MeasurementLegend />
+                            // Robustly find manual data
+                            let manualData = group.measurements.find(
+                              (m) => m.manualData
+                            )?.manualData;
+
+                            if (
+                              !manualData &&
+                              report.measurementData?.manualDataByGroup
+                            ) {
+                              manualData =
+                                report.measurementData.manualDataByGroup[
+                                  group.id
+                                ];
+                            }
+
+                            return (
+                              <div
+                                key={`${stageData.stage}-${group.id}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+                              >
+                                <div className="bg-gray-100 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                                  <Layers className="w-4 h-4 text-gray-500" />
+                                  <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase">
+                                    {configLabel} ({stageData.label})
+                                  </span>
                                 </div>
-                                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                                  <MeasurementSummaryTable
-                                    measurements={group.measurements}
-                                    specsData={stageData.specs.full}
-                                    selectedSpecsList={stageData.specs.selected}
-                                  />
+
+                                <div className="p-4 space-y-5 bg-white dark:bg-gray-800">
+                                  {/* Display Manual Data */}
+                                  {manualData && (
+                                    <YPivotQAReportMeasurementManualDisplay
+                                      manualData={manualData}
+                                    />
+                                  )}
+
+                                  {/* Only show Stats and Table if Specs exist */}
+                                  {stageData.specs.full.length > 0 && (
+                                    <>
+                                      <MeasurementStatsCards stats={stats} />
+                                      <div className="py-1">
+                                        <MeasurementLegend />
+                                      </div>
+                                      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <MeasurementSummaryTable
+                                          measurements={group.measurements}
+                                          specsData={stageData.specs.full}
+                                          selectedSpecsList={
+                                            stageData.specs.selected
+                                          }
+                                          sizeList={sizeList}
+                                        />
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-                  </div>
-                ))}
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1635,6 +2295,27 @@ const YPivotQAReportFullView = () => {
                     className="md:col-span-4"
                   />
 
+                  {/* --- START OF NEW REMARKS SECTION --- */}
+                  {config.remarks && (
+                    <div className="md:col-span-4 mt-1">
+                      <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-3.5 flex gap-3">
+                        <div className="shrink-0">
+                          <div className="p-2 bg-amber-100 dark:bg-amber-800/40 rounded-lg">
+                            <MessageSquare className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wide mb-1">
+                            Inspection Remarks
+                          </h4>
+                          <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap leading-relaxed">
+                            {config.remarks}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* NEW: All Distinct SKUs Card */}
                   {allUniqueSKUs.length > 0 && (
                     <div className="md:col-span-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700 p-3 mt-1">
@@ -1699,7 +2380,8 @@ const YPivotQAReportFullView = () => {
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* --- MODIFIED: Changed from grid-cols-2 to space-y-6 for FULL WIDTH --- */}
+                      <div className="space-y-6">
                         {orderData.orderBreakdowns.map((breakdown) => {
                           const skuData = breakdown.yorksysOrder?.skuData;
                           if (!skuData || skuData.length === 0) return null;
@@ -1769,81 +2451,134 @@ const YPivotQAReportFullView = () => {
 
             <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
               <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-                <SectionHeader title="Inspection Scope" icon={Layers} />
+                {/* RENAMED TITLE */}
+                <SectionHeader title="Inspection Configuration" icon={Layers} />
               </div>
               <div className="flex-1 overflow-x-auto">
                 {lineTableConfig.length > 0 ? (
                   <table className="w-full text-xs text-left">
                     <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 font-medium">
                       <tr>
-                        {scopeColumns.map((col) => (
-                          <th key={col} className="px-3 py-2">
-                            {col}
+                        {/* 1. DYNAMIC CONFIG COLUMNS */}
+                        {lineTableConfig.some((g) => g.lineName || g.line) && (
+                          <th className="px-3 py-2">Line</th>
+                        )}
+                        {lineTableConfig.some(
+                          (g) => g.tableName || g.table
+                        ) && <th className="px-3 py-2">Table</th>}
+                        {lineTableConfig.some(
+                          (g) => g.colorName || g.color
+                        ) && <th className="px-3 py-2">Color</th>}
+
+                        {/* 2. CARTON COLUMN (Conditionally displayed) */}
+                        {config.cartonQty > 0 && (
+                          <th className="px-3 py-2 text-center text-blue-600">
+                            Cartons
                           </th>
-                        ))}
-                        <th className="px-3 py-2 text-right">Qty</th>
+                        )}
+
+                        {/* 3. AQL SPECIFIC: FINISHED QTY */}
+                        {isAQLMethod && (
+                          <th className="px-3 py-2 text-center">
+                            Finished Qty
+                          </th>
+                        )}
+
+                        {/* 4. SAMPLE SIZE (Common) */}
+                        <th className="px-3 py-2 text-right">Sample Size</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {lineTableConfig.map(
-                        (group) =>
-                          group.assignments?.map((assign, idx) => (
-                            <tr
-                              key={`${group.id}-${assign.id || idx}`}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-700/20"
-                            >
-                              {scopeColumns.includes("Line") && (
-                                <td className="px-3 py-1.5 font-bold">
-                                  {idx === 0
-                                    ? group.lineName || group.line
-                                    : ""}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Table") && (
-                                <td className="px-3 py-1.5">
-                                  {idx === 0
-                                    ? group.tableName || group.table
-                                    : ""}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Color") && (
-                                <td className="px-3 py-1.5 text-indigo-600">
-                                  {idx === 0
-                                    ? group.colorName || group.color
-                                    : ""}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 text-right font-mono">
-                                {assign.qty || 0}
+                      {lineTableConfig.map((group, idx) => {
+                        // Check which config columns are active to ensure alignment
+                        const hasLine = lineTableConfig.some(
+                          (g) => g.lineName || g.line
+                        );
+                        const hasTable = lineTableConfig.some(
+                          (g) => g.tableName || g.table
+                        );
+                        const hasColor = lineTableConfig.some(
+                          (g) => g.colorName || g.color
+                        );
+                        const hasCartons = config.cartonQty > 0;
+
+                        // Calculate Fixed Sample Size (Sum of assignments for this group)
+                        const fixedSampleSize =
+                          group.assignments?.reduce(
+                            (sum, a) => sum + (a.qty || 0),
+                            0
+                          ) || 0;
+
+                        return (
+                          <tr
+                            key={idx}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/20"
+                          >
+                            {/* --- CONFIG COLUMNS --- */}
+                            {hasLine && (
+                              <td className="px-3 py-2 font-bold text-gray-700 dark:text-gray-300">
+                                {group.lineName || group.line || "-"}
                               </td>
-                            </tr>
-                          )) || (
-                            <tr key={group.id}>
-                              {scopeColumns.includes("Line") && (
-                                <td className="px-3 py-1.5">
-                                  {group.lineName || group.line}
+                            )}
+                            {hasTable && (
+                              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                {group.tableName || group.table || "-"}
+                              </td>
+                            )}
+                            {hasColor && (
+                              <td className="px-3 py-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                                {group.colorName || group.color || "-"}
+                              </td>
+                            )}
+
+                            {/* --- METRIC COLUMNS (Merged for AQL / Cartons) --- */}
+
+                            {/* A. CARTONS (Merged if exists) */}
+                            {hasCartons &&
+                              (idx === 0 ? (
+                                <td
+                                  className="px-3 py-2 text-center font-mono font-bold text-blue-600 border-l border-gray-100 dark:border-gray-700"
+                                  rowSpan={lineTableConfig.length}
+                                >
+                                  {config.cartonQty}
                                 </td>
-                              )}
-                              {scopeColumns.includes("Table") && (
-                                <td className="px-3 py-1.5">
-                                  {group.tableName || group.table}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Color") && (
-                                <td className="px-3 py-1.5">
-                                  {group.colorName || group.color}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 text-right">-</td>
-                            </tr>
-                          )
-                      )}
+                              ) : null)}
+
+                            {/* B. AQL MODE: Merged Columns */}
+                            {isAQLMethod ? (
+                              idx === 0 ? (
+                                <>
+                                  {/* Finished Qty (InspectedQty from details) */}
+                                  <td
+                                    className="px-3 py-2 text-center font-mono border-l border-gray-100 dark:border-gray-700"
+                                    rowSpan={lineTableConfig.length}
+                                  >
+                                    {config.inspectedQty || 0}
+                                  </td>
+                                  {/* AQL Sample Size (Report Wide) */}
+                                  <td
+                                    className="px-3 py-2 text-right font-mono font-bold text-emerald-600 border-l border-gray-100 dark:border-gray-700"
+                                    rowSpan={lineTableConfig.length}
+                                  >
+                                    {config.aqlSampleSize || 0}
+                                  </td>
+                                </>
+                              ) : null // Don't render for subsequent rows
+                            ) : (
+                              // C. FIXED MODE: Individual Row Values
+                              <td className="px-3 py-2 text-right font-mono font-bold text-gray-800 dark:text-gray-200">
+                                {fixedSampleSize}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
                   <div className="p-6 text-center text-gray-400">
                     <AlertCircle className="w-6 h-6 mx-auto mb-1 opacity-50" />
-                    <p className="text-xs">No scope configured</p>
+                    <p className="text-xs">No configuration found</p>
                   </div>
                 )}
               </div>
@@ -2009,6 +2744,9 @@ const YPivotQAReportFullView = () => {
           </div>
         )}
 
+        {/* --- PRODUCTION STATUS --- */}
+        <ProductionStatusSection inspectionDetails={report.inspectionDetails} />
+
         {/* 9. Photo Documentation */}
         {report.photoData && report.photoData.length > 0 && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -2082,14 +2820,27 @@ const YPivotQAReportFullView = () => {
                                         <div
                                           key={img.imageId || imgIdx}
                                           className="relative group cursor-pointer rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700"
-                                          onClick={() =>
-                                            setPreviewImage({
-                                              src: imgUrl,
-                                              alt: `${item.itemName} - Image ${
-                                                imgIdx + 1
-                                              }`
-                                            })
-                                          }
+                                          onClick={() => {
+                                            // 1. Find the global index of this specific image in the flattened array
+                                            // We match based on URL or ID to ensure we find the exact photo
+                                            const globalIndex =
+                                              allPhotoDataImages.findIndex(
+                                                (flatImg) =>
+                                                  (img.imageId &&
+                                                    flatImg.imageId ===
+                                                      img.imageId) ||
+                                                  flatImg.imageURL ===
+                                                    img.imageURL
+                                              );
+
+                                            // 2. Open Modal with the Full Array and the specific Start Index
+                                            if (globalIndex !== -1) {
+                                              setPreviewImage({
+                                                images: allPhotoDataImages,
+                                                startIndex: globalIndex
+                                              });
+                                            }
+                                          }}
                                         >
                                           {/* Use w-full to fit container, h-auto for real aspect ratio */}
                                           <img
@@ -2134,13 +2885,46 @@ const YPivotQAReportFullView = () => {
             )}
           </div>
         )}
+        {/* 10. PP Sheet / Pilot Run Meeting Report (Conditional) */}
+        {report.ppSheetData && (
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mt-4">
+            <div
+              className="bg-gradient-to-r from-teal-500 to-emerald-500 px-4 py-2.5 flex justify-between items-center cursor-pointer"
+              onClick={() => toggleSection("ppSheet")}
+            >
+              <h2 className="text-white font-bold text-sm flex items-center gap-2">
+                <FileSpreadsheet className="w-4 h-4" /> PP Sheet / Pilot Meeting
+              </h2>
+              {expandedSections.ppSheet ? (
+                <ChevronUp className="text-white w-4 h-4" />
+              ) : (
+                <ChevronDown className="text-white w-4 h-4" />
+              )}
+            </div>
+
+            {expandedSections.ppSheet && (
+              <YPivotQAReportPPSheetSection
+                ppSheetData={report.ppSheetData}
+                onImageClick={(url, title) => {
+                  // Reusing the existing image preview logic
+                  if (url) {
+                    setPreviewImage({
+                      images: [{ url: url, defectName: title }],
+                      startIndex: 0
+                    });
+                  }
+                }}
+              />
+            )}
+          </div>
+        )}
       </div>
 
       {/* Image Preview Modal */}
       {previewImage && (
         <ImagePreviewModal
-          src={previewImage.src}
-          alt={previewImage.alt}
+          images={previewImage.images}
+          startIndex={previewImage.startIndex}
           onClose={() => setPreviewImage(null)}
         />
       )}

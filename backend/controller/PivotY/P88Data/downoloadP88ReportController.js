@@ -1,4 +1,3 @@
-import express from "express";
 import puppeteer from "puppeteer";
 import path from "path";
 import fs from "fs";
@@ -6,29 +5,70 @@ import { promisify } from "util";
 import { execSync } from "child_process";
 import { exec } from "child_process";
 import { p88LegacyData } from "../../MongoDB/dbConnectionController.js";
+import { Builder, Browser, By, until } from "selenium-webdriver";
+import chrome from "selenium-webdriver/chrome.js";
+import archiver from "archiver";
 
 const stat = promisify(fs.stat);
-const readdir = promisify(fs.readdir);
+// const readdir = promisify(fs.readdir);
 
-// UPDATED: Better temp directory management
 const baseTempDir =
   process.platform === "win32"
-    ? path.join(process.env.TEMP || "C:/temp", "puppeteer-downloads")
-    : "/tmp/puppeteer-downloads";
+    ? path.join(process.env.TEMP || "C:/temp", "p88-bulk-temp")
+    : "/tmp/p88-bulk-temp";
 
-// Ensure base temp directory exists
-if (!fs.existsSync(baseTempDir)) {
-  fs.mkdirSync(baseTempDir, { recursive: true });
-}
+if (!fs.existsSync(baseTempDir)) fs.mkdirSync(baseTempDir, { recursive: true });
 
 const CONFIG = {
   LOGIN_URL: "https://yw.pivot88.com/login",
   BASE_REPORT_URL: "https://yw.pivot88.com/inspectionreport/show/",
-  DEFAULT_DOWNLOAD_DIR: path.resolve("P:/P88Test"),
-  TIMEOUT: 15000,
-  DELAY_BETWEEN_DOWNLOADS: 3000,
-  HEADLESS: "new" // Always run headless - no GUI windows
+  DEFAULT_DOWNLOAD_DIR:
+    process.platform === "win32" ? "P:/P88Test" : "/tmp/p88-reports",
+  HEADLESS: "new"
 };
+
+// Enhanced waitForNewFile function with better error handling
+async function waitForNewFile(dir, existingFiles, timeout = 90000) {
+  // Increased timeout
+  const start = Date.now();
+
+  while (Date.now() - start < timeout) {
+    if (fs.existsSync(dir)) {
+      const currentFiles = fs.readdirSync(dir);
+
+      // Find files that are PDFs and were NOT in the initial list
+      const newPdfs = currentFiles.filter(
+        (f) =>
+          f.endsWith(".pdf") &&
+          !existingFiles.includes(f) &&
+          !f.endsWith(".crdownload") &&
+          !f.endsWith(".tmp") &&
+          !f.endsWith(".part")
+      );
+
+      // Check if there are any active downloads still happening
+      const isDownloading = currentFiles.some(
+        (f) =>
+          f.endsWith(".crdownload") || f.endsWith(".tmp") || f.endsWith(".part")
+      );
+
+      if (newPdfs.length > 0 && !isDownloading) {
+        // Double check file size to ensure it's not a 0-byte placeholder
+        const filePath = path.join(dir, newPdfs[0]);
+        const fileSize = fs.statSync(filePath).size;
+
+        if (fileSize > 1000) {
+          return newPdfs;
+        }
+      }
+    }
+
+    await new Promise((r) => setTimeout(r, 2000)); // Poll every 2 seconds
+  }
+  throw new Error(
+    "Download timeout: No new PDF file detected within 90 seconds."
+  );
+}
 
 // Helper functions (keep existing ones)
 const getFileSize = async (filePath) => {
@@ -42,10 +82,12 @@ const getFileSize = async (filePath) => {
 
 const formatBytes = (bytes) => {
   if (bytes === 0) return "0 Bytes";
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (
+    parseFloat((bytes / Math.pow(1024, i)).toFixed(2)) +
+    " " +
+    ["Bytes", "KB", "MB", "GB"][i]
+  );
 };
 
 const getAvailableSpace = async (dirPath) => {
@@ -87,6 +129,113 @@ const getAvailableSpace = async (dirPath) => {
   } catch (error) {
     console.warn("Error getting available space:", error.message);
     return 1024 * 1024 * 1024 * 5;
+  }
+};
+
+export const downloadBulkReportsUbuntu = async (req, res) => {
+  let driver = null;
+  let jobDir = null;
+  try {
+    const {
+      startRange,
+      endRange,
+      downloadAll,
+      startDate,
+      endDate,
+      factoryName,
+      language = "english",
+      includeDownloaded = false
+    } = req.body;
+
+    jobDir = path.join(baseTempDir, `selenium_${Date.now()}`);
+    fs.mkdirSync(jobDir, { recursive: true });
+
+    const records = await getInspectionRecords(
+      startRange,
+      endRange,
+      downloadAll,
+      startDate,
+      endDate,
+      factoryName,
+      includeDownloaded
+    );
+    if (records.length === 0)
+      return res.json({
+        success: false,
+        message: "No records matching criteria"
+      });
+
+    const options = new chrome.Options();
+    options.addArguments(
+      "--headless",
+      "--no-sandbox",
+      "--disable-dev-shm-usage"
+    );
+    options.setUserPreferences({ "download.default_directory": jobDir });
+
+    driver = await new Builder()
+      .forBrowser(Browser.CHROME)
+      .setChromeOptions(options)
+      .build();
+    await driver.sendAndGetDevToolsCommand("Page.setDownloadBehavior", {
+      behavior: "allow",
+      downloadPath: jobDir
+    });
+
+    // Login
+    await driver.get(CONFIG.LOGIN_URL);
+    await driver
+      .findElement(By.id("username"))
+      .sendKeys(process.env.P88_USERNAME);
+    await driver
+      .findElement(By.id("password"))
+      .sendKeys(process.env.P88_PASSWORD);
+    await driver.findElement(By.id("js-login-submit")).click();
+    await driver.wait(until.urlContains("dashboard"), 20000);
+
+    for (const record of records) {
+      const inspNo =
+        record.inspectionNumbers?.[0] ||
+        record.inspectionNumbersKey?.split("-")[0];
+      if (!inspNo) continue;
+
+      try {
+        await updateDownloadStatus(record._id, "In Progress");
+
+        const filesBefore = fs.readdirSync(jobDir);
+
+        // Navigate to report
+        await driver.get(`${CONFIG.BASE_REPORT_URL}${inspNo}`);
+
+        const printBtn = await driver.wait(
+          until.elementLocated(By.css("#page-wrapper a")),
+          15000
+        );
+        await printBtn.click();
+
+        const newFiles = await waitForNewFile(jobDir, filesBefore);
+        const baseName = getFilename(record);
+
+        newFiles.forEach((file, index) => {
+          const oldPath = path.join(jobDir, file);
+          const newName = `${baseName}${
+            newFiles.length > 1 ? `_${index + 1}` : ""
+          }.pdf`;
+          fs.renameSync(oldPath, path.join(jobDir, newName));
+        });
+
+        await updateDownloadStatus(record._id, "Downloaded");
+      } catch (err) {
+        console.error(`❌ Error on ${inspNo}:`, err.message);
+        await updateDownloadStatus(record._id, "Failed");
+      }
+    }
+
+    await driver.quit();
+    await streamZipAndCleanup(jobDir, res);
+  } catch (error) {
+    if (driver) await driver.quit();
+    res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -204,7 +353,7 @@ export const getDownloadStatusStats = async (req, res) => {
   }
 };
 
-// Language change function for Puppeteer
+// Enhanced Language change function for Puppeteer
 const changeLanguage = async (page, language = "english") => {
   try {
     // Wait for page to load completely
@@ -268,24 +417,25 @@ const changeLanguage = async (page, language = "english") => {
 };
 
 // Update download status in database
-const updateDownloadStatus = async (recordId, status, downloadedAt = null) => {
+const updateDownloadStatus = async (recordId, status) => {
   try {
-    const updateData = {
+    await p88LegacyData.findByIdAndUpdate(recordId, {
       downloadStatus: status,
-      lastModifiedDate: new Date()
-    };
-
-    if (downloadedAt) {
-      updateData.downloadedAt = downloadedAt;
-    }
-
-    await p88LegacyData.findByIdAndUpdate(recordId, updateData);
-  } catch (error) {
-    console.error(
-      `Error updating download status for record ${recordId}:`,
-      error
-    );
+      downloadedAt: status === "Downloaded" ? new Date() : null
+    });
+  } catch (e) {
+    console.error("DB Error:", e.message);
   }
+};
+
+const getFilename = (record) => {
+  const reportType = (record.reportType || "Report").replace(
+    /[/\\?%*:|"<>]/g,
+    "-"
+  );
+  const po = record.poNumbers?.length > 0 ? record.poNumbers[0] : "NO-PO";
+  const group = record.groupNumber || "NO-GROUP";
+  return `${reportType}-${po}-${group}`;
 };
 
 // Get inspection records from your MongoDB collection (updated to include download status)
@@ -293,162 +443,58 @@ const getInspectionRecords = async (
   startRange,
   endRange,
   downloadAll,
-  includeDownloaded = false,
-  startDate = null,
-  endDate = null,
-  factoryName = null
+  startDate,
+  endDate,
+  factoryName,
+  includeDownloaded = false
 ) => {
-  try {
-    let query = {};
+  let query = {};
 
-    // Add date range filter
-    if (startDate && endDate) {
-      query.submittedInspectionDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate + "T23:59:59.999Z")
-      };
-    }
+  // Only exclude downloaded records if user hasn't selected to include them
+  if (!includeDownloaded) {
+    query.downloadStatus = { $ne: "Downloaded" };
+  }
 
-    // Add factory filter
-    if (factoryName && factoryName.trim() !== "") {
-      query.supplier = factoryName;
-    }
+  if (startDate && endDate) {
+    query.submittedInspectionDate = {
+      $gte: new Date(startDate),
+      $lte: new Date(endDate + "T23:59:59.999Z")
+    };
+  }
 
-    // Filter out already downloaded records unless specifically requested
-    if (!includeDownloaded) {
-      query.downloadStatus = { $ne: "Downloaded" };
-    }
+  if (factoryName?.trim()) {
+    query.supplier = factoryName;
+  }
 
-    let records;
-    if (downloadAll) {
-      // Get all records matching criteria
-      records = await p88LegacyData
-        .find(query)
-        .select(
-          "_id groupNumber inspectionNumbers inspectionNumbersKey project supplier poNumbers reportType downloadStatus submittedInspectionDate"
-        )
-        .sort({ submittedInspectionDate: 1 })
-        .lean();
-    } else {
-      // Get records in specified range
-      const skip = Math.max(0, startRange - 1);
-      const limit = Math.max(1, endRange - startRange + 1);
-
-      records = await p88LegacyData
-        .find(query)
-        .select(
-          "_id groupNumber inspectionNumbers inspectionNumbersKey project supplier poNumbers reportType downloadStatus submittedInspectionDate"
-        )
-        .sort({ submittedInspectionDate: 1 })
-        .skip(skip)
-        .limit(limit)
-        .lean();
-    }
-
+  if (downloadAll) {
+    const records = await p88LegacyData
+      .find(query)
+      .sort({ submittedInspectionDate: 1 })
+      .lean();
     return records;
-  } catch (error) {
-    console.error("Database error:", error);
-    throw new Error("Failed to fetch inspection records from database");
-  }
-};
-
-// Get total count of records for UI display (updated to exclude downloaded)
-const getTotalRecordCount = async (includeDownloaded = false) => {
-  try {
-    let query = {};
-    if (!includeDownloaded) {
-      query.downloadStatus = { $ne: "Downloaded" };
-    }
-
-    const count = await p88LegacyData.countDocuments(query);
-    return count;
-  } catch (error) {
-    console.error("Error getting record count:", error);
-    return 0;
-  }
-};
-
-// Extract first inspection number from record
-const getFirstInspectionNumber = (record) => {
-  if (record.inspectionNumbers && record.inspectionNumbers.length > 0) {
-    return record.inspectionNumbers[0];
-  } else if (record.inspectionNumbersKey) {
-    return record.inspectionNumbersKey.split("-")[0];
-  }
-  return null;
-};
-
-// Get first PO number from record
-const getFirstPoNumber = (record) => {
-  if (record.poNumbers && record.poNumbers.length > 0) {
-    return record.poNumbers[0];
-  }
-  return "NO-PO";
-};
-
-// Generate custom filename: reportType-firstPoNumber-GroupNumber
-const generateCustomFileName = (record) => {
-  const reportType = (record.reportType || "Report").replace(/\s+/g, "-");
-  const firstPoNumber = getFirstPoNumber(record);
-  const groupNumber = record.groupNumber || "NO-GROUP";
-
-  return `${reportType}-${firstPoNumber}-${groupNumber}`;
-};
-
-// Rename downloaded files with custom naming
-const renameDownloadedFiles = async (
-  targetDownloadDir,
-  newFiles,
-  customFileName
-) => {
-  const renamedFiles = [];
-
-  for (let i = 0; i < newFiles.length; i++) {
-    const file = newFiles[i];
-    const oldPath = path.join(targetDownloadDir, file.name);
-    const fileExtension = path.extname(file.name);
-    const newFileName = `${customFileName}${
-      newFiles.length > 1 ? `_${i + 1}` : ""
-    }${fileExtension}`;
-    const newPath = path.join(targetDownloadDir, newFileName);
-
-    try {
-      // Check if file with new name already exists
-      if (fs.existsSync(newPath)) {
-        const timestamp = Date.now();
-        const finalFileName = `${customFileName}${
-          newFiles.length > 1 ? `_${i + 1}` : ""
-        }_${timestamp}${fileExtension}`;
-        const finalPath = path.join(targetDownloadDir, finalFileName);
-        fs.renameSync(oldPath, finalPath);
-        renamedFiles.push({
-          ...file,
-          name: finalFileName,
-          originalName: file.name
-        });
-      } else {
-        fs.renameSync(oldPath, newPath);
-        renamedFiles.push({
-          ...file,
-          name: newFileName,
-          originalName: file.name
-        });
-      }
-    } catch (error) {
-      console.error(`Error renaming file ${file.name}:`, error);
-      // Keep original file if rename fails
-      renamedFiles.push(file);
-    }
   }
 
-  return renamedFiles;
+  const skip = Math.max(0, startRange - 1);
+  const limit = Math.max(1, endRange - startRange + 1);
+  const records = await p88LegacyData
+    .find(query)
+    .sort({ submittedInspectionDate: 1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+  return records;
+};
+
+export const downloadBulkReportsAuto = async (req, res) => {
+  process.platform === "linux"
+    ? await downloadBulkReportsUbuntu(req, res)
+    : await downloadBulkReports(req, res);
 };
 
 // NEW: Single file download with temp folder and direct serve
 export const downloadSingleReportDirect = async (req, res) => {
   let browser = null;
   let jobDir = null;
-
   try {
     const { inspectionNumber, language = "english" } = req.body;
 
@@ -459,21 +505,17 @@ export const downloadSingleReportDirect = async (req, res) => {
       });
     }
 
-    // 1️⃣ Create unique temp folder for this job
     const jobId =
       Date.now().toString() + "_" + Math.random().toString(36).substr(2, 9);
     jobDir = path.join(baseTempDir, jobId);
     fs.mkdirSync(jobDir, { recursive: true });
 
-    // 2️⃣ Launch browser and setup download behavior
     browser = await puppeteer.launch({
       headless: CONFIG.HEADLESS,
       args: ["--no-sandbox", "--disable-setuid-sandbox"]
     });
 
     const page = await browser.newPage();
-
-    // 👉 Tell Puppeteer to download into TEMP folder
     const client = await page.createCDPSession();
     await client.send("Page.setDownloadBehavior", {
       behavior: "allow",
@@ -492,9 +534,15 @@ export const downloadSingleReportDirect = async (req, res) => {
     const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
     await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
 
-    // Change language if requested
-    if (language === "chinese") {
-      await changeLanguage(page, language);
+    // Wait for page to fully load
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+
+    // 🔥 ALWAYS try to change language (for both English and Chinese)
+    const languageChanged = await changeLanguage(page, language);
+    if (languageChanged) {
+      console.log(`✅ Language changed to ${language} for ${inspectionNumber}`);
+    } else {
+      console.warn(`⚠️ Language change failed for ${inspectionNumber}`);
     }
 
     // Wait for print button and click
@@ -504,7 +552,7 @@ export const downloadSingleReportDirect = async (req, res) => {
     // Wait and check for file creation
     let downloadedFile = null;
     let attempts = 0;
-    const maxAttempts = 20; // 20 seconds max wait
+    const maxAttempts = 30;
 
     while (attempts < maxAttempts && !downloadedFile) {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -533,24 +581,22 @@ export const downloadSingleReportDirect = async (req, res) => {
 
     if (!downloadedFile) {
       throw new Error(
-        "Download timeout - no file was downloaded within 20 seconds"
+        "Download timeout - no file was downloaded within 30 seconds"
       );
     }
 
-    // 4️⃣ Send file to the user (browser decides location)
+    // Send file to the user
     const filePath = path.join(jobDir, downloadedFile);
-    const customFileName = `Report-${inspectionNumber}-${Date.now()}.pdf`;
+    const customFileName = `Report-${inspectionNumber}-${language}-${Date.now()}.pdf`;
 
-    // Set proper headers for file download
     res.setHeader(
       "Content-Disposition",
       `attachment; filename="${customFileName}"`
     );
     res.setHeader("Content-Type", "application/pdf");
 
-    // Send file and cleanup
     res.download(filePath, customFileName, (err) => {
-      // 🔥 Always cleanup temp directory
+      // Cleanup temp directory
       if (jobDir && fs.existsSync(jobDir)) {
         try {
           fs.rmSync(jobDir, { recursive: true, force: true });
@@ -567,12 +613,11 @@ export const downloadSingleReportDirect = async (req, res) => {
           });
         }
       } else {
-        console.log("✅ File sent successfully to user");
+        console.log(`✅ File sent successfully to user in ${language}`);
       }
     });
   } catch (error) {
     console.error("Direct download failed:", error);
-
     // Cleanup on error
     if (browser) {
       try {
@@ -599,983 +644,190 @@ export const downloadSingleReportDirect = async (req, res) => {
   }
 };
 
-// Single report download function (updated with status tracking and custom naming)
-const downloadSingleReport = async (
-  page,
-  inspectionNumber,
-  targetDownloadDir,
-  record,
-  includeDownloaded = false,
-  language = "english"
-) => {
-  try {
-    const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
-
-    // Check if already downloaded - ONLY skip if includeDownloaded is false
-    if (!includeDownloaded && record.downloadStatus === "Downloaded") {
-      return {
-        inspectionNumber,
-        groupNumber: record.groupNumber,
-        project: record.project,
-        fileCount: 0,
-        totalSize: 0,
-        files: [],
-        success: true,
-        skipped: true,
-        reason: "Already downloaded"
-      };
-    }
-
-    // Update status to 'In Progress'
-    await updateDownloadStatus(record._id, "In Progress");
-
-    // Get initial file list
-    const getFileList = async () => {
-      if (!fs.existsSync(targetDownloadDir)) return [];
-      const files = await readdir(targetDownloadDir);
-      const fileStats = await Promise.all(
-        files.map(async (file) => {
-          const filePath = path.join(targetDownloadDir, file);
-          const stats = await stat(filePath);
-          return {
-            name: file,
-            mtime: stats.mtime.getTime()
-          };
-        })
-      );
-      return fileStats;
-    };
-
-    const initialFiles = await getFileList();
-
-    // Navigate to report
-    await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
-
-    // Change language if requested - do this BEFORE looking for print button
-    if (language !== "english" || language === "english") {
-      const languageChanged = await changeLanguage(page, language);
-      if (languageChanged) {
-        // Wait a bit more for page to fully reload in new language
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } else {
-        console.warn(
-          `Language change to ${language} failed for inspection ${inspectionNumber}, continuing with default`
-        );
-      }
-    }
-
-    // Wait for the print button to be available
-    try {
-      await page.waitForSelector("#page-wrapper a", { timeout: 15000 });
-    } catch (error) {
-      await updateDownloadStatus(record._id, "Failed");
-      throw new Error(
-        `Print button not found for inspection ${inspectionNumber}. Page may not have loaded correctly.`
-      );
-    }
-
-    // Click print button
-    await page.click("#page-wrapper a");
-
-    // Wait for download to complete
-    await new Promise((resolve) => setTimeout(resolve, 8000));
-
-    // Get new files
-    const finalFiles = await getFileList();
-    const newFiles = finalFiles.filter(
-      (finalFile) =>
-        !initialFiles.some(
-          (initialFile) =>
-            initialFile.name === finalFile.name &&
-            initialFile.mtime === finalFile.mtime
-        )
-    );
-
-    if (newFiles.length === 0) {
-      await updateDownloadStatus(record._id, "Failed");
-      throw new Error(
-        `No files were downloaded for inspection ${inspectionNumber}`
-      );
-    }
-
-    // Generate custom filename and rename files
-    const customFileName = generateCustomFileName(record);
-
-    // If re-downloading, add timestamp to avoid filename conflicts
-    const finalCustomFileName =
-      includeDownloaded && record.downloadStatus === "Downloaded"
-        ? `${customFileName}_${Date.now()}`
-        : customFileName;
-
-    const renamedFiles = await renameDownloadedFiles(
-      targetDownloadDir,
-      newFiles,
-      finalCustomFileName
-    );
-
-    let totalSize = 0;
-    const fileDetails = [];
-
-    for (const fileInfo of renamedFiles) {
-      const filePath = path.join(targetDownloadDir, fileInfo.name);
-      const size = await getFileSize(filePath);
-      totalSize += size;
-      fileDetails.push({
-        name: fileInfo.name,
-        originalName: fileInfo.originalName || fileInfo.name,
-        size: formatBytes(size),
-        sizeBytes: size,
-        inspectionNumber: inspectionNumber,
-        groupNumber: record.groupNumber,
-        project: record.project,
-        customFileName: finalCustomFileName
-      });
-    }
-
-    // Update status to 'Downloaded'
-    await updateDownloadStatus(record._id, "Downloaded", new Date());
-
-    return {
-      inspectionNumber,
-      groupNumber: record.groupNumber,
-      project: record.project,
-      fileCount: renamedFiles.length,
-      totalSize,
-      files: fileDetails,
-      success: true,
-      customFileName: finalCustomFileName,
-      redownloaded: includeDownloaded && record.downloadStatus === "Downloaded"
-    };
-  } catch (error) {
-    console.error(`Error downloading report ${inspectionNumber}:`, error);
-
-    // Update status to 'Failed'
-    await updateDownloadStatus(record._id, "Failed");
-
-    return {
-      inspectionNumber,
-      groupNumber: record.groupNumber,
-      project: record.project,
-      fileCount: 0,
-      totalSize: 0,
-      files: [],
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-// Enhanced helper function for downloading single report with temp folder
-const downloadSingleReportWithTemp = async (
-  page,
-  inspectionNumber,
-  tempDir,
-  finalDir,
-  record,
-  includeDownloaded = false,
-  language = "english"
-) => {
-  try {
-    const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
-
-    // Check if already downloaded
-    if (!includeDownloaded && record.downloadStatus === "Downloaded") {
-      return {
-        inspectionNumber,
-        groupNumber: record.groupNumber,
-        project: record.project,
-        fileCount: 0,
-        totalSize: 0,
-        files: [],
-        success: true,
-        skipped: true,
-        reason: "Already downloaded"
-      };
-    }
-
-    // Update status to 'In Progress'
-    await updateDownloadStatus(record._id, "In Progress");
-
-    // Navigate to report
-    await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
-
-    // Change language if requested
-    if (language === "chinese") {
-      const languageChanged = await changeLanguage(page, language);
-      if (languageChanged) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } else {
-        console.warn(`⚠️ Language change failed, continuing with default`);
-      }
-    }
-
-    try {
-      await page.waitForSelector("#page-wrapper a", { timeout: 15000 });
-    } catch (error) {
-      console.error(`❌ Print button not found: ${error.message}`);
-      await updateDownloadStatus(record._id, "Failed");
-      throw new Error(
-        `Print button not found for inspection ${inspectionNumber}. Page may not have loaded correctly.`
-      );
-    }
-
-    // Get initial temp files
-    const initialTempFiles = fs.existsSync(tempDir)
-      ? fs.readdirSync(tempDir)
-      : [];
-
-    // Click the print button
-    await page.click("#page-wrapper a");
-
-    // Wait a moment for the download to start
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // 3️⃣ Enhanced download waiting with better monitoring
-    let newTempFiles = [];
-    let attempts = 0;
-    const maxAttempts = 30; // Increased to 30 seconds
-    let lastFileCount = 0;
-
-    while (attempts < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      attempts++;
-
-      try {
-        if (fs.existsSync(tempDir)) {
-          const currentTempFiles = fs.readdirSync(tempDir);
-
-          // Log all files for debugging
-          if (currentTempFiles.length > lastFileCount) {
-            lastFileCount = currentTempFiles.length;
-          }
-
-          // Filter for new PDF files (excluding partial downloads)
-          newTempFiles = currentTempFiles.filter((file) => {
-            const isNew = !initialTempFiles.includes(file);
-            const isPdf = file.toLowerCase().endsWith(".pdf");
-            const isNotPartial =
-              !file.endsWith(".crdownload") && !file.endsWith(".tmp");
-            const hasSize = fs.statSync(path.join(tempDir, file)).size > 0;
-
-            return isNew && isPdf && isNotPartial && hasSize;
-          });
-
-          if (newTempFiles.length > 0) {
-            break;
-          }
-
-          // Check for partial downloads
-          const partialFiles = currentTempFiles.filter(
-            (file) => file.endsWith(".crdownload") || file.endsWith(".tmp")
-          );
-          if (partialFiles.length > 0) {
-            console.log(`⏳ Partial downloads in progress:`, partialFiles);
-          }
-        } else {
-          console.log(`📂 Temp directory doesn't exist yet: ${tempDir}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ Error checking temp directory: ${error.message}`);
-      }
-    }
-    const customFileName = generateCustomFileName(record);
-    const finalCustomFileName =
-      includeDownloaded && record.downloadStatus === "Downloaded"
-        ? `${customFileName}_${Date.now()}`
-        : customFileName;
-
-    // Ensure final directory exists
-    if (!fs.existsSync(finalDir)) {
-      fs.mkdirSync(finalDir, { recursive: true });
-    }
-
-    const movedFiles = [];
-    let totalSize = 0;
-
-    for (let i = 0; i < newTempFiles.length; i++) {
-      const tempFile = newTempFiles[i];
-      const tempFilePath = path.join(tempDir, tempFile);
-
-      const fileExtension = path.extname(tempFile);
-      const newFileName = `${finalCustomFileName}${
-        newTempFiles.length > 1 ? `_${i + 1}` : ""
-      }${fileExtension}`;
-      const finalFilePath = path.join(finalDir, newFileName);
-
-      // Handle file name conflicts
-      let actualFinalPath = finalFilePath;
-      if (fs.existsSync(finalFilePath)) {
-        const timestamp = Date.now();
-        const conflictFileName = `${finalCustomFileName}${
-          newTempFiles.length > 1 ? `_${i + 1}` : ""
-        }_${timestamp}${fileExtension}`;
-        actualFinalPath = path.join(finalDir, conflictFileName);
-      }
-
-      // Move file from temp to final location
-      try {
-        fs.copyFileSync(tempFilePath, actualFinalPath);
-
-        const size = await getFileSize(actualFinalPath);
-        totalSize += size;
-
-        movedFiles.push({
-          name: path.basename(actualFinalPath),
-          originalName: tempFile,
-          size: formatBytes(size),
-          sizeBytes: size,
-          inspectionNumber: inspectionNumber,
-          groupNumber: record.groupNumber,
-          project: record.project,
-          customFileName: finalCustomFileName
-        });
-      } catch (moveError) {
-        console.error(`❌ Error moving file ${tempFile}:`, moveError);
-        throw moveError;
-      }
-    }
-
-    // Update status to 'Downloaded'
-    await updateDownloadStatus(record._id, "Downloaded", new Date());
-
-    return {
-      inspectionNumber,
-      groupNumber: record.groupNumber,
-      project: record.project,
-      fileCount: movedFiles.length,
-      totalSize,
-      files: movedFiles,
-      success: true,
-      customFileName: finalCustomFileName,
-      redownloaded: includeDownloaded && record.downloadStatus === "Downloaded"
-    };
-  } catch (error) {
-    console.error(`❌ Error downloading report ${inspectionNumber}:`, error);
-    await updateDownloadStatus(record._id, "Failed");
-
-    return {
-      inspectionNumber,
-      groupNumber: record.groupNumber,
-      project: record.project,
-      fileCount: 0,
-      totalSize: 0,
-      files: [],
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-// Enhanced login function with better session management
-// Enhanced login function with detailed debugging
-const performLogin = async (page) => {
-  try {
-    // Navigate to login page
-    await page.goto(CONFIG.LOGIN_URL, {
-      waitUntil: "networkidle0",
-      timeout: 30000
-    });
-
-    // Take screenshot of login page
-    try {
-      await page.screenshot({ path: "/tmp/login_page.png", fullPage: true });
-    } catch (screenshotError) {
-      console.log("⚠️ Could not save login page screenshot");
-    }
-
-    // Wait for login form
-    await page.waitForSelector("#username", { timeout: 10000 });
-    await page.waitForSelector("#password", { timeout: 10000 });
-    await page.waitForSelector("#js-login-submit", { timeout: 10000 });
-
-    // Get credentials
-    const username = process.env.P88_USERNAME;
-    const password = process.env.P88_PASSWORD;
-
-    // Clear and type username
-    await page.click("#username", { clickCount: 3 });
-    await page.type("#username", username, { delay: 100 });
-
-    // Clear and type password
-    await page.click("#password", { clickCount: 3 });
-    await page.type("#password", password, { delay: 100 });
-
-    // Click login and wait for navigation
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: "networkidle0", timeout: 30000 }),
-      page.click("#js-login-submit")
-    ]);
-
-    // Wait a bit more
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Check result
-    const currentUrl = page.url();
-    const pageTitle = await page.title();
-
-    // Check for error messages on the page
-    try {
-      const errorMessages = await page.$$eval(
-        '.alert, .error, .danger, [class*="error"], [class*="alert"]',
-        (elements) =>
-          elements
-            .map((el) => el.textContent.trim())
-            .filter((text) => text.length > 0)
-      );
-      if (errorMessages.length > 0) {
-        console.log("⚠️ Error messages found on page:", errorMessages);
-      }
-    } catch (e) {
-      console.log("ℹ️ No error messages found on page");
-    }
-
-    // Check if we're still on login page (login failed)
-    if (currentUrl.includes("/login") || pageTitle.includes("Login")) {
-      throw new Error(
-        `Login failed - still on login page. URL: ${currentUrl}, Title: ${pageTitle}`
-      );
-    }
-
-    // Wait a bit more for session to be fully established
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    return true;
-  } catch (error) {
-    console.error("❌ Login failed:", error.message);
-    throw error;
-  }
-};
-
-// Function to validate session before downloading
-const validateSession = async (page) => {
-  try {
-    // Try to access a protected page to check if session is valid
-    const testUrl = "https://yw.pivot88.com/dashboard"; // or any protected page
-    await page.goto(testUrl, { waitUntil: "networkidle0", timeout: 15000 });
-
-    const currentUrl = page.url();
-    const pageTitle = await page.title();
-
-    // If redirected to login, session is invalid
-    if (currentUrl.includes("/login") || pageTitle.includes("Login")) {
-      await performLogin(page);
-      return false; // Session was invalid
-    }
-
-    return true; // Session is valid
-  } catch (error) {
-    console.log("⚠️ Session validation failed, re-logging in...");
-    await performLogin(page);
-    return false;
-  }
-};
-
-// FIXED downloadSingleReportWithTemp function
-const downloadSingleReportWithTempFixed = async (
-  page,
-  inspectionNumber,
-  tempDir,
-  finalDir,
-  record,
-  includeDownloaded = false,
-  language = "english"
-) => {
-  try {
-    const reportUrl = `${CONFIG.BASE_REPORT_URL}${inspectionNumber}`;
-
-    // Check if already downloaded
-    if (!includeDownloaded && record.downloadStatus === "Downloaded") {
-      return {
-        inspectionNumber,
-        groupNumber: record.groupNumber,
-        project: record.project,
-        fileCount: 0,
-        totalSize: 0,
-        files: [],
-        success: true,
-        skipped: true,
-        reason: "Already downloaded"
-      };
-    }
-
-    // Update status to 'In Progress'
-    await updateDownloadStatus(record._id, "In Progress");
-
-    // Validate session before proceeding
-    await validateSession(page);
-
-    // Navigate to report
-    await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
-
-    // Check if page loaded correctly and we're not redirected to login
-    const pageTitle = await page.title();
-    const currentUrl = page.url();
-
-    // If we're redirected to login, the session expired
-    if (currentUrl.includes("/login") || pageTitle.includes("Login")) {
-      await performLogin(page);
-
-      // Try navigating to the report again
-      await page.goto(reportUrl, { waitUntil: "networkidle0", timeout: 30000 });
-
-      const newTitle = await page.title();
-      const newUrl = page.url();
-
-      if (newUrl.includes("/login") || newTitle.includes("Login")) {
-        throw new Error(
-          `Unable to access report ${inspectionNumber} - authentication failed`
-        );
-      }
-    }
-
-    // Change language if requested
-    if (language === "chinese") {
-      const languageChanged = await changeLanguage(page, language);
-      if (languageChanged) {
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-      } else {
-        console.warn(`⚠️ Language change failed, continuing with default`);
-      }
-    }
-
-    // Wait for print button and click
-    try {
-      await page.waitForSelector("#page-wrapper a", { timeout: 15000 });
-    } catch (error) {
-      console.error(`❌ Print button not found: ${error.message}`);
-
-      // Take a screenshot for debugging
-      try {
-        const screenshotPath = path.join(
-          tempDir,
-          `no_print_button_${inspectionNumber}.png`
-        );
-        await page.screenshot({ path: screenshotPath, fullPage: true });
-      } catch (screenshotError) {
-        console.log(
-          `⚠️ Could not save debug screenshot: ${screenshotError.message}`
-        );
-      }
-
-      await updateDownloadStatus(record._id, "Failed");
-      throw new Error(
-        `Print button not found for inspection ${inspectionNumber}. Page may not have loaded correctly.`
-      );
-    }
-
-    // Get initial temp files
-    const initialTempFiles = fs.existsSync(tempDir)
-      ? fs.readdirSync(tempDir)
-      : [];
-
-    // Click the print button
-    await page.click("#page-wrapper a");
-
-    // Wait longer for the download to start
-    await new Promise((resolve) => setTimeout(resolve, 5000)); // Increased wait time
-
-    // Enhanced download waiting with better monitoring
-    let newTempFiles = [];
-    let attempts = 0;
-    const maxAttempts = 45; // Increased to 45 seconds
-    let lastFileCount = 0;
-
-    while (attempts < maxAttempts) {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      attempts++;
-
-      try {
-        if (fs.existsSync(tempDir)) {
-          const currentTempFiles = fs.readdirSync(tempDir);
-
-          if (attempts % 5 === 0) {
-            // Log every 5 seconds
-            console.log(
-              `📂 Attempt ${attempts}: Found ${currentTempFiles.length} total files in temp dir`
-            );
-          }
-
-          if (currentTempFiles.length > lastFileCount) {
-            console.log(`📄 Files in temp dir:`, currentTempFiles);
-            lastFileCount = currentTempFiles.length;
-          }
-
-          // Filter for new PDF files (excluding partial downloads)
-          newTempFiles = currentTempFiles.filter((file) => {
-            const isNew = !initialTempFiles.includes(file);
-            const isPdf = file.toLowerCase().endsWith(".pdf");
-            const isNotPartial =
-              !file.endsWith(".crdownload") && !file.endsWith(".tmp");
-
-            if (isNew && isPdf && isNotPartial) {
-              try {
-                const hasSize =
-                  fs.statSync(path.join(tempDir, file)).size > 1000; // At least 1KB
-                return hasSize;
-              } catch (statError) {
-                return false;
-              }
-            }
-            return false;
-          });
-
-          if (newTempFiles.length > 0) {
-            // Wait a bit more to ensure download is complete
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            break;
-          }
-
-          // Check for partial downloads
-          const partialFiles = currentTempFiles.filter(
-            (file) => file.endsWith(".crdownload") || file.endsWith(".tmp")
-          );
-          if (partialFiles.length > 0 && attempts % 10 === 0) {
-            console.log(`⏳ Partial downloads in progress:`, partialFiles);
-          }
-        } else {
-          console.log(`📂 Temp directory doesn't exist yet: ${tempDir}`);
-        }
-      } catch (error) {
-        console.log(`⚠️ Error checking temp directory: ${error.message}`);
-      }
-    }
-
-    const customFileName = generateCustomFileName(record);
-    const finalCustomFileName =
-      includeDownloaded && record.downloadStatus === "Downloaded"
-        ? `${customFileName}_${Date.now()}`
-        : customFileName;
-
-    // Ensure final directory exists
-    if (!fs.existsSync(finalDir)) {
-      fs.mkdirSync(finalDir, { recursive: true });
-    }
-
-    const movedFiles = [];
-    let totalSize = 0;
-
-    for (let i = 0; i < newTempFiles.length; i++) {
-      const tempFile = newTempFiles[i];
-      const tempFilePath = path.join(tempDir, tempFile);
-
-      const fileExtension = path.extname(tempFile);
-      const newFileName = `${finalCustomFileName}${
-        newTempFiles.length > 1 ? `_${i + 1}` : ""
-      }${fileExtension}`;
-      const finalFilePath = path.join(finalDir, newFileName);
-
-      // Handle file name conflicts
-      let actualFinalPath = finalFilePath;
-      if (fs.existsSync(finalFilePath)) {
-        const timestamp = Date.now();
-        const conflictFileName = `${finalCustomFileName}${
-          newTempFiles.length > 1 ? `_${i + 1}` : ""
-        }_${timestamp}${fileExtension}`;
-        actualFinalPath = path.join(finalDir, conflictFileName);
-      }
-
-      // Move file from temp to final location
-      try {
-        fs.copyFileSync(tempFilePath, actualFinalPath);
-
-        const size = await getFileSize(actualFinalPath);
-        totalSize += size;
-
-        movedFiles.push({
-          name: path.basename(actualFinalPath),
-          originalName: tempFile,
-          size: formatBytes(size),
-          sizeBytes: size,
-          inspectionNumber: inspectionNumber,
-          groupNumber: record.groupNumber,
-          project: record.project,
-          customFileName: finalCustomFileName
-        });
-      } catch (moveError) {
-        console.error(`❌ Error moving file ${tempFile}:`, moveError);
-        throw moveError;
-      }
-    }
-
-    // Update status to 'Downloaded'
-    await updateDownloadStatus(record._id, "Downloaded", new Date());
-
-    return {
-      inspectionNumber,
-      groupNumber: record.groupNumber,
-      project: record.project,
-      fileCount: movedFiles.length,
-      totalSize,
-      files: movedFiles,
-      success: true,
-      customFileName: finalCustomFileName,
-      redownloaded: includeDownloaded && record.downloadStatus === "Downloaded"
-    };
-  } catch (error) {
-    console.error(`❌ Error downloading report ${inspectionNumber}:`, error);
-    await updateDownloadStatus(record._id, "Failed");
-
-    return {
-      inspectionNumber,
-      groupNumber: record.groupNumber,
-      project: record.project,
-      fileCount: 0,
-      totalSize: 0,
-      files: [],
-      success: false,
-      error: error.message
-    };
-  }
-};
-
-// Main bulk download function (UPDATED with proper login)
+// Updated downloadBulkReports function
 export const downloadBulkReports = async (req, res) => {
   let browser = null;
   let jobDir = null;
-
   try {
     const {
-      downloadPath,
       startRange,
       endRange,
       downloadAll,
-      includeDownloaded = false,
       startDate,
       endDate,
       factoryName,
-      language = "english"
+      language = "english",
+      includeDownloaded = false
     } = req.body;
 
-    // 1️⃣ Create unique temp folder for this bulk job
-    const jobId =
-      Date.now().toString() +
-      "_bulk_" +
-      Math.random().toString(36).substr(2, 9);
-    jobDir = path.join(baseTempDir, jobId);
+    jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
     fs.mkdirSync(jobDir, { recursive: true });
 
-    const targetDownloadDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
-
-    // Get inspection records
     const records = await getInspectionRecords(
       startRange,
       endRange,
       downloadAll,
-      includeDownloaded,
       startDate,
       endDate,
-      factoryName
+      factoryName,
+      includeDownloaded
     );
 
-    if (records.length === 0) {
-      // Cleanup empty job directory
-      if (jobDir && fs.existsSync(jobDir)) {
-        fs.rmSync(jobDir, { recursive: true, force: true });
-      }
-
-      return res.json({
-        success: true,
-        message: "No records found matching the specified criteria",
-        downloadInfo: {
-          totalRecords: 0,
-          successfulDownloads: 0,
-          failedDownloads: 0,
-          skippedDownloads: 0,
-          totalFiles: 0,
-          totalSize: "0 Bytes",
-          details: []
-        }
-      });
-    }
-
-    // 2️⃣ Enhanced browser launch with better session handling
     browser = await puppeteer.launch({
       headless: CONFIG.HEADLESS,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
-        "--disable-web-security",
-        "--disable-features=VizDisplayCompositor",
         "--disable-dev-shm-usage",
-        "--disable-gpu",
-        "--no-first-run",
-        "--no-zygote",
-        "--disable-blink-features=AutomationControlled", // Hide automation
-        "--disable-extensions",
-        "--disable-plugins"
-      ],
-      defaultViewport: null,
-      ignoreDefaultArgs: ["--enable-automation"] // Hide automation flags
+        "--disable-web-security",
+        "--disable-features=VizDisplayCompositor"
+      ]
     });
 
     const page = await browser.newPage();
 
-    // Enhanced user agent and headers
-    await page.setUserAgent(
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-    );
+    // Set longer timeouts
+    page.setDefaultTimeout(60000);
+    page.setDefaultNavigationTimeout(60000);
 
-    // Remove webdriver property
-    await page.evaluateOnNewDocument(() => {
-      Object.defineProperty(navigator, "webdriver", {
-        get: () => undefined
-      });
-    });
-
-    // Set viewport
-    await page.setViewport({ width: 1366, height: 768 });
-
-    // 👉 Enhanced download behavior setup
-    const client = await page.createCDPSession();
+    const client = await page.target().createCDPSession();
     await client.send("Page.setDownloadBehavior", {
       behavior: "allow",
       downloadPath: jobDir
     });
 
-    // Set additional headers to maintain session
-    await page.setExtraHTTPHeaders({
-      Accept:
-        "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-      "Accept-Language": "en-US,en;q=0.5",
-      "Accept-Encoding": "gzip, deflate",
-      Connection: "keep-alive",
-      "Upgrade-Insecure-Requests": "1"
-    });
+    // Login process
+    await page.goto(CONFIG.LOGIN_URL);
+    await page.waitForSelector("#username");
+    await page.type("#username", process.env.P88_USERNAME);
+    await page.type("#password", process.env.P88_PASSWORD);
+    await page.click("#js-login-submit");
+    await page.waitForNavigation();
 
-    // Login process with enhanced session management
-    await performLogin(page);
-
-    // Download reports
-    const downloadResults = [];
-    let successfulDownloads = 0;
-    let failedDownloads = 0;
-    let skippedDownloads = 0;
-    let redownloadedCount = 0;
-    let totalFiles = 0;
-    let totalSizeBytes = 0;
-
-    for (let i = 0; i < records.length; i++) {
-      const record = records[i];
-      const inspectionNumber = getFirstInspectionNumber(record);
-
-      if (!inspectionNumber) {
-        failedDownloads++;
-        downloadResults.push({
-          inspectionNumber: "N/A",
-          groupNumber: record.groupNumber,
-          project: record.project,
-          success: false,
-          error: "No inspection number found"
-        });
-        continue;
-      }
+    for (const record of records) {
+      const inspNo =
+        record.inspectionNumbers?.[0] ||
+        record.inspectionNumbersKey?.split("-")[0];
+      if (!inspNo) continue;
 
       try {
-        // Use the FIXED single report download function
-        const result = await downloadSingleReportWithTempFixed(
-          page,
-          inspectionNumber,
-          jobDir, // Use temp directory
-          targetDownloadDir, // Final destination
-          record,
-          includeDownloaded,
-          language
-        );
+        await updateDownloadStatus(record._id, "In Progress");
+        const filesBefore = fs.readdirSync(jobDir);
 
-        downloadResults.push(result);
+        // Navigate to report
+        await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, {
+          waitUntil: "networkidle0",
+          timeout: 60000
+        });
 
-        if (result.success) {
-          if (result.skipped) {
-            skippedDownloads++;
-          } else {
-            successfulDownloads++;
-            totalFiles += result.fileCount;
-            totalSizeBytes += result.totalSize;
+        // Wait for page to fully load
+        await new Promise((resolve) => setTimeout(resolve, 3000));
 
-            if (result.redownloaded) {
-              redownloadedCount++;
-            } else {
-              console.log(
-                `✅ Downloaded: ${inspectionNumber} (${result.fileCount} files)`
-              );
-            }
-          }
+        // 🔥 ALWAYS try to change language (for both English and Chinese)
+        const languageChanged = await changeLanguage(page, language);
+        if (languageChanged) {
+          // Wait for page to reload with new language
+          await new Promise((resolve) => setTimeout(resolve, 4000));
         } else {
-          failedDownloads++;
-          console.log(`❌ Failed: ${inspectionNumber} - ${result.error}`);
+          console.warn(
+            `⚠️ Language change failed for ${inspNo}, continuing with current language`
+          );
         }
-      } catch (error) {
-        console.error(`Error processing record ${record._id}:`, error);
-        failedDownloads++;
-        downloadResults.push({
-          inspectionNumber: inspectionNumber,
-          groupNumber: record.groupNumber,
-          project: record.project,
-          success: false,
-          error: error.message
+
+        // Wait for and click print button with multiple selectors
+        let printButton = null;
+
+        const printSelectors = [
+          "#page-wrapper a",
+          'a[href*="print"]',
+          'a[onclick*="print"]',
+          ".print-btn",
+          'button[onclick*="print"]'
+        ];
+
+        for (const selector of printSelectors) {
+          try {
+            await page.waitForSelector(selector, { timeout: 5000 });
+            printButton = await page.$(selector);
+            if (printButton) {
+              break;
+            }
+          } catch (e) {
+            continue;
+          }
+        }
+
+        if (!printButton) {
+          throw new Error("Print button not found with any selector");
+        }
+
+        // Click print button
+        await printButton.click();
+
+        // Wait a bit for download to start
+        await new Promise((resolve) => setTimeout(resolve, 3000));
+
+        // Wait for file download
+        const newFiles = await waitForNewFile(jobDir, filesBefore);
+
+        // Rename files
+        const baseName = getFilename(record);
+        newFiles.forEach((file, index) => {
+          const oldPath = path.join(jobDir, file);
+          const newName = `${baseName}${
+            newFiles.length > 1 ? `_${index + 1}` : ""
+          }.pdf`;
+          fs.renameSync(oldPath, path.join(jobDir, newName));
         });
+
+        await updateDownloadStatus(record._id, "Downloaded");
+      } catch (err) {
+        console.error(`❌ Error downloading ${inspNo}:`, err.message);
+        await updateDownloadStatus(record._id, "Failed");
+
+        // Take screenshot for debugging
+        try {
+          const screenshotPath = path.join(
+            jobDir,
+            `error_${inspNo}_${Date.now()}.png`
+          );
+          await page.screenshot({ path: screenshotPath, fullPage: true });
+        } catch (screenshotError) {
+          console.log(
+            "Could not take error screenshot:",
+            screenshotError.message
+          );
+        }
       }
     }
 
-    if (browser) {
-      await browser.close();
-    }
-
-    // 🔥 Cleanup temp directory
-    if (jobDir && fs.existsSync(jobDir)) {
-      try {
-        fs.rmSync(jobDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error("Error cleaning up bulk temp directory:", cleanupError);
-      }
-    }
-
-    const summaryMessage = includeDownloaded
-      ? `Download completed: ${successfulDownloads} successful (${redownloadedCount} re-downloaded), ${failedDownloads} failed, ${skippedDownloads} skipped`
-      : `Download completed: ${successfulDownloads} successful, ${failedDownloads} failed, ${skippedDownloads} skipped`;
-
-    res.json({
-      success: true,
-      message: summaryMessage,
-      downloadInfo: {
-        totalRecords: records.length,
-        successfulDownloads,
-        failedDownloads,
-        skippedDownloads,
-        redownloadedCount,
-        totalFiles,
-        totalSize: formatBytes(totalSizeBytes),
-        downloadPath: targetDownloadDir,
-        details: downloadResults,
-        includeDownloaded
-      }
-    });
+    await browser.close();
+    await streamZipAndCleanup(jobDir, res);
   } catch (error) {
-    console.error("Bulk download failed:", error);
-
-    // Cleanup on error
-    if (browser) {
-      try {
-        await browser.close();
-      } catch (closeError) {
-        console.error("Error closing browser:", closeError);
-      }
-    }
-
-    if (jobDir && fs.existsSync(jobDir)) {
-      try {
-        fs.rmSync(jobDir, { recursive: true, force: true });
-      } catch (cleanupError) {
-        console.error("Error cleaning up temp directory:", cleanupError);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+    console.error("❌ Bulk download failed:", error);
+    if (browser) await browser.close();
+    res.status(500).json({ success: false, error: error.message });
   }
 };
+
+async function streamZipAndCleanup(jobDir, res) {
+  const zipName = `Reports_${Date.now()}.zip`;
+  const zipPath = path.join(baseTempDir, zipName);
+  const output = fs.createWriteStream(zipPath);
+  const archive = archiver("zip", { zlib: { level: 9 } });
+
+  output.on("close", () => {
+    res.download(zipPath, zipName, (err) => {
+      if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+      if (fs.existsSync(jobDir))
+        fs.rmSync(jobDir, { recursive: true, force: true });
+    });
+  });
+
+  archive.pipe(output);
+  archive.directory(jobDir, false);
+  await archive.finalize();
+}
 
 // Get total record count endpoint (updated)
 export const getRecordCount = async (req, res) => {

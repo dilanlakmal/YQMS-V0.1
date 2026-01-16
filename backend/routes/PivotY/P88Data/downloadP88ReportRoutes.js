@@ -11,7 +11,9 @@ import {
   resetDownloadStatus,
   getFactories,
   getDateFilteredStats,
-  downloadSingleReportDirect
+  downloadSingleReportDirect,
+  downloadBulkReportsAuto,
+  downloadBulkReportsUbuntu
 } from "../../../controller/PivotY/P88Data/downoloadP88ReportController.js";
 
 const router = express.Router();
@@ -31,5 +33,13 @@ router.post(
 router.get("/api/scraping/download-status-stats", getDownloadStatusStats);
 router.post("/api/scraping/reset-download-status", resetDownloadStatus);
 router.post("/api/scraping/download-single-direct", downloadSingleReportDirect);
+router.post(
+  "/api/scraping/download-bulk-reports-auto",
+  downloadBulkReportsAuto
+);
+router.post(
+  "/api/scraping/download-bulk-reports-ubuntu",
+  downloadBulkReportsUbuntu
+);
 
 export default router;
