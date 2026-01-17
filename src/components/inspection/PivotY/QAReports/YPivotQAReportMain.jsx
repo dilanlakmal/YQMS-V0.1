@@ -482,7 +482,7 @@ const ColumnCustomizeModal = ({
 
   return createPortal(
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col max-h-[80vh]">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 dark:border-gray-700 overflow-hidden flex flex-col h-[600px] max-h-[90vh]">
         {/* Header with Tabs */}
         <div className="px-5 py-4 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
           <div className="flex items-center justify-between mb-4">
@@ -827,7 +827,6 @@ const YPivotQAReportMain = () => {
   const [canViewReportId, setCanViewReportId] = useState(false);
   const [reports, setReports] = useState([]);
   const [viewingReportQR, setViewingReportQR] = useState(null);
-  const [showDetailedView, setShowDetailedView] = useState(false);
   const [viewingInspector, setViewingInspector] = useState(null);
   const [showColumnModal, setShowColumnModal] = useState(false);
 
@@ -1253,16 +1252,6 @@ const YPivotQAReportMain = () => {
     });
   }, [canViewReportId]);
 
-  // Helper for column visibility check (for detailed view columns)
-  const isColumnVisible = (colId) => {
-    if (
-      ["orderType", "method", "wash", "supplier", "external"].includes(colId)
-    ) {
-      return showDetailedView && visibleColumns.includes(colId);
-    }
-    return visibleColumns.includes(colId);
-  };
-
   // Helper to construct full image URL
   const getProductImageUrl = (url) => {
     if (!url) return null;
@@ -1546,31 +1535,6 @@ const YPivotQAReportMain = () => {
               >
                 <Settings2 className="w-4 h-4" /> Customize
               </button>
-
-              {/* View Details Toggle */}
-              <button
-                onClick={() => setShowDetailedView(!showDetailedView)}
-                className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl shadow-sm transition-all active:scale-95 border ${
-                  showDetailedView
-                    ? "bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/50 dark:text-indigo-300 dark:border-indigo-700"
-                    : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600"
-                }`}
-              >
-                {showDetailedView ? (
-                  <>
-                    <EyeOff className="w-4 h-4" /> Hide Details
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4" /> View Details
-                  </>
-                )}
-              </button>
-
-              {/* Export Button */}
-              <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl shadow-lg transition-transform active:scale-95">
-                <Download className="w-4 h-4" /> Export Excel
-              </button>
             </div>
           </div>
 
@@ -1614,22 +1578,22 @@ const YPivotQAReportMain = () => {
                 {isColumnVisible("product") && (
                   <th className="px-5 py-4 whitespace-nowrap">Product</th>
                 )}
-                {showDetailedView && isColumnVisible("orderType") && (
+                {isColumnVisible("orderType") && (
                   <th className="px-5 py-4 whitespace-nowrap">Type</th>
                 )}
-                {showDetailedView && isColumnVisible("method") && (
+                {isColumnVisible("method") && (
                   <th className="px-5 py-4 whitespace-nowrap">Method</th>
                 )}
-                {showDetailedView && isColumnVisible("wash") && (
+                {isColumnVisible("wash") && (
                   <th className="px-5 py-4 whitespace-nowrap">Wash</th>
                 )}
                 {isColumnVisible("qaId") && (
                   <th className="px-5 py-4 whitespace-nowrap">QA ID</th>
                 )}
-                {showDetailedView && isColumnVisible("supplier") && (
+                {isColumnVisible("supplier") && (
                   <th className="px-5 py-4 whitespace-nowrap">Supplier</th>
                 )}
-                {showDetailedView && isColumnVisible("external") && (
+                {isColumnVisible("external") && (
                   <th className="px-5 py-4 whitespace-nowrap">External</th>
                 )}
                 {isColumnVisible("factory") && (
@@ -1812,7 +1776,7 @@ const YPivotQAReportMain = () => {
                       )}
 
                       {/* Order Type */}
-                      {showDetailedView && isColumnVisible("orderType") && (
+                      {isColumnVisible("orderType") && (
                         <td className="px-5 py-4">
                           <span
                             className={`px-2 py-1 rounded text-[10px] font-bold uppercase border ${
@@ -1829,7 +1793,7 @@ const YPivotQAReportMain = () => {
                       )}
 
                       {/* Method */}
-                      {showDetailedView && isColumnVisible("method") && (
+                      {isColumnVisible("method") && (
                         <td className="px-5 py-4">
                           {report.inspectionMethod === "AQL" ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
@@ -1844,7 +1808,7 @@ const YPivotQAReportMain = () => {
                       )}
 
                       {/* Wash */}
-                      {showDetailedView && isColumnVisible("wash") && (
+                      {isColumnVisible("wash") && (
                         <td className="px-5 py-4">
                           {report.measurementMethod === "Before" ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-700 border border-blue-200">
@@ -1899,14 +1863,14 @@ const YPivotQAReportMain = () => {
                       )}
 
                       {/* Supplier */}
-                      {showDetailedView && isColumnVisible("supplier") && (
+                      {isColumnVisible("supplier") && (
                         <td className="px-5 py-4 text-gray-600 dark:text-gray-300 font-medium">
                           {details.supplier || "YM"}
                         </td>
                       )}
 
                       {/* External */}
-                      {showDetailedView && isColumnVisible("external") && (
+                      {isColumnVisible("external") && (
                         <td className="px-5 py-4">
                           {isSubCon ? (
                             <div className="flex items-center gap-1.5 text-orange-600 font-bold text-xs">
