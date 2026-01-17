@@ -4,6 +4,7 @@ import {
   getDefectImagesForReport,
   getReportMeasurementSpecs,
   checkUserPermission,
+  checkApprovalPermission,
   getReportImagesAsBase64,
   getReportDefectHeatmap,
   getFilterOptions,
@@ -43,6 +44,12 @@ router.get(
 
 // Route to check permission
 router.get("/api/fincheck-reports/check-permission", checkUserPermission);
+
+// Route to check Decision/Approval permission
+router.get(
+  "/api/fincheck-reports/check-approval-permission",
+  checkApprovalPermission
+);
 
 // Get all report images as base64 for PDF generation
 router.get(

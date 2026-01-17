@@ -889,6 +889,7 @@ const YPivotQAReportFullView = () => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   // Permission State
   const [canViewReportId, setCanViewReportId] = useState(false);
+  const [isApprover, setIsApprover] = useState(false);
 
   const [defectHeatmap, setDefectHeatmap] = useState(null);
 
@@ -1039,7 +1040,35 @@ const YPivotQAReportFullView = () => {
     checkPermission();
   }, [user]);
 
-  // NEW: Fetch Defect Heatmap (Visual Locations)
+  // USEEFFECT FOR APPROVAL PERMISSION CHECK
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      // We need both the logged-in User AND the Report to be loaded
+      // so we can validate the specific report ID/Buyer against the user.
+      if (user?.emp_id && report?.reportId) {
+        try {
+          // Pass both empId AND reportId
+          const res = await axios.get(
+            `${API_BASE_URL}/api/fincheck-reports/check-approval-permission?empId=${user.emp_id}&reportId=${report.reportId}`
+          );
+
+          if (res.data && res.data.success && res.data.isApprover) {
+            setIsApprover(true);
+          } else {
+            setIsApprover(false);
+          }
+        } catch (error) {
+          console.error("Failed to check approval permission", error);
+          setIsApprover(false);
+        }
+      }
+    };
+
+    checkApprovalStatus();
+    // Add 'report' to dependency array so it re-runs once report details are fetched
+  }, [user, report]);
+
+  // Fetch Defect Heatmap (Visual Locations)
   useEffect(() => {
     const fetchHeatmap = async () => {
       if (!reportId) return;
@@ -1539,21 +1568,23 @@ const YPivotQAReportFullView = () => {
 
           <div className="flex items-center gap-2">
             {/* --- DECISION BUTTON --- */}
-            <button
-              onClick={() => setShowDecisionModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-800/40 hover:bg-indigo-900/40 text-white rounded-xl font-bold border border-indigo-400/30 transition-colors"
-            >
-              <Gavel className="w-4 h-4" />
-              <span className="hidden sm:inline">Decision</span>
-            </button>
+            {isApprover && (
+              <button
+                onClick={() => setShowDecisionModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-800/40 hover:bg-indigo-900/40 text-white rounded-xl font-bold border border-indigo-400/30 transition-colors"
+              >
+                <Gavel className="w-4 h-4" />
+                <span className="hidden sm:inline">Decision</span>
+              </button>
+            )}
 
-            <button
+            {/* <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:bg-gray-50 transition-colors"
             >
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print</span>
-            </button>
+            </button> */}
 
             {/* New PDF Generator Button */}
             <YPivotQAReportPDFGenerator

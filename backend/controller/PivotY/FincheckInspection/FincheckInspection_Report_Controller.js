@@ -5,7 +5,8 @@ import {
   RoleManagment,
   UserMain,
   QASectionsProductLocation,
-  FincheckUserPreferences
+  FincheckUserPreferences,
+  FincheckApprovalAssignees
 } from "../../MongoDB/dbConnectionController.js";
 
 import axios from "axios";
@@ -509,6 +510,73 @@ export const checkUserPermission = async (req, res) => {
   } catch (error) {
     console.error("Permission check error:", error);
     return res.status(500).json({ success: false, isAdmin: false });
+  }
+};
+
+// ============================================================
+// Check Approval Authority (New Endpoint)
+// ============================================================
+
+export const checkApprovalPermission = async (req, res) => {
+  try {
+    // 1. Get empId AND reportId
+    const { empId, reportId } = req.query;
+
+    if (!empId) {
+      return res.status(200).json({ success: true, isApprover: false });
+    }
+
+    // 2. Find the Assignee (The Leader)
+    const assignee = await FincheckApprovalAssignees.findOne({
+      empId: empId
+    }).select("allowedCustomers");
+
+    // If user is not in the approval list at all, return false
+    if (!assignee) {
+      return res.status(200).json({
+        success: true,
+        isApprover: false
+      });
+    }
+
+    // 3. If a specific Report ID is provided, validate the Buyer
+    if (reportId) {
+      const report = await FincheckInspectionReports.findOne({
+        reportId: parseInt(reportId)
+      }).select("buyer");
+
+      if (!report) {
+        // Report doesn't exist? Fail safe.
+        return res
+          .status(404)
+          .json({ success: false, message: "Report not found" });
+      }
+
+      // CHECK: Is the Report's Buyer in the Assignee's allowed list?
+      const isBuyerAllowed = assignee.allowedCustomers.includes(report.buyer);
+
+      if (!isBuyerAllowed) {
+        return res.status(200).json({
+          success: true,
+          isApprover: false, // DENIED due to buyer mismatch
+          message: "User not authorized for this buyer"
+        });
+      }
+    }
+
+    // 4. Success (User is assignee AND (if reportId provided) buyer is allowed)
+    return res.status(200).json({
+      success: true,
+      isApprover: true,
+      allowedCustomers: assignee.allowedCustomers || []
+    });
+  } catch (error) {
+    console.error("Approval permission check error:", error);
+    return res.status(500).json({
+      success: false,
+      isApprover: false,
+      error: error.message
+    });
   }
 };
 
