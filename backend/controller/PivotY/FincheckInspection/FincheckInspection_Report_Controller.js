@@ -6,12 +6,14 @@ import {
   UserMain,
   QASectionsProductLocation,
   FincheckUserPreferences,
-  FincheckApprovalAssignees
+  FincheckApprovalAssignees,
+  FincheckInspectionDecision
 } from "../../MongoDB/dbConnectionController.js";
 
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 // ============================================================
 // Get Filtered Inspection Reports
@@ -932,6 +934,105 @@ export const deleteUserFilter = async (req, res) => {
     const updated = await FincheckUserPreferences.findOne({ empId });
     return res.status(200).json({ success: true, data: updated });
   } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Submit Leader Decision (With Audio Support)
+// ============================================================
+
+// Define Storage Path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Define Decision Audio Storage Path
+const uploadDirDecision = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/Decision"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirDecision)) {
+  fs.mkdirSync(uploadDirDecision, { recursive: true });
+}
+
+export const submitLeaderDecision = async (req, res) => {
+  try {
+    // 1. Parse Data
+    const {
+      reportId,
+      status,
+      systemComment,
+      additionalComment,
+      leaderId,
+      leaderName
+    } = req.body;
+
+    // Validate Report ID
+    if (!reportId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID missing." });
+    }
+    const parsedReportId = parseInt(reportId);
+
+    // 2. Validate Report Exists
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parsedReportId
+    });
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    // 3. Handle Audio File Upload
+    let audioUrl = "";
+    let hasAudio = false;
+
+    if (req.files && req.files.audioBlob) {
+      const audioFile = req.files.audioBlob;
+
+      // Use the correctly defined path variable
+      const targetDir = uploadDirDecision;
+
+      // Naming: Decision_ReportID_LeaderID_Timestamp.webm
+      const fileName = `Decision_${parsedReportId}_${leaderId}_${Date.now()}.webm`;
+      const uploadPath = path.join(targetDir, fileName);
+
+      // Save file
+      await audioFile.mv(uploadPath);
+
+      // Save relative URL for frontend access (Publicly accessible path)
+      // Note: Ensure your appConfig.js serves '/storage/PivotY' correctly
+      audioUrl = `/storage/PivotY/Fincheck/Decision/${fileName}`;
+      hasAudio = true;
+    }
+
+    // 4. Save Record to MongoDB
+    const newDecision = new FincheckInspectionDecision({
+      reportId: parsedReportId,
+      reportRef: report._id,
+      approvalEmpId: leaderId,
+      approvalEmpName: leaderName,
+      decisionStatus: status,
+      systemGeneratedComment: systemComment,
+      additionalComment: additionalComment || "",
+      hasAudio: hasAudio,
+      audioUrl: audioUrl,
+      approvalDate: new Date()
+    });
+
+    await newDecision.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Decision saved successfully",
+      data: newDecision
+    });
+  } catch (error) {
+    console.error("Error saving decision:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };

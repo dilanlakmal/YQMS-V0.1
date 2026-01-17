@@ -1,4 +1,5 @@
 import express from "express";
+import fileUpload from "express-fileupload";
 import {
   getInspectionReports,
   getDefectImagesForReport,
@@ -12,7 +13,8 @@ import {
   autocompleteCustStyle,
   saveUserPreference,
   getUserPreferences,
-  deleteUserFilter
+  deleteUserFilter,
+  submitLeaderDecision
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
@@ -69,6 +71,20 @@ router.get("/api/fincheck-reports/preferences/get", getUserPreferences);
 router.post(
   "/api/fincheck-reports/preferences/delete-filter",
   deleteUserFilter
+);
+
+// POST - Submit Decision (Supports FormData for Audio)
+router.post(
+  "/api/fincheck-reports/submit-decision",
+
+  // 1. Middleware: Activates only for this route to parse FormData/Audio
+  fileUpload({
+    createParentPath: true, // Creates folders if missing
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for audio
+  }),
+
+  // 2. Controller
+  submitLeaderDecision
 );
 
 export default router;
