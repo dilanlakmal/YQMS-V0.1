@@ -893,6 +893,9 @@ const YPivotQAReportMain = () => {
   // Action column dropdown handller
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
 
+  // Display Loaded filter names
+  const [activeFilterName, setActiveFilterName] = useState(null);
+
   // --- SWAL FIRE STATE ---
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
@@ -1009,6 +1012,7 @@ const YPivotQAReportMain = () => {
     // If you want Start Date to also be dynamic if it was today, you would need similar logic above.
 
     setFilters(loadedFilters);
+    setActiveFilterName(savedItem.name);
   };
 
   // --- 4. Delete Filter ---
@@ -1055,15 +1059,6 @@ const YPivotQAReportMain = () => {
     } catch (error) {
       console.error("Failed to save column preference", error);
     }
-  };
-
-  // --- Helper: Get Local Today String (YYYY-MM-DD) ---
-  const getTodayString = () => {
-    const d = new Date();
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${year}-${month}-${day}`;
   };
 
   // --- Fetch Filter Options ---
@@ -1164,6 +1159,7 @@ const YPivotQAReportMain = () => {
 
   // Reset Filters
   const handleReset = () => {
+    setActiveFilterName(null);
     setFilters({
       startDate: new Date().toISOString().split("T")[0],
       endDate: new Date().toISOString().split("T")[0],
@@ -1182,6 +1178,7 @@ const YPivotQAReportMain = () => {
 
   // Hard Reset (New): Resets EVERYTHING to default
   const handleResetAll = () => {
+    setActiveFilterName(null);
     setFilters({
       startDate: "", // ← Change from getTodayString() to empty string
       endDate: "", // ← Change from getTodayString() to empty string
@@ -1221,6 +1218,12 @@ const YPivotQAReportMain = () => {
       });
       setOpenMenuId(id);
     }
+  };
+
+  // Helper for column visibility check
+  const isColumnVisible = (colId) => {
+    // Simply check if it's in the array
+    return visibleColumns.includes(colId);
   };
 
   const handleViewReport = (report) => {
@@ -1285,6 +1288,8 @@ const YPivotQAReportMain = () => {
     // orderNosString might be "ORDER1, ORDER2, ORDER3"
     const firstOrderNo = orderNosString.split(",")[0].trim();
 
+    setActiveFilterName(null);
+
     // Reset ALL filters and only set orderNo
     setFilters({
       startDate: "",
@@ -1313,18 +1318,76 @@ const YPivotQAReportMain = () => {
     });
   };
 
+  // --- Helper to Generate Summary String ---
+  const activeFilterSummary = useMemo(() => {
+    if (!activeFilterName) return null;
+
+    const readableLabels = {
+      startDate: "Start",
+      endDate: "End",
+      reportId: "Report ID",
+      reportType: "Type",
+      orderType: "Ord Type",
+      orderNo: "Order #",
+      productType: "Product",
+      empId: "QA ID",
+      subConFactory: "Ext. Fac",
+      custStyle: "Style",
+      buyer: "Buyer",
+      supplier: "Supplier"
+    };
+
+    const parts = [];
+
+    Object.entries(filters).forEach(([key, val]) => {
+      // 1. Skip empty strings, nulls, undefined
+      // 2. Skip "All" values
+      if (!val || val === "All") return;
+
+      const label = readableLabels[key] || key;
+
+      // Optional: Format dates to look nicer?
+      // For now, just displaying the value as is.
+      parts.push(`${label}: ${val}`);
+    });
+
+    if (parts.length === 0) return "";
+    return `(${parts.join(", ")})`;
+  }, [filters, activeFilterName]);
+
   return (
     <div className="space-y-4 animate-fadeIn">
       {/* --- 1. FILTER PANE --- */}
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 relative z-40">
         <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100 dark:border-gray-700">
           <div className="flex items-center gap-2">
-            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+            <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400 flex-shrink-0">
               <Filter className="w-5 h-5" />
             </div>
-            <h2 className="text-base font-bold text-gray-800 dark:text-white">
+            <h2 className="text-base font-bold text-gray-800 dark:text-white flex-shrink-0">
               Report Filters
             </h2>
+            {/* --- LOADED FILTER BADGE --- */}
+            {activeFilterName && (
+              <div className="ml-2 px-3 py-1 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg flex items-center gap-2 min-w-0 animate-fadeIn">
+                <span className="text-[10px] uppercase font-bold text-indigo-500 flex-shrink-0">
+                  Loaded Filter:
+                </span>
+                <div className="text-xs text-indigo-700 dark:text-indigo-300 truncate">
+                  <span className="font-bold mr-1">{activeFilterName}</span>
+                  <span className="text-indigo-400 dark:text-indigo-500 font-normal">
+                    {activeFilterSummary}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setActiveFilterName(null)}
+                  className="ml-1 p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800 text-indigo-400"
+                  title="Clear saved filter label"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {/* Save Filters Button */}
