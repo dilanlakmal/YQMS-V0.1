@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../../../authentication/AuthContext'; 
 import SearchableSelect from './SearchableSelect';
 
 const PrintP88Report = () => {
     const [loading, setLoading] = useState(false);
+    const { user } = useAuth();
     const [status, setStatus] = useState({ message: '', type: '' });
     const [showDownloadDialog, setShowDownloadDialog] = useState(false);
     const [downloadInfo, setDownloadInfo] = useState(null);
@@ -243,10 +245,12 @@ const PrintP88Report = () => {
             }
             
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+            const token = localStorage.getItem('authToken') || localStorage.getItem('token');
             const response = await fetch(`${apiBaseUrl}/api/scraping/cancel-bulk-download`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify({ jobId: currentJobId })
             });
@@ -304,7 +308,7 @@ const PrintP88Report = () => {
             ? (Math.min(endRange, totalRecords) - startRange + 1)
             : totalRecords;
         
-        const estimatedSeconds = 90 + (reportsCount * 25); 
+        const estimatedSeconds = 60 + (reportsCount * 25); 
         setTimeRemaining(estimatedSeconds);
         setLoading(true);
         setIsCancelling(false);
@@ -336,11 +340,14 @@ const PrintP88Report = () => {
                 includeDownloaded: includeDownloaded,
                 language: language
             };
+
+            const token = localStorage.getItem('authToken') || localStorage.getItem('token');
             
             const response = await fetch(`${apiBaseUrl}/api/scraping/${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(body),
                 signal: abortControllerRef.current.signal // Add abort signal
@@ -395,6 +402,11 @@ const PrintP88Report = () => {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 py-8 px-4">
+            {user && (
+                <div className="max-w-7xl mx-auto mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg text-sm">
+                    <strong>Current User:</strong> {user.eng_name} ({user.emp_id})
+                </div>
+            )}
             <div className="max-w-7xl mx-auto">
                 {/* Header Card */}
                 <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-700 overflow-hidden mb-6">

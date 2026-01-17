@@ -8,6 +8,7 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 import { Builder, Browser, By, until } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
 import archiver from 'archiver';
+import {  logFailedReport } from "./p88failedReportController.js";
 
 const stat = promisify(fs.stat);
 // const readdir = promisify(fs.readdir);
@@ -28,7 +29,7 @@ const CONFIG = {
 };
 
 // Enhanced waitForNewFile function with better error handling
-async function waitForNewFile(dir, existingFiles, timeout = 300000) { // Increased timeout
+async function waitForNewFile(dir, existingFiles, timeout = 90000) { // Increased timeout
     const start = Date.now();
     
     while (Date.now() - start < timeout) {
@@ -64,7 +65,7 @@ async function waitForNewFile(dir, existingFiles, timeout = 300000) { // Increas
         
         await new Promise(r => setTimeout(r, 2000)); // Poll every 2 seconds
     }
-    throw new Error('Download timeout: No new PDF file detected within 300 seconds.');
+    throw new Error('Download timeout: No new PDF file detected within 90 seconds.');
 }
 
 
@@ -188,7 +189,7 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
                 // Navigate to report
                 await driver.get(`${CONFIG.BASE_REPORT_URL}${inspNo}`);
                 
-                const printBtn = await driver.wait(until.elementLocated(By.css('#page-wrapper a')), 180000);
+                const printBtn = await driver.wait(until.elementLocated(By.css('#page-wrapper a')), 15000);
                 await printBtn.click();
 
                 const newFiles = await waitForNewFile(jobDir, filesBefore);
@@ -350,53 +351,91 @@ export const getDownloadStatusStats = async (req, res) => {
   }
 };
 
-// Enhanced Language change function for Puppeteer
-const changeLanguage = async (page, language = 'english') => {
+// 1. IMPROVED LANGUAGE CHANGE: Waits for reload to ensure language "sticks"
+const changeLanguage = async (page, targetLanguage = 'english') => {
     try {
+        const target = targetLanguage.toLowerCase();
         
-        // Wait for page to load completely
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Try to find the specific language dropdown button
-        try {
-            await page.waitForSelector('#dropdownLanguage', { timeout: 5000 });
-          
-            
-            // Click the language dropdown
-            await page.click('#dropdownLanguage');
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Look for the requested language option in the dropdown
-            const languageOptions = await page.$$('a');
-            for (const option of languageOptions) {
-                try {
-                    const text = await page.evaluate(el => el.textContent?.trim(), option);
-                    const href = await page.evaluate(el => el.href, option);
-                    
-                    let isTargetLanguage = false;
-                    
-                    if (language === 'chinese') {
-                        isTargetLanguage = text && (text.includes('中文') || text.includes('Chinese') || text.includes('CN') || href?.includes('zh'));
-                    } else if (language === 'english') {
-                        isTargetLanguage = text && (text.includes('English') || text.includes('EN') || href?.includes('en'));
-                    }
-                    
-                    if (isTargetLanguage) {
-                        await option.click();
-                        await new Promise(resolve => setTimeout(resolve, 3000));
-                        return true;
-                    }
-                } catch (e) {
-                    // Skip this element
-                }
-            }
-        } catch (e) {
-            console.log('dropdownLanguage button not found, trying alternative methods');
+        // 1. Check current language from the dropdown button text
+        const currentLangDisplay = await page.evaluate(() => {
+            const el = document.querySelector('#dropdownLanguage');
+            return el ? el.innerText.trim().toLowerCase() : '';
+        });
+
+        const isCurrentlyChinese = currentLangDisplay.includes('中文') || currentLangDisplay.includes('chinese');
+        const isCurrentlyEnglish = currentLangDisplay.includes('english') || currentLangDisplay.includes('en');
+
+        if ((target === 'chinese' && isCurrentlyChinese) || (target === 'english' && isCurrentlyEnglish)) {
+            console.log(`ℹ️ Language already set to ${target}.`);
+            return true;
         }
+
+        console.log(`🌐 Switching session language to: ${target}`);
         
-        return false;
+        // 2. Open the dropdown
+        await page.waitForSelector('#dropdownLanguage', { timeout: 10000 });
+        await page.click('#dropdownLanguage');
+        
+        // 3. Wait for the menu to exist in the DOM
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // 4. Find the target link with Strict Text Matching
+        const clickResult = await page.evaluate((targetLang) => {
+            // Get all links that are children of a dropdown menu or have language-related text
+            const links = Array.from(document.querySelectorAll('a'));
+            
+            let found = null;
+            if (targetLang === 'chinese') {
+                // Look for Chinese identifiers
+                found = links.find(a => /中文|Chinese|CN/i.test(a.textContent));
+            } else {
+                // Look for English identifiers - STRICTOR matching to avoid "Tasks" (任务)
+                // We look for "English" or "EN" specifically
+                found = links.find(a => {
+                    const text = a.textContent.trim();
+                    return text === 'English' || text === 'EN' || /^English\s?\(.*\)$/i.test(text);
+                });
+            }
+
+            if (found) {
+                found.click();
+                return { success: true, text: found.textContent.trim() };
+            }
+
+            // Diagnostic: return all available link texts if we failed
+            return { success: false, availableLinks: links.map(a => a.textContent.trim()).filter(t => t.length > 0).slice(0, 20) };
+        }, target);
+
+        if (clickResult.success) {
+            console.log(`✅ Clicked: ${clickResult.text}`);
+            
+            // 5. Wait for the page to reload
+            await Promise.all([
+                page.waitForNavigation({ waitUntil: 'networkidle2', timeout: 30000 }).catch(() => {}),
+                new Promise(r => setTimeout(r, 5000)) 
+            ]);
+
+            // 6. Force Refresh if the UI is still wrong
+            const bodyText = await page.evaluate(() => document.body.innerText);
+            const verified = target === 'chinese' ? bodyText.includes('报告') : bodyText.includes('Report');
+            
+            if (!verified) {
+                console.log("⚠️ Verification failed. Performing Hard Refresh...");
+                await page.reload({ waitUntil: 'networkidle2' });
+                await new Promise(r => setTimeout(r, 3000));
+            }
+
+            console.log(`✅ Session set to ${target}`);
+            return true;
+        } else {
+            console.warn(`❌ Link not found. Available links on page:`, clickResult.availableLinks);
+            await page.keyboard.press('Escape');
+            return false;
+        }
+
     } catch (error) {
-        console.warn('Could not change language automatically:', error.message);
+        console.warn('⚠️ Language switch error:', error.message);
+        await page.keyboard.press('Escape').catch(() => {});
         return false;
     }
 };
@@ -608,6 +647,9 @@ export const downloadSingleReportDirect = async (req, res) => {
 };
 
 export const downloadBulkReportsCancellable = async (req, res) => {
+
+    const currentUserId = req.user?.emp_id || req.user?.id || "Unknown";
+    
     let browser = null;
     let jobDir = null;
     const { jobId } = req.body;
@@ -615,47 +657,27 @@ export const downloadBulkReportsCancellable = async (req, res) => {
     try {
         const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
         
-        // Store job info for potential cancellation
-        activeJobs.set(jobId, {
-            status: 'running',
-            startTime: new Date(),
-            cancelled: false,
-            jobDir: null,
-            browser: null
-        });
+        activeJobs.set(jobId, { status: 'running', startTime: new Date(), cancelled: false, jobDir: null, browser: null });
         
         jobDir = path.join(baseTempDir, `puppeteer_${jobId}`);
         fs.mkdirSync(jobDir, { recursive: true });
-        
-        // Update job info with directory
         activeJobs.get(jobId).jobDir = jobDir;
         
         const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded);
         
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-pdf-viewer-policy']
         });
         
-        // Update job info with browser
         activeJobs.get(jobId).browser = browser;
-        
         const page = await browser.newPage();
-        
-        // Set longer timeouts
-        page.setDefaultTimeout(300000);
-        page.setDefaultNavigationTimeout(300000);
+        page.setDefaultTimeout(120000); // 2 minute default
         
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
 
-        // Login process
+        // Login
         await page.goto(CONFIG.LOGIN_URL);
         await page.waitForSelector('#username');
         await page.type('#username', process.env.P88_USERNAME);
@@ -668,11 +690,8 @@ export const downloadBulkReportsCancellable = async (req, res) => {
         let failedCount = 0;
 
         for (const record of records) {
-            // Check if job was cancelled
             const jobInfo = activeJobs.get(jobId);
-            if (!jobInfo || jobInfo.cancelled) {
-                break;
-            }
+            if (!jobInfo || jobInfo.cancelled) break;
 
             const inspNo = record.inspectionNumbers?.[0] || record.inspectionNumbersKey?.split('-')[0];
             if (!inspNo) continue;
@@ -681,56 +700,39 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 await updateDownloadStatus(record._id, 'In Progress');
                 const filesBefore = fs.readdirSync(jobDir);
 
-                // Navigate to report
-                await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { 
-                    waitUntil: 'networkidle0',
-                    timeout: 120000 
+                // Load Report Page
+                await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { waitUntil: 'networkidle2' });
+
+                // 🔥 THE FIX: Always run language change. It will verify and switch if needed.
+                await changeLanguage(page, language);
+
+                // Give the server a moment to synchronize the session with the PDF generator
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Prepare print button
+                await page.evaluate(() => {
+                    const btn = document.querySelector('#page-wrapper a, a[href*="print"]');
+                    if (btn) btn.setAttribute('target', '_self');
                 });
 
-                // Wait for page to fully load
-                await new Promise(resolve => setTimeout(resolve, 90000));
-
-                // Try to change language
-                const languageChanged = await changeLanguage(page, language);
-                if (languageChanged) {
-                    await new Promise(resolve => setTimeout(resolve, 4000));
+                console.log(`📥 Requesting ${language} PDF for ${inspNo}...`);
+                
+                try {
+                    const printBtn = await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
+                    await printBtn.click();
+                } catch (clickErr) {
+                    if (!clickErr.message.includes('net::ERR_ABORTED')) throw clickErr;
                 }
 
-                // Wait for and click print button
-                let printButton = null;
-                const printSelectors = [
-                    '#page-wrapper a',
-                    'a[href*="print"]',
-                    'a[onclick*="print"]',
-                    '.print-btn',
-                    'button[onclick*="print"]'
-                ];
+                // Wait for file
+                const newFiles = await waitForNewFile(jobDir, filesBefore, 120000);
 
-                for (const selector of printSelectors) {
-                    try {
-                        await page.waitForSelector(selector, { timeout: 15000 });
-                        printButton = await page.$(selector);
-                        if (printButton) break;
-                    } catch (e) {
-                        continue;
-                    }
-                }
-
-                if (!printButton) {
-                    throw new Error('Print button not found with any selector');
-                }
-
-                await printButton.click();
-                await new Promise(resolve => setTimeout(resolve, 3000));
-
-                // Wait for file download
-                const newFiles = await waitForNewFile(jobDir, filesBefore);
-
-                // Rename files
+                // Rename
                 const baseName = getFilename(record);
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
-                    const newName = `${baseName}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
+                    // Include language in filename for easy verification
+                    const newName = `${baseName}-${language}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
                     fs.renameSync(oldPath, path.join(jobDir, newName));
                 });
 
@@ -738,49 +740,27 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 successCount++;
                 
             } catch (err) {
-                console.error(`❌ Error downloading ${inspNo}:`, err.message);
+                console.error(`❌ Error on ${inspNo}:`, err.message);
+                await logFailedReport(record._id, inspNo, record.groupNumber || 'NO-GROUP', err.message);
                 await updateDownloadStatus(record._id, 'Failed');
                 failedCount++;
             }
+        
             
             processedCount++;
-            
-            // Update job progress
             if (activeJobs.has(jobId)) {
-                activeJobs.get(jobId).progress = {
-                    processed: processedCount,
-                    total: records.length,
-                    success: successCount,
-                    failed: failedCount
-                };
+                activeJobs.get(jobId).progress = { processed: processedCount, total: records.length, success: successCount, failed: failedCount };
             }
         }
 
         await browser.close();
-        
-        // Remove from active jobs
         activeJobs.delete(jobId);
-        
-        // Send ZIP file
         await streamZipAndCleanup(jobDir, res);
 
     } catch (error) {
-        console.error('❌ Cancellable bulk download failed:', error);
-        
-        if (browser) {
-            try {
-                await browser.close();
-            } catch (closeError) {
-                console.error('Error closing browser:', closeError);
-            }
-        }
-        
-        // Clean up job
+        if (browser) await browser.close();
         activeJobs.delete(jobId);
-        
-        if (!res.headersSent) {
-            res.status(500).json({ success: false, error: error.message });
-        }
+        if (!res.headersSent) res.status(500).json({ success: false, error: error.message });
     }
 };
 
@@ -928,7 +908,7 @@ export const getJobStatus = async (req, res) => {
     }
 };
 
-// Updated downloadBulkReports function
+// 3. STANDARD BULK DOWNLOAD (Follows same logic)
 export const downloadBulkReports = async (req, res) => {
     let browser = null;
     let jobDir = null;
@@ -942,25 +922,13 @@ export const downloadBulkReports = async (req, res) => {
         
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-dev-shm-usage',
-                '--disable-web-security',
-                '--disable-features=VizDisplayCompositor'
-            ]
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-pdf-viewer-policy']
         });
         
         const page = await browser.newPage();
-        
-        // Set longer timeouts
-        page.setDefaultTimeout(90000);
-        page.setDefaultNavigationTimeout(60000);
-        
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
 
-        // Login process
         await page.goto(CONFIG.LOGIN_URL);
         await page.waitForSelector('#username');
         await page.type('#username', process.env.P88_USERNAME);
@@ -976,81 +944,55 @@ export const downloadBulkReports = async (req, res) => {
                 await updateDownloadStatus(record._id, 'In Progress');
                 const filesBefore = fs.readdirSync(jobDir);
 
-                // Navigate to report
-                await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { 
-                    waitUntil: 'networkidle0',
-                    timeout: 180000 
-                });
+                // Load Report Page
+                await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { waitUntil: 'networkidle2' });
 
-                // Wait for page to fully load
-                await new Promise(resolve => setTimeout(resolve, 10000));
+                // 🔥 THE FIX: Always run language change. It will verify and switch if needed.
+                await changeLanguage(page, language);
 
-                 await changeLanguage(page, language);
+                // Give the server a moment to synchronize the session with the PDF generator
+                await new Promise(resolve => setTimeout(resolve, 2000));
 
-                 // 🔥 CRITICAL: Force the print link to open in the SAME tab
-                // This prevents the download behavior from breaking in headless mode
+                // Prepare print button
                 await page.evaluate(() => {
-                    const links = document.querySelectorAll('a[href*="print"], #page-wrapper a');
-                    links.forEach(link => link.setAttribute('target', '_self'));
+                    const btn = document.querySelector('#page-wrapper a, a[href*="print"]');
+                    if (btn) btn.setAttribute('target', '_self');
                 });
 
-                let printButton = null;
-                const printSelectors = ['#page-wrapper a', 'a[href*="print"]', '.print-btn'];
+                console.log(`📥 Requesting ${language} PDF for ${inspNo}...`);
                 
-                for (const selector of printSelectors) {
-                    try {
-                        await page.waitForSelector(selector, { timeout: 60000 });
-                        printButton = await page.$(selector);
-                        if (printButton) {
-                            break;
-                        }
-                    } catch (e) {
-                        continue;
-                    }
-                }
-                
-                if (!printButton) {
-                    throw new Error('Print button not found with any selector');
+                try {
+                    const printBtn = await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
+                    await printBtn.click();
+                } catch (clickErr) {
+                    if (!clickErr.message.includes('net::ERR_ABORTED')) throw clickErr;
                 }
 
-                   await page.evaluate((el) => el.click(), printButton);
-                
-                console.log(`🚀 Clicked print for ${inspNo}, monitoring folder...`);
-                // await new Promise(resolve => setTimeout(resolve, 3000));
+                // Wait for file
+                const newFiles = await waitForNewFile(jobDir, filesBefore, 120000);
 
-                // Wait for file download
-                const newFiles = await waitForNewFile(jobDir, filesBefore);
-
-                // Rename files
+                // Rename
                 const baseName = getFilename(record);
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
-                    const newName = `${baseName}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
+                    // Include language in filename for easy verification
+                    const newName = `${baseName}-${language}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
                     fs.renameSync(oldPath, path.join(jobDir, newName));
                 });
 
                 await updateDownloadStatus(record._id, 'Downloaded');
+                successCount++;
                 
             } catch (err) {
-                console.error(`❌ Error downloading ${inspNo}:`, err.message);
+                console.error(`❌ Error on ${inspNo}:`, err.message);
                 await updateDownloadStatus(record._id, 'Failed');
-                
-                // Take screenshot for debugging
-                try {
-                    console.error(`❌ Error downloading ${inspNo}:`, err.message);
-                    // Take an error screenshot - helps see if there's an error popup on the site
-                    await page.screenshot({ path: path.join(jobDir, `FAIL_${inspNo}.png`) });
-                    await updateDownloadStatus(record._id, 'Failed');
-                } catch (screenshotError) {
-                    console.log('Could not take error screenshot:', screenshotError.message);
-                }
+                failedCount++;
             }
         }
 
         await browser.close();
         await streamZipAndCleanup(jobDir, res);
     } catch (error) {
-        console.error('❌ Bulk download failed:', error);
         if (browser) await browser.close();
         res.status(500).json({ success: false, error: error.message });
     }

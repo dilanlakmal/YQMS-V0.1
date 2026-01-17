@@ -103,6 +103,7 @@ import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspec
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+import p88failedReportsModel from "../../models/P88/p88FailedReports.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 //YDT Models
@@ -267,6 +268,7 @@ export const HumidityFiberName = createHumidityFiberNameModel(ymProdConnection);
 export const CoverPage = createCoverPageSchema(ymProdConnection);
 //P88Data
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
+export const p88FailedReport = p88failedReportsModel(ymProdConnection);
 
 //Humidity Exported Models
 export const HumidityReport = createHumidityModel(ymProdConnection);
