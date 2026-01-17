@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { MessageSquare, Plus, History, Users, Star, BarChart3 } from 'lucide-react';
 import FeedbackForm from '../components/Feedback/feedbackForm';
 import SubmittedFeedbacks from '../components/Feedback/SubmittedFeedbacks';
@@ -13,22 +13,23 @@ const Feedback = () => {
       label: 'New Feedback',
       icon: <Plus size={20} />,
       component: <FeedbackForm />,
-      description: 'Submit new feedback or suggestions'
+      description: 'Submit new feedback or suggestions',
+      color: 'from-blue-500 to-indigo-600'
     },
     {
       id: 'old',
       label: 'All Feedback',
       icon: <History size={20} />,
       component: <SubmittedFeedbacks />,
-      description: 'View and continue conversations'
+      description: 'View and continue conversations',
+      color: 'from-purple-500 to-pink-600'
     },
     {
       id: 'ratings',
       label: 'Rate Services',
       icon: <Star size={20} />,
       component: <RatingSystem />,
-      description: 'Rate overall experience and individual modules',
-      color: 'from-yellow-500 to-orange-500'
+      description: 'Rate overall experience and individual modules'
     }
   ];
 
@@ -38,7 +39,7 @@ const Feedback = () => {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800">
       {/* Header Section */}
       <div className="bg-white dark:bg-gray-800 shadow-lg border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             {/* Title Section */}
             <div className="flex items-center gap-4">
@@ -94,6 +95,7 @@ const Feedback = () => {
                     }`}>
                       {tab.icon}
                     </div>
+                     <div className="text-3xl">{tab.emoji}</div>
                     {tab.label}
                     {isActive && (
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse ml-1"></div>
@@ -107,7 +109,7 @@ const Feedback = () => {
       </div>
 
       {/* Content Section */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-8xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="animate-fadeIn">
           {activeTabData?.component}
         </div>

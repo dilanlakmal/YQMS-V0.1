@@ -8,8 +8,6 @@ const messageSchema = new mongoose.Schema({
   authorId: {
     type: mongoose.Schema.Types.ObjectId,
     required: true,
-    // Note: We'll reference your existing user collection
-    // but won't enforce the ref since you have your own User model
   },
   message: {
     type: String,
@@ -26,6 +24,24 @@ const messageSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  mentions: [{
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      required: true
+    },
+    username: {
+      type: String,
+      required: true
+    },
+    messageId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Message' // Reference to the mentioned message
+    }
+  }],
+  replyTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message'
+  },
   isAdmin: {
     type: Boolean,
     default: false

@@ -246,9 +246,9 @@ export const getFeedbackById = async (req, res) => {
 export const addMessage = async (req, res) => {
   try {
     const { id } = req.params;
-    const { message } = req.body;
-
+    const { message, replyTo, mentions } = req.body;
     const { userId, userName, isAdmin } = await getAuthUser(req);
+
     const feedback = await Feedback.findById(id);
     if (!feedback) {
       return res.status(404).json({
@@ -276,11 +276,37 @@ export const addMessage = async (req, res) => {
       });
     }
 
+    // Parse mentions from message
+    const mentionRegex = /@(\w+)/g;
+    const parsedMentions = [];
+    let match;
+    
+    while ((match = mentionRegex.exec(message)) !== null) {
+      const mentionedUsername = match[1];
+      // Find user by username
+      const mentionedUser = await UserMain.findOne({
+        $or: [
+          { eng_name: mentionedUsername },
+          { name: mentionedUsername }
+        ]
+      });
+      
+      if (mentionedUser) {
+        parsedMentions.push({
+          userId: mentionedUser._id,
+          username: mentionedUsername,
+          messageId: mentions?.find(m => m.username === mentionedUsername)?.messageId || null
+        });
+      }
+    }
+
     const newMessage = {
       author: userName,
       authorId: userId,
       message: message?.trim() || '',
       images,
+      mentions: parsedMentions,
+      replyTo: replyTo || null,
       isAdmin,
       timestamp: new Date()
     };
@@ -290,7 +316,26 @@ export const addMessage = async (req, res) => {
     
     await feedback.save();
 
+    // Populate the replyTo message if it exists
     const addedMessage = feedback.messages[feedback.messages.length - 1];
+    if (addedMessage.replyTo) {
+      const replyToMessage = feedback.messages.id(addedMessage.replyTo);
+      addedMessage.replyTo = replyToMessage;
+    }
+
+    // Populate mentioned messages
+    if (addedMessage.mentions && addedMessage.mentions.length > 0) {
+      addedMessage.mentions = addedMessage.mentions.map(mention => {
+        if (mention.messageId) {
+          const mentionedMessage = feedback.messages.id(mention.messageId);
+          return {
+            ...mention.toObject(),
+            message: mentionedMessage
+          };
+        }
+        return mention;
+      });
+    }
 
     res.json({
       success: true,
@@ -313,6 +358,7 @@ export const addMessage = async (req, res) => {
     });
   }
 };
+
 
 // Edit message
 export const editMessage = async (req, res) => {
