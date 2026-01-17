@@ -5,13 +5,29 @@ import {
   getReportMeasurementSpecs,
   checkUserPermission,
   getReportImagesAsBase64,
-  getReportDefectHeatmap
+  getReportDefectHeatmap,
+  getFilterOptions,
+  autocompleteOrderNo,
+  autocompleteCustStyle,
+  saveUserPreference,
+  getUserPreferences,
+  deleteUserFilter
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
 
 // Get filtered inspection reports
 router.get("/api/fincheck-reports/list", getInspectionReports);
+
+// Get filter options
+router.get("/api/fincheck-reports/filter-options", getFilterOptions);
+
+// Autocomplete endpoints
+router.get("/api/fincheck-reports/autocomplete/order-no", autocompleteOrderNo);
+router.get(
+  "/api/fincheck-reports/autocomplete/cust-style",
+  autocompleteCustStyle
+);
 
 // Route for Defect Images
 router.get(
@@ -38,6 +54,14 @@ router.get(
 router.get(
   "/api/fincheck-inspection/report/:reportId/defect-heatmap",
   getReportDefectHeatmap
+);
+
+// User Preferences Routes
+router.post("/api/fincheck-reports/preferences/save", saveUserPreference);
+router.get("/api/fincheck-reports/preferences/get", getUserPreferences);
+router.post(
+  "/api/fincheck-reports/preferences/delete-filter",
+  deleteUserFilter
 );
 
 export default router;

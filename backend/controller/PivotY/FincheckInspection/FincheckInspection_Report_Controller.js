@@ -4,7 +4,8 @@ import {
   DtOrder,
   RoleManagment,
   UserMain,
-  QASectionsProductLocation
+  QASectionsProductLocation,
+  FincheckUserPreferences
 } from "../../MongoDB/dbConnectionController.js";
 
 import axios from "axios";
@@ -14,6 +15,7 @@ import path from "path";
 // ============================================================
 // Get Filtered Inspection Reports
 // ============================================================
+
 export const getInspectionReports = async (req, res) => {
   try {
     const {
@@ -28,11 +30,12 @@ export const getInspectionReports = async (req, res) => {
       subConFactory,
       custStyle,
       buyer,
-      supplier
+      supplier,
+      page = 1,
+      limit = 20
     } = req.query;
 
     let query = {
-      // Exclude cancelled reports by default if needed, or show all
       status: { $ne: "cancelled" }
     };
 
@@ -59,7 +62,7 @@ export const getInspectionReports = async (req, res) => {
 
     // 4. Order Type Filter
     if (orderType && orderType !== "All") {
-      query.orderType = orderType.toLowerCase(); // Ensure lowercase matching
+      query.orderType = orderType.toLowerCase();
     }
 
     // 5. Order No Filter (Regex Search)
@@ -77,12 +80,12 @@ export const getInspectionReports = async (req, res) => {
       query.empId = { $regex: empId, $options: "i" };
     }
 
-    // 8. Sub-Con Factory Filter (Nested in inspectionDetails)
+    // 8. Sub-Con Factory Filter
     if (subConFactory && subConFactory !== "All") {
       query["inspectionDetails.subConFactory"] = subConFactory;
     }
 
-    // 9. Customer Style Filter (Regex Search, Nested)
+    // 9. Customer Style Filter
     if (custStyle) {
       query["inspectionDetails.custStyle"] = {
         $regex: custStyle,
@@ -90,26 +93,39 @@ export const getInspectionReports = async (req, res) => {
       };
     }
 
-    // 10. Buyer Filter (Root level field)
+    // 10. Buyer Filter
     if (buyer && buyer !== "All") {
       query.buyer = buyer;
     }
 
-    // 11. Supplier Filter (Nested)
+    // 11. Supplier Filter
     if (supplier && supplier !== "All") {
       query["inspectionDetails.supplier"] = supplier;
     }
 
-    // Execute Query
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const totalCount = await FincheckInspectionReports.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    // Execute Query with Pagination
     const reports = await FincheckInspectionReports.find(query)
-      .sort({ inspectionDate: -1, createdAt: -1 }) // Newest first
-      // This populates the 'productTypeId' field with the full object from 'qa_sections_product_type'
+      .sort({ inspectionDate: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .populate("productTypeId", "imageURL")
       .lean();
 
     return res.status(200).json({
       success: true,
       count: reports.length,
+      totalCount,
+      totalPages,
+      currentPage: pageNum,
       data: reports
     });
   } catch (error) {
@@ -119,6 +135,133 @@ export const getInspectionReports = async (req, res) => {
       message: "Server Error",
       error: error.message
     });
+  }
+};
+
+// ============================================================
+// Get All Filter Options (for dropdowns)
+// ============================================================
+export const getFilterOptions = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let dateQuery = {};
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateQuery.inspectionDate = { $gte: start, $lte: end };
+    }
+
+    const baseQuery = { status: { $ne: "cancelled" }, ...dateQuery };
+
+    const [reportTypes, productTypes, buyers, suppliers, factories] =
+      await Promise.all([
+        FincheckInspectionReports.distinct("reportType", baseQuery),
+        FincheckInspectionReports.distinct("productType", baseQuery),
+        FincheckInspectionReports.distinct("buyer", baseQuery),
+        FincheckInspectionReports.distinct(
+          "inspectionDetails.supplier",
+          baseQuery
+        ),
+        FincheckInspectionReports.distinct(
+          "inspectionDetails.subConFactory",
+          baseQuery
+        )
+      ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        reportTypes: reportTypes.filter(Boolean).sort(),
+        productTypes: productTypes.filter(Boolean).sort(),
+        buyers: buyers.filter(Boolean).sort(),
+        suppliers: suppliers.filter(Boolean).sort(),
+        subConFactories: factories.filter(Boolean).sort()
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Autocomplete for Order No
+// ============================================================
+export const autocompleteOrderNo = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    if (!term || term.length < 2) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const results = await FincheckInspectionReports.find({
+      orderNosString: { $regex: term, $options: "i" },
+      status: { $ne: "cancelled" }
+    })
+      .select("orderNosString orderNos")
+      .limit(20)
+      .lean();
+
+    // Extract unique order numbers
+    const orderSet = new Set();
+    results.forEach((r) => {
+      if (r.orderNos && Array.isArray(r.orderNos)) {
+        r.orderNos.forEach((o) => {
+          if (o.toLowerCase().includes(term.toLowerCase())) {
+            orderSet.add(o);
+          }
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(orderSet).slice(0, 15)
+    });
+  } catch (error) {
+    console.error("Error in order autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Autocomplete for Customer Style
+// ============================================================
+export const autocompleteCustStyle = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    if (!term || term.length < 2) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const results = await FincheckInspectionReports.find({
+      "inspectionDetails.custStyle": { $regex: term, $options: "i" },
+      status: { $ne: "cancelled" }
+    })
+      .select("inspectionDetails.custStyle")
+      .limit(30)
+      .lean();
+
+    // Extract unique styles
+    const styleSet = new Set();
+    results.forEach((r) => {
+      if (r.inspectionDetails?.custStyle) {
+        styleSet.add(r.inspectionDetails.custStyle);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(styleSet).slice(0, 15)
+    });
+  } catch (error) {
+    console.error("Error in style autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -692,3 +835,224 @@ export const getReportDefectHeatmap = async (req, res) => {
     });
   }
 };
+
+// ============================================================
+// User Preferences: Save Filter & Columns
+// ============================================================
+export const saveUserPreference = async (req, res) => {
+  try {
+    const { empId, type, data } = req.body; // type: 'filter' or 'columns'
+
+    if (!empId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Emp ID required" });
+
+    let userPref = await FincheckUserPreferences.findOne({ empId });
+
+    if (!userPref) {
+      userPref = new FincheckUserPreferences({ empId });
+    }
+
+    if (type === "columns") {
+      // Data should be array of column IDs
+      userPref.favoriteColumns = data;
+    } else if (type === "filter") {
+      const { name, filters } = data;
+
+      // Check validation
+      if (name.length > 25) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Name must be less than 25 chars" });
+      }
+
+      // Check for duplicate filters (comparing object structure)
+      // We convert to string for a quick comparison of values
+      const newFilterStr = JSON.stringify(filters);
+
+      const duplicate = userPref.savedFilters.find(
+        (f) => JSON.stringify(f.filters) === newFilterStr
+      );
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: `This exact filter configuration is already saved as "${duplicate.name}". Please select different filters.`
+        });
+      }
+
+      // Check for duplicate name
+      const nameDuplicate = userPref.savedFilters.find(
+        (f) => f.name.toLowerCase() === name.toLowerCase()
+      );
+      if (nameDuplicate) {
+        return res
+          .status(400)
+          .json({
+            success: false,
+            message: "A filter with this name already exists."
+          });
+      }
+
+      userPref.savedFilters.push({ name, filters });
+    }
+
+    userPref.updatedAt = new Date();
+    await userPref.save();
+
+    return res.status(200).json({ success: true, data: userPref });
+  } catch (error) {
+    console.error("Error saving preferences:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// User Preferences: Get Preferences
+// ============================================================
+export const getUserPreferences = async (req, res) => {
+  try {
+    const { empId } = req.query;
+    if (!empId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Emp ID required" });
+
+    const userPref = await FincheckUserPreferences.findOne({ empId });
+
+    return res.status(200).json({
+      success: true,
+      data: userPref || { favoriteColumns: [], savedFilters: [] }
+    });
+  } catch (error) {
+    console.error("Error fetching preferences:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// User Preferences: Delete Filter
+// ============================================================
+export const deleteUserFilter = async (req, res) => {
+  try {
+    const { empId, filterId } = req.body;
+
+    await FincheckUserPreferences.updateOne(
+      { empId },
+      { $pull: { savedFilters: { _id: filterId } } }
+    );
+
+    const updated = await FincheckUserPreferences.findOne({ empId });
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// export const getInspectionReports = async (req, res) => {
+//   try {
+//     const {
+//       startDate,
+//       endDate,
+//       reportId,
+//       reportType,
+//       orderType,
+//       orderNo,
+//       productType,
+//       empId,
+//       subConFactory,
+//       custStyle,
+//       buyer,
+//       supplier
+//     } = req.query;
+
+//     let query = {
+//       // Exclude cancelled reports by default if needed, or show all
+//       status: { $ne: "cancelled" }
+//     };
+
+//     // 1. Date Range Filter
+//     if (startDate && endDate) {
+//       const start = new Date(startDate);
+//       start.setHours(0, 0, 0, 0);
+
+//       const end = new Date(endDate);
+//       end.setHours(23, 59, 59, 999);
+
+//       query.inspectionDate = { $gte: start, $lte: end };
+//     }
+
+//     // 2. Report ID Filter (Exact Match)
+//     if (reportId) {
+//       query.reportId = parseInt(reportId);
+//     }
+
+//     // 3. Report Name (Type) Filter
+//     if (reportType && reportType !== "All") {
+//       query.reportType = reportType;
+//     }
+
+//     // 4. Order Type Filter
+//     if (orderType && orderType !== "All") {
+//       query.orderType = orderType.toLowerCase(); // Ensure lowercase matching
+//     }
+
+//     // 5. Order No Filter (Regex Search)
+//     if (orderNo) {
+//       query.orderNosString = { $regex: orderNo, $options: "i" };
+//     }
+
+//     // 6. Product Type Filter
+//     if (productType && productType !== "All") {
+//       query.productType = productType;
+//     }
+
+//     // 7. QA ID (Emp ID) Filter
+//     if (empId) {
+//       query.empId = { $regex: empId, $options: "i" };
+//     }
+
+//     // 8. Sub-Con Factory Filter (Nested in inspectionDetails)
+//     if (subConFactory && subConFactory !== "All") {
+//       query["inspectionDetails.subConFactory"] = subConFactory;
+//     }
+
+//     // 9. Customer Style Filter (Regex Search, Nested)
+//     if (custStyle) {
+//       query["inspectionDetails.custStyle"] = {
+//         $regex: custStyle,
+//         $options: "i"
+//       };
+//     }
+
+//     // 10. Buyer Filter (Root level field)
+//     if (buyer && buyer !== "All") {
+//       query.buyer = buyer;
+//     }
+
+//     // 11. Supplier Filter (Nested)
+//     if (supplier && supplier !== "All") {
+//       query["inspectionDetails.supplier"] = supplier;
+//     }
+
+//     // Execute Query
+//     const reports = await FincheckInspectionReports.find(query)
+//       .sort({ inspectionDate: -1, createdAt: -1 }) // Newest first
+//       // This populates the 'productTypeId' field with the full object from 'qa_sections_product_type'
+//       .populate("productTypeId", "imageURL")
+//       .lean();
+
+//     return res.status(200).json({
+//       success: true,
+//       count: reports.length,
+//       data: reports
+//     });
+//   } catch (error) {
+//     console.error("Error fetching inspection reports:", error);
+//     return res.status(500).json({
+//       success: false,
+//       message: "Server Error",
+//       error: error.message
+//     });
+//   }
+// };
