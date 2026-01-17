@@ -39,7 +39,8 @@ import {
   Eye,
   Clock,
   ClipboardList,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Gavel
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -73,6 +74,8 @@ import { useAuth } from "../../../authentication/AuthContext";
 import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
 import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
 import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
+
+import YPivotQAReportDecisionModal from "./YPivotQAReportDecisionModal";
 
 import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
 
@@ -889,6 +892,8 @@ const YPivotQAReportFullView = () => {
 
   const [defectHeatmap, setDefectHeatmap] = useState(null);
 
+  const [showDecisionModal, setShowDecisionModal] = useState(false);
+
   // =========================================================================
   // FETCH ALL DATA
   // =========================================================================
@@ -1440,6 +1445,15 @@ const YPivotQAReportFullView = () => {
     window.print();
   };
 
+  const handleDecisionSubmit = async ({ status, comment, leaderId }) => {
+    console.log("Decision Submitted:", { status, comment, leaderId });
+    // TODO: Call your backend API to save the decision
+    // e.g., await axios.post(`${API_BASE_URL}/api/report/decision`, { ... })
+
+    // Optional: Show a success alert here
+    alert(`Report ${status} successfully!`);
+  };
+
   // =========================================================================
   // RENDER
   // =========================================================================
@@ -1524,6 +1538,15 @@ const YPivotQAReportFullView = () => {
           </div>
 
           <div className="flex items-center gap-2">
+            {/* --- DECISION BUTTON --- */}
+            <button
+              onClick={() => setShowDecisionModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-800/40 hover:bg-indigo-900/40 text-white rounded-xl font-bold border border-indigo-400/30 transition-colors"
+            >
+              <Gavel className="w-4 h-4" />
+              <span className="hidden sm:inline">Decision</span>
+            </button>
+
             <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:bg-gray-50 transition-colors"
@@ -2926,6 +2949,17 @@ const YPivotQAReportFullView = () => {
           images={previewImage.images}
           startIndex={previewImage.startIndex}
           onClose={() => setPreviewImage(null)}
+        />
+      )}
+
+      {/* --- DECISION MODAL --- */}
+      {showDecisionModal && (
+        <YPivotQAReportDecisionModal
+          isOpen={showDecisionModal}
+          onClose={() => setShowDecisionModal(false)}
+          report={report}
+          user={user}
+          onSubmit={handleDecisionSubmit}
         />
       )}
 

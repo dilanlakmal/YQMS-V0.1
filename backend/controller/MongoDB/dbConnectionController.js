@@ -115,6 +115,7 @@ import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.
 
 import createFincheckUserPreferencesModel from "../../models/QA/FincheckUserPreferences.js";
 import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
+import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprovalAssignee.js";
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
@@ -299,6 +300,8 @@ export const FincheckUserPreferences =
   createFincheckUserPreferencesModel(ymProdConnection);
 export const FincheckInspectionReports =
   createFincheckInspectionReportsModel(ymProdConnection);
+export const FincheckApprovalAssignees =
+  createFincheckApprovalAssigneeModel(ymProdConnection);
 
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
 

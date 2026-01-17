@@ -8,12 +8,14 @@ import {
   Home,
   User,
   LayoutGrid,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from "lucide-react";
 import { useAuth } from "../components/authentication/AuthContext";
 
 // --- Import Tab Components ---
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
+import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -72,6 +74,13 @@ const YPivotQAReport = () => {
         icon: <Download size={18} />,
         component: <ExportPlaceholder />,
         color: "text-orange-600"
+      },
+      {
+        id: "approval",
+        label: "Assignees",
+        icon: <ShieldCheck size={18} />,
+        component: <FincheckApprovalAssignee />,
+        color: "text-purple-600"
       }
     ],
     []
