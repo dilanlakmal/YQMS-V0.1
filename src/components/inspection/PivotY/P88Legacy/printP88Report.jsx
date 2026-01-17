@@ -304,7 +304,7 @@ const PrintP88Report = () => {
             ? (Math.min(endRange, totalRecords) - startRange + 1)
             : totalRecords;
         
-        const estimatedSeconds = 15 + (reportsCount * 25); 
+        const estimatedSeconds = 90 + (reportsCount * 25); 
         setTimeRemaining(estimatedSeconds);
         setLoading(true);
         setIsCancelling(false);
@@ -320,7 +320,7 @@ const PrintP88Report = () => {
         
         try {
             const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
-            const endpoint = 'download-bulk-reports-cancellable'; // Use cancellable endpoint
+            const endpoint = 'download-bulk-reports-cancellable'; 
             
             const body = { 
                 jobId: jobId,

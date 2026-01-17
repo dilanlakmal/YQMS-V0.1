@@ -28,7 +28,7 @@ const CONFIG = {
 };
 
 // Enhanced waitForNewFile function with better error handling
-async function waitForNewFile(dir, existingFiles, timeout = 90000) { // Increased timeout
+async function waitForNewFile(dir, existingFiles, timeout = 300000) { // Increased timeout
     const start = Date.now();
     
     while (Date.now() - start < timeout) {
@@ -64,7 +64,7 @@ async function waitForNewFile(dir, existingFiles, timeout = 90000) { // Increase
         
         await new Promise(r => setTimeout(r, 2000)); // Poll every 2 seconds
     }
-    throw new Error('Download timeout: No new PDF file detected within 90 seconds.');
+    throw new Error('Download timeout: No new PDF file detected within 300 seconds.');
 }
 
 
@@ -188,7 +188,7 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
                 // Navigate to report
                 await driver.get(`${CONFIG.BASE_REPORT_URL}${inspNo}`);
                 
-                const printBtn = await driver.wait(until.elementLocated(By.css('#page-wrapper a')), 15000);
+                const printBtn = await driver.wait(until.elementLocated(By.css('#page-wrapper a')), 180000);
                 await printBtn.click();
 
                 const newFiles = await waitForNewFile(jobDir, filesBefore);
@@ -649,8 +649,8 @@ export const downloadBulkReportsCancellable = async (req, res) => {
         const page = await browser.newPage();
         
         // Set longer timeouts
-        page.setDefaultTimeout(60000);
-        page.setDefaultNavigationTimeout(60000);
+        page.setDefaultTimeout(300000);
+        page.setDefaultNavigationTimeout(300000);
         
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
@@ -684,11 +684,11 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 // Navigate to report
                 await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { 
                     waitUntil: 'networkidle0',
-                    timeout: 60000 
+                    timeout: 120000 
                 });
 
                 // Wait for page to fully load
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 90000));
 
                 // Try to change language
                 const languageChanged = await changeLanguage(page, language);
@@ -708,7 +708,7 @@ export const downloadBulkReportsCancellable = async (req, res) => {
 
                 for (const selector of printSelectors) {
                     try {
-                        await page.waitForSelector(selector, { timeout: 5000 });
+                        await page.waitForSelector(selector, { timeout: 15000 });
                         printButton = await page.$(selector);
                         if (printButton) break;
                     } catch (e) {
@@ -954,7 +954,7 @@ export const downloadBulkReports = async (req, res) => {
         const page = await browser.newPage();
         
         // Set longer timeouts
-        page.setDefaultTimeout(60000);
+        page.setDefaultTimeout(90000);
         page.setDefaultNavigationTimeout(60000);
         
         const client = await page.target().createCDPSession();
@@ -979,35 +979,27 @@ export const downloadBulkReports = async (req, res) => {
                 // Navigate to report
                 await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { 
                     waitUntil: 'networkidle0',
-                    timeout: 60000 
+                    timeout: 180000 
                 });
 
                 // Wait for page to fully load
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                await new Promise(resolve => setTimeout(resolve, 10000));
 
-                // 🔥 ALWAYS try to change language (for both English and Chinese)
-                const languageChanged = await changeLanguage(page, language);
-                if (languageChanged) {
-                    // Wait for page to reload with new language
-                    await new Promise(resolve => setTimeout(resolve, 4000));
-                } else {
-                    console.warn(`⚠️ Language change failed for ${inspNo}, continuing with current language`);
-                }
+                 await changeLanguage(page, language);
 
-                // Wait for and click print button with multiple selectors
+                 // 🔥 CRITICAL: Force the print link to open in the SAME tab
+                // This prevents the download behavior from breaking in headless mode
+                await page.evaluate(() => {
+                    const links = document.querySelectorAll('a[href*="print"], #page-wrapper a');
+                    links.forEach(link => link.setAttribute('target', '_self'));
+                });
+
                 let printButton = null;
-                
-                const printSelectors = [
-                    '#page-wrapper a',
-                    'a[href*="print"]',
-                    'a[onclick*="print"]',
-                    '.print-btn',
-                    'button[onclick*="print"]'
-                ];
+                const printSelectors = ['#page-wrapper a', 'a[href*="print"]', '.print-btn'];
                 
                 for (const selector of printSelectors) {
                     try {
-                        await page.waitForSelector(selector, { timeout: 5000 });
+                        await page.waitForSelector(selector, { timeout: 60000 });
                         printButton = await page.$(selector);
                         if (printButton) {
                             break;
@@ -1021,11 +1013,10 @@ export const downloadBulkReports = async (req, res) => {
                     throw new Error('Print button not found with any selector');
                 }
 
-                // Click print button
-                await printButton.click();
+                   await page.evaluate((el) => el.click(), printButton);
                 
-                // Wait a bit for download to start
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                console.log(`🚀 Clicked print for ${inspNo}, monitoring folder...`);
+                // await new Promise(resolve => setTimeout(resolve, 3000));
 
                 // Wait for file download
                 const newFiles = await waitForNewFile(jobDir, filesBefore);
@@ -1046,8 +1037,10 @@ export const downloadBulkReports = async (req, res) => {
                 
                 // Take screenshot for debugging
                 try {
-                    const screenshotPath = path.join(jobDir, `error_${inspNo}_${Date.now()}.png`);
-                    await page.screenshot({ path: screenshotPath, fullPage: true });
+                    console.error(`❌ Error downloading ${inspNo}:`, err.message);
+                    // Take an error screenshot - helps see if there's an error popup on the site
+                    await page.screenshot({ path: path.join(jobDir, `FAIL_${inspNo}.png`) });
+                    await updateDownloadStatus(record._id, 'Failed');
                 } catch (screenshotError) {
                     console.log('Could not take error screenshot:', screenshotError.message);
                 }
