@@ -1,6 +1,7 @@
 import {
   FincheckApprovalAssignees,
-  QASectionsBuyer
+  QASectionsBuyer,
+  RoleManagment
 } from "../../MongoDB/dbConnectionController.js";
 
 // ============================================================
@@ -33,12 +34,10 @@ export const addApprovalAssignee = async (req, res) => {
     // Check if exists
     const existing = await FincheckApprovalAssignees.findOne({ empId });
     if (existing) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "User already exists in approval list."
-        });
+      return res.status(400).json({
+        success: false,
+        message: "User already exists in approval list."
+      });
     }
 
     const newAssignee = new FincheckApprovalAssignees({

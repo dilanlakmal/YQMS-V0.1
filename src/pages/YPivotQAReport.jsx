@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FileText,
@@ -11,7 +11,9 @@ import {
   Sparkles,
   ShieldCheck
 } from "lucide-react";
+import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
+import { API_BASE_URL } from "../../config";
 
 // --- Import Tab Components ---
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
@@ -46,14 +48,57 @@ const YPivotQAReport = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("reports");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoadingPermission, setIsLoadingPermission] = useState(true);
+
+  // Permission Check Effect
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!user?.emp_id) {
+        console.log("[TAB VISIBILITY] No user found");
+        setIsAdmin(false);
+        setIsLoadingPermission(false);
+        return;
+      }
+
+      try {
+        setIsLoadingPermission(true);
+
+        // Use the EXISTING working endpoint
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-reports/check-permission`,
+          {
+            params: { empId: user.emp_id },
+            timeout: 10000 // 10 second timeout
+          }
+        );
+
+        // VERY STRICT boolean check
+        const isAdminValue = res.data?.isAdmin;
+
+        if (isAdminValue === true) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        setIsAdmin(false);
+      } finally {
+        setIsLoadingPermission(false);
+      }
+    };
+
+    checkPermission();
+  }, [user?.emp_id]);
 
   const handleGoHome = () => {
     navigate("/home");
   };
 
   // --- TAB CONFIGURATION ---
-  const tabs = useMemo(
-    () => [
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      // Base tabs available to everyone
       {
         id: "reports",
         label: "Reports",
@@ -74,17 +119,20 @@ const YPivotQAReport = () => {
         icon: <Download size={18} />,
         component: <ExportPlaceholder />,
         color: "text-orange-600"
-      },
-      {
+      }
+    ];
+    if (!isLoadingPermission && isAdmin === true) {
+      console.log("✅ [TABS MEMO] Adding Assignees tab");
+      baseTabs.push({
         id: "approval",
         label: "Assignees",
         icon: <ShieldCheck size={18} />,
         component: <FincheckApprovalAssignee />,
         color: "text-purple-600"
-      }
-    ],
-    []
-  );
+      });
+    }
+    return baseTabs;
+  }, [isAdmin, isLoadingPermission]);
 
   const activeTabData = tabs.find((t) => t.id === activeTab);
 
