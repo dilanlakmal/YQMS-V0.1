@@ -250,37 +250,6 @@ import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
 import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
 
 /* -----------------------------
-QA Random Inspection Imports
------------------------------- */
-import qaDefect from "./routes/QARandomInspection/QAAdmin/QADefectRoutes.js";
-import qaDefectBuyerStatus from "./routes/QARandomInspection/QAAdmin/QADefectBuyerStatusRoutes.js";
-import qaStandardDefect from "./routes/QARandomInspection/QAAdmin/QAStandardDefectRoutes.js";
-import qaRandomInspectionSave from "./routes/QARandomInspection/QARandomInspectionData/QARandomInspectionSaveRoutes.js";
-import qaRandomInspection from "./routes/QARandomInspection/QARandomInspectionData/QARandomInspectionRoutes.js";
-import qaAccuracyDashboard from "./routes/QARandomInspection/QAaccuracyDashboard/QAAccuracyDashboardRoutes.js";
-
-/* ------------------------------
-  Sub Con QC1 Inspection
------------------------------- */
-
-import subConQAInspection from "./routes/Sub-ConQC1/Sub-ConQA/subConQAInspectionRoutes.js";
-import SubConQAReport from "./routes/Sub-ConQC1/Sub-ConQA/subConQAReportRoutes.js";
-import SubConDefectManagement from "./routes/Sub-ConQC1/Sub-ConQC1 Admin/subConSewingQCDefectsRoutes.js";
-import subConSewingQCFactory from "./routes/Sub-ConQC1/Sub-ConQC1 Admin/subConSewingQCFactoryRoutes.js";
-import subConSewingQCInspection from "./routes/Sub-ConQC1/Sub-ConQC1 Inspection/subConsewingQCInspectionRoutes.js";
-import subConQADashboard from "./routes/Sub-ConQC1/SubConQCDashboard/subConQCDashboardRoutes.js";
-import subConSewingQCReport from "./routes/Sub-ConQC1/Sub-ConQC1 Inspection/subConsewingQCReportRoutes.js";
-
-/* ------------------------------
-  QC Washing
------------------------------- */
-
-import qcWashingInspection from "./routes/QCWashing/QCWashing Inspection/qcWashingInspectionRoutes.js";
-import qcWashingAdmin from "./routes/QCWashing/QCWashing Admin/qcWashingAdminRoutes.js";
-import qcWashingReport from "./routes/QCWashing/QCWashing Report/qcWashingReportRoutes.js";
-import qcWashingOldQty from "./routes/QCWashing/oldQtyRoutes.js";
-
-/* -----------------------------
   After Ironing Import
 ------------------------------ */
 import afterIroning from "./routes/AfterIroning/AfterIroningInspection/afterIroningInspectionRoutes.js";
