@@ -47,19 +47,19 @@ const P88Legacy = () => {
       },
       {
         id: "print_original_report",
-        label: "Print Report",
+        label: "Download report",
         icon: <Printer size={20} />,
         // Remove dataVersion prop to prevent refresh triggers
         component: <PrintP88Report/>,
-        description: "Print Report"
+        description: "Download Report"
       },
       {
         id: "failed_reports",
-        label: "Print Report",
+        label: "Manual Report",
         icon: <Octagon size={20} />,
         // Remove dataVersion prop to prevent refresh triggers
         component: <FailedReportsTable/>,
-        description: "Print Report"
+        description: "Manual Report"
       },
     ],
     [handleDataUploadSuccess] // Add dependency to prevent unnecessary re-renders

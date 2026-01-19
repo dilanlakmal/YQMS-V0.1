@@ -8,7 +8,7 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 import { Builder, Browser, By, until } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
 import archiver from 'archiver';
-import Buffer from 'buffer';
+import { Buffer } from 'buffer';
 import {  logFailedReport, getAuthUserIdentifier } from "./p88failedReportController.js";
 
 const stat = promisify(fs.stat);
