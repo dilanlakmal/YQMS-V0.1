@@ -815,6 +815,9 @@ const ALL_COLUMNS = [
   { id: "sampleSize", label: "Sample Size" },
   { id: "createdDate", label: "Created Date" },
   { id: "updatedDate", label: "Updated Date" },
+  { id: "status", label: "QA Status" },
+  { id: "resubmission", label: "Resubmission" },
+  { id: "decision", label: "Leader Decision" },
   { id: "action", label: "Action", required: true }
 ];
 
@@ -856,6 +859,9 @@ const YPivotQAReportMain = () => {
     "sampleSize",
     "createdDate",
     "updatedDate",
+    "status",
+    "resubmission",
+    "decision",
     "action"
   ]);
 
@@ -902,6 +908,15 @@ const YPivotQAReportMain = () => {
     type: "success",
     message: ""
   });
+
+  const getNumSuffix = (num) => {
+    const j = num % 10,
+      k = num % 100;
+    if (j === 1 && k !== 11) return "st";
+    if (j === 2 && k !== 12) return "nd";
+    if (j === 3 && k !== 13) return "rd";
+    return "th";
+  };
 
   // --- 1. Fetch Preferences on Load ---
   useEffect(() => {
@@ -1678,6 +1693,19 @@ const YPivotQAReportMain = () => {
                 {isColumnVisible("updatedDate") && (
                   <th className="px-5 py-4 whitespace-nowrap">Updated Date</th>
                 )}
+                {isColumnVisible("status") && (
+                  <th className="px-5 py-4 whitespace-nowrap text-center">
+                    QA Status
+                  </th>
+                )}
+                {isColumnVisible("resubmission") && (
+                  <th className="px-5 py-4 whitespace-nowrap">Resubmission</th>
+                )}
+                {isColumnVisible("decision") && (
+                  <th className="px-5 py-4 whitespace-nowrap">
+                    Leader Decision
+                  </th>
+                )}
                 {isColumnVisible("action") && (
                   <th className="px-5 py-4 text-center whitespace-nowrap">
                     Action
@@ -2002,6 +2030,134 @@ const YPivotQAReportMain = () => {
                               <Clock className="w-3 h-3" /> {updated.time}
                             </div>
                           </div>
+                        </td>
+                      )}
+
+                      {/* 1. QA Status Column */}
+                      {isColumnVisible("status") && (
+                        <td className="px-5 py-4 text-center">
+                          <span
+                            className={`px-3 py-1 rounded-lg text-xs font-bold uppercase border shadow-sm ${
+                              report.status === "completed"
+                                ? "bg-green-100 text-green-700 border-green-300"
+                                : "bg-gray-100 text-gray-600 border-gray-300"
+                            }`}
+                          >
+                            {report.status === "completed"
+                              ? "Completed"
+                              : "Pending"}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* 2. Resubmission Column */}
+                      {isColumnVisible("resubmission") && (
+                        <td className="px-5 py-4">
+                          {report.resubmissionHistory &&
+                          report.resubmissionHistory.length > 0 ? (
+                            (() => {
+                              const lastResub =
+                                report.resubmissionHistory[
+                                  report.resubmissionHistory.length - 1
+                                ];
+                              const resubDate = formatDateTime(
+                                lastResub.resubmissionDate
+                              );
+                              return (
+                                <div className="flex items-start gap-3">
+                                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 border border-purple-300 text-purple-700 text-xs font-bold shadow-sm flex-shrink-0">
+                                    {lastResub.resubmissionNo}
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
+                                      {resubDate.date}
+                                    </span>
+                                    <span className="text-[10px] text-gray-500 font-mono">
+                                      {resubDate.time}
+                                    </span>
+                                  </div>
+                                </div>
+                              );
+                            })()
+                          ) : (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </td>
+                      )}
+
+                      {/* 3. Decision Column */}
+                      {isColumnVisible("decision") && (
+                        <td className="px-5 py-4">
+                          {(() => {
+                            // 1. Determine Status Label
+                            let statusLabel = "Pending";
+                            let statusClass =
+                              "bg-gray-100 text-gray-500 border-gray-300";
+
+                            // If QA is not complete, decision is N/A or Pending
+                            if (report.status !== "completed") {
+                              statusLabel = "Pending QA";
+                            }
+                            // QA Complete but no decision record found
+                            else if (!report.decisionStatus) {
+                              statusLabel = "Pending";
+                            }
+                            // Decision Exists
+                            else {
+                              statusLabel = report.decisionStatus;
+                              if (statusLabel === "Approved")
+                                statusClass =
+                                  "bg-green-100 text-green-700 border-green-600";
+                              else if (statusLabel === "Rework")
+                                statusClass =
+                                  "bg-orange-100 text-orange-700 border-orange-600";
+                              else if (statusLabel === "Rejected")
+                                statusClass =
+                                  "bg-red-100 text-red-700 border-red-600";
+                            }
+
+                            // 2. Determine Action Required
+                            let actionRequired = false;
+                            if (
+                              report.decisionStatus &&
+                              report.resubmissionHistory?.length > 0
+                            ) {
+                              const lastDecisionTime = new Date(
+                                report.decisionUpdatedAt
+                              ).getTime();
+                              const lastResub =
+                                report.resubmissionHistory[
+                                  report.resubmissionHistory.length - 1
+                                ];
+                              const lastResubTime = new Date(
+                                lastResub.resubmissionDate
+                              ).getTime();
+
+                              // If QA submitted AFTER leader decided -> Action Required
+                              if (lastResubTime > lastDecisionTime) {
+                                actionRequired = true;
+                              }
+                            }
+
+                            return (
+                              <div className="flex flex-col items-start gap-1.5">
+                                <span
+                                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold uppercase border ${statusClass}`}
+                                >
+                                  {statusLabel}
+                                </span>
+
+                                {actionRequired && (
+                                  <div className="flex items-center gap-1 animate-pulse">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                                    <span className="text-[10px] font-bold text-red-500 uppercase tracking-tight border border-red-200 bg-red-50 px-1.5 rounded">
+                                      Action Required
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
                       )}
 

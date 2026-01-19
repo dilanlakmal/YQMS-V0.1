@@ -18,7 +18,8 @@ import {
   Plus,
   Minus,
   Volume2,
-  AlertCircle
+  AlertCircle,
+  RefreshCw
 } from "lucide-react";
 import { createPortal } from "react-dom";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
@@ -76,6 +77,15 @@ const AutoDismissModal = ({ isOpen, onClose, type, message }) => {
   );
 };
 
+const getNumSuffix = (num) => {
+  const j = num % 10,
+    k = num % 100;
+  if (j === 1 && k !== 11) return "st";
+  if (j === 2 && k !== 12) return "nd";
+  if (j === 3 && k !== 13) return "rd";
+  return "th";
+};
+
 const YPivotQAReportDecisionModal = ({
   isOpen,
   onClose,
@@ -103,6 +113,10 @@ const YPivotQAReportDecisionModal = ({
   const [audioUrl, setAudioUrl] = useState(null);
   const [recordingDuration, setRecordingDuration] = useState(0);
 
+  const [reportResubmissions, setReportResubmissions] = useState([]);
+  const [qaInfo, setQaInfo] = useState(null);
+  const [actionRequired, setActionRequired] = useState(false);
+
   // --- Status Modal State ---
   const [statusModal, setStatusModal] = useState({
     isOpen: false,
@@ -129,21 +143,45 @@ const YPivotQAReportDecisionModal = ({
           setLeaderDetails(userRes.data);
         }
 
-        // Fetch Existing Decision
+        // Fetch Decision + Report Info
         const decisionRes = await axios.get(
           `${API_BASE_URL}/api/fincheck-reports/get-decision/${report.reportId}`
         );
 
-        if (decisionRes.data.success && decisionRes.data.exists) {
-          const data = decisionRes.data.data;
-          setExistingDecision(data);
+        if (decisionRes.data.success) {
+          const { decision, resubmissionHistory, qaInfo } =
+            decisionRes.data.data;
 
-          // Pre-fill STATUS only.
-          // Do NOT pre-fill comments/audio to allow fresh input.
-          if (data.decisionStatus) setStatus(data.decisionStatus);
+          setReportResubmissions(resubmissionHistory || []);
+          setQaInfo(qaInfo);
+
+          if (decision) {
+            setExistingDecision(decision);
+            // Pre-fill STATUS only
+            if (decision.decisionStatus) setStatus(decision.decisionStatus);
+
+            // LOGIC: Check for "Action Required"
+            // Compare last Leader Decision Time vs Last QA Resubmission Time
+            if (resubmissionHistory && resubmissionHistory.length > 0) {
+              const lastDecisionTime = new Date(decision.updatedAt).getTime();
+              const lastResubmission =
+                resubmissionHistory[resubmissionHistory.length - 1];
+              const lastResubmissionTime = new Date(
+                lastResubmission.resubmissionDate
+              ).getTime();
+
+              // If QA submitted AFTER leader decided -> Action Required
+              if (lastResubmissionTime > lastDecisionTime) {
+                setActionRequired(true);
+              } else {
+                setActionRequired(false);
+              }
+            }
+          }
         }
       } catch (error) {
         console.error("Error fetching data", error);
+        // Fallback user info
         setLeaderDetails({
           emp_id: user.emp_id,
           eng_name: user.eng_name || user.username,
@@ -347,30 +385,69 @@ QA ID: ${report.empId}`;
         <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
           {/* --- EXISTING DECISION BANNER --- */}
           {existingDecision && (
-            <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 flex items-center justify-between shadow-sm animate-fadeIn">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
-                  <History className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+            <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-3 shadow-sm animate-fadeIn">
+              {/* TOP ROW: Status & Action Required Badge */}
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                    <History className="w-5 h-5 text-blue-600 dark:text-blue-300" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-blue-500 dark:text-blue-300 uppercase tracking-wide flex items-center gap-2">
+                      Current Status:{" "}
+                      <span className="text-blue-700 dark:text-blue-100 text-sm">
+                        {existingDecision.decisionStatus}
+                      </span>
+                      {/* ACTION REQUIRED BADGE */}
+                      {actionRequired && (
+                        <span className="ml-2 px-2 py-0.5 bg-red-100 text-red-600 border border-red-200 rounded-full text-[10px] font-bold animate-pulse">
+                          Action Required
+                        </span>
+                      )}
+                    </p>
+                    <p className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5 mt-0.5">
+                      <CalendarClock className="w-3.5 h-3.5 opacity-60" />
+                      Decision made at:{" "}
+                      {formatDecisionDate(existingDecision.updatedAt)}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs font-bold text-blue-500 dark:text-blue-300 uppercase tracking-wide">
-                    Current Status:{" "}
-                    <span className="text-blue-700 dark:text-blue-100">
-                      {existingDecision.decisionStatus}
+                <div className="text-right">
+                  <span className="inline-block px-2 py-1 bg-white dark:bg-gray-800 rounded text-xs font-bold text-gray-500 border border-gray-200 dark:border-gray-700">
+                    Version: {existingDecision.approvalHistory?.length || 1}
+                  </span>
+                </div>
+              </div>
+
+              {/* BOTTOM ROW: QA Resubmission Info */}
+              {reportResubmissions.length > 0 && (
+                <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                  <p className="text-xs text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+                    <RefreshCw className="w-3.5 h-3.5 text-indigo-500" />
+                    <span>
+                      QA <b>{qaInfo?.empId}</b> ({qaInfo?.empName}) resubmitted
+                      report{" "}
+                      <b>
+                        {
+                          reportResubmissions[reportResubmissions.length - 1]
+                            .resubmissionNo
+                        }
+                      </b>
+                      {getNumSuffix(
+                        reportResubmissions[reportResubmissions.length - 1]
+                          .resubmissionNo
+                      )}{" "}
+                      time at{" "}
+                      <b>
+                        {formatDecisionDate(
+                          reportResubmissions[reportResubmissions.length - 1]
+                            .resubmissionDate
+                        )}
+                      </b>
                     </span>
                   </p>
-                  <p className="text-sm font-bold text-gray-700 dark:text-gray-200 flex items-center gap-1.5 mt-0.5">
-                    <CalendarClock className="w-3.5 h-3.5 opacity-60" />
-                    Decision made at:{" "}
-                    {formatDecisionDate(existingDecision.updatedAt)}
-                  </p>
                 </div>
-              </div>
-              <div className="text-right">
-                <span className="inline-block px-2 py-1 bg-white dark:bg-gray-800 rounded text-xs font-bold text-gray-500 border border-gray-200 dark:border-gray-700">
-                  Version: {existingDecision.approvalHistory?.length || 1}
-                </span>
-              </div>
+              )}
             </div>
           )}
 

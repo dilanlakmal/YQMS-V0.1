@@ -38,6 +38,7 @@ export const getInspectionReports = async (req, res) => {
       limit = 20
     } = req.query;
 
+    // --- 1. Build Query ---
     let query = {
       status: { $ne: "cancelled" }
     };
@@ -115,6 +116,7 @@ export const getInspectionReports = async (req, res) => {
     const totalCount = await FincheckInspectionReports.countDocuments(query);
     const totalPages = Math.ceil(totalCount / limitNum);
 
+    // --- 2. Fetch Reports ---
     // Execute Query with Pagination
     const reports = await FincheckInspectionReports.find(query)
       .sort({ inspectionDate: -1, createdAt: -1 })
@@ -123,13 +125,47 @@ export const getInspectionReports = async (req, res) => {
       .populate("productTypeId", "imageURL")
       .lean();
 
+    // --- 3. Fetch Decision Status (Manual Join) ---
+
+    // Get list of Report IDs from the current page results
+    const reportIds = reports.map((r) => r.reportId);
+
+    // Find decisions matching these IDs
+    const decisions = await FincheckInspectionDecision.find({
+      reportId: { $in: reportIds }
+    })
+      .select("reportId decisionStatus updatedAt")
+      .lean();
+
+    // Create a Map for fast lookup: { 12345: { status: "Approved", time: ... } }
+    const decisionMap = {};
+    decisions.forEach((d) => {
+      decisionMap[d.reportId] = {
+        status: d.decisionStatus,
+        updatedAt: d.updatedAt
+      };
+    });
+
+    // --- 4. Merge Data ---
+    const mergedReports = reports.map((report) => {
+      const decisionInfo = decisionMap[report.reportId];
+      return {
+        ...report,
+        // Add the decision fields to the report object
+        decisionStatus: decisionInfo ? decisionInfo.status : null,
+        decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      count: reports.length,
+      count: mergedReports.length,
+      //count: reports.length,
       totalCount,
       totalPages,
       currentPage: pageNum,
-      data: reports
+      data: mergedReports
+      //data: reports
     });
   } catch (error) {
     console.error("Error fetching inspection reports:", error);
@@ -960,22 +996,33 @@ if (!fs.existsSync(uploadDirDecision)) {
 // ============================================================
 // Get Existing Decision (To Pre-fill Modal)
 // ============================================================
+
 export const getLeaderDecision = async (req, res) => {
   try {
     const { reportId } = req.params;
+    const parsedId = parseInt(reportId);
 
+    // 1. Fetch Decision Data
     const decision = await FincheckInspectionDecision.findOne({
-      reportId: parseInt(reportId)
+      reportId: parsedId
     });
 
-    if (!decision) {
-      return res.status(200).json({ success: true, exists: false, data: null });
-    }
+    // 2. Fetch Report Data (For Resubmission History & Emp Name)
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parsedId
+    }).select("resubmissionHistory empId empName"); // Only select needed fields
+
+    // Prepare response data
+    const responseData = {
+      decision: decision || null,
+      resubmissionHistory: report ? report.resubmissionHistory : [],
+      qaInfo: report ? { empId: report.empId, empName: report.empName } : null
+    };
 
     return res.status(200).json({
       success: true,
-      exists: true,
-      data: decision
+      exists: !!decision,
+      data: responseData // Send combined data
     });
   } catch (error) {
     console.error("Error fetching decision:", error);
