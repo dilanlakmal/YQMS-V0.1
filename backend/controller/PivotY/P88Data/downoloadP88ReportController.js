@@ -366,11 +366,8 @@ const changeLanguage = async (page, targetLanguage = 'english') => {
         const isCurrentlyEnglish = currentLangDisplay.includes('english') || currentLangDisplay.includes('en');
 
         if ((target === 'chinese' && isCurrentlyChinese) || (target === 'english' && isCurrentlyEnglish)) {
-            console.log(`ℹ️ Language already set to ${target}.`);
             return true;
         }
-
-        console.log(`🌐 Switching session language to: ${target}`);
         
         // 2. Open the dropdown
         await page.waitForSelector('#dropdownLanguage', { timeout: 10000 });
@@ -407,7 +404,6 @@ const changeLanguage = async (page, targetLanguage = 'english') => {
         }, target);
 
         if (clickResult.success) {
-            console.log(`✅ Clicked: ${clickResult.text}`);
             
             // 5. Wait for the page to reload
             await Promise.all([
@@ -420,12 +416,10 @@ const changeLanguage = async (page, targetLanguage = 'english') => {
             const verified = target === 'chinese' ? bodyText.includes('报告') : bodyText.includes('Report');
             
             if (!verified) {
-                console.log("⚠️ Verification failed. Performing Hard Refresh...");
                 await page.reload({ waitUntil: 'networkidle2' });
                 await new Promise(r => setTimeout(r, 3000));
             }
 
-            console.log(`✅ Session set to ${target}`);
             return true;
         } else {
             console.warn(`❌ Link not found. Available links on page:`, clickResult.availableLinks);
@@ -714,8 +708,6 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                     const btn = document.querySelector('#page-wrapper a, a[href*="print"]');
                     if (btn) btn.setAttribute('target', '_self');
                 });
-
-                console.log(`📥 Requesting ${language} PDF for ${inspNo}...`);
                 
                 try {
                     const printBtn = await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
@@ -965,7 +957,6 @@ export const downloadBulkReports = async (req, res) => {
                     if (btn) btn.setAttribute('target', '_self');
                 });
 
-                console.log(`📥 Requesting ${language} PDF for ${inspNo}...`);
                 
                 try {
                     const printBtn = await page.waitForSelector('#page-wrapper a', { timeout: 15000 });

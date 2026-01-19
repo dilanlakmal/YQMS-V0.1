@@ -65,7 +65,6 @@ export const getFailedReports = async (req, res) => {
 export const markAsDownloaded = async (req, res) => {
     try {
         const { reportId } = req.body;
-        console.log(`Marking report ${reportId} as downloaded`); // Debug log
 
         await p88FailedReport.findByIdAndUpdate(reportId, {
             status: 'Downloaded',
@@ -82,7 +81,6 @@ export const markAsDownloaded = async (req, res) => {
 // Get filter options for failed reports
 export const getFailedReportsFilterOptions = async (req, res) => {
     try {
-        console.log('Fetching filter options for failed reports...');
         
         // Get unique values for each filter field
         const [users, inspectionNumbers, groupIds] = await Promise.all([
@@ -132,8 +130,6 @@ export const getFilteredFailedReports = async (req, res) => {
             endDate 
         } = req.query;
 
-        console.log('Fetching filtered failed reports with filters:', req.query);
-
         // Build query object
         let query = {};
 
@@ -167,8 +163,6 @@ export const getFilteredFailedReports = async (req, res) => {
 
         const reports = await p88FailedReport.find(query)
             .sort({ failedAt: -1 });
-
-        console.log(`Found ${reports.length} filtered failed reports`);
 
         res.json({ 
             success: true, 
