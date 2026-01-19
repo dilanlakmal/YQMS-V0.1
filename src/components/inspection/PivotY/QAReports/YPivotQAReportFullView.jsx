@@ -1470,17 +1470,10 @@ const YPivotQAReportFullView = () => {
     navigate("/fincheck-reports");
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const handleDecisionSubmit = async ({ status, comment, leaderId }) => {
-    console.log("Decision Submitted:", { status, comment, leaderId });
-    // TODO: Call your backend API to save the decision
-    // e.g., await axios.post(`${API_BASE_URL}/api/report/decision`, { ... })
-
-    // Optional: Show a success alert here
-    alert(`Report ${status} successfully!`);
+  const handleDecisionSubmit = async (result) => {
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
   };
 
   // =========================================================================

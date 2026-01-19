@@ -248,7 +248,8 @@ const YPivotQAInspectionSummary = ({
   dirtySections = {},
   getDirtySectionsList = () => [],
   hasUnsavedChanges = false,
-  markAllSectionsClean = () => {}
+  markAllSectionsClean = () => {},
+  onReportSubmitted
 }) => {
   const { selectedOrders, orderData: details } = orderData;
   const { selectedTemplate, config, lineTableConfig, headerData, photoData } =
@@ -693,6 +694,30 @@ const YPivotQAInspectionSummary = ({
       if (res.data.success) {
         // Clear all dirty states
         markAllSectionsClean();
+
+        if (onReportSubmitted) {
+          // Pass the data object (contains status, updatedAt, resubmissionHistory) back to Parent
+          onReportSubmitted(res.data.data);
+        }
+
+        // >>> Success Message Logic <<<
+        let successMessage = "Report Finalized Successfully!";
+
+        if (res.data.hasChanges) {
+          if (res.data.isResubmission) {
+            // It was a resubmission
+            const history = res.data.data.resubmissionHistory || [];
+            const lastEntry = history[history.length - 1];
+            successMessage = `Resubmission #${
+              lastEntry?.resubmissionNo || "New"
+            } Saved!`;
+          } else {
+            // First time submit
+            successMessage = `Report Submitted! Updated: ${res.data.updatedSections.join(
+              ", "
+            )}`;
+          }
+        }
 
         setStatusModal({
           isOpen: true,

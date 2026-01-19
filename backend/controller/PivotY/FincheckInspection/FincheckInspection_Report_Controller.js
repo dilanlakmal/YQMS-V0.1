@@ -957,9 +957,38 @@ if (!fs.existsSync(uploadDirDecision)) {
   fs.mkdirSync(uploadDirDecision, { recursive: true });
 }
 
+// ============================================================
+// Get Existing Decision (To Pre-fill Modal)
+// ============================================================
+export const getLeaderDecision = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    const decision = await FincheckInspectionDecision.findOne({
+      reportId: parseInt(reportId)
+    });
+
+    if (!decision) {
+      return res.status(200).json({ success: true, exists: false, data: null });
+    }
+
+    return res.status(200).json({
+      success: true,
+      exists: true,
+      data: decision
+    });
+  } catch (error) {
+    console.error("Error fetching decision:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Submit Leader Decision (With History & Audio)
+// ============================================================
+
 export const submitLeaderDecision = async (req, res) => {
   try {
-    // 1. Parse Data
     const {
       reportId,
       status,
@@ -969,7 +998,6 @@ export const submitLeaderDecision = async (req, res) => {
       leaderName
     } = req.body;
 
-    // Validate Report ID
     if (!reportId) {
       return res
         .status(400)
@@ -977,7 +1005,7 @@ export const submitLeaderDecision = async (req, res) => {
     }
     const parsedReportId = parseInt(reportId);
 
-    // 2. Validate Report Exists
+    // 1. Check if Report Exists
     const report = await FincheckInspectionReports.findOne({
       reportId: parsedReportId
     });
@@ -987,160 +1015,77 @@ export const submitLeaderDecision = async (req, res) => {
         .json({ success: false, message: "Report not found" });
     }
 
+    // 2. Check for Existing Decision Document
+    let decisionDoc = await FincheckInspectionDecision.findOne({
+      reportId: parsedReportId
+    });
+
+    // Determine Approval Number (Increment if exists, else 1)
+    const nextApprovalNo = decisionDoc
+      ? decisionDoc.approvalHistory.length + 1
+      : 1;
+
     // 3. Handle Audio File Upload
     let audioUrl = "";
     let hasAudio = false;
 
     if (req.files && req.files.audioBlob) {
       const audioFile = req.files.audioBlob;
-
-      // Use the correctly defined path variable
       const targetDir = uploadDirDecision;
 
-      // Naming: Decision_ReportID_LeaderID_Timestamp.webm
-      const fileName = `Decision_${parsedReportId}_${leaderId}_${Date.now()}.webm`;
+      // Naming: Decision_ReportID_AppvNo_Timestamp.webm
+      const fileName = `Decision_${parsedReportId}_AppvNo${nextApprovalNo}_${Date.now()}.webm`;
       const uploadPath = path.join(targetDir, fileName);
 
-      // Save file
       await audioFile.mv(uploadPath);
-
-      // Save relative URL for frontend access (Publicly accessible path)
-      // Note: Ensure your appConfig.js serves '/storage/PivotY' correctly
       audioUrl = `/storage/PivotY/Fincheck/Decision/${fileName}`;
       hasAudio = true;
     }
 
-    // 4. Save Record to MongoDB
-    const newDecision = new FincheckInspectionDecision({
-      reportId: parsedReportId,
-      reportRef: report._id,
+    // 4. Create History Object
+    const historyEntry = {
+      approvalNo: nextApprovalNo,
+      decisionStatus: status,
       approvalEmpId: leaderId,
       approvalEmpName: leaderName,
-      decisionStatus: status,
-      systemGeneratedComment: systemComment,
       additionalComment: additionalComment || "",
       hasAudio: hasAudio,
       audioUrl: audioUrl,
       approvalDate: new Date()
-    });
+    };
 
-    await newDecision.save();
+    // 5. Update or Create Document
+    if (decisionDoc) {
+      // UPDATE Existing
+      decisionDoc.decisionStatus = status; // Update Top Level
+      decisionDoc.approvalEmpId = leaderId;
+      decisionDoc.approvalEmpName = leaderName;
+      decisionDoc.systemGeneratedComment = systemComment;
+      decisionDoc.approvalHistory.push(historyEntry); // Add to history
+
+      await decisionDoc.save();
+    } else {
+      // CREATE New
+      decisionDoc = new FincheckInspectionDecision({
+        reportId: parsedReportId,
+        reportRef: report._id,
+        approvalEmpId: leaderId,
+        approvalEmpName: leaderName,
+        decisionStatus: status,
+        systemGeneratedComment: systemComment,
+        approvalHistory: [historyEntry] // Initialize history
+      });
+
+      await decisionDoc.save();
+    }
 
     return res.status(200).json({
       success: true,
       message: "Decision saved successfully",
-      data: newDecision
+      data: decisionDoc
     });
   } catch (error) {
     console.error("Error saving decision:", error);
     return res.status(500).json({ success: false, error: error.message });
   }
 };
-
-// export const getInspectionReports = async (req, res) => {
-//   try {
-//     const {
-//       startDate,
-//       endDate,
-//       reportId,
-//       reportType,
-//       orderType,
-//       orderNo,
-//       productType,
-//       empId,
-//       subConFactory,
-//       custStyle,
-//       buyer,
-//       supplier
-//     } = req.query;
-
-//     let query = {
-//       // Exclude cancelled reports by default if needed, or show all
-//       status: { $ne: "cancelled" }
-//     };
-
-//     // 1. Date Range Filter
-//     if (startDate && endDate) {
-//       const start = new Date(startDate);
-//       start.setHours(0, 0, 0, 0);
-
-//       const end = new Date(endDate);
-//       end.setHours(23, 59, 59, 999);
-
-//       query.inspectionDate = { $gte: start, $lte: end };
-//     }
-
-//     // 2. Report ID Filter (Exact Match)
-//     if (reportId) {
-//       query.reportId = parseInt(reportId);
-//     }
-
-//     // 3. Report Name (Type) Filter
-//     if (reportType && reportType !== "All") {
-//       query.reportType = reportType;
-//     }
-
-//     // 4. Order Type Filter
-//     if (orderType && orderType !== "All") {
-//       query.orderType = orderType.toLowerCase(); // Ensure lowercase matching
-//     }
-
-//     // 5. Order No Filter (Regex Search)
-//     if (orderNo) {
-//       query.orderNosString = { $regex: orderNo, $options: "i" };
-//     }
-
-//     // 6. Product Type Filter
-//     if (productType && productType !== "All") {
-//       query.productType = productType;
-//     }
-
-//     // 7. QA ID (Emp ID) Filter
-//     if (empId) {
-//       query.empId = { $regex: empId, $options: "i" };
-//     }
-
-//     // 8. Sub-Con Factory Filter (Nested in inspectionDetails)
-//     if (subConFactory && subConFactory !== "All") {
-//       query["inspectionDetails.subConFactory"] = subConFactory;
-//     }
-
-//     // 9. Customer Style Filter (Regex Search, Nested)
-//     if (custStyle) {
-//       query["inspectionDetails.custStyle"] = {
-//         $regex: custStyle,
-//         $options: "i"
-//       };
-//     }
-
-//     // 10. Buyer Filter (Root level field)
-//     if (buyer && buyer !== "All") {
-//       query.buyer = buyer;
-//     }
-
-//     // 11. Supplier Filter (Nested)
-//     if (supplier && supplier !== "All") {
-//       query["inspectionDetails.supplier"] = supplier;
-//     }
-
-//     // Execute Query
-//     const reports = await FincheckInspectionReports.find(query)
-//       .sort({ inspectionDate: -1, createdAt: -1 }) // Newest first
-//       // This populates the 'productTypeId' field with the full object from 'qa_sections_product_type'
-//       .populate("productTypeId", "imageURL")
-//       .lean();
-
-//     return res.status(200).json({
-//       success: true,
-//       count: reports.length,
-//       data: reports
-//     });
-//   } catch (error) {
-//     console.error("Error fetching inspection reports:", error);
-//     return res.status(500).json({
-//       success: false,
-//       message: "Server Error",
-//       error: error.message
-//     });
-//   }
-// };

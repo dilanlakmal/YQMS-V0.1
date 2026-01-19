@@ -14,6 +14,7 @@ import {
   saveUserPreference,
   getUserPreferences,
   deleteUserFilter,
+  getLeaderDecision,
   submitLeaderDecision
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
@@ -72,6 +73,9 @@ router.post(
   "/api/fincheck-reports/preferences/delete-filter",
   deleteUserFilter
 );
+
+// Get existing decision for a report
+router.get("/api/fincheck-reports/get-decision/:reportId", getLeaderDecision);
 
 // POST - Submit Decision (Supports FormData for Audio)
 router.post(
