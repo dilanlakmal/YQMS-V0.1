@@ -52,6 +52,8 @@ function Home() {
   const [pageLoading, setPageLoading] = useState(true);
   const [accessMap, setAccessMap] = useState({});
 
+  const [fincheckActionCount, setFincheckActionCount] = useState(0);
+
   const sectionRefs = useRef({});
 
   const allSections = useMemo(
@@ -624,6 +626,30 @@ function Home() {
     });
   };
 
+  // Fetch Fincheck Action Required Count for Badge
+  useEffect(() => {
+    if (!user?.emp_id) return;
+
+    const fetchActionCount = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-reports/action-count?empId=${user.emp_id}`
+        );
+        if (res.data.success) {
+          setFincheckActionCount(res.data.count);
+        }
+      } catch (error) {
+        console.error("Error fetching action count:", error);
+      }
+    };
+
+    fetchActionCount();
+
+    // Poll every 60 seconds
+    const interval = setInterval(fetchActionCount, 60000);
+    return () => clearInterval(interval);
+  }, [user?.emp_id]);
+
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
@@ -685,6 +711,14 @@ function Home() {
                       onClick={() => handleNavigation(item)}
                       className="group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1"
                     >
+                      {/* Notification Badge for Fincheck Inspection */}
+                      {item.path === "/fincheck-inspection" &&
+                        fincheckActionCount > 0 && (
+                          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5 animate-pulse">
+                            {fincheckActionCount}
+                          </div>
+                        )}
+
                       <img
                         src={item.image}
                         alt={item.title}

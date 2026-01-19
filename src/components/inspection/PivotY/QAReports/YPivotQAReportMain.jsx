@@ -1630,7 +1630,10 @@ const YPivotQAReportMain = () => {
         {/* Table Content - Scrollable */}
         <div
           className="overflow-auto flex-1"
-          style={{ maxHeight: "calc(100vh - 400px)" }}
+          style={{
+            maxHeight: "calc(100vh - 400px)",
+            WebkitOverflowScrolling: "touch"
+          }}
         >
           <table className="w-full text-sm text-left">
             <thead className="bg-gray-900 dark:bg-gray-950 text-xs uppercase font-bold text-gray-100 sticky top-0 z-20">
