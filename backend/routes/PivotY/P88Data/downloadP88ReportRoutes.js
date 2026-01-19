@@ -16,6 +16,7 @@ import {
     downloadBulkReportsUbuntu,
     downloadBulkReportsCancellable,
     cancelBulkDownload,
+    getDownloadResults, 
     getJobStatus,
     getPONumbers,
     getStyles,
@@ -43,6 +44,7 @@ router.post('/api/scraping/download-bulk-reports-auto', downloadBulkReportsAuto)
 router.post('/api/scraping/download-bulk-reports-ubuntu', downloadBulkReportsUbuntu);
 router.post('/api/scraping/download-bulk-reports-cancellable', downloadBulkReportsCancellable);
 router.post('/api/scraping/cancel-bulk-download', cancelBulkDownload);
+router.get('/api/scraping/download-results/:jobId', getDownloadResults);
 router.get('/api/scraping/job-status/:jobId', getJobStatus);
 router.get('/api/scraping/po-numbers', getPONumbers);
 router.get('/api/scraping/styles', getStyles);

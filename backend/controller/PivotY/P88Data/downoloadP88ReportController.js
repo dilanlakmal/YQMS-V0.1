@@ -8,10 +8,11 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 import { Builder, Browser, By, until } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
 import archiver from 'archiver';
+import Buffer from 'buffer';
 import {  logFailedReport, getAuthUserIdentifier } from "./p88failedReportController.js";
 
 const stat = promisify(fs.stat);
-// const readdir = promisify(fs.readdir);
+const readdir = promisify(fs.readdir);
 const activeJobs = new Map();
 
 const baseTempDir = process.platform === 'win32' 
@@ -131,8 +132,9 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     let driver = null;
     let jobDir = null;
     const { jobId } = req.body;
+
     try {
-        const { startRange, endRange, downloadAll, startDate, endDate, factoryName,poNumber, styleNumber, language = 'english', includeDownloaded = false  } = req.body;
+        const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
 
         activeJobs.set(jobId, {
             status: 'running',
@@ -144,11 +146,9 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         
         jobDir = path.join(baseTempDir, `selenium_${Date.now()}`);
         fs.mkdirSync(jobDir, { recursive: true });
-
-         // Update job info
         activeJobs.get(jobId).jobDir = jobDir;
 
-        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded );
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded);
         if (records.length === 0) return res.json({ success: false, message: 'No records matching criteria' });
 
         const options = new chrome.Options();
@@ -156,7 +156,6 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         options.setUserPreferences({ 'download.default_directory': jobDir });
 
         driver = await new Builder().forBrowser(Browser.CHROME).setChromeOptions(options).build();
-          // Update job info with driver
         activeJobs.get(jobId).driver = driver;
 
         await driver.sendAndGetDevToolsCommand('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
@@ -164,6 +163,8 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         let processedCount = 0;
         let successCount = 0;
         let failedCount = 0;
+        let failedReports = [];
+        const startTime = Date.now();
 
         // Login
         await driver.get(CONFIG.LOGIN_URL);
@@ -173,11 +174,11 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         await driver.wait(until.urlContains('dashboard'), 20000);
 
         for (const record of records) {
-
             const jobInfo = activeJobs.get(jobId);
             if (!jobInfo || jobInfo.cancelled) {
                 break;
             }
+
             const inspNo = record.inspectionNumbers?.[0] || record.inspectionNumbersKey?.split('-')[0];
             if (!inspNo) continue;
 
@@ -191,10 +192,9 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
                 
                 const printBtn = await driver.wait(until.elementLocated(By.css('#page-wrapper a')), 15000);
                 await printBtn.click();
-
+                
                 const newFiles = await waitForNewFile(jobDir, filesBefore);
                 const baseName = getFilename(record);
-
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
                     const newName = `${baseName}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
@@ -202,11 +202,20 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
                 });
 
                 await updateDownloadStatus(record._id, 'Downloaded');
+                successCount++;
+                
             } catch (err) {
                 console.error(`❌ Error on ${inspNo}:`, err.message);
+                failedCount++;
+                failedReports.push({
+                    inspectionNumber: inspNo,
+                    groupNumber: record.groupNumber,
+                    error: err.message
+                });
                 await updateDownloadStatus(record._id, 'Failed');
             }
-             processedCount++;
+
+            processedCount++;
             
             // Update job progress
             if (activeJobs.has(jobId)) {
@@ -219,14 +228,40 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
             }
         }
 
+        const endTime = Date.now();
+        const duration = Math.round((endTime - startTime) / 1000);
+
+        const downloadResults = {
+            total: processedCount,
+            successful: successCount,
+            failed: failedCount,
+            failedReports: failedReports,
+            duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+            completedAt: new Date().toISOString()
+        };
+
         await driver.quit();
-        activeJobs.delete(jobId);
-        await streamZipAndCleanup(jobDir, res);
+        
+        if (activeJobs.has(jobId)) {
+            const job = activeJobs.get(jobId);
+            job.status = 'completed';
+            job.results = downloadResults;
+            // Auto-cleanup after 5 minutes
+            setTimeout(() => { if (activeJobs.has(jobId)) activeJobs.delete(jobId); }, 300000);
+        }
+
+        await streamZipAndCleanup(jobDir, res, downloadResults);
+        
     } catch (error) {
+        console.error('Download error:', error);
         if (driver) await driver.quit();
-        res.status(500).json({ success: false, error: error.message });
+        activeJobs.delete(jobId);
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };
+
 
 export const downloadBulkReportsAutoCancellable = async (req, res) => {
     process.platform === 'linux' 
@@ -641,11 +676,9 @@ export const downloadSingleReportDirect = async (req, res) => {
 };
 
 export const downloadBulkReportsCancellable = async (req, res) => {
-
     let browser = null;
     let jobDir = null;
     const { jobId, userId } = req.body;
-
     const currentUserId = userId || await getAuthUserIdentifier(req);
     
     try {
@@ -659,6 +692,10 @@ export const downloadBulkReportsCancellable = async (req, res) => {
         
         const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded);
         
+        if (records.length === 0) {
+            return res.json({ success: false, message: 'No records matching criteria' });
+        }
+        
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
             args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-pdf-viewer-policy']
@@ -670,7 +707,7 @@ export const downloadBulkReportsCancellable = async (req, res) => {
         
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
-
+        
         // Login
         await page.goto(CONFIG.LOGIN_URL);
         await page.waitForSelector('#username');
@@ -682,6 +719,8 @@ export const downloadBulkReportsCancellable = async (req, res) => {
         let processedCount = 0;
         let successCount = 0;
         let failedCount = 0;
+        let failedReports = [];
+        const startTime = Date.now();
 
         for (const record of records) {
             const jobInfo = activeJobs.get(jobId);
@@ -697,10 +736,10 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 // Load Report Page
                 await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { waitUntil: 'networkidle2' });
 
-                // 🔥 THE FIX: Always run language change. It will verify and switch if needed.
+                // Language change
                 await changeLanguage(page, language);
 
-                // Give the server a moment to synchronize the session with the PDF generator
+                // Give the server a moment to synchronize
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Prepare print button
@@ -723,7 +762,6 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 const baseName = getFilename(record);
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
-                    // Include language in filename for easy verification
                     const newName = `${baseName}-${language}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
                     fs.renameSync(oldPath, path.join(jobDir, newName));
                 });
@@ -733,6 +771,13 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 
             } catch (err) {
                 console.error(`❌ Error on ${inspNo}:`, err.message);
+                failedCount++; // Only increment once
+                failedReports.push({
+                    inspectionNumber: inspNo,
+                    po: record.poNumbers?.[0] || 'N/A',
+                    error: err.message
+                });
+                
                 await logFailedReport(
                     record._id, 
                     inspNo, 
@@ -741,26 +786,56 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                     currentUserId
                 );
                 await updateDownloadStatus(record._id, 'Failed');
-                failedCount++;
             }
-        
-            
+
             processedCount++;
+            
             if (activeJobs.has(jobId)) {
-                activeJobs.get(jobId).progress = { processed: processedCount, total: records.length, success: successCount, failed: failedCount };
+                activeJobs.get(jobId).progress = { 
+                    processed: processedCount, 
+                    total: records.length, 
+                    success: successCount, 
+                    failed: failedCount 
+                };
             }
         }
 
+        const endTime = Date.now();
+        const duration = Math.round((endTime - startTime) / 1000); // seconds
+
+        // Store results for later retrieval
+        const downloadResults = {
+            total: processedCount,
+            successful: successCount,
+            failed: failedCount,
+            failedReports: failedReports,
+            duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+            completedAt: new Date().toISOString()
+        };
+
         await browser.close();
-        activeJobs.delete(jobId);
-        await streamZipAndCleanup(jobDir, res);
+        
+        if (activeJobs.has(jobId)) {
+            const job = activeJobs.get(jobId);
+            job.status = 'completed';
+            job.results = downloadResults;
+            // Auto-cleanup after 5 minutes
+            setTimeout(() => { if (activeJobs.has(jobId)) activeJobs.delete(jobId); }, 300000);
+        }
+
+        await streamZipAndCleanup(jobDir, res, downloadResults);
 
     } catch (error) {
+        console.error('Download error:', error);
         if (browser) await browser.close();
         activeJobs.delete(jobId);
-        if (!res.headersSent) res.status(500).json({ success: false, error: error.message });
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };
+
+
 
 // NEW: Cancel download function
 export const cancelBulkDownload = async (req, res) => {
@@ -831,7 +906,6 @@ export const cancelBulkDownload = async (req, res) => {
                 });
                 
                 output.on('error', (err) => {
-                    console.error('Error creating partial results ZIP:', err);
                     activeJobs.delete(jobId);
                     if (!res.headersSent) {
                         res.status(500).json({
@@ -906,17 +980,41 @@ export const getJobStatus = async (req, res) => {
     }
 };
 
+// NEW: Get download results
+export const getDownloadResults = async (req, res) => {
+    try {
+        const { jobId } = req.params;
+        const jobInfo = activeJobs.get(jobId);
+        
+        if (!jobInfo) {
+            return res.status(404).json({ success: false, message: 'Job not found or expired' });
+        }
+        
+        if (jobInfo.results) {
+            return res.json({ success: true, results: jobInfo.results });
+        }
+        
+        res.json({ success: false, message: 'Results not available yet' });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+};
+
 // 3. STANDARD BULK DOWNLOAD (Follows same logic)
 export const downloadBulkReports = async (req, res) => {
     let browser = null;
     let jobDir = null;
+    
     try {
         const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
         
         jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
         fs.mkdirSync(jobDir, { recursive: true });
-
-        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded );
+        const records = await getInspectionRecords(startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, includeDownloaded);
+        
+        if (records.length === 0) {
+            return res.json({ success: false, message: 'No records matching criteria' });
+        }
         
         browser = await puppeteer.launch({ 
             headless: CONFIG.HEADLESS, 
@@ -926,13 +1024,19 @@ export const downloadBulkReports = async (req, res) => {
         const page = await browser.newPage();
         const client = await page.target().createCDPSession();
         await client.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: jobDir });
-
+        
         await page.goto(CONFIG.LOGIN_URL);
         await page.waitForSelector('#username');
         await page.type('#username', process.env.P88_USERNAME);
         await page.type('#password', process.env.P88_PASSWORD);
         await page.click('#js-login-submit');
         await page.waitForNavigation();
+
+        let processedCount = 0;
+        let successCount = 0;
+        let failedCount = 0;
+        let failedReports = [];
+        const startTime = Date.now();
 
         for (const record of records) {
             const inspNo = record.inspectionNumbers?.[0] || record.inspectionNumbersKey?.split('-')[0];
@@ -945,10 +1049,10 @@ export const downloadBulkReports = async (req, res) => {
                 // Load Report Page
                 await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, { waitUntil: 'networkidle2' });
 
-                // 🔥 THE FIX: Always run language change. It will verify and switch if needed.
+                // Language change
                 await changeLanguage(page, language);
 
-                // Give the server a moment to synchronize the session with the PDF generator
+                // Give the server a moment to synchronize
                 await new Promise(resolve => setTimeout(resolve, 2000));
 
                 // Prepare print button
@@ -956,7 +1060,6 @@ export const downloadBulkReports = async (req, res) => {
                     const btn = document.querySelector('#page-wrapper a, a[href*="print"]');
                     if (btn) btn.setAttribute('target', '_self');
                 });
-
                 
                 try {
                     const printBtn = await page.waitForSelector('#page-wrapper a', { timeout: 15000 });
@@ -972,7 +1075,6 @@ export const downloadBulkReports = async (req, res) => {
                 const baseName = getFilename(record);
                 newFiles.forEach((file, index) => {
                     const oldPath = path.join(jobDir, file);
-                    // Include language in filename for easy verification
                     const newName = `${baseName}-${language}${newFiles.length > 1 ? `_${index + 1}` : ''}.pdf`;
                     fs.renameSync(oldPath, path.join(jobDir, newName));
                 });
@@ -982,35 +1084,85 @@ export const downloadBulkReports = async (req, res) => {
                 
             } catch (err) {
                 console.error(`❌ Error on ${inspNo}:`, err.message);
-                await updateDownloadStatus(record._id, 'Failed');
                 failedCount++;
+                failedReports.push({
+                    inspectionNumber: inspNo,
+                    groupNumber: record.groupNumber,
+                    error: err.message
+                });
+                await updateDownloadStatus(record._id, 'Failed');
             }
+            
+            processedCount++;
         }
 
+        const endTime = Date.now();
+        const duration = Math.round((endTime - startTime) / 1000);
+
+        const downloadResults = {
+            total: processedCount,
+            successful: successCount,
+            failed: failedCount,
+            failedReports: failedReports,
+            duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+            completedAt: new Date().toISOString()
+        };
+
         await browser.close();
-        await streamZipAndCleanup(jobDir, res);
+        await streamZipAndCleanup(jobDir, res, downloadResults);
+        
     } catch (error) {
+        console.error('Download error:', error);
         if (browser) await browser.close();
-        res.status(500).json({ success: false, error: error.message });
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: error.message });
+        }
     }
 };
 
-async function streamZipAndCleanup(jobDir, res) {
-    const zipName = `Reports_${Date.now()}.zip`;
+async function streamZipAndCleanup(jobDir, res, downloadResults = null) {
+    const zipName = `P88_Reports_${Date.now()}.zip`;
     const zipPath = path.join(baseTempDir, zipName);
     const output = fs.createWriteStream(zipPath);
     const archive = archiver('zip', { zlib: { level: 9 } });
 
     output.on('close', () => {
+        if (downloadResults) {
+            try {
+                const jsonStr = JSON.stringify(downloadResults);
+                // Use the global Buffer to create a Base64 string
+                const base64Results = Buffer.from(jsonStr).toString('base64');
+                
+                // Expose the header so the browser/frontend can see it
+                res.setHeader('Access-Control-Expose-Headers', 'X-Download-Results');
+                res.setHeader('X-Download-Results', base64Results);
+            } catch (headerError) {
+                console.error("Error setting results header:", headerError);
+            }
+        }
+        
         res.download(zipPath, zipName, (err) => {
+            // Cleanup files after download starts/finishes
             if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-            if (fs.existsSync(jobDir)) fs.rmSync(jobDir, { recursive: true, force: true });
+            if (fs.existsSync(jobDir)) {
+                try {
+                    fs.rmSync(jobDir, { recursive: true, force: true });
+                } catch (rmErr) {
+                    console.error("Error removing job directory:", rmErr);
+                }
+            }
         });
+    });
+
+    output.on('error', (err) => {
+        if (!res.headersSent) {
+            res.status(500).json({ success: false, error: 'Failed to create ZIP file' });
+        }
     });
 
     archive.pipe(output);
     archive.directory(jobDir, false);
-    await archive.finalize();
+    archive.finalize();
 }
 
 // Get total record count endpoint (updated)

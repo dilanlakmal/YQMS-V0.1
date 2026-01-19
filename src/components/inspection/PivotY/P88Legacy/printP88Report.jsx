@@ -35,6 +35,8 @@ const PrintP88Report = () => {
     const [styleNumber, setStyleNumber] = useState('');
     const [poNumbers, setPONumbers] = useState([]);
     const [styles, setStyles] = useState([]);
+    const [downloadResults, setDownloadResults] = useState(null);
+    const [showResults, setShowResults] = useState(false);
 
     // Helper to format seconds into MM:SS
     const formatTime = (seconds) => {
@@ -362,23 +364,57 @@ const PrintP88Report = () => {
             if (contentType && contentType.includes("application/json")) {
                 // If the server sends JSON (usually an error or "no records found")
                 const data = await response.json();
+                if (data.downloadStats) {
+                setDownloadResults(data.downloadStats);
+                setShowResults(true);
+            }
                 setStatus({ message: data.message || 'No records found', type: 'info' });
             } else {
                 // IF IT IS A FILE (The ZIP)
+                
+                let resultsLoaded = false;
+
+                // Try to get results from header first
+               // 1. TRY TO GET RESULTS FROM HEADER
+                const base64Header = response.headers.get('X-Download-Results');
+                let results = null;
+
+                if (base64Header) {
+                    try {
+                        const decodedJson = atob(base64Header); // Decode Base64
+                        results = JSON.parse(decodedJson);
+                    } catch (e) {
+                        console.error("Error parsing results header", e);
+                    }
+                }
+
                 const blob = await response.blob();
                 const url = window.URL.createObjectURL(blob);
                 const link = document.createElement('a');
                 link.href = url;
-                
-                // Set the filename for the user's computer
                 link.setAttribute('download', `P88_Reports_${new Date().toISOString().split('T')[0]}.zip`);
-                
-                // Trigger the click and cleanup
                 document.body.appendChild(link);
                 link.click();
-                link.parentNode.removeChild(link);
+                document.body.removeChild(link);
                 window.URL.revokeObjectURL(url);
-                setStatus({ message: 'Download completed successfully! Check your browser downloads.', type: 'success' });
+
+                // 3. IF HEADER WAS MISSING, POLL THE DATA
+                if (!results) {
+                    // Wait 2 seconds for server to finalize job object
+                    await new Promise(r => setTimeout(r, 2000));
+                    const resultRes = await fetch(`${apiBaseUrl}/api/scraping/download-results/${jobId}`);
+                    if (resultRes.ok) {
+                        const data = await resultRes.json();
+                        results = data.results;
+                    }
+                }
+
+                // 4. DISPLAY THE MODAL
+                if (results) {
+                    setDownloadResults(results);
+                    setShowResults(true); // This triggers your "Download Results Modal"
+                    setStatus({ message: 'Download completed successfully!', type: 'success' });
+                }
             }
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -396,6 +432,24 @@ const PrintP88Report = () => {
             abortControllerRef.current = null;
         }
     };
+
+    const fetchDownloadResults = async (jobId) => {
+    try {
+        const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '';
+        const response = await fetch(`${apiBaseUrl}/api/scraping/download-results/${jobId}`);
+        
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.results) {
+                setDownloadResults(data.results);
+                setShowResults(true);
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching download results:', error);
+    }
+};
+
 
     const handleModeChange = async (mode) => {
         setDownloadMode(mode);
@@ -981,6 +1035,113 @@ const PrintP88Report = () => {
                                                 <span>Start Download</span>
                                             </div>
                                         )}
+                                    </button>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Download Results Modal */}
+                {showResults && downloadResults && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-lg w-full shadow-2xl">
+                            {/* Modal Header */}
+                            <div className="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4 rounded-t-2xl">
+                                <h3 className="text-xl font-bold text-white flex items-center space-x-2">
+                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                                    </svg>
+                                    <span>Download Results</span>
+                                </h3>
+                            </div>
+
+                            <div className="p-6 space-y-6">
+                                {/* Results Summary */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="text-center p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                        <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                            {downloadResults.total || 0}
+                                        </div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-300">Total Processed</div>
+                                    </div>
+                                    
+                                    <div className="text-center p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                        <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+                                            {downloadResults.successful || 0}
+                                        </div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-300">Successful</div>
+                                    </div>
+                                    
+                                    <div className="text-center p-4 bg-red-50 dark:bg-red-900/20 rounded-lg">
+                                        <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+                                            {downloadResults.failed || 0}
+                                        </div>
+                                        <div className="text-sm text-gray-600 dark:text-gray-300">Failed</div>
+                                    </div>
+                                </div>
+
+                                {/* Success Rate */}
+                                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Success Rate</span>
+                                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                            {downloadResults.total > 0 
+                                                ? Math.round((downloadResults.successful / downloadResults.total) * 100)
+                                                : 0}%
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                        <div 
+                                            className="bg-green-500 h-2 rounded-full transition-all duration-500" 
+                                            style={{ 
+                                                width: `${downloadResults.total > 0 
+                                                    ? (downloadResults.successful / downloadResults.total) * 100 
+                                                    : 0}%` 
+                                            }}
+                                        ></div>
+                                    </div>
+                                </div>
+
+                                {/* Additional Details */}
+                                {downloadResults.duration && (
+                                    <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+                                        <span>Completed in {downloadResults.duration}</span>
+                                    </div>
+                                )}
+
+                                {/* Failed Reports List (if any) */}
+                                {downloadResults.failed > 0 && downloadResults.failedReports && (
+                                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                                        <h4 className="font-medium text-red-800 dark:text-red-200 mb-2">
+                                            Failed Reports ({downloadResults.failed})
+                                        </h4>
+                                        <div className="max-h-32 overflow-y-auto text-sm text-red-700 dark:text-red-300">
+                                            {downloadResults.failedReports.slice(0, 5).map((report, index) => (
+                                                <div key={index} className="mb-1">
+                                                    • {report.inspectionNumber || report.id} - {report.error || 'Unknown error'}
+                                                </div>
+                                            ))}
+                                            {downloadResults.failedReports.length > 5 && (
+                                                <div className="text-xs text-red-600 dark:text-red-400 mt-2">
+                                                    ... and {downloadResults.failedReports.length - 5} more
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Close Button */}
+                                <div className="flex justify-center pt-4">
+                                    <button
+                                        onClick={() => {
+                                            setShowResults(false);
+                                            setDownloadResults(null);
+                                        }}
+                                        className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors duration-200"
+                                    >
+                                        Close
                                     </button>
                                 </div>
                             </div>
