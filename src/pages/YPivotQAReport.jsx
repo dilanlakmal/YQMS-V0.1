@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   FileText,
@@ -8,12 +8,16 @@ import {
   Home,
   User,
   LayoutGrid,
-  Sparkles
+  Sparkles,
+  ShieldCheck
 } from "lucide-react";
+import axios from "axios";
 import { useAuth } from "../components/authentication/AuthContext";
+import { API_BASE_URL } from "../../config";
 
 // --- Import Tab Components ---
 import YPivotQAReportMain from "../components/inspection/PivotY/QAReports/YPivotQAReportMain";
+import FincheckApprovalAssignee from "../components/inspection/PivotY/QAReports/FincheckApprovalAssignee";
 
 // --- Placeholder Components for Future Tabs ---
 const AnalyticsPlaceholder = () => (
@@ -44,14 +48,57 @@ const YPivotQAReport = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("reports");
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoadingPermission, setIsLoadingPermission] = useState(true);
+
+  // Permission Check Effect
+  useEffect(() => {
+    const checkPermission = async () => {
+      if (!user?.emp_id) {
+        console.log("[TAB VISIBILITY] No user found");
+        setIsAdmin(false);
+        setIsLoadingPermission(false);
+        return;
+      }
+
+      try {
+        setIsLoadingPermission(true);
+
+        // Use the EXISTING working endpoint
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-reports/check-permission`,
+          {
+            params: { empId: user.emp_id },
+            timeout: 10000 // 10 second timeout
+          }
+        );
+
+        // VERY STRICT boolean check
+        const isAdminValue = res.data?.isAdmin;
+
+        if (isAdminValue === true) {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      } catch (error) {
+        setIsAdmin(false);
+      } finally {
+        setIsLoadingPermission(false);
+      }
+    };
+
+    checkPermission();
+  }, [user?.emp_id]);
 
   const handleGoHome = () => {
     navigate("/home");
   };
 
   // --- TAB CONFIGURATION ---
-  const tabs = useMemo(
-    () => [
+  const tabs = useMemo(() => {
+    const baseTabs = [
+      // Base tabs available to everyone
       {
         id: "reports",
         label: "Reports",
@@ -73,14 +120,24 @@ const YPivotQAReport = () => {
         component: <ExportPlaceholder />,
         color: "text-orange-600"
       }
-    ],
-    []
-  );
+    ];
+    if (!isLoadingPermission && isAdmin === true) {
+      console.log("✅ [TABS MEMO] Adding Assignees tab");
+      baseTabs.push({
+        id: "approval",
+        label: "Assignees",
+        icon: <ShieldCheck size={18} />,
+        component: <FincheckApprovalAssignee />,
+        color: "text-purple-600"
+      });
+    }
+    return baseTabs;
+  }, [isAdmin, isLoadingPermission]);
 
   const activeTabData = tabs.find((t) => t.id === activeTab);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans">
+    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-gray-900 dark:via-slate-900 dark:to-gray-800 text-gray-800 dark:text-gray-200 font-sans flex flex-col">
       {/* Background Ambience */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-600/10 rounded-full blur-3xl animate-pulse"></div>
@@ -259,10 +316,12 @@ const YPivotQAReport = () => {
       </div>
 
       {/* --- CONTENT AREA --- */}
-      <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-6 pt-[100px] lg:pt-[84px]">
-        {/* Render Active Component */}
-        <div className="animate-fadeIn">
-          {tabs.find((tab) => tab.id === activeTab)?.component}
+      <div className="flex-1 overflow-hidden pt-[90px] lg:pt-[70px] flex flex-col">
+        <div className="relative max-w-8xl mx-auto px-3 sm:px-4 lg:px-6 pb-4 h-full flex flex-col min-h-0">
+          {/* Render Active Component */}
+          <div className="h-full animate-fadeIn">
+            {tabs.find((tab) => tab.id === activeTab)?.component}
+          </div>
         </div>
       </div>
 

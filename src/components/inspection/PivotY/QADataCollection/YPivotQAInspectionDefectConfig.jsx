@@ -128,7 +128,7 @@ const YPivotQAInspectionDefectConfig = ({
 
   const currentManualData = useMemo(() => {
     const allManualData = reportData?.defectData?.manualDataByGroup || {};
-    const groupId = activeGroup?.id || "general";
+    const groupId = activeGroup ? activeGroup.id : 0;
     return allManualData[groupId] || { remarks: "", images: [] };
   }, [reportData?.defectData?.manualDataByGroup, activeGroup]);
 
@@ -195,19 +195,41 @@ const YPivotQAInspectionDefectConfig = ({
 
   const handleManualDataUpdate = (newManualDataForActiveGroup) => {
     if (onUpdateDefectData) {
-      const groupId = activeGroup?.id || "general";
+      // --- MODIFY THIS LINE ---
+      // Use activeGroup.id if available.
+      // If no active group (General mode), use 0.
+      const groupId = activeGroup ? activeGroup.id : 0;
+
       const existingManualDataMap =
         reportData?.defectData?.manualDataByGroup || {};
+
       const updatedMap = {
         ...existingManualDataMap,
         [groupId]: newManualDataForActiveGroup
       };
+
       onUpdateDefectData({
         savedDefects: savedDefects,
         manualDataByGroup: updatedMap
       });
     }
   };
+
+  // const handleManualDataUpdate = (newManualDataForActiveGroup) => {
+  //   if (onUpdateDefectData) {
+  //     const groupId = activeGroup?.id || "general";
+  //     const existingManualDataMap =
+  //       reportData?.defectData?.manualDataByGroup || {};
+  //     const updatedMap = {
+  //       ...existingManualDataMap,
+  //       [groupId]: newManualDataForActiveGroup
+  //     };
+  //     onUpdateDefectData({
+  //       savedDefects: savedDefects,
+  //       manualDataByGroup: updatedMap
+  //     });
+  //   }
+  // };
 
   // --- Initial Fetch ---
   useEffect(() => {

@@ -39,7 +39,8 @@ import {
   Eye,
   Clock,
   ClipboardList,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Gavel
 } from "lucide-react";
 import { API_BASE_URL, PUBLIC_ASSET_URL } from "../../../../../config";
 
@@ -71,6 +72,10 @@ import { determineBuyerFromOrderNo } from "../QADataCollection/YPivotQAInspectio
 import { useAuth } from "../../../authentication/AuthContext";
 
 import YPivotQAReportPPSheetSection from "./YPivotQAReportPPSheetSection";
+import YPivotQAReportMeasurementManualDisplay from "./YPivotQAReportMeasurementManualDisplay";
+import YPivotQAInspectionManualDefectDisplay from "./YPivotQAInspectionManualDefectDisplay";
+
+import YPivotQAReportDecisionModal from "./YPivotQAReportDecisionModal";
 
 import YPivotQAReportPDFGenerator from "./YPivotQAReportPDFGenerator";
 
@@ -644,22 +649,23 @@ const SKUDataTable = ({ skuData, orderNo }) => {
         <table className="w-full text-xs border-collapse">
           <thead>
             <tr className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white">
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              {/* --- Added specific width w-[40%] to SKU Column --- */}
+              <th className="px-3 py-2 text-left font-bold text-[10px] uppercase w-[40%]">
                 SKU
               </th>
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-left font-bold text-[10px] uppercase">
                 PO Line
               </th>
-              <th className="px-2 py-1.5 text-left font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-left font-bold text-[10px] uppercase">
                 Color
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
                 ETD
               </th>
-              <th className="px-2 py-1.5 text-center font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-center font-bold text-[10px] uppercase">
                 ETA
               </th>
-              <th className="px-2 py-1.5 text-right font-bold text-[10px] uppercase">
+              <th className="px-2 py-2 text-right font-bold text-[10px] uppercase">
                 Qty
               </th>
             </tr>
@@ -674,22 +680,23 @@ const SKUDataTable = ({ skuData, orderNo }) => {
                     : "bg-gray-50 dark:bg-gray-800/50"
                 }`}
               >
-                <td className="px-2 py-1.5 font-mono text-[11px] text-gray-700 dark:text-gray-300">
+                {/* --- Added 'font-bold' to ALL cells below --- */}
+                <td className="px-3 py-2 font-bold text-[11px] text-gray-800 dark:text-gray-200 break-all">
                   {sku.sku || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.POLine || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-[11px] text-gray-700 dark:text-gray-300">
+                <td className="px-2 py-2 font-bold text-[11px] text-gray-700 dark:text-gray-300">
                   {sku.Color || "N/A"}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-center text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.ETD || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-center text-[11px] text-gray-600 dark:text-gray-400">
+                <td className="px-2 py-2 font-bold text-center text-[11px] text-gray-600 dark:text-gray-400">
                   {sku.ETA || "-"}
                 </td>
-                <td className="px-2 py-1.5 text-right font-semibold text-[11px] text-emerald-600 dark:text-emerald-400">
+                <td className="px-2 py-2 font-bold text-right text-[11px] text-emerald-600 dark:text-emerald-400">
                   {sku.Qty?.toLocaleString() || 0}
                 </td>
               </tr>
@@ -796,7 +803,7 @@ const transformMeasurementDataFromBackend = (backendMeasurementData) => {
   }
 
   const processedMeasurements = backendMeasurementData
-    .filter((m) => m.size !== "Manual_Entry")
+    //.filter((m) => m.size !== "Manual_Entry")
     .map((m) => ({
       ...m,
       allEnabledPcs: new Set(m.allEnabledPcs || []),
@@ -863,6 +870,7 @@ const YPivotQAReportFullView = () => {
     Before: { full: [], selected: [] },
     After: { full: [], selected: [] }
   });
+  const [sizeList, setSizeList] = useState([]);
 
   // UI States
   const [previewImage, setPreviewImage] = useState(null);
@@ -881,8 +889,11 @@ const YPivotQAReportFullView = () => {
     setExpandedSections((prev) => ({ ...prev, [key]: !prev[key] }));
   // Permission State
   const [canViewReportId, setCanViewReportId] = useState(false);
+  const [isApprover, setIsApprover] = useState(false);
 
   const [defectHeatmap, setDefectHeatmap] = useState(null);
+
+  const [showDecisionModal, setShowDecisionModal] = useState(false);
 
   // =========================================================================
   // FETCH ALL DATA
@@ -988,6 +999,7 @@ const YPivotQAReportFullView = () => {
 
             if (specsRes.data.success) {
               setMeasurementSpecs(specsRes.data.specs); // Save { Before:..., After:... }
+              setSizeList(specsRes.data.sizeList || []);
             }
           } catch (err) {
             console.warn("Could not fetch measurement specs", err);
@@ -1028,7 +1040,35 @@ const YPivotQAReportFullView = () => {
     checkPermission();
   }, [user]);
 
-  // NEW: Fetch Defect Heatmap (Visual Locations)
+  // USEEFFECT FOR APPROVAL PERMISSION CHECK
+  useEffect(() => {
+    const checkApprovalStatus = async () => {
+      // We need both the logged-in User AND the Report to be loaded
+      // so we can validate the specific report ID/Buyer against the user.
+      if (user?.emp_id && report?.reportId) {
+        try {
+          // Pass both empId AND reportId
+          const res = await axios.get(
+            `${API_BASE_URL}/api/fincheck-reports/check-approval-permission?empId=${user.emp_id}&reportId=${report.reportId}`
+          );
+
+          if (res.data && res.data.success && res.data.isApprover) {
+            setIsApprover(true);
+          } else {
+            setIsApprover(false);
+          }
+        } catch (error) {
+          console.error("Failed to check approval permission", error);
+          setIsApprover(false);
+        }
+      }
+    };
+
+    checkApprovalStatus();
+    // Add 'report' to dependency array so it re-runs once report details are fetched
+  }, [user, report]);
+
+  // Fetch Defect Heatmap (Visual Locations)
   useEffect(() => {
     const fetchHeatmap = async () => {
       if (!reportId) return;
@@ -1438,8 +1478,10 @@ const YPivotQAReportFullView = () => {
     navigate("/fincheck-reports");
   };
 
-  const handlePrint = () => {
-    window.print();
+  const handleDecisionSubmit = async (result) => {
+    setTimeout(() => {
+      window.location.reload();
+    }, 2000);
   };
 
   // =========================================================================
@@ -1526,13 +1568,24 @@ const YPivotQAReportFullView = () => {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
+            {/* --- DECISION BUTTON --- */}
+            {isApprover && (
+              <button
+                onClick={() => setShowDecisionModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-800/40 hover:bg-indigo-900/40 text-white rounded-xl font-bold border border-indigo-400/30 transition-colors"
+              >
+                <Gavel className="w-4 h-4" />
+                <span className="hidden sm:inline">Decision</span>
+              </button>
+            )}
+
+            {/* <button
               onClick={handlePrint}
               className="flex items-center gap-2 px-4 py-2 bg-white text-indigo-600 rounded-xl font-bold shadow-lg hover:bg-gray-50 transition-colors"
             >
               <Printer className="w-4 h-4" />
               <span className="hidden sm:inline">Print</span>
-            </button>
+            </button> */}
 
             {/* New PDF Generator Button */}
             <YPivotQAReportPDFGenerator
@@ -1551,6 +1604,7 @@ const YPivotQAReportFullView = () => {
               defectResult={defectResult}
               isAQLMethod={isAQLMethod}
               inspectedQty={inspectedQty}
+              sizeList={sizeList}
             />
           </div>
         </div>
@@ -1867,7 +1921,8 @@ const YPivotQAReportFullView = () => {
         )}
 
         {/* 4. Defect Summary */}
-        {summaryData.groups.length > 0 && (
+        {(summaryData.groups.length > 0 ||
+          (report.defectManualData && report.defectManualData.length > 0)) && (
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
             <div
               className="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 flex justify-between items-center cursor-pointer"
@@ -1886,6 +1941,15 @@ const YPivotQAReportFullView = () => {
                 <ChevronDown className="text-white w-4 h-4" />
               )}
             </div>
+
+            {/* --- MANUAL DEFECT DISPLAY SECTION --- */}
+            {report.defectManualData && report.defectManualData.length > 0 && (
+              <div className="px-4 pb-6">
+                <YPivotQAInspectionManualDefectDisplay
+                  manualData={report.defectManualData}
+                />
+              </div>
+            )}
 
             {expandedSections.defectSummary && (
               <div className="p-0">
@@ -2069,89 +2133,144 @@ const YPivotQAReportFullView = () => {
             {expandedSections.measurement && (
               <div className="p-4 space-y-8">
                 {/* Loop through each Stage (Before / After) */}
-                {measurementStageData.map((stageData) => (
-                  <div key={stageData.stage} className="space-y-5">
-                    {/* Stage Header */}
-                    <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
-                      <span
-                        className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
-                          stageData.stage === "Before"
-                            ? "bg-purple-500"
-                            : "bg-teal-500"
-                        }`}
-                      >
-                        {stageData.label}
-                      </span>
-                    </div>
+                {measurementStageData.map((stageData) => {
+                  // Check if we have any data groups (including Manual Entry)
+                  const hasData = stageData.groupedData.groups.length > 0;
 
-                    {/* Check if specs are loaded for this stage */}
-                    {stageData.specs.full.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200">
-                        <Loader2 className="w-6 h-6 animate-spin mb-1 text-indigo-500" />
-                        <p className="text-xs">
-                          Loading Specs for {stageData.label}...
-                        </p>
+                  return (
+                    <div key={stageData.stage} className="space-y-5">
+                      {/* Stage Header */}
+                      <div className="flex items-center gap-2 pb-2 border-b-2 border-cyan-100 dark:border-cyan-900">
+                        <span
+                          className={`px-3 py-1 rounded-lg text-xs font-bold text-white ${
+                            stageData.stage === "Before"
+                              ? "bg-purple-500"
+                              : "bg-teal-500"
+                          }`}
+                        >
+                          {stageData.label}
+                        </span>
                       </div>
-                    ) : (
-                      <>
-                        {/* Overall Result Table */}
-                        <OverallMeasurementSummaryTable
-                          groupedMeasurements={stageData.groupedDataForOverall}
-                        />
 
-                        {/* Detailed Groups */}
-                        {stageData.groupedData.groups.map((group) => {
-                          const configLabel =
-                            [
-                              group.lineName ? `Line ${group.lineName}` : null,
-                              group.tableName
-                                ? `Table ${group.tableName}`
-                                : null,
-                              group.colorName
-                                ? group.colorName.toUpperCase()
-                                : null
-                            ]
-                              .filter(Boolean)
-                              .join(" / ") || "General Configuration";
+                      {/* LOADING STATE: Only show if NO Specs AND NO Data (Manual or otherwise) */}
+                      {stageData.specs.full.length === 0 && !hasData ? (
+                        <div className="flex flex-col items-center justify-center py-6 text-gray-400 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-dashed border-gray-200">
+                          <Loader2 className="w-6 h-6 animate-spin mb-1 text-indigo-500" />
+                          <p className="text-xs">
+                            Loading Specs for {stageData.label}...
+                          </p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Overall Result Table - Only show if we have specs */}
+                          {stageData.specs.full.length > 0 && (
+                            <OverallMeasurementSummaryTable
+                              groupedMeasurements={
+                                stageData.groupedDataForOverall
+                              }
+                              sizeList={sizeList}
+                            />
+                          )}
 
-                          const stats = calculateGroupStats(
-                            group.measurements,
-                            stageData.specs.full,
-                            stageData.specs.selected
-                          );
+                          {/* Detailed Groups */}
+                          {stageData.groupedData.groups.map((group) => {
+                            const configLabel =
+                              [
+                                group.lineName
+                                  ? `Line ${group.lineName}`
+                                  : null,
+                                group.tableName
+                                  ? `Table ${group.tableName}`
+                                  : null,
+                                group.colorName
+                                  ? group.colorName.toUpperCase()
+                                  : null
+                              ]
+                                .filter(Boolean)
+                                .join(" / ") || "General Configuration";
 
-                          return (
-                            <div
-                              key={`${stageData.stage}-${group.id}`}
-                              className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
-                            >
-                              <div className="bg-gray-100 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
-                                <Layers className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase">
-                                  {configLabel} ({stageData.label})
-                                </span>
-                              </div>
+                            // Calculate stats only if specs exist
+                            const stats =
+                              stageData.specs.full.length > 0
+                                ? calculateGroupStats(
+                                    group.measurements,
+                                    stageData.specs.full,
+                                    stageData.specs.selected
+                                  )
+                                : {
+                                    totalPoints: 0,
+                                    passPoints: 0,
+                                    failPoints: 0,
+                                    totalPcs: 0,
+                                    passPcs: 0,
+                                    failPcs: 0,
+                                    pointPassRate: "0.0",
+                                    pcsPassRate: "0.0"
+                                  };
 
-                              <div className="p-4 space-y-5 bg-white dark:bg-gray-800">
-                                <MeasurementStatsCards stats={stats} />
-                                <div className="py-1">
-                                  <MeasurementLegend />
+                            // Robustly find manual data
+                            let manualData = group.measurements.find(
+                              (m) => m.manualData
+                            )?.manualData;
+
+                            if (
+                              !manualData &&
+                              report.measurementData?.manualDataByGroup
+                            ) {
+                              manualData =
+                                report.measurementData.manualDataByGroup[
+                                  group.id
+                                ];
+                            }
+
+                            return (
+                              <div
+                                key={`${stageData.stage}-${group.id}`}
+                                className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm"
+                              >
+                                <div className="bg-gray-100 dark:bg-gray-700/50 px-4 py-2 border-b border-gray-200 dark:border-gray-700 flex items-center gap-2">
+                                  <Layers className="w-4 h-4 text-gray-500" />
+                                  <span className="text-sm font-bold text-gray-800 dark:text-gray-200 uppercase">
+                                    {configLabel} ({stageData.label})
+                                  </span>
                                 </div>
-                                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
-                                  <MeasurementSummaryTable
-                                    measurements={group.measurements}
-                                    specsData={stageData.specs.full}
-                                    selectedSpecsList={stageData.specs.selected}
-                                  />
+
+                                <div className="p-4 space-y-5 bg-white dark:bg-gray-800">
+                                  {/* Display Manual Data */}
+                                  {manualData && (
+                                    <YPivotQAReportMeasurementManualDisplay
+                                      manualData={manualData}
+                                    />
+                                  )}
+
+                                  {/* Only show Stats and Table if Specs exist */}
+                                  {stageData.specs.full.length > 0 && (
+                                    <>
+                                      <MeasurementStatsCards stats={stats} />
+                                      <div className="py-1">
+                                        <MeasurementLegend />
+                                      </div>
+                                      <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <MeasurementSummaryTable
+                                          measurements={group.measurements}
+                                          specsData={stageData.specs.full}
+                                          selectedSpecsList={
+                                            stageData.specs.selected
+                                          }
+                                          sizeList={sizeList}
+                                        />
+                                      </div>
+                                    </>
+                                  )}
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </>
-                    )}
-                  </div>
-                ))}
+                            );
+                          })}
+                        </>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -2326,7 +2445,8 @@ const YPivotQAReportFullView = () => {
                         </h3>
                       </div>
 
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* --- MODIFIED: Changed from grid-cols-2 to space-y-6 for FULL WIDTH --- */}
+                      <div className="space-y-6">
                         {orderData.orderBreakdowns.map((breakdown) => {
                           const skuData = breakdown.yorksysOrder?.skuData;
                           if (!skuData || skuData.length === 0) return null;
@@ -2396,81 +2516,134 @@ const YPivotQAReportFullView = () => {
 
             <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col">
               <div className="p-4 border-b border-gray-100 dark:border-gray-700">
-                <SectionHeader title="Inspection Scope" icon={Layers} />
+                {/* RENAMED TITLE */}
+                <SectionHeader title="Inspection Configuration" icon={Layers} />
               </div>
               <div className="flex-1 overflow-x-auto">
                 {lineTableConfig.length > 0 ? (
                   <table className="w-full text-xs text-left">
                     <thead className="bg-gray-50 dark:bg-gray-700/50 text-gray-500 font-medium">
                       <tr>
-                        {scopeColumns.map((col) => (
-                          <th key={col} className="px-3 py-2">
-                            {col}
+                        {/* 1. DYNAMIC CONFIG COLUMNS */}
+                        {lineTableConfig.some((g) => g.lineName || g.line) && (
+                          <th className="px-3 py-2">Line</th>
+                        )}
+                        {lineTableConfig.some(
+                          (g) => g.tableName || g.table
+                        ) && <th className="px-3 py-2">Table</th>}
+                        {lineTableConfig.some(
+                          (g) => g.colorName || g.color
+                        ) && <th className="px-3 py-2">Color</th>}
+
+                        {/* 2. CARTON COLUMN (Conditionally displayed) */}
+                        {config.cartonQty > 0 && (
+                          <th className="px-3 py-2 text-center text-blue-600">
+                            Cartons
                           </th>
-                        ))}
-                        <th className="px-3 py-2 text-right">Qty</th>
+                        )}
+
+                        {/* 3. AQL SPECIFIC: FINISHED QTY */}
+                        {isAQLMethod && (
+                          <th className="px-3 py-2 text-center">
+                            Finished Qty
+                          </th>
+                        )}
+
+                        {/* 4. SAMPLE SIZE (Common) */}
+                        <th className="px-3 py-2 text-right">Sample Size</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
-                      {lineTableConfig.map(
-                        (group) =>
-                          group.assignments?.map((assign, idx) => (
-                            <tr
-                              key={`${group.id}-${assign.id || idx}`}
-                              className="hover:bg-gray-50 dark:hover:bg-gray-700/20"
-                            >
-                              {scopeColumns.includes("Line") && (
-                                <td className="px-3 py-1.5 font-bold">
-                                  {idx === 0
-                                    ? group.lineName || group.line
-                                    : ""}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Table") && (
-                                <td className="px-3 py-1.5">
-                                  {idx === 0
-                                    ? group.tableName || group.table
-                                    : ""}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Color") && (
-                                <td className="px-3 py-1.5 text-indigo-600">
-                                  {idx === 0
-                                    ? group.colorName || group.color
-                                    : ""}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 text-right font-mono">
-                                {assign.qty || 0}
+                      {lineTableConfig.map((group, idx) => {
+                        // Check which config columns are active to ensure alignment
+                        const hasLine = lineTableConfig.some(
+                          (g) => g.lineName || g.line
+                        );
+                        const hasTable = lineTableConfig.some(
+                          (g) => g.tableName || g.table
+                        );
+                        const hasColor = lineTableConfig.some(
+                          (g) => g.colorName || g.color
+                        );
+                        const hasCartons = config.cartonQty > 0;
+
+                        // Calculate Fixed Sample Size (Sum of assignments for this group)
+                        const fixedSampleSize =
+                          group.assignments?.reduce(
+                            (sum, a) => sum + (a.qty || 0),
+                            0
+                          ) || 0;
+
+                        return (
+                          <tr
+                            key={idx}
+                            className="hover:bg-gray-50 dark:hover:bg-gray-700/20"
+                          >
+                            {/* --- CONFIG COLUMNS --- */}
+                            {hasLine && (
+                              <td className="px-3 py-2 font-bold text-gray-700 dark:text-gray-300">
+                                {group.lineName || group.line || "-"}
                               </td>
-                            </tr>
-                          )) || (
-                            <tr key={group.id}>
-                              {scopeColumns.includes("Line") && (
-                                <td className="px-3 py-1.5">
-                                  {group.lineName || group.line}
+                            )}
+                            {hasTable && (
+                              <td className="px-3 py-2 text-gray-600 dark:text-gray-400">
+                                {group.tableName || group.table || "-"}
+                              </td>
+                            )}
+                            {hasColor && (
+                              <td className="px-3 py-2 text-indigo-600 dark:text-indigo-400 font-medium">
+                                {group.colorName || group.color || "-"}
+                              </td>
+                            )}
+
+                            {/* --- METRIC COLUMNS (Merged for AQL / Cartons) --- */}
+
+                            {/* A. CARTONS (Merged if exists) */}
+                            {hasCartons &&
+                              (idx === 0 ? (
+                                <td
+                                  className="px-3 py-2 text-center font-mono font-bold text-blue-600 border-l border-gray-100 dark:border-gray-700"
+                                  rowSpan={lineTableConfig.length}
+                                >
+                                  {config.cartonQty}
                                 </td>
-                              )}
-                              {scopeColumns.includes("Table") && (
-                                <td className="px-3 py-1.5">
-                                  {group.tableName || group.table}
-                                </td>
-                              )}
-                              {scopeColumns.includes("Color") && (
-                                <td className="px-3 py-1.5">
-                                  {group.colorName || group.color}
-                                </td>
-                              )}
-                              <td className="px-3 py-1.5 text-right">-</td>
-                            </tr>
-                          )
-                      )}
+                              ) : null)}
+
+                            {/* B. AQL MODE: Merged Columns */}
+                            {isAQLMethod ? (
+                              idx === 0 ? (
+                                <>
+                                  {/* Finished Qty (InspectedQty from details) */}
+                                  <td
+                                    className="px-3 py-2 text-center font-mono border-l border-gray-100 dark:border-gray-700"
+                                    rowSpan={lineTableConfig.length}
+                                  >
+                                    {config.inspectedQty || 0}
+                                  </td>
+                                  {/* AQL Sample Size (Report Wide) */}
+                                  <td
+                                    className="px-3 py-2 text-right font-mono font-bold text-emerald-600 border-l border-gray-100 dark:border-gray-700"
+                                    rowSpan={lineTableConfig.length}
+                                  >
+                                    {config.aqlSampleSize || 0}
+                                  </td>
+                                </>
+                              ) : null // Don't render for subsequent rows
+                            ) : (
+                              // C. FIXED MODE: Individual Row Values
+                              <td className="px-3 py-2 text-right font-mono font-bold text-gray-800 dark:text-gray-200">
+                                {fixedSampleSize}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 ) : (
                   <div className="p-6 text-center text-gray-400">
                     <AlertCircle className="w-6 h-6 mx-auto mb-1 opacity-50" />
-                    <p className="text-xs">No scope configured</p>
+                    <p className="text-xs">No configuration found</p>
                   </div>
                 )}
               </div>
@@ -2818,6 +2991,17 @@ const YPivotQAReportFullView = () => {
           images={previewImage.images}
           startIndex={previewImage.startIndex}
           onClose={() => setPreviewImage(null)}
+        />
+      )}
+
+      {/* --- DECISION MODAL --- */}
+      {showDecisionModal && (
+        <YPivotQAReportDecisionModal
+          isOpen={showDecisionModal}
+          onClose={() => setShowDecisionModal(false)}
+          report={report}
+          user={user}
+          onSubmit={handleDecisionSubmit}
         />
       )}
 

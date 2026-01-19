@@ -165,6 +165,7 @@ const YPivotQAReportPDFGenerator = ({
   finalResult,
   defectResult,
   isAQLMethod,
+  sizeList,
   inspectedQty,
   // Trigger ref or callback
   triggerRef
@@ -477,6 +478,7 @@ const YPivotQAReportPDFGenerator = ({
           defectImagesWithBase64={defectImagesWithBase64}
           ppSheetDataWithImages={ppSheetDataWithImages}
           defectHeatmapData={defectHeatmapData}
+          sizeList={sizeList}
         />
       );
 
@@ -534,7 +536,8 @@ const YPivotQAReportPDFGenerator = ({
     finalResult,
     defectResult,
     isAQLMethod,
-    inspectedQty
+    inspectedQty,
+    sizeList
   ]);
 
   // Expose generate function via ref if provided

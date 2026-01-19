@@ -1120,6 +1120,19 @@ const YPivotQAInspection = () => {
     [markSectionClean]
   );
 
+  // Handler for when the full report is submitted/finalized from the Summary tab
+  const handleReportFinalized = useCallback((updatedReportData) => {
+    setSavedReportData((prev) => ({
+      ...prev,
+      status: updatedReportData.status,
+      resubmissionHistory: updatedReportData.resubmissionHistory,
+      updatedAt: updatedReportData.updatedAt
+    }));
+
+    // Optional: If you want to force the UI to lock/unlock based on status immediately
+    // setIsReportSaved(true); // It should already be true, but safe to ensure
+  }, []);
+
   const tabs = useMemo(
     () => [
       {
@@ -1342,6 +1355,7 @@ const YPivotQAInspection = () => {
             hasUnsavedChanges={hasUnsavedChanges}
             markAllSectionsClean={markAllSectionsClean}
             activeGroup={activeGroup}
+            onReportSubmitted={handleReportFinalized}
           />
         ),
         gradient: "from-indigo-500 to-violet-500",

@@ -1,17 +1,37 @@
 import express from "express";
+import fileUpload from "express-fileupload";
 import {
   getInspectionReports,
   getDefectImagesForReport,
   getReportMeasurementSpecs,
   checkUserPermission,
+  checkApprovalPermission,
   getReportImagesAsBase64,
-  getReportDefectHeatmap
+  getReportDefectHeatmap,
+  getFilterOptions,
+  autocompleteOrderNo,
+  autocompleteCustStyle,
+  saveUserPreference,
+  getUserPreferences,
+  deleteUserFilter,
+  getLeaderDecision,
+  submitLeaderDecision
 } from "../../../controller/PivotY/FincheckInspection/FincheckInspection_Report_Controller.js";
 
 const router = express.Router();
 
 // Get filtered inspection reports
 router.get("/api/fincheck-reports/list", getInspectionReports);
+
+// Get filter options
+router.get("/api/fincheck-reports/filter-options", getFilterOptions);
+
+// Autocomplete endpoints
+router.get("/api/fincheck-reports/autocomplete/order-no", autocompleteOrderNo);
+router.get(
+  "/api/fincheck-reports/autocomplete/cust-style",
+  autocompleteCustStyle
+);
 
 // Route for Defect Images
 router.get(
@@ -28,6 +48,12 @@ router.get(
 // Route to check permission
 router.get("/api/fincheck-reports/check-permission", checkUserPermission);
 
+// Route to check Decision/Approval permission
+router.get(
+  "/api/fincheck-reports/check-approval-permission",
+  checkApprovalPermission
+);
+
 // Get all report images as base64 for PDF generation
 router.get(
   "/api/fincheck-reports/:reportId/images-base64",
@@ -38,6 +64,31 @@ router.get(
 router.get(
   "/api/fincheck-inspection/report/:reportId/defect-heatmap",
   getReportDefectHeatmap
+);
+
+// User Preferences Routes
+router.post("/api/fincheck-reports/preferences/save", saveUserPreference);
+router.get("/api/fincheck-reports/preferences/get", getUserPreferences);
+router.post(
+  "/api/fincheck-reports/preferences/delete-filter",
+  deleteUserFilter
+);
+
+// Get existing decision for a report
+router.get("/api/fincheck-reports/get-decision/:reportId", getLeaderDecision);
+
+// POST - Submit Decision (Supports FormData for Audio)
+router.post(
+  "/api/fincheck-reports/submit-decision",
+
+  // 1. Middleware: Activates only for this route to parse FormData/Audio
+  fileUpload({
+    createParentPath: true, // Creates folders if missing
+    limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit for audio
+  }),
+
+  // 2. Controller
+  submitLeaderDecision
 );
 
 export default router;

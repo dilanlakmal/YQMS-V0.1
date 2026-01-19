@@ -253,6 +253,16 @@ const styles = StyleSheet.create({
     color: colors.gray[700]
   },
   textTol: { fontSize: 5, color: colors.gray[500] },
+  textTolMinus: {
+    fontSize: 5,
+    color: colors.danger,
+    fontFamily: "Helvetica-Bold"
+  },
+  textTolPlus: {
+    fontSize: 5,
+    color: colors.success,
+    fontFamily: "Helvetica-Bold"
+  },
   textSizeTitle: {
     fontSize: 7,
     fontFamily: "Helvetica-Bold",
@@ -275,6 +285,8 @@ const styles = StyleSheet.create({
 const cleanText = (str) => {
   if (str === null || str === undefined) return "";
   let s = String(str);
+
+  // Replace unicode fractions with ASCII equivalents
   s = s
     .replace(/¼/g, " 1/4")
     .replace(/½/g, " 1/2")
@@ -287,16 +299,120 @@ const cleanText = (str) => {
     .replace(/⅚/g, " 5/6")
     .replace(/⅓/g, " 1/3")
     .replace(/⅔/g, " 2/3");
+
+  // Replace fraction slash characters
   s = s.replace(/[\u2044\u2215]/g, "/");
+
+  // Replace math symbols
   s = s
     .replace(/≤/g, "<=")
     .replace(/≥/g, ">=")
     .replace(/≠/g, "!=")
     .replace(/±/g, "+/-");
-  s = s.replace(/[”"]/g, '"').replace(/[’‘]/g, "'");
+
+  // Replace fancy quotes
+  s = s.replace(/[""]/g, '"').replace(/['']/g, "'");
+
+  // FIX: Convert mixed number hyphen to space
+  // Pattern: digit followed by hyphen followed by fraction (numerator/denominator)
+  // Examples:
+  //   "27-1/2"  → "27 1/2"  (positive mixed number)
+  //   "1-1/2"   → "1 1/2"   (positive mixed number)
+  //   "-27-1/2" → "-27 1/2" (negative mixed number)
+  //   "-1-1/2"  → "-1 1/2"  (negative mixed number)
+  //   "-1/2"    → "-1/2"    (negative fraction, unchanged)
+  //   "3/16"    → "3/16"    (simple fraction, unchanged)
+  s = s.replace(/(\d)-(\d+\/\d+)/g, "$1 $2");
+
+  // Clean up multiple spaces
   s = s.replace(/\s+/g, " ").trim();
+
   return s;
 };
+
+// =============================================================================
+// TOLERANCE DISPLAY NORMALIZATION
+// =============================================================================
+
+/**
+ * Normalize Tol- for DISPLAY: Always show as negative value
+ * - If value is "-1/2" → display "-1/2"
+ * - If value is "1/2" → display "-1/2"
+ * - If value is "+1/2" → display "-1/2"
+ * - If value is "0" → display "0"
+ */
+const normalizeTolMinusDisplay = (value) => {
+  // 1. Clean unicode fractions first! (e.g., converts '⅛' to '1/8')
+  let strVal = cleanText(value);
+
+  if (!strVal || strVal === "-") {
+    return "-";
+  }
+
+  // 2. Handle zero cases
+  if (strVal === "0" || strVal === "-0" || strVal === "+0") {
+    return "0";
+  }
+
+  // 3. Remove any existing sign (+ or -) so we don't get double signs (e.g. --1/4)
+  strVal = strVal.replace(/^[+-]\s*/, "").trim();
+
+  // If empty after removing sign, return dash
+  if (!strVal) {
+    return "-";
+  }
+
+  // 4. Force Negative sign logic
+  return `-${strVal}`;
+};
+
+/**
+ * Normalize Tol+ for DISPLAY: Always show as positive value
+ * Handles mixed numbers with hyphen separator
+ */
+const normalizeTolPlusDisplay = (value) => {
+  // 1. Clean unicode fractions and formatting first using the helper
+  let strVal = cleanText(value);
+
+  if (!strVal || strVal === "-") {
+    return "-";
+  }
+
+  // 2. Handle zero cases
+  if (strVal === "0" || strVal === "-0" || strVal === "+0") {
+    return "0";
+  }
+
+  // 3. Remove any existing signs (+ or -)
+  strVal = strVal.replace(/^[+-]\s*/, "").trim();
+
+  if (!strVal) return "-";
+
+  // 4. Return without sign (positive)
+  return strVal;
+};
+
+/**
+ * Normalize decimal tolerance for CALCULATION: Always use absolute value
+ */
+const normalizeToleranceDecimal = (value) => {
+  if (value === null || value === undefined || value === "") {
+    return 0;
+  }
+
+  // If it's already a number, use it directly
+  const num = typeof value === "number" ? value : parseFloat(value);
+
+  if (isNaN(num)) {
+    return 0;
+  }
+
+  return Math.abs(num);
+};
+
+// =============================================================================
+// HELPER: OTHER UTILITIES
+// =============================================================================
 
 const getUniqueRows = (allSpecs) => {
   if (!allSpecs) return [];
@@ -319,32 +435,82 @@ const getSpecDetailsForSize = (rowName, size, allSpecs) => {
       s.Specs?.some((sz) => sz.size === size)
   );
   if (!matchedSpecEntry)
-    return { decimal: null, fraction: "-", tolPlus: "-", tolMinus: "-" };
+    return {
+      decimal: null,
+      fraction: "-",
+      tolPlus: "-",
+      tolMinus: "-",
+      tolPlusDec: 0,
+      tolMinusDec: 0
+    };
+
   const targetObj = matchedSpecEntry.Specs.find((s) => s.size === size);
   const tolPlus = matchedSpecEntry.TolPlus?.fraction || "-";
   const tolMinus = matchedSpecEntry.TolMinus?.fraction || "-";
+  const tolPlusDec = matchedSpecEntry.TolPlus?.decimal;
+  const tolMinusDec = matchedSpecEntry.TolMinus?.decimal;
+
   return {
     decimal: targetObj?.decimal,
     fraction: targetObj?.fraction || "-",
     tolPlus,
-    tolMinus
+    tolMinus,
+    tolPlusDec,
+    tolMinusDec
   };
 };
 
-const checkTolerance = (targetDecimal, value, tolPlusStr, tolMinusStr) => {
-  if (value === 0 || value === "" || value === null || value === undefined) {
+/**
+ * Check if measured value (deviation) is within tolerance range
+ * The measured value is a deviation from spec, so we compare directly against [-|TolMinus|, +|TolPlus|]
+ *
+ * @param {number|string} measuredValue - The measured deviation value (decimal)
+ * @param {number|string} tolPlusVal - Tolerance plus (decimal)
+ * @param {number|string} tolMinusVal - Tolerance minus (decimal)
+ */
+const checkTolerance = (measuredValue, tolPlusVal, tolMinusVal) => {
+  // Empty/zero/null values are considered within tolerance
+  if (
+    measuredValue === 0 ||
+    measuredValue === "" ||
+    measuredValue === null ||
+    measuredValue === undefined
+  ) {
     return { isWithin: true, status: "Empty" };
   }
-  const target = parseFloat(targetDecimal);
-  const reading = parseFloat(value);
-  if (isNaN(target) || isNaN(reading)) return { isWithin: true };
-  const tPlus = parseFloat(tolPlusStr || 0);
-  const tMinus = parseFloat(tolMinusStr || 0);
-  const upperLimit = target + tPlus;
-  const lowerLimit = target - tMinus;
+
+  const reading =
+    typeof measuredValue === "number"
+      ? measuredValue
+      : parseFloat(measuredValue);
+
+  // If we can't parse reading, consider it valid (default pass)
+  if (isNaN(reading)) {
+    return { isWithin: true, status: "Invalid" };
+  }
+
+  // Use absolute values for tolerance calculation
+  const tPlus = normalizeToleranceDecimal(tolPlusVal);
+  const tMinus = normalizeToleranceDecimal(tolMinusVal);
+
+  // The measured value is a deviation from spec
+  // Range: [-|TolMinus|, +|TolPlus|]
+  const lowerLimit = -tMinus;
+  const upperLimit = tPlus;
+
+  // Check if reading is within range
+  const epsilon = 0.0001;
   const isWithin =
-    reading >= lowerLimit - 0.0001 && reading <= upperLimit + 0.0001;
-  return { isWithin };
+    reading >= lowerLimit - epsilon && reading <= upperLimit + epsilon;
+
+  return {
+    isWithin,
+    lowerLimit,
+    upperLimit,
+    reading,
+    tPlus,
+    tMinus
+  };
 };
 
 const chunkArray = (arr, size) => {
@@ -353,6 +519,45 @@ const chunkArray = (arr, size) => {
     chunks.push(arr.slice(i, i + size));
   }
   return chunks;
+};
+
+/**
+ * Sort sizes based on a reference SizeList order
+ * Sizes not in SizeList will be placed at the end, sorted alphabetically
+ * @param {string[]} sizes - Array of size strings to sort
+ * @param {string[]} sizeList - Reference order from DtOrder.SizeList
+ * @returns {string[]} Sorted sizes array
+ */
+const sortSizesByReference = (sizes, sizeList = []) => {
+  if (!sizeList || sizeList.length === 0) {
+    // Fallback to natural sort if no reference list
+    return [...sizes].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  }
+
+  // Create a map for quick index lookup
+  const orderMap = new Map();
+  sizeList.forEach((size, index) => {
+    orderMap.set(size, index);
+  });
+
+  return [...sizes].sort((a, b) => {
+    const indexA = orderMap.has(a) ? orderMap.get(a) : Infinity;
+    const indexB = orderMap.has(b) ? orderMap.get(b) : Infinity;
+
+    // If both are in the reference list, sort by their order
+    if (indexA !== Infinity && indexB !== Infinity) {
+      return indexA - indexB;
+    }
+
+    // If only one is in the list, it comes first
+    if (indexA !== Infinity) return -1;
+    if (indexB !== Infinity) return 1;
+
+    // Both are not in the list, sort alphabetically
+    return a.localeCompare(b, undefined, { numeric: true });
+  });
 };
 
 // =============================================================================
@@ -367,7 +572,7 @@ const getConfigResult = (measurements) => {
 // =============================================================================
 // COMPONENT: Config Summary Table
 // =============================================================================
-const ConfigSummaryTable = ({ groupedData }) => {
+const ConfigSummaryTable = ({ groupedData, sizeList = [] }) => {
   if (!groupedData?.groups?.length && !groupedData?.noContext?.length) {
     return null;
   }
@@ -395,9 +600,8 @@ const ConfigSummaryTable = ({ groupedData }) => {
       if (m.size) allSizes.add(m.size);
     });
   });
-  const sortedSizes = Array.from(allSizes).sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true })
-  );
+  // Use sortSizesByReference instead of alphabetical sort
+  const sortedSizes = sortSizesByReference(Array.from(allSizes), sizeList);
 
   return (
     <View style={styles.sumTable}>
@@ -518,11 +722,11 @@ const MeasurementLegend = () => (
   <View style={styles.legendRow}>
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-      <Text style={styles.legendText}>Pass</Text>
+      <Text style={styles.legendText}>Pass (Within Tol)</Text>
     </View>
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: colors.danger }]} />
-      <Text style={styles.legendText}>Fail</Text>
+      <Text style={styles.legendText}>Fail (Out of Tol)</Text>
     </View>
     <View style={styles.legendItem}>
       <View style={[styles.legendDot, { backgroundColor: "#a855f7" }]} />
@@ -539,7 +743,8 @@ const MeasurementTableChunk = ({
   sizeChunk,
   measurements,
   uniqueRows,
-  allSpecs
+  allSpecs,
+  criticalSpecIds = new Set() // NEW: Add this parameter
 }) => {
   if (!sizeChunk.length || !uniqueRows.length) return null;
 
@@ -563,29 +768,16 @@ const MeasurementTableChunk = ({
 
   return (
     <View style={styles.tableContainer}>
+      {/* Header Row */}
       <View style={styles.tableHeaderRow}>
         <View style={styles.colPoint}>
           <Text style={styles.textPoint}>Measurement Point</Text>
         </View>
         <View style={styles.colTol}>
-          <Text
-            style={[
-              styles.textTol,
-              { color: colors.danger, fontWeight: "bold" }
-            ]}
-          >
-            Tol -
-          </Text>
+          <Text style={styles.textTolMinus}>Tol -</Text>
         </View>
         <View style={styles.colTol}>
-          <Text
-            style={[
-              styles.textTol,
-              { color: colors.danger, fontWeight: "bold" }
-            ]}
-          >
-            Tol +
-          </Text>
+          <Text style={styles.textTolPlus}>Tol +</Text>
         </View>
         {sizeColumnConfigs.map((config, idx) => (
           <View key={idx} style={styles.sizeWrapper}>
@@ -606,6 +798,8 @@ const MeasurementTableChunk = ({
           </View>
         ))}
       </View>
+
+      {/* Sub Header Row (Spec, #1, #2, etc.) */}
       <View
         style={[
           styles.tableRow,
@@ -650,53 +844,100 @@ const MeasurementTableChunk = ({
           );
         })}
       </View>
+
+      {/* Data Rows */}
       {uniqueRows.map((rowSpec, rIdx) => {
+        // Check if this spec is critical
+        const isCritical = criticalSpecIds.has(rowSpec.id);
+
+        // Get tolerance values for display (use first size chunk for display)
         const firstSizeDetails = getSpecDetailsForSize(
           rowSpec.MeasurementPointEngName,
           sizeChunk[0],
           allSpecs
         );
-        const displayTolMinus = cleanText(firstSizeDetails.tolMinus);
-        const displayTolPlus = cleanText(firstSizeDetails.tolPlus);
+
+        // Normalize tolerance display values
+        const displayTolMinus = normalizeTolMinusDisplay(
+          firstSizeDetails.tolMinus
+        );
+        const displayTolPlus = normalizeTolPlusDisplay(
+          firstSizeDetails.tolPlus
+        );
+
+        // Row background color - critical rows get light blue
+        const rowBgColor = isCritical
+          ? "#dbeafe" // Blue-100 for critical
+          : rIdx % 2 === 0
+          ? "#FFFFFF"
+          : "#F9FAFB";
+
+        // Point cell background - critical gets slightly different shade
+        const pointCellBg = isCritical ? "#bfdbfe" : rowBgColor; // Blue-200 for critical point cell
+
         return (
           <View
             key={rIdx}
-            style={[
-              styles.tableRow,
-              { backgroundColor: rIdx % 2 === 0 ? "#FFFFFF" : "#F9FAFB" }
-            ]}
+            style={[styles.tableRow, { backgroundColor: rowBgColor }]}
           >
-            <View style={styles.colPoint}>
-              <Text style={styles.textPoint}>
-                {cleanText(rowSpec.MeasurementPointEngName)}
-              </Text>
+            {/* Point Name - with critical indicator */}
+            <View style={[styles.colPoint, { backgroundColor: pointCellBg }]}>
+              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                {isCritical && (
+                  <Text
+                    style={{
+                      fontSize: 5,
+                      color: "#2563eb",
+                      marginRight: 2
+                    }}
+                  >
+                    ★
+                  </Text>
+                )}
+                <Text style={styles.textPoint}>
+                  {cleanText(rowSpec.MeasurementPointEngName)}
+                </Text>
+              </View>
             </View>
+
+            {/* Tol - (Always show as negative) */}
             <View style={styles.colTol}>
-              <Text style={styles.textTol}>{displayTolMinus}</Text>
+              <Text style={styles.textTolMinus}>{displayTolMinus}</Text>
             </View>
+
+            {/* Tol + (Always show as positive) */}
             <View style={styles.colTol}>
-              <Text style={styles.textTol}>{displayTolPlus}</Text>
+              <Text style={styles.textTolPlus}>{displayTolPlus}</Text>
             </View>
+
+            {/* Size Data Columns */}
             {sizeColumnConfigs.map((config, sIdx) => {
               const colWidthPct = 100 / (1 + config.cols.length);
+
+              // Get spec details for this size
               const details = getSpecDetailsForSize(
                 (rowSpec.MeasurementPointEngName || "").trim(),
                 config.size,
                 allSpecs
               );
+
+              // Find the matched spec entry for tolerance decimals
               const matchedSpecEntry = allSpecs.find(
                 (s) =>
                   (s.MeasurementPointEngName || "").trim() ===
                     (rowSpec.MeasurementPointEngName || "").trim() &&
                   s.Specs?.some((sz) => sz.size === config.size)
               );
+
               const tolPlusDec = matchedSpecEntry?.TolPlus?.decimal;
               const tolMinusDec = matchedSpecEntry?.TolMinus?.decimal;
+
               return (
                 <View
                   key={sIdx}
                   style={[styles.sizeWrapper, styles.subColContainer]}
                 >
+                  {/* Spec Value Cell */}
                   <View
                     style={[styles.subColSpec, { width: `${colWidthPct}%` }]}
                   >
@@ -706,31 +947,41 @@ const MeasurementTableChunk = ({
                       {cleanText(details.fraction)}
                     </Text>
                   </View>
+
+                  {/* Measurement Reading Cells */}
                   {config.cols.map((col, cIdx) => {
                     let displayVal = "-";
                     let bgStyle = {};
                     let textStyle = { color: colors.gray[300] };
+
                     if (col.type !== "empty" && config.measurement) {
                       const dataSource =
                         col.type === "all"
                           ? config.measurement.allMeasurements
                           : config.measurement.criticalMeasurements;
+
                       const effectiveSpecId = matchedSpecEntry
                         ? matchedSpecEntry.id
                         : rowSpec.id;
+
                       const reading = dataSource?.[effectiveSpecId]?.[col.idx];
+
                       if (reading && reading.decimal !== undefined) {
                         displayVal = cleanText(reading.fraction);
+
+                        // FIX: Check tolerance using deviation comparison (no target needed)
                         const check = checkTolerance(
-                          details.decimal,
                           reading.decimal,
                           tolPlusDec,
                           tolMinusDec
                         );
+
                         if (check.isWithin) {
+                          // Within tolerance - Light Green
                           bgStyle = { backgroundColor: colors.successBg };
                           textStyle = { color: colors.success };
                         } else {
+                          // Out of tolerance - Light Red
                           bgStyle = { backgroundColor: colors.dangerBg };
                           textStyle = {
                             color: colors.danger,
@@ -739,6 +990,7 @@ const MeasurementTableChunk = ({
                         }
                       }
                     }
+
                     return (
                       <View
                         key={cIdx}
@@ -771,33 +1023,35 @@ const calculateGroupStats = (measurements, allSpecs) => {
     totalPcs = 0,
     passPcs = 0,
     failPcs = 0;
+
   measurements.forEach((m) => {
     const allPcs = Array.from(m.allEnabledPcs || []);
     const critPcs = Array.from(m.criticalEnabledPcs || []);
     const pcsIndices = [...allPcs, ...critPcs];
+
     const applicableSpecs = allSpecs.filter((s) =>
       s.Specs?.some((sz) => sz.size === m.size)
     );
+
     pcsIndices.forEach((pcsIndex) => {
       totalPcs++;
       let pcsHasFail = false;
+
       applicableSpecs.forEach((spec) => {
         let valObj = null;
         if (allPcs.includes(pcsIndex))
           valObj = m.allMeasurements?.[spec.id]?.[pcsIndex];
         else if (critPcs.includes(pcsIndex))
           valObj = m.criticalMeasurements?.[spec.id]?.[pcsIndex];
+
         if (valObj && valObj.decimal !== undefined) {
           totalPoints++;
-          const targetObj = spec.Specs.find((s) => s.size === m.size);
           const tolPlus = spec.TolPlus?.decimal;
           const tolMinus = spec.TolMinus?.decimal;
-          const check = checkTolerance(
-            targetObj?.decimal,
-            valObj.decimal,
-            tolPlus,
-            tolMinus
-          );
+
+          // Check tolerance using deviation comparison (no target needed)
+          const check = checkTolerance(valObj.decimal, tolPlus, tolMinus);
+
           if (check.isWithin) passPoints++;
           else {
             failPoints++;
@@ -805,10 +1059,12 @@ const calculateGroupStats = (measurements, allSpecs) => {
           }
         }
       });
+
       if (pcsHasFail) failPcs++;
       else passPcs++;
     });
   });
+
   return {
     totalPoints,
     passPoints,
@@ -866,7 +1122,11 @@ const MeasurementStatsCards = ({ stats }) => (
 // =============================================================================
 // MAIN EXPORT
 // =============================================================================
-const MeasurementSectionPDF = ({ measurementStageData, measurementResult }) => {
+const MeasurementSectionPDF = ({
+  measurementStageData,
+  measurementResult,
+  sizeList = [] // NEW: Add sizeList prop
+}) => {
   if (!measurementStageData || measurementStageData.length === 0) return null;
 
   return (
@@ -892,8 +1152,11 @@ const MeasurementSectionPDF = ({ measurementStageData, measurementResult }) => {
                 <Text style={styles.textStage}>{stageData.label}</Text>
               </View>
 
-              {/* Configuration Summary Table */}
-              <ConfigSummaryTable groupedData={stageData.groupedData} />
+              {/* Configuration Summary Table - Pass sizeList */}
+              <ConfigSummaryTable
+                groupedData={stageData.groupedData}
+                sizeList={sizeList}
+              />
 
               {stageData.groupedData?.groups?.map((group, gIdx) => {
                 const configLabel =
@@ -905,14 +1168,26 @@ const MeasurementSectionPDF = ({ measurementStageData, measurementResult }) => {
                     .filter(Boolean)
                     .join(" / ") || "General Configuration";
                 const measurements = group.measurements || [];
+
+                // NEW: Use sortSizesByReference for unique sizes
                 const uniqueSizes = [
                   ...new Set(measurements.map((m) => m.size))
-                ].sort((a, b) =>
-                  a.localeCompare(b, undefined, { numeric: true })
+                ];
+                const sortedUniqueSizes = sortSizesByReference(
+                  uniqueSizes,
+                  sizeList
                 );
+
                 const stats = calculateGroupStats(measurements, allSpecs);
                 const uniqueRows = getUniqueRows(allSpecs);
-                const sizeChunks = chunkArray(uniqueSizes, 3);
+
+                // Use sorted sizes for chunking (still 2 per chunk)
+                const sizeChunks = chunkArray(sortedUniqueSizes, 2);
+
+                // Build set of critical spec IDs
+                const criticalSpecIds = new Set(
+                  (stageData.specs?.selected || []).map((s) => s.id)
+                );
 
                 return (
                   <View key={gIdx} style={{ marginBottom: 12 }}>
@@ -951,6 +1226,7 @@ const MeasurementSectionPDF = ({ measurementStageData, measurementResult }) => {
                           measurements={measurements}
                           uniqueRows={uniqueRows}
                           allSpecs={allSpecs}
+                          criticalSpecIds={criticalSpecIds}
                         />
                       </View>
                     ))}
