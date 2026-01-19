@@ -8,9 +8,15 @@ import { p88LegacyData } from "../../MongoDB/dbConnectionController.js";
 import { Builder, Browser, By, until } from "selenium-webdriver";
 import chrome from "selenium-webdriver/chrome.js";
 import archiver from "archiver";
+import { Buffer } from "buffer";
+import {
+  logFailedReport,
+  getAuthUserIdentifier
+} from "./p88failedReportController.js";
 
 const stat = promisify(fs.stat);
-// const readdir = promisify(fs.readdir);
+const readdir = promisify(fs.readdir);
+const activeJobs = new Map();
 
 const baseTempDir =
   process.platform === "win32"
@@ -135,6 +141,8 @@ const getAvailableSpace = async (dirPath) => {
 export const downloadBulkReportsUbuntu = async (req, res) => {
   let driver = null;
   let jobDir = null;
+  const { jobId } = req.body;
+
   try {
     const {
       startRange,
@@ -143,12 +151,23 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
       startDate,
       endDate,
       factoryName,
+      poNumber,
+      styleNumber,
       language = "english",
       includeDownloaded = false
     } = req.body;
 
+    activeJobs.set(jobId, {
+      status: "running",
+      startTime: new Date(),
+      cancelled: false,
+      jobDir: null,
+      driver: null
+    });
+
     jobDir = path.join(baseTempDir, `selenium_${Date.now()}`);
     fs.mkdirSync(jobDir, { recursive: true });
+    activeJobs.get(jobId).jobDir = jobDir;
 
     const records = await getInspectionRecords(
       startRange,
@@ -157,6 +176,8 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
       startDate,
       endDate,
       factoryName,
+      poNumber,
+      styleNumber,
       includeDownloaded
     );
     if (records.length === 0)
@@ -177,10 +198,18 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
       .forBrowser(Browser.CHROME)
       .setChromeOptions(options)
       .build();
+    activeJobs.get(jobId).driver = driver;
+
     await driver.sendAndGetDevToolsCommand("Page.setDownloadBehavior", {
       behavior: "allow",
       downloadPath: jobDir
     });
+
+    let processedCount = 0;
+    let successCount = 0;
+    let failedCount = 0;
+    let failedReports = [];
+    const startTime = Date.now();
 
     // Login
     await driver.get(CONFIG.LOGIN_URL);
@@ -194,6 +223,11 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
     await driver.wait(until.urlContains("dashboard"), 20000);
 
     for (const record of records) {
+      const jobInfo = activeJobs.get(jobId);
+      if (!jobInfo || jobInfo.cancelled) {
+        break;
+      }
+
       const inspNo =
         record.inspectionNumbers?.[0] ||
         record.inspectionNumbersKey?.split("-")[0];
@@ -215,7 +249,6 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
 
         const newFiles = await waitForNewFile(jobDir, filesBefore);
         const baseName = getFilename(record);
-
         newFiles.forEach((file, index) => {
           const oldPath = path.join(jobDir, file);
           const newName = `${baseName}${
@@ -225,18 +258,70 @@ export const downloadBulkReportsUbuntu = async (req, res) => {
         });
 
         await updateDownloadStatus(record._id, "Downloaded");
+        successCount++;
       } catch (err) {
         console.error(`❌ Error on ${inspNo}:`, err.message);
+        failedCount++;
+        failedReports.push({
+          inspectionNumber: inspNo,
+          groupNumber: record.groupNumber,
+          error: err.message
+        });
         await updateDownloadStatus(record._id, "Failed");
+      }
+
+      processedCount++;
+
+      // Update job progress
+      if (activeJobs.has(jobId)) {
+        activeJobs.get(jobId).progress = {
+          processed: processedCount,
+          total: records.length,
+          success: successCount,
+          failed: failedCount
+        };
       }
     }
 
+    const endTime = Date.now();
+    const duration = Math.round((endTime - startTime) / 1000);
+
+    const downloadResults = {
+      total: processedCount,
+      successful: successCount,
+      failed: failedCount,
+      failedReports: failedReports,
+      duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+      completedAt: new Date().toISOString()
+    };
+
     await driver.quit();
-    await streamZipAndCleanup(jobDir, res);
+
+    if (activeJobs.has(jobId)) {
+      const job = activeJobs.get(jobId);
+      job.status = "completed";
+      job.results = downloadResults;
+      // Auto-cleanup after 5 minutes
+      setTimeout(() => {
+        if (activeJobs.has(jobId)) activeJobs.delete(jobId);
+      }, 300000);
+    }
+
+    await streamZipAndCleanup(jobDir, res, downloadResults);
   } catch (error) {
+    console.error("Download error:", error);
     if (driver) await driver.quit();
-    res.status(500).json({ success: false, error: error.message });
+    activeJobs.delete(jobId);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
+};
+
+export const downloadBulkReportsAutoCancellable = async (req, res) => {
+  process.platform === "linux"
+    ? await downloadBulkReportsUbuntu(req, res)
+    : await downloadBulkReportsCancellable(req, res);
 };
 
 export const initializeDownloadStatus = async (req, res) => {
@@ -353,65 +438,108 @@ export const getDownloadStatusStats = async (req, res) => {
   }
 };
 
-// Enhanced Language change function for Puppeteer
-const changeLanguage = async (page, language = "english") => {
+// 1. IMPROVED LANGUAGE CHANGE: Waits for reload to ensure language "sticks"
+const changeLanguage = async (page, targetLanguage = "english") => {
   try {
-    // Wait for page to load completely
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const target = targetLanguage.toLowerCase();
 
-    // Try to find the specific language dropdown button
-    try {
-      await page.waitForSelector("#dropdownLanguage", { timeout: 5000 });
+    // 1. Check current language from the dropdown button text
+    const currentLangDisplay = await page.evaluate(() => {
+      const el = document.querySelector("#dropdownLanguage");
+      return el ? el.innerText.trim().toLowerCase() : "";
+    });
 
-      // Click the language dropdown
-      await page.click("#dropdownLanguage");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    const isCurrentlyChinese =
+      currentLangDisplay.includes("中文") ||
+      currentLangDisplay.includes("chinese");
+    const isCurrentlyEnglish =
+      currentLangDisplay.includes("english") ||
+      currentLangDisplay.includes("en");
 
-      // Look for the requested language option in the dropdown
-      const languageOptions = await page.$$("a");
-      for (const option of languageOptions) {
-        try {
-          const text = await page.evaluate(
-            (el) => el.textContent?.trim(),
-            option
-          );
-          const href = await page.evaluate((el) => el.href, option);
-
-          let isTargetLanguage = false;
-
-          if (language === "chinese") {
-            isTargetLanguage =
-              text &&
-              (text.includes("中文") ||
-                text.includes("Chinese") ||
-                text.includes("CN") ||
-                href?.includes("zh"));
-          } else if (language === "english") {
-            isTargetLanguage =
-              text &&
-              (text.includes("English") ||
-                text.includes("EN") ||
-                href?.includes("en"));
-          }
-
-          if (isTargetLanguage) {
-            await option.click();
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-            return true;
-          }
-        } catch (e) {
-          // Skip this element
-        }
-      }
-    } catch (e) {
-      console.log(
-        "dropdownLanguage button not found, trying alternative methods"
-      );
+    if (
+      (target === "chinese" && isCurrentlyChinese) ||
+      (target === "english" && isCurrentlyEnglish)
+    ) {
+      return true;
     }
 
-    return false;
+    // 2. Open the dropdown
+    await page.waitForSelector("#dropdownLanguage", { timeout: 10000 });
+    await page.click("#dropdownLanguage");
+
+    // 3. Wait for the menu to exist in the DOM
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // 4. Find the target link with Strict Text Matching
+    const clickResult = await page.evaluate((targetLang) => {
+      // Get all links that are children of a dropdown menu or have language-related text
+      const links = Array.from(document.querySelectorAll("a"));
+
+      let found = null;
+      if (targetLang === "chinese") {
+        // Look for Chinese identifiers
+        found = links.find((a) => /中文|Chinese|CN/i.test(a.textContent));
+      } else {
+        // Look for English identifiers - STRICTOR matching to avoid "Tasks" (任务)
+        // We look for "English" or "EN" specifically
+        found = links.find((a) => {
+          const text = a.textContent.trim();
+          return (
+            text === "English" ||
+            text === "EN" ||
+            /^English\s?\(.*\)$/i.test(text)
+          );
+        });
+      }
+
+      if (found) {
+        found.click();
+        return { success: true, text: found.textContent.trim() };
+      }
+
+      // Diagnostic: return all available link texts if we failed
+      return {
+        success: false,
+        availableLinks: links
+          .map((a) => a.textContent.trim())
+          .filter((t) => t.length > 0)
+          .slice(0, 20)
+      };
+    }, target);
+
+    if (clickResult.success) {
+      // 5. Wait for the page to reload
+      await Promise.all([
+        page
+          .waitForNavigation({ waitUntil: "networkidle2", timeout: 30000 })
+          .catch(() => {}),
+        new Promise((r) => setTimeout(r, 5000))
+      ]);
+
+      // 6. Force Refresh if the UI is still wrong
+      const bodyText = await page.evaluate(() => document.body.innerText);
+      const verified =
+        target === "chinese"
+          ? bodyText.includes("报告")
+          : bodyText.includes("Report");
+
+      if (!verified) {
+        await page.reload({ waitUntil: "networkidle2" });
+        await new Promise((r) => setTimeout(r, 3000));
+      }
+
+      return true;
+    } else {
+      console.warn(
+        `❌ Link not found. Available links on page:`,
+        clickResult.availableLinks
+      );
+      await page.keyboard.press("Escape");
+      return false;
+    }
   } catch (error) {
-    console.warn("Could not change language automatically:", error.message);
+    console.warn("⚠️ Language switch error:", error.message);
+    await page.keyboard.press("Escape").catch(() => {});
     return false;
   }
 };
@@ -446,6 +574,8 @@ const getInspectionRecords = async (
   startDate,
   endDate,
   factoryName,
+  poNumber,
+  styleNumber,
   includeDownloaded = false
 ) => {
   let query = {};
@@ -464,6 +594,14 @@ const getInspectionRecords = async (
 
   if (factoryName?.trim()) {
     query.supplier = factoryName;
+  }
+
+  if (poNumber?.trim()) {
+    query.poNumbers = poNumber;
+  }
+
+  if (styleNumber?.trim()) {
+    query.style = styleNumber; // Changed from styleNumber to style (lowercase)
   }
 
   if (downloadAll) {
@@ -644,10 +782,12 @@ export const downloadSingleReportDirect = async (req, res) => {
   }
 };
 
-// Updated downloadBulkReports function
-export const downloadBulkReports = async (req, res) => {
+export const downloadBulkReportsCancellable = async (req, res) => {
   let browser = null;
   let jobDir = null;
+  const { jobId, userId } = req.body;
+  const currentUserId = userId || (await getAuthUserIdentifier(req));
+
   try {
     const {
       startRange,
@@ -656,12 +796,23 @@ export const downloadBulkReports = async (req, res) => {
       startDate,
       endDate,
       factoryName,
+      poNumber,
+      styleNumber,
       language = "english",
       includeDownloaded = false
     } = req.body;
 
-    jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
+    activeJobs.set(jobId, {
+      status: "running",
+      startTime: new Date(),
+      cancelled: false,
+      jobDir: null,
+      browser: null
+    });
+
+    jobDir = path.join(baseTempDir, `puppeteer_${jobId}`);
     fs.mkdirSync(jobDir, { recursive: true });
+    activeJobs.get(jobId).jobDir = jobDir;
 
     const records = await getInspectionRecords(
       startRange,
@@ -670,8 +821,17 @@ export const downloadBulkReports = async (req, res) => {
       startDate,
       endDate,
       factoryName,
+      poNumber,
+      styleNumber,
       includeDownloaded
     );
+
+    if (records.length === 0) {
+      return res.json({
+        success: false,
+        message: "No records matching criteria"
+      });
+    }
 
     browser = await puppeteer.launch({
       headless: CONFIG.HEADLESS,
@@ -679,16 +839,13 @@ export const downloadBulkReports = async (req, res) => {
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-dev-shm-usage",
-        "--disable-web-security",
-        "--disable-features=VizDisplayCompositor"
+        "--disable-pdf-viewer-policy"
       ]
     });
 
+    activeJobs.get(jobId).browser = browser;
     const page = await browser.newPage();
-
-    // Set longer timeouts
-    page.setDefaultTimeout(60000);
-    page.setDefaultNavigationTimeout(60000);
+    page.setDefaultTimeout(120000); // 2 minute default
 
     const client = await page.target().createCDPSession();
     await client.send("Page.setDownloadBehavior", {
@@ -696,13 +853,372 @@ export const downloadBulkReports = async (req, res) => {
       downloadPath: jobDir
     });
 
-    // Login process
+    // Login
     await page.goto(CONFIG.LOGIN_URL);
     await page.waitForSelector("#username");
     await page.type("#username", process.env.P88_USERNAME);
     await page.type("#password", process.env.P88_PASSWORD);
     await page.click("#js-login-submit");
     await page.waitForNavigation();
+
+    let processedCount = 0;
+    let successCount = 0;
+    let failedCount = 0;
+    let failedReports = [];
+    const startTime = Date.now();
+
+    for (const record of records) {
+      const jobInfo = activeJobs.get(jobId);
+      if (!jobInfo || jobInfo.cancelled) break;
+
+      const inspNo =
+        record.inspectionNumbers?.[0] ||
+        record.inspectionNumbersKey?.split("-")[0];
+      if (!inspNo) continue;
+
+      try {
+        await updateDownloadStatus(record._id, "In Progress");
+        const filesBefore = fs.readdirSync(jobDir);
+
+        // Load Report Page
+        await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, {
+          waitUntil: "networkidle2"
+        });
+
+        // Language change
+        await changeLanguage(page, language);
+
+        // Give the server a moment to synchronize
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Prepare print button
+        await page.evaluate(() => {
+          const btn = document.querySelector(
+            '#page-wrapper a, a[href*="print"]'
+          );
+          if (btn) btn.setAttribute("target", "_self");
+        });
+
+        try {
+          const printBtn = await page.waitForSelector("#page-wrapper a", {
+            timeout: 15000
+          });
+          await printBtn.click();
+        } catch (clickErr) {
+          if (!clickErr.message.includes("net::ERR_ABORTED")) throw clickErr;
+        }
+
+        // Wait for file
+        const newFiles = await waitForNewFile(jobDir, filesBefore, 120000);
+
+        // Rename
+        const baseName = getFilename(record);
+        newFiles.forEach((file, index) => {
+          const oldPath = path.join(jobDir, file);
+          const newName = `${baseName}-${language}${
+            newFiles.length > 1 ? `_${index + 1}` : ""
+          }.pdf`;
+          fs.renameSync(oldPath, path.join(jobDir, newName));
+        });
+
+        await updateDownloadStatus(record._id, "Downloaded");
+        successCount++;
+      } catch (err) {
+        console.error(`❌ Error on ${inspNo}:`, err.message);
+        failedCount++; // Only increment once
+        failedReports.push({
+          inspectionNumber: inspNo,
+          po: record.poNumbers?.[0] || "N/A",
+          error: err.message
+        });
+
+        await logFailedReport(
+          record._id,
+          inspNo,
+          record.groupNumber || "NO-GROUP",
+          err.message,
+          currentUserId
+        );
+        await updateDownloadStatus(record._id, "Failed");
+      }
+
+      processedCount++;
+
+      if (activeJobs.has(jobId)) {
+        activeJobs.get(jobId).progress = {
+          processed: processedCount,
+          total: records.length,
+          success: successCount,
+          failed: failedCount
+        };
+      }
+    }
+
+    const endTime = Date.now();
+    const duration = Math.round((endTime - startTime) / 1000); // seconds
+
+    // Store results for later retrieval
+    const downloadResults = {
+      total: processedCount,
+      successful: successCount,
+      failed: failedCount,
+      failedReports: failedReports,
+      duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+      completedAt: new Date().toISOString()
+    };
+
+    await browser.close();
+
+    if (activeJobs.has(jobId)) {
+      const job = activeJobs.get(jobId);
+      job.status = "completed";
+      job.results = downloadResults;
+      // Auto-cleanup after 5 minutes
+      setTimeout(() => {
+        if (activeJobs.has(jobId)) activeJobs.delete(jobId);
+      }, 300000);
+    }
+
+    await streamZipAndCleanup(jobDir, res, downloadResults);
+  } catch (error) {
+    console.error("Download error:", error);
+    if (browser) await browser.close();
+    activeJobs.delete(jobId);
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  }
+};
+
+// NEW: Cancel download function
+export const cancelBulkDownload = async (req, res) => {
+  try {
+    const { jobId } = req.body;
+
+    if (!jobId) {
+      return res.status(400).json({
+        success: false,
+        error: "Job ID is required"
+      });
+    }
+
+    const jobInfo = activeJobs.get(jobId);
+
+    if (!jobInfo) {
+      return res.status(404).json({
+        success: false,
+        error: "Job not found or already completed"
+      });
+    }
+
+    // Mark job as cancelled
+    jobInfo.cancelled = true;
+    jobInfo.cancelledAt = new Date();
+
+    // Close browser if it exists
+    if (jobInfo.browser) {
+      try {
+        await jobInfo.browser.close();
+      } catch (error) {
+        console.error("Error closing browser during cancellation:", error);
+      }
+    }
+
+    // Wait a moment for any ongoing operations to complete
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+
+    // Check if there are any downloaded files to send
+    if (jobInfo.jobDir && fs.existsSync(jobInfo.jobDir)) {
+      const files = fs.readdirSync(jobInfo.jobDir);
+      const pdfFiles = files.filter((file) => file.endsWith(".pdf"));
+
+      if (pdfFiles.length > 0) {
+        // Create ZIP with partial results
+        const zipName = `Reports_Partial_${Date.now()}.zip`;
+        const zipPath = path.join(baseTempDir, zipName);
+        const output = fs.createWriteStream(zipPath);
+        const archive = archiver("zip", { zlib: { level: 9 } });
+
+        output.on("close", () => {
+          // Send the partial results ZIP
+          res.download(zipPath, zipName, (err) => {
+            // Cleanup
+            if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+            if (fs.existsSync(jobInfo.jobDir)) {
+              fs.rmSync(jobInfo.jobDir, { recursive: true, force: true });
+            }
+            activeJobs.delete(jobId);
+
+            // if (err) {
+            //     console.error('Error sending partial results:', err);
+            // } else {
+            //     console.log(`Partial results sent successfully for job ${jobId}`);
+            // }
+          });
+        });
+
+        output.on("error", (err) => {
+          activeJobs.delete(jobId);
+          if (!res.headersSent) {
+            res.status(500).json({
+              success: false,
+              error: "Failed to create partial results ZIP"
+            });
+          }
+        });
+
+        archive.pipe(output);
+        archive.directory(jobInfo.jobDir, false);
+        await archive.finalize();
+      } else {
+        // No files downloaded yet
+        activeJobs.delete(jobId);
+        res.json({
+          success: true,
+          message: "Download cancelled. No files were completed yet.",
+          partialResults: false
+        });
+      }
+    } else {
+      // No job directory found
+      activeJobs.delete(jobId);
+      res.json({
+        success: true,
+        message: "Download cancelled. No files were completed yet.",
+        partialResults: false
+      });
+    }
+  } catch (error) {
+    console.error("Error cancelling download:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// NEW: Get job status function (optional - for progress tracking)
+export const getJobStatus = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    const jobInfo = activeJobs.get(jobId);
+
+    if (!jobInfo) {
+      return res.status(404).json({
+        success: false,
+        error: "Job not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      jobInfo: {
+        status: jobInfo.status,
+        cancelled: jobInfo.cancelled,
+        startTime: jobInfo.startTime,
+        progress: jobInfo.progress || null
+      }
+    });
+  } catch (error) {
+    console.error("Error getting job status:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// NEW: Get download results
+export const getDownloadResults = async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const jobInfo = activeJobs.get(jobId);
+
+    if (!jobInfo) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Job not found or expired" });
+    }
+
+    if (jobInfo.results) {
+      return res.json({ success: true, results: jobInfo.results });
+    }
+
+    res.json({ success: false, message: "Results not available yet" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// 3. STANDARD BULK DOWNLOAD (Follows same logic)
+export const downloadBulkReports = async (req, res) => {
+  let browser = null;
+  let jobDir = null;
+
+  try {
+    const {
+      startRange,
+      endRange,
+      downloadAll,
+      startDate,
+      endDate,
+      factoryName,
+      poNumber,
+      styleNumber,
+      language = "english",
+      includeDownloaded = false
+    } = req.body;
+
+    jobDir = path.join(baseTempDir, `puppeteer_${Date.now()}`);
+    fs.mkdirSync(jobDir, { recursive: true });
+    const records = await getInspectionRecords(
+      startRange,
+      endRange,
+      downloadAll,
+      startDate,
+      endDate,
+      factoryName,
+      poNumber,
+      styleNumber,
+      includeDownloaded
+    );
+
+    if (records.length === 0) {
+      return res.json({
+        success: false,
+        message: "No records matching criteria"
+      });
+    }
+
+    browser = await puppeteer.launch({
+      headless: CONFIG.HEADLESS,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-pdf-viewer-policy"
+      ]
+    });
+
+    const page = await browser.newPage();
+    const client = await page.target().createCDPSession();
+    await client.send("Page.setDownloadBehavior", {
+      behavior: "allow",
+      downloadPath: jobDir
+    });
+
+    await page.goto(CONFIG.LOGIN_URL);
+    await page.waitForSelector("#username");
+    await page.type("#username", process.env.P88_USERNAME);
+    await page.type("#password", process.env.P88_PASSWORD);
+    await page.click("#js-login-submit");
+    await page.waitForNavigation();
+
+    let processedCount = 0;
+    let successCount = 0;
+    let failedCount = 0;
+    let failedReports = [];
+    const startTime = Date.now();
 
     for (const record of records) {
       const inspNo =
@@ -714,119 +1230,131 @@ export const downloadBulkReports = async (req, res) => {
         await updateDownloadStatus(record._id, "In Progress");
         const filesBefore = fs.readdirSync(jobDir);
 
-        // Navigate to report
+        // Load Report Page
         await page.goto(`${CONFIG.BASE_REPORT_URL}${inspNo}`, {
-          waitUntil: "networkidle0",
-          timeout: 60000
+          waitUntil: "networkidle2"
         });
 
-        // Wait for page to fully load
-        await new Promise((resolve) => setTimeout(resolve, 3000));
+        // Language change
+        await changeLanguage(page, language);
 
-        // 🔥 ALWAYS try to change language (for both English and Chinese)
-        const languageChanged = await changeLanguage(page, language);
-        if (languageChanged) {
-          // Wait for page to reload with new language
-          await new Promise((resolve) => setTimeout(resolve, 4000));
-        } else {
-          console.warn(
-            `⚠️ Language change failed for ${inspNo}, continuing with current language`
+        // Give the server a moment to synchronize
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        // Prepare print button
+        await page.evaluate(() => {
+          const btn = document.querySelector(
+            '#page-wrapper a, a[href*="print"]'
           );
+          if (btn) btn.setAttribute("target", "_self");
+        });
+
+        try {
+          const printBtn = await page.waitForSelector("#page-wrapper a", {
+            timeout: 15000
+          });
+          await printBtn.click();
+        } catch (clickErr) {
+          if (!clickErr.message.includes("net::ERR_ABORTED")) throw clickErr;
         }
 
-        // Wait for and click print button with multiple selectors
-        let printButton = null;
+        // Wait for file
+        const newFiles = await waitForNewFile(jobDir, filesBefore, 120000);
 
-        const printSelectors = [
-          "#page-wrapper a",
-          'a[href*="print"]',
-          'a[onclick*="print"]',
-          ".print-btn",
-          'button[onclick*="print"]'
-        ];
-
-        for (const selector of printSelectors) {
-          try {
-            await page.waitForSelector(selector, { timeout: 5000 });
-            printButton = await page.$(selector);
-            if (printButton) {
-              break;
-            }
-          } catch (e) {
-            continue;
-          }
-        }
-
-        if (!printButton) {
-          throw new Error("Print button not found with any selector");
-        }
-
-        // Click print button
-        await printButton.click();
-
-        // Wait a bit for download to start
-        await new Promise((resolve) => setTimeout(resolve, 3000));
-
-        // Wait for file download
-        const newFiles = await waitForNewFile(jobDir, filesBefore);
-
-        // Rename files
+        // Rename
         const baseName = getFilename(record);
         newFiles.forEach((file, index) => {
           const oldPath = path.join(jobDir, file);
-          const newName = `${baseName}${
+          const newName = `${baseName}-${language}${
             newFiles.length > 1 ? `_${index + 1}` : ""
           }.pdf`;
           fs.renameSync(oldPath, path.join(jobDir, newName));
         });
 
         await updateDownloadStatus(record._id, "Downloaded");
+        successCount++;
       } catch (err) {
-        console.error(`❌ Error downloading ${inspNo}:`, err.message);
+        console.error(`❌ Error on ${inspNo}:`, err.message);
+        failedCount++;
+        failedReports.push({
+          inspectionNumber: inspNo,
+          groupNumber: record.groupNumber,
+          error: err.message
+        });
         await updateDownloadStatus(record._id, "Failed");
-
-        // Take screenshot for debugging
-        try {
-          const screenshotPath = path.join(
-            jobDir,
-            `error_${inspNo}_${Date.now()}.png`
-          );
-          await page.screenshot({ path: screenshotPath, fullPage: true });
-        } catch (screenshotError) {
-          console.log(
-            "Could not take error screenshot:",
-            screenshotError.message
-          );
-        }
       }
+
+      processedCount++;
     }
 
+    const endTime = Date.now();
+    const duration = Math.round((endTime - startTime) / 1000);
+
+    const downloadResults = {
+      total: processedCount,
+      successful: successCount,
+      failed: failedCount,
+      failedReports: failedReports,
+      duration: `${Math.floor(duration / 60)}m ${duration % 60}s`,
+      completedAt: new Date().toISOString()
+    };
+
     await browser.close();
-    await streamZipAndCleanup(jobDir, res);
+    await streamZipAndCleanup(jobDir, res, downloadResults);
   } catch (error) {
-    console.error("❌ Bulk download failed:", error);
+    console.error("Download error:", error);
     if (browser) await browser.close();
-    res.status(500).json({ success: false, error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, error: error.message });
+    }
   }
 };
 
-async function streamZipAndCleanup(jobDir, res) {
-  const zipName = `Reports_${Date.now()}.zip`;
+async function streamZipAndCleanup(jobDir, res, downloadResults = null) {
+  const zipName = `P88_Reports_${Date.now()}.zip`;
   const zipPath = path.join(baseTempDir, zipName);
   const output = fs.createWriteStream(zipPath);
   const archive = archiver("zip", { zlib: { level: 9 } });
 
   output.on("close", () => {
+    if (downloadResults) {
+      try {
+        const jsonStr = JSON.stringify(downloadResults);
+        // Use the global Buffer to create a Base64 string
+        const base64Results = Buffer.from(jsonStr).toString("base64");
+
+        // Expose the header so the browser/frontend can see it
+        res.setHeader("Access-Control-Expose-Headers", "X-Download-Results");
+        res.setHeader("X-Download-Results", base64Results);
+      } catch (headerError) {
+        console.error("Error setting results header:", headerError);
+      }
+    }
+
     res.download(zipPath, zipName, (err) => {
+      // Cleanup files after download starts/finishes
       if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-      if (fs.existsSync(jobDir))
-        fs.rmSync(jobDir, { recursive: true, force: true });
+      if (fs.existsSync(jobDir)) {
+        try {
+          fs.rmSync(jobDir, { recursive: true, force: true });
+        } catch (rmErr) {
+          console.error("Error removing job directory:", rmErr);
+        }
+      }
     });
+  });
+
+  output.on("error", (err) => {
+    if (!res.headersSent) {
+      res
+        .status(500)
+        .json({ success: false, error: "Failed to create ZIP file" });
+    }
   });
 
   archive.pipe(output);
   archive.directory(jobDir, false);
-  await archive.finalize();
+  archive.finalize();
 }
 
 // Get total record count endpoint (updated)
@@ -906,7 +1434,9 @@ export const checkBulkSpace = async (req, res) => {
       includeDownloaded = false,
       startDate,
       endDate,
-      factoryName
+      factoryName,
+      poNumber,
+      styleNumber
     } = req.body;
 
     const targetDir = downloadPath || CONFIG.DEFAULT_DOWNLOAD_DIR;
@@ -929,6 +1459,16 @@ export const checkBulkSpace = async (req, res) => {
     // Add factory filter
     if (factoryName && factoryName.trim() !== "") {
       query.supplier = factoryName;
+    }
+
+    // Add PO number filter
+    if (poNumber && poNumber.trim() !== "") {
+      query.poNumbers = poNumber;
+    }
+
+    // Add style filter
+    if (styleNumber && styleNumber.trim() !== "") {
+      query.style = styleNumber;
     }
 
     // Filter out already downloaded records unless specifically requested
@@ -1261,6 +1801,110 @@ export const getFactories = async (req, res) => {
   }
 };
 
+// Get unique PO numbers from database
+export const getPONumbers = async (req, res) => {
+  try {
+    const poNumbers = await p88LegacyData.distinct("poNumbers");
+    // Flatten array since poNumbers might be an array field
+    const flattenedPOs = poNumbers
+      .flat()
+      .filter((po) => po && po.trim() !== "");
+
+    res.json({
+      success: true,
+      poNumbers: [...new Set(flattenedPOs)].sort()
+    });
+  } catch (error) {
+    console.error("Error getting PO numbers:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get unique styles from database
+export const getStyles = async (req, res) => {
+  try {
+    const styles = await p88LegacyData.distinct("style"); // Changed from 'Style' to 'style'
+    const filteredStyles = styles.filter(
+      (style) => style && style.trim() !== ""
+    );
+
+    res.json({
+      success: true,
+      styles: filteredStyles.sort()
+    });
+  } catch (error) {
+    console.error("Error getting styles:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+// Get cross-filtered options based on current filters
+export const getCrossFilteredOptions = async (req, res) => {
+  try {
+    const { startDate, endDate, factoryName, poNumber, styleNumber } =
+      req.query;
+
+    let baseQuery = {};
+
+    // Add date filter if provided
+    if (startDate && endDate) {
+      baseQuery.submittedInspectionDate = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate + "T23:59:59.999Z")
+      };
+    }
+
+    // Build queries for each filter option
+    const factoryQuery = { ...baseQuery };
+    const poQuery = { ...baseQuery };
+    const styleQuery = { ...baseQuery };
+
+    // Add cross-filters (exclude the field we're getting options for)
+    if (poNumber && poNumber.trim() !== "") {
+      factoryQuery.poNumbers = poNumber;
+      styleQuery.poNumbers = poNumber;
+    }
+
+    if (styleNumber && styleNumber.trim() !== "") {
+      factoryQuery.style = styleNumber; // Changed to 'style'
+      poQuery.style = styleNumber; // Changed to 'style'
+    }
+
+    if (factoryName && factoryName.trim() !== "") {
+      poQuery.supplier = factoryName;
+      styleQuery.supplier = factoryName;
+    }
+
+    // Get filtered options
+    const [factories, poNumbers, styles] = await Promise.all([
+      p88LegacyData.distinct("supplier", factoryQuery),
+      p88LegacyData.distinct("poNumbers", poQuery),
+      p88LegacyData.distinct("style", styleQuery) // Changed to 'style'
+    ]);
+
+    res.json({
+      success: true,
+      factories: factories.filter((f) => f && f.trim() !== "").sort(),
+      poNumbers: [...new Set(poNumbers.flat())]
+        .filter((po) => po && po.trim() !== "")
+        .sort(),
+      styles: styles.filter((s) => s && s.trim() !== "").sort()
+    });
+  } catch (error) {
+    console.error("Error getting cross-filtered options:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
 // Open download folder in system file explorer
 export const openDownloadFolder = async (req, res) => {
   try {
@@ -1311,25 +1955,30 @@ export const getDateFilteredStats = async (req, res) => {
       startDate,
       endDate,
       factoryName,
+      poNumber,
+      styleNumber,
       includeDownloaded = "false"
     } = req.query;
 
-    if (!startDate || !endDate) {
-      return res.status(400).json({
-        success: false,
-        error: "Start date and end date are required"
-      });
-    }
+    let query = {};
 
-    let query = {
-      submittedInspectionDate: {
+    if (startDate && endDate) {
+      query.submittedInspectionDate = {
         $gte: new Date(startDate),
         $lte: new Date(endDate + "T23:59:59.999Z")
-      }
-    };
+      };
+    }
 
     if (factoryName && factoryName.trim() !== "") {
       query.supplier = factoryName;
+    }
+
+    if (poNumber && poNumber.trim() !== "") {
+      query.poNumbers = poNumber;
+    }
+
+    if (styleNumber && styleNumber.trim() !== "") {
+      query.style = styleNumber; // Changed to 'style'
     }
 
     if (includeDownloaded !== "true") {
@@ -1349,11 +1998,102 @@ export const getDateFilteredStats = async (req, res) => {
       totalRecords,
       downloadedRecords: includeDownloaded === "true" ? downloadedRecords : 0,
       pendingRecords,
-      dateRange: { startDate, endDate },
-      factory: factoryName || "All Factories"
+      filters: {
+        dateRange: startDate && endDate ? { startDate, endDate } : null,
+        factory: factoryName || null,
+        poNumber: poNumber || null,
+        styleNumber: styleNumber || null
+      }
     });
   } catch (error) {
     console.error("Error getting date filtered stats:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const searchSuppliers = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || query.trim().length < 1) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    const suppliers = await p88LegacyData.distinct("supplier", {
+      supplier: { $regex: query.trim(), $options: "i" }
+    });
+
+    const filteredSuppliers = suppliers
+      .filter((supplier) => supplier && supplier.trim() !== "")
+      .slice(0, 10) // Limit to 10 suggestions
+      .sort();
+
+    res.json({
+      success: true,
+      suggestions: filteredSuppliers
+    });
+  } catch (error) {
+    console.error("Error searching suppliers:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const searchPONumbers = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || query.trim().length < 1) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    const poNumbers = await p88LegacyData.distinct("poNumbers", {
+      poNumbers: { $regex: query.trim(), $options: "i" }
+    });
+
+    const filteredPOs = [...new Set(poNumbers.flat())]
+      .filter((po) => po && po.trim() !== "")
+      .slice(0, 10)
+      .sort();
+
+    res.json({
+      success: true,
+      suggestions: filteredPOs
+    });
+  } catch (error) {
+    console.error("Error searching PO numbers:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
+
+export const searchStyles = async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query || query.trim().length < 1) {
+      return res.json({ success: true, suggestions: [] });
+    }
+
+    const styles = await p88LegacyData.distinct("style", {
+      style: { $regex: query.trim(), $options: "i" }
+    });
+
+    const filteredStyles = styles
+      .filter((style) => style && style.trim() !== "")
+      .slice(0, 10)
+      .sort();
+
+    res.json({
+      success: true,
+      suggestions: filteredStyles
+    });
+  } catch (error) {
+    console.error("Error searching styles:", error);
     res.status(500).json({
       success: false,
       error: error.message

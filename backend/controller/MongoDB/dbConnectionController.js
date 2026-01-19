@@ -120,6 +120,7 @@ import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_insp
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+import p88failedReportsModel from "../../models/P88/p88FailedReports.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
@@ -308,6 +309,7 @@ export const FincheckInspectionDecision =
   createFincheckInspectionDecisionModel(ymProdConnection);
 
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
+export const p88FailedReport = p88failedReportsModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 
