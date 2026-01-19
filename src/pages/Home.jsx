@@ -52,6 +52,7 @@ function Home() {
   const [roleManagement, setRoleManagement] = useState(null);
   const [pageLoading, setPageLoading] = useState(true);
   const [accessMap, setAccessMap] = useState({});
+
   const sectionRefs = useRef({});
 
   // const backgroundImageUrl = "assets/Home/background.avif"; 
@@ -679,6 +680,30 @@ function Home() {
     });
   };
 
+  // Fetch Fincheck Action Required Count for Badge
+  useEffect(() => {
+    if (!user?.emp_id) return;
+
+    const fetchActionCount = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-reports/action-count?empId=${user.emp_id}`
+        );
+        if (res.data.success) {
+          setFincheckActionCount(res.data.count);
+        }
+      } catch (error) {
+        console.error("Error fetching action count:", error);
+      }
+    };
+
+    fetchActionCount();
+
+    // Poll every 60 seconds
+    const interval = setInterval(fetchActionCount, 60000);
+    return () => clearInterval(interval);
+  }, [user?.emp_id]);
+
   if (loading || pageLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-slate-900">
@@ -730,81 +755,65 @@ function Home() {
           </div>
         </header>
 
-        <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8 mt-16">
-          {errorMessage && (
-            <div className="bg-red-500/90 text-white text-center py-2 mb-6 rounded-md backdrop-blur-sm">
-              {errorMessage}
+      <main className="max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8">
+        {errorMessage && (
+          <div className="bg-red-500 text-white text-center py-2 mb-6 rounded-md">
+            {errorMessage}
+          </div>
+        )}
+        <div className="space-y-12">
+          {accessibleSections.length > 0 ? (
+            accessibleSections.map((section) => (
+              <section
+                key={section.id}
+                ref={(el) => (sectionRefs.current[section.id] = el)}
+                className={`p-6 rounded-2xl ${section.bgColor} transition-colors`}
+              >
+                <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center">
+                  {section.icon}
+                  {section.title}
+                </h2>
+                <div
+                  className="grid gap-4"
+                  style={{
+                    gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
+                  }}
+                >
+                  {section.items.map((item, itemIndex) => (
+                    <div
+                      key={itemIndex}
+                      onClick={() => handleNavigation(item)}
+                      className="group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white dark:bg-slate-800 cursor-pointer hover:shadow-xl hover:-translate-y-1"
+                    >
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="w-14 h-14 object-contain mb-3"
+                      />
+                      <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
+                        {item.title}
+                      </h3>
+                      <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
+                        {item.description}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))
+          ) : (
+            <div className="text-center py-20">
+              <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
+                No Accessible Modules
+              </h2>
+              <p className="mt-2 text-slate-500">
+                Please contact your administrator if you believe you should have
+                access.
+              </p>
             </div>
           )}
-
-          <div className="space-y-12">
-            {accessibleSections.length > 0 ? (
-              accessibleSections.map((section) => (
-                <section
-                  key={section.id}
-                  ref={(el) => (sectionRefs.current[section.id] = el)}
-                  className={`scroll-mt-20 p-6 rounded-2xl ${section.bgColor} transition-colors backdrop-blur-sm border border-white/20 dark:border-slate-700/20`}
-                >
-                  <h2 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-white mb-6 flex items-center">
-                    {section.icon}
-                    {section.title}
-                  </h2>
-
-                  <div
-                    className="grid gap-4"
-                    style={{
-                      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))"
-                    }}
-                  >
-                    {section.items.map((item, itemIndex) => {
-                      const getVersionStyle = () => {
-                        if (item.version === '0') {
-                          return 'border-4 border-red-500';
-                        } else if (item.version === '0.1') {
-                          return 'border-4 border-green-500';
-                        }
-                        return '';
-                      };
-
-                      return (
-                        <div
-                          key={itemIndex}
-                          onClick={() => handleNavigation(item)}
-                          className={`group relative flex flex-col items-center justify-center p-4 rounded-xl shadow-md transition-all duration-300 bg-white/90 dark:bg-slate-800/90 cursor-pointer hover:shadow-xl hover:-translate-y-1 backdrop-blur-sm ${getVersionStyle()}`}
-                        >
-                          <img
-                            src={item.image}
-                            alt={item.title}
-                            className="w-16 h-16 object-contain mb-3"
-                          />
-
-                          <h3 className="text-sm font-bold text-center text-slate-700 dark:text-slate-100">
-                            {item.title}
-                          </h3>
-
-                          <p className="text-xs text-center text-slate-500 dark:text-slate-400 mt-1">
-                            {item.description}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))
-            ) : (
-              <div className="text-center py-20 bg-white/80 dark:bg-slate-800/80 rounded-2xl backdrop-blur-sm">
-                <h2 className="text-2xl font-bold text-slate-700 dark:text-slate-300">
-                  No Accessible Modules
-                </h2>
-                <p className="mt-2 text-slate-500">
-                  Please contact your administrator if you believe you should have
-                  access.
-                </p>
-              </div>
-            )}
-          </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

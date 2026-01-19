@@ -1136,3 +1136,167 @@ export const submitLeaderDecision = async (req, res) => {
     return res.status(500).json({ success: false, error: error.message });
   }
 };
+
+// ============================================================
+// Get Notifications for QA (User)
+// ============================================================
+export const getQANotifications = async (req, res) => {
+  try {
+    const { empId } = req.query;
+
+    if (!empId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "QA ID is required." });
+    }
+
+    // 1. Find all reports created by this QA (empId)
+    // We only need reportId to join with decisions
+    const userReports = await FincheckInspectionReports.find({
+      empId: empId,
+      status: { $ne: "cancelled" } // Optional: Exclude cancelled
+    }).select("reportId orderNosString inspectionDate");
+
+    const reportIds = userReports.map((r) => r.reportId);
+
+    if (reportIds.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    // 2. Find Decisions for these reports
+    // We want all decisions where status exists (Approved, Rework, Rejected)
+    const decisions = await FincheckInspectionDecision.find({
+      reportId: { $in: reportIds }
+    }).lean();
+
+    // 3. Merge Data & Filter Logic
+    // Logic:
+    // - Show notification if a decision exists.
+    // - If "Rework" or "Rejected", it's an ACTIVE notification until fixed.
+    // - If "Approved", show it but maybe mark as read (frontend logic) or just show recent.
+    // - IMPORTANT: Remove notification if QA resubmitted AFTER the decision.
+
+    const notifications = [];
+
+    for (const decision of decisions) {
+      const report = userReports.find((r) => r.reportId === decision.reportId);
+      if (!report) continue;
+
+      // Get full report details to check resubmission time
+      // Fetching again here to get resubmissionHistory array (optimized query would use aggregation, but this is fine for logic clarity)
+      const fullReport = await FincheckInspectionReports.findOne({
+        reportId: decision.reportId
+      }).select("resubmissionHistory");
+
+      const lastDecisionTime = new Date(decision.updatedAt).getTime();
+      let lastResubmissionTime = 0;
+
+      if (fullReport && fullReport.resubmissionHistory?.length > 0) {
+        const lastResub =
+          fullReport.resubmissionHistory[
+            fullReport.resubmissionHistory.length - 1
+          ];
+        lastResubmissionTime = new Date(lastResub.resubmissionDate).getTime();
+      }
+
+      // HIDE NOTIFICATION IF: User Resubmitted AFTER Leader Decision
+      // This means the ball is in Leader's court again.
+      if (lastResubmissionTime > lastDecisionTime) {
+        continue;
+      }
+
+      notifications.push({
+        _id: decision._id,
+        reportId: decision.reportId,
+        orderNo: report.orderNosString,
+        inspectionDate: report.inspectionDate,
+        status: decision.decisionStatus, // Approved, Rework, Rejected
+        leaderName: decision.approvalEmpName,
+        systemComment: decision.systemGeneratedComment,
+        additionalComment:
+          decision.approvalHistory?.length > 0
+            ? decision.approvalHistory[decision.approvalHistory.length - 1]
+                .additionalComment
+            : decision.additionalComment,
+        audioUrl:
+          decision.approvalHistory?.length > 0
+            ? decision.approvalHistory[decision.approvalHistory.length - 1]
+                .audioUrl
+            : decision.audioUrl,
+        updatedAt: decision.updatedAt
+      });
+    }
+
+    // Sort by newest decision first
+    notifications.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    return res.status(200).json({
+      success: true,
+      data: notifications
+    });
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Get Action Required Count for Home Page Badge
+// ============================================================
+export const getActionRequiredCount = async (req, res) => {
+  try {
+    const { empId } = req.query;
+
+    if (!empId) {
+      return res.status(200).json({ success: true, count: 0 });
+    }
+
+    // 1. Find all reports by this QA
+    const userReports = await FincheckInspectionReports.find({
+      empId: empId,
+      status: { $ne: "cancelled" }
+    }).select("reportId resubmissionHistory");
+
+    const reportIds = userReports.map((r) => r.reportId);
+
+    if (reportIds.length === 0) {
+      return res.status(200).json({ success: true, count: 0 });
+    }
+
+    // 2. Find Decisions with Rework or Rejected ONLY
+    const decisions = await FincheckInspectionDecision.find({
+      reportId: { $in: reportIds },
+      decisionStatus: { $in: ["Rework", "Rejected"] } // Only action-required statuses
+    }).lean();
+
+    // 3. Count only those NOT resubmitted after decision
+    let actionCount = 0;
+
+    for (const decision of decisions) {
+      const report = userReports.find((r) => r.reportId === decision.reportId);
+      if (!report) continue;
+
+      const lastDecisionTime = new Date(decision.updatedAt).getTime();
+      let lastResubmissionTime = 0;
+
+      if (report.resubmissionHistory?.length > 0) {
+        const lastResub =
+          report.resubmissionHistory[report.resubmissionHistory.length - 1];
+        lastResubmissionTime = new Date(lastResub.resubmissionDate).getTime();
+      }
+
+      // Only count if NOT resubmitted after decision
+      if (lastResubmissionTime <= lastDecisionTime) {
+        actionCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: actionCount
+    });
+  } catch (error) {
+    console.error("Error fetching action count:", error);
+    return res.status(200).json({ success: true, count: 0 });
+  }
+};
