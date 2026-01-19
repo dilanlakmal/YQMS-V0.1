@@ -120,7 +120,7 @@ import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_insp
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
-import p88failedReportsModel from "../../models/P88/p88FailedReports.js";
+import p88failedReportsModel from "../../models/P88/p88failedReports.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
