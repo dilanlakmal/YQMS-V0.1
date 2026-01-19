@@ -9,7 +9,7 @@ const p88failedReportSchema = new mongoose.Schema({
     inspectionNumber: { type: String, required: true },
     groupId: { type: String },
     // Changed to an array to store multiple user IDs
-    // emp_ids: [{ type: String }], 
+    emp_ids: [{ type: String }], 
     status: { 
         type: String, 
         enum: ['Pending', 'Downloaded'], 

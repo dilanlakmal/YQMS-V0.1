@@ -328,6 +328,8 @@ const PrintP88Report = () => {
             
             const body = { 
                 jobId: jobId,
+                userId: user?.emp_id,
+                userName: user?.eng_name,
                 downloadPath: selectedPath,
                 startRange: downloadMode === 'range' ? startRange : null,
                 endRange: downloadMode === 'range' ? endRange : null,
@@ -991,4 +993,3 @@ const PrintP88Report = () => {
 };
 
 export default PrintP88Report;
-

@@ -8,7 +8,7 @@ import { p88LegacyData } from '../../MongoDB/dbConnectionController.js';
 import { Builder, Browser, By, until } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
 import archiver from 'archiver';
-import {  logFailedReport } from "./p88failedReportController.js";
+import {  logFailedReport, getAuthUserIdentifier } from "./p88failedReportController.js";
 
 const stat = promisify(fs.stat);
 // const readdir = promisify(fs.readdir);
@@ -648,11 +648,11 @@ export const downloadSingleReportDirect = async (req, res) => {
 
 export const downloadBulkReportsCancellable = async (req, res) => {
 
-    const currentUserId = req.user?.emp_id || req.user?.id || "Unknown";
-    
     let browser = null;
     let jobDir = null;
-    const { jobId } = req.body;
+    const { jobId, userId } = req.body;
+
+    const currentUserId = userId || await getAuthUserIdentifier(req);
     
     try {
         const { startRange, endRange, downloadAll, startDate, endDate, factoryName, poNumber, styleNumber, language = 'english', includeDownloaded = false } = req.body;
@@ -741,7 +741,13 @@ export const downloadBulkReportsCancellable = async (req, res) => {
                 
             } catch (err) {
                 console.error(`❌ Error on ${inspNo}:`, err.message);
-                await logFailedReport(record._id, inspNo, record.groupNumber || 'NO-GROUP', err.message);
+                await logFailedReport(
+                    record._id, 
+                    inspNo, 
+                    record.groupNumber || 'NO-GROUP', 
+                    err.message, 
+                    currentUserId
+                );
                 await updateDownloadStatus(record._id, 'Failed');
                 failedCount++;
             }
