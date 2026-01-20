@@ -827,6 +827,14 @@ export const downloadBulkReportsCancellable = async (req, res) => {
 
     } catch (error) {
         console.error('Download error:', error);
+        if (jobDir && fs.existsSync(jobDir)) {
+            try {
+                fs.rmSync(jobDir, { recursive: true, force: true });
+                console.log(`Cleaned up directory after error: ${jobDir}`);
+            } catch (cleanupErr) {
+                console.error('Failed to clean up after error:', cleanupErr);
+            }
+        }
         if (browser) await browser.close();
         activeJobs.delete(jobId);
         if (!res.headersSent) {
@@ -1882,3 +1890,39 @@ export const searchStyles = async (req, res) => {
         });
     }
 };
+
+
+/**
+ * GARBAGE COLLECTOR
+ * Run every hour to clean up "zombie" folders left by crashes or cancelled jobs
+ */
+// setInterval(() => {
+//     console.log("Running scheduled temp file cleanup...");
+//     fs.readdir(baseTempDir, (err, files) => {
+//         if (err) {
+//             console.error("Cleanup error:", err);
+//             return;
+//         }
+        
+//         const now = Date.now();
+//         const maxAge = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+
+//         files.forEach(file => {
+//             const filePath = path.join(baseTempDir, file);
+//             fs.stat(filePath, (err, stats) => {
+//                 if (err) return;
+
+//                 // If the file/folder is older than maxAge, delete it
+//                 if (now - stats.mtimeMs > maxAge) {
+//                     fs.rm(filePath, { recursive: true, force: true }, (rmErr) => {
+//                         if (!rmErr) {
+//                             console.log(`Garbage Collector: Deleted old temp file/folder: ${file}`);
+//                         } else {
+//                             console.error(`Garbage Collector: Failed to delete ${file}:`, rmErr);
+//                         }
+//                     });
+//                 }
+//             });
+//         });
+//     });
+// }, 60 * 60 * 1000); // 1 hour interval
