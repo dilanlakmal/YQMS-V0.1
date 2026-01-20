@@ -343,23 +343,21 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
         <div className="mining-results-page">
             {/* Header */}
             <header className="page-header">
-                <div className="header-content">
+                <div className="header-title-area">
                     <h1>📚 Glossary Mining Results</h1>
-                    <span className="stats">
-                        {terms.length} terms shown, {pagination.total} total
-                    </span>
+                </div>
+                <div className="header-stats">
+                    {terms.length} terms shown • {pagination.total} total
                 </div>
             </header>
 
             {/* Message toast */}
-            {message && (
-                <div className={`message-toast ${message.type}`}>
-                    {message.text}
-                </div>
-            )}
+            <div className={`message-toast ${message ? 'active' : ''} ${message?.type === 'error' ? 'toast-error' : 'toast-success'}`}>
+                {message?.text}
+            </div>
 
             {/* Source Type Tabs */}
-            <div style={{ display: 'flex', gap: '20px', marginBottom: '16px', borderBottom: '1px solid #e5e7eb', paddingBottom: '0px' }}>
+            <nav className="mining-tabs">
                 {[
                     { id: '', label: 'All Results' },
                     { id: 'single', label: 'Single File' },
@@ -368,32 +366,23 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                 ].map(tab => (
                     <button
                         key={tab.id}
+                        className={`mining-tab-btn ${filters.creator === tab.id ? 'active' : ''}`}
                         onClick={() => setFilters({ ...filters, creator: tab.id })}
-                        style={{
-                            padding: '8px 12px',
-                            background: 'none',
-                            border: 'none',
-                            borderBottom: filters.creator === tab.id ? '2px solid #3b82f6' : '2px solid transparent',
-                            color: filters.creator === tab.id ? '#3b82f6' : '#6b7280',
-                            fontWeight: 500,
-                            cursor: 'pointer',
-                            fontSize: '14px'
-                        }}
                     >
                         {tab.label}
                     </button>
                 ))}
-            </div>
+            </nav>
 
             {/* Batch Filter Indicator */}
             {filters.miningBatchId && (
-                <div style={{ backgroundColor: '#eff6ff', padding: '8px 12px', borderRadius: '4px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '1px solid #bfdbfe' }}>
-                    <span style={{ fontSize: '13px', color: '#1e40af', fontWeight: 500 }}>
-                        📍 Showing terms from extraction batch: <strong>{filters.miningBatchId}</strong>
+                <div className="batch-indicator">
+                    <span className="batch-text">
+                        📍 Viewing batch: <strong>{filters.miningBatchId}</strong>
                     </span>
                     <button
+                        className="batch-clear-btn"
                         onClick={() => setFilters({ ...filters, miningBatchId: '' })}
-                        style={{ fontSize: '12px', color: '#1e40af', background: 'none', border: 'none', textDecoration: 'underline', cursor: 'pointer' }}
                     >
                         Show all batches
                     </button>
@@ -404,62 +393,68 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
             <FilterPanel filters={filters} onChange={setFilters} domains={domains} />
 
             {/* Bulk Actions */}
-            <div className="bulk-actions">
-                <label className="checkbox-label">
+            <div className="bulk-actions-bar">
+                <div className="selection-count">
                     <input
+                        className="custom-cb"
                         type="checkbox"
                         checked={selectedIds.size === terms.length && terms.length > 0}
                         onChange={selectAll}
                     />
-                    Select All ({selectedIds.size} selected)
-                </label>
+                    <span>{selectedIds.size} Selected</span>
+                </div>
 
-                <button
-                    className="btn-verify"
-                    onClick={handleBulkVerify}
-                    disabled={selectedIds.size === 0}
-                >
-                    ✓ Bulk Verify ({selectedIds.size})
-                </button>
+                <div className="action-buttons">
+                    <button
+                        className="btn-premium btn-verify-bulk"
+                        onClick={handleBulkVerify}
+                        disabled={selectedIds.size === 0}
+                    >
+                        ✓ Bulk Verify
+                    </button>
 
-                <button
-                    className="btn-verify"
-                    onClick={() => setIsAdding(true)}
-                    style={{ marginLeft: '12px', backgroundColor: '#10b981' }}
-                >
-                    + Add New Term
-                </button>
+                    <button
+                        className="btn-premium btn-add-new"
+                        onClick={() => setIsAdding(true)}
+                    >
+                        + Add New Term
+                    </button>
+                </div>
             </div>
 
             {/* Terms Table */}
             <div className="terms-table-container">
                 {loading ? (
-                    <div className="loading">Loading terms...</div>
+                    <div className="loading-pulse">
+                        <div className="loader-spinner"></div>
+                        <span>Loading refined terms...</span>
+                    </div>
                 ) : terms.length === 0 ? (
                     <div className="empty-state">
-                        No terms found matching your filters.
+                        <span style={{ fontSize: '32px' }}>🔍</span>
+                        <p>No terms found matching your current filters.</p>
                     </div>
                 ) : (
                     <table className="terms-table">
                         <thead>
                             <tr>
-                                <th>☐</th>
+                                <th style={{ width: '40px' }}></th>
                                 <th>Source</th>
                                 <th>Target</th>
                                 <th>Confidence</th>
                                 <th>Domain</th>
                                 <th>Created By</th>
-                                <th>Verified</th>
-                                <th>Actions</th>
+                                <th style={{ textAlign: 'center' }}>Status</th>
+                                <th style={{ textAlign: 'right' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {isAdding && (
-                                <tr style={{ background: 'rgba(16, 185, 129, 0.1)' }}>
+                                <tr className="edit-row">
                                     <td></td>
                                     <td>
                                         <input
-                                            className="edit-input"
+                                            className="edit-input-modern"
                                             placeholder="Source Term"
                                             value={newTerm.source}
                                             onChange={e => setNewTerm({ ...newTerm, source: e.target.value })}
@@ -468,7 +463,7 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                                     </td>
                                     <td>
                                         <input
-                                            className="edit-input"
+                                            className="edit-input-modern"
                                             placeholder="Target Term"
                                             value={newTerm.target}
                                             onChange={e => setNewTerm({ ...newTerm, target: e.target.value })}
@@ -477,18 +472,22 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                                     <td><ConfidenceBadge score={1.0} /></td>
                                     <td>
                                         <select
-                                            className="edit-select"
+                                            className="edit-select-modern"
                                             value={newTerm.domain}
                                             onChange={e => setNewTerm({ ...newTerm, domain: e.target.value })}
                                         >
                                             {domains.map(d => <option key={d} value={d}>{d}</option>)}
                                         </select>
                                     </td>
-                                    <td>Manual</td>
-                                    <td>Verified</td>
-                                    <td className="actions-cell">
-                                        <button className="btn-save" onClick={handleCreate}>💾</button>
-                                        <button className="btn-cancel" onClick={() => setIsAdding(false)}>✕</button>
+                                    <td><span className="creator-info">👤 Manual</span></td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <span className="badge-green confidence-badge">Verified</span>
+                                    </td>
+                                    <td style={{ textAlign: 'right' }}>
+                                        <div className="actions-flex" style={{ justifyContent: 'flex-end' }}>
+                                            <button className="icon-btn btn-save-mode" onClick={handleCreate} title="Save">💾</button>
+                                            <button className="icon-btn" onClick={() => setIsAdding(false)} title="Cancel">✕</button>
+                                        </div>
                                     </td>
                                 </tr>
                             )}
@@ -497,9 +496,10 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                                 const editValues = editingTerms[term._id] || {};
 
                                 return (
-                                    <tr key={term._id} className={term.verificationStatus === 'verified' ? 'verified-row' : ''}>
+                                    <tr key={term._id} className={`${term.verificationStatus === 'verified' ? 'verified-row' : ''} ${isEditing ? 'edit-row' : ''}`}>
                                         <td>
                                             <input
+                                                className="custom-cb"
                                                 type="checkbox"
                                                 checked={selectedIds.has(term._id)}
                                                 onChange={() => toggleSelection(term._id)}
@@ -511,7 +511,7 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                                                     type="text"
                                                     value={editValues.source}
                                                     onChange={(e) => updateEdit(term._id, 'source', e.target.value)}
-                                                    className="edit-input"
+                                                    className="edit-input-modern"
                                                 />
                                             ) : (
                                                 <span className="term-text">{term.source}</span>
@@ -523,7 +523,7 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                                                     type="text"
                                                     value={editValues.target}
                                                     onChange={(e) => updateEdit(term._id, 'target', e.target.value)}
-                                                    className="edit-input"
+                                                    className="edit-input-modern"
                                                 />
                                             ) : (
                                                 <span className="term-text">{term.target}</span>
@@ -537,66 +537,72 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
                                                 <select
                                                     value={editValues.domain}
                                                     onChange={(e) => updateEdit(term._id, 'domain', e.target.value)}
-                                                    className="edit-select"
+                                                    className="edit-select-modern"
                                                 >
                                                     {domains.map(d => (
                                                         <option key={d} value={d}>{d}</option>
                                                     ))}
                                                 </select>
                                             ) : (
-                                                <span className="domain-tag">{term.domain}</span>
+                                                <span className="domain-pill">{term.domain}</span>
                                             )}
                                         </td>
                                         <td>
-                                            <span className="created-by">
+                                            <div className="creator-info">
                                                 {term.createdBy?.agent !== 'None'
                                                     ? `🤖 ${term.createdBy?.agent}`
                                                     : `👤 ${term.createdBy?.reviewerName || 'Manual'}`
                                                 }
-                                            </span>
+                                            </div>
                                         </td>
-                                        <td>
+                                        <td style={{ textAlign: 'center' }}>
                                             <input
                                                 type="checkbox"
                                                 checked={term.verificationStatus === 'verified'}
                                                 onChange={() => handleVerify(term._id, term.verificationStatus)}
-                                                className="verify-checkbox"
+                                                className="custom-cb"
                                             />
                                         </td>
-                                        <td className="actions-cell">
-                                            {isEditing ? (
-                                                <>
-                                                    <button
-                                                        className="btn-save"
-                                                        onClick={() => handleSaveEdit(term._id)}
-                                                    >
-                                                        💾
-                                                    </button>
-                                                    <button
-                                                        className="btn-cancel"
-                                                        onClick={() => cancelEdit(term._id)}
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <button
-                                                        className="btn-edit"
-                                                        onClick={() => startEdit(term)}
-                                                    >
-                                                        ✏️
-                                                    </button>
-                                                    {currentUser.role >= 2 && (
+                                        <td style={{ textAlign: 'right' }}>
+                                            <div className="actions-flex" style={{ justifyContent: 'flex-end' }}>
+                                                {isEditing ? (
+                                                    <>
                                                         <button
-                                                            className="btn-delete"
-                                                            onClick={() => handleDelete(term._id)}
+                                                            className="icon-btn btn-save-mode"
+                                                            onClick={() => handleSaveEdit(term._id)}
+                                                            title="Save"
                                                         >
-                                                            🗑️
+                                                            💾
                                                         </button>
-                                                    )}
-                                                </>
-                                            )}
+                                                        <button
+                                                            className="icon-btn"
+                                                            onClick={() => cancelEdit(term._id)}
+                                                            title="Cancel"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <button
+                                                            className="icon-btn btn-edit-mode"
+                                                            onClick={() => startEdit(term)}
+                                                            title="Edit"
+                                                        >
+                                                            ✏️
+                                                        </button>
+                                                        {currentUser.role >= 2 && (
+                                                            <button
+                                                                className="icon-btn btn-delete-mode"
+                                                                onClick={() => handleDelete(term._id)}
+                                                                title="Delete"
+                                                            >
+                                                                🗑️
+                                                            </button>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 );
@@ -608,15 +614,17 @@ const MiningResultsPage = ({ currentUser = { name: 'Expert', role: 2 }, initialB
 
             {/* Pagination */}
             {pagination.pages > 1 && (
-                <div className="pagination">
+                <div className="pagination-area">
                     <button
+                        className="pg-btn"
                         onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
                         disabled={pagination.page <= 1}
                     >
-                        ← Previous
+                        ← Prev
                     </button>
-                    <span>Page {pagination.page} of {pagination.pages}</span>
+                    <span className="pg-info">Page {pagination.page} of {pagination.pages}</span>
                     <button
+                        className="pg-btn"
                         onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
                         disabled={pagination.page >= pagination.pages}
                     >
