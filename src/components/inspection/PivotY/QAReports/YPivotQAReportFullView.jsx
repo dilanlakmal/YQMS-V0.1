@@ -871,6 +871,7 @@ const YPivotQAReportFullView = () => {
     After: { full: [], selected: [] }
   });
   const [sizeList, setSizeList] = useState([]);
+  const [activeValidColors, setActiveValidColors] = useState([]);
 
   // UI States
   const [previewImage, setPreviewImage] = useState(null);
@@ -1000,6 +1001,8 @@ const YPivotQAReportFullView = () => {
             if (specsRes.data.success) {
               setMeasurementSpecs(specsRes.data.specs); // Save { Before:..., After:... }
               setSizeList(specsRes.data.sizeList || []);
+              // --- ADD THIS LINE to save the filtered colors from backend ---
+              setActiveValidColors(specsRes.data.activeColors || []);
             }
           } catch (err) {
             console.warn("Could not fetch measurement specs", err);
@@ -1171,9 +1174,23 @@ const YPivotQAReportFullView = () => {
     return stages
       .map((stage) => {
         // Filter measurements for this stage
-        const stageMeasurements = savedMeasurements.filter(
-          (m) => m.stage === stage || (!m.stage && stage === "Before")
-        );
+        const stageMeasurements = savedMeasurements.filter((m) => {
+          // 1. Check Stage
+          const isStageMatch =
+            m.stage === stage || (!m.stage && stage === "Before");
+
+          // 2. Check Color (If we have a valid list, ensure this measurement matches)
+          // We use m.colorName as that is what the backend used to generate the list
+          const isColorValid =
+            activeValidColors.length === 0 || // If list is empty, show all (backward compatibility)
+            activeValidColors.includes(m.colorName);
+
+          return isStageMatch && isColorValid;
+        });
+
+        // const stageMeasurements = savedMeasurements.filter(
+        //   (m) => m.stage === stage || (!m.stage && stage === "Before")
+        // );
 
         if (stageMeasurements.length === 0) return null;
 
@@ -2334,6 +2351,15 @@ const YPivotQAReportFullView = () => {
                     value={yorksys.productType}
                     icon={Layers}
                   />
+                  {/* --- Carton Qty--- */}
+                  {config.cartonQty && (
+                    <InfoRow
+                      label="Carton Qty"
+                      value={config.cartonQty}
+                      icon={Truck}
+                    />
+                  )}
+
                   <InfoRow
                     label="Fabric Content"
                     value={yorksys.fabricContent
@@ -2342,6 +2368,15 @@ const YPivotQAReportFullView = () => {
                     icon={Shirt}
                     className="md:col-span-2"
                   />
+                  {/* --- Shipping Stage--- */}
+                  {config.shippingStage && (
+                    <InfoRow
+                      label="Shipping Stage"
+                      value={config.shippingStage}
+                      icon={Truck}
+                    />
+                  )}
+
                   <InfoRow
                     label="SKU Description"
                     value={yorksys.skuDescription}

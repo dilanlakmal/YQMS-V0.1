@@ -433,14 +433,104 @@ export const getDefectImagesForReport = async (req, res) => {
 // Get Measurement Specifications Linked to a Report
 // ============================================================
 
+// export const getReportMeasurementSpecs = async (req, res) => {
+//   try {
+//     const { reportId } = req.params;
+
+//     // 1. Fetch the Report to get Order No
+//     const report = await FincheckInspectionReports.findOne({
+//       reportId: parseInt(reportId)
+//     }).select("orderNos");
+
+//     if (!report) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Report not found" });
+//     }
+
+//     const orderNos = report.orderNos;
+//     if (!orderNos || orderNos.length === 0) {
+//       return res.status(200).json({
+//         success: true,
+//         specs: { Before: null, After: null },
+//         sizeList: [] // Return empty size list
+//       });
+//     }
+
+//     // Use the first order number to find specs
+//     const primaryOrderNo = orderNos[0];
+
+//     // 2. Fetch DtOrder to get SizeList for ordering
+//     const dtOrder = await DtOrder.findOne({
+//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+//     })
+//       .select("SizeList")
+//       .lean();
+
+//     const sizeList = dtOrder?.SizeList || [];
+
+//     // 3. Find the Specs in the Specs Collection
+//     const specsRecord = await QASectionsMeasurementSpecs.findOne({
+//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+//     }).lean();
+
+//     const result = {
+//       Before: { full: [], selected: [] },
+//       After: { full: [], selected: [] }
+//     };
+
+//     if (specsRecord) {
+//       // Process Before
+//       result.Before.full = specsRecord.AllBeforeWashSpecs || [];
+//       result.Before.selected =
+//         specsRecord.selectedBeforeWashSpecs &&
+//         specsRecord.selectedBeforeWashSpecs.length > 0
+//           ? specsRecord.selectedBeforeWashSpecs
+//           : specsRecord.AllBeforeWashSpecs || [];
+
+//       // Process After
+//       result.After.full = specsRecord.AllAfterWashSpecs || [];
+//       result.After.selected =
+//         specsRecord.selectedAfterWashSpecs &&
+//         specsRecord.selectedAfterWashSpecs.length > 0
+//           ? specsRecord.selectedAfterWashSpecs
+//           : specsRecord.AllAfterWashSpecs || [];
+//     } else {
+//       // Fallback: Check DtOrder (Legacy - usually only Before)
+//       const dtOrderFull = await DtOrder.findOne({
+//         Order_No: primaryOrderNo
+//       }).lean();
+
+//       if (dtOrderFull && dtOrderFull.BeforeWashSpecs) {
+//         const legacySpecs = dtOrderFull.BeforeWashSpecs.map((s) => ({
+//           ...s,
+//           id: s._id ? s._id.toString() : s.id
+//         }));
+//         result.Before.full = legacySpecs;
+//         result.Before.selected = legacySpecs;
+//       }
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       specs: result,
+//       sizeList: sizeList // NEW: Include size list in response
+//     });
+//   } catch (error) {
+//     console.error("Error fetching report measurement specs:", error);
+//     return res.status(500).json({ success: false, error: error.message });
+//   }
+// };
+
 export const getReportMeasurementSpecs = async (req, res) => {
   try {
     const { reportId } = req.params;
 
-    // 1. Fetch the Report to get Order No
+    // 1. Fetch the Report
+    // MODIFICATION: Added "measurementData" to .select() to access the colors used in inspection
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
-    }).select("orderNos");
+    }).select("orderNos measurementData");
 
     if (!report) {
       return res
@@ -453,21 +543,51 @@ export const getReportMeasurementSpecs = async (req, res) => {
       return res.status(200).json({
         success: true,
         specs: { Before: null, After: null },
-        sizeList: [] // Return empty size list
+        sizeList: [],
+        activeColors: [] // Return empty colors
       });
     }
+
+    // --- NEW LOGIC START: Extract distinct colors from Report ---
+    // Get all unique colorNames from the measurementData array
+    const distinctReportColors = [
+      ...new Set(
+        report.measurementData
+          .map((m) => m.colorName)
+          .filter((c) => c && typeof c === "string") // Remove null/undefined/empty
+      )
+    ];
+    // --- NEW LOGIC END ---
 
     // Use the first order number to find specs
     const primaryOrderNo = orderNos[0];
 
-    // 2. Fetch DtOrder to get SizeList for ordering
+    // 2. Fetch DtOrder to get SizeList AND OrderColors for validation
+    // MODIFICATION: Added "OrderColors" to .select()
     const dtOrder = await DtOrder.findOne({
       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
     })
-      .select("SizeList")
+      .select("SizeList OrderColors")
       .lean();
 
     const sizeList = dtOrder?.SizeList || [];
+
+    // --- NEW LOGIC START: Filter Colors ---
+    // 1. Extract valid colors from DtOrder
+    const validOrderColors = dtOrder?.OrderColors?.map((oc) => oc.Color) || [];
+
+    // 2. Create a Set for efficient, case-insensitive lookup
+    // (We trim and lowercase to ensure "NAVY" matches "Navy")
+    const validColorSet = new Set(
+      validOrderColors.map((c) => (c ? c.trim().toLowerCase() : ""))
+    );
+
+    // 3. Filter the colors found in the Report
+    // Only keep colors that actually exist in the DtOrder
+    const activeColors = distinctReportColors.filter((reportColor) =>
+      validColorSet.has(reportColor.trim().toLowerCase())
+    );
+    // --- NEW LOGIC END ---
 
     // 3. Find the Specs in the Specs Collection
     const specsRecord = await QASectionsMeasurementSpecs.findOne({
@@ -514,7 +634,8 @@ export const getReportMeasurementSpecs = async (req, res) => {
     return res.status(200).json({
       success: true,
       specs: result,
-      sizeList: sizeList // NEW: Include size list in response
+      sizeList: sizeList,
+      activeColors: activeColors // Return the filtered list of valid colors found in this report
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
