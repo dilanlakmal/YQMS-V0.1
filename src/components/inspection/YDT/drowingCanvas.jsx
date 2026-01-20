@@ -26,9 +26,9 @@ const DrawingCanvas = forwardRef(({
   const [dragMode, setDragMode] = useState(null); 
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [currentPath, setCurrentPath] = useState([]);
-  const [editingText, setEditingText] = useState(null);
-  const [lastClickTime, setLastClickTime] = useState(0);
+  const [editingText, setEditingText] = useState(null); 
 
+  // --- 1. COORDINATE HELPER ---
   const getCanvasCoords = (e) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     const rect = canvasRef.current.getBoundingClientRect();
@@ -38,14 +38,16 @@ const DrawingCanvas = forwardRef(({
     };
   };
 
-  // --- 1. KEYBOARD LISTENERS ---
+  // --- 2. KEYBOARD LISTENERS (DELETE) ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.code === 'Space') setIsSpacePressed(true);
       const isTyping = document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA';
       if ((e.key === 'Delete' || e.key === 'Backspace') && !isTyping && !viewMode) {
-        setDrawnObjects(prev => prev.filter(obj => !selectedObjects.includes(obj.id)));
-        setSelectedObjects([]);
+        if (selectedObjects.length > 0) {
+          setDrawnObjects(prev => prev.filter(obj => !selectedObjects.includes(obj.id)));
+          setSelectedObjects([]);
+        }
       }
     };
     const handleKeyUp = (e) => { if (e.code === 'Space') setIsSpacePressed(false); };
@@ -54,7 +56,7 @@ const DrawingCanvas = forwardRef(({
     return () => { window.removeEventListener('keydown', handleKeyDown); window.removeEventListener('keyup', handleKeyUp); };
   }, [selectedObjects, viewMode, editingText]);
 
-  // --- 2. CENTERING ---
+  // --- 3. AUTO-CENTERING ---
   useEffect(() => {
     if (backgroundImage) {
       const img = new Image();
@@ -63,23 +65,30 @@ const DrawingCanvas = forwardRef(({
         bgImageRef.current = img;
         setTimeout(() => {
           if (!containerRef.current) return;
-          const scale = Math.min(0.8, (containerRef.current.clientWidth * 0.8) / img.width, (containerRef.current.clientHeight * 0.8) / img.height);
+          const contW = containerRef.current.clientWidth;
+          const contH = containerRef.current.clientHeight;
+          const scale = Math.min(0.8, (contW * 0.8) / img.width, (contH * 0.8) / img.height);
           setZoom(scale);
-          setPan({ x: (containerRef.current.clientWidth / scale / 2) - (img.width / 2), y: (containerRef.current.clientHeight / scale / 2) - (img.height / 2) });
+          setPan({ x: (contW / scale / 2) - (img.width / 2), y: (contH / scale / 2) - (img.height / 2) });
+          draw();
         }, 100);
       };
     }
   }, [backgroundImage]);
 
-  // --- 3. TEXT SIZE & BOUNDS ---
+  useEffect(() => {
+    if (initialCanvasData?.length > 0) setDrawnObjects(initialCanvasData);
+  }, [initialCanvasData]);
+
+  // --- 4. HIT DETECTION & BOUNDS ---
   const calculateBounds = (type, data) => {
     const p = 10;
     if (type === 'rectangle') return { x: data.x - p, y: data.y - p, w: data.width + p*2, h: data.height + p*2 };
     if (type === 'circle') return { x: data.x - data.radius - p, y: data.y - data.radius - p, w: data.radius*2 + p*2, h: data.radius*2 + p*2 };
     if (type === 'text') {
-        const width = (data.text.length * (data.fontSize || 20) * 0.6) + 20;
-        const height = (data.fontSize || 20) + 20;
-        return { x: data.x - 5, y: data.y, w: width, h: height };
+        const fs = data.fontSize || 20;
+        const width = (data.text.length * fs * 0.6) + 20;
+        return { x: data.x - 5, y: data.y - 5, w: width, h: fs + 15 };
     }
     if (type === 'line' || type === 'arrow') return { x: Math.min(data.x1, data.x2)-p, y: Math.min(data.y1, data.y2)-p, w: Math.abs(data.x2-data.x1)+p*2, h: Math.abs(data.y2-data.y1)+p*2 };
     if (type === 'path') {
@@ -95,7 +104,7 @@ const DrawingCanvas = forwardRef(({
     return b && p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h;
   };
 
-  // --- 4. RENDER ENGINE ---
+  // --- 5. RENDER ENGINE ---
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -108,6 +117,8 @@ const DrawingCanvas = forwardRef(({
     if (bgImageRef.current) ctx.drawImage(bgImageRef.current, 0, 0);
 
     drawnObjects.forEach(obj => {
+      if (editingText && obj.id === editingText.id) return; // Hide while editing
+
       ctx.strokeStyle = obj.strokeColor;
       ctx.fillStyle = obj.strokeColor;
       ctx.lineWidth = obj.strokeWidth;
@@ -126,7 +137,7 @@ const DrawingCanvas = forwardRef(({
             ctx.stroke();
         }
       }
-      if (obj.type === 'text' && editingText?.id !== obj.id) {
+      if (obj.type === 'text') {
         ctx.font = `bold ${obj.data.fontSize || 20}px Arial`;
         ctx.textBaseline = "top";
         ctx.fillText(obj.data.text, obj.data.x, obj.data.y);
@@ -160,22 +171,49 @@ const DrawingCanvas = forwardRef(({
 
   useEffect(() => { draw(); }, [draw]);
 
-  // --- 5. INTERACTION ---
-  const onMouseDown = (e) => {
+  // --- 6. TEXT EDITING LOGIC ---
+  const handleDoubleClick = (e) => {
     if (viewMode) return;
     const coords = getCanvasCoords(e);
     const hit = drawnObjects.slice().reverse().find(o => isPointInObj(coords, o));
 
-    // Handle Double Click to edit Text
-    const now = Date.now();
-    if (hit && hit.type === 'text' && now - lastClickTime < 300) {
-        setEditingText({ id: hit.id, x: hit.data.x, y: hit.data.y, text: hit.data.text, fontSize: hit.data.fontSize || 20 });
-        setDrawnObjects(prev => prev.filter(o => o.id !== hit.id));
+    if (hit && hit.type === 'text') {
+        setEditingText({ 
+            id: hit.id, 
+            x: hit.data.x, 
+            y: hit.data.y, 
+            text: hit.data.text, 
+            fontSize: hit.data.fontSize || 20 
+        });
+        setSelectedObjects([]);
+    }
+  };
+
+  const finishTextEditing = () => {
+    if (!editingText) return;
+    if (editingText.text.trim() === '') {
+        setDrawnObjects(prev => prev.filter(o => o.id !== editingText.id));
+        setEditingText(null);
         return;
     }
-    setLastClickTime(now);
 
+    const data = { x: editingText.x, y: editingText.y, text: editingText.text, fontSize: editingText.fontSize };
+    const updatedObj = { id: editingText.id, type: 'text', strokeColor, strokeWidth: 1, data, bounds: calculateBounds('text', data) };
+
+    setDrawnObjects(prev => {
+        const filtered = prev.filter(o => o.id !== editingText.id);
+        return [...filtered, updatedObj];
+    });
+    setEditingText(null);
+    setSelectedObjects([updatedObj.id]);
+  };
+
+  // --- 7. MOUSE INTERACTION ---
+  const onMouseDown = (e) => {
+    if (viewMode) return;
     if (editingText) finishTextEditing();
+    const coords = getCanvasCoords(e);
+    const hit = drawnObjects.slice().reverse().find(o => isPointInObj(coords, o));
 
     if (isSpacePressed || tool === 'pan') { setDragMode('pan'); setStartPos({ x: e.clientX, y: e.clientY }); setIsDragging(true); return; }
 
@@ -229,8 +267,8 @@ const DrawingCanvas = forwardRef(({
           if (obj.type === 'text') { newData.fontSize = Math.max(10, (newData.fontSize || 20) + (dx / 5)); }
           if (obj.type === 'path') {
               const centerX = obj.bounds.x; const centerY = obj.bounds.y;
-              const sX = 1 + (dx / obj.bounds.w); const sY = 1 + (dy / obj.bounds.h);
-              newData.points = newData.points.map(p => ({ x: centerX + (p.x - centerX) * sX, y: centerY + (p.y - centerY) * sY }));
+              const scaleX = 1 + (dx / obj.bounds.w); const scaleY = 1 + (dy / obj.bounds.h);
+              newData.points = newData.points.map(p => ({ x: centerX + (p.x - centerX) * scaleX, y: centerY + (p.y - centerY) * scaleY }));
           }
           return { ...obj, data: newData, bounds: calculateBounds(obj.type, newData) };
         }));
@@ -242,24 +280,18 @@ const DrawingCanvas = forwardRef(({
   const onMouseUp = (e) => {
     if (dragMode === 'draw') {
       const coords = getCanvasCoords(e);
+      if (tool === 'text') {
+          setEditingText({ id: Date.now().toString(), x: coords.x, y: coords.y, text: '', fontSize: 20 });
+          setIsDragging(false); setDragMode(null); return;
+      }
       let newObj = { id: Date.now().toString(), strokeColor, strokeWidth, type: tool };
       if (tool === 'rectangle') newObj.data = { x: Math.min(startPos.x, coords.x), y: Math.min(startPos.y, coords.y), width: Math.abs(coords.x - startPos.x), height: Math.abs(coords.y - startPos.y) };
       else if (tool === 'circle') newObj.data = { x: startPos.x, y: startPos.y, radius: Math.sqrt(Math.pow(coords.x - startPos.x, 2) + Math.pow(coords.y - startPos.y, 2)) };
       else if (tool === 'line' || tool === 'arrow') newObj.data = { x1: startPos.x, y1: startPos.y, x2: coords.x, y2: coords.y };
       else if (tool === 'pen') { newObj.data = { points: [...currentPath] }; newObj.type = 'path'; }
-      else if (tool === 'text') { setEditingText({ id: newObj.id, x: startPos.x, y: startPos.y, text: '', fontSize: 20 }); setIsDragging(false); setDragMode(null); return; }
       if (newObj.data) { newObj.bounds = calculateBounds(newObj.type, newObj.data); setDrawnObjects(prev => [...prev, newObj]); }
     }
     setIsDragging(false); setDragMode(null); setCurrentPath([]);
-  };
-
-  const finishTextEditing = () => {
-    if (!editingText || editingText.text.trim() === '') { setEditingText(null); return; }
-    const data = { x: editingText.x, y: editingText.y, text: editingText.text, fontSize: editingText.fontSize };
-    const newObj = { id: editingText.id, type: 'text', strokeColor, strokeWidth: 1, data, bounds: calculateBounds('text', data) };
-    setDrawnObjects(prev => [...prev, newObj]);
-    setEditingText(null);
-    setSelectedObjects([newObj.id]);
   };
 
   useImperativeHandle(ref, () => ({
@@ -269,9 +301,9 @@ const DrawingCanvas = forwardRef(({
   }));
 
   return (
-    <div className="flex flex-col h-[650px] w-full bg-slate-100 rounded-xl overflow-hidden border border-slate-300 shadow-xl">
+    <div className="flex flex-col h-[650px] w-full bg-slate-100 rounded-xl overflow-hidden border border-slate-300">
       {!viewMode && (
-        <div className="flex items-center justify-between px-4 py-2 bg-white border-b z-10">
+        <div className="flex items-center justify-between px-4 py-2 bg-white border-b z-10 shadow-sm">
           <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-lg">
             <ToolBtn active={tool === 'select'} icon={<MousePointer size={18}/>} onClick={() => setTool('select')} />
             <ToolBtn active={tool === 'pan'} icon={<Hand size={18}/>} onClick={() => setTool('pan')} />
@@ -285,29 +317,34 @@ const DrawingCanvas = forwardRef(({
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2 bg-slate-50 px-2 py-1 rounded border border-slate-200">
                 <Hash size={14} className="text-slate-400" />
-                <select value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="text-xs font-bold bg-transparent border-none outline-none cursor-pointer">
-                    {[1, 2, 3, 5, 8, 12].map(s => <option key={s} value={s}>{s}px</option>)}
+                <select value={strokeWidth} onChange={(e) => setStrokeWidth(Number(e.target.value))} className="text-xs font-bold bg-transparent border-none outline-none text-slate-700 cursor-pointer">
+                    {[1, 2, 3, 5, 8, 12, 18].map(s => <option key={s} value={s}>{s}px</option>)}
                 </select>
             </div>
             <input type="color" value={strokeColor} onChange={e => setStrokeColor(e.target.value)} className="w-8 h-8 rounded cursor-pointer border-none shadow-sm" />
-            <button onClick={() => { setDrawnObjects(prev => prev.filter(o => !selectedObjects.includes(o.id))); setSelectedObjects([]); }} className="text-red-500 hover:bg-red-50 p-2 rounded-md"><Trash2 size={18}/></button>
+            <button onClick={() => { setDrawnObjects(prev => prev.filter(o => !selectedObjects.includes(o.id))); setSelectedObjects([]); }} className="flex items-center px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 rounded-md border border-red-100 transition-colors">
+              <Trash2 size={14} className="mr-1.5" /> Delete
+            </button>
           </div>
         </div>
       )}
 
-      <div ref={containerRef} className="relative flex-1 bg-[#cbd5e1] overflow-hidden">
+      <div ref={containerRef} className="relative flex-1 bg-slate-200 overflow-hidden cursor-crosshair">
         <canvas
           ref={canvasRef}
           width={containerRef.current?.clientWidth || 1000}
           height={containerRef.current?.clientHeight || 600}
-          onMouseDown={onMouseDown} onMouseMove={onMouseMove} onMouseUp={onMouseUp}
+          onMouseDown={onMouseDown} 
+          onMouseMove={onMouseMove} 
+          onMouseUp={onMouseUp}
+          onDoubleClick={handleDoubleClick}
           className={`touch-none ${isSpacePressed ? 'cursor-grab' : ''}`}
         />
 
         {editingText && (
           <textarea
             ref={textAreaRef} autoFocus
-            className="absolute bg-white/90 border-2 border-blue-500 outline-none p-1 shadow-2xl rounded text-center overflow-hidden resize-none"
+            className="absolute bg-white border-2 border-blue-500 outline-none p-2 shadow-2xl rounded text-center overflow-hidden resize-none"
             style={{ 
                 left: (editingText.x + pan.x) * zoom, 
                 top: (editingText.y + pan.y) * zoom, 
@@ -316,15 +353,13 @@ const DrawingCanvas = forwardRef(({
                 minWidth: '100px',
                 height: 'auto'
             }}
-            value={editingText.text} onChange={e => setEditingText({ ...editingText, text: e.target.value })} onBlur={finishTextEditing}
+            value={editingText.text} 
+            onChange={e => setEditingText({ ...editingText, text: e.target.value })} 
+            onBlur={finishTextEditing}
           />
         )}
 
-        <div className="absolute bottom-4 left-4 bg-white/80 px-2 py-1 rounded text-[9px] text-slate-600 font-bold uppercase">
-            Double-Click Text to Edit • Drag Handle to Resize Font
-        </div>
-
-        <div className="absolute bottom-4 right-4 flex items-center bg-white shadow-xl border p-1 rounded-lg">
+        <div className="absolute bottom-4 right-4 flex items-center bg-white shadow-xl border p-1 space-x-1 rounded-lg">
             <button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} className="p-1.5 hover:bg-slate-100 rounded"><ZoomOut size={16}/></button>
             <span className="text-[11px] font-bold w-12 text-center text-slate-700">{Math.round(zoom * 100)}%</span>
             <button onClick={() => setZoom(z => Math.min(4, z + 0.1))} className="p-1.5 hover:bg-slate-100 rounded"><ZoomIn size={16}/></button>
