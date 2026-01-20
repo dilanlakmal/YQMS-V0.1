@@ -4,16 +4,21 @@ import {
   DtOrder,
   RoleManagment,
   UserMain,
-  QASectionsProductLocation
+  QASectionsProductLocation,
+  FincheckUserPreferences,
+  FincheckApprovalAssignees,
+  FincheckInspectionDecision
 } from "../../MongoDB/dbConnectionController.js";
 
 import axios from "axios";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 
 // ============================================================
 // Get Filtered Inspection Reports
 // ============================================================
+
 export const getInspectionReports = async (req, res) => {
   try {
     const {
@@ -28,11 +33,13 @@ export const getInspectionReports = async (req, res) => {
       subConFactory,
       custStyle,
       buyer,
-      supplier
+      supplier,
+      page = 1,
+      limit = 20
     } = req.query;
 
+    // --- 1. Build Query ---
     let query = {
-      // Exclude cancelled reports by default if needed, or show all
       status: { $ne: "cancelled" }
     };
 
@@ -59,7 +66,7 @@ export const getInspectionReports = async (req, res) => {
 
     // 4. Order Type Filter
     if (orderType && orderType !== "All") {
-      query.orderType = orderType.toLowerCase(); // Ensure lowercase matching
+      query.orderType = orderType.toLowerCase();
     }
 
     // 5. Order No Filter (Regex Search)
@@ -77,12 +84,12 @@ export const getInspectionReports = async (req, res) => {
       query.empId = { $regex: empId, $options: "i" };
     }
 
-    // 8. Sub-Con Factory Filter (Nested in inspectionDetails)
+    // 8. Sub-Con Factory Filter
     if (subConFactory && subConFactory !== "All") {
       query["inspectionDetails.subConFactory"] = subConFactory;
     }
 
-    // 9. Customer Style Filter (Regex Search, Nested)
+    // 9. Customer Style Filter
     if (custStyle) {
       query["inspectionDetails.custStyle"] = {
         $regex: custStyle,
@@ -90,27 +97,75 @@ export const getInspectionReports = async (req, res) => {
       };
     }
 
-    // 10. Buyer Filter (Root level field)
+    // 10. Buyer Filter
     if (buyer && buyer !== "All") {
       query.buyer = buyer;
     }
 
-    // 11. Supplier Filter (Nested)
+    // 11. Supplier Filter
     if (supplier && supplier !== "All") {
       query["inspectionDetails.supplier"] = supplier;
     }
 
-    // Execute Query
+    // Pagination
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Get total count for pagination
+    const totalCount = await FincheckInspectionReports.countDocuments(query);
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    // --- 2. Fetch Reports ---
+    // Execute Query with Pagination
     const reports = await FincheckInspectionReports.find(query)
-      .sort({ inspectionDate: -1, createdAt: -1 }) // Newest first
-      // This populates the 'productTypeId' field with the full object from 'qa_sections_product_type'
+      .sort({ inspectionDate: -1, createdAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .populate("productTypeId", "imageURL")
       .lean();
 
+    // --- 3. Fetch Decision Status (Manual Join) ---
+
+    // Get list of Report IDs from the current page results
+    const reportIds = reports.map((r) => r.reportId);
+
+    // Find decisions matching these IDs
+    const decisions = await FincheckInspectionDecision.find({
+      reportId: { $in: reportIds }
+    })
+      .select("reportId decisionStatus updatedAt")
+      .lean();
+
+    // Create a Map for fast lookup: { 12345: { status: "Approved", time: ... } }
+    const decisionMap = {};
+    decisions.forEach((d) => {
+      decisionMap[d.reportId] = {
+        status: d.decisionStatus,
+        updatedAt: d.updatedAt
+      };
+    });
+
+    // --- 4. Merge Data ---
+    const mergedReports = reports.map((report) => {
+      const decisionInfo = decisionMap[report.reportId];
+      return {
+        ...report,
+        // Add the decision fields to the report object
+        decisionStatus: decisionInfo ? decisionInfo.status : null,
+        decisionUpdatedAt: decisionInfo ? decisionInfo.updatedAt : null
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      count: reports.length,
-      data: reports
+      count: mergedReports.length,
+      //count: reports.length,
+      totalCount,
+      totalPages,
+      currentPage: pageNum,
+      data: mergedReports
+      //data: reports
     });
   } catch (error) {
     console.error("Error fetching inspection reports:", error);
@@ -119,6 +174,133 @@ export const getInspectionReports = async (req, res) => {
       message: "Server Error",
       error: error.message
     });
+  }
+};
+
+// ============================================================
+// Get All Filter Options (for dropdowns)
+// ============================================================
+export const getFilterOptions = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+
+    let dateQuery = {};
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      dateQuery.inspectionDate = { $gte: start, $lte: end };
+    }
+
+    const baseQuery = { status: { $ne: "cancelled" }, ...dateQuery };
+
+    const [reportTypes, productTypes, buyers, suppliers, factories] =
+      await Promise.all([
+        FincheckInspectionReports.distinct("reportType", baseQuery),
+        FincheckInspectionReports.distinct("productType", baseQuery),
+        FincheckInspectionReports.distinct("buyer", baseQuery),
+        FincheckInspectionReports.distinct(
+          "inspectionDetails.supplier",
+          baseQuery
+        ),
+        FincheckInspectionReports.distinct(
+          "inspectionDetails.subConFactory",
+          baseQuery
+        )
+      ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        reportTypes: reportTypes.filter(Boolean).sort(),
+        productTypes: productTypes.filter(Boolean).sort(),
+        buyers: buyers.filter(Boolean).sort(),
+        suppliers: suppliers.filter(Boolean).sort(),
+        subConFactories: factories.filter(Boolean).sort()
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching filter options:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Autocomplete for Order No
+// ============================================================
+export const autocompleteOrderNo = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    if (!term || term.length < 2) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const results = await FincheckInspectionReports.find({
+      orderNosString: { $regex: term, $options: "i" },
+      status: { $ne: "cancelled" }
+    })
+      .select("orderNosString orderNos")
+      .limit(20)
+      .lean();
+
+    // Extract unique order numbers
+    const orderSet = new Set();
+    results.forEach((r) => {
+      if (r.orderNos && Array.isArray(r.orderNos)) {
+        r.orderNos.forEach((o) => {
+          if (o.toLowerCase().includes(term.toLowerCase())) {
+            orderSet.add(o);
+          }
+        });
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(orderSet).slice(0, 15)
+    });
+  } catch (error) {
+    console.error("Error in order autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Autocomplete for Customer Style
+// ============================================================
+export const autocompleteCustStyle = async (req, res) => {
+  try {
+    const { term } = req.query;
+
+    if (!term || term.length < 2) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    const results = await FincheckInspectionReports.find({
+      "inspectionDetails.custStyle": { $regex: term, $options: "i" },
+      status: { $ne: "cancelled" }
+    })
+      .select("inspectionDetails.custStyle")
+      .limit(30)
+      .lean();
+
+    // Extract unique styles
+    const styleSet = new Set();
+    results.forEach((r) => {
+      if (r.inspectionDetails?.custStyle) {
+        styleSet.add(r.inspectionDetails.custStyle);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: Array.from(styleSet).slice(0, 15)
+    });
+  } catch (error) {
+    console.error("Error in style autocomplete:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };
 
@@ -270,15 +452,24 @@ export const getDefectImagesForReport = async (req, res) => {
 //     if (!orderNos || orderNos.length === 0) {
 //       return res.status(200).json({
 //         success: true,
-//         specs: { Before: null, After: null }
+//         specs: { Before: null, After: null },
+//         sizeList: [] // Return empty size list
 //       });
 //     }
 
 //     // Use the first order number to find specs
 //     const primaryOrderNo = orderNos[0];
 
-//     // 2. Find the Specs in the Specs Collection
-//     // We fetch EVERYTHING (Before and After)
+//     // 2. Fetch DtOrder to get SizeList for ordering
+//     const dtOrder = await DtOrder.findOne({
+//       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
+//     })
+//       .select("SizeList")
+//       .lean();
+
+//     const sizeList = dtOrder?.SizeList || [];
+
+//     // 3. Find the Specs in the Specs Collection
 //     const specsRecord = await QASectionsMeasurementSpecs.findOne({
 //       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
 //     }).lean();
@@ -306,12 +497,12 @@ export const getDefectImagesForReport = async (req, res) => {
 //           : specsRecord.AllAfterWashSpecs || [];
 //     } else {
 //       // Fallback: Check DtOrder (Legacy - usually only Before)
-//       const dtOrder = await DtOrder.findOne({
+//       const dtOrderFull = await DtOrder.findOne({
 //         Order_No: primaryOrderNo
 //       }).lean();
 
-//       if (dtOrder && dtOrder.BeforeWashSpecs) {
-//         const legacySpecs = dtOrder.BeforeWashSpecs.map((s) => ({
+//       if (dtOrderFull && dtOrderFull.BeforeWashSpecs) {
+//         const legacySpecs = dtOrderFull.BeforeWashSpecs.map((s) => ({
 //           ...s,
 //           id: s._id ? s._id.toString() : s.id
 //         }));
@@ -322,7 +513,8 @@ export const getDefectImagesForReport = async (req, res) => {
 
 //     return res.status(200).json({
 //       success: true,
-//       specs: result
+//       specs: result,
+//       sizeList: sizeList // NEW: Include size list in response
 //     });
 //   } catch (error) {
 //     console.error("Error fetching report measurement specs:", error);
@@ -334,10 +526,11 @@ export const getReportMeasurementSpecs = async (req, res) => {
   try {
     const { reportId } = req.params;
 
-    // 1. Fetch the Report to get Order No
+    // 1. Fetch the Report
+    // MODIFICATION: Added "measurementData" to .select() to access the colors used in inspection
     const report = await FincheckInspectionReports.findOne({
       reportId: parseInt(reportId)
-    }).select("orderNos");
+    }).select("orderNos measurementData");
 
     if (!report) {
       return res
@@ -350,21 +543,51 @@ export const getReportMeasurementSpecs = async (req, res) => {
       return res.status(200).json({
         success: true,
         specs: { Before: null, After: null },
-        sizeList: [] // Return empty size list
+        sizeList: [],
+        activeColors: [] // Return empty colors
       });
     }
+
+    // --- NEW LOGIC START: Extract distinct colors from Report ---
+    // Get all unique colorNames from the measurementData array
+    const distinctReportColors = [
+      ...new Set(
+        report.measurementData
+          .map((m) => m.colorName)
+          .filter((c) => c && typeof c === "string") // Remove null/undefined/empty
+      )
+    ];
+    // --- NEW LOGIC END ---
 
     // Use the first order number to find specs
     const primaryOrderNo = orderNos[0];
 
-    // 2. Fetch DtOrder to get SizeList for ordering
+    // 2. Fetch DtOrder to get SizeList AND OrderColors for validation
+    // MODIFICATION: Added "OrderColors" to .select()
     const dtOrder = await DtOrder.findOne({
       Order_No: { $regex: new RegExp(`^${primaryOrderNo}$`, "i") }
     })
-      .select("SizeList")
+      .select("SizeList OrderColors")
       .lean();
 
     const sizeList = dtOrder?.SizeList || [];
+
+    // --- NEW LOGIC START: Filter Colors ---
+    // 1. Extract valid colors from DtOrder
+    const validOrderColors = dtOrder?.OrderColors?.map((oc) => oc.Color) || [];
+
+    // 2. Create a Set for efficient, case-insensitive lookup
+    // (We trim and lowercase to ensure "NAVY" matches "Navy")
+    const validColorSet = new Set(
+      validOrderColors.map((c) => (c ? c.trim().toLowerCase() : ""))
+    );
+
+    // 3. Filter the colors found in the Report
+    // Only keep colors that actually exist in the DtOrder
+    const activeColors = distinctReportColors.filter((reportColor) =>
+      validColorSet.has(reportColor.trim().toLowerCase())
+    );
+    // --- NEW LOGIC END ---
 
     // 3. Find the Specs in the Specs Collection
     const specsRecord = await QASectionsMeasurementSpecs.findOne({
@@ -411,7 +634,8 @@ export const getReportMeasurementSpecs = async (req, res) => {
     return res.status(200).json({
       success: true,
       specs: result,
-      sizeList: sizeList // NEW: Include size list in response
+      sizeList: sizeList,
+      activeColors: activeColors // Return the filtered list of valid colors found in this report
     });
   } catch (error) {
     console.error("Error fetching report measurement specs:", error);
@@ -445,6 +669,73 @@ export const checkUserPermission = async (req, res) => {
   } catch (error) {
     console.error("Permission check error:", error);
     return res.status(500).json({ success: false, isAdmin: false });
+  }
+};
+
+// ============================================================
+// Check Approval Authority (New Endpoint)
+// ============================================================
+
+export const checkApprovalPermission = async (req, res) => {
+  try {
+    // 1. Get empId AND reportId
+    const { empId, reportId } = req.query;
+
+    if (!empId) {
+      return res.status(200).json({ success: true, isApprover: false });
+    }
+
+    // 2. Find the Assignee (The Leader)
+    const assignee = await FincheckApprovalAssignees.findOne({
+      empId: empId
+    }).select("allowedCustomers");
+
+    // If user is not in the approval list at all, return false
+    if (!assignee) {
+      return res.status(200).json({
+        success: true,
+        isApprover: false
+      });
+    }
+
+    // 3. If a specific Report ID is provided, validate the Buyer
+    if (reportId) {
+      const report = await FincheckInspectionReports.findOne({
+        reportId: parseInt(reportId)
+      }).select("buyer");
+
+      if (!report) {
+        // Report doesn't exist? Fail safe.
+        return res
+          .status(404)
+          .json({ success: false, message: "Report not found" });
+      }
+
+      // CHECK: Is the Report's Buyer in the Assignee's allowed list?
+      const isBuyerAllowed = assignee.allowedCustomers.includes(report.buyer);
+
+      if (!isBuyerAllowed) {
+        return res.status(200).json({
+          success: true,
+          isApprover: false, // DENIED due to buyer mismatch
+          message: "User not authorized for this buyer"
+        });
+      }
+    }
+
+    // 4. Success (User is assignee AND (if reportId provided) buyer is allowed)
+    return res.status(200).json({
+      success: true,
+      isApprover: true,
+      allowedCustomers: assignee.allowedCustomers || []
+    });
+  } catch (error) {
+    console.error("Approval permission check error:", error);
+    return res.status(500).json({
+      success: false,
+      isApprover: false,
+      error: error.message
+    });
   }
 };
 
@@ -690,5 +981,570 @@ export const getReportDefectHeatmap = async (req, res) => {
       message: "Server Error",
       error: error.message
     });
+  }
+};
+
+// ============================================================
+// User Preferences: Save Filter & Columns
+// ============================================================
+export const saveUserPreference = async (req, res) => {
+  try {
+    const { empId, type, data } = req.body; // type: 'filter' or 'columns'
+
+    if (!empId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Emp ID required" });
+
+    let userPref = await FincheckUserPreferences.findOne({ empId });
+
+    if (!userPref) {
+      userPref = new FincheckUserPreferences({ empId });
+    }
+
+    if (type === "columns") {
+      // Data should be array of column IDs
+      userPref.favoriteColumns = data;
+    } else if (type === "filter") {
+      const { name, filters } = data;
+
+      // Check validation
+      if (name.length > 25) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Name must be less than 25 chars" });
+      }
+
+      // Check for duplicate filters (comparing object structure)
+      // We convert to string for a quick comparison of values
+      const newFilterStr = JSON.stringify(filters);
+
+      const duplicate = userPref.savedFilters.find(
+        (f) => JSON.stringify(f.filters) === newFilterStr
+      );
+      if (duplicate) {
+        return res.status(400).json({
+          success: false,
+          message: `This exact filter configuration is already saved as "${duplicate.name}". Please select different filters.`
+        });
+      }
+
+      // Check for duplicate name
+      const nameDuplicate = userPref.savedFilters.find(
+        (f) => f.name.toLowerCase() === name.toLowerCase()
+      );
+      if (nameDuplicate) {
+        return res.status(400).json({
+          success: false,
+          message: "A filter with this name already exists."
+        });
+      }
+
+      userPref.savedFilters.push({ name, filters });
+    }
+
+    userPref.updatedAt = new Date();
+    await userPref.save();
+
+    return res.status(200).json({ success: true, data: userPref });
+  } catch (error) {
+    console.error("Error saving preferences:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// User Preferences: Get Preferences
+// ============================================================
+export const getUserPreferences = async (req, res) => {
+  try {
+    const { empId } = req.query;
+    if (!empId)
+      return res
+        .status(400)
+        .json({ success: false, message: "Emp ID required" });
+
+    const userPref = await FincheckUserPreferences.findOne({ empId });
+
+    return res.status(200).json({
+      success: true,
+      data: userPref || { favoriteColumns: [], savedFilters: [] }
+    });
+  } catch (error) {
+    console.error("Error fetching preferences:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// User Preferences: Delete Filter
+// ============================================================
+export const deleteUserFilter = async (req, res) => {
+  try {
+    const { empId, filterId } = req.body;
+
+    await FincheckUserPreferences.updateOne(
+      { empId },
+      { $pull: { savedFilters: { _id: filterId } } }
+    );
+
+    const updated = await FincheckUserPreferences.findOne({ empId });
+    return res.status(200).json({ success: true, data: updated });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Submit Leader Decision (With Audio Support)
+// ============================================================
+
+// Define Storage Path
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Define Decision Audio Storage Path
+const uploadDirDecision = path.join(
+  __dirname,
+  "../../../storage/PivotY/Fincheck/Decision"
+);
+
+// Ensure directory exists
+if (!fs.existsSync(uploadDirDecision)) {
+  fs.mkdirSync(uploadDirDecision, { recursive: true });
+}
+
+// ============================================================
+// Get Existing Decision (To Pre-fill Modal)
+// ============================================================
+
+export const getLeaderDecision = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+    const parsedId = parseInt(reportId);
+
+    // 1. Fetch Decision Data
+    const decision = await FincheckInspectionDecision.findOne({
+      reportId: parsedId
+    });
+
+    // 2. Fetch Report Data (For Resubmission History & Emp Name)
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parsedId
+    }).select("resubmissionHistory empId empName"); // Only select needed fields
+
+    // Prepare response data
+    const responseData = {
+      decision: decision || null,
+      resubmissionHistory: report ? report.resubmissionHistory : [],
+      qaInfo: report ? { empId: report.empId, empName: report.empName } : null
+    };
+
+    return res.status(200).json({
+      success: true,
+      exists: !!decision,
+      data: responseData // Send combined data
+    });
+  } catch (error) {
+    console.error("Error fetching decision:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Submit Leader Decision (With History & Audio)
+// ============================================================
+
+export const submitLeaderDecision = async (req, res) => {
+  try {
+    const {
+      reportId,
+      status,
+      systemComment,
+      additionalComment,
+      leaderId,
+      leaderName
+    } = req.body;
+
+    if (!reportId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Report ID missing." });
+    }
+    const parsedReportId = parseInt(reportId);
+
+    // 1. Check if Report Exists
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parsedReportId
+    });
+    if (!report) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Report not found" });
+    }
+
+    // 2. Check for Existing Decision Document
+    let decisionDoc = await FincheckInspectionDecision.findOne({
+      reportId: parsedReportId
+    });
+
+    // Determine Approval Number (Increment if exists, else 1)
+    const nextApprovalNo = decisionDoc
+      ? decisionDoc.approvalHistory.length + 1
+      : 1;
+
+    // 3. Handle Audio File Upload
+    let audioUrl = "";
+    let hasAudio = false;
+
+    if (req.files && req.files.audioBlob) {
+      const audioFile = req.files.audioBlob;
+      const targetDir = uploadDirDecision;
+
+      // Naming: Decision_ReportID_AppvNo_Timestamp.webm
+      const fileName = `Decision_${parsedReportId}_AppvNo${nextApprovalNo}_${Date.now()}.webm`;
+      const uploadPath = path.join(targetDir, fileName);
+
+      await audioFile.mv(uploadPath);
+      audioUrl = `/storage/PivotY/Fincheck/Decision/${fileName}`;
+      hasAudio = true;
+    }
+
+    // 4. Create History Object
+    const historyEntry = {
+      approvalNo: nextApprovalNo,
+      decisionStatus: status,
+      approvalEmpId: leaderId,
+      approvalEmpName: leaderName,
+      additionalComment: additionalComment || "",
+      hasAudio: hasAudio,
+      audioUrl: audioUrl,
+      approvalDate: new Date()
+    };
+
+    // 5. Update or Create Document
+    if (decisionDoc) {
+      // UPDATE Existing
+      decisionDoc.decisionStatus = status; // Update Top Level
+      decisionDoc.approvalEmpId = leaderId;
+      decisionDoc.approvalEmpName = leaderName;
+      decisionDoc.systemGeneratedComment = systemComment;
+      decisionDoc.approvalHistory.push(historyEntry); // Add to history
+
+      await decisionDoc.save();
+    } else {
+      // CREATE New
+      decisionDoc = new FincheckInspectionDecision({
+        reportId: parsedReportId,
+        reportRef: report._id,
+        approvalEmpId: leaderId,
+        approvalEmpName: leaderName,
+        decisionStatus: status,
+        systemGeneratedComment: systemComment,
+        approvalHistory: [historyEntry] // Initialize history
+      });
+
+      await decisionDoc.save();
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Decision saved successfully",
+      data: decisionDoc
+    });
+  } catch (error) {
+    console.error("Error saving decision:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Get Notifications for QA (User)
+// ============================================================
+export const getQANotifications = async (req, res) => {
+  try {
+    const { empId } = req.query;
+
+    if (!empId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "QA ID is required." });
+    }
+
+    // 1. Find all reports created by this QA (empId)
+    // We only need reportId to join with decisions
+    const userReports = await FincheckInspectionReports.find({
+      empId: empId,
+      status: { $ne: "cancelled" } // Optional: Exclude cancelled
+    }).select("reportId orderNosString inspectionDate");
+
+    const reportIds = userReports.map((r) => r.reportId);
+
+    if (reportIds.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    // 2. Find Decisions for these reports
+    // We want all decisions where status exists (Approved, Rework, Rejected)
+    const decisions = await FincheckInspectionDecision.find({
+      reportId: { $in: reportIds }
+    }).lean();
+
+    // 3. Merge Data & Filter Logic
+    // Logic:
+    // - Show notification if a decision exists.
+    // - If "Rework" or "Rejected", it's an ACTIVE notification until fixed.
+    // - If "Approved", show it but maybe mark as read (frontend logic) or just show recent.
+    // - IMPORTANT: Remove notification if QA resubmitted AFTER the decision.
+
+    const notifications = [];
+
+    for (const decision of decisions) {
+      const report = userReports.find((r) => r.reportId === decision.reportId);
+      if (!report) continue;
+
+      // Get full report details to check resubmission time
+      // Fetching again here to get resubmissionHistory array (optimized query would use aggregation, but this is fine for logic clarity)
+      const fullReport = await FincheckInspectionReports.findOne({
+        reportId: decision.reportId
+      }).select("resubmissionHistory");
+
+      const lastDecisionTime = new Date(decision.updatedAt).getTime();
+      let lastResubmissionTime = 0;
+
+      if (fullReport && fullReport.resubmissionHistory?.length > 0) {
+        const lastResub =
+          fullReport.resubmissionHistory[
+            fullReport.resubmissionHistory.length - 1
+          ];
+        lastResubmissionTime = new Date(lastResub.resubmissionDate).getTime();
+      }
+
+      // HIDE NOTIFICATION IF: User Resubmitted AFTER Leader Decision
+      // This means the ball is in Leader's court again.
+      if (lastResubmissionTime > lastDecisionTime) {
+        continue;
+      }
+
+      notifications.push({
+        _id: decision._id,
+        reportId: decision.reportId,
+        orderNo: report.orderNosString,
+        inspectionDate: report.inspectionDate,
+        status: decision.decisionStatus, // Approved, Rework, Rejected
+        leaderName: decision.approvalEmpName,
+        systemComment: decision.systemGeneratedComment,
+        additionalComment:
+          decision.approvalHistory?.length > 0
+            ? decision.approvalHistory[decision.approvalHistory.length - 1]
+                .additionalComment
+            : decision.additionalComment,
+        audioUrl:
+          decision.approvalHistory?.length > 0
+            ? decision.approvalHistory[decision.approvalHistory.length - 1]
+                .audioUrl
+            : decision.audioUrl,
+        updatedAt: decision.updatedAt
+      });
+    }
+
+    // Sort by newest decision first
+    notifications.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+    return res.status(200).json({
+      success: true,
+      data: notifications
+    });
+  } catch (error) {
+    console.error("Error fetching notifications:", error);
+    return res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+// ============================================================
+// Get Action Required Count for Home Page Badge
+// ============================================================
+export const getActionRequiredCount = async (req, res) => {
+  try {
+    const { empId } = req.query;
+
+    if (!empId) {
+      return res.status(200).json({ success: true, count: 0 });
+    }
+
+    // 1. Find all reports by this QA
+    const userReports = await FincheckInspectionReports.find({
+      empId: empId,
+      status: { $ne: "cancelled" }
+    }).select("reportId resubmissionHistory");
+
+    const reportIds = userReports.map((r) => r.reportId);
+
+    if (reportIds.length === 0) {
+      return res.status(200).json({ success: true, count: 0 });
+    }
+
+    // 2. Find Decisions with Rework or Rejected ONLY
+    const decisions = await FincheckInspectionDecision.find({
+      reportId: { $in: reportIds },
+      decisionStatus: { $in: ["Rework", "Rejected"] } // Only action-required statuses
+    }).lean();
+
+    // 3. Count only those NOT resubmitted after decision
+    let actionCount = 0;
+
+    for (const decision of decisions) {
+      const report = userReports.find((r) => r.reportId === decision.reportId);
+      if (!report) continue;
+
+      const lastDecisionTime = new Date(decision.updatedAt).getTime();
+      let lastResubmissionTime = 0;
+
+      if (report.resubmissionHistory?.length > 0) {
+        const lastResub =
+          report.resubmissionHistory[report.resubmissionHistory.length - 1];
+        lastResubmissionTime = new Date(lastResub.resubmissionDate).getTime();
+      }
+
+      // Only count if NOT resubmitted after decision
+      if (lastResubmissionTime <= lastDecisionTime) {
+        actionCount++;
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: actionCount
+    });
+  } catch (error) {
+    console.error("Error fetching action count:", error);
+    return res.status(200).json({ success: true, count: 0 });
+  }
+};
+
+// ============================================================
+// Get Order Qty Breakdown in Shipping Stage
+// ============================================================
+
+export const getShippingStageBreakdown = async (req, res) => {
+  try {
+    const { reportId } = req.params;
+
+    // 1. Fetch Report to get Order Nos
+    const report = await FincheckInspectionReports.findOne({
+      reportId: parseInt(reportId)
+    }).select("orderNos");
+
+    if (!report || !report.orderNos || report.orderNos.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No orders linked to report"
+      });
+    }
+
+    // 2. Fetch all related DtOrders
+    // We use $in to get all matching orders (e.g., PTCOC335, PTCOC335A)
+    const orders = await DtOrder.find({
+      Order_No: { $in: report.orderNos }
+    })
+      .select("OrderColorShip")
+      .lean();
+
+    if (!orders || orders.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: null,
+        message: "No order details found"
+      });
+    }
+
+    // 3. Aggregate Data
+    // Structure: { "ColorName": { "SeqNo": TotalQty } }
+    const colorMap = {};
+    const allSeqNos = new Set();
+
+    orders.forEach((order) => {
+      if (order.OrderColorShip && Array.isArray(order.OrderColorShip)) {
+        order.OrderColorShip.forEach((colorItem) => {
+          const colorName = colorItem.Color;
+          if (!colorName) return;
+
+          if (!colorMap[colorName]) {
+            colorMap[colorName] = {};
+          }
+
+          if (colorItem.ShipSeqNo && Array.isArray(colorItem.ShipSeqNo)) {
+            colorItem.ShipSeqNo.forEach((shipSeq) => {
+              const seqNo = shipSeq.seqNo;
+              allSeqNos.add(seqNo);
+
+              // Calculate total qty for this sequence (Sum of all sizes)
+              let seqQty = 0;
+              if (shipSeq.sizes && Array.isArray(shipSeq.sizes)) {
+                shipSeq.sizes.forEach((sizeObj) => {
+                  // Iterate values in the object (e.g., {XS: 100})
+                  Object.values(sizeObj).forEach((val) => {
+                    seqQty += Number(val) || 0;
+                  });
+                });
+              }
+
+              // Add to existing count (handling multiple orders with same color/seq)
+              colorMap[colorName][seqNo] =
+                (colorMap[colorName][seqNo] || 0) + seqQty;
+            });
+          }
+        });
+      }
+    });
+
+    // 4. Transform for Frontend
+    const sortedSeqNos = Array.from(allSeqNos).sort((a, b) => a - b);
+
+    // Prepare Rows
+    const rows = Object.keys(colorMap).map((color) => {
+      const seqData = colorMap[color];
+      let rowTotal = 0;
+
+      const rowSeqValues = {};
+      sortedSeqNos.forEach((seq) => {
+        const val = seqData[seq] || 0;
+        rowSeqValues[seq] = val;
+        rowTotal += val;
+      });
+
+      return {
+        color: color,
+        seqValues: rowSeqValues,
+        rowTotal: rowTotal
+      };
+    });
+
+    // Prepare Column Totals
+    const columnTotals = {};
+    let grandTotal = 0;
+
+    sortedSeqNos.forEach((seq) => {
+      let colSum = 0;
+      rows.forEach((row) => {
+        colSum += row.seqValues[seq];
+      });
+      columnTotals[seq] = colSum;
+      grandTotal += colSum;
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        seqColumns: sortedSeqNos,
+        rows: rows.sort((a, b) => a.color.localeCompare(b.color)),
+        columnTotals,
+        grandTotal
+      }
+    });
+  } catch (error) {
+    console.error("Error fetching shipping stage breakdown:", error);
+    return res.status(500).json({ success: false, error: error.message });
   }
 };

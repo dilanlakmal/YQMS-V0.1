@@ -428,7 +428,16 @@ const createFincheckInspectionReportsModel = (connection) => {
     { _id: false }
   );
 
-  // 3. Main Report Schema
+  // --- Resubmission History Sub-Schema ---
+  const ResubmissionHistorySchema = new mongoose.Schema(
+    {
+      resubmissionNo: { type: Number, required: true },
+      resubmissionDate: { type: Date, default: Date.now }
+    },
+    { _id: false }
+  );
+
+  // Main Report Schema
   const FincheckInspectionReportsSchema = new mongoose.Schema(
     {
       inspectionDate: { type: Date, required: true },
@@ -477,6 +486,7 @@ const createFincheckInspectionReportsModel = (connection) => {
         enum: ["draft", "in_progress", "completed", "cancelled"],
         default: "draft"
       },
+      resubmissionHistory: { type: [ResubmissionHistorySchema], default: [] },
       inspectionDetails: InspectionDetailsSchema,
       // --- Header Data Array ---
       headerData: { type: [HeaderDataItemSchema], default: [] },

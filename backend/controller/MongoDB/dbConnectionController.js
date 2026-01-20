@@ -113,10 +113,14 @@ import createQASectionsMeasurementSpecsModel from "../../models/QA/QASectionsMea
 
 import createQASectionsTemplatesModel from "../../models/QA/QASectionsTemplates.js";
 
+import createFincheckUserPreferencesModel from "../../models/QA/FincheckUserPreferences.js";
 import createFincheckInspectionReportsModel from "../../models/QA/FincheckInspectionReports.js";
+import createFincheckApprovalAssigneeModel from "../../models/QA/FincheckApprovalAssignee.js";
+import createFincheckInspectionDecisionModel from "../../models/QA/fincheck_inspection_decision.js";
 
 //P88Data
 import createP88DataSchema from "../../models/P88/p88LegacyData.js";
+import p88failedReportsModel from "../../models/P88/p88failedReports.js";
 
 import normalNotificationSchema from "../../models/NormalNotification.js";
 
@@ -301,7 +305,17 @@ export const QASectionsTemplates =
 export const FincheckInspectionReports =
     createFincheckInspectionReportsModel(ymProdConnection);
 
+export const FincheckUserPreferences =
+    createFincheckUserPreferencesModel(ymProdConnection);
+
+export const FincheckApprovalAssignees =
+    createFincheckApprovalAssigneeModel(ymProdConnection);
+
+export const FincheckInspectionDecision =
+    createFincheckInspectionDecisionModel(ymProdConnection);
+
 export const p88LegacyData = createP88DataSchema(ymProdConnection);
+export const p88FailedReport = p88failedReportsModel(ymProdConnection);
 
 export const NormalNotification = normalNotificationSchema(ymProdConnection);
 

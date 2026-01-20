@@ -18,7 +18,8 @@ import {
   Loader2,
   Plus,
   AlertTriangle,
-  QrCode
+  QrCode,
+  Bell
 } from "lucide-react";
 import React, {
   useMemo,
@@ -39,6 +40,7 @@ import YPivotQAInspectionMeasurementDataSave from "../components/inspection/Pivo
 import YPivotQAInspectionDefectDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionDefectDataSave";
 import YPivotQAInspectionPPSheetDataSave from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPPSheetDataSave";
 import YPivotQAInspectionPreviousReport from "../components/inspection/PivotY/QADataCollection/YPivotQAInspectionPreviousReport";
+import YPivotQAInspectionNotifications from "../components/inspection/PivotY/QAReports/YPivotQAInspectionNotifications";
 
 import axios from "axios";
 import { API_BASE_URL } from "../../config";
@@ -539,6 +541,8 @@ const YPivotQAInspection = () => {
     ppSheetData: false
   });
 
+  const [notificationCount, setNotificationCount] = useState(0);
+
   // Add a ref to track if we're currently loading data from backend
   const isLoadingFromBackendRef = useRef(false);
 
@@ -791,6 +795,27 @@ const YPivotQAInspection = () => {
     sharedOrderState.selectedOrders?.[0],
     sharedOrderState.orderData
   ]);
+
+  // Fetch Notification Count
+  useEffect(() => {
+    if (!user?.emp_id) return;
+    const fetchCount = async () => {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/fincheck-reports/notifications?empId=${user.emp_id}`
+        );
+        if (res.data.success) {
+          setNotificationCount(res.data.data.length);
+        }
+      } catch (e) {
+        /* silent fail */
+      }
+    };
+    fetchCount();
+    // Poll every 60s
+    const interval = setInterval(fetchCount, 60000);
+    return () => clearInterval(interval);
+  }, [user?.emp_id]);
 
   // Handler to update PP Sheet data - MODIFIED to mark dirty
   const handlePPSheetUpdate = useCallback(
@@ -1120,6 +1145,19 @@ const YPivotQAInspection = () => {
     [markSectionClean]
   );
 
+  // Handler for when the full report is submitted/finalized from the Summary tab
+  const handleReportFinalized = useCallback((updatedReportData) => {
+    setSavedReportData((prev) => ({
+      ...prev,
+      status: updatedReportData.status,
+      resubmissionHistory: updatedReportData.resubmissionHistory,
+      updatedAt: updatedReportData.updatedAt
+    }));
+
+    // Optional: If you want to force the UI to lock/unlock based on status immediately
+    // setIsReportSaved(true); // It should already be true, but safe to ensure
+  }, []);
+
   const tabs = useMemo(
     () => [
       {
@@ -1342,6 +1380,7 @@ const YPivotQAInspection = () => {
             hasUnsavedChanges={hasUnsavedChanges}
             markAllSectionsClean={markAllSectionsClean}
             activeGroup={activeGroup}
+            onReportSubmitted={handleReportFinalized}
           />
         ),
         gradient: "from-indigo-500 to-violet-500",
@@ -1355,6 +1394,25 @@ const YPivotQAInspection = () => {
         component: <YPivotQAInspectionPreviousReport user={user} />,
         gradient: "from-slate-700 to-gray-800",
         description: "Search & Download Previous Reports",
+        requiresSave: false
+      },
+      {
+        id: "notifications",
+        label: "Notifications",
+        // Custom Icon with Badge
+        icon: (
+          <div className="relative">
+            <Bell size={18} />
+            {notificationCount > 0 && (
+              <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white border border-white">
+                {notificationCount}
+              </span>
+            )}
+          </div>
+        ),
+        component: <YPivotQAInspectionNotifications user={user} />,
+        gradient: "from-pink-500 to-rose-500", // Distinct color
+        description: "Leader Feedback & Decisions",
         requiresSave: false
       }
     ],

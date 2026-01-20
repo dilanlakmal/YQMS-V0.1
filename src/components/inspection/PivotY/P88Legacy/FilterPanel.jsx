@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 
 const FilterField = ({
   label,
@@ -54,8 +54,8 @@ const FilterField = ({
     w-full px-4 py-3 border rounded-lg text-sm transition-all duration-200
     focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500
     hover:border-gray-400 bg-white dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:border-gray-500
-    ${isFocused ? "border-blue-500 shadow-md" : "border-gray-300"}
-    ${type !== "select" ? "pr-10" : ""}
+    ${isFocused ? 'border-blue-500 shadow-md' : 'border-gray-300'}
+    ${type !== 'select' ? 'pr-10' : ''}
   `;
 
   const handleInputFocus = () => {
@@ -193,7 +193,7 @@ const FilterField = ({
 
             {/* Custom Dropdown with improved styling */}
             {isDropdownOpen && filteredOptions.length > 0 && (
-              <div
+              <div 
                 className="absolute z-[9999] w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl max-h-60 overflow-y-auto"
                 style={{
                   boxShadow:
@@ -207,9 +207,7 @@ const FilterField = ({
                     onMouseDown={(e) => e.preventDefault()} // Prevent input blur
                     onClick={() => handleOptionSelect(option)}
                   >
-                    <span className="text-gray-800 dark:text-gray-200 font-medium">
-                      {option}
-                    </span>
+                    <span className="text-gray-800 dark:text-gray-200 font-medium">{option}</span>
                     {value === option && (
                       <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-full font-semibold">
                         Selected
@@ -220,8 +218,7 @@ const FilterField = ({
 
                 {filteredOptions.length > 10 && (
                   <div className="px-4 py-2 text-xs text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600 font-medium">
-                    Showing 10 of {filteredOptions.length} results. Keep typing
-                    to narrow down...
+                    Showing 10 of {filteredOptions.length} results. Keep typing to narrow down...
                   </div>
                 )}
 
@@ -284,11 +281,11 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
       options: [...(options.inspector || [])].sort()
     },
     {
-      key: "approvalStatus",
-      label: "Status",
-      type: "select",
-      icon: "✅",
-      options: ["Pending Approval", "Accepted", "Reworked"]
+      key: 'approvalStatus',
+      label: 'Status',
+      type: 'select',
+      icon: '✅',
+      options: ['Pending Approval', 'Accepted', 'Reworked'],
     },
     {
       key: "reportType",
@@ -319,10 +316,10 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
       options: [...(options.poNumbers || [])].sort()
     },
     {
-      key: "style",
-      label: "Style",
-      placeholder: "",
-      icon: "👕",
+      key: 'style',
+      label: 'Style',
+      placeholder: '',
+      icon: '👕',
       options: [...(options.style || [])].sort()
     }
   ];
@@ -337,15 +334,12 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
               <span className="text-xl">🔍</span>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
-                Filter Inspections
-              </h3>
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-white">Filter Inspections</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {hasActiveFilters
-                  ? `${activeFilterCount} filter${
-                      activeFilterCount > 1 ? "s" : ""
-                    } applied`
-                  : ""}
+                {hasActiveFilters 
+                  ? `${activeFilterCount} filter${activeFilterCount > 1 ? 's' : ''} applied`
+                  : ''
+                }
               </p>
             </div>
           </div>
@@ -397,9 +391,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
         {hasActiveFilters && (
           <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                Active filters:
-              </span>
+              <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Active filters:</span>
               {Object.entries(filters).map(([key, value]) => {
                 if (!value) return null;
                 const field = filterFields.find((f) => f.key === key);
@@ -413,7 +405,7 @@ const FilterPanel = ({ filters, onFilterChange, options }) => {
                     <span className="max-w-32 truncate">{value}</span>
                     <button
                       type="button"
-                      onClick={() => onFilterChange(key, "")}
+                      onClick={() => onFilterChange(key, '')}
                       className="ml-1 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
                     >
                       <svg

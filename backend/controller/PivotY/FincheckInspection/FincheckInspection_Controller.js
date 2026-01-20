@@ -2489,6 +2489,9 @@ export const submitFullInspectionReport = async (req, res) => {
         .json({ success: false, message: "Report not found." });
     }
 
+    // Capture the status BEFORE applying current changes
+    const wasAlreadyCompleted = report.status === "completed";
+
     // ============================================================
     // HELPER: Determine if section should be processed
     // ============================================================
@@ -2796,7 +2799,7 @@ export const submitFullInspectionReport = async (req, res) => {
         const groupId = manualItem.groupId || 0;
         const processedImages = (manualItem.images || [])
           .map((img, idx) => {
-            // FIX: Removed uploadDirDefectManual argument
+            // Removed uploadDirDefectManual argument
             const processed = processImageObject(
               img,
               `def_man_${reportId}_${groupId}`,
@@ -2852,26 +2855,46 @@ export const submitFullInspectionReport = async (req, res) => {
     // FINALIZATION
     // ============================================================
 
-    // Always mark as completed
-    const wasAlreadyCompleted = report.status === "completed";
+    //const wasAlreadyCompleted = report.status === "completed";
     report.status = "completed";
 
     if (hasChanges) {
+      // HANDLE RESUBMISSION HISTORY <<<
+      if (wasAlreadyCompleted) {
+        // Calculate the next number (Length + 1)
+        const currentCount = report.resubmissionHistory
+          ? report.resubmissionHistory.length
+          : 0;
+        const nextNo = currentCount + 1;
+
+        // Push new entry
+        report.resubmissionHistory.push({
+          resubmissionNo: nextNo,
+          resubmissionDate: new Date()
+        });
+      }
+
       // Save the document with all changes
       await report.save();
 
       return res.status(200).json({
         success: true,
-        message: `Report submitted successfully! Updated: ${updatedSections.join(
-          ", "
-        )}`,
+        message: wasAlreadyCompleted
+          ? `Resubmission #${
+              report.resubmissionHistory.length
+            } Successful! Updated: ${updatedSections.join(", ")}`
+          : `Report submitted successfully! Updated: ${updatedSections.join(
+              ", "
+            )}`,
         hasChanges: true,
+        isResubmission: wasAlreadyCompleted,
         updatedSections: updatedSections,
         skippedSections: skippedSections,
         data: {
           reportId: report.reportId,
           status: report.status,
-          updatedAt: report.updatedAt
+          updatedAt: report.updatedAt,
+          resubmissionHistory: report.resubmissionHistory
         }
       });
     } else {

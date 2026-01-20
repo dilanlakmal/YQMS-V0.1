@@ -207,6 +207,7 @@ PivotY - Fincheck Inspection
 ------------------------------ */
 import FincheckInspection from "./routes/PivotY/FincheckInspection/FincheckInspection_Route.js";
 import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/FincheckInspection_Report_Route.js";
+import FincheckInspection_Approval from "./routes/PivotY/FincheckInspection/FincheckInspection_Approval_Route.js";
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -214,6 +215,7 @@ import FincheckInspection_Report from "./routes/PivotY/FincheckInspection/Finche
 import p88Upload from "./routes/PivotY/P88Data/uploadP88DataRoutes.js";
 import p88Summarydata from "./routes/PivotY/P88Data/summaryP88DataRoutes.js";
 import downloadP88Report from "./routes/PivotY/P88Data/downloadP88ReportRoutes.js";
+import p88failedReports from "./routes/PivotY/P88Data/p88failedReportsRoutes.js";
 
 /* -----------------------------
 QA Random Inspection Imports
@@ -523,6 +525,7 @@ PivotY - Fincheck Inspection routes
 ------------------------------ */
 app.use(FincheckInspection);
 app.use(FincheckInspection_Report);
+app.use(FincheckInspection_Approval);
 
 /* ------------------------------
  P88 Data Upoad Routes
@@ -530,6 +533,7 @@ app.use(FincheckInspection_Report);
 app.use(p88Upload);
 app.use(p88Summarydata);
 app.use(downloadP88Report);
+app.use(p88failedReports);
 
 /* -----------------------------
   QA Random Inspection Routes
